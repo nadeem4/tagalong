@@ -66,7 +66,7 @@ the total can run a little low.
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
 | `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
 | `brain/src/brain/app_tools.py`   | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                             |
-| `brain/src/brain/tools.py`       | The brain's own tools (memory, Home and expert tools) as specs and handlers for `BrainSource`                                                                    |
+| `brain/src/brain/tools.py`       | The brain's own tools (memory, timer, Home and expert tools) as specs and handlers for `BrainSource`                                                             |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
 | `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                                               |
@@ -124,8 +124,8 @@ flowchart TD
   prompt from Scout's soul, that "What you know" block, the local time (with its UTC offset), and the bodies online.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
-  `forget`) and every online body's tools (see Toolbox); a refused or failed call ends as an error
-  result the model reads.
+  `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`) and every online body's
+  tools (see Toolbox); a refused or failed call ends as an error result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
@@ -417,7 +417,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | Kind        | Batch window | Cap per hour | Note                                            |
 | ----------- | ------------ | ------------ | ----------------------------------------------- |
 | `job_ended` | 30 s         | 10           | A job ended; endings within 30 s share one wake |
-| `timer`     | none         | 6            | One of Scout's timers came due                  |
+| `timer`     | 0 s          | 6            | One of Scout's timers came due                  |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key. Held events live in memory only: a
@@ -478,22 +478,24 @@ shows them as Scout does.
 
 Scout can leave itself a message for later. `Timers` (`timers.py`) fires the stored timers as `timer`
 events; the scheduler (see [Jobs and tools](#jobs-and-tools)) decides when Scout hears them. A
-timer wakes with no batching and at most 6 times an hour.
+timer has a 0 s batch window (timer events held together share one wake) and wakes at most 6 times
+an hour.
 
 The `timers` table (in `tagalong.db`): `id`, `note`, `next_at` (UTC ISO text, so text order is time
 order), `repeat_s` (null for a one-off), `created_at` and `fired` (0 or 1). Times are stored in UTC.
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
-| Tool           | Effect | Mode   | Does                                                                                   |
-| -------------- | ------ | ------ | -------------------------------------------------------------------------------------- |
-| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?}`. Returns `timer <id> set for <local time>` |
-| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes}]}`, soonest first               |
-| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                 |
+| Tool           | Effect | Mode   | Does                                                                                                                                                        |
+| -------------- | ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                     |
+| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
+| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                      |
 
 `set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
-one of `in_minutes` (more than 0) or `at` (ISO 8601 with a UTC offset, in the future). A repeat
-(`repeat_minutes`) must be 5 or more. Refusals are plain sentences the model reads, for example
+one of `in_minutes` (a number above 0, at most 525600, one year) or `at` (ISO 8601 with a UTC
+offset, in the future). A repeat (`repeat_minutes`) must be a whole number from 5 to 525600. `cancel_timer`
+needs `id` as a whole number. Refusals are plain sentences the model reads, for example
 `repeat_minutes must be at least 5.`, `at is not in the future.` or, from `cancel_timer`,
 `no timer with id 7.`.
 
@@ -508,6 +510,8 @@ one of `in_minutes` (more than 0) or `at` (ISO 8601 with a UTC offset, in the fu
   what counts as worth saying; on each wake Scout uses the app's tools and may stay silent.
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
+  Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
+  does not recall that event: Scout is still woken with the note of the cancelled timer.
 
 ## Not built yet
 

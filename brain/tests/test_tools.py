@@ -562,6 +562,17 @@ async def test_set_timer_at_with_offset_stores_utc(mem, trun):
         {"note": "n", "in_minutes": 5, "repeat_minutes": 4},
         {"note": "  ", "in_minutes": 5},
         {"note": "x" * 501, "in_minutes": 5},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": 525601},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": 10**18},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": True},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": 5.5},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": "10"},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": float("nan")},
+        {"note": "n", "in_minutes": True},
+        {"note": "n", "in_minutes": float("nan")},
+        {"note": "n", "in_minutes": float("inf")},
+        {"note": "n", "in_minutes": 525601},
+        {"note": "n", "in_minutes": "5"},
     ],
 )
 async def test_set_timer_refuses_bad_input(mem, trun, args):
@@ -569,6 +580,31 @@ async def test_set_timer_refuses_bad_input(mem, trun, args):
         await trun("set_timer", args)
     assert mem.list_timers() == []
     assert trun.fake.changes == 0
+
+
+async def test_set_timer_accepts_integral_float_repeat_and_the_year_limit(mem, trun):
+    out = await trun("set_timer", {"note": "n", "in_minutes": 5, "repeat_minutes": 5.0})
+    assert out.endswith(", repeats every 5 minutes")
+    await trun("set_timer", {"note": "n", "in_minutes": 525600, "repeat_minutes": 525600})
+    assert len(mem.list_timers()) == 2
+
+
+@pytest.mark.parametrize("bad", [True, "1", [1], 1.5, None])
+async def test_cancel_timer_refuses_non_integer_ids(mem, trun, bad):
+    await trun("set_timer", {"note": "n", "in_minutes": 5})
+    with pytest.raises(MemoryRefused, match="whole number"):
+        await trun("cancel_timer", {"id": bad})
+    assert len(mem.list_timers()) == 1
+
+
+async def test_list_timers_marks_fired_one_offs_pending(mem, trun):
+    await trun("set_timer", {"note": "n", "in_minutes": 5})
+    await trun("set_timer", {"note": "r", "in_minutes": 10, "repeat_minutes": 15})
+    first = min(mem.list_timers(), key=lambda t: t.next_at)
+    mem.mark_timer_fired(first.id)
+    rows = {r["note"]: r for r in json.loads(await trun("list_timers", {}))["timers"]}
+    assert rows["n"]["pending"] is True
+    assert rows["r"]["pending"] is False
 
 
 async def test_set_timer_repeat_of_5_is_allowed(mem, trun):
@@ -585,7 +621,7 @@ async def test_list_timers_shows_next_and_repeat(mem, trun):
     assert rows[0]["next_at"] == "2026-10-28T08:10:00+00:00"
     assert rows[0]["repeat_minutes"] == 15
     assert rows[1]["repeat_minutes"] is None
-    assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes"}
+    assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes", "pending"}
 
 
 async def test_cancel_timer_removes_it_and_refuses_unknown_ids(mem, trun):

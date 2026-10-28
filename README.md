@@ -74,7 +74,7 @@ queue and show one at a time; if the brain is offline when you click, the card s
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
 `TAGALONG_WAKES_PER_HOUR` (default 12). Scout can also set its own timers (a reminder, or a
-repeating check, at least every 5 minutes); they survive a brain restart. See
+repeating check, no more often than every 5 minutes); they survive a brain restart. See
 [docs/brain.md](docs/brain.md).
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
