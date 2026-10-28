@@ -231,6 +231,7 @@ its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> ask
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
 Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
+When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-tools)).
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
 
@@ -336,6 +337,19 @@ the adapter's own message (for example that auth is required).
 that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
+**Wake and the finish turn.** `Session.wake(event_text)` is the entry point for events that are not
+the user talking. It queues the event; when no turn runs, it starts one turn per event, in order,
+through the same path as `say` (same budget, step cap and turn notifications). The turn goes to the
+body Scout last talked to if it is online, else any online body; with none online the event waits
+until a body connects. The event is fenced as `<data kind="job">`, so its text is data, not
+instructions.
+
+When a job ends, the session wakes Scout with a note of facts only (id, task, folder, state, reason,
+and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that turn has started (a failed start leaves it unreported). At
+brain start every finished unreported job (including those just stopped) is queued again. Scout's
+prompt says a job note is an event, not a request; the model decides whether to speak, and may say
+nothing.
+
 | Tool          | Audience    | Effect | Gate                      | Does                                                                         |
 | ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |
 | `hand_off`    | scout       | change | asks itself (`self_asks`) | `{task, folder}`. Returns `job <id> started`, or the plain reason it did not |
@@ -366,13 +380,13 @@ shows them as Scout does.
   the next change.
 - **Restart.** Jobs do not resume. A brain restart marks running jobs `stopped`.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
-  running job (rows become `stopped`, adapters end) and ignores a run that fails to stop.
+  running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
+  sends no report: those jobs stay unreported and are told about at the next start.
 
 ## Not built yet
 
 | Row   | Brings                                                                                                                                                           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8a3   | The finish turn: Scout reports a finished job, and unreported jobs requeue                                                                                       |
 | 8b    | Home's Jobs panel; the desktop shows non-confirm asks (options as buttons, input such as the folder, free text), so the hand-off and relayed asks reach the user |
 | Later | Live-state replay of open turns after `resync`                                                                                                                   |
 

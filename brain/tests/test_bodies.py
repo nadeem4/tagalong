@@ -96,6 +96,18 @@ def test_connect_first_time():
     assert bodies.tools("a") == [tool("t")]
 
 
+def test_a_raising_on_connect_does_not_break_connect():
+    bodies = Bodies()
+
+    def boom() -> None:
+        raise RuntimeError("wake failed")
+
+    bodies.on_connect = boom
+    joined = bodies.connect(body("a"), [], FakePeer(), None)
+    assert joined == Joined(0, False, [])
+    assert bodies.online() == [body("a")]
+
+
 def test_notify_reaches_online_and_queues_offline():
     bodies = Bodies()
     a, b = FakePeer(), FakePeer()

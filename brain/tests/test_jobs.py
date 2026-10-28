@@ -13,8 +13,8 @@ import pytest
 
 from brain.asks import Answer
 from brain.experts import ExpertRun
-from brain.jobs import JobError, Jobs
-from brain.memory import Memory
+from brain.jobs import JobError, Jobs, job_note
+from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
@@ -420,6 +420,16 @@ async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
     del rig.runs[0].stop  # back to the real stop so the rig can clean the stuck one up
 
 
+async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
+    # A job stopped by shutdown must not wake a turn the exiting brain would drop.
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job_id = await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.shutdown()
+    assert rig.finished == []
+    assert rig.memory.get_job(job_id).state == "stopped"
+    assert not rig.memory.get_job(job_id).reported
+
+
 async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):
     rig = make_rig(FakeAsks(), max_running=1)  # the mode ask blocks forever
     task = asyncio.create_task(rig.jobs.start("go", str(rig.folder)))
@@ -439,3 +449,46 @@ async def test_startup_stops_leftover_running_rows(make_rig):
     rig.jobs.startup()
     job = rig.memory.get_job("old")
     assert (job.state, job.reason) == ("stopped", "brain restarted")
+
+
+def test_job_note_states_facts_and_trims_a_long_result():
+    job = Job(
+        "j1",
+        "claude_code",
+        "fix it",
+        "C:/x",
+        "default",
+        "done",
+        "end_turn",
+        None,
+        "A" * 5000,
+        "s1",
+        False,
+        "t0",
+        "t1",
+    )
+    note = job_note(job)
+    for fact in ("j1", "fix it", "C:/x", "done", "end_turn"):
+        assert fact in note
+    assert "A" * 4000 in note and "A" * 4001 not in note
+    assert note.endswith("[trimmed]")
+
+
+def test_job_note_without_a_result_or_reason():
+    job = Job(
+        "j2",
+        "claude_code",
+        "t",
+        "C:/x",
+        "default",
+        "stopped",
+        None,
+        None,
+        None,
+        None,
+        False,
+        "t0",
+        "t1",
+    )
+    note = job_note(job)
+    assert "stopped" in note and "[trimmed]" not in note
