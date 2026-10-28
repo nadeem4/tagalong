@@ -284,10 +284,24 @@ async def test_stop_job_stops_and_refusal_is_rpc_error(home):
     assert "not running" in str(err.value)
 
 
-async def test_stop_job_without_job_is_invalid_params(home):
-    with pytest.raises(RpcError) as err:
-        await home.run("stop_job", {})
-    assert err.value.code == ErrorCode.invalid_params
+@pytest.mark.parametrize(
+    "tool, args",
+    [
+        ("stop_job", {}),
+        ("stop_job", {"job": ""}),
+        ("stop_job", {"job": 5}),
+        ("hand_off", {"task": "", "folder": "C:/p"}),
+        ("hand_off", {"task": "t", "folder": "  "}),
+        ("hand_off", {"task": "t", "folder": 7}),
+        ("tell_expert", {"job": "", "note": "n"}),
+        ("tell_expert", {"job": "j1", "note": None}),
+        ("tell_expert", {"job": 1, "note": "n"}),
+    ],
+)
+async def test_expert_tools_refuse_empty_or_non_text_args(home, tool, args):
+    with pytest.raises(MemoryRefused):
+        await home.run(tool, args)
+    assert home.jobs.calls == []
 
 
 async def test_list_and_stop_work_through_the_gate_for_home(home):
@@ -301,13 +315,9 @@ async def test_list_and_stop_work_through_the_gate_for_home(home):
 
 
 async def test_list_permissions_shows_hand_off_as_self_asking(home):
-    row = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}[
-        "hand_off"
-    ]
-    assert row["self_asks"] is True and row["mode"] == "auto"
-    assert "list_jobs" in {
-        t["name"] for t in json.loads(await home.run("list_permissions"))["tools"]
-    }
+    rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert rows["hand_off"]["self_asks"] is True and rows["hand_off"]["mode"] == "auto"
+    assert "list_jobs" in rows
 
 
 def declare(bodies, body_id, *tools):

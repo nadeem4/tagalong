@@ -12,7 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
-- [Hand-offs to Claude Code](#hand-offs-to-claude-code)
+- [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
 - [Greeting](#greeting)
 - [Keeping an eye on things](#keeping-an-eye-on-things)
@@ -381,8 +381,8 @@ their rows return.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
-Needs `npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer), Claude Code
-logged in with your own login, the brain and the desktop running as above, and a small test
+This section covers the Python brain. Needs `npm install -g @agentclientprotocol/claude-agent-acp`
+(Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running as above, and a small test
 folder you do not mind Claude Code editing. The Home Jobs panel arrives in 8b, so for now check
 jobs by asking Scout ("list my jobs", "stop that job").
 
@@ -410,7 +410,10 @@ jobs by asking Scout ("list my jobs", "stop that job").
 8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
    **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes.
 
-## Hand-offs to Claude Code
+## Hand-offs to Claude Code (old engine)
+
+These sections cover the old packages/core engine, which the desktop no longer boots. For the
+Python brain see "Hand off to Claude Code (real brain, real Claude Code)" above.
 
 ### E.1. Scout briefs, you press Send
 

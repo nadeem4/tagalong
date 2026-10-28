@@ -65,6 +65,12 @@ def _need(tool: str, args: dict, *names: str) -> None:
         raise MemoryRefused(f"{tool} needs {' and '.join(names)}.")
 
 
+def _need_text(tool: str, args: dict, *names: str) -> None:
+    """Like _need, but each value must be a non-blank string (ids and paths are text)."""
+    if any(not isinstance(args.get(n), str) or not args[n].strip() for n in names):
+        raise MemoryRefused(f"{tool} needs {' and '.join(names)} as non-empty text.")
+
+
 def brain_tools(
     memory: Memory, notify: Notify = lambda method, params: None
 ) -> list[tuple[ToolSpec, Handler]]:
@@ -184,7 +190,7 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
     raises it as an RpcError so the body shows the same words."""
 
     async def hand_off(args: dict) -> str:
-        _need("hand_off", args, "task", "folder")
+        _need_text("hand_off", args, "task", "folder")
         try:
             job_id = await jobs.start(args["task"], args["folder"])
         except JobError as err:
@@ -192,7 +198,7 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         return f"job {job_id} started"
 
     async def tell_expert(args: dict) -> str:
-        _need("tell_expert", args, "job", "note")
+        _need_text("tell_expert", args, "job", "note")
         try:
             jobs.tell(args["job"], args["note"])
         except JobError as err:
@@ -203,8 +209,7 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         return json.dumps({"jobs": [asdict(j) for j in jobs.list()]})
 
     async def stop_job(args: dict) -> str:
-        if not args.get("job"):
-            raise RpcError(ErrorCode.invalid_params, "stop_job needs job.")
+        _need_text("stop_job", args, "job")
         try:
             await jobs.stop(args["job"])
         except JobError as err:
