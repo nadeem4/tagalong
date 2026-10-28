@@ -22,7 +22,7 @@ const EXPERTS = 'Claude Code · runs on this machine, started by the brain';
 
 /** Where an app runs: its web address, or the command line the brain starts. */
 function describeApp(app: AppInfo): string {
-  return app.url ?? [app.command, ...(app.args ?? [])].join(' ');
+  return app.url || [app.command, ...(app.args ?? [])].join(' ').trim();
 }
 
 export function WhereThingsRun() {
@@ -32,7 +32,7 @@ export function WhereThingsRun() {
 
   const refresh = useCallback(() => {
     void bridge.brainLink?.().then(setLink, () => undefined);
-    // Offline the list call fails; the note below covers it, so keep whatever was shown.
+    // Offline the list call fails; the note below covers it, and apps only render when online.
     void bridge.listConnections?.().then(
       (latest) => setApps(latest.apps),
       () => undefined,
@@ -66,14 +66,12 @@ export function WhereThingsRun() {
           {state.words}
         </span>
       </p>
-      {link.status === 'offline' ? (
-        <p>Connected apps show up when the brain is back.</p>
+      {link.status !== 'online' ? (
+        <p>Connected apps show up when the brain is connected.</p>
       ) : (
         apps.map((app) => (
           <p key={app.id} className="home-card__row">
-            <strong>
-              {app.name} · {describeApp(app)}
-            </strong>
+            <strong>{[app.name, describeApp(app)].filter(Boolean).join(' · ')}</strong>
             <span>
               <span className={STATUS_DOT[app.status]} aria-hidden="true" />
               {STATUS_WORDS[app.status]}

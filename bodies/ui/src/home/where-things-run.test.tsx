@@ -66,8 +66,7 @@ describe('WhereThingsRun', () => {
     renderCard(createFakeHostBridge({ apps: [FILES, WIKI] }));
     const region = await card();
     await screen.findByText(/node files-server\.js/);
-    expect(region).toHaveTextContent('Files');
-    expect(region).toHaveTextContent('Connected');
+    expect(screen.getByText(/Files/).closest('p')).toHaveTextContent('Connected');
     expect(region).toHaveTextContent('Wiki');
     expect(region).toHaveTextContent('https://wiki.example.com/mcp');
     expect(region).toHaveTextContent('Not working');
@@ -111,14 +110,34 @@ describe('WhereThingsRun', () => {
   it('keeps a quiet note instead of apps while the brain is offline', async () => {
     renderCard(createFakeHostBridge({ brainLink: OFFLINE, apps: [FILES] }));
     const region = await card();
-    expect(region).toHaveTextContent(/apps show up when the brain is back/i);
+    expect(region).toHaveTextContent(/apps show up when the brain is connected/i);
     expect(region).not.toHaveTextContent('files-server.js');
   });
 
-  it('shows nothing on a host without a brain link', () => {
+  it('hides the last app list while the brain is only connecting', async () => {
+    const link: BrainLink = { addr: 'ws://127.0.0.1:47321', status: 'connecting' };
+    renderCard(createFakeHostBridge({ brainLink: link, apps: [FILES] }));
+    const region = await card();
+    expect(region).toHaveTextContent(/apps show up when the brain is connected/i);
+    expect(region).not.toHaveTextContent('files-server.js');
+  });
+
+  it('falls back to the command when the url is empty, and shows only the name if both are', async () => {
+    const empty: AppInfo = { ...FILES, id: 'x', name: 'Odd', url: '', command: 'node', args: [] };
+    const bare: AppInfo = { ...FILES, id: 'y', name: 'Bare', url: '', command: '', args: [] };
+    renderCard(createFakeHostBridge({ apps: [empty, bare] }));
+    await card();
+    expect(await screen.findByText(/^Odd · node$/)).toBeInTheDocument();
+    expect(screen.getByText('Bare')).toBeInTheDocument();
+  });
+
+  it('shows nothing on a host without a brain link', async () => {
     const bridge = createFakeHostBridge();
     delete bridge.brainLink;
     renderCard(bridge);
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(screen.queryByRole('region', { name: 'Where things run' })).toBeNull();
   });
 });
