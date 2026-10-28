@@ -1,4 +1,4 @@
-﻿/** Tests for the desktop's body tools: declarations, minimized windows, refusals, notices, timeout. */
+/** Tests for the desktop's body tools: declarations, minimized windows, refusals, notices, timeout. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, Tool } from '@tagalong/contract';
 import type { CaptureExclusions } from '@tagalong/protocol';
