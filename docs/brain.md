@@ -55,7 +55,7 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
-| `brain/src/brain/asks.py`        | `Asks`: opens a permission ask to the bodies, waits for one answer, times out, closes on cancel                                                                  |
+| `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                               |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
@@ -241,6 +241,15 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Reconnect.** Asks live in memory only. A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
+- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=)`
+  is for work with no Scout turn (expert jobs). It sends a plain ask: no `turn`, no `confirm`, any
+  option names (for example `allow-once`, `reject`). It waits until closed; there is no default
+  timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
+  returns `Answer(None, None)` at once and opens nothing. With `free_text=True` an answer whose
+  option is not listed is accepted when it carries non-empty `text` (the user typed their own
+  answer). `cancel_all(ask_ids)` closes the named asks with `reason: "cancelled"` and their waiters
+  get a `cancelled` error. `answer {ask, option, text}` now passes `text` through to the ask; the
+  closed frame is unchanged.
 
 ## Home tools
 

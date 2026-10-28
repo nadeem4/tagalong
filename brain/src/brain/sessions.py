@@ -108,8 +108,8 @@ class Session:
         if turn_id == self._turn_id and self._task is not None:
             self._task.cancel()
 
-    def answer(self, ask_id: str, option: str, body_id: str) -> None:
-        self._asks.answer(ask_id, option, body_id)
+    def answer(self, ask_id: str, option: str, body_id: str, text: str | None = None) -> None:
+        self._asks.answer(ask_id, option, body_id, text)
 
     def open_asks(self) -> list[dict]:
         return self._asks.open_asks()
