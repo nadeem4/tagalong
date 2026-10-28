@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from brain.asks import Answer, Asks
-from brain.experts import ExpertError, ExpertRun, PermissionRequest, Question
+from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.memory import Job, Memory
 from brain.protocol import RpcError
 
@@ -70,12 +70,13 @@ class Jobs:
             on_end=lambda state, reason, result: self._end(job_id, state, reason, result),
         )
         self._starting += 1
+        slot_held = True  # released once the row exists, so a job never counts twice
         handed_off = False
         try:
             try:
                 modes = await run.start(path)
-            except ExpertError as exc:
-                raise JobError(str(exc)) from exc
+            except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
+                raise JobError(str(exc) or type(exc).__name__) from exc
             by_name = {m.name: m.id for m in modes}
             answer = await self._ask_or_none(
                 text=task,
@@ -90,19 +91,27 @@ class Jobs:
             self._memory.add_job(job_id, AGENT, task, str(path), mode_id)
             self._runs[job_id] = run
             handed_off = True
+            self._starting -= 1
+            slot_held = False
             self._changed()
             try:
                 await run.begin(mode_id, task)
-            except ExpertError as exc:
-                self._memory.update_job(job_id, state="error", reason=str(exc), ended_at=_now())
+            except BaseException as exc:
+                # The row exists but nothing runs: end it, free the slot, kill the adapter.
+                message = str(exc) or type(exc).__name__
+                self._memory.update_job(job_id, state="error", reason=message, ended_at=_now())
                 self._runs.pop(job_id, None)
                 self._changed()
-                raise JobError(str(exc)) from exc
+                await run.close()
+                if isinstance(exc, Exception):
+                    raise JobError(message) from exc
+                raise
             self._memory.update_job(job_id, session_id=run.session_id)
             return job_id
         finally:
-            self._starting -= 1
-            if not handed_off or job_id not in self._runs:
+            if slot_held:
+                self._starting -= 1
+            if not handed_off:
                 await run.close()
 
     def tell(self, job_id: str, note: str) -> None:

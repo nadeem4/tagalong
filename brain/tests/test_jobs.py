@@ -197,6 +197,76 @@ async def test_relayed_permission_shows_claude_code_tool_and_the_pick_maps_to_it
     assert rig.changed() >= 3  # started, answered, finished
 
 
+async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_the_slot(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), max_running=1)
+    original = rig.make_run
+
+    def failing(**callbacks):
+        run = original(**callbacks)
+
+        async def boom(mode_id, task):
+            raise ConnectionError("connection lost")
+
+        run.begin = boom
+        return run
+
+    rig.jobs._make_run = failing
+    with pytest.raises(JobError, match="connection lost"):
+        await rig.jobs.start("go", str(rig.folder))
+    (job,) = rig.memory.list_jobs()
+    assert (job.state, job.reason) == ("error", "connection lost") and job.ended_at
+    assert rig.memory.running_jobs() == [] and rig.jobs._runs == {}
+    assert rig.changed() == 2
+    await until(lambda: not alive(rig.runs[0]))
+    rig.jobs._make_run = original
+    await rig.jobs.start("again", str(rig.folder))  # the cap of one is free again
+
+
+async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
+    rig = make_rig(FakeAsks())
+    original = rig.make_run
+
+    def failing(**callbacks):
+        run = original(**callbacks)
+
+        async def refuse(folder):
+            raise RuntimeError("auth required")
+
+        run.start = refuse
+        return run
+
+    rig.jobs._make_run = failing
+    with pytest.raises(JobError, match="auth required") as raised:
+        await rig.jobs.start("go", str(rig.folder))
+    assert isinstance(raised.value.__cause__, RuntimeError)
+    assert rig.memory.list_jobs() == [] and rig.asks.opened == []
+
+
+async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    original = rig.make_run
+    slow = []
+
+    def make(**callbacks):
+        run = original(**callbacks)
+        if not slow:
+            slow.append(run)
+            real = run.begin
+
+            async def slow_begin(mode_id, task):
+                await asyncio.sleep(0.5)
+                await real(mode_id, task)
+
+            run.begin = slow_begin
+        return run
+
+    rig.jobs._make_run = make
+    first = asyncio.create_task(rig.jobs.start("one", str(rig.folder)))
+    await until(lambda: rig.memory.running_jobs())  # row exists, begin still pending
+    second = await rig.jobs.start("two", str(rig.folder))
+    assert second and await first
+
+
 async def test_unanswered_permission_is_cancelled(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
     rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), steps)
@@ -221,7 +291,7 @@ async def test_question_with_a_pick_and_with_typed_text(make_rig):
     assert reply["result"]["content"] == {"question_0": "Red"}
 
 
-async def test_typed_text_wins_over_the_option(make_rig, tmp_path, monkeypatch):
+async def test_typed_text_wins_over_the_option(make_rig):
     steps = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Red", "teal")), steps)
     await rig.jobs.start("go", str(rig.folder))
