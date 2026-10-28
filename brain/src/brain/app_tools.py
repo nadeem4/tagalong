@@ -9,6 +9,7 @@ import json
 import logging
 import re
 from typing import TYPE_CHECKING, Literal
+from urllib.parse import urlsplit, urlunsplit
 
 from mcp.types import (
     CallToolResult,
@@ -147,6 +148,17 @@ def app_home_tools(
             raise refuse(f"There is no app called {app_id}.")
         return app_id
 
+    def target(row) -> dict:
+        """Where the app runs, for Home. Never env, tokens or url secrets (userinfo, query)."""
+        if row.transport == "http":
+            parts = urlsplit(row.config.get("url", ""))
+            host = parts.hostname or ""
+            if ":" in host:
+                host = f"[{host}]"
+            netloc = f"{host}:{parts.port}" if parts.port else host
+            return {"url": urlunsplit((parts.scheme, netloc, parts.path, "", ""))}
+        return {"command": row.config.get("command", ""), "args": row.config.get("args", [])}
+
     async def list_apps(args: dict) -> str:
         rows = []
         for row in memory.list_apps():
@@ -162,6 +174,7 @@ def app_home_tools(
                     "transport": row.transport,
                     "auth": row.auth,
                     "enabled": row.enabled,
+                    **target(row),
                     "status": status.state,
                     "error": status.error,
                     "tools": tools,

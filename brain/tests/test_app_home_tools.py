@@ -80,6 +80,44 @@ async def test_list_apps_empty(rig):
     assert await rig.call("list_apps") == {"apps": []}
 
 
+async def test_list_apps_stdio_shows_command_and_args(rig):
+    await rig.call("add_app", stdio(env={"API_KEY": "topsecret"}))
+    app = (await rig.call("list_apps"))["apps"][0]
+    assert app["command"] == sys.executable
+    assert app["args"] == [FAKE]
+    assert "url" not in app
+
+
+async def test_list_apps_http_shows_url_only(rig):
+    await rig.call(
+        "add_app",
+        {"name": "Wiki", "transport": "http", "url": "https://127.0.0.1:1/mcp", "auth": "none"},
+    )
+    app = (await rig.call("list_apps"))["apps"][0]
+    assert app["url"] == "https://127.0.0.1:1/mcp"
+    assert "command" not in app and "args" not in app
+
+
+async def test_list_apps_never_leaks_secrets(rig):
+    await rig.call("add_app", stdio("Local", env={"API_KEY": "topsecret"}))
+    await rig.call(
+        "add_app",
+        {
+            "name": "Remote",
+            "transport": "http",
+            "url": "https://user:pw123@host.example/x?key=qsecret#frag",
+            "auth": "token",
+            "token": "tok456",
+        },
+    )
+    listed = await rig.call("list_apps")
+    text = json.dumps(listed)
+    for secret in ("topsecret", "tok456", "pw123", "user:", "qsecret", "frag"):
+        assert secret not in text
+    remote = next(a for a in listed["apps"] if a["id"] == "remote")
+    assert remote["url"] == "https://host.example/x"
+
+
 async def test_add_app_connects_and_lists_tools(rig):
     out = await rig.call("add_app", stdio(auth="none"))
     assert out["id"] == "fake"
