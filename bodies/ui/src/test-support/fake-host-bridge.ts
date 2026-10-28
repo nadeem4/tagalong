@@ -31,6 +31,7 @@ import type {
   AskInput,
   ConfirmHandoff,
   HostBridge,
+  JobRow,
   PermissionRow,
   TurnEvent,
 } from '../host-bridge';
@@ -58,6 +59,10 @@ export interface FakeHostBridge extends HostBridge {
   permissions: PermissionRow[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'ask' | 'auto' }[];
+  /** Home's Jobs rows; a test may swap them. */
+  jobs: JobRow[];
+  /** Every stopJob call's job id, in order. */
+  readonly jobStops: readonly string[];
   /** How many times the activity was listed. */
   activityReads: number;
   /** The experience log, newest first, and each episode's events by id. */
@@ -143,6 +148,8 @@ export function createFakeHostBridge(
     memories?: MemoryEntry[];
     /** Home's Permissions rows. */
     permissions?: PermissionRow[];
+    /** Home's Jobs rows. */
+    jobs?: JobRow[];
     /** Whether a calendar link is kept; absent, none is. */
     calendar?: CalendarCheckResult;
     /** Every ask, waiting or answered. */
@@ -177,6 +184,7 @@ export function createFakeHostBridge(
   const calendarLinks: (string | null)[] = [];
   const appliedSettings: SettingsPatch[] = [];
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
+  const jobStops: string[] = [];
   let calendar: CalendarCheckResult = options.calendar ?? { linked: false, meetings: 0 };
   let routineCount = 0;
   const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
@@ -531,6 +539,15 @@ export function createFakeHostBridge(
       fake.permissions = fake.permissions.map((row) =>
         row.name === tool ? { ...row, mode } : row,
       );
+      return Promise.resolve();
+    },
+    jobs: (options.jobs ?? []).map((row) => ({ ...row })),
+    jobStops,
+    listJobs() {
+      return Promise.resolve(fake.jobs.map((row) => ({ ...row })));
+    },
+    stopJob(job) {
+      jobStops.push(job);
       return Promise.resolve();
     },
     copied,

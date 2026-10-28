@@ -54,6 +54,21 @@ export interface PermissionRow {
   online: boolean;
 }
 
+/** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
+export interface JobRow {
+  id: string;
+  agent: string;
+  task: string;
+  folder: string;
+  mode: string;
+  state: string;
+  reason: string | null;
+  progress: string | null;
+  result: string | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
 /**
  * The core-to-host notifications a panel renders: everything about a turn in flight, a
  * watch, a hand-off to an expert as it goes, connector confirms and routines.
@@ -248,6 +263,10 @@ export interface HostBridge {
   listPermissions?(): Promise<PermissionRow[]>;
   /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
   setPermission?(tool: string, mode: 'ask' | 'auto'): Promise<void>;
+  /** Home's Jobs panel: recent Claude Code jobs, newest first. */
+  listJobs?(): Promise<JobRow[]>;
+  /** Stops one running job; rejects when the brain refuses (already ended, say). */
+  stopJob?(job: string): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`): read it again. Returns an
    * unsubscribe function. Optional: a host without a brain never sends it.

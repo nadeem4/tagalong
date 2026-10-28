@@ -73,6 +73,8 @@ export const IPC = {
   deleteMemory: 'tagalong:memory:delete',
   listPermissions: 'tagalong:permissions:list',
   setPermission: 'tagalong:permissions:set',
+  listJobs: 'tagalong:jobs:list',
+  stopJob: 'tagalong:jobs:stop',
   setCalendarLink: 'tagalong:calendar:set-link',
   checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',
