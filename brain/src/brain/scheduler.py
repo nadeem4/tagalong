@@ -18,6 +18,7 @@ from brain.events import EVENT_KINDS, Event, EventKind, load_notes
 from brain.tools import _fence_safe
 
 log = logging.getLogger("brain")
+_WINDOW = 3600  # seconds in the rolling cap window
 
 
 def wake_text(kind: EventKind, events: list[tuple[Event, datetime]], note: str) -> str:
@@ -54,7 +55,7 @@ class Scheduler:
         notes: dict[str, str] | None = None,
     ) -> None:
         self._bodies = bodies
-        self._budget = budget  # used by the caps and budget drop, added on top of this queue
+        self._budget = budget
         self._busy = busy
         self._last_body = last_body
         self._start = start
@@ -65,6 +66,7 @@ class Scheduler:
         self._groups: list[_Group] = []  # oldest first
         self._latest: dict[str, dict[str, Event]] = {}
         self._timer: asyncio.TimerHandle | None = None
+        self._wakes: list[tuple[datetime, str]] = []  # capped wakes in the rolling hour
 
     def emit(self, event: Event, *, on_start: Callable[[], None] | None = None) -> None:
         kind = self._kinds.get(event.kind)
@@ -91,11 +93,15 @@ class Scheduler:
         self.pump()
 
     def pump(self) -> None:
+        if self._groups and not self._budget.allows():
+            self._drop_all()
         if self._groups and not self._busy():
             group = next((g for g in self._groups if self._remaining(g) <= 0), None)
             body_id = self._choose_body() if group is not None else None
             if group is not None and body_id is not None:
                 self._groups.remove(group)
+                if group.kind.max_per_hour is not None:
+                    self._wakes.append((self._now(), group.kind.name))
                 text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))
                 self._start(body_id, [{"type": "text", "text": text}])
                 for on_start in group.on_starts:  # after the start, so a failed start stays untold
@@ -116,7 +122,29 @@ class Scheduler:
 
     def _remaining(self, group: _Group) -> float:
         wait = group.kind.batch_seconds or 0
-        return wait - (self._now() - group.opened).total_seconds()
+        batch = wait - (self._now() - group.opened).total_seconds()
+        return max(batch, self._cap_wait(group.kind))
+
+    def _cap_wait(self, kind: EventKind) -> float:
+        # Seconds until enough recorded wakes age out of the window; 0 when under both caps.
+        if kind.max_per_hour is None:
+            return 0.0
+        now = self._now()
+        self._wakes = [(t, k) for t, k in self._wakes if (now - t).total_seconds() < _WINDOW]
+        waits = [0.0]
+        for times, cap in (
+            ([t for t, k in self._wakes if k == kind.name], kind.max_per_hour),
+            ([t for t, _ in self._wakes], self._wakes_per_hour),
+        ):
+            if len(times) >= cap:
+                oldest_blocking = times[len(times) - cap]
+                waits.append(_WINDOW - (now - oldest_blocking).total_seconds())
+        return max(waits)
+
+    def _drop_all(self) -> None:
+        for group in self._groups:
+            log.warning("budget spent, dropped %d %s event(s)", len(group.events), group.kind.name)
+        self._groups.clear()
 
     def _choose_body(self) -> str | None:
         last = self._last_body()
@@ -126,8 +154,8 @@ class Scheduler:
         return online[0] if online else None  # none: the next connect retries
 
     def _arm_timer(self) -> None:
-        # Only a batch still waiting on time needs a timer; busy and no-body groups are
-        # woken by turn_ended and by a body connecting.
+        # Only a group still waiting on time (batch or cap) needs a timer; busy and no-body
+        # groups are woken by turn_ended and by a body connecting.
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None

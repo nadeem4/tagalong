@@ -132,3 +132,14 @@ def test_split_command_posix_still_honours_quotes():
         "node",
         "/opt/my agent/index.js",
     ]
+
+
+def test_wakes_per_hour_default_and_override():
+    assert load_config({}).wakes_per_hour == 12
+    assert load_config({"TAGALONG_WAKES_PER_HOUR": "4"}).wakes_per_hour == 4
+
+
+@pytest.mark.parametrize("value", ["0", "x"])
+def test_wakes_per_hour_must_be_at_least_one(value):
+    with pytest.raises(ValueError, match="TAGALONG_WAKES_PER_HOUR"):
+        load_config({"TAGALONG_WAKES_PER_HOUR": value})

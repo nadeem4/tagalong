@@ -47,7 +47,9 @@ class FakeBodies(Bodies):
 
 
 class Rig:
-    def __init__(self, online=("desktop",), kinds=KINDS, last="desktop", now=None) -> None:
+    def __init__(
+        self, online=("desktop",), kinds=KINDS, last="desktop", now=None, budget=None, wakes=12
+    ) -> None:
         self.bodies = FakeBodies(list(online))
         self.starts: list[tuple[str, list]] = []
         self.busy = False
@@ -56,13 +58,14 @@ class Rig:
         self.clock = now or (lambda: self.t)
         self.scheduler = Scheduler(
             bodies=self.bodies,
-            budget=Open(),
+            budget=budget or Open(),
             busy=lambda: self.busy,
             last_body=lambda: self.last,
             start=self._start,
             now=self.clock,
             kinds=kinds,
             notes=NOTES,
+            wakes_per_hour=wakes,
         )
 
     def _start(self, body_id: str, content: list) -> str:
@@ -219,3 +222,101 @@ async def test_pump_arms_a_timer_for_the_batch():
     assert rig.scheduler._timer is not None
     await asyncio.sleep(1.1)
     assert len(rig.starts) == 1
+
+
+CAPPED = {
+    "a": EventKind("a", batch_seconds=0, max_per_hour=2),
+    "b": EventKind("b", batch_seconds=0, max_per_hour=5),
+    "free": EventKind("free", batch_seconds=0, max_per_hour=None),
+}
+CAPPED_NOTES = {k: f"note for {k}" for k in CAPPED}
+
+
+def capped_rig(**kw) -> Rig:
+    rig = Rig(kinds=CAPPED, **kw)
+    rig.scheduler._notes = CAPPED_NOTES
+    return rig
+
+
+def test_per_kind_cap_holds_the_next_wake_until_the_window_frees():
+    rig = capped_rig()
+    for seconds in (0, 60, 120):
+        rig.t = T0 + timedelta(seconds=seconds)
+        rig.scheduler.emit(ev("a", n=str(seconds)))
+    assert len(rig.starts) == 2
+    assert rig.scheduler.next_due() == 3600 - 120
+    rig.t = T0 + timedelta(seconds=3599)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 2
+    rig.t = T0 + timedelta(seconds=3600)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 3
+
+
+def test_held_events_merge_into_one_wake_when_the_cap_frees():
+    kinds = {"a": EventKind("a", batch_seconds=30, max_per_hour=1)}
+    rig = Rig(kinds=kinds)
+    rig.scheduler._notes = {"a": "n"}
+    rig.scheduler.emit(ev("a", n="1"))
+    rig.t = T0 + timedelta(seconds=30)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 1
+    for i, n in ((100, "3"), (200, "4")):
+        rig.t = T0 + timedelta(seconds=i)
+        rig.scheduler.emit(ev("a", n=n))
+    rig.t = T0 + timedelta(seconds=3700)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 2
+    assert "n: 3" in rig.text(1) and "n: 4" in rig.text(1)
+
+
+def test_global_cap_counts_every_capped_kind():
+    rig = capped_rig(wakes=3)
+    for kind in ("a", "b", "a"):
+        rig.scheduler.emit(ev(kind))
+    assert len(rig.starts) == 3
+    rig.scheduler.emit(ev("b"))
+    assert len(rig.starts) == 3
+    assert rig.scheduler.next_due() == 3600
+
+
+def test_exempt_kind_ignores_both_caps_and_is_not_counted():
+    rig = capped_rig(wakes=1)
+    rig.scheduler.emit(ev("a"))
+    rig.scheduler.emit(ev("free"))
+    assert len(rig.starts) == 2
+    rig.scheduler.emit(ev("free"))
+    assert len(rig.starts) == 3
+    rig.scheduler.emit(ev("b"))  # global cap of 1 is used by "a" alone
+    assert len(rig.starts) == 3
+
+
+def test_budget_spent_drops_waking_events_and_skips_on_start(caplog):
+    rig = Rig(budget=Spent())
+    told = []
+    with caplog.at_level(logging.WARNING, logger="brain"):
+        rig.scheduler.emit(ev("ping"), on_start=lambda: told.append(1))
+    assert rig.starts == []
+    assert told == []
+    assert "ping" in caplog.text
+    assert rig.scheduler.next_due() is None
+
+
+def test_context_only_events_survive_a_spent_budget():
+    rig = Rig(budget=Spent())
+    rig.scheduler.emit(ev("focus", title="x"))
+    assert rig.scheduler.latest("focus")[""].facts["title"] == "x"
+
+
+async def test_cap_held_group_arms_a_timer_for_the_cap_wait(monkeypatch):
+    rig = capped_rig()
+    for seconds in (0, 60, 120):
+        rig.t = T0 + timedelta(seconds=seconds)
+        rig.scheduler.emit(ev("a"))
+    delays = []
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(
+        loop, "call_later", lambda d, cb: delays.append(d) or loop.call_soon(lambda: None)
+    )
+    rig.scheduler.pump()
+    assert delays == [3600 - 120]
