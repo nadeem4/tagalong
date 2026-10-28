@@ -27,7 +27,10 @@ class EventKind:
     max_per_hour: int | None = None
 
 
-_KINDS = (EventKind("job_ended", batch_seconds=30, max_per_hour=10),)
+_KINDS = (
+    EventKind("timer", batch_seconds=0, max_per_hour=6),
+    EventKind("job_ended", batch_seconds=30, max_per_hour=10),
+)
 EVENT_KINDS: dict[str, EventKind] = {k.name: k for k in _KINDS}
 
 

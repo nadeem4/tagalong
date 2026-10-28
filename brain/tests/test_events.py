@@ -59,3 +59,8 @@ def test_multiline_fact_is_indented():
     ev = Event("job_ended", {"report": "line one\nline two"})
     text = wake_text(KIND, [(ev, AT)], "n")
     assert "  report: line one\n    line two" in text
+
+
+def test_timer_defaults():
+    kind = EVENT_KINDS["timer"]
+    assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 6

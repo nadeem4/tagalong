@@ -659,3 +659,29 @@ async def test_restart_queues_only_finished_unreported_jobs():
     assert "Job fresh ended" in told[0] and "Job alive ended" in told[0]
     assert "Job old ended" not in told[0]
     assert not memory.unreported_jobs()
+
+
+async def test_a_due_timer_wakes_scout_with_its_note():
+    tz = datetime.timezone(datetime.timedelta(hours=1))
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
+    memory = Memory(":memory:")
+    memory.add_timer("look at the deploy", now - datetime.timedelta(minutes=1))
+    kinds = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Event: timer" in text
+    assert "look at the deploy" in text
+
+
+async def test_set_timer_tool_is_offered_to_the_model():
+    model = Gate(["ok"])
+    session, _ = make(model)
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await finish(session)
+    names = {t["name"] for t in model.tools[-1]}
+    assert {"set_timer", "list_timers", "cancel_timer"} <= names

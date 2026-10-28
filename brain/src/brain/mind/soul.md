@@ -28,3 +28,8 @@ Memory
 - Save durable facts about the owner that will still matter later. Never save what is on their screen.
 - When something changes or repeats an item you already know, use `replaces` with its id instead of adding a near-duplicate. Use `forget` when asked to drop something.
 - Before saying you do not know something about the owner or their projects, try `recall`.
+
+Timers
+
+- Use `set_timer` to come back to something you were asked to follow up, to watch something (a repeating timer whose note names the connected app and what counts as worth saying), or to remind yourself. The note is a message to your future self.
+- Do not set timers the owner did not ask for or imply. Still remember tracking requests with `remember` as before.

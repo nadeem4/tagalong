@@ -112,6 +112,18 @@ MIGRATIONS = (
         enabled INTEGER NOT NULL DEFAULT 1
     );
     """,
+    # Scout's timers. next_at is UTC ISO text so text order equals time order; fired marks
+    # one-offs that already woke Scout (kept, so a restart never replays them).
+    """
+    CREATE TABLE timers(
+        id INTEGER PRIMARY KEY,
+        note TEXT NOT NULL,
+        next_at TEXT NOT NULL,
+        repeat_s INTEGER,
+        created_at TEXT NOT NULL,
+        fired INTEGER NOT NULL DEFAULT 0
+    );
+    """,
 )
 
 
@@ -147,6 +159,16 @@ class Job:
 
 
 @dataclass(frozen=True)
+class Timer:
+    id: int
+    note: str
+    next_at: datetime
+    repeat_s: int | None
+    created_at: str
+    fired: bool
+
+
+@dataclass(frozen=True)
 class Hit:
     ref: str
     kind: str
@@ -162,6 +184,11 @@ _JOB_COLUMNS = (
 _JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
 JOB_RESULT_CAP = 20_000
 JOB_PROGRESS_CAP = 2_000
+
+
+def _utc_text(at: datetime) -> str:
+    """Whole seconds in UTC, so stored text sorts the same as the instants it names."""
+    return at.astimezone(UTC).isoformat(timespec="seconds")
 
 
 def _probe_fts5(db: sqlite3.Connection) -> None:
@@ -331,6 +358,44 @@ class Memory:
 
     def mark_reported(self, id: str) -> None:
         self._db.execute("UPDATE jobs SET reported=1 WHERE id=?", (id,))
+
+    def _timers(self, where: str = "", args: tuple = ()) -> list[Timer]:
+        rows = self._db.execute(
+            "SELECT id, note, next_at, repeat_s, created_at, fired FROM timers"
+            f" {where} ORDER BY next_at, id",
+            args,
+        ).fetchall()
+        return [Timer(i, n, datetime.fromisoformat(a), r, c, bool(f)) for i, n, a, r, c, f in rows]
+
+    def add_timer(self, note: str, next_at: datetime, repeat_s: int | None = None) -> Timer:
+        cur = self._db.execute(
+            "INSERT INTO timers(note, next_at, repeat_s, created_at) VALUES (?,?,?,?)",
+            (note, _utc_text(next_at), repeat_s, self._now().isoformat()),
+        )
+        return self._timers("WHERE id=?", (cur.lastrowid,))[0]
+
+    def list_timers(self) -> list[Timer]:
+        """Soonest first."""
+        return self._timers()
+
+    def get_timer(self, id: int) -> Timer | None:
+        rows = self._timers("WHERE id=?", (id,))
+        return rows[0] if rows else None
+
+    def delete_timer(self, id: int) -> bool:
+        return self._db.execute("DELETE FROM timers WHERE id=?", (id,)).rowcount > 0
+
+    def set_timer_next(self, id: int, next_at: datetime) -> None:
+        self._db.execute("UPDATE timers SET next_at=? WHERE id=?", (_utc_text(next_at), id))
+
+    def due_timers(self, now: datetime) -> list[Timer]:
+        return self._timers("WHERE fired=0 AND next_at<=?", (_utc_text(now),))
+
+    def mark_timer_fired(self, id: int) -> None:
+        self._db.execute("UPDATE timers SET fired=1 WHERE id=?", (id,))
+
+    def fired_timers(self) -> list[Timer]:
+        return self._timers("WHERE fired=1")
 
     def _item(self, item_id: int) -> Item | None:
         row = self._db.execute(f"SELECT {_COLUMNS} FROM memories WHERE id=?", (item_id,)).fetchone()

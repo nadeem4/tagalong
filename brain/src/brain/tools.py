@@ -7,18 +7,24 @@ reads. Handlers that change what Home shows send `changed` through the notify th
 """
 
 import json
+import math
 import re
 from collections.abc import Callable
 from dataclasses import asdict
+from datetime import UTC, datetime, timedelta
 
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
+from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import Handler, Toolbox, ToolSpec
 
 Notify = Callable[[str, dict], None]
 LIST_MEMORIES_MAX = 200
+TIMER_NOTE_MAX = 500
+# One year; keeps now + timedelta far from datetime overflow.
+TIMER_MAX_MINUTES = 525600
 
 RECALL_MAX_CHARS = 4000
 LIST_TEXT_CAP = 1000  # per job row in list_jobs, for result and for progress
@@ -182,6 +188,132 @@ def brain_tools(
                 effect="read",
             ),
             list_memories,
+        ),
+    ]
+
+
+def timer_tools(
+    memory: Memory, timers: Timers, now: Callable[[], datetime]
+) -> list[tuple[ToolSpec, Handler]]:
+    """Scout's timers. Times are stored in UTC; answers echo the owner's offset."""
+
+    def aware_now() -> datetime:
+        # A naive clock would be read as local time by Memory; make that explicit.
+        current = now()
+        return current if current.tzinfo else current.astimezone()
+
+    async def set_timer(args: dict) -> str:
+        note = args.get("note")
+        if not isinstance(note, str) or not note.strip() or len(note) > TIMER_NOTE_MAX:
+            raise MemoryRefused(f"set_timer needs a note of 1 to {TIMER_NOTE_MAX} characters.")
+        minutes, at = args.get("in_minutes"), args.get("at")
+        if (minutes is None) == (at is None):
+            raise MemoryRefused("set_timer needs exactly one of in_minutes and at.")
+        current = aware_now()
+        if minutes is not None:
+            if isinstance(minutes, bool) or not isinstance(minutes, int | float):
+                raise MemoryRefused("in_minutes must be a number.")
+            if not math.isfinite(minutes) or minutes <= 0:
+                raise MemoryRefused("in_minutes must be greater than 0.")
+            if minutes > TIMER_MAX_MINUTES:
+                raise MemoryRefused(f"in_minutes must be at most {TIMER_MAX_MINUTES} (a year).")
+            when = current + timedelta(minutes=minutes)
+        else:
+            try:
+                when = datetime.fromisoformat(at)
+            except (TypeError, ValueError):
+                raise MemoryRefused("at must be an ISO 8601 time with a UTC offset.") from None
+            if when.tzinfo is None:
+                raise MemoryRefused("at needs a UTC offset, e.g. 2026-10-28T15:00:00+01:00.")
+            if when <= current:
+                raise MemoryRefused("at is not in the future.")
+        repeat = args.get("repeat_minutes")
+        if isinstance(repeat, float) and repeat.is_integer():
+            repeat = int(repeat)
+        if repeat is not None:
+            if isinstance(repeat, bool) or not isinstance(repeat, int):
+                raise MemoryRefused("repeat_minutes must be a whole number.")
+            if repeat * 60 < MIN_REPEAT_S:
+                raise MemoryRefused(f"repeat_minutes must be at least {MIN_REPEAT_S // 60}.")
+            if repeat > TIMER_MAX_MINUTES:
+                raise MemoryRefused(f"repeat_minutes must be at most {TIMER_MAX_MINUTES} (a year).")
+        timer = memory.add_timer(note, when, repeat * 60 if repeat else None)
+        timers.changed()
+        local = timer.next_at.astimezone(current.tzinfo)
+        out = f"timer {timer.id} set for {local.isoformat(timespec='seconds')}"
+        return out + (f", repeats every {repeat} minutes" if repeat else "")
+
+    async def list_timers(args: dict) -> str:
+        rows = [
+            {
+                "id": t.id,
+                "note": t.note,
+                "next_at": t.next_at.astimezone(UTC).isoformat(timespec="seconds"),
+                "repeat_minutes": t.repeat_s // 60 if t.repeat_s else None,
+                # Fired but Scout has not heard it yet.
+                "pending": bool(t.fired),
+            }
+            for t in memory.list_timers()
+        ]
+        return json.dumps({"timers": rows})
+
+    async def cancel_timer(args: dict) -> str:
+        tid = args.get("id")
+        if isinstance(tid, bool) or not isinstance(tid, int):
+            raise MemoryRefused("cancel_timer needs id as a whole number.")
+        if not memory.delete_timer(args["id"]):
+            raise MemoryRefused(f"no timer with id {args['id']}.")
+        timers.changed()
+        return f"timer {args['id']} cancelled"
+
+    scout = frozenset({"scout"})
+    return [
+        (
+            ToolSpec(
+                "set_timer",
+                "Set a timer that wakes you later with your note. The note is a message to your "
+                "future self. Give exactly one of in_minutes or at (ISO 8601 with a UTC offset, "
+                "e.g. 2026-10-28T15:00:00+01:00). repeat_minutes (at least 5) makes it repeat.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "note": {"type": "string", "description": "At most 500 characters."},
+                        "in_minutes": {"type": "number", "description": "Minutes from now."},
+                        "at": {"type": "string", "description": "ISO 8601 time with offset."},
+                        "repeat_minutes": {"type": "integer", "description": "At least 5."},
+                    },
+                    "required": ["note"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            set_timer,
+        ),
+        (
+            ToolSpec(
+                "list_timers",
+                "Your timers, soonest first, with next time in UTC.",
+                {"type": "object", "properties": {}},
+                scout,
+                effect="read",
+            ),
+            list_timers,
+        ),
+        (
+            ToolSpec(
+                "cancel_timer",
+                "Cancel one timer by id.",
+                {
+                    "type": "object",
+                    "properties": {"id": {"type": "integer"}},
+                    "required": ["id"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            cancel_timer,
         ),
     ]
 

@@ -13,6 +13,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
+- [Scout's timers (real brain)](#scouts-timers-real-brain)
 - [Connected apps on the Python brain (real brain, a real stdio app)](#connected-apps-on-the-python-brain-real-brain-a-real-stdio-app)
 - [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
@@ -453,6 +454,26 @@ so allow about that long before expecting a report.
 4. **Action:** start a long job, stop the brain while it runs, then start the brain again.
    **Expected:** the job shows as stopped with reason "brain restarted". Scout reports it once after
    the restart (once the desktop is connected), and not again on the next restart.
+
+## Scout's timers (real brain)
+
+Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so
+expect a word right when one is due.
+
+1. **Action:** ask Scout "remind me to stretch in 2 minutes".
+   **Expected:** Scout confirms. About 2 minutes later Scout speaks once about stretching, without
+   being asked, and does not repeat it.
+2. **Action:** ask Scout "check in with me every 5 minutes about water", then ask "what timers do you
+   have?", then "cancel that".
+   **Expected:** Scout lists the repeating timer with its id and 5-minute repeat; after the cancel
+   it says the timer is gone and a later "what timers do you have?" lists none.
+3. **Action:** ask Scout "remind me in 3 minutes to call back", then stop the brain at once and
+   start it again after the 3 minutes have passed.
+   **Expected:** once the desktop reconnects Scout speaks about the reminder exactly once, and not
+   again on a later restart.
+4. **Action:** ask Scout to repeat something every 1 minute.
+   **Expected:** Scout says in plain words that a repeat must be at least 5 minutes, and sets no
+   such timer.
 
 ## Connected apps on the Python brain (real brain, a real stdio app)
 
