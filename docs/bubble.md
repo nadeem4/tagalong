@@ -377,22 +377,23 @@ slot.
 `listModels(providerId)`, `savePet(pet)` and an optional `status()` (the overview's line: "Ready"
 only when Scout can think and see, from `overviewStatus(scoutBrain(...), paused)`).
 
-The nav lists twelve pages (`HomePage`), the companion's name filling in where it appears:
+The nav lists thirteen pages (`HomePage`), the companion's name filling in where it appears:
 
-| Page (`HomePage`)               | Component                  | Reads and writes                                                                                     |
-| ------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Overview (`overview`)           | `Overview`                 | `host.status()`, `listExperts`, `listActivity({ limit: 3 })`; the Spend card (`usageSummary`)        |
-| Waiting on you (`waiting`)      | `WaitingView`              | `listAsks`, `answerAsk`, `openAsk`; re-reads on `asks.changed`                                       |
-| Scout (`scout`)                 | `ScoutPanel`               | provider and model, `host.listModels`, `host.savePet`                                                |
-| Experts (`experts`)             | `ExpertsPanel`             | `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`          |
-| Routines (`routines`)           | `RoutinesPanel`            | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, the calendar link |
-| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`  |
-| Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                 |
-| How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                 |
-| What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                  |
-| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                               |
-| What Scout learned (`learned`)  | `LearnedView`              | `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`                           |
-| Settings (`settings`)           | the host's `settings` slot | the host's settings form                                                                             |
+| Page (`HomePage`)               | Component                  | Reads and writes                                                                                                    |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Overview (`overview`)           | `Overview`                 | `host.status()`, `listExperts`, `listActivity({ limit: 3 })`; the Spend card (`usageSummary`)                       |
+| Waiting on you (`waiting`)      | `WaitingView`              | `listAsks`, `answerAsk`, `openAsk`; re-reads on `asks.changed`                                                      |
+| Scout (`scout`)                 | `ScoutPanel`               | provider and model, `host.listModels`, `host.savePet`                                                               |
+| Experts (`experts`)             | `ExpertsPanel`             | `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`                         |
+| Routines (`routines`)           | `RoutinesPanel`            | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, the calendar link                |
+| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`                 |
+| Approvals (`approvals`)         | `ApprovalsView`            | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')` |
+| Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                                |
+| How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                                |
+| What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                                 |
+| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                              |
+| What Scout learned (`learned`)  | `LearnedView`              | `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`                                          |
+| Settings (`settings`)           | the host's `settings` slot | the host's settings form                                                                                            |
 
 - **Navigation.** The `page` prop selects a page when the host names one (main's
   `homePageEvent`, through `homeTarget`, which also splits `settings#<section>` for a Fix it and
@@ -407,6 +408,20 @@ The nav lists twelve pages (`HomePage`), the companion's name filling in where i
   expert no longer available"; all but Approved add "Nothing was changed." Empty: "Nothing is
   waiting on you." A failed answer shows as an alert. Risk classes, expiry and outcomes are in
   [asks.md](asks.md).
+- **Approvals.** `ApprovalsView` (`home/approvals-view.tsx`) has two halves. `PreferencesList`
+  (`preferences-list.tsx`) lists "STANDING PREFERENCES", the built-in default first: each card shows
+  the sentence, "Agreed {day}", "Used {n} times" and "Last used" once used, with **Edit** (an inline
+  field with **Save** and **Cancel**; an empty sentence is refused) and **Remove**. A refusal from
+  the brain shows as an alert and the list is read again. With none: "None yet. Scout offers one
+  after you approve the same kind of thing a few times." `ApprovalHistory` (`approval-history.tsx`)
+  shows a summary strip (asks, Scout answered, refused), the **All** / **Decided by Scout** /
+  **Refused** filter with its counts, and rows grouped by local day (Today, Yesterday, then the date):
+  time, what was asked, where it came from (Claude Code expert, Scout tool, Connected app), who
+  decided, and a chip (Approved, Refused, Timed out, No one online). A Scout row reads "Scout decided,
+  per your preference" with the sentence it relied on, and an "Auto" pill. **Show more** pages back
+  with `before: next`. Until a read succeeds nothing is claimed; a failed read shows an alert. A
+  bridge without `listApprovals` (an old body) renders nothing. `e2e/approvals.spec.ts` covers it on
+  the fake brain.
 - **Activity.** `ActivityView` reads 30 entries a page (`PAGE`), newest first, and **Show older** pages
   back with `before: next`. It re-reads the first page on `changesActivity(event)`: `turn.started`,
   `turn.completed`, `turn.error`, `handoff.finished`, `routine.result`, `routines.changed` (a

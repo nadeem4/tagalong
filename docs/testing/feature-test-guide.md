@@ -14,6 +14,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Approvals history (real brain)](#approvals-history-real-brain)
 - [Learned approvals (real brain, real Claude Code)](#learned-approvals-real-brain-real-claude-code)
+- [Approvals page (real brain)](#approvals-page-real-brain)
 - [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
 - [Scout's timers (real brain)](#scouts-timers-real-brain)
 - [Scout notices you (real brain, desktop)](#scout-notices-you-real-brain-desktop)
@@ -459,9 +460,10 @@ Needs the same setup as the hand-off section above, with the desktop connected.
 
 ## Approvals history (real brain)
 
-Needs the real brain and the desktop, and the hand-off setup above for the Claude Code steps. Home
-has no Approvals page yet, so read the history with a `call` to the brain (any websocket client
-that sends `hello`, then `call {tool: "list_approvals", input: {}}`).
+Needs the real brain and the desktop, and the hand-off setup above for the Claude Code steps. Read
+the history with a `call` to the brain (any websocket client that sends `hello`, then `call
+{tool: "list_approvals", input: {}}`); the Approvals page shows the same data and is checked in the
+next section.
 
 1. **Action:** call `list_preferences` on a fresh data folder.
    **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
@@ -525,6 +527,41 @@ history and preferences with `call` as in the section above.
    offers after three approvals can spend).
 8. **Action:** let an offer ask sit unanswered for 10 minutes.
    **Expected:** it closes and nothing is saved.
+
+## Approvals page (real brain)
+
+Needs the real brain, the desktop and a fresh data folder. Do the steps of "Approvals history" and
+"Learned approvals" above first, so there is something to show. Then open Home → **Approvals**.
+The automated version of steps 1 to 5 runs on the fake brain (`e2e/approvals.spec.ts`).
+
+1. **Action:** open the page on a fresh data folder.
+   **Expected:** one preference, "Always ask me before risky actions", with "Used 0 times" and
+   **Edit** and **Remove**, and an empty history ("Nothing here yet."). Once you have a preference
+   of your own, the default is still listed first.
+2. **Action:** after the history steps above, look at the summary strip and the filter buttons.
+   **Expected:** the counts match `list_approvals`'s `counts`: asks, Scout answered, refused. Rows
+   are grouped under Today (then Yesterday and dates), newest first, each with its time, what was
+   asked, its source (Claude Code expert, Scout tool or Connected app), who decided and a chip:
+   Approved, Refused, Timed out or No one online.
+3. **Action:** press **Refused**, then **Decided by Scout**, then **All**.
+   **Expected:** only the refused rows; only the rows Scout approved; all rows again.
+4. **Action:** find a row Scout approved (the learned-approvals section above makes one).
+   **Expected:** it reads "Scout decided, per your preference" followed by the sentence in quotes,
+   with an "Auto" chip. A row you decided reads "Decided by you".
+5. **Action:** press **Edit** on that preference, change the sentence, **Save**; then **Cancel** on
+   a second edit; then try to save an empty sentence.
+   **Expected:** the new sentence shows; Cancel changes nothing; the empty one is refused with a
+   line and nothing is saved. The old Scout row still quotes the sentence as it was.
+6. **Action:** press **Remove** on the preference.
+   **Expected:** it leaves the list at once (the page reads again when the brain says approvals
+   changed). The next matching ask comes to you.
+7. **Action:** have Scout approve an ask while the bubble is hidden.
+   **Expected:** the bubble comes up without taking the keyboard, with "Approved for you: ..." and
+   "per '...'", and leaves by itself after about 7 seconds. The new row appears on the page
+   without reopening it.
+8. **Action:** stop the brain and open the page.
+   **Expected:** a line says Tagalong could not read the approvals; no list and no "None yet" is
+   claimed. Start the brain, and it loads on the next change or when Home reopens.
 
 ## Scout speaks first: job reports (real brain)
 

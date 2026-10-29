@@ -61,6 +61,8 @@ Every ask that reaches an end is logged in `tagalong.db` by `Approvals`
 - **Home calls** (audience `home`, never offered to the model): `list_approvals`,
   `list_preferences`, `remove_preference`, `edit_preference`. See
   [brain.md](brain.md#home-tools).
+- **Seen in Home.** The Approvals page shows the preferences and this history, and the bubble shows
+  the "Approved for you" card; see [bubble.md](bubble.md#home) and [desktop.md](desktop.md).
 
 ### Scout approves under your preferences
 
