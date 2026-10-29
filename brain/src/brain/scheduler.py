@@ -3,7 +3,8 @@ Facts come from outside (job reports, window titles), so the whole body is
 fenced and cannot close its own <data> tag.
 
 The scheduler never owns a turn; Session hands it `busy`, `last_body` and `start`, and calls
-`turn_ended` so the next held batch can run.
+`turn_ended` so the next held batch can run. Each event may carry three hooks: on_start (the
+wake began), on_drop (the budget was spent, so it never will) and on_end (its turn ended).
 """
 
 import asyncio
@@ -32,12 +33,16 @@ def wake_text(kind: EventKind, events: list[tuple[Event, datetime]], note: str) 
     return f'<data kind="event">\n{_fence_safe(chr(10).join(lines))}\n</data>'
 
 
+_Hook = Callable[[], None] | None
+_Hooks = tuple[_Hook, _Hook, _Hook]  # on_start, on_drop, on_end
+
+
 @dataclass
 class _Group:
     kind: EventKind
     opened: datetime
     events: list[tuple[Event, datetime]] = field(default_factory=list)
-    on_starts: list[Callable[[], None] | None] = field(default_factory=list)
+    hooks: list[_Hooks] = field(default_factory=list)  # parallel to events
 
 
 class Scheduler:
@@ -67,8 +72,16 @@ class Scheduler:
         self._latest: dict[str, dict[str, Event]] = {}
         self._timer: asyncio.TimerHandle | None = None
         self._wakes: list[tuple[datetime, str]] = []  # capped wakes in the rolling hour
+        self._on_ends: dict[str, list[Callable[[], None]]] = {}  # by the turn id start returned
 
-    def emit(self, event: Event, *, on_start: Callable[[], None] | None = None) -> None:
+    def emit(
+        self,
+        event: Event,
+        *,
+        on_start: _Hook = None,
+        on_drop: _Hook = None,
+        on_end: _Hook = None,
+    ) -> None:
         kind = self._kinds.get(event.kind)
         if kind is None or not kind.enabled:
             log.warning("dropped event of unknown or disabled kind %r", event.kind)
@@ -80,17 +93,25 @@ class Scheduler:
         group = None
         if kind.batch_seconds is not None:  # a held group of the kind absorbs the event
             group = next((g for g in self._groups if g.kind is kind), None)
-        if group is None:
+        if event.key is not None:  # a never-merged kind holds each event in its own group
+            self._replace_held(kind, event.key)
+        if group is None or group not in self._groups:
             group = _Group(kind, now)
             self._groups.append(group)
-        if event.key is not None:
-            for i, (old, _) in enumerate(group.events):
-                if old.key == event.key:
-                    del group.events[i], group.on_starts[i]
-                    break
         group.events.append((event, now))
-        group.on_starts.append(on_start)
+        group.hooks.append((on_start, on_drop, on_end))
         self.pump()
+
+    def _replace_held(self, kind: EventKind, key: str) -> None:
+        for group in self._groups:
+            if group.kind is not kind:
+                continue
+            for i, (old, _) in enumerate(group.events):
+                if old.key == key:
+                    del group.events[i], group.hooks[i]
+                    if not group.events:
+                        self._groups.remove(group)
+                    return
 
     def pump(self) -> None:
         try:
@@ -113,19 +134,28 @@ class Scheduler:
             self._wakes.append((self._now(), group.kind.name))
         text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))
         try:
-            self._start(body_id, [{"type": "text", "text": text}])
+            turn_id = self._start(body_id, [{"type": "text", "text": text}])
         except Exception:
             log.exception("could not start a %s wake", group.kind.name)
             return
-        for on_start in group.on_starts:  # after the start, so a failed start stays untold
-            if on_start is not None:
-                try:
-                    on_start()
-                except Exception:
-                    log.exception("on_start failed for a %s wake", group.kind.name)
+        ends = [h[2] for h in group.hooks if h[2] is not None]
+        if ends:
+            self._on_ends[turn_id] = ends
+        # after the start, so a failed start stays untold
+        self._call([h[0] for h in group.hooks], "on_start", group.kind)
 
     def turn_ended(self, turn_id: str) -> None:
+        self._call(self._on_ends.pop(turn_id, []), "on_end", None)
         self.pump()
+
+    @staticmethod
+    def _call(hooks: list, name: str, kind: EventKind | None) -> None:
+        for hook in hooks:
+            if hook is not None:
+                try:
+                    hook()
+                except Exception:
+                    log.exception("%s failed for a %s wake", name, kind.name if kind else "")
 
     def next_due(self) -> float | None:
         if not self._groups:
@@ -159,7 +189,9 @@ class Scheduler:
     def _drop_all(self) -> None:
         for group in self._groups:
             log.warning("budget spent, dropped %d %s event(s)", len(group.events), group.kind.name)
-        self._groups.clear()
+        groups, self._groups = self._groups, []
+        for group in groups:
+            self._call([h[1] for h in group.hooks], "on_drop", group.kind)
 
     def _choose_body(self) -> str | None:
         last = self._last_body()

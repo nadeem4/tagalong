@@ -113,3 +113,10 @@ def test_from_connect_needs_ten_minutes_away():
 def test_timer_defaults():
     kind = EVENT_KINDS["timer"]
     assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 6
+
+
+def test_job_question_defaults_never_merge_and_ignore_caps():
+    kind = EVENT_KINDS["job_question"]
+    assert kind.wakes is True
+    assert kind.batch_seconds is None
+    assert kind.max_per_hour is None
