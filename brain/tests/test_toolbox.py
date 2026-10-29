@@ -200,6 +200,40 @@ async def test_oversized_total_is_over_limit():
     assert e.value.code == ErrorCode.over_limit
 
 
+async def test_body_text_part_over_part_limit_is_refused():
+    bodies = Bodies()
+    connect(bodies, "desktop", output=[{"type": "text", "text": "a" * 5_000_001}])
+    with pytest.raises(RpcError) as e:
+        await body_box(bodies).run(call("desktop__see_screen"))
+    assert e.value.code == ErrorCode.over_limit
+    assert "see_screen sent more data than allowed." in e.value.message
+
+
+async def test_body_many_text_parts_over_message_limit_are_refused():
+    bodies = Bodies()
+    part = {"type": "text", "text": "a" * 4_900_000}  # each under the part limit
+    connect(bodies, "desktop", output=[part] * 5)
+    with pytest.raises(RpcError) as e:
+        await body_box(bodies).run(call("desktop__see_screen"))
+    assert e.value.code == ErrorCode.over_limit
+
+
+async def test_body_text_just_under_the_limit_passes():
+    bodies = Bodies()
+    connect(bodies, "desktop", output=[{"type": "text", "text": "a" * 5_000_000}])
+    result = await body_box(bodies).run(call("desktop__see_screen"))
+    assert result == [{"type": "text", "text": "a" * 5_000_000}] or result == "a" * 5_000_000
+
+
+async def test_body_multibyte_text_counts_bytes_not_characters():
+    bodies = Bodies()
+    # 2_000_000 characters, 6_000_000 bytes
+    connect(bodies, "desktop", output=[{"type": "text", "text": "€" * 2_000_000}])
+    with pytest.raises(RpcError) as e:
+        await body_box(bodies).run(call("desktop__see_screen"))
+    assert e.value.code == ErrorCode.over_limit
+
+
 async def test_malformed_output_is_tool_failed():
     bodies = Bodies()
     connect(bodies, "desktop", output=[{"type": "video"}])

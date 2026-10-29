@@ -122,7 +122,10 @@ class BodySource:
             raise RpcError(ErrorCode.tool_failed, "body sent a bad result") from None
         total = 0
         for part in parts:
-            size = len(part.data) * 3 // 4 if hasattr(part, "data") else 0
+            # Text counts in bytes, not characters: a body's text could otherwise be unbounded.
+            size = (
+                len(part.data) * 3 // 4 if hasattr(part, "data") else len(part.text.encode("utf-8"))
+            )
             total += size
             if size > LIMITS["part_bytes"] or total > LIMITS["message_bytes"]:
                 raise RpcError(ErrorCode.over_limit, f"{plain} sent more data than allowed.")
