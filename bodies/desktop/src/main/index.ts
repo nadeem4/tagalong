@@ -493,7 +493,8 @@ async function start(): Promise<void> {
   pauseListening({ petsShown: avatar.isVisible() });
   // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
   // The brain hears of a return after the same 5-minute idle, and of the front window changing.
-  const sendToBrain = (name: string, data: unknown): void => desktop?.brain.event(name, data);
+  const sendToBrain = (name: string, data: unknown): boolean =>
+    desktop?.brain.event(name, data) ?? false;
   const sendBack = createBackSender({
     send: sendToBrain,
     now: Date.now,

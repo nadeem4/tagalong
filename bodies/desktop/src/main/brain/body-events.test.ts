@@ -98,7 +98,7 @@ describe('startFocusWatch', () => {
     front: () => Promise<{ app: string; title: string } | null>;
     enabled?: () => boolean;
   }) => {
-    const send = vi.fn();
+    const send = vi.fn((_name: string, _data: unknown) => true);
     const stop = startFocusWatch({ ...opts, enabled: opts.enabled ?? (() => true), send });
     return { send, stop };
   };
@@ -121,7 +121,7 @@ describe('startFocusWatch', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('sends nothing while disabled', async () => {
+  it('sends nothing while disabled from the start, and does not list windows', async () => {
     const front = vi.fn(async () => ({ app: 'a', title: 'x' }));
     const { send } = setup({ front, enabled: () => false });
     await vi.advanceTimersByTimeAsync(10_000);
@@ -129,10 +129,51 @@ describe('startFocusWatch', () => {
     expect(front).not.toHaveBeenCalled();
   });
 
-  it('sends nothing when there is no front window', async () => {
+  it('sends nothing when there is no front window and nothing was sent before', async () => {
     const { send } = setup({ front: async () => null });
     await vi.advanceTimersByTimeAsync(10_000);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('clears the focus once when an excluded window comes to the front', async () => {
+    let w: { app: string; title: string } | null = { app: 'a', title: 'x' };
+    const { send } = setup({ front: async () => w });
+    await vi.advanceTimersByTimeAsync(5_000);
+    w = null;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(send.mock.calls).toEqual([
+      ['focus', { app: 'a', title: 'x' }],
+      ['focus', { app: '', title: '' }],
+    ]);
+    w = { app: 'a', title: 'x' };
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(send).toHaveBeenCalledTimes(3);
+  });
+
+  it('clears the focus once when sight is paused', async () => {
+    let on = true;
+    const { send } = setup({ front: async () => ({ app: 'a', title: 'x' }), enabled: () => on });
+    await vi.advanceTimersByTimeAsync(5_000);
+    on = false;
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(send.mock.calls).toEqual([
+      ['focus', { app: 'a', title: 'x' }],
+      ['focus', { app: '', title: '' }],
+    ]);
+  });
+
+  it('sends the same window again after a send the brain never got', async () => {
+    const send = vi.fn((_name: string, _data: unknown) => false);
+    startFocusWatch({
+      front: async () => ({ app: 'a', title: 'x' }),
+      enabled: () => true,
+      send,
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+    send.mockReturnValue(true);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it('swallows a failing front() and runs the next tick', async () => {

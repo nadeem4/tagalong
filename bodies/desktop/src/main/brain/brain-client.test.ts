@@ -363,7 +363,7 @@ describe('BrainClient', () => {
 
   it('event sends a notification when online', async () => {
     const { client, s } = await online();
-    client.event('focus', { app: 'Code' });
+    expect(client.event('focus', { app: 'Code' })).toBe(true);
     expect(s.sent.at(-1)).toEqual({
       jsonrpc: '2.0',
       method: 'event',
@@ -375,7 +375,7 @@ describe('BrainClient', () => {
     const { client, s } = await online();
     s.drop();
     const before = s.sent.length;
-    client.event('back');
+    expect(client.event('back')).toBe(false);
     expect(s.sent).toHaveLength(before);
   });
 

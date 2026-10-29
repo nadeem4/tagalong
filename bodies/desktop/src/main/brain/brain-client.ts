@@ -112,10 +112,14 @@ export class BrainClient {
     this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method: 'cancel', params: { turn } }));
   }
 
-  /** Tells the brain something happened on this body (focus, back). Dropped unless online. */
-  event(name: string, data?: unknown): void {
-    if (this.status !== 'online') return;
-    this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method: 'event', params: { name, data } }));
+  /**
+   * Tells the brain something happened on this body (focus, back). Dropped unless online;
+   * returns whether it was sent, so a caller can say it again later.
+   */
+  event(name: string, data?: unknown): boolean {
+    if (this.status !== 'online' || this.socket === null) return false;
+    this.socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'event', params: { name, data } }));
+    return true;
   }
 
   /**
