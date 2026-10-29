@@ -165,7 +165,9 @@ async def run_turn(
             if not limit.expired():
                 raise  # a TimeoutError from inside the loop, not our clock
             log.warning("turn %s ran past %s s", turn_id, turn_timeout)
-            notify("reply", {"turn": turn_id, "body": body_id, "delta": TIMEOUT_MESSAGE})
+            # On its own line when Scout was mid-reply, so it is not glued onto the sentence.
+            note = "\n\n" + TIMEOUT_MESSAGE if spoke else TIMEOUT_MESSAGE
+            notify("reply", {"turn": turn_id, "body": body_id, "delta": note})
             spoke = True
             _close_dangling_tool_use(history)
             reason = "error"

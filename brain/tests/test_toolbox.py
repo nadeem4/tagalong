@@ -222,7 +222,7 @@ async def test_body_text_just_under_the_limit_passes():
     bodies = Bodies()
     connect(bodies, "desktop", output=[{"type": "text", "text": "a" * 5_000_000}])
     result = await body_box(bodies).run(call("desktop__see_screen"))
-    assert result == [{"type": "text", "text": "a" * 5_000_000}] or result == "a" * 5_000_000
+    assert result == [{"type": "text", "text": "a" * 5_000_000}]
 
 
 async def test_body_multibyte_text_counts_bytes_not_characters():

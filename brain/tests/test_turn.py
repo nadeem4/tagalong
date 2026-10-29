@@ -320,6 +320,24 @@ async def test_stalled_model_ends_the_turn_with_error_and_a_message():
     assert len(dones(sent)) == 1
 
 
+async def test_timeout_note_starts_on_its_own_line_after_a_partial_reply():
+    class SpeaksThenStalls:
+        model_id = "claude-sonnet-5-5"
+
+        async def stream(self, system, messages, tools):
+            yield "Part of an answer"
+            await asyncio.sleep(3600)
+
+    sent = []
+    history = [{"role": "user", "content": "go"}]
+    reason = await start(SpeaksThenStalls(), history, sent, turn_timeout=0.05)
+    assert reason == "error"
+    replies = [p for m, p in sent if m == "reply" and "delta" in p]
+    assert replies[0]["delta"] == "Part of an answer"
+    assert replies[1]["delta"].startswith("\n\n") and "too long" in replies[1]["delta"]
+    assert len(dones(sent)) == 1
+
+
 async def test_turn_timeout_leaves_history_valid():
 
     class ToolThenStall(FakeModel):

@@ -466,18 +466,18 @@ dead expert arrives as `job_ended` and is held until a body is online, then told
 permission an expert asked while nobody was online raises `job_question` with no question id, keyed
 by the job: nothing is open to answer, so the note tells the owner what the expert asked. The
 expert itself still gets "no answer" at once. The news is kept as the latest per job: a second
-offline ask from the same job replaces the first.
+offline ask from the same job replaces the first. This news is held in memory only, so a brain restart before the person returns loses it (the job's end is still told through unreported jobs).
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind           | Batch window | Cap per hour | Note                                                                         |
-| -------------- | ------------ | ------------ | ---------------------------------------------------------------------------- |
-| `job_ended`    | 30 s         | 10           | A job ended; endings within 30 s share one wake                              |
-| `timer`        | 0 s          | 6            | One of Scout's timers came due                                               |
-| `body_online`  | 0 s          | 2            | A body came back after 10+ minutes away                                      |
-| `back`         | 0 s          | 2            | The owner returned after 5+ minutes idle                                     |
-| `job_question` | none         | none         | An expert asks a question; one wake each, not counted against the global cap |
-| `focus`        | none         | none         | Which window is in front (context, no wake)                                  |
+| Kind           | Batch window | Cap per hour | Note                                                                                                                            |
+| -------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `job_ended`    | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                 |
+| `timer`        | 0 s          | 6            | One of Scout's timers came due                                                                                                  |
+| `body_online`  | 0 s          | 2            | A body came back after 10+ minutes away                                                                                         |
+| `back`         | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                        |
+| `job_question` | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap |
+| `focus`        | none         | none         | Which window is in front (context, no wake)                                                                                     |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
