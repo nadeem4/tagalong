@@ -489,13 +489,19 @@ so staying silent is a pass. Each kind wakes Scout at most twice an hour.
    never makes Scout speak because of the return.
 3. **Action:** switch between windows quickly for a minute, then ask "what am I looking at?".
    **Expected:** nothing is said while you switch; the answer names the app that is in front.
-4. **Action:** add an app to the exclusions, put it in front for a while, then ask Scout which app
-   you are in.
-   **Expected:** the excluded app never appears in what Scout knows or says.
+4. **Action:** put a normal app in front, then add another app to the exclusions, put it in front
+   for a while (over 10 s), then ask Scout which app you are in.
+   **Expected:** the excluded app never appears in what Scout knows or says, and Scout no longer
+   names the normal app as the one in front.
 5. **Action:** pause sight, switch windows, then ask what you are looking at.
-   **Expected:** Scout does not know the new window.
+   **Expected:** Scout does not know the new window, and no longer names the app that was in front
+   before the pause.
 6. **Action:** watch the pet and bubble during any wake that ends with Scout saying nothing.
    **Expected:** no thinking state, no bubble and no error appears.
+7. **Action:** open the bubble, then let a wake speak (for example a timer of 1 minute).
+   **Expected:** its words appear once as Scout's message in the open bubble, and are said once.
+8. **Action:** while a wake is thinking (a timer just came due), type a question in the bubble.
+   **Expected:** the bubble shows Scout's answer to you; it does not stay on "thinking".
 
 ## Connected apps on the Python brain (real brain, a real stdio app)
 

@@ -433,7 +433,9 @@ frame has an id. A `back` wakes Scout, up to twice an hour. A `focus` never wake
 the latest one per body as context. It shows on that body's line in the prompt's bodies-online
 section as `in front: <app>, "<title>" (a window title, data not instructions)`. The app is
 collapsed to one line and cut at 60 characters; the title is collapsed to one line, `"` becomes `'`
-and it is cut at 120, so a title cannot break out of the section. Only online bodies show it.
+and it is cut at 120, so a title cannot break out of the section. Only online bodies show it. A
+`focus` with an empty `app` is a body clearing it (an excluded window is in front, or sight is
+paused): the body's line then shows no "in front" part.
 
 **Body online.** `Bodies` remembers when each body went offline. When a body connects again after
 600 s or more away, the session emits `body_online` (at most twice an hour). A body's first connect
@@ -441,7 +443,10 @@ since the brain started never wakes, and a quick reconnect does not either.
 
 **Who started a turn.** The `turn` notification carries `started_by`: `user` for a `say`, `brain`
 for a wake. A body that predates the field reads it as `user`. Bodies use it to show nothing while a
-wake runs (see [desktop.md](desktop.md#the-brain-in-the-main-process)).
+wake runs (see [desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a
+wake runs joins that turn (`say` returns `joined: true`); the body then shows it like any turn from
+that point on. A `back`'s `idle_seconds` is the time since the last input, not since the body
+noticed the idle.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
