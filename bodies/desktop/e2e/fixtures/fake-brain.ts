@@ -1,9 +1,10 @@
 /**
  * A scripted brain for the e2e suites: a real websocket server speaking contract v1, so the
  * desktop's whole path (BrainClient, turn events, bubble) runs without Python or a model.
- * It answers hello, Home's permission, jobs and apps tools (`call`), then every say with the same short reply. A say that mentions "permission"
+ * It answers hello, Home's permission, jobs, apps and approvals tools (`call`), then every say with the same short reply. A say that mentions "permission"
  * first opens one confirm ask and holds the turn until the desktop answers it, as the real
- * brain does. A say that mentions "hand off" replies, then (turn over) opens a job's three
+ * brain does. A say that mentions "offer" opens an offer ask (Yes, auto-approve / Keep asking).
+ * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included.
  */
@@ -21,6 +22,10 @@ export interface FakeBrain {
   permissionSets: { tool: string; mode: string }[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
+  /** Every preference id Home sent to `remove_preference`, in order. */
+  removedPreferences: number[];
+  /** Tell every connected body that Scout approved an ask under a preference. */
+  sendApproved(note: { tool: string; text: string; preference: string }): void;
   close(): Promise<void>;
 }
 
@@ -66,6 +71,57 @@ const APPS = [
   },
 ];
 
+// The approvals page's data, as the brain's snake_case rows: one ask Scout answered under a
+// preference, one the person approved, one refused.
+const DEFAULT_PREFERENCE = {
+  id: 1,
+  sentence: 'Always ask me before risky actions',
+  builtin: true,
+  created_at: '2026-10-20T09:00:00Z',
+  use_count: 0,
+  last_used: null,
+};
+const TEST_PREFERENCE = {
+  id: 2,
+  sentence: 'Approve test runs in C:/work/app',
+  builtin: false,
+  created_at: '2026-10-25T09:00:00Z',
+  use_count: 3,
+  last_used: '2026-10-27T10:00:00Z',
+};
+const APPROVALS = [
+  {
+    id: 3,
+    source: 'claude_code',
+    tool: 'claude_code:Run tests',
+    summary: 'Run pnpm test',
+    outcome: 'approved',
+    decided_by: 'scout',
+    preference: TEST_PREFERENCE.sentence,
+    at: '2026-10-27T10:00:00Z',
+  },
+  {
+    id: 2,
+    source: 'scout_tool',
+    tool: 'desktop__move_window',
+    summary: 'Move the Notes window',
+    outcome: 'approved',
+    decided_by: 'person',
+    preference: null,
+    at: '2026-10-27T09:30:00Z',
+  },
+  {
+    id: 1,
+    source: 'claude_code',
+    tool: 'claude_code:Run command',
+    summary: 'Delete the build folder',
+    outcome: 'refused',
+    decided_by: 'person',
+    preference: null,
+    at: '2026-10-27T09:00:00Z',
+  },
+];
+
 export async function startFakeBrain(): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
@@ -76,6 +132,12 @@ export async function startFakeBrain(): Promise<FakeBrain> {
   const answers: FakeBrain['answers'] = [];
   const permissionSets: { tool: string; mode: string }[] = [];
   const stops: string[] = [];
+  const removedPreferences: number[] = [];
+  const preferences: Record<string, unknown>[] = [
+    { ...DEFAULT_PREFERENCE },
+    { ...TEST_PREFERENCE },
+  ];
+  const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
   const permissions = [
     {
@@ -97,6 +159,8 @@ export async function startFakeBrain(): Promise<FakeBrain> {
   ];
 
   server.on('connection', (socket: WebSocket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
     const notify = (method: string, params: Record<string, unknown>) =>
       socket.send(JSON.stringify({ jsonrpc: '2.0', method, params: { seq: ++seq, ...params } }));
     // What a turn still has to say once its open ask is answered.
@@ -137,6 +201,17 @@ export async function startFakeBrain(): Promise<FakeBrain> {
             tool: 'desktop__move_window',
             input: { x: 0 },
           });
+        } else if (msg.params?.text?.includes('offer')) {
+          // The turn ends first; the offer is a plain ask, as the brain sends it.
+          finish();
+          notify('ask', {
+            id: 'o1',
+            state: 'open',
+            text: 'You’ve allowed C:/work/app 3 times lately. Approve it from now on?',
+            options: ['Yes, auto-approve', 'Keep asking'],
+            tool: 'approval_offer',
+            input: { sentence: 'Approve test runs in C:/work/app', group: 'C:/work/app' },
+          });
         } else if (msg.params?.text?.includes('hand off')) {
           // The turn ends first: a job's asks come later, with no turn running, as in the brain.
           finish();
@@ -176,7 +251,7 @@ export async function startFakeBrain(): Promise<FakeBrain> {
         // Home's tools: the permission pair and the jobs pair, kept in memory like the real brain.
         const params = msg.params as {
           tool?: string;
-          input?: { tool?: string; mode?: string; job?: string };
+          input?: { tool?: string; mode?: string; job?: string; id?: number; filter?: string };
         };
         let value: unknown = {};
         if (params.tool === 'list_jobs') value = { jobs };
@@ -189,7 +264,28 @@ export async function startFakeBrain(): Promise<FakeBrain> {
           }
           notify('changed', { what: 'jobs' });
         } else if (params.tool === 'list_apps') value = { apps: APPS };
-        else if (params.tool === 'list_permissions') value = { tools: permissions };
+        else if (params.tool === 'list_approvals') {
+          const filter = params.input?.filter;
+          const rows = APPROVALS.filter((r) =>
+            filter === 'scout'
+              ? r.decided_by === 'scout'
+              : filter === 'refused'
+                ? r.outcome === 'refused'
+                : true,
+          );
+          const counts = {
+            total: APPROVALS.length,
+            scout: APPROVALS.filter((r) => r.decided_by === 'scout').length,
+            refused: APPROVALS.filter((r) => r.outcome === 'refused').length,
+          };
+          value = { approvals: rows, counts, next: null };
+        } else if (params.tool === 'list_preferences') value = { preferences };
+        else if (params.tool === 'remove_preference') {
+          removedPreferences.push(Number(params.input?.id));
+          const at = preferences.findIndex((p) => p.id === params.input?.id);
+          if (at >= 0) preferences.splice(at, 1);
+          notify('changed', { what: 'approvals' });
+        } else if (params.tool === 'list_permissions') value = { tools: permissions };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
           if (row !== undefined) row.mode = String(params.input?.mode);
@@ -223,6 +319,14 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     answers,
     permissionSets,
     stops,
+    removedPreferences,
+    sendApproved: (note) => {
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({ jsonrpc: '2.0', method: 'approved', params: { seq: ++seq, ...note } }),
+        );
+      }
+    },
     close: () =>
       new Promise<void>((resolve) => {
         for (const client of server.clients) client.terminate();
