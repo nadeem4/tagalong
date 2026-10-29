@@ -72,6 +72,7 @@ import type { VoiceService } from './voice/voice';
 import { openClaudeSignIn, signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
+import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
 import type { BrainStatus } from './brain/brain-client';
 import { shouldOpenWelcome } from './welcome';
 import type { BrainClient } from './brain/brain-client';
@@ -239,6 +240,7 @@ app.on('before-quit', () => {
   desktop?.voiceWorker.stop();
   stopListeningGuard();
   stopPresence();
+  stopFocusWatch();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -487,9 +489,22 @@ async function start(): Promise<void> {
   avatar.on('hide', () => pauseListening({ petsShown: false }));
   pauseListening({ petsShown: avatar.isVisible() });
   // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
+  // The brain hears of a return after the same 5-minute idle, and of the front window changing.
+  const sendToBrain = (name: string, data: unknown): void => desktop?.brain.event(name, data);
+  const sendBack = createBackSender({ send: sendToBrain, now: Date.now });
   stopPresence = watchPresence(powerMonitor, (event) => {
     const pet = desktop?.avatar;
     if (pet != null && !pet.isDestroyed()) pet.webContents.send(IPC.turnEvent, event);
+    sendBack(event.type === 'presence.away' ? 'away' : 'back');
+  });
+  stopFocusWatch = startFocusWatch({
+    // The platform is already gated by the sight pause; enabled also skips the listing.
+    front: async () => {
+      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
+      return frontWindow((await platform.listWindows(exclusions, { countText: false })).windows);
+    },
+    send: sendToBrain,
+    enabled: () => !sightPause.paused,
   });
 
   // Deliberately not a modal, and deliberately not fatal. The only way to store an
@@ -512,6 +527,8 @@ async function start(): Promise<void> {
 let stopListeningGuard = (): void => undefined;
 /** Stops reading the idle time on quit. */
 let stopPresence = (): void => undefined;
+/** Stops reporting the front window to the brain on quit. */
+let stopFocusWatch = (): void => undefined;
 /** Why Always listening waits: a call or full screen in front, the pets hidden, or Welcome open. */
 let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
