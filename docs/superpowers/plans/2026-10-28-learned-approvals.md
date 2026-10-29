@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Code decides *when* Scout looks; the model decides *if* a preference covers an ask. No rules engine, allowlists, command parsing or pattern matching in code.
+- Code decides _when_ Scout looks; the model decides _if_ a preference covers an ask. No rules engine, allowlists, command parsing or pattern matching in code.
 - Side-check runs only if the person has at least one preference they created; the built-in risky-actions default does not count. With none: no wait, no model call, no cost.
 - Scout's only outcomes are "approve under a named preference" or "pass". Deny is never Scout's call. Approving is allow-once only (Claude Code: the option whose kind is `allow_once`; never `allow_always`).
 - Side-check timeout 20 s; errors, timeout, over-budget or nobody online mean the ask goes to the person as today. Spend counts toward `Budget`.
@@ -37,14 +37,14 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `brain/src/brain/memory.py` | migration (3 tables, default seed) and row methods |
-| `brain/src/brain/approvals.py` | `Approvals` service (record, preferences, notify), Home tools |
-| `brain/src/brain/side_check.py` | LA2: the standalone decision call and its two tools |
-| `brain/src/brain/offers.py` | LA2: offer trigger, caps, look, offer ask |
-| `brain/src/brain/mind/approvals.md` | LA2: wording for the decision and the offer look |
-| `bodies/ui/src/home/approvals-view.tsx` (+ `preferences-list.tsx`, `approval-history.tsx`) | LA3: the page |
+| File                                                                                       | Responsibility                                                |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| `brain/src/brain/memory.py`                                                                | migration (3 tables, default seed) and row methods            |
+| `brain/src/brain/approvals.py`                                                             | `Approvals` service (record, preferences, notify), Home tools |
+| `brain/src/brain/side_check.py`                                                            | LA2: the standalone decision call and its two tools           |
+| `brain/src/brain/offers.py`                                                                | LA2: offer trigger, caps, look, offer ask                     |
+| `brain/src/brain/mind/approvals.md`                                                        | LA2: wording for the decision and the offer look              |
+| `bodies/ui/src/home/approvals-view.tsx` (+ `preferences-list.tsx`, `approval-history.tsx`) | LA3: the page                                                 |
 
 ---
 
@@ -57,6 +57,7 @@ Target about 800 changed lines. New: `approvals.py`, `tests/test_approvals.py`. 
 **Files:** modify `brain/src/brain/memory.py` (append one migration, new dataclasses and methods); test `brain/tests/test_memory.py`.
 
 **Interfaces:**
+
 - Produces tables: `approvals(id INTEGER PK, source TEXT CHECK IN ('scout_tool','claude_code','app'), tool, summary, input TEXT json, job_id, group_key, outcome TEXT CHECK IN ('approved','refused','timed_out','no_one'), decided_by TEXT CHECK IN ('person','scout','none'), preference_id INTEGER, at TEXT)`; `preferences(id INTEGER PK, sentence, source, tool, group_key, builtin INTEGER, created_at, use_count INTEGER DEFAULT 0, last_used TEXT)`; `offers(id INTEGER PK, group_key, at TEXT, outcome TEXT CHECK IN ('yes','keep_asking','no_answer','none'))`.
 - Produces `@dataclass(frozen=True) Approval(id, source, tool, summary, input, job_id, group_key, outcome, decided_by, preference_id, at)` and `Preference(id, sentence, source, tool, group_key, builtin, created_at, use_count, last_used)`.
 - Produces `Memory.add_approval(*, source, tool, summary, input, job_id, group_key, outcome, decided_by, preference_id, at) -> int`; `list_approvals(filter: Literal["all","scout","refused"], limit: int, before: int | None) -> list[Approval]` (newest first, `before` = id cursor); `approval_counts() -> dict[str,int]` keys `total, scout, refused`; `add_preference(*, sentence, source, tool, group_key, at) -> Preference`; `list_preferences() -> list[Preference]` (default first, then oldest first); `remove_preference(id) -> bool`; `edit_preference(id, sentence) -> bool`; `use_preference(id, at) -> None`; `add_offer(group_key, at, outcome) -> None`; `offers_for(group_key) -> list[tuple[str,str]]` (at, outcome, newest first); `person_approvals_since(group_key, since_iso) -> int`; `has_user_preferences() -> bool`; `has_preference_for(group_key) -> bool`; `default_preference() -> Preference | None`.
@@ -72,6 +73,7 @@ Target about 800 changed lines. New: `approvals.py`, `tests/test_approvals.py`. 
 **Files:** create `brain/src/brain/approvals.py`; modify `toolbox.py`, `app_tools.py`, `sessions.py`; test `brain/tests/test_approvals.py`, `test_toolbox.py`.
 
 **Interfaces:**
+
 - Consumes: Task 1 Memory methods; `Source` classes in `toolbox.py`.
 - Produces `Approvals(memory: Memory, notify: Callable[[str, dict], None], now: Callable[[], datetime])` with `record(*, source, tool, summary, input, group_key, outcome, job_id=None, decided_by="person", preference_id=None) -> None` (stores the row, then `notify("changed", {"what": "approvals"})`) and `summarise(text: str, tool: str, input: dict) -> str` (the ask text if non-empty, else `tool` plus compact input; cut at 200 chars, deterministic).
 - Produces class attribute `approval_source: str` on `BrainSource` and `BodySource` (`"scout_tool"`) and `AppSource` (`"app"`).
@@ -88,6 +90,7 @@ Target about 800 changed lines. New: `approvals.py`, `tests/test_approvals.py`. 
 **Files:** modify `brain/src/brain/jobs.py`, `sessions.py`; test `brain/tests/test_jobs.py`.
 
 **Interfaces:**
+
 - Consumes: `Approvals.record`; `PermissionOption.kind` (ACP kinds `allow_once`, `allow_always`, `reject_once`, `reject_always`).
 - Produces `Jobs(..., approvals: Approvals | None = None)`; `_permission` records `source="claude_code"`, `tool=f"claude_code:{request.title}"`, `group_key=f"claude_code:{folder}"` (folder from the job row), `job_id`.
 
@@ -102,6 +105,7 @@ Target about 800 changed lines. New: `approvals.py`, `tests/test_approvals.py`. 
 **Files:** modify `approvals.py` (add `approval_home_tools`), `sessions.py` (register), `brain/src/brain/protocol.py`, `protocol/ts/src/messages.ts`, `protocol/ts/src/messages.test.ts`, `brain/tests/test_protocol.py`, `protocol/README.md`; test `brain/tests/test_approvals.py`.
 
 **Interfaces:**
+
 - Produces `approval_home_tools(approvals: Approvals) -> list[tuple[ToolSpec, Handler]]`, audience `{"home"}`:
   - `list_approvals` input `{filter?: "all"|"scout"|"refused", before?: int}`; output JSON `{"approvals": [row...], "counts": {"total","scout","refused"}, "next": int|null}`; page size 50; `counts` ignore the filter and cover all history. Row keys snake_case: `id, source, tool, summary, input, job_id, outcome, decided_by, preference_id, preference (sentence or null), at`.
   - `list_preferences` output `{"preferences": [{id, sentence, source, tool, builtin, created_at, use_count, last_used}]}`.
@@ -132,6 +136,7 @@ Target about 900 changed lines. New: `side_check.py`, `offers.py`, `mind/approva
 **Files:** create `brain/src/brain/side_check.py`, `brain/src/brain/mind/approvals.md`; test `brain/tests/test_side_check.py`.
 
 **Interfaces:**
+
 - Consumes: `Model` (`brain.mind.turn`; read the stream to its `Final`, read the first `tool_use` block), `Budget.allows/spend`, Memory preference methods.
 - Produces `@dataclass(frozen=True) AskFacts(source: str, tool: str, summary: str, input: dict, group_key: str, locked: bool)`.
 - Produces `SideCheck(model: Model, budget, memory: Memory, timeout: float = 20.0)` with `async decide(facts: AskFacts) -> Preference | None` (the preference Scout approved under, else None).
@@ -148,6 +153,7 @@ Target about 900 changed lines. New: `side_check.py`, `offers.py`, `mind/approva
 **Files:** modify `toolbox.py`, `jobs.py`, `approvals.py`, `sessions.py`; test `test_toolbox.py`, `test_jobs.py`.
 
 **Interfaces:**
+
 - Consumes: `SideCheck.decide`, `Approvals.record`, `Memory.use_preference`.
 - Produces `Approvals.scout_approved(facts: AskFacts, pref: Preference, summary: str, job_id: str | None = None) -> None`: records `approved`/`decided_by="scout"`/`preference_id`, calls `use_preference`, sends `notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})`.
 - Produces `Toolbox(..., side_check: SideCheck | None = None)` and `Jobs(..., side_check: SideCheck | None = None)`.
@@ -163,6 +169,7 @@ Target about 900 changed lines. New: `side_check.py`, `offers.py`, `mind/approva
 **Files:** create `brain/src/brain/offers.py`; modify `config.py`, `mind/approvals.md` (`## offer`), `toolbox.py`, `jobs.py`, `sessions.py`; test `brain/tests/test_offers.py`, `test_config.py`.
 
 **Interfaces:**
+
 - Consumes: `Memory.person_approvals_since/offers_for/has_preference_for/add_offer/add_preference`, `Asks.open`, `Model`, `Budget`.
 - Produces `Config.offer_min_approvals=3`, `offer_window_days=14`, `keep_asking_days=7` from `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS`, `TAGALONG_KEEP_ASKING_DAYS` (positive ints, same error style as `TAGALONG_WAKES_PER_HOUR`).
 - Produces `OfferSettings(min_approvals, window_days, keep_asking_days)` and `Offers(model, budget, memory, asks, notify, settings, now)` with `consider(group_key: str, source: str, tool: str) -> None`, called after a person approval (fire and forget; the task is kept in a set so it is not collected). Conditions in order: anyone online; no person preference for the group; last offer/look older than 1 day; no `keep_asking` within `keep_asking_days`; `person_approvals_since(window) >= min_approvals`; budget allows. Then one look (model tools `offer(sentence: str)` and `no_offer()`), recorded as an `offers` row (`none` when no offer, so a look is capped to 1/day). On `offer`: `Asks.open(text=<lead naming the group, count and the proposed sentence>, options=["Yes, auto-approve","Keep asking"], tool="approval_offer", input={"sentence": sentence, "group": group_key}, timeout=600)`; yes saves the preference (source, tool, group) and sends `changed: approvals`; Keep asking records `keep_asking`; timeout, cancel or error records `no_answer` and saves nothing.
@@ -191,6 +198,7 @@ Target about 750 changed lines. New: `bodies/ui/src/home/approvals-view.tsx`, `p
 **Files:** modify `bodies/ui/src/host-bridge.ts`, `test-support/fake-host-bridge.ts`, `bodies/desktop/src/shared/ipc.ts`, `src/preload/index.ts`; create `bodies/desktop/src/main/ipc/approvals.ts` and register it in `main/index.ts`; test `ipc/approvals.test.ts`.
 
 **Interfaces:**
+
 - Produces types `ApprovalRow {id:number; source:'scout_tool'|'claude_code'|'app'; tool:string; summary:string; outcome:'approved'|'refused'|'timed_out'|'no_one'; decidedBy:'person'|'scout'|'none'; preference:string|null; at:string}`, `ApprovalCounts {total:number; scout:number; refused:number}`, `PreferenceRow {id:number; sentence:string; builtin:boolean; createdAt:string; useCount:number; lastUsed:string|null}`.
 - Produces optional bridge methods `listApprovals?(filter:'all'|'scout'|'refused', before?:number): Promise<{approvals:ApprovalRow[]; counts:ApprovalCounts; next:number|null}>`, `listPreferences?(): Promise<PreferenceRow[]>`, `removePreference?(id:number): Promise<void>`, `editPreference?(id:number, sentence:string): Promise<void>`, and `onApproved?(handler:(n:{tool:string; text:string; preference:string})=>void): () => void`. Handlers call the Home tools `list_approvals`, `list_preferences`, `remove_preference`, `edit_preference` through `callJson` and map snake_case to camelCase, as `ipc/jobs.ts` does.
 
@@ -205,6 +213,7 @@ Target about 750 changed lines. New: `bodies/ui/src/home/approvals-view.tsx`, `p
 **Files:** create `approvals-view.tsx`, `preferences-list.tsx`, `approval-history.tsx` and tests in `bodies/ui/src/home/`; modify `home-view.tsx` (add `'approvals'` to `HomePage` and `PAGES`, after Connections; update the page-count comment) and `home-styles.ts`.
 
 **Interfaces:**
+
 - Consumes: bridge methods from Task 1; `onBrainChanged` (`what === 'approvals'` refetches).
 - Produces `ApprovalsView()` (no props) showing: title and sub-line; "Standing preferences" cards (sentence, agreed date, used N times, last used, Remove; Edit inline with Save/Cancel; the built-in default shown like any other); the summary strip (`total` asks, `scout` "Scout answered", `refused` "refused") above the history; segmented filter "All / Decided by Scout / Refused" with counts, `aria-pressed`; history grouped by day (Today, Yesterday, date) with time, source icon and label, summary, outcome chip (Approved / Refused / Timed out / No one online), and for Scout-decided rows the navy rail, "Scout decided, per your preference" plus the sentence, and an "Auto" pill; "Show more" using `next`. No nav badge.
 
@@ -219,6 +228,7 @@ Target about 750 changed lines. New: `bodies/ui/src/home/approvals-view.tsx`, `p
 **Files:** modify `bodies/ui/src/companion-bubble.tsx` (+ `companion-bubble.test.tsx`), bubble event wiring in the desktop renderer host.
 
 **Interfaces:**
+
 - Consumes: `bridge.onApproved`.
 - Produces a small card "Approved for you: {text}" with the line "per '{preference}'" that fades with the bubble's normal notice timing; no Scout speech. The offer is an existing custom-option ask (`tool: "approval_offer"`, text from the brain, options "Yes, auto-approve" / "Keep asking"); no new ask component. The richer labelled-row offer from the mockup is not built here.
 

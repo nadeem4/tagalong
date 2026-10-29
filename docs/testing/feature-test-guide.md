@@ -12,6 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
+- [Approvals history (real brain)](#approvals-history-real-brain)
 - [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
 - [Scout's timers (real brain)](#scouts-timers-real-brain)
 - [Scout notices you (real brain, desktop)](#scout-notices-you-real-brain-desktop)
@@ -454,6 +455,33 @@ Needs the same setup as the hand-off section above, with the desktop connected.
 3. The fallback when the daily budget is spent (the card appears at once, since Scout cannot wake)
    cannot be followed by hand and is covered by the test
    `test_budget_spent_falls_back_to_the_user_card`.
+
+## Approvals history (real brain)
+
+Needs the real brain and the desktop, and the hand-off setup above for the Claude Code steps. Home
+has no Approvals page yet, so read the history with a `call` to the brain (any websocket client
+that sends `hello`, then `call {tool: "list_approvals", input: {}}`).
+
+1. **Action:** call `list_preferences` on a fresh data folder.
+   **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
+2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow
+   once**. Ask again and press **Deny**. Ask a third time and let it sit for 5 minutes.
+   **Expected:** `list_approvals` lists three rows for that tool, newest first: `timed_out`
+   (`decided_by: "none"`), `refused` and `approved` (both `decided_by: "person"`), with
+   `source: "scout_tool"` and a summary of the words Scout wrote before the call. `counts.total` is 3 and
+   `counts.refused` is 1.
+3. **Action:** hand off a task that edits a file in Manual mode. Allow one permission ask and
+   refuse another.
+   **Expected:** two more rows with `source: "claude_code"`, `tool` starting `claude_code:`, and a
+   `job_id`. `list_approvals {filter: "refused"}` returns only the refused ones.
+4. **Action:** with nobody connected, a job asks for permission (close the desktop mid-job).
+   **Expected:** a row with `outcome: "no_one"`.
+5. **Action:** press **cancel** on a pending ask, and run a tool that is set to `auto`.
+   **Expected:** no row for either.
+6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
+   **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
+   stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is
+   `invalid_params`.
 
 ## Scout speaks first: job reports (real brain)
 

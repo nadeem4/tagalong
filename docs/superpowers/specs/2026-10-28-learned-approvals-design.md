@@ -30,8 +30,8 @@ preference the person agreed to in so many words.
 ## Non-goals
 
 - No rules engine, no allowlists, no command parsing, no pattern matching in code. Code
-  decides *when* Scout looks; Scout (the model) decides *if* a preference covers an ask and
-  *what* to offer.
+  decides _when_ Scout looks; Scout (the model) decides _if_ a preference covers an ask and
+  _what_ to offer.
 - No automatic preferences. Counts trigger a look, never a switch.
 - No change to the existing per-tool Ask/Auto modes; Auto tools still never ask.
 
@@ -82,7 +82,7 @@ preference the person agreed to in so many words.
 - **Fallbacks:** decision turn errors, times out (20 s), or hits the budget → the ask goes to
   the person. Nobody online → today's behaviour.
 - **When Scout considers an offer:** after the person approves an ask, the brain checks the
-  *group* it belongs to: for Claude Code, the job's folder (all Claude Code tools in one
+  _group_ it belongs to: for Claude Code, the job's folder (all Claude Code tools in one
   folder are one group, since titles vary per command); for Scout and app tools, the tool
   name. If the group has 3+ approvals by the person in the last 14 days, Scout gets one quiet
   look at that group's history and decides whether to offer and what the sentence covers

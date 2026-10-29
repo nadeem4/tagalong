@@ -35,6 +35,30 @@ flowchart TD
 - Code: `brain/src/brain/asks.py` and gate step 3 in `brain/src/brain/toolbox.py`. Details are in
   [brain.md](brain.md#permissions-and-asks).
 
+### Approvals history and preferences
+
+Every ask that reaches an end is logged in `tagalong.db` by `Approvals`
+(`brain/src/brain/approvals.py`). The log is never pruned. Each row is sent to every body as
+`changed {what: "approvals"}`.
+
+| Table         | Holds                                                                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approvals`   | One row per ask: `source`, `tool`, `summary` (at most 200 characters), `input`, `job_id`, `group_key`, `outcome`, `decided_by`, `preference_id`, `at` |
+| `preferences` | Plain sentences. "Always ask me before risky actions" is seeded once as the built-in default; it can be edited or removed, and stays removed          |
+| `offers`      | Reserved for LA2 (Scout asking whether to handle a kind of ask for you); nothing writes it yet                                                        |
+
+- **outcome** is `approved`, `refused`, `timed_out` or `no_one`. **decided_by** is `person`,
+  `scout` or `none` (a timeout or nobody online). Only `person` is written today; `scout` comes
+  with LA2.
+- **Where it is recorded.** `Toolbox._ask` logs Scout's tools (`source` `scout_tool`), body tools
+  (`scout_tool`) and connected-app tools (`app`); `group_key` is the tool name. `Always` counts as
+  `approved`. `Jobs._permission` logs Claude Code's permission asks (`claude_code`): `tool` is
+  `claude_code:<title>` and `group_key` is `claude_code:<job folder>`.
+- **Not recorded.** A cancelled ask, and tools in `auto` mode, which never ask.
+- **Home calls** (audience `home`, never offered to the model): `list_approvals`,
+  `list_preferences`, `remove_preference`, `edit_preference`. See
+  [brain.md](brain.md#home-tools).
+
 ## Where it lives (old brain)
 
 | File                                             | What it holds                                                                                                                         |

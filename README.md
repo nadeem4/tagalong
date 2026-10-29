@@ -71,6 +71,11 @@ When Scout's brain wants to use a tool that needs your say-so, the bubble asks i
 with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
 queue and show one at a time; if the brain is offline when you click, the card stays up.
 
+The brain keeps a history of every such ask and how it ended (approved, refused, timed out, or no
+one was there), for Scout's tools and for Claude Code's permission asks. It also keeps plain-sentence
+preferences, starting with "Always ask me before risky actions". Nothing in Home shows them yet; Scout
+acting on them and the Approvals page come later. See [docs/asks.md](docs/asks.md).
+
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
 `TAGALONG_WAKES_PER_HOUR` (default 12). Scout can also set its own timers (a reminder, or a
