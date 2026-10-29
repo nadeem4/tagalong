@@ -12,6 +12,9 @@ export type {
   ConfirmHandoff,
   HostBridge,
   JobRow,
+  ApprovalRow,
+  ApprovalCounts,
+  PreferenceRow,
   PermissionRow,
   SpendToday,
   TurnEvent,
@@ -19,6 +22,7 @@ export type {
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
+export { ApprovedReport } from './approved-card';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
 export type { BeanFigure, DockMood, DockPetProps, ListeningDot } from './dock-pet';

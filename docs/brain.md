@@ -325,7 +325,7 @@ so there is one gate and no second path.
 The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
 plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
 every recorded ask and every preference the offer saves. In `list_approvals`, `preference` is the
-sentence as it was when Scout approved, so later edits or removals do not change old rows. The history is described in [asks.md](asks.md#approvals-history-and-preferences).
+sentence as it was when Scout approved, so later edits or removals do not change old rows. The history is described in [asks.md](asks.md#approvals-history-and-preferences); Home's Approvals page that shows it is in [bubble.md](bubble.md#home).
 
 | Tool                | Input                                                    | Result text (JSON)                                                                                                                                                                                                                                              |
 | ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

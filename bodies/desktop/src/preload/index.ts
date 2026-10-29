@@ -41,7 +41,10 @@ import type {
   BrainLink,
   DropOffer,
   HostBridge,
+  ApprovalCounts,
+  ApprovalRow,
   JobRow,
+  PreferenceRow,
   PermissionRow,
   SpendToday,
   TurnEvent,
@@ -172,6 +175,26 @@ const bridge: HostBridge = {
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
+  listApprovals: (filter: 'all' | 'scout' | 'refused', before?: number) =>
+    ipcRenderer.invoke(IPC.listApprovals, filter, before) as Promise<{
+      approvals: ApprovalRow[];
+      counts: ApprovalCounts;
+      next: number | null;
+    }>,
+  listPreferences: () => ipcRenderer.invoke(IPC.listPreferences) as Promise<PreferenceRow[]>,
+  removePreference: (id: number) => ipcRenderer.invoke(IPC.removePreference, id) as Promise<void>,
+  editPreference: (id: number, sentence: string) =>
+    ipcRenderer.invoke(IPC.editPreference, id, sentence) as Promise<void>,
+  onApproved: (
+    handler: (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void,
+  ) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      n: { tool: string; text: string; preference: string; cameUp?: boolean },
+    ): void => handler(n);
+    ipcRenderer.on(IPC.approvedEvent, listener);
+    return () => void ipcRenderer.off(IPC.approvedEvent, listener);
+  },
   copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   setCalendarLink: (link: string | null) =>
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,

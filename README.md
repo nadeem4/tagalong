@@ -76,8 +76,8 @@ one was there), for Scout's tools, connected-app tools and Claude Code's permiss
 preferences, starting with "Always ask me before risky actions". After you have allowed the same
 kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
 preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
-under that preference, then tells you which one. Anything unclear still comes to you. Nothing in
-Home shows the history yet; the Approvals page comes later. See [docs/asks.md](docs/asks.md).
+under that preference, then tells you which one. Anything unclear still comes to you. Home's
+**Approvals** page shows all of it. See [docs/asks.md](docs/asks.md).
 
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
@@ -358,7 +358,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in twelve pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in thirteen pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code)
   (**Spend**), and the latest activity. Spend shows the dollars spent today against the daily limit,
@@ -433,6 +433,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
     **Cancel**.
+- **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **Activity**: every answer, every hand-off, every call to an app and every routine run, newest
   first. Click one to read it.
 - **How Scout decided**: every decision Scout made, newest first, including each time it chose to

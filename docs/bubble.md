@@ -22,6 +22,7 @@ decides to hand to it.
 | `answer.tsx`                                                                                          | `Answer` (Markdown), `DraftBlock` (a draft with Copy), `ANSWER_CSS`                            |
 | `handoff-card.tsx`                                                                                    | `ProposalCard`, `HandoffStatus`, `Handoff`, `withProgress`, `undelivered`, `HANDOFF_CSS`       |
 | `connector-confirm.tsx`, `routine-card.tsx`, `settings-card.tsx`, `pick-up-card.tsx`, `drop-card.tsx` | The other cards in the bubble                                                                  |
+| `approved-card.tsx`                                                                                   | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`             |
 | `health-ask.ts`, `health.ts`, `health-card.tsx`                                                       | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard`       |
 | `stop-status.ts`                                                                                      | `stopStatus`: the quiet line for a turn that ended with nothing said                           |
 | `status-mark.tsx`                                                                                     | `StatusMark` (`tag` and `row`)                                                                 |
@@ -154,6 +155,13 @@ by `--tg-voice-level`) doubles as **Stop speaking**. The talk status line says "
 with “Scout” to ask.", "Listening paused during a call or full screen.", "Listening… let go of the
 key, or click the mic, to send." or "Turning that into text…", plus any `talk.note` and the words
 heard so far (`aria-live="off"`).
+
+**The "Approved for you" card.** It is not one of the bubble's cards: the desktop panel hosts it
+(`ApprovedReport`, subscribed to `bridge.onApproved`) above whatever the panel shows, the bubble or
+a quiet line, so it appears either way. It is a quiet "Approved for you: {text}" with "per
+'{preference}'", no speech and no buttons, and it goes after about 7 seconds. When main brought a
+hidden panel up only for it (`cameUp` on the notice), the panel hides again as the card goes; a
+panel that was already showing is left alone.
 
 **The cards.** Below the answer, in this order: the pick-up card, the drop card, the connector
 confirm card, the routine card, the settings card, then the hand-off card (proposed, or working and
@@ -376,22 +384,23 @@ slot.
 `listModels(providerId)`, `savePet(pet)` and an optional `status()` (the overview's line: "Ready"
 only when Scout can think and see, from `overviewStatus(scoutBrain(...), paused)`).
 
-The nav lists twelve pages (`HomePage`), the companion's name filling in where it appears:
+The nav lists thirteen pages (`HomePage`), the companion's name filling in where it appears:
 
-| Page (`HomePage`)               | Component                  | Reads and writes                                                                                     |
-| ------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Overview (`overview`)           | `Overview`                 | `host.status()`, `listExperts`, `listActivity({ limit: 3 })`; the Spend card (`usageSummary`)        |
-| Waiting on you (`waiting`)      | `WaitingView`              | `listAsks`, `answerAsk`, `openAsk`; re-reads on `asks.changed`                                       |
-| Scout (`scout`)                 | `ScoutPanel`               | provider and model, `host.listModels`, `host.savePet`                                                |
-| Experts (`experts`)             | `ExpertsPanel`             | `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`          |
-| Routines (`routines`)           | `RoutinesPanel`            | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, the calendar link |
-| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`  |
-| Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                 |
-| How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                 |
-| What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                  |
-| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                               |
-| What Scout learned (`learned`)  | `LearnedView`              | `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`                           |
-| Settings (`settings`)           | the host's `settings` slot | the host's settings form                                                                             |
+| Page (`HomePage`)               | Component                  | Reads and writes                                                                                                    |
+| ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Overview (`overview`)           | `Overview`                 | `host.status()`, `listExperts`, `listActivity({ limit: 3 })`; the Spend card (`usageSummary`)                       |
+| Waiting on you (`waiting`)      | `WaitingView`              | `listAsks`, `answerAsk`, `openAsk`; re-reads on `asks.changed`                                                      |
+| Scout (`scout`)                 | `ScoutPanel`               | provider and model, `host.listModels`, `host.savePet`                                                               |
+| Experts (`experts`)             | `ExpertsPanel`             | `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`                         |
+| Routines (`routines`)           | `RoutinesPanel`            | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, the calendar link                |
+| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`                 |
+| Approvals (`approvals`)         | `ApprovalsView`            | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')` |
+| Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                                |
+| How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                                |
+| What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                                 |
+| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                              |
+| What Scout learned (`learned`)  | `LearnedView`              | `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`                                          |
+| Settings (`settings`)           | the host's `settings` slot | the host's settings form                                                                                            |
 
 - **Navigation.** The `page` prop selects a page when the host names one (main's
   `homePageEvent`, through `homeTarget`, which also splits `settings#<section>` for a Fix it and
@@ -406,6 +415,22 @@ The nav lists twelve pages (`HomePage`), the companion's name filling in where i
   expert no longer available"; all but Approved add "Nothing was changed." Empty: "Nothing is
   waiting on you." A failed answer shows as an alert. Risk classes, expiry and outcomes are in
   [asks.md](asks.md).
+- **Approvals.** `ApprovalsView` (`home/approvals-view.tsx`) has two halves. `PreferencesList`
+  (`preferences-list.tsx`) lists "STANDING PREFERENCES", the built-in default first: each card shows
+  the sentence, "Agreed {day}", "Used {n} times" and "Last used" once used, with **Edit** (an inline
+  field with **Save** and **Cancel**; an empty sentence is refused) and **Remove**. A refusal from
+  the brain shows as an alert in the brain's own words (Electron's "Error invoking remote method"
+  prefix is stripped, as on the Connections page); **Cancel** clears it. With none: "None yet. Scout offers one
+  after you approve the same kind of thing a few times." `ApprovalHistory` (`approval-history.tsx`)
+  shows a summary strip (asks, Scout answered, refused), the **All** / **Decided by Scout** /
+  **Refused** filter with its counts, and rows grouped by local day (Today, Yesterday, then the date):
+  time, what was asked, where it came from (Claude Code expert, Scout tool, Connected app), who
+  decided, and a chip (Approved, Refused, Timed out, No one online). A Scout row reads "Scout decided,
+  per your preference" with the sentence it relied on, and an "Auto" pill. **Show more** pages back
+  with `before: next`; a click while that read is out is ignored, and an answer for a list since
+  re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert. A
+  bridge without `listApprovals` (an old body) renders nothing. `e2e/approvals.spec.ts` covers it on
+  the fake brain.
 - **Activity.** `ActivityView` reads 30 entries a page (`PAGE`), newest first, and **Show older** pages
   back with `before: next`. It re-reads the first page on `changesActivity(event)`: `turn.started`,
   `turn.completed`, `turn.error`, `handoff.finished`, `routine.result`, `routines.changed` (a

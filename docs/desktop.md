@@ -416,6 +416,19 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   The old `ExpertsPanel` under it calls the retired engine (`engine()` throws), so it does not
   work; do not rely on it. `e2e/jobs.spec.ts` covers the panel on the fake brain.
+- **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses
+  `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`
+  (`ipc/approvals.ts`, channels `tagalong:approvals:list`, `tagalong:approvals:preferences:list`,
+  `...:remove` and `...:edit`). The brain's snake_case rows become `ApprovalRow` and
+  `PreferenceRow`; a bad filter or id is refused before the brain, a malformed reply rejects, and a
+  refusal from the brain rejects so the page can say so. The page reads again on `changed { what:
+"approvals" }`. The `approved { tool, text, preference }` notification is sent to every window on
+  `IPC.approvedEvent` (preload: `onApproved`) and brings the bubble up without the keyboard
+  (`bringUpBubble(false)`), where the "Approved for you" card shows. The event carries `cameUp`
+  (true when the panel was hidden): the panel's `ApprovedReport` shows the card over the bubble or a
+  quiet line, and hides the panel again when the card's hold ends if `cameUp` (a panel shown
+  without focus never blurs). `e2e/approvals.spec.ts` covers
+  the page, Remove, the Scout filter, the report card and an offer ask on the fake brain.
 - **Job asks:** a Claude Code job asks the person through the same `ask` path, but without
   `confirm` and with its own options. Three cases, all shown as a card in the bubble even with
   no turn running (the bubble is brought up on `connector.confirm`): the hand-off mode ask (tool

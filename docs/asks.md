@@ -61,6 +61,8 @@ Every ask that reaches an end is logged in `tagalong.db` by `Approvals`
 - **Home calls** (audience `home`, never offered to the model): `list_approvals`,
   `list_preferences`, `remove_preference`, `edit_preference`. See
   [brain.md](brain.md#home-tools).
+- **Seen in Home.** The Approvals page shows the preferences and this history, and the bubble shows
+  the "Approved for you" card; see [bubble.md](bubble.md#home) and [desktop.md](desktop.md).
 
 ### Scout approves under your preferences
 
@@ -86,7 +88,7 @@ Scout never refuses; only you do. When it approves, it approves once: for tools 
 as it is, and for Claude Code it picks the `allow_once` option, never `allow_always`. The row is
 saved with `decided_by: "scout"` and the preference, the preference's use count goes up, and the
 `approved` notification `{tool, text, preference}` goes to every body so you see what Scout did and
-why. The model's spend counts toward the daily budget.
+why: the desktop panel shows a card "Approved for you: {text}" and "per '{preference}'" (`approved-card.tsx`) over whatever it is showing, a bubble or a quiet line. If the panel was hidden it comes up quietly and hides again when the card fades, after about 7 seconds. The model's spend counts toward the daily budget.
 
 ### Scout offers a preference
 

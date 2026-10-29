@@ -56,7 +56,7 @@ function envLines(text: string): Record<string, string> | string {
 }
 
 /** A failed call's own words: Electron wraps them in "Error invoking remote method '…': Error: ". */
-function failure(error: unknown): string {
+export function failure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, '');
 }

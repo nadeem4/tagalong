@@ -1,6 +1,6 @@
 /** Tests for CompanionBubble and GreetingLine: asking, chips, full chat, talk and voice. */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -891,5 +891,36 @@ describe('GreetingLine with a status mark', () => {
     expect(screen.getByTestId('status-row')).toHaveTextContent('Can’t think: no API key.');
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
     expect(onFix).toHaveBeenCalledWith('brain');
+  });
+});
+
+// The "Approved for you" card is hosted by the panel (ApprovedReport, approved-card.test.tsx).
+describe('the approval offer ask', () => {
+  it('an approval_offer ask renders its text and exactly two buttons and answering sends the chosen option', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'connector.confirm',
+        approvalId: '20000000-0000-4000-8000-000000000001',
+        turnId: '',
+        petId: 'scout',
+        app: 'Scout',
+        tool: 'approval_offer',
+        summary: 'You often say yes to edits here. Want me to approve them?',
+        options: ['Yes, auto-approve', 'Keep asking'],
+      }),
+    );
+    const card = screen.getByRole('region', { name: 'Scout asks' });
+    expect(card).toHaveTextContent('You often say yes to edits here. Want me to approve them?');
+    const buttons = within(card).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(['Yes, auto-approve', 'Keep asking']);
+    await act(async () => {
+      fireEvent.click(buttons[0]!);
+      await Promise.resolve();
+    });
+    expect(bridge.jobAnswers).toEqual([
+      { approvalId: '20000000-0000-4000-8000-000000000001', option: 'Yes, auto-approve' },
+    ]);
   });
 });
