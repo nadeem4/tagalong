@@ -598,10 +598,11 @@ screenshot is attached.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
   **Allow once**; every call is logged in Activity (which app and tool, never the content).
-- Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. Their
-  sign-in tokens are kept in the OS keychain and deleted on **Disconnect**. The Python brain keeps
-  an app's secrets in its own token file, not in the apps table, and saves chat, approvals, job
-  results and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
+- Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
+  Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
+  the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and
+  progress and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
+  The OS keychain applies only to the old TypeScript core.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 

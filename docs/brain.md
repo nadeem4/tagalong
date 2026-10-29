@@ -361,7 +361,7 @@ all six (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 | Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                                            |
 | ----------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "url" (http) or "command" + "args" (stdio), "status", "error", "tools": [{"name", "effect", "locked"}]}]}`                          |
-| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                                                                                      |
+| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`), env literals and secret url parts go to `app-tokens.json`, never the row                                                     |
 | `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                                                                                           |
 | `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and every secret of it                                                                                                              |
 | `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                                                                                                  |
@@ -644,10 +644,13 @@ order lives in one place. A side-check that raises or times out falls through to
 
 The `save` hook runs through `mask_json` over the new chat messages (`Session._persist`, which
 saves a masked copy while `history` keeps the real values for the live turn), an approval's
-summary and input (`Approvals`), a job's result (`Jobs._end`), and, through `SecretLogFilter` on
+summary and input (`Approvals`), a job's result (`Jobs._end`) and progress (`Jobs._progress`), and, through `SecretLogFilter` on
 every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
 characters and common key shapes with `[secret]`; its list of values is cached for 1 second. A
-guard that raises or blocks stores `[withheld]` instead of the raw text. The log filter calls the
+guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_json` leaves
+the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone, so
+a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
+when masking would change it; `redacted_thinking` blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
 prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 

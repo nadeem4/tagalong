@@ -1633,8 +1633,8 @@ Use fake values only. The brain's data folder holds `tagalong.db` and `app-token
 database with `sqlite3` or DB Browser for SQLite.
 
 - [ ] **Add an app** → **A command on this PC**, command `node`, args any script, env lines
-      `API_KEY=fake-secret-12345678` and `HOME_DIR=${HOME}`. In the `apps` table, the row's `config`
-      has no `fake-secret-12345678`; `HOME_DIR=${HOME}` is still there. `app-tokens.json` has
+      `API_KEY=fake-secret-12345678` and `HOME_DIR=${USERPROFILE}`. In the `apps` table, the row's `config`
+      has no `fake-secret-12345678`; `HOME_DIR=${USERPROFILE}` is still there. `app-tokens.json` has
       `"<app id>:env:API_KEY": "fake-secret-12345678"` and no key for `HOME_DIR`. The app still
       connects.
 - [ ] **Add an app** → **An address on the web** with
