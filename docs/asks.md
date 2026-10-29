@@ -32,6 +32,10 @@ flowchart TD
   `anyone_online` (nobody online: denied), `side_check` (Scout may approve once under your
   preference) and `person_ask` (the card you answer). Claude Code's permission asks use the same
   chain.
+- Expert ask while nobody is online: the expert is denied at once ("no answer"), and the brain
+  raises the `job_question` event keyed by the job, so Scout tells the owner what the expert asked
+  when someone returns. Only the latest such ask per job is kept: a second offline ask from the
+  same job replaces the first.
 - Options are `allow`, `always`, `deny`; a locked tool has no `always`, so "Always" stays hidden
   for it.
 - Locked rule: a locked tool (destructive hint or risky name, or a body's `confirm`) asks by

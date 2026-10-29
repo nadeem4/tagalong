@@ -3,6 +3,13 @@
 > This page describes the old `packages/core` engine. Claude Code hand-offs now live in the Python
 > brain: its `hand_off` tool, jobs, and the finish turn that reports a finished job. See
 > [brain.md](brain.md#jobs-and-tools).
+>
+> In the Python brain the person is told what an expert did, even when they were away. An expert
+> that finishes, stalls (hits the run limit) or dies is told once, as a `job_ended` event held until
+> a body is online. A question or permission an expert asks while nobody is online raises a
+> `job_question` event keyed by the job, told when someone returns; the expert still gets "no
+> answer" at once. That news is kept as the latest per job: a second offline ask from the same job
+> replaces the first. See [brain.md](brain.md#experts).
 
 ## Purpose
 

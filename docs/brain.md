@@ -27,6 +27,7 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                 |
 | `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                              |
 | `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                            |
+| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)   |
 | `TAGALONG_EXPERT_CMD`          | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line)                               |
 | `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`             | Longest an expert run may take, in seconds                                                              |
 | `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                |
@@ -138,6 +139,11 @@ flowchart TD
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
+- **Turn timeout.** A turn that runs longer than `TAGALONG_TURN_TIMEOUT_S` (300 s by default) is
+  stopped, so a stalled model cannot hold the conversation open. Time spent inside a tool batch,
+  including the wait for the person to answer an ask, does not count; model calls and guards do.
+  On timeout Scout sends one message ("Sorry, I took too long on that and had to stop. Ask me
+  again?") and the turn ends with `error`. History stays valid: an open `tool_use` is closed.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
 - History is append-only and always valid: a half-streamed message is never kept, and a
   `tool_use` always gets a `tool_result`, even on cancel.
@@ -218,7 +224,10 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
-  oversized result is an error result.
+  oversized result is an error result. A part is over the limit above 5,000,000 bytes, and all
+  parts of one result together above 20,000,000 bytes. An image or file part counts its decoded
+  size; a text part counts its UTF-8 bytes (not characters), so a body cannot send an unbounded
+  page of text. Both give `over_limit`: "<tool> sent more data than allowed."
 
 ## Permissions and asks
 
@@ -451,6 +460,13 @@ state, reason, and the result cut at 4,000 characters with `[trimmed]`). `report
 turn has started (a failed start leaves it unreported). At brain start every finished unreported
 job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
 from the owner; the model decides whether to speak, and may say nothing.
+
+The person is told what an expert did even when they were away. A finished, stalled (run limit) or
+dead expert arrives as `job_ended` and is held until a body is online, then told once. A question or
+permission an expert asked while nobody was online raises `job_question` with no question id, keyed
+by the job: nothing is open to answer, so the note tells the owner what the expert asked. The
+expert itself still gets "no answer" at once. The news is kept as the latest per job: a second
+offline ask from the same job replaces the first.
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
@@ -689,7 +705,8 @@ One function, one test, one `add` in `sessions.py`:
    passed in (never import `config`).
 
 The limits are `TAGALONG_DAILY_BUDGET_USD` and `TAGALONG_STEP_CAP` (see [Run it](#run-it)); no env
-name or meaning changed.
+name or meaning changed. The turn timeout `TAGALONG_TURN_TIMEOUT_S` is a plain argument to the
+turn loop, not a guard (see [What a turn does](#what-a-turn-does)).
 
 ## Not built yet
 

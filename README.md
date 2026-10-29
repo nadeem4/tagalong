@@ -363,7 +363,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code)
   (**Spend**), and the latest activity. Spend shows the dollars spent today against the daily limit,
   as the brain reports them. The brain's limit is $5 a day unless `TAGALONG_DAILY_BUDGET_USD` sets
-  another when the brain starts; the **Settings → Daily budget** box does not change it.
+  another when the brain starts; the **Settings → Daily budget** box does not change it. A single
+  Scout turn is also stopped after 300 seconds unless `TAGALONG_TURN_TIMEOUT_S` sets another;
+  Scout then says it took too long. Time spent in tools, or waiting for you to answer, does not count.
 - **Waiting on you**: every change Scout wants to make in a connected app and every hand-off card
   still waiting for Send, with **Allow once**, **Open** and **Decline**, and the last ones answered
   with how each ended. The nav shows how many wait. A change waits an hour and a card a day; a

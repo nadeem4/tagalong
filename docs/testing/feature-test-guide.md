@@ -352,6 +352,23 @@ desktop app. You need `uv` and an Anthropic key.
     chat never gets that long), then run the SQL check with step 7's python one-liner:
     `select kind, text from memories where kind='summary'`.
     **Expected:** one `summary` row per compaction.
+13. **Action:** stop the brain, set `TAGALONG_TURN_TIMEOUT_S=5`, start it, and `say` something that
+    makes Scout run a slow tool or wait on a stalled model (a model stub that never answers, or a
+    tool that sleeps longer than 5 s).
+    **Expected:** a stalled model ends the turn after about 5 s: one `reply` saying it took too
+    long ("Sorry, I took too long on that and had to stop. Ask me again?"), then `turn` `ended`
+    with `reason: "error"`. A slow tool alone does not trip it, and neither does waiting for you to
+    answer an ask, because time inside tool calls is not counted. A new `say` works.
+14. **Action:** hand a task to an expert (`hand_off`), then close the body (quit the desktop) while
+    it runs. Reopen the desktop after the expert has finished.
+    **Expected:** Scout tells you once that the expert finished (or stalled, or died). Repeat with
+    an expert that asks a question or for permission while the desktop is closed: when you reopen,
+    Scout tells you what it asked. If the same expert asked twice while you were away, only the
+    latest ask is told.
+15. **Action:** make a body tool return more than 5 MB of text (for example a page read of a very
+    large page).
+    **Expected:** the call ends as an error result `<tool> sent more data than allowed.`
+    (`over_limit`); Scout does not receive the text.
 
 ## The desktop on the Python brain
 

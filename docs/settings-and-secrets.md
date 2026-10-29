@@ -351,7 +351,9 @@ Guard limits are not settings here either. The brain's spend guards take `TAGALO
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
 environment or its `.env` (see [brain.md](brain.md#run-it) and
-[Guardrails](brain.md#guardrails)).
+[Guardrails](brain.md#guardrails)). The turn timeout is the same kind of setting:
+`TAGALONG_TURN_TIMEOUT_S` (default 300 seconds, a positive number) is read by `config.py`, passed
+to the session, and ends a Scout turn that runs too long.
 
 ## Failure handling
 
