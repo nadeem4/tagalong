@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 import pytest
 
 from brain.approvals import Approvals
+from brain.guards import Guards
+from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 
 
@@ -49,6 +51,22 @@ def test_record_notifies_changed_approvals(mem):
         "scout_tool",
     )
     assert row.at == "2026-10-28T09:00:00+00:00"
+
+
+def test_record_masks_summary_and_input(mem):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
+    Approvals(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
+        source="scout_tool",
+        tool="t",
+        summary="call with fake-token-12345678",
+        input={"url": "https://x/y?token=abcdef123", "h": "Bearer " + "A1b2C3d4E5f6G7h8i9"},
+        group_key="t",
+        outcome="approved",
+    )
+    [row] = mem.list_approvals("all", 10, None)
+    assert row.summary == "call with [secret]"
+    assert row.input == {"url": "https://x/y?token=[secret]", "h": "Bearer [secret]"}
 
 
 # --- Home tools ---------------------------------------------------------------------------

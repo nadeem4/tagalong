@@ -8,6 +8,8 @@ import asyncio
 import logging
 import os
 import sys
+import time
+from collections.abc import Callable
 from functools import partial
 
 from anthropic import AsyncAnthropic
@@ -17,6 +19,7 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertRun
 from brain.guardrails import Budget
+from brain.masking import Masker, SecretLogFilter
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
@@ -24,6 +27,20 @@ from brain.server import start_server
 from brain.sessions import Session
 
 log = logging.getLogger("brain")
+
+
+def cached[T](fn: Callable[[], T], ttl: float, clock: Callable[[], float] = time.monotonic):
+    """Reuse fn's result for ttl seconds: one chat save masks many strings, each asking for
+    the secret values, and fn re-reads files."""
+    box: list = []  # [expires_at, value]
+
+    def get() -> T:
+        now = clock()
+        if not box or now >= box[0]:
+            box[:] = [now + ttl, fn()]
+        return box[1]
+
+    return get
 
 
 async def _run() -> None:
@@ -47,6 +64,11 @@ async def _run() -> None:
     make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
+    masker = Masker(
+        cached(lambda: [*apps.secret_values(), os.environ.get("ANTHROPIC_API_KEY")], 1.0)
+    )
+    for handler in logging.getLogger().handlers:  # every logger reaches disk or the console here
+        handler.addFilter(SecretLogFilter(masker))
     session = Session(
         model,
         budget,
@@ -58,6 +80,7 @@ async def _run() -> None:
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
         turn_timeout=config.turn_timeout,
+        masker=masker,
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),

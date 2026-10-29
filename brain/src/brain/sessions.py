@@ -39,6 +39,7 @@ from brain.config import (
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.experts import ExpertRun
 from brain.jobs import Jobs, job_note
+from brain.masking import Masker, mask_json, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
@@ -75,6 +76,7 @@ class Session:
         kinds: dict[str, EventKind] | None = None,
         offers: OfferSettings = DEFAULT_OFFER_SETTINGS,
         turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
+        masker: Masker | None = None,
     ) -> None:
         self._model = model
         self._budget = budget
@@ -86,6 +88,8 @@ class Session:
         # One set of spend guards for the loop, the scheduler, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
+        if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
+            self.guards.add(mask_secrets(masker))
         notify = bodies.notify
         # main passes the configured command and timeout; the defaults keep tests short.
         make_run = make_run or partial(
@@ -105,7 +109,7 @@ class Session:
             kinds=kinds or EVENT_KINDS,
         )
         questions = ScoutQuestions(self.scheduler.emit)
-        approvals = Approvals(memory, notify, now)
+        approvals = Approvals(memory, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, guards=self.guards)
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
@@ -307,7 +311,8 @@ class Session:
     def _persist(self) -> None:
         # Saving is best effort: a full disk must not stop the ended notification.
         try:
-            new = self.history[self._saved :]
+            # A masked copy goes to disk; self.history keeps the real values for the live turn.
+            new = mask_json(self.guards, "chat", self.history[self._saved :])
             self._memory.save_messages(new)
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
             for message in new:

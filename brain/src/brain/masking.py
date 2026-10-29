@@ -1,9 +1,10 @@
-"""Masking secrets in text before it is saved: the `save` guard and a JSON walker.
+"""Masking secrets in text before it is saved: the `save` guard, a JSON walker and a log filter.
 
 Exact secret values (read fresh each call) and common key shapes become `[secret]`. Scout's live
 turn is not masked; only what reaches disk or logs. A masker that fails withholds the text.
 """
 
+import logging
 import re
 from collections.abc import Callable, Iterable
 from typing import Any
@@ -40,6 +41,32 @@ class Masker:
         for pattern, repl in _SHAPES:
             text = pattern.sub(repl, text)
         return text
+
+
+class SecretLogFilter(logging.Filter):
+    """Masks a record's message and traceback on the handler, so every logger is covered.
+
+    It calls the masker directly, not the guard runner: the runner can log, and a log line
+    that logs would loop. A masker that fails withholds the line.
+    """
+
+    def __init__(self, masker: Masker) -> None:
+        super().__init__()
+        self._masker = masker
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            msg = self._masker.mask(record.getMessage())
+            exc = None
+            if record.exc_info and record.exc_info[0] is not None:
+                exc = self._masker.mask(logging.Formatter().formatException(record.exc_info))
+            stack = self._masker.mask(record.stack_info) if record.stack_info else None
+        except Exception:
+            msg, exc, stack = WITHHELD, (WITHHELD if record.exc_info else None), None
+        record.msg, record.args = msg, None
+        record.exc_text = exc  # the formatter reuses it instead of formatting the raw traceback
+        record.stack_info = stack
+        return True
 
 
 def mask_secrets(masker: Masker) -> Guard:
