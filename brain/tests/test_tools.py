@@ -20,6 +20,7 @@ from brain.tools import (
     expert_tools,
     format_hits,
     home_tools,
+    question_tools,
     timer_tools,
 )
 
@@ -648,3 +649,44 @@ async def test_set_timer_with_a_naive_clock_still_gets_an_aware_time(mem):
     out = await handlers["set_timer"]({"note": "n", "in_minutes": 5})
     assert mem.list_timers()[0].next_at.tzinfo is not None
     assert out.startswith("timer ")
+
+
+class _FakeQuestions:
+    def answer(self, question_id, answers):
+        return "answered" if question_id == "q1" else f"no open question {question_id}."
+
+    def pass_to_user(self, question_id):
+        return "passed to the owner" if question_id == "q1" else f"no open question {question_id}."
+
+
+@pytest.fixture
+def qrun():
+    pairs = question_tools(_FakeQuestions())
+    handlers = {spec.name: handler for spec, handler in pairs}
+
+    async def call(name, args):
+        return await handlers[name](args)
+
+    call.specs = {spec.name: spec for spec, _ in pairs}
+    return call
+
+
+async def test_answer_expert_and_pass_question_specs_are_scout_only_and_auto(qrun):
+    assert set(qrun.specs) == {"answer_expert", "pass_question"}
+    for spec in qrun.specs.values():
+        assert spec.audience == frozenset({"scout"})
+        assert spec.effect == "change"
+        assert spec.default_mode == "auto"
+
+
+async def test_answer_expert_refusals_reach_the_model_as_text(qrun):
+    assert await qrun("answer_expert", {"question": "q1", "answers": {"a": "b"}}) == "answered"
+    assert await qrun("pass_question", {"question": "q1"}) == "passed to the owner"
+    with pytest.raises(MemoryRefused, match="no open question zz."):
+        await qrun("answer_expert", {"question": "zz", "answers": {}})
+    with pytest.raises(MemoryRefused, match="no open question zz."):
+        await qrun("pass_question", {"question": "zz"})
+    with pytest.raises(MemoryRefused, match="answer_expert needs"):
+        await qrun("answer_expert", {"question": "q1", "answers": "x"})
+    with pytest.raises(MemoryRefused, match="pass_question needs"):
+        await qrun("pass_question", {})

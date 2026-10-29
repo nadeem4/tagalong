@@ -17,6 +17,7 @@ from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
+from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import Handler, Toolbox, ToolSpec
 
@@ -497,5 +498,68 @@ def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[Too
                 effect="change",
             ),
             set_permission,
+        ),
+    ]
+
+
+def question_tools(questions: ScoutQuestions) -> list[tuple[ToolSpec, Handler]]:
+    """Scout's two ways to settle an expert's question; a refusal comes back as text."""
+
+    async def answer_expert(args: dict) -> str:
+        qid, answers = args.get("question"), args.get("answers")
+        if not isinstance(qid, str) or not isinstance(answers, dict):
+            raise MemoryRefused("answer_expert needs question (a string) and answers (an object).")
+        out = questions.answer(qid, answers)
+        if out != ANSWERED:
+            raise MemoryRefused(out)
+        return out
+
+    async def pass_question(args: dict) -> str:
+        qid = args.get("question")
+        if not isinstance(qid, str):
+            raise MemoryRefused("pass_question needs question (a string).")
+        out = questions.pass_to_user(qid)
+        if out != PASSED:
+            raise MemoryRefused(out)
+        return out
+
+    scout = frozenset({"scout"})
+    return [
+        (
+            ToolSpec(
+                "answer_expert",
+                "Answer a question an expert asked, in your own words, when you can from what "
+                "you know. answers maps every field key to one of its options, or to your own "
+                "text. If you cannot answer well, use pass_question instead.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string", "description": "The question id."},
+                        "answers": {"type": "object", "description": "Field key to answer."},
+                    },
+                    "required": ["question", "answers"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            answer_expert,
+        ),
+        (
+            ToolSpec(
+                "pass_question",
+                "Hand an expert's question to the owner to answer, when it needs their choice.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string", "description": "The question id."}
+                    },
+                    "required": ["question"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            pass_question,
         ),
     ]
