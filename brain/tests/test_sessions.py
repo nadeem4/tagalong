@@ -948,3 +948,26 @@ def test_toolbox_and_jobs_share_one_offers_service():
     session, _ = make(Gate([]))
     assert session.toolbox._offers is session.jobs._offers
     assert session.toolbox._offers is not None
+
+
+async def test_session_shares_one_guards_with_scheduler_and_loop():
+    class Broke(Open):
+        def allows(self):
+            return False
+
+    bodies = Bodies()
+    sent = []
+    bodies.notify = lambda m, p: sent.append((m, p))
+    memory = Memory(":memory:")
+    model = Gate(["never"])
+    session = Session(model, Broke(), bodies, 10, memory)
+    join(session, "desktop")
+    assert session.guards is session.scheduler._guards
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    assert sent[-1][1]["state"] == "ended" and sent[-1][1]["reason"] == "over_budget"
+    assert model.steps == ["never"]  # the loop never reached the model
+    session.jobs._on_finished(end_job(memory))
+    await settle()
+    brain_started = [p for m, p in sent if m == "turn" and p.get("started_by") == "brain"]
+    assert brain_started == [] and session.scheduler.next_due() is None

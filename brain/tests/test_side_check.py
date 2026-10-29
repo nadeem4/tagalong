@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from brain.guards import Hook, stop
 from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.side_check import AskFacts, SideCheck
@@ -181,3 +182,23 @@ async def test_a_huge_input_is_truncated_in_the_prompt(mem):
     await check(mem, model).decide(big)
     text = model.seen[0][1][0]["content"]
     assert "x" * 100 in text and len(text) < 8_000
+
+
+class StopGuards:
+    """A Guards stand-in whose every hook stops, so nothing here depends on the budget."""
+
+    def __init__(self):
+        self.hooks = []
+
+    async def run(self, hook, ctx):
+        self.hooks.append(hook)
+        return stop("no", "over_budget")
+
+
+async def test_decide_stops_when_the_guards_stop(mem):
+    pref(mem)
+    model = Model(approve(1))
+    guards = StopGuards()
+    side = SideCheck(model, Budget(), mem, guards=guards)
+    assert await side.decide(facts()) is None
+    assert model.calls == 0 and guards.hooks == [Hook.model_call]

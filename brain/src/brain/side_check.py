@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
 
+from brain.builtin_guards import spend_guards
+from brain.config import DEFAULT_STEP_CAP
+from brain.guards import Guards, Hook, ModelCallCtx
 from brain.memory import Memory, Preference
 from brain.mind.turn import Final, Model
 
@@ -62,7 +65,15 @@ def prompt_section(name: str) -> str:
 
 
 class SideCheck:
-    def __init__(self, model: Model, budget, memory: Memory, timeout: float = 20.0) -> None:
+    def __init__(
+        self,
+        model: Model,
+        budget,
+        memory: Memory,
+        timeout: float = 20.0,
+        guards: Guards | None = None,
+    ) -> None:
+        self._guards = guards or spend_guards(budget, DEFAULT_STEP_CAP)
         self._model = model
         self._budget = budget
         self._memory = memory
@@ -74,7 +85,8 @@ class SideCheck:
             return None
         if facts.locked and self._memory.default_preference() is not None:
             return None
-        if not self._budget.allows():
+        verdict = await self._guards.run(Hook.model_call, ModelCallCtx("side_check", None, 0))
+        if verdict.kind != "allow":
             return None
         try:
             async with asyncio.timeout(self._timeout):

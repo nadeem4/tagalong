@@ -7,12 +7,14 @@ once. A guard that raises counts as a block, so spend and tool hooks fail closed
 import dataclasses
 import inspect
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
+    from brain.events import EventKind
     from brain.toolbox import ToolSpec
 
 log = logging.getLogger("brain.guardrails")
@@ -90,7 +92,9 @@ class AskCtx:
 
 @dataclass(frozen=True)
 class EmitCtx:
-    """Filled in by G2."""
+    kind: "EventKind | None"
+    now: datetime
+    wakes: Sequence[tuple[datetime, str]]
 
 
 @dataclass(frozen=True)
