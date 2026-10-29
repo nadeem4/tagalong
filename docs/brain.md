@@ -596,21 +596,22 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
 
 ## Guardrails
 
-Every refusal goes through one runner, `guards.py`, so precedence and logging live once. A guard is
+The budget and the step cap go through one runner, `guards.py`, so precedence and logging live
+once; later slices move the tool gate, asks and wake caps onto it. A guard is
 a plain function that gets a context and returns a verdict. `sessions.py` builds one `Guards` set
 and hands it to the turn loop, the scheduler, the side-check and offers. The budget ledger stays in
 `guardrails.py`; the guards that use it are in `builtin_guards.py`.
 
 ### Hooks
 
-| Hook          | Runs                                | Built in G1                                |
-| ------------- | ----------------------------------- | ------------------------------------------ |
-| `model_call`  | Before each model call              | `daily_budget`, `step_cap`                 |
-| `emit`        | When the scheduler takes an event   | `daily_budget` (drops wakes once it's out) |
-| `tool_call`   | Before a tool runs                  | Later slice                                |
-| `ask`         | Before a permission ask reaches you | Later slice                                |
-| `tool_result` | After a tool returns                | Later slice                                |
-| `save`        | Before text is stored               | Later slice                                |
+| Hook          | Runs                                          | Built in G1                                                                                                            |
+| ------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                             |
+| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (the scheduler acts only on code `over_budget`: it drops all queued events; other verdicts are ignored) |
+| `tool_call`   | Before a tool runs                            | Later slice                                                                                                            |
+| `ask`         | Before a permission ask reaches you           | Later slice                                                                                                            |
+| `tool_result` | After a tool returns                          | Later slice                                                                                                            |
+| `save`        | Before text is stored                         | Later slice                                                                                                            |
 
 `model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
 offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports
@@ -628,20 +629,25 @@ offer. `step_cap` only counts turns. The budget guard is listed first so a spent
 
 `stop` carries the code the body already knows: `over_budget` or `step_cap`. The contract does not
 change. The first `block` or `stop` ends the run; otherwise the order is `ask`, then `rewrite`, then
-`allow`. A guard that raises counts as a `block` (reason `guard failed`, code `error`), so a broken
-spend check fails closed.
+`allow`. A guard that raises, or returns something that is not a verdict, counts as a `block`
+(reason `guard failed (<ExceptionClassName>)`, code `error`), so a broken spend check fails closed.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
     A[Guards.run hook, context] --> B[next guard for the hook]
-    B --> C{raised?}
+    B --> C{raised or not a verdict?}
     C -->|yes| D[block: guard failed]
     C -->|no| E[verdict]
     D --> F{block or stop?}
     E --> F
     F -->|yes| G[log one line, return it]
-    F -->|no| H{more guards?}
+    F -->|no| J{ask?}
+    J -->|yes| K[log one line, remember it]
+    J -->|no| L{allow_once on the ask hook?}
+    L -->|yes| M[return allow early]
+    L -->|no| H
+    K --> H{more guards?}
     H -->|yes| B
     H -->|no| I[return ask, else rewrite, else allow]
 ```
@@ -655,7 +661,7 @@ guard=<name> hook=<hook> verdict=<kind> reason=<text> turn=<id>
 ```
 
 `turn=<id>` is added only when a turn is known. `allow` is not logged. The line never holds tool
-input or result text, and a guard that raised logs the fixed words `guard failed`, not the error.
+input or result text, and a guard that raised logs `guard failed (<ExceptionClassName>)`, never the message.
 
 ### Adding a guard
 

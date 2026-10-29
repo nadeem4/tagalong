@@ -1,7 +1,8 @@
 """The guard runner: one ordered list of checks per hook, folded into a single verdict.
 
-Every refusal (budget, tool gate, masking) goes through here so precedence and logging live
-once. A guard that raises counts as a block, so spend and tool hooks fail closed.
+Refusals go through here so precedence and logging live once; in G1 that is the budget and the
+step cap (later slices move the tool gate, asks and wake caps). A guard that raises or returns
+a non-Verdict counts as a block, so spend and tool hooks fail closed.
 """
 
 import dataclasses
@@ -114,6 +115,8 @@ class _Fold:
         self.final: Verdict | None = None
 
     def feed(self, guard: Guard, verdict: Verdict) -> bool:
+        if not isinstance(verdict, Verdict):
+            raise TypeError("guard returned a non-Verdict")
         v = dataclasses.replace(verdict, guard=guard.name)
         if v.kind in ("block", "stop"):
             self._log(v)
@@ -126,13 +129,13 @@ class _Fold:
             self._log(v)
             self.asked = self.asked or v
         elif v.kind == "rewrite":
-            self.rewritten = v
             self.ctx = dataclasses.replace(self.ctx, text=v.value)
+            self.rewritten = v
         return False
 
-    def failed(self, guard: Guard) -> bool:
-        # Reason is fixed words: an exception's text could carry tool input.
-        return self.feed(guard, block("guard failed", "error"))
+    def failed(self, guard: Guard, exc: Exception) -> bool:
+        # Class name only: an exception's text could carry tool input.
+        return self.feed(guard, block(f"guard failed ({type(exc).__name__})", "error"))
 
     def result(self) -> Verdict:
         return self.final or self.asked or self.rewritten or ALLOW
@@ -162,10 +165,9 @@ class Guards:
                 v = g.check(fold.ctx)
                 if inspect.isawaitable(v):
                     v = await v
-            except Exception:
-                done = fold.failed(g)
-            else:
                 done = fold.feed(g, v)
+            except Exception as exc:
+                done = fold.failed(g, exc)
             if done:
                 break
         return fold.result()
@@ -179,10 +181,9 @@ class Guards:
                     if inspect.iscoroutine(v):
                         v.close()
                     raise TypeError("async guard on a sync hook")
-            except Exception:
-                done = fold.failed(g)
-            else:
                 done = fold.feed(g, v)
+            except Exception as exc:
+                done = fold.failed(g, exc)
             if done:
                 break
         return fold.result()

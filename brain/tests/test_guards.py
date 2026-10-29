@@ -137,6 +137,35 @@ async def test_raising_guard_is_block_with_code_error():
         assert "secret detail" not in v.reason and v.reason
 
 
+async def test_non_verdict_return_is_block_with_one_log_line(caplog):
+    caplog.set_level(logging.INFO, logger="brain.guardrails")
+    g = make(Guard("x", Hook.tool_call, lambda c: None))
+    v = await g.run(Hook.tool_call, None)
+    assert v.kind == "block" and v.code == "error"
+    assert len([r for r in caplog.records if r.name == "brain.guardrails"]) == 1
+    caplog.clear()
+    v = g.run_sync(Hook.tool_call, None)
+    assert v.kind == "block" and v.code == "error"
+    assert len([r for r in caplog.records if r.name == "brain.guardrails"]) == 1
+
+
+async def test_rewrite_on_ctx_without_text_is_block():
+    g = make(Guard("x", Hook.model_call, lambda c: rewrite("z")))
+    v = await g.run(Hook.model_call, MODEL)
+    assert v.kind == "block" and v.code == "error"
+
+
+async def test_raising_guard_logs_class_name_not_message(caplog):
+    caplog.set_level(logging.INFO, logger="brain.guardrails")
+
+    def boom(ctx):
+        raise RuntimeError("secret detail")
+
+    await make(Guard("x", Hook.tool_call, boom)).run(Hook.tool_call, None)
+    assert "guard failed (RuntimeError)" in caplog.text
+    assert "secret detail" not in caplog.text
+
+
 def test_run_sync_rejects_async_guard_as_block():
     async def a(ctx):
         return ALLOW
