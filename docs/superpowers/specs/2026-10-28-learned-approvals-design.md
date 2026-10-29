@@ -57,7 +57,7 @@ preference the person agreed to in so many words.
    a summary strip of counts above the history (from option B). Mockup:
    `.superpowers/brainstorm/56893-1793241461/content/approvals-home.html`.
 
-## Decisions (Claude's calls, adjustable after testing)
+## Decisions (defaults, adjustable after testing)
 
 - **When Scout looks first:** only if the person has at least one preference they created
   (the risky-actions default does not count). With none, asks go straight to the person as

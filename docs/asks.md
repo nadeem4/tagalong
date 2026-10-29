@@ -38,8 +38,7 @@ flowchart TD
 ### Approvals history and preferences
 
 Every ask that reaches an end is logged in `tagalong.db` by `Approvals`
-(`brain/src/brain/approvals.py`). The log is never pruned. Each row is sent to every body as
-`changed {what: "approvals"}`.
+(`brain/src/brain/approvals.py`). The log is never pruned. Each new row sends `changed {what: "approvals"}` to every body.
 
 | Table         | Holds                                                                                                                                                 |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |

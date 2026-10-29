@@ -476,7 +476,7 @@ that sends `hello`, then `call {tool: "list_approvals", input: {}}`).
    `job_id`. `list_approvals {filter: "refused"}` returns only the refused ones.
 4. **Action:** with nobody connected, a job asks for permission (close the desktop mid-job).
    **Expected:** a row with `outcome: "no_one"`.
-5. **Action:** press **cancel** on a pending ask, and run a tool that is set to `auto`.
+5. **Action:** press **Stop** on the turn while its ask is open, and run a tool that is set to `auto`.
    **Expected:** no row for either.
 6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and

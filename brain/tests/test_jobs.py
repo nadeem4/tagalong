@@ -656,7 +656,7 @@ async def test_permission_nobody_online_records_no_one(make_rig):
     real_open = asks.open
 
     async def open_then_go_offline(**kw):
-        if kw.get("tool"):  # the permission ask, not the hand-off
+        if kw.get("tool"):  # also the hand-off ask (tool="hand_off"): offline before _permission
             asks.online = False
         return await real_open(**kw)
 

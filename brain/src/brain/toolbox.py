@@ -223,6 +223,7 @@ class Toolbox:
         try:
             choice = await self._asks.permission(call, spec.name, spec.locked)
         except RpcError as exc:
+            # A cancelled ask is not a final outcome, so it records no row.
             if exc.code == ErrorCode.timeout:
                 record("timed_out", "none")
             raise
