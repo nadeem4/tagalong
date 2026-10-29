@@ -77,7 +77,8 @@ Scout can speak first. When a background job ends, the brain wakes Scout once (j
 repeating check, no more often than every 5 minutes); they survive a brain restart. Scout also
 notices when you come back after 5 minutes away or reopen the app after a long break, and knows
 which app is in front (never one you excluded, and none while sight is paused); it may greet you or
-stay silent, at most twice an hour per kind. See [docs/brain.md](docs/brain.md).
+stay silent, at most twice an hour per kind. When Claude Code asks a question during a job, Scout
+gets it first and answers from what it knows, or passes it to you. See [docs/brain.md](docs/brain.md).
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.

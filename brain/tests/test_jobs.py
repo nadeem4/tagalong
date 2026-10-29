@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from brain.asks import Answer
-from brain.experts import ExpertRun
+from brain.experts import ExpertRun, Question, QuestionField
 from brain.jobs import JobError, Jobs, job_note
 from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
@@ -30,6 +30,10 @@ class FakeAsks:
         self.open_ids: set[str] = set()
         self.closed_by_cancel: list[str] = []
         self.cancel_all_calls: list[list[str]] = []
+        self.online = True
+
+    def anyone_online(self) -> bool:
+        return self.online
 
     async def open(self, **kw):
         self.opened.append(kw)
@@ -52,8 +56,26 @@ class FakeAsks:
         self.cancel_all_calls.append(list(ask_ids))
 
 
+class FakeScout:
+    """Stands in for ScoutQuestions: ask() returns the scripted value."""
+
+    def __init__(self, result=None) -> None:
+        self.result = result
+        self.asked: list[tuple] = []
+        self.cancelled: list[str] = []
+        self.before_return = lambda: None
+
+    async def ask(self, job_id, question):
+        self.asked.append((job_id, question))
+        self.before_return()
+        return self.result
+
+    def cancel_job(self, job_id) -> None:
+        self.cancelled.append(job_id)
+
+
 class Rig:
-    def __init__(self, tmp_path, monkeypatch, asks, steps, max_running=2) -> None:
+    def __init__(self, tmp_path, monkeypatch, asks, steps, max_running=2, scout=None) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
@@ -75,6 +97,7 @@ class Rig:
             max_running=max_running,
             on_finished=self.finished.append,
             clock=lambda: self.now,
+            scout_questions=scout,
         )
 
     def make_run(self, **callbacks) -> ExpertRun:
@@ -492,3 +515,78 @@ def test_job_note_without_a_result_or_reason():
     )
     note = job_note(job)
     assert "stopped" in note and "[trimmed]" not in note
+
+
+# --- expert questions go to Scout first (10d) ---
+
+ASK_COLOUR = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
+
+
+def reply_of(rig):
+    return next(f for f in rig.frames() if f.get("result", {}).get("action"))["result"]
+
+
+async def test_scout_answer_goes_to_the_expert_and_no_user_ask_opens(make_rig):
+    scout = FakeScout({"question_0": "Blue"})
+    rig = make_rig(FakeAsks(Answer("Plan")), ASK_COLOUR, scout=scout)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert len(rig.asks.opened) == 1  # only the hand-off ask
+    assert reply_of(rig)["content"] == {"question_0": "Blue"}
+    assert scout.asked[0][1].message == "Which colour?"
+
+
+async def test_scout_pass_opens_the_users_question_card_as_before(make_rig):
+    scout = FakeScout(None)
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Red")), ASK_COLOUR, scout=scout)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    ask = rig.asks.opened[1]
+    assert (ask["text"], ask["options"], ask["free_text"]) == (
+        "Which colour?",
+        ["Red", "Blue"],
+        True,
+    )
+    assert "tool" not in ask
+    assert reply_of(rig)["content"] == {"question_0": "Red"}
+
+
+async def test_ask_with_nobody_online_skips_scout_and_cancels(make_rig):
+    scout = FakeScout({"question_0": "Blue"})
+    asks = FakeAsks(Answer("Plan"), Answer(None))
+    rig = make_rig(asks, ASK_COLOUR, scout=scout)
+    await rig.jobs.start("go", str(rig.folder))
+    asks.online = False
+    await until(lambda: rig.finished)
+    assert scout.asked == []
+    assert reply_of(rig)["action"] == "cancel"
+
+
+@pytest.mark.parametrize("result", [None, {"question_0": "Blue"}])
+async def test_job_stopped_while_scout_thinks_opens_no_ask(make_rig, result):
+    scout = FakeScout(result)
+    rig = make_rig(FakeAsks(), scout=scout)
+    rig.jobs._runs["j1"] = object()  # a running job, stopped while Scout thinks
+    scout.before_return = lambda: rig.jobs._runs.pop("j1")
+    question = Question("Which?", [QuestionField("question_0", "Q", ["A"])])
+    assert await rig.jobs._question("j1", question) is None
+    assert scout.asked and rig.asks.opened == []
+
+
+async def test_permission_asks_never_go_to_scout(make_rig):
+    steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
+    scout = FakeScout({"question_0": "Blue"})
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Yes")), steps, scout=scout)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert scout.asked == []
+    assert rig.asks.opened[1]["tool"] == "claude_code:ls -la"
+
+
+async def test_cancel_job_is_called_when_a_job_ends(make_rig):
+    scout = FakeScout()
+    steps = [{"text": "done"}, {"end": "end_turn"}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, scout=scout)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert scout.cancelled == [job_id]

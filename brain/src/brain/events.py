@@ -36,6 +36,7 @@ _KINDS = (
     EventKind("job_ended", batch_seconds=30, max_per_hour=10),
     EventKind("body_online", batch_seconds=0, max_per_hour=2),
     EventKind("back", batch_seconds=0, max_per_hour=2),
+    EventKind("job_question", batch_seconds=None, max_per_hour=None),
     EventKind("focus", wakes=False),
 )
 EVENT_KINDS: dict[str, EventKind] = {k.name: k for k in _KINDS}

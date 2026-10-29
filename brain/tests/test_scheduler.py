@@ -351,3 +351,104 @@ async def test_failed_start_still_rearms_the_timer_for_other_groups():
     rig.scheduler.emit(ev("ping"))  # starts now and fails
     assert rig.scheduler._timer is not None
     rig.scheduler._timer.cancel()
+
+
+def test_on_drop_runs_for_each_dropped_event_when_the_budget_is_spent():
+    rig = Rig(budget=Spent())
+    dropped = []
+    rig.scheduler.emit(ev("ping"), on_drop=lambda: dropped.append("a"))
+    rig.scheduler.emit(ev("single"), on_drop=lambda: dropped.append("b"))
+    assert rig.starts == []
+    assert sorted(dropped) == ["a", "b"]
+
+
+def test_on_end_runs_when_the_wake_turn_ends():
+    rig = Rig()
+    ended = []
+    rig.scheduler.emit(ev(), on_end=lambda: ended.append(1))
+    assert ended == []
+    rig.scheduler.turn_ended("other")
+    assert ended == []
+    rig.scheduler.turn_ended("t1")  # the id start returned
+    assert ended == [1]
+    rig.scheduler.turn_ended("t1")
+    assert ended == [1]
+
+
+def test_on_end_does_not_run_for_a_replaced_event():
+    rig = Rig()
+    rig.busy = True
+    ended = []
+    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda: ended.append("old"))
+    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda: ended.append("new"))
+    rig.busy = False
+    rig.scheduler.pump()
+    rig.scheduler.turn_ended("t1")
+    assert ended == ["new"]
+
+
+def test_key_replaces_a_held_event_of_a_never_merged_kind():
+    rig = Rig()
+    rig.busy = True
+    ran = []
+    rig.scheduler.emit(ev("single", key="k", a="old"), on_start=lambda: ran.append("old"))
+    rig.scheduler.emit(ev("single", key="k", a="new"), on_start=lambda: ran.append("new"))
+    rig.scheduler.emit(ev("single", key="other", a="third"))
+    rig.busy = False
+    rig.scheduler.pump()
+    assert "a: new" in rig.text(0) and "old" not in rig.text(0)
+    rig.scheduler.turn_ended("t1")
+    assert "third" in rig.text(1)
+    assert ran == ["new"]
+
+
+def test_job_question_wakes_twice_even_with_the_hourly_cap_used_up():
+    from brain.events import EVENT_KINDS
+
+    rig = Rig(kinds=EVENT_KINDS, wakes=1)
+    rig.scheduler._notes = {k: "n" for k in EVENT_KINDS}
+    rig.scheduler.emit(ev("timer"))  # uses the one capped wake
+    rig.scheduler.turn_ended("t1")
+    rig.scheduler.emit(ev("job_question", a="one"))
+    rig.scheduler.turn_ended("t2")
+    rig.scheduler.emit(ev("job_question", a="two"))
+    assert len(rig.starts) == 3
+    assert "one" in rig.text(1) and "two" in rig.text(2)
+
+
+def test_failed_start_runs_on_drop_once_per_event():
+    rig = failing_rig()
+    dropped = []
+    rig.scheduler.emit(
+        ev("ping"), on_drop=lambda: dropped.append(1), on_end=lambda: dropped.append("end")
+    )
+    assert dropped == [1]
+
+
+def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(caplog):
+    rig = Rig()
+    rig.busy = True
+    ran = []
+
+    def boom():
+        raise RuntimeError("hook broke")
+
+    rig.scheduler.emit(ev("single", a="1"), on_start=boom)
+    rig.scheduler.emit(ev("single", a="2"), on_start=lambda: ran.append("second"))
+    rig.busy = False
+    with caplog.at_level(logging.ERROR, logger="brain"):
+        rig.scheduler.pump()
+        rig.scheduler.turn_ended("t1")
+    assert len(rig.starts) == 2 and ran == ["second"]
+    assert "hook broke" in caplog.text
+
+    rig2 = Rig()
+    ends = []
+    rig2.scheduler.emit(ev("slow", a="1"), on_end=boom)
+    rig2.scheduler.emit(ev("slow", a="2"), on_end=lambda: ends.append("b"))
+    rig2.t = T0 + timedelta(seconds=30)
+    rig2.scheduler.pump()
+    rig2.scheduler.emit(ev("ping"))
+    rig2.busy = True
+    rig2.scheduler.turn_ended("t1")  # boom must not stop "b"
+    assert ends == ["b"]

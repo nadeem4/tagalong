@@ -425,18 +425,35 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** the Jobs card lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens the result text.
-12. **Action:** with the bubble closed and Scout silent, start a Manual-mode job that needs
-    permission (or asks a question) and leave the relayed ask unanswered for a minute.
+12. **Action:** with the bubble closed, start a Manual-mode job that needs permission (or asks a
+    question; its card appears once Scout passes the question on or cannot answer it) and leave
+    the relayed ask unanswered for a minute.
     **Expected:** the bubble comes up by itself with the card (the request and its input, one
     button per option) and stays until you answer or it times out, though no chat turn is running.
     Ending a chat turn meanwhile does not remove it.
 13. **Action:** in Manual mode, have the job do something that needs permission. Then have it ask
     a question ("Ask me which colour to use").
     **Expected:** a "Claude Code asks" card shows the request and its input with one button per
-    option; the question card has a **Your answer** field and **Send** (Enter sends too). Typing
+    option; the question card (when Scout passes the question on, see the next section) has a **Your answer** field and **Send** (Enter sends too). Typing
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
     **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
+
+## Claude Code asks Scout first (real brain, real Claude Code)
+
+Needs the same setup as the hand-off section above, with the desktop connected.
+
+1. **Action:** tell Scout your favourite colour (for example "my favourite colour is teal"). Then
+   ask "Hand this to Claude Code: ask me which colour to use, then write it to colour.txt" in a
+   test folder.
+   **Expected:** Scout answers the expert itself and no question card appears; `colour.txt` holds
+   your colour.
+2. **Action:** hand off a question Scout cannot know ("ask me for the name of my first pet, then
+   write it to pet.txt").
+   **Expected:** Scout passes it on and you get the question card; your answer reaches the job.
+3. The fallback when the daily budget is spent (the card appears at once, since Scout cannot wake)
+   cannot be followed by hand and is covered by the test
+   `test_budget_spent_falls_back_to_the_user_card`.
 
 ## Scout speaks first: job reports (real brain)
 

@@ -27,10 +27,11 @@ from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.protocol import SayParams, SayResult, Tool
+from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools, expert_tools, home_tools, timer_tools
+from brain.tools import brain_tools, expert_tools, home_tools, question_tools, timer_tools
 
 log = logging.getLogger("brain")
 
@@ -61,15 +62,35 @@ class Session:
         make_run = make_run or partial(
             ExpertRun, command=[DEFAULT_EXPERT_CMD], timeout=DEFAULT_EXPERT_TIMEOUT_S
         )
-        self.jobs = Jobs(memory, self._asks, notify, make_run, on_finished=self._on_job_finished)
+        # Built first: the questions and the timers emit through it. It only calls back into the
+        # session once an event arrives, by which time the rest of __init__ has run.
+        self.scheduler = Scheduler(
+            bodies=bodies,
+            budget=budget,
+            busy=self._busy,
+            last_body=lambda: self._last_body,
+            start=lambda body_id, content: self._start_turn(body_id, content, "brain"),
+            now=now,
+            wakes_per_hour=wakes_per_hour,
+            kinds=kinds or EVENT_KINDS,
+        )
+        questions = ScoutQuestions(self.scheduler.emit)
+        self.jobs = Jobs(
+            memory,
+            self._asks,
+            notify,
+            make_run,
+            on_finished=self._on_job_finished,
+            scout_questions=questions,
+        )
         self.jobs.startup()  # rows left running by a dead brain become stopped
-        # The scheduler is built further down; the timers only reach it once started.
-        timers = Timers(memory, lambda *a, **kw: self.scheduler.emit(*a, **kw), now)
+        timers = Timers(memory, self.scheduler.emit, now)
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox)
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
+            + question_tools(questions)
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
@@ -102,16 +123,6 @@ class Session:
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
         self._last_body: str | None = None  # where a wake turn goes first
-        self.scheduler = Scheduler(
-            bodies=bodies,
-            budget=budget,
-            busy=self._busy,
-            last_body=lambda: self._last_body,
-            start=lambda body_id, content: self._start_turn(body_id, content, "brain"),
-            now=now,
-            wakes_per_hour=wakes_per_hour,
-            kinds=kinds or EVENT_KINDS,
-        )
         bodies.on_connect = self._on_connect
         for job in memory.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
