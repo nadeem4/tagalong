@@ -1,4 +1,4 @@
-﻿# Tagalong
+# Tagalong
 
 Tagalong is a desktop screen companion for Windows. One companion, Scout, sits on your screen.
 Press a key and Scout sees what you are working on: the text you selected, the window you are in,
