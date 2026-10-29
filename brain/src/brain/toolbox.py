@@ -2,8 +2,8 @@
 
 A Source owns a set of tools (the brain's own, or a body's). The toolbox lists what Scout may
 see, and gates each call: unknown name, wrong caller, or a source that cannot serve it now.
-A Scout call to an ask-mode tool then waits for a person's allow (gate step 3); Home calls
-skip that step.
+A tool_call guard then decides: an ask-mode tool waits for a person's allow (gate step 3);
+Home calls skip that step.
 """
 
 import logging
@@ -16,6 +16,8 @@ from pydantic import ValidationError
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.builtin_guards import resolve_mode, tool_mode
+from brain.guards import Guards, Hook, ToolCallCtx
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
@@ -137,6 +139,7 @@ class Toolbox:
         approvals: Approvals | None = None,
         side_check: SideCheck | None = None,
         offers: Offers | None = None,
+        guards: Guards | None = None,
     ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
         self._modes = modes  # stored per-tool choices, read on every call
@@ -145,18 +148,13 @@ class Toolbox:
         self._approvals = approvals  # None records nothing
         self._side_check = side_check  # None: every ask goes to the person
         self._offers = offers  # None: no offers to auto-approve
+        if guards is None:
+            guards = Guards()
+            guards.add(tool_mode(modes))
+        self._guards = guards
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
-        if spec.self_asks:
-            return "auto"
-        if spec.locked:
-            return "ask"
-        stored = self._modes().get(spec.name)
-        if stored in ("ask", "auto"):
-            return stored
-        if spec.default_mode is not None:
-            return spec.default_mode
-        return "auto" if spec.effect == "read" else "ask"
+        return resolve_mode(spec, self._modes().get(spec.name))
 
     def set_mode(self, name: str, mode: str) -> None:
         spec = next((s for src in self.sources for s in src.specs() if s.name == name), None)
@@ -259,9 +257,14 @@ class Toolbox:
                 if spec.name == call.name:
                     if caller not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
-                    if caller != "home" and self._asks is not None and self.mode(spec) == "ask":
+                    if self._asks is not None:
                         kind = getattr(source, "approval_source", "scout_tool")
-                        await self._ask(call, spec, kind)
+                        ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
+                        verdict = await self._guards.run(Hook.tool_call, ctx)
+                        if verdict.kind == "block":
+                            raise RpcError(ErrorCode(int(verdict.code)), verdict.reason)
+                        if verdict.kind == "ask":
+                            await self._ask(call, spec, kind)
                     return await source.run(call, call.name)
         for source in self.sources:
             error = source.unavailable(call.name)

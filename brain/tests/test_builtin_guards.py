@@ -3,8 +3,9 @@
 They guard the model_call hook; side-check and offer calls are never counted as turn steps.
 """
 
-from brain.builtin_guards import daily_budget, spend_guards, step_cap
-from brain.guards import Hook, ModelCallCtx
+from brain.builtin_guards import daily_budget, spend_guards, step_cap, tool_mode
+from brain.guards import Hook, ModelCallCtx, ToolCallCtx
+from brain.toolbox import ToolSpec
 
 
 class Spend:
@@ -47,3 +48,38 @@ async def test_spend_guards_check_budget_before_step_cap():
     assert v.code == "over_budget"
     v = await spend_guards(Spend(), 3).run(Hook.model_call, ctx(steps=3))
     assert v.code == "step_cap"
+
+
+def tool_ctx(caller="scout", **spec_kw):
+    spec = ToolSpec("t", "d", {"type": "object"}, **spec_kw)
+    return ToolCallCtx(spec, {}, caller, "scout_tool", "t1")
+
+
+def test_tool_mode_asks_for_change_tools_by_default():
+    v = tool_mode(lambda: {}).check(tool_ctx(effect="change"))
+    assert (v.kind, v.reason) == ("ask", "needs your yes")
+
+
+def test_tool_mode_allows_reads_by_default():
+    assert tool_mode(lambda: {}).check(tool_ctx(effect="read")).kind == "allow"
+
+
+def test_tool_mode_stored_auto_allows():
+    guard = tool_mode(lambda: {"t": "auto"})
+    assert guard.check(tool_ctx(effect="change")).kind == "allow"
+
+
+def test_tool_mode_self_asks_resolves_to_ask():
+    # self_asks runs its own ask, so the gate adds none; the guard still resolves it as auto.
+    assert tool_mode(lambda: {}).check(tool_ctx(self_asks=True)).kind == "allow"
+
+
+def test_tool_mode_home_caller_skips_the_ask():
+    assert tool_mode(lambda: {}).check(tool_ctx("home", effect="change")).kind == "allow"
+
+
+def test_tool_mode_default_mode_beats_effect():
+    assert tool_mode(lambda: {}).check(tool_ctx(effect="read", default_mode="ask")).kind == "ask"
+    assert (
+        tool_mode(lambda: {}).check(tool_ctx(effect="change", default_mode="auto")).kind == "allow"
+    )
