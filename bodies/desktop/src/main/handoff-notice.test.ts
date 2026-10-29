@@ -93,6 +93,15 @@ describe('handoffLine', () => {
 describe('bubbleHearsRemark', () => {
   const plain = { remarkId: id, petId: 'scout', text: 'Hi.' };
 
+  it('panel hidden when the remark arrives: the panel’s bubble is skipped', () => {
+    // The caller passes the visibility from before showRemark brings the panel up.
+    expect(bubbleHearsRemark(plain, false)).toBe(false);
+  });
+
+  it('panel visible when the remark arrives: it goes to the bubble', () => {
+    expect(bubbleHearsRemark(plain, true)).toBe(true);
+  });
+
   it('lets the open bubble show a plain remark, since no quiet line appears then', () => {
     expect(bubbleHearsRemark(plain, true)).toBe(true);
   });

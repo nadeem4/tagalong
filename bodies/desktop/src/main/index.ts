@@ -592,9 +592,10 @@ function routeHandoffLine(notification: { method: string; params: unknown }): {
 
 /**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
- * the keyboard. While the bubble is already open it shows the words itself, as Scout's
- * message (the forward reaches it), so nothing is lost and the quiet line stays out of the
- * way. A line still tied to a finished hand-off goes to its card there instead.
+ * the keyboard. While the panel is already open the bubble shows the words itself, as
+ * Scout's message (the forward reaches it), and the quiet line stays out of the way. If the
+ * panel is open on something else (a quiet line, a routine, the hello) the bubble is not
+ * showing, so the words are dropped. A line tied to a finished hand-off goes to its card.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
@@ -704,6 +705,8 @@ function hasText(params: { text?: unknown }): boolean {
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(incoming: { method: string; params: unknown }): void {
+  // Read before showRemark below, which shows the hidden panel for the quiet line.
+  const panelWasVisible = desktop?.panel?.isVisible() === true;
   const notification = routeHandoffLine(incoming);
   const params = (notification.params ?? {}) as {
     turnId?: string;
@@ -751,7 +754,7 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
     notification.method === 'pet.remark' ? PetRemarkParams.safeParse(notification.params) : null;
   const panel = desktop?.panel;
   const bubbleDeaf =
-    remark?.success === true && !bubbleHearsRemark(remark.data, panel?.isVisible() === true);
+    remark?.success === true && !bubbleHearsRemark(remark.data, panelWasVisible);
   for (const window of BrowserWindow.getAllWindows()) {
     if (bubbleDeaf && window === panel) continue;
     window.webContents.send(IPC.turnEvent, event);

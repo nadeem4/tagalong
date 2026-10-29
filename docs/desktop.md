@@ -113,8 +113,9 @@ running.
   window changes. A blocked or excluded window is never sent, and nothing is read while sight is
   paused. When an excluded window comes to the front, or sight is paused, an empty focus
   (`app: ""`) goes once, so the brain stops showing the old app as in front. `BrainClient.event`
-  returns whether it was sent; a `focus` it dropped (brain offline) is sent again on the next poll,
-  so a restarted brain learns the front window without waiting for a change.
+  returns whether it was sent; a `focus` it dropped (brain offline) is sent again on the next poll.
+  A brain that restarts while the window stays the same, after the last send got through, learns
+  the front window only at the next change.
 - **Brain-started turns.** A `turn` with `started_by: "brain"` (a wake) shows no thinking state, no
   bubble and no tool rows. If it ends `done` with words (not just whitespace), they appear once as a
   pet remark: the quiet line beside Scout when the bubble is closed, or Scout's message in the
