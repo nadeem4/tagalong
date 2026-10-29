@@ -3,9 +3,14 @@
 They guard the model_call hook; side-check and offer calls are never counted as turn steps.
 """
 
-from brain.builtin_guards import daily_budget, spend_guards, step_cap, tool_mode
-from brain.guards import Hook, ModelCallCtx, ToolCallCtx
+from datetime import UTC, datetime, timedelta
+
+from brain.builtin_guards import daily_budget, spend_guards, step_cap, tool_mode, wake_caps
+from brain.events import EventKind
+from brain.guards import EmitCtx, Hook, ModelCallCtx, ToolCallCtx
 from brain.toolbox import ToolSpec
+
+NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
 
 class Spend:
@@ -204,3 +209,40 @@ def test_ask_chain_order_is_online_then_side_check_then_person():
         "side_check",
         "person_ask",
     ]
+
+
+# wake_caps: the per-kind and overall hourly caps on the emit hook.
+TIMER = EventKind("timer", max_per_hour=2)
+
+
+def _wake_ctx(wakes, kind=TIMER):
+    return EmitCtx(kind, NOW, wakes)
+
+
+def test_wake_caps_allow_under_both_caps():
+    wakes = [(NOW - timedelta(minutes=5), "timer")]
+    assert wake_caps(5).check(_wake_ctx(wakes)).kind == "allow"
+
+
+def test_wake_caps_hold_when_the_kind_cap_is_reached_with_wait_seconds():
+    wakes = [(NOW - timedelta(minutes=50), "timer"), (NOW - timedelta(minutes=10), "timer")]
+    v = wake_caps(5).check(_wake_ctx(wakes))
+    assert (v.kind, v.code, v.reason) == ("block", "held", "wake cap reached")
+    assert v.value == 600.0  # the oldest wake leaves the hour in 10 minutes
+
+
+def test_wake_caps_hold_when_the_overall_cap_is_reached():
+    wakes = [(NOW - timedelta(minutes=30), "job_ended"), (NOW - timedelta(minutes=20), "back")]
+    v = wake_caps(2).check(_wake_ctx(wakes))
+    assert (v.code, v.value) == ("held", 1800.0)
+
+
+def test_wake_caps_ignore_kinds_without_a_cap():
+    wakes = [(NOW - timedelta(minutes=1), "timer")] * 9
+    assert wake_caps(1).check(_wake_ctx(wakes, EventKind("note"))).kind == "allow"
+    assert wake_caps(1).check(_wake_ctx(wakes, None)).kind == "allow"
+
+
+def test_wake_caps_wait_is_zero_after_the_window_ages_out():
+    wakes = [(NOW - timedelta(hours=2), "timer"), (NOW - timedelta(hours=1), "timer")]
+    assert wake_caps(1).check(_wake_ctx(wakes)).kind == "allow"

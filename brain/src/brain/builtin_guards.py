@@ -1,4 +1,4 @@
-"""Built-in guards: the spend caps (daily budget, step cap) and the tool-mode gate.
+"""Built-in guards: the spend caps (daily budget, step cap), wake caps and the tool-mode gate.
 
 The budget also sits on emit so the scheduler drops wakes; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Literal
 from brain.guards import (
     ALLOW,
     AskCtx,
+    EmitCtx,
     Guard,
     Guards,
     Hook,
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from brain.toolbox import ToolSpec
 
 log = logging.getLogger("brain")
+_WINDOW = 3600  # seconds in the rolling wake-cap window
 
 
 def daily_budget(budget) -> Guard:
@@ -52,6 +54,28 @@ def step_cap(cap: int) -> Guard:
         return ALLOW
 
     return Guard("step_cap", Hook.model_call, check)
+
+
+def wake_caps(per_hour: int) -> Guard:
+    """Hold a wake while its kind's cap or the overall cap is reached; value = seconds to wait."""
+
+    def check(ctx: EmitCtx) -> Verdict:
+        if ctx.kind is None or ctx.kind.max_per_hour is None:
+            return ALLOW
+        recent = [(t, k) for t, k in ctx.wakes if (ctx.now - t).total_seconds() < _WINDOW]
+        waits = []
+        for times, cap in (
+            ([t for t, k in recent if k == ctx.kind.name], ctx.kind.max_per_hour),
+            ([t for t, _ in recent], per_hour),
+        ):
+            if len(times) >= cap:
+                oldest_blocking = times[len(times) - cap]
+                waits.append(_WINDOW - (ctx.now - oldest_blocking).total_seconds())
+        if not waits:
+            return ALLOW
+        return dataclasses.replace(block("wake cap reached", "held"), value=max(waits))
+
+    return Guard("wake_caps", Hook.emit, check)
 
 
 def spend_guards(budget, cap: int) -> Guards:

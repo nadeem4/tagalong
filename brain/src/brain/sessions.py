@@ -25,6 +25,7 @@ from brain.builtin_guards import (
     side_check_guard,
     spend_guards,
     tool_mode,
+    wake_caps,
 )
 from brain.config import (
     DEFAULT_EXPERT_CMD,
@@ -81,6 +82,7 @@ class Session:
         self._asks = Asks(bodies)
         # One set of spend guards for the loop, the scheduler, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
+        self.guards.add(wake_caps(wakes_per_hour))
         notify = bodies.notify
         # main passes the configured command and timeout; the defaults keep tests short.
         make_run = make_run or partial(
