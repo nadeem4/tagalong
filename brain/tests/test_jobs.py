@@ -850,3 +850,100 @@ async def test_claude_code_scout_approved_that_raises_still_asks_the_person(make
     await until(lambda: rig.finished)
     [row] = logged(rig)
     assert (row.outcome, row.decided_by) == ("approved", "person")
+
+
+# --- The permission relay runs the shared ask chain ---------------------------------------
+
+
+def chain_of(*guards):
+    from brain.guards import Guards
+
+    chain = Guards()
+    for guard in guards:
+        chain.add(guard)
+    return chain
+
+
+def recorder(seen, verdict):
+    from brain.guards import Guard, Hook
+
+    def check(ctx):
+        seen.append(ctx)
+        return verdict
+
+    return Guard("recorder", Hook.ask, check)
+
+
+async def test_permission_runs_the_shared_ask_chain(make_rig):
+    from brain.guards import allow_once
+
+    steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    seen: list = []
+    rig.jobs._guards = chain_of(recorder(seen, allow_once("test", value="allow")))
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    [ctx] = seen
+    assert (ctx.source, ctx.tool, ctx.group_key, ctx.locked) == (
+        "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}", False,
+    )  # fmt: skip
+
+
+async def test_permission_side_check_approval_picks_allow_once_option_never_allow_always(make_rig):
+    steps = [{"permission": {"title": "ls", "options": [OPTS[1], OPTS[0], OPTS[2]]}}]
+    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
+
+
+async def test_permission_chain_guard_error_refuses_without_hanging(make_rig):
+    from brain.guards import Guard, Hook
+
+    def boom(ctx):
+        raise RuntimeError("boom")
+
+    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
+    asks = FakeAsks(Answer("Plan"))
+    rig = with_approvals(make_rig, asks, steps)
+    rig.jobs._guards = chain_of(Guard("boom", Hook.ask, boom))
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"]["outcome"] != "selected"
+    assert len(asks.opened) == 1  # only the hand-off ask: nothing ran, nobody was asked
+
+
+async def test_permission_unexpected_allow_is_not_approval(make_rig):
+    from brain.guards import ALLOW
+
+    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan")), steps)
+    rig.jobs._guards = chain_of(recorder([], ALLOW))
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"]["outcome"] != "selected"
+    assert logged(rig) == []
+
+
+@pytest.mark.parametrize("scenario", ["denied", "nobody_online"])
+async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
+    steps = [{"permission": {"title": "rm secret-file", "options": OPTS}}]
+    asks = FakeAsks(Answer("Plan"), Answer("Nope"))
+    rig = with_approvals(make_rig, asks, steps)
+    if scenario == "nobody_online":
+        real_open = asks.open
+
+        async def open_then_go_offline(**kw):
+            if kw.get("tool"):
+                asks.online = False
+            return await real_open(**kw)
+
+        asks.open = open_then_go_offline
+    with caplog.at_level("INFO", logger="brain.guardrails"):
+        await rig.jobs.start("go", str(rig.folder))
+        await until(lambda: rig.finished)
+    assert "guard=" in caplog.text  # the refusal was logged
+    assert "rm secret-file" not in caplog.text

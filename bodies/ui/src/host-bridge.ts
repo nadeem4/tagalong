@@ -42,7 +42,7 @@ export interface SpendToday {
 
 /**
  * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
- * (`auto`). A locked tool always asks; an offline body's tool cannot be changed yet.
+ * (`auto`). A locked tool asks until set to auto on Home; an offline body's tool cannot be changed yet.
  */
 export interface PermissionRow {
   name: string;

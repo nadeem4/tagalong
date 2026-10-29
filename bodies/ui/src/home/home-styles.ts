@@ -198,9 +198,11 @@ export const HOME_CSS = `
 .home-perms { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-row {
-  display: flex; align-items: center; gap: ${t.space.xl}px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.xl}px;
   padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
 }
+.perm-row__warning { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.md}px; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; }
+.perm-row__warning p { flex: 1 1 100%; margin: 0; }
 .perm-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .perm-row__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
 .perm-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; }

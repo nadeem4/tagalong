@@ -78,15 +78,83 @@ describe('PermissionsPanel', () => {
     await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'recall', mode: 'ask' }]));
   });
 
-  it('shows a locked tool as Ask, always asking, with the switch disabled', async () => {
+  it('shows a locked tool as Ask, marked risky, with an enabled switch', async () => {
     const bridge = createFakeHostBridge({ permissions: [FORGET] });
     renderPanel(bridge);
     const toggle = await screen.findByRole('switch', { name: 'forget' });
-    expect(toggle).toBeDisabled();
+    expect(toggle).toBeEnabled();
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     expect(toggle).toHaveTextContent('Ask');
-    expect(screen.getByText('Always asks')).toBeInTheDocument();
+    expect(screen.getByText('Risky action')).toBeInTheDocument();
+    expect(screen.queryByText('Always asks')).toBeNull();
+  });
+
+  it('turning a locked tool to Auto shows a risk warning and does not call setPermission yet', async () => {
+    const bridge = createFakeHostBridge({ permissions: [FORGET] });
+    renderPanel(bridge);
+    fireEvent.click(await screen.findByRole('switch', { name: 'forget' }));
+    const warning = await screen.findByRole('alert');
+    expect(warning).toHaveTextContent(/risky action/i);
+    expect(warning).toHaveTextContent(/no longer ask/i);
+    expect(bridge.permissionSets).toEqual([]);
+  });
+
+  it('confirming the warning calls setPermission with auto', async () => {
+    const bridge = createFakeHostBridge({ permissions: [FORGET] });
+    renderPanel(bridge);
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
     fireEvent.click(toggle);
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'forget', mode: 'auto' }]));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+  });
+
+  it('cancelling the warning leaves the switch on Ask and calls nothing', async () => {
+    const bridge = createFakeHostBridge({ permissions: [FORGET] });
+    renderPanel(bridge);
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
+    fireEvent.click(toggle);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(bridge.permissionSets).toEqual([]);
+  });
+
+  it('turning a locked tool back to Ask needs no confirmation', async () => {
+    const bridge = createFakeHostBridge({ permissions: [{ ...FORGET, mode: 'auto' }] });
+    renderPanel(bridge);
+    fireEvent.click(await screen.findByRole('switch', { name: 'forget' }));
+    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'forget', mode: 'ask' }]));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('an unlocked tool turns to Auto without a warning', async () => {
+    const bridge = createFakeHostBridge({ permissions: [MOVE] });
+    renderPanel(bridge);
+    fireEvent.click(await screen.findByRole('switch', { name: 'desktop__move_window' }));
+    await waitFor(() => expect(bridge.permissionSets).toHaveLength(1));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('puts focus on Cancel when the warning opens and describes the switch by it', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [FORGET] }));
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
+    fireEvent.click(toggle);
+    const cancel = await screen.findByRole('button', { name: 'Cancel' });
+    await waitFor(() => expect(cancel).toHaveFocus());
+    const warning = screen.getByRole('alert');
+    expect(toggle).toHaveAttribute('aria-describedby', warning.id);
+  });
+
+  it('Escape cancels the warning, calls nothing and returns focus to the switch', async () => {
+    const bridge = createFakeHostBridge({ permissions: [FORGET] });
+    renderPanel(bridge);
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
+    fireEvent.click(toggle);
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Cancel' }), { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(toggle).toHaveFocus();
+    expect(toggle).not.toHaveAttribute('aria-describedby');
     expect(bridge.permissionSets).toEqual([]);
   });
 

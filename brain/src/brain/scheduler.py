@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from brain.bodies import Bodies
-from brain.builtin_guards import spend_guards
+from brain.builtin_guards import spend_guards, wake_caps
 from brain.config import DEFAULT_STEP_CAP, DEFAULT_WAKES_PER_HOUR
 from brain.events import EVENT_KINDS, Event, EventKind, load_notes
 from brain.guards import EmitCtx, Guards, Hook
@@ -63,12 +63,14 @@ class Scheduler:
         guards: Guards | None = None,
     ) -> None:
         self._bodies = bodies
-        self._guards = guards or spend_guards(budget, DEFAULT_STEP_CAP)
+        if guards is None:
+            guards = spend_guards(budget, DEFAULT_STEP_CAP)
+            guards.add(wake_caps(wakes_per_hour))
+        self._guards = guards
         self._busy = busy
         self._last_body = last_body
         self._start = start
         self._now = now
-        self._wakes_per_hour = wakes_per_hour
         self._kinds = kinds
         self._notes = load_notes() if notes is None else notes
         self._groups: list[_Group] = []  # oldest first
@@ -178,19 +180,10 @@ class Scheduler:
 
     def _cap_wait(self, kind: EventKind) -> float:
         # Seconds until enough recorded wakes age out of the window; 0 when under both caps.
-        if kind.max_per_hour is None:
-            return 0.0
         now = self._now()
         self._wakes = [(t, k) for t, k in self._wakes if (now - t).total_seconds() < _WINDOW]
-        waits = [0.0]
-        for times, cap in (
-            ([t for t, k in self._wakes if k == kind.name], kind.max_per_hour),
-            ([t for t, _ in self._wakes], self._wakes_per_hour),
-        ):
-            if len(times) >= cap:
-                oldest_blocking = times[len(times) - cap]
-                waits.append(_WINDOW - (now - oldest_blocking).total_seconds())
-        return max(waits)
+        verdict = self._guards.run_sync(Hook.emit, EmitCtx(kind, now, self._wakes))
+        return verdict.value if verdict.code == "held" else 0.0
 
     def _drop_all(self) -> None:
         for group in self._groups:

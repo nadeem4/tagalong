@@ -88,7 +88,18 @@ class ToolCallCtx:
 
 @dataclass(frozen=True)
 class AskCtx:
-    """Filled in by G2."""
+    """One ask on the way to the person; `ask_person` does the wire work and returns the choice."""
+
+    source: str
+    tool: str
+    summary: str
+    input: dict
+    group_key: str
+    locked: bool
+    turn_id: str | None
+    ask_person: Callable[[], Awaitable[str]]
+    job_id: str | None = None  # an expert's job, so Scout's approval row names it
+    can_approve: bool = True  # False: Scout may not answer (an expert offered no allow-once)
 
 
 @dataclass(frozen=True)

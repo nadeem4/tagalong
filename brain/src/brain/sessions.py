@@ -19,7 +19,14 @@ from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.builtin_guards import spend_guards
+from brain.builtin_guards import (
+    anyone_online,
+    person_ask,
+    side_check_guard,
+    spend_guards,
+    tool_mode,
+    wake_caps,
+)
 from brain.config import (
     DEFAULT_EXPERT_CMD,
     DEFAULT_EXPERT_TIMEOUT_S,
@@ -75,6 +82,7 @@ class Session:
         self._asks = Asks(bodies)
         # One set of spend guards for the loop, the scheduler, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
+        self.guards.add(wake_caps(wakes_per_hour))
         notify = bodies.notify
         # main passes the configured command and timeout; the defaults keep tests short.
         make_run = make_run or partial(
@@ -111,6 +119,7 @@ class Session:
             approvals=approvals,
             side_check=side_check,
             offers=offer,
+            guards=self.guards,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -135,6 +144,11 @@ class Session:
             memory.set_permission_mode(name, mode)
             notify("changed", {"what": "permissions"})
 
+        # The tool gate and its ask chain: nobody online, then Scout's look, then the person.
+        self.guards.add(tool_mode(memory.permission_modes))
+        self.guards.add(anyone_online(self._asks))
+        self.guards.add(side_check_guard(side_check, approvals))
+        self.guards.add(person_ask())
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             memory.permission_modes,
@@ -143,6 +157,7 @@ class Session:
             approvals,
             side_check,
             offer,
+            guards=self.guards,
         )
         self._now = now
         loaded = memory.load_messages()

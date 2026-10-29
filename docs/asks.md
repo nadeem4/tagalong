@@ -28,7 +28,17 @@ flowchart TD
   E -- turn cancelled --> J[Closed: cancelled]
 ```
 
-- Options are `allow`, `always`, `deny`; a locked tool has no `always`.
+- Ask chain: after the mode check says `ask`, the `ask` hook runs three guards in order:
+  `anyone_online` (nobody online: denied), `side_check` (Scout may approve once under your
+  preference) and `person_ask` (the card you answer). Claude Code's permission asks use the same
+  chain.
+- Options are `allow`, `always`, `deny`; a locked tool has no `always`, so "Always" stays hidden
+  for it.
+- Locked rule: a locked tool (destructive hint or risky name, or a body's `confirm`) asks by
+  default. It runs without asking only after you set its Home switch to **Auto** (Home warns that
+  it is a risky action and Scout will no longer ask; the switch back to **Ask** needs no
+  confirmation), or when Scout approves it under a preference you made that names the tool. A
+  general preference never approves a locked tool, even with the built-in default removed.
 - The first answer wins. A second answer, an answer after the ask closed, or an unknown id gets
   `not_found`. An option the ask did not offer gets `invalid_params`.
 - A body that connects while an ask is open is sent it again.
@@ -76,8 +86,9 @@ to you as before, with no wait.
 
 1. You have at least one preference you made. The built-in default does not count, so with none
    there is no model call and no cost.
-2. The tool is not `locked` while the default preference exists. A locked tool always asks you.
-   (Claude Code asks have no such flag: their risk is the model's judgment.)
+2. If the tool is `locked`, only a preference you made whose tool is that tool's name can cover
+   it (one comes from accepting Scout's offer for that tool); the built-in default and general preferences never do. (Claude Code asks have no such
+   flag: their risk is the model's judgment.)
 3. The daily budget allows it.
 4. The model, given the ask, your preferences and the recent history for that tool or folder,
    either approves under one preference id or passes. It has 20 seconds; an error, a timeout or

@@ -83,14 +83,15 @@ class SideCheck:
         # Order matters: the cheap checks run first so a person with no preferences pays nothing.
         if not self._memory.has_user_preferences():
             return None
-        if facts.locked and self._memory.default_preference() is not None:
+        candidates = self._candidates(facts)
+        if not candidates:
             return None
         verdict = await self._guards.run(Hook.model_call, ModelCallCtx("side_check", None, 0))
         if verdict.kind != "allow":
             return None
         try:
             async with asyncio.timeout(self._timeout):
-                final = await self._ask(facts)
+                final = await self._ask(facts, candidates)
         except Exception:  # TimeoutError included: every failure leaves the ask to the person
             log.exception("side-check failed")
             return None
@@ -102,24 +103,32 @@ class SideCheck:
             return None
         wanted = (call.get("input") or {}).get("preference")
         # Re-read now: the person may have removed the preference while the model thought.
-        for p in self._memory.list_preferences():
-            if p.id == wanted and not p.builtin:
+        for p in self._candidates(facts):
+            if p.id == wanted:
                 return p
         return None
 
-    async def _ask(self, facts: AskFacts) -> Final | None:
-        message = self._message(facts)
+    def _candidates(self, facts: AskFacts) -> list[Preference]:
+        """Preferences Scout may approve under. A locked tool needs one that names it: a
+        general preference never unlocks it, so the person's explicit word is required."""
+        prefs = [p for p in self._memory.list_preferences() if not p.builtin]
+        if facts.locked:
+            prefs = [p for p in prefs if p.tool == facts.tool]
+        return prefs
+
+    async def _ask(self, facts: AskFacts, candidates: list[Preference]) -> Final | None:
+        message = self._message(facts, candidates)
         final = None
         async for item in self._model.stream(prompt_section("decide"), message, TOOLS):
             if isinstance(item, Final):
                 final = item
         return final
 
-    def _message(self, facts: AskFacts) -> list[dict]:
-        prefs = [
-            f"{p.id}{' (default)' if p.builtin else ''}: {p.sentence}"
-            for p in self._memory.list_preferences()
-        ]
+    def _message(self, facts: AskFacts, candidates: list[Preference]) -> list[dict]:
+        shown = candidates
+        if not facts.locked:  # the default shows as context, never as a choice
+            shown = self._memory.list_preferences()
+        prefs = [f"{p.id}{' (default)' if p.builtin else ''}: {p.sentence}" for p in shown]
         history = [
             f"{a.outcome} by {a.decided_by}: {a.summary}"
             for a in self._memory.list_approvals("all", HISTORY_SCAN, None)

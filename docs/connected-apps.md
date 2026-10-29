@@ -4,7 +4,7 @@
 
 Scout can use the user's own apps (Notion, GitHub, Linear, or any local tool) through the Model
 Context Protocol. The Python brain is the MCP client (the official `mcp` SDK). Each app tool becomes
-one Scout tool: reads run at once, changes ask first, and risky ones ask every time.
+one Scout tool: reads run at once, changes ask first, and risky ones ask every time until unlocked on Home.
 
 Status: the brain side (slice 9a), Home's Connections page on it (9b) and browser sign-in (OAuth,
 9c) are built.
@@ -114,11 +114,12 @@ flowchart TD
 - **change**: anything else, including a tool with no hints at all;
 - **locked**: `destructiveHint`, or a whole word in the name (split on `_`, `-`, `.`, spaces and
   camelCase) of `send`, `delete`, `remove`, `destroy`, `trash`, `pay` or `charge`. A risky word wins
-  over a read-only hint, since hints are the app's own claim. Locked tools ask every time and can
-  never be set to `auto`.
+  over a read-only hint, since hints are the app's own claim. Locked tools ask every time until you
+  unlock one on Home: its switch is on and reads "Risky action", and turning it to **Auto** first
+  warns that Scout will no longer ask. Switch it back to **Ask** to undo.
 
 Modes are the toolbox's usual ones (see [brain.md](brain.md)): reads `auto`, changes `ask`, and the
-user may save `auto` for a change (not a locked one).
+user may save `auto` for a change, and for a locked one only through that Home switch.
 
 ### Scout's side
 

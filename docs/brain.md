@@ -56,7 +56,7 @@ the total can run a little low.
 | `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
 | `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
 | `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
-| `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit) and `step_cap` (model_call)                                                                                                                                                                                                         |
+| `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                 |
 | `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
 | `brain/src/brain/mind/resume.py`    | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                      |
 | `brain/src/brain/memory.py`         | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                                                                                                                                                       |
@@ -223,19 +223,20 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 ## Permissions and asks
 
 Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a tool that
-asks for itself (below) is `auto`; then locked is `ask`; then the user's saved choice; then the
-tool's own default; then the effect.
+asks for itself (below) is `auto`; then the user's saved choice (a locked tool included); then a
+locked tool is `ask`; then the tool's own default; then the effect. The same function,
+`resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                          | Default mode            |
-| --------------------------------------------- | ----------------------- |
-| Reads (`effect: "read"`), such as `list_jobs` | `auto`                  |
-| Changes (`effect: "change"`)                  | `ask`                   |
-| Memory tools (`remember`, `forget`)           | `auto`                  |
-| Timer tools `set_timer` and `cancel_timer`    | `auto`                  |
-| Expert tools `tell_expert` and `stop_job`     | `auto`                  |
-| `hand_off` (asks itself, see below)           | `auto`, no gate ask     |
-| A body tool that does not declare effect      | `ask`                   |
-| Locked (`confirm: true` from the body)        | `ask`, and never `auto` |
+| Tool                                          | Default mode                              |
+| --------------------------------------------- | ----------------------------------------- |
+| Reads (`effect: "read"`), such as `list_jobs` | `auto`                                    |
+| Changes (`effect: "change"`)                  | `ask`                                     |
+| Memory tools (`remember`, `forget`)           | `auto`                                    |
+| Timer tools `set_timer` and `cancel_timer`    | `auto`                                    |
+| Expert tools `tell_expert` and `stop_job`     | `auto`                                    |
+| `hand_off` (asks itself, see below)           | `auto`, no gate ask                       |
+| A body tool that does not declare effect      | `ask`                                     |
+| Locked (`confirm: true` from the body)        | `ask`, until you set it to `auto` on Home |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -244,7 +245,10 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 | `tool` | The full tool name (primary key) |
 | `mode` | `ask` or `auto`                  |
 
-No row means the tool's default applies. `Toolbox.set_mode` refuses `auto` on a locked tool.
+No row means the tool's default applies. `Toolbox.set_mode` accepts `auto` for a locked tool: that
+is the explicit unlock, made with the Home switch (which warns first, see
+[Home tools](#home-tools)), and a stored `auto` counts even if it was saved before the tool became
+locked. Flip it back to `ask` and the tool asks again. Only a tool that asks for itself is refused.
 
 A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
 its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
@@ -255,8 +259,8 @@ When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-too
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
 
-- **Options.** `["allow", "always", "deny"]`, or `["allow", "deny"]` for a locked tool. `always`
-  allows this call and saves `auto` for the tool.
+- **Options.** `["allow", "always", "deny"]`, or `["allow", "deny"]` for a locked tool (a locked
+  tool is only unlocked on Home). `always` allows this call and saves `auto` for the tool.
 - **Text.** The words Scout wrote just before the tool call. The soul tells Scout so: "When you
   call a tool that changes something, the words you write just before it are what the user sees
   when asked to approve it, so say what you are about to do."
@@ -266,9 +270,11 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
   (Scout's tools in `Toolbox._ask`, Claude Code in `Jobs._permission`). When it approves, no ask
   opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
-  `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its approval) or a 20 s timeout leaves the ask
-  as described below. A very long input is cut to 4,000 characters in what the model sees. A locked tool never gets this look while the built-in default exists. A tool
-  stays in `ask` mode. Details: [asks.md](asks.md#scout-approves-under-your-preferences).
+  `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
+  approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
+  A locked tool gets this look only under a preference you made that names the tool; the
+  built-in default and general preferences never approve it. A tool stays in `ask` mode.
+  Details: [asks.md](asks.md#scout-approves-under-your-preferences).
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
   `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
@@ -307,8 +313,8 @@ so there is one gate and no second path.
 - **Errors.** A tool Home may not use, or that does not exist, is `unknown_tool`. Bad params
   (including a `set_permission` without `tool` or `mode`) are `invalid_params`. A tool that fails
   (for example `forget` with an id that does not exist) is `tool_failed` with the message. Any
-  `RpcError` a tool raises keeps its code (for example `set_permission` of a locked tool to
-  `auto` is `invalid_params`).
+  `RpcError` a tool raises keeps its code (for example `set_permission` of a tool that asks for
+  itself is `invalid_params`).
 - **Changed.** `remember` and `forget` send `changed {what: "memory"}`; `set_permission` sends
   `changed {what: "permissions"}`. Every body gets it, so Home refetches.
 
@@ -366,8 +372,8 @@ url shows empty. Home shows these rows in its "Where things run" card.
   is up (it returns at once; a slow or hanging app never delays boot) and `apps.shutdown()` after
   the experts stop and before memory closes.
 - **`AppSource`** is the toolbox's third source. A connected app's tools appear as `<app>__<tool>`
-  (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time,
-  never `auto`) when its hints say destructive or its name has a risky word (`send`, `delete`,
+  (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time
+  until you set it to `auto` on Home) when its hints say destructive or its name has a risky word (`send`, `delete`,
   `remove`, `destroy`, `trash`, `pay`, `charge`). An app that is not connected is offline.
   Answers are capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`.
 - **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
@@ -596,22 +602,28 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
 
 ## Guardrails
 
-The budget and the step cap go through one runner, `guards.py`, so precedence and logging live
-once; later slices move the tool gate, asks and wake caps onto it. A guard is
+The budget, the step cap, the tool gate's ask, the ask chain and the wake caps go through one
+runner, `guards.py`, so precedence and logging live once. A guard is
 a plain function that gets a context and returns a verdict. `sessions.py` builds one `Guards` set
 and hands it to the turn loop, the scheduler, the side-check and offers. The budget ledger stays in
 `guardrails.py`; the guards that use it are in `builtin_guards.py`.
 
 ### Hooks
 
-| Hook          | Runs                                          | Built in G1                                                                                                            |
-| ------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                             |
-| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (the scheduler acts only on code `over_budget`: it drops all queued events; other verdicts are ignored) |
-| `tool_call`   | Before a tool runs                            | Later slice                                                                                                            |
-| `ask`         | Before a permission ask reaches you           | Later slice                                                                                                            |
-| `tool_result` | After a tool returns                          | Later slice                                                                                                            |
-| `save`        | Before text is stored                         | Later slice                                                                                                            |
+| Hook          | Runs                                          | Built in                                                                                                                                                                            |
+| ------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
+| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
+| `tool_call`   | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
+| `ask`         | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
+| `tool_result` | After a tool returns                          | Later slice                                                                                                                                                                         |
+| `save`        | Before text is stored                         | Later slice                                                                                                                                                                         |
+
+The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
+body is connected. `side_check` lets Scout approve once under a preference (an allow-once, so the
+rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Scout's tools
+(`Toolbox`) and Claude Code's permission asks (`Jobs._permission`) share this one chain, so the
+order lives in one place. A side-check that raises or times out falls through to `person_ask`.
 
 `model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
 offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports

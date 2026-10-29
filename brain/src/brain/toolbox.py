@@ -2,8 +2,8 @@
 
 A Source owns a set of tools (the brain's own, or a body's). The toolbox lists what Scout may
 see, and gates each call: unknown name, wrong caller, or a source that cannot serve it now.
-A Scout call to an ask-mode tool then waits for a person's allow (gate step 3); Home calls
-skip that step.
+A tool_call guard then decides: an ask-mode tool waits for a person's allow (gate step 3);
+Home calls skip that step.
 """
 
 import logging
@@ -16,11 +16,19 @@ from pydantic import ValidationError
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.builtin_guards import (
+    anyone_online,
+    person_ask,
+    resolve_mode,
+    side_check_guard,
+    tool_mode,
+)
+from brain.guards import AskCtx, Guards, Hook, ToolCallCtx
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
-from brain.side_check import AskFacts, SideCheck
+from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
@@ -37,7 +45,7 @@ class ToolSpec:
     audience: frozenset[str] = frozenset({"scout"})  # the design's `for`; a Python keyword
     effect: Literal["read", "change"] = "change"  # unknown effect is treated as a change
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
-    locked: bool = False  # always asks; the person cannot turn this to auto
+    locked: bool = False  # asks until the person sets it to auto; no "Always" button
     self_asks: bool = False  # runs its own ask with the user, so the gate adds none
 
 
@@ -127,6 +135,11 @@ class BodySource:
         return None
 
 
+def _error_code(name: str) -> ErrorCode:
+    # Guard codes are ErrorCode names; "" or "error" (a guard that raised) means denied.
+    return ErrorCode[name] if name in ErrorCode.__members__ else ErrorCode.denied
+
+
 class Toolbox:
     def __init__(
         self,
@@ -137,6 +150,7 @@ class Toolbox:
         approvals: Approvals | None = None,
         side_check: SideCheck | None = None,
         offers: Offers | None = None,
+        guards: Guards | None = None,
     ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
         self._modes = modes  # stored per-tool choices, read on every call
@@ -145,18 +159,19 @@ class Toolbox:
         self._approvals = approvals  # None records nothing
         self._side_check = side_check  # None: every ask goes to the person
         self._offers = offers  # None: no offers to auto-approve
+        if guards is None:
+            # Standalone toolbox: build the same chain the Session registers.
+            guards = Guards()
+            guards.add(tool_mode(modes))
+            if asks is not None:
+                guards.add(anyone_online(asks))
+                if side_check is not None and approvals is not None:
+                    guards.add(side_check_guard(side_check, approvals))
+                guards.add(person_ask())
+        self._guards = guards
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
-        if spec.self_asks:
-            return "auto"
-        if spec.locked:
-            return "ask"
-        stored = self._modes().get(spec.name)
-        if stored in ("ask", "auto"):
-            return stored
-        if spec.default_mode is not None:
-            return spec.default_mode
-        return "auto" if spec.effect == "read" else "ask"
+        return resolve_mode(spec, self._modes().get(spec.name))
 
     def set_mode(self, name: str, mode: str) -> None:
         spec = next((s for src in self.sources for s in src.specs() if s.name == name), None)
@@ -166,8 +181,6 @@ class Toolbox:
             raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
         if spec.self_asks:
             raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
-        if spec.locked and mode == "auto":
-            raise RpcError(ErrorCode.invalid_params, f"{name} always asks first.")
         self._save_mode(name, mode)
 
     def known_specs(self) -> list[ToolSpec]:
@@ -206,49 +219,56 @@ class Toolbox:
         return out
 
     async def _ask(self, call: Call, spec: ToolSpec, source_kind: str) -> None:
-        """Gate step 3: wait for a person to allow the call; return only if it may run."""
+        """Gate step 3: run the ask chain; return only if the call may run."""
         assert self._asks is not None
+        approvals = self._approvals
 
         def record(outcome: str, decided_by: str = "person") -> None:
-            if self._approvals is not None:
-                self._approvals.record(
+            if approvals is not None:
+                approvals.record(
                     source=source_kind,
                     tool=spec.name,
-                    summary=self._approvals.summarise(call.text, spec.name, call.input),
+                    summary=summary,
                     input=call.input,
                     group_key=spec.name,
                     outcome=outcome,
                     decided_by=decided_by,
                 )
 
-        if not self._asks.anyone_online():
-            record("no_one", "none")
-            raise RpcError(
-                ErrorCode.denied, f"Nobody was there to ask, so {spec.name} was not run."
-            )
-        if self._side_check is not None and self._approvals is not None:
-            summary = self._approvals.summarise(call.text, spec.name, call.input)
-            facts = AskFacts(source_kind, spec.name, summary, call.input, spec.name, spec.locked)
-            try:
-                pref = await self._side_check.decide(facts)
-                if pref is not None:
-                    # Allow-once only: the tool's ask mode stays as it is.
-                    self._approvals.scout_approved(facts, pref, summary)
-                    return
-            except Exception:
-                log.exception("side-check failed; asking the person")
-        try:
-            choice = await self._asks.permission(call, spec.name, spec.locked)
-        except RpcError as exc:
-            # A cancelled ask is not a final outcome, so it records no row.
-            if exc.code == ErrorCode.timeout:
+        summary = approvals.summarise(call.text, spec.name, call.input) if approvals else ""
+        ctx = AskCtx(
+            source_kind,
+            spec.name,
+            summary,
+            call.input,
+            spec.name,
+            spec.locked,
+            call.turn,
+            lambda: self._asks.permission(call, spec.name, spec.locked),
+        )
+        verdict = await self._guards.run(Hook.ask, ctx)
+        if verdict.kind in ("block", "stop"):
+            if verdict.guard == "anyone_online":
+                record("no_one", "none")
+            elif verdict.guard == "person_ask" and verdict.code == "timeout":
                 record("timed_out", "none")
-            raise
-        if choice == "deny":
-            record("refused")
-            raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
+            elif verdict.guard == "person_ask" and verdict.code == "denied":
+                record("refused")
+            # A cancelled ask is not a final outcome, so it records no row.
+            # Logged guard reasons hold no tool text; the user-facing line is built here.
+            reason = verdict.reason
+            if verdict.guard == "anyone_online":
+                reason = f"Nobody was there to ask, so {spec.name} was not run."
+            elif verdict.guard == "person_ask" and verdict.code == "denied":
+                reason = f"The user said no to {spec.name}."
+            raise RpcError(_error_code(verdict.code), reason)
+        if verdict.guard == "side_check":
+            return  # the guard already logged Scout's row
+        if verdict.guard != "person_ask":
+            # An allow nobody vouched for (not a once-allow from side_check or person_ask) refuses.
+            raise RpcError(ErrorCode.denied, f"Nobody approved {spec.name}, so it was not run.")
         record("approved")
-        if choice == "always":
+        if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
         elif self._offers is not None:
             self._offers.consider(spec.name, source_kind, spec.name)
@@ -259,9 +279,14 @@ class Toolbox:
                 if spec.name == call.name:
                     if caller not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
-                    if caller != "home" and self._asks is not None and self.mode(spec) == "ask":
+                    if self._asks is not None:
                         kind = getattr(source, "approval_source", "scout_tool")
-                        await self._ask(call, spec, kind)
+                        ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
+                        verdict = await self._guards.run(Hook.tool_call, ctx)
+                        if verdict.kind in ("block", "stop"):
+                            raise RpcError(_error_code(verdict.code), verdict.reason)
+                        if verdict.kind == "ask":
+                            await self._ask(call, spec, kind)
                     return await source.run(call, call.name)
         for source in self.sources:
             error = source.unavailable(call.name)

@@ -15,12 +15,14 @@ from pathlib import Path
 
 from brain.approvals import Approvals
 from brain.asks import Answer, Asks
+from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.experts import ExpertRun, PermissionRequest, Question
+from brain.guards import AskCtx, Guards, Hook
 from brain.memory import Job, Memory
 from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
-from brain.side_check import AskFacts, SideCheck
+from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
@@ -50,6 +52,7 @@ class Jobs:
         approvals: Approvals | None = None,
         side_check: SideCheck | None = None,
         offers: Offers | None = None,
+        guards: Guards | None = None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -62,6 +65,14 @@ class Jobs:
         self._approvals = approvals  # None records nothing
         self._side_check = side_check  # None: every permission goes to the person
         self._offers = offers  # None: no offers to auto-approve
+        if guards is None:
+            # Standalone jobs: build the same ask chain the Session registers.
+            guards = Guards()
+            guards.add(anyone_online(asks))
+            if side_check is not None and approvals is not None:
+                guards.add(side_check_guard(side_check, approvals))
+            guards.add(person_ask())
+        self._guards = guards
         self._runs: dict[str, ExpertRun] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
@@ -183,55 +194,58 @@ class Jobs:
 
     async def _permission(self, job_id: str, request: PermissionRequest) -> str | None:
         by_name = {o.name: o for o in request.options}
-        online = self._asks.anyone_online()  # checked before the ask, as the tool gate does
-        outcome = None  # stays None when cancelled: that is not a final outcome, so no row
-        picked = None
-        if online and (option_id := await self._scout_approval(job_id, request)):
-            self._changed()
-            return option_id
-        try:
+        once = next((o for o in request.options if o.kind == "allow_once"), None)
+        job = self._memory.get_job(job_id)
+        folder = job.folder if job is not None else ""
+        tool = f"{AGENT}:{request.title}"
+        approvals = self._approvals
+        picked = None  # the option the person chose, kept for the return value
+
+        async def ask_person() -> str:
+            nonlocal picked
             # No `confirm`: that flag only allows the fixed allow/deny sets.
             answer = await self._open_ask(
-                job_id=job_id,
-                text="",
-                tool=f"claude_code:{request.title}",
-                input=request.input,
-                options=list(by_name),
+                job_id=job_id, text="", tool=tool, input=request.input, options=list(by_name)
             )
-        except RpcError as exc:
-            if exc.code == ErrorCode.timeout:
-                outcome = "timed_out"
-        else:
             picked = by_name.get(answer.option)
-            if picked is not None:
-                outcome = "approved" if picked.kind.startswith("allow") else "refused"
-            elif not online:
+            if picked is None:  # no usable pick: not a decision, so no row
+                raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
+            return "allow" if picked.kind.startswith("allow") else "deny"
+
+        ctx = AskCtx(
+            AGENT,
+            tool,
+            approvals.summarise(request.title, tool, request.input) if approvals else "",
+            request.input,
+            f"{AGENT}:{folder}",
+            False,
+            None,
+            ask_person,
+            job_id=job_id,
+            can_approve=once is not None and job is not None,  # never allow_always
+        )
+        verdict = await self._guards.run(Hook.ask, ctx)
+        outcome = None  # stays None when cancelled or failed: not a final outcome, so no row
+        result: str | None = None
+        if verdict.kind == "allow" and verdict.guard == "side_check" and once is not None:
+            result = once.id  # the guard already logged Scout's row
+        elif verdict.kind == "allow" and verdict.guard == "person_ask" and picked is not None:
+            outcome, result = "approved", picked.id
+        elif verdict.kind in ("block", "stop"):
+            # Matches person_ask/denied by guard and code, as Toolbox._ask does.
+            if verdict.guard == "anyone_online":
                 outcome = "no_one"
+            elif verdict.guard == "person_ask" and verdict.code == "timeout":
+                outcome = "timed_out"
+            elif verdict.guard == "person_ask" and verdict.code == "denied" and picked is not None:
+                outcome, result = "refused", picked.id
+        # Anything else (a failed guard, an allow nobody vouched for) refuses: no option picked.
         if outcome is not None:
             self._record(job_id, request, outcome)
         if outcome == "approved":
             self._offer(job_id, request)
         self._changed()
-        return picked.id if picked else None
-
-    async def _scout_approval(self, job_id: str, request: PermissionRequest) -> str | None:
-        """The allow-once option id when Scout approves under a preference; None means ask."""
-        once = next((o for o in request.options if o.kind == "allow_once"), None)
-        job = self._memory.get_job(job_id)
-        if self._side_check is None or self._approvals is None or once is None or job is None:
-            return None  # never allow_always: with no allow_once option there is nothing to pick
-        tool = f"claude_code:{request.title}"
-        summary = self._approvals.summarise(request.title, tool, request.input)
-        facts = AskFacts(AGENT, tool, summary, request.input, f"{AGENT}:{job.folder}", False)
-        try:
-            pref = await self._side_check.decide(facts)
-            if pref is None:
-                return None
-            self._approvals.scout_approved(facts, pref, summary, job_id)
-        except Exception:
-            log.exception("side-check failed; asking the person")
-            return None
-        return once.id
+        return result
 
     def _offer(self, job_id: str, request: PermissionRequest) -> None:
         """A person allowed this: Scout may offer to approve the whole folder's kind of ask."""
