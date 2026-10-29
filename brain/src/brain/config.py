@@ -19,6 +19,7 @@ DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_STEP_CAP = 25
 DEFAULT_EXPERT_CMD = "claude-agent-acp"
 DEFAULT_EXPERT_TIMEOUT_S = 1800.0
+DEFAULT_TURN_TIMEOUT_S = 300.0
 DEFAULT_WAKES_PER_HOUR = 12
 DEFAULT_OFFER_MIN_APPROVALS = 3
 DEFAULT_OFFER_WINDOW_DAYS = 14
@@ -35,6 +36,7 @@ class Config:
     step_cap: int = DEFAULT_STEP_CAP
     expert_cmd: list[str] = field(default_factory=lambda: [DEFAULT_EXPERT_CMD])
     expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
+    turn_timeout: float = DEFAULT_TURN_TIMEOUT_S
     wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
     offer_min_approvals: int = DEFAULT_OFFER_MIN_APPROVALS
     offer_window_days: int = DEFAULT_OFFER_WINDOW_DAYS
@@ -74,6 +76,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
         expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
+        turn_timeout=_turn_timeout(env.get("TAGALONG_TURN_TIMEOUT_S")),
         wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
         offer_min_approvals=_positive_int(
             env, "TAGALONG_OFFER_MIN_APPROVALS", DEFAULT_OFFER_MIN_APPROVALS
@@ -106,6 +109,18 @@ def _expert_timeout(text: str | None) -> float:
         raise ValueError(f"bad TAGALONG_EXPERT_TIMEOUT_S: {text!r}") from None
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"TAGALONG_EXPERT_TIMEOUT_S must be positive: {text!r}")
+    return value
+
+
+def _turn_timeout(text: str | None) -> float:
+    if not text:
+        return DEFAULT_TURN_TIMEOUT_S
+    try:
+        value = float(text)
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_TURN_TIMEOUT_S: {text!r}") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"TAGALONG_TURN_TIMEOUT_S must be positive: {text!r}")
     return value
 
 

@@ -925,6 +925,23 @@ async def test_question_is_not_counted_against_the_global_cap():
     assert await result == {"question_0": "Blue"}
 
 
+async def test_session_passes_the_turn_timeout():
+    class Stall:
+        model_id = "m"
+
+        async def stream(self, system, messages, tools):
+            await asyncio.sleep(3600)
+            yield None
+
+    bodies = Bodies()
+    sent = []
+    bodies.notify = lambda m, p: sent.append((m, p))
+    session = Session(Stall(), Open(), bodies, 10, Memory(":memory:"), turn_timeout=0.05)
+    session.say("desktop", say("hi"))
+    await idle(session)
+    assert any(m == "reply" and "too long" in p.get("delta", "") for m, p in sent)
+
+
 async def test_a_question_cannot_close_the_fence():
     model = Reactive([answer_step(), "ok"])
     session, _ = make(model, kinds=QUESTION_KINDS)

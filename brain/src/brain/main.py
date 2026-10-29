@@ -57,6 +57,7 @@ async def _run() -> None:
         apps=apps,
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
+        turn_timeout=config.turn_timeout,
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),

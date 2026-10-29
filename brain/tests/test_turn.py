@@ -74,6 +74,7 @@ def start(
     budget=None,
     step_cap=10,
     guards=None,
+    turn_timeout=None,
 ):
     return run_turn(
         turn_id="t1",
@@ -88,6 +89,7 @@ def start(
         budget=budget or Spend(),
         step_cap=step_cap,
         guards=guards,
+        turn_timeout=turn_timeout,
     )
 
 
@@ -298,6 +300,60 @@ async def test_cancel_while_tools_run_closes_history():
     assert sorted(p["call"] for p in ended) == ["c1", "c2"]
     assert all(p["ok"] is False for p in ended)
     assert sorted(cancelled) == ["x", "y"]
+
+
+class Stalled:
+    model_id = "claude-sonnet-5-5"
+
+    async def stream(self, system, messages, tools):
+        await asyncio.sleep(3600)
+        yield None
+
+
+async def test_stalled_model_ends_the_turn_with_error_and_a_message():
+    sent = []
+    history = [{"role": "user", "content": "go"}]
+    reason = await start(Stalled(), history, sent, turn_timeout=0.05)
+    assert reason == "error"
+    replies = [p for m, p in sent if m == "reply" and "delta" in p]
+    assert len(replies) == 1 and "too long" in replies[0]["delta"]
+    assert len(dones(sent)) == 1
+
+
+async def test_turn_timeout_leaves_history_valid():
+
+    class ToolThenStall(FakeModel):
+        async def stream(self, system, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                yield tool_step(("c1", "x"))[1]
+            else:
+                await asyncio.sleep(3600)
+                yield None
+
+    history = [{"role": "user", "content": "go"}]
+    reason = await start(ToolThenStall([]), history, [], turn_timeout=0.05)
+    assert reason == "error"
+    assert history[-1]["role"] == "user"
+    assert history[-2]["role"] == "assistant"
+    results = history[-1]["content"]
+    assert [r["tool_use_id"] for r in results] == ["c1"]
+
+
+async def test_time_in_tools_does_not_count_toward_the_turn_timeout():
+    async def slow(call):
+        await asyncio.sleep(0.3)
+        return "ok"
+
+    reason, *_ = await go(
+        [tool_step(("c1", "x")), text_step("done")], run_tool=slow, turn_timeout=0.1
+    )
+    assert reason == "done"
+
+
+async def test_no_timeout_when_none():
+    reason, *_ = await go([text_step("hi")], turn_timeout=None)
+    assert reason == "done"
 
 
 def test_request_has_the_constants():
