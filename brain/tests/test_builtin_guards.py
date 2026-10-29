@@ -83,3 +83,124 @@ def test_tool_mode_default_mode_beats_effect():
     assert (
         tool_mode(lambda: {}).check(tool_ctx(effect="change", default_mode="auto")).kind == "allow"
     )
+
+
+# --- the ask chain: anyone_online, side_check_guard, person_ask ----------------------------
+
+from types import SimpleNamespace  # noqa: E402
+
+from brain.builtin_guards import anyone_online, person_ask, side_check_guard  # noqa: E402
+from brain.guards import AskCtx  # noqa: E402
+from brain.protocol import ErrorCode, RpcError  # noqa: E402
+
+
+def ask_ctx(ask_person=None):
+    async def default():
+        return "allow"
+
+    return AskCtx("scout_tool", "t", "Doing it.", {"a": 1}, "t", False, "t1", ask_person or default)
+
+
+def test_anyone_online_blocks_with_denied_when_nobody_is_online():
+    v = anyone_online(SimpleNamespace(anyone_online=lambda: False)).check(ask_ctx())
+    assert (v.kind, v.code, v.reason) == (
+        "block",
+        "denied",
+        "Nobody was there to ask, so t was not run.",
+    )
+
+
+def test_anyone_online_allows_when_someone_is_online():
+    assert anyone_online(SimpleNamespace(anyone_online=lambda: True)).check(ask_ctx()).kind == (
+        "allow"
+    )
+
+
+class StubSideCheck:
+    def __init__(self, result=None, boom=False):
+        self.result, self.boom, self.facts = result, boom, []
+
+    async def decide(self, facts):
+        self.facts.append(facts)
+        if self.boom:
+            raise RuntimeError("boom")
+        return self.result
+
+
+class StubApprovals:
+    def __init__(self):
+        self.scouted = []
+
+    def scout_approved(self, facts, pref, summary):
+        self.scouted.append((facts, pref, summary))
+
+
+async def test_side_check_guard_allow_once_with_preference_and_records_scout_row():
+    approvals = StubApprovals()
+    v = await side_check_guard(StubSideCheck("pref"), approvals).check(ask_ctx())
+    assert (v.kind, v.once, v.value, v.reason) == (
+        "allow",
+        True,
+        "pref",
+        "approved under a preference",
+    )
+    [(facts, pref, summary)] = approvals.scouted
+    assert (facts.tool, facts.group_key, facts.locked, pref, summary) == (
+        "t",
+        "t",
+        False,
+        "pref",
+        "Doing it.",
+    )
+
+
+async def test_side_check_guard_falls_through_when_decide_returns_none():
+    v = await side_check_guard(StubSideCheck(None), StubApprovals()).check(ask_ctx())
+    assert (v.kind, v.once) == ("allow", False)
+
+
+async def test_side_check_guard_falls_through_when_decide_raises():
+    v = await side_check_guard(StubSideCheck(boom=True), StubApprovals()).check(ask_ctx())
+    assert (v.kind, v.once) == ("allow", False)
+
+
+async def test_person_ask_allow():
+    v = await person_ask().check(ask_ctx())
+    assert (v.kind, v.once, v.value) == ("allow", True, "allow")
+
+
+async def test_person_ask_always_value():
+    async def always():
+        return "always"
+
+    v = await person_ask().check(ask_ctx(always))
+    assert (v.once, v.value) == (True, "always")
+
+
+async def test_person_ask_deny_blocks_with_denied():
+    async def deny():
+        return "deny"
+
+    v = await person_ask().check(ask_ctx(deny))
+    assert (v.kind, v.code, v.reason) == ("block", "denied", "The user said no to t.")
+
+
+async def test_person_ask_timeout_blocks_with_timeout_code():
+    async def late():
+        raise RpcError(ErrorCode.timeout, "No answer in time.")
+
+    v = await person_ask().check(ask_ctx(late))
+    assert (v.kind, v.code, v.reason) == ("block", "timeout", "No answer in time.")
+
+
+def test_ask_chain_order_is_online_then_side_check_then_person():
+    from brain.bodies import Bodies
+    from brain.memory import Memory
+    from brain.sessions import Session
+
+    session = Session(object(), object(), Bodies(), 10, Memory(":memory:"))
+    assert [g.name for g in session.guards._for(Hook.ask)] == [
+        "anyone_online",
+        "side_check",
+        "person_ask",
+    ]

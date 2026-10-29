@@ -2,17 +2,35 @@
 
 The budget also sits on emit so the scheduler drops wakes; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
-tool_mode is the tool_call guard that asks the person before a tool runs in ask mode.
+tool_mode is the tool_call guard that asks the person before a tool runs in ask mode; the ask
+hook then runs anyone_online, side_check_guard and person_ask in that order.
 """
 
 import dataclasses
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Literal
 
-from brain.guards import ALLOW, Guard, Guards, Hook, ModelCallCtx, ToolCallCtx, Verdict, ask, stop
+from brain.guards import (
+    ALLOW,
+    AskCtx,
+    Guard,
+    Guards,
+    Hook,
+    ModelCallCtx,
+    ToolCallCtx,
+    Verdict,
+    allow_once,
+    ask,
+    block,
+    stop,
+)
+from brain.protocol import RpcError
 
 if TYPE_CHECKING:
     from brain.toolbox import ToolSpec
+
+log = logging.getLogger("brain")
 
 
 def daily_budget(budget) -> Guard:
@@ -66,3 +84,44 @@ def tool_mode(modes: Callable[[], dict[str, str]]) -> Guard:
         return ALLOW
 
     return Guard("tool_mode", Hook.tool_call, check)
+
+
+def anyone_online(asks) -> Guard:
+    def check(ctx: AskCtx) -> Verdict:
+        if asks.anyone_online():
+            return ALLOW
+        return block(f"Nobody was there to ask, so {ctx.tool} was not run.", "denied")
+
+    return Guard("anyone_online", Hook.ask, check)
+
+
+def side_check_guard(side_check, approvals) -> Guard:
+    async def check(ctx: AskCtx) -> Verdict:
+        from brain.side_check import AskFacts  # side_check imports this module
+
+        facts = AskFacts(ctx.source, ctx.tool, ctx.summary, ctx.input, ctx.group_key, ctx.locked)
+        try:
+            pref = await side_check.decide(facts)
+            if pref is None:
+                return ALLOW
+            # Allow-once only: the tool's ask mode stays as it is.
+            approvals.scout_approved(facts, pref, ctx.summary)
+            return allow_once("approved under a preference", value=pref)
+        except Exception:
+            log.exception("side-check failed; asking the person")
+            return ALLOW
+
+    return Guard("side_check", Hook.ask, check)
+
+
+def person_ask() -> Guard:
+    async def check(ctx: AskCtx) -> Verdict:
+        try:
+            choice = await ctx.ask_person()
+        except RpcError as exc:
+            return block(exc.message, exc.code.name)
+        if choice == "deny":
+            return block(f"The user said no to {ctx.tool}.", "denied")
+        return allow_once("the person answered", value=choice)
+
+    return Guard("person_ask", Hook.ask, check)

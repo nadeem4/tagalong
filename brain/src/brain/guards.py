@@ -88,7 +88,16 @@ class ToolCallCtx:
 
 @dataclass(frozen=True)
 class AskCtx:
-    """Filled in by G2."""
+    """One ask on the way to the person; `ask_person` does the wire work and returns the choice."""
+
+    source: str
+    tool: str
+    summary: str
+    input: dict
+    group_key: str
+    locked: bool
+    turn_id: str | None
+    ask_person: Callable[[], Awaitable[str]]
 
 
 @dataclass(frozen=True)

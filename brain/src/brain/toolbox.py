@@ -16,13 +16,19 @@ from pydantic import ValidationError
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.builtin_guards import resolve_mode, tool_mode
-from brain.guards import Guards, Hook, ToolCallCtx
+from brain.builtin_guards import (
+    anyone_online,
+    person_ask,
+    resolve_mode,
+    side_check_guard,
+    tool_mode,
+)
+from brain.guards import AskCtx, Guards, Hook, ToolCallCtx
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
-from brain.side_check import AskFacts, SideCheck
+from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
@@ -154,8 +160,14 @@ class Toolbox:
         self._side_check = side_check  # None: every ask goes to the person
         self._offers = offers  # None: no offers to auto-approve
         if guards is None:
+            # Standalone toolbox: build the same chain the Session registers.
             guards = Guards()
             guards.add(tool_mode(modes))
+            if asks is not None:
+                guards.add(anyone_online(asks))
+                if side_check is not None and approvals is not None:
+                    guards.add(side_check_guard(side_check, approvals))
+                guards.add(person_ask())
         self._guards = guards
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
@@ -209,49 +221,47 @@ class Toolbox:
         return out
 
     async def _ask(self, call: Call, spec: ToolSpec, source_kind: str) -> None:
-        """Gate step 3: wait for a person to allow the call; return only if it may run."""
+        """Gate step 3: run the ask chain; return only if the call may run."""
         assert self._asks is not None
+        approvals = self._approvals
 
         def record(outcome: str, decided_by: str = "person") -> None:
-            if self._approvals is not None:
-                self._approvals.record(
+            if approvals is not None:
+                approvals.record(
                     source=source_kind,
                     tool=spec.name,
-                    summary=self._approvals.summarise(call.text, spec.name, call.input),
+                    summary=summary,
                     input=call.input,
                     group_key=spec.name,
                     outcome=outcome,
                     decided_by=decided_by,
                 )
 
-        if not self._asks.anyone_online():
-            record("no_one", "none")
-            raise RpcError(
-                ErrorCode.denied, f"Nobody was there to ask, so {spec.name} was not run."
-            )
-        if self._side_check is not None and self._approvals is not None:
-            summary = self._approvals.summarise(call.text, spec.name, call.input)
-            facts = AskFacts(source_kind, spec.name, summary, call.input, spec.name, spec.locked)
-            try:
-                pref = await self._side_check.decide(facts)
-                if pref is not None:
-                    # Allow-once only: the tool's ask mode stays as it is.
-                    self._approvals.scout_approved(facts, pref, summary)
-                    return
-            except Exception:
-                log.exception("side-check failed; asking the person")
-        try:
-            choice = await self._asks.permission(call, spec.name, spec.locked)
-        except RpcError as exc:
-            # A cancelled ask is not a final outcome, so it records no row.
-            if exc.code == ErrorCode.timeout:
+        summary = approvals.summarise(call.text, spec.name, call.input) if approvals else ""
+        ctx = AskCtx(
+            source_kind,
+            spec.name,
+            summary,
+            call.input,
+            spec.name,
+            spec.locked,
+            call.turn,
+            lambda: self._asks.permission(call, spec.name, spec.locked),
+        )
+        verdict = await self._guards.run(Hook.ask, ctx)
+        if verdict.kind in ("block", "stop"):
+            if verdict.guard == "anyone_online":
+                record("no_one", "none")
+            elif verdict.guard == "person_ask" and verdict.code == "timeout":
                 record("timed_out", "none")
-            raise
-        if choice == "deny":
-            record("refused")
-            raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
+            elif verdict.guard == "person_ask" and verdict.code == "denied":
+                record("refused")
+            # A cancelled ask is not a final outcome, so it records no row.
+            raise RpcError(_error_code(verdict.code), verdict.reason)
+        if verdict.guard == "side_check":
+            return  # the guard already logged Scout's row
         record("approved")
-        if choice == "always":
+        if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
         elif self._offers is not None:
             self._offers.consider(spec.name, source_kind, spec.name)

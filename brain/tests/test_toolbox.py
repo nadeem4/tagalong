@@ -9,7 +9,7 @@ import pytest
 
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.guards import Guard, Guards, Hook, block, stop
+from brain.guards import Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.toolbox import BodySource, BrainSource, ToolSpec
@@ -928,4 +928,20 @@ async def test_run_refuses_when_a_tool_call_guard_stops():
     with pytest.raises(RpcError) as err:
         await box.run(call("a"))
     assert (err.value.code, err.value.message) == (ErrorCode.denied, "halted")
+    assert source.ran == []
+
+
+async def test_chain_error_in_an_ask_guard_refuses_the_tool():
+    def boom(ctx):
+        raise RuntimeError("secret input text")
+
+    source = FakeSource([spec("a")])
+    guards = Guards()
+    guards.add(Guard("ask_all", Hook.tool_call, lambda ctx: ask("needs your yes")))
+    guards.add(Guard("boom", Hook.ask, boom))
+    box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
+    with pytest.raises(RpcError) as err:
+        await box.run(call("a"))
+    assert err.value.code == ErrorCode.denied
+    assert "secret" not in err.value.message
     assert source.ran == []
