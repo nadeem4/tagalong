@@ -16,6 +16,7 @@ from brain.asks import Answer, Asks
 from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.memory import Job, Memory
 from brain.protocol import RpcError
+from brain.questions import ScoutQuestions
 
 AGENT = "claude_code"
 CANCEL = "cancel"
@@ -39,6 +40,7 @@ class Jobs:
         max_running: int = 2,
         on_finished: Callable[[Job], object] = lambda job: None,
         clock: Callable[[], float] = time.monotonic,
+        scout_questions: ScoutQuestions | None = None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -47,6 +49,7 @@ class Jobs:
         self._max_running = max_running
         self._on_finished = on_finished
         self._clock = clock
+        self._scout = scout_questions
         self._runs: dict[str, ExpertRun] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
@@ -175,6 +178,14 @@ class Jobs:
         return ids.get(answer.option) if answer else None
 
     async def _question(self, job_id: str, question: Question) -> dict | None:
+        if self._scout is not None and self._asks.anyone_online():
+            # Scout answers when he can; None (passed, dropped, wake over) means ask the user.
+            scout_content = await self._scout.ask(job_id, question)
+            if job_id not in self._runs:  # the job ended while Scout thought: nobody to answer
+                return None
+            if scout_content is not None:
+                self._changed()
+                return scout_content
         content: dict = {}
         for field in question.fields:
             # A lone question's text is the message; several carry theirs in the description.
@@ -206,6 +217,8 @@ class Jobs:
         self._runs.pop(job_id, None)
         self._progress_sent.pop(job_id, None)
         self._asks.cancel_all(self._ask_ids.pop(job_id, set()))
+        if self._scout is not None:
+            self._scout.cancel_job(job_id)
         self._changed()
         outcome = self._on_finished(self._memory.get_job(job_id))
         if inspect.isawaitable(outcome):
