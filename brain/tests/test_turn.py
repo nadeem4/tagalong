@@ -9,6 +9,7 @@ import datetime
 from types import SimpleNamespace
 
 from brain.guardrails import Budget
+from brain.guards import ALLOW, Guard, Guards, Hook, stop
 from brain.mind.turn import AnthropicModel, Call, Final, _request, run_turn
 
 
@@ -63,7 +64,16 @@ async def ok_tool(call):
 
 
 def start(
-    model, history, sent, *, run_tool=ok_tool, tools=None, inbox=None, budget=None, step_cap=10
+    model,
+    history,
+    sent,
+    *,
+    run_tool=ok_tool,
+    tools=None,
+    inbox=None,
+    budget=None,
+    step_cap=10,
+    guards=None,
 ):
     return run_turn(
         turn_id="t1",
@@ -77,6 +87,7 @@ def start(
         notify=lambda m, p: sent.append((m, p)),
         budget=budget or Spend(),
         step_cap=step_cap,
+        guards=guards,
     )
 
 
@@ -201,6 +212,22 @@ async def test_step_cap():
     reason, _, _, model = await go(steps, step_cap=2)
     assert reason == "step_cap"
     assert model.calls == 2
+
+
+async def test_run_turn_uses_given_guards():
+    seen = []
+
+    def after_one(ctx):
+        seen.append((ctx.kind, ctx.turn_id, ctx.steps))
+        return stop("custom", "step_cap") if ctx.steps >= 1 else ALLOW
+
+    guards = Guards()
+    guards.add(Guard("after_one", Hook.model_call, after_one))
+    steps = [tool_step(("c1", "x")), text_step("never")]
+    reason, _, _, model = await go(steps, guards=guards)
+    assert reason == "step_cap"
+    assert model.calls == 1
+    assert seen == [("turn", "t1", 0), ("turn", "t1", 1)]
 
 
 async def test_over_budget_makes_no_call():

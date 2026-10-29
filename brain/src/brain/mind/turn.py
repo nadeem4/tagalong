@@ -11,6 +11,9 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from brain.builtin_guards import spend_guards
+from brain.guards import Guards, Hook, ModelCallCtx
+
 log = logging.getLogger(__name__)
 
 
@@ -83,17 +86,17 @@ async def run_turn(
     notify: Callable[[str, dict], None],
     budget,
     step_cap: int,
+    guards: Guards | None = None,
 ) -> str:
+    guards = guards or spend_guards(budget, step_cap)
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
     steps = 0
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
     try:
         while True:
-            if not budget.allows():
-                reason = "over_budget"
-                break
-            if steps == step_cap:
-                reason = "step_cap"
+            verdict = await guards.run(Hook.model_call, ModelCallCtx("turn", turn_id, steps))
+            if verdict.kind in ("stop", "block"):
+                reason = verdict.code or "error"
                 break
             steps += 1
 
