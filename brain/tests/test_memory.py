@@ -560,3 +560,113 @@ def test_an_older_database_migrates_forward(tmp_path):
     m = Memory(path)
     assert m.list_timers() == []
     m.close()
+
+
+def _ap(mem, outcome="approved", by="person", group="g1", at="2026-01-01T00:00:00+00:00"):
+    return mem.add_approval(
+        source="scout_tool",
+        tool="run",
+        summary="s",
+        input={"a": 1},
+        job_id=None,
+        group_key=group,
+        outcome=outcome,
+        decided_by=by,
+        preference_id=None,
+        at=at,
+    )
+
+
+def test_fresh_db_has_only_the_risky_default(mem):
+    prefs = mem.list_preferences()
+    assert len(prefs) == 1
+    assert prefs[0].builtin is True
+    assert prefs[0].sentence == "Always ask me before risky actions"
+    assert mem.default_preference() == prefs[0]
+    assert mem.has_user_preferences() is False
+
+
+def test_default_is_not_reseeded_after_removal(tmp_path):
+    m = Memory(tmp_path / "d.db")
+    assert m.remove_preference(m.default_preference().id) is True
+    m.close()
+    m = Memory(tmp_path / "d.db")
+    assert m.list_preferences() == []
+    assert m.default_preference() is None
+    m.close()
+
+
+def test_add_preference_and_listing_order(mem):
+    p = mem.add_preference(
+        sentence="Run tests freely", source="scout_tool", tool="run", group_key="g1", at="t"
+    )
+    assert p.builtin is False and p.use_count == 0 and p.last_used is None
+    assert [x.builtin for x in mem.list_preferences()] == [True, False]
+    assert mem.has_user_preferences() is True
+    assert mem.has_preference_for("g1") is True
+    assert mem.has_preference_for("other") is False
+
+
+def test_list_approvals_filters(mem):
+    a = _ap(mem)
+    b = _ap(mem, by="scout")
+    c = _ap(mem, outcome="refused", by="person")
+    assert [x.id for x in mem.list_approvals("all", 10, None)] == [c, b, a]
+    assert [x.id for x in mem.list_approvals("scout", 10, None)] == [b]
+    assert [x.id for x in mem.list_approvals("refused", 10, None)] == [c]
+    assert [x.id for x in mem.list_approvals("all", 1, None)] == [c]
+    assert [x.id for x in mem.list_approvals("all", 10, b)] == [a]
+    assert mem.list_approvals("all", 10, None)[0].input == {"a": 1}
+
+
+def test_approval_counts(mem):
+    _ap(mem)
+    _ap(mem, by="scout")
+    _ap(mem, outcome="refused")
+    assert mem.approval_counts() == {"total": 3, "scout": 1, "refused": 1}
+
+
+def test_person_approvals_since_counts_only_person_approved_in_group(mem):
+    _ap(mem, at="2026-01-02T00:00:00+00:00")
+    _ap(mem, at="2026-01-03T00:00:00+00:00")
+    _ap(mem, by="scout", at="2026-01-03T00:00:00+00:00")
+    _ap(mem, outcome="refused", at="2026-01-03T00:00:00+00:00")
+    _ap(mem, group="g2", at="2026-01-03T00:00:00+00:00")
+    _ap(mem, at="2025-12-01T00:00:00+00:00")
+    assert mem.person_approvals_since("g1", "2026-01-01T00:00:00+00:00") == 2
+
+
+def test_use_preference_bumps_count_and_last_used(mem):
+    p = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
+    mem.use_preference(p.id, "t1")
+    mem.use_preference(p.id, "t2")
+    got = next(x for x in mem.list_preferences() if x.id == p.id)
+    assert (got.use_count, got.last_used) == (2, "t2")
+
+
+def test_edit_and_remove_report_missing_ids(mem):
+    p = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
+    assert mem.edit_preference(p.id, "y") is True
+    assert mem.edit_preference(999, "y") is False
+    assert mem.remove_preference(p.id) is True
+    assert mem.remove_preference(p.id) is False
+
+
+def test_offers_newest_first(mem):
+    mem.add_offer("g", "2026-01-01", "no_answer")
+    mem.add_offer("g", "2026-01-02", "yes")
+    mem.add_offer("h", "2026-01-03", "none")
+    assert mem.offers_for("g") == [("2026-01-02", "yes"), ("2026-01-01", "no_answer")]
+
+
+def test_migration_is_one_step_after_timers(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.close()
+    m = Memory(path)
+    v = m._db.execute("PRAGMA user_version").fetchone()[0]
+    assert v == n + 1 == len(memory.MIGRATIONS)
+    assert m.default_preference() is not None
+    m.close()
