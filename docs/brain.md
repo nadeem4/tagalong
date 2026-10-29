@@ -62,6 +62,7 @@ the total can run a little low.
 | `brain/src/brain/scheduler.py`   | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                       |
 | `brain/src/brain/timers.py`      | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                 |
 | `brain/src/brain/mind/events.md` | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                   |
+| `brain/src/brain/questions.py`   | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                       |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
 | `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
@@ -414,16 +415,17 @@ from the owner; the model decides whether to speak, and may say nothing.
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind          | Batch window | Cap per hour | Note                                            |
-| ------------- | ------------ | ------------ | ----------------------------------------------- |
-| `job_ended`   | 30 s         | 10           | A job ended; endings within 30 s share one wake |
-| `timer`       | 0 s          | 6            | One of Scout's timers came due                  |
-| `body_online` | 0 s          | 2            | A body came back after 10+ minutes away         |
-| `back`        | 0 s          | 2            | The owner returned after 5+ minutes idle        |
-| `focus`       | none         | none         | Which window is in front (context, no wake)     |
+| Kind           | Batch window | Cap per hour | Note                                                                         |
+| -------------- | ------------ | ------------ | ---------------------------------------------------------------------------- |
+| `job_ended`    | 30 s         | 10           | A job ended; endings within 30 s share one wake                              |
+| `timer`        | 0 s          | 6            | One of Scout's timers came due                                               |
+| `body_online`  | 0 s          | 2            | A body came back after 10+ minutes away                                      |
+| `back`         | 0 s          | 2            | The owner returned after 5+ minutes idle                                     |
+| `job_question` | none         | none         | An expert asks a question; one wake each, not counted against the global cap |
+| `focus`        | none         | none         | Which window is in front (context, no wake)                                  |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
-a `key` replaces an older held event of the same kind and key. Held events live in memory only: a
+a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
 brain restart loses them, and unreported jobs are emitted again at start.
 
 **Body events.** A body reports what it noticed with the `event` notification (`name`, `data`). The
@@ -485,7 +487,21 @@ shows them as Scout does.
   change its mode.
 - **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
   (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
-  closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`.
+  closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`. Permission
+  asks and progress always go straight to the owner.
+- **Questions go to Scout first.** When a body is online, `Jobs` hands Claude Code's question to
+  `ScoutQuestions` (`questions.py`), which emits a `job_question` event (id, job, message and one
+  line per field: key, title, description, options, `multi`). It wakes Scout at once: no batch
+  window, no per-hour cap, and it does not count against the global wake cap. Scout settles it with
+  `answer_expert {question, answers}` (every field key mapped to one of its options or to its own
+  text; a multi field takes a list) or `pass_question {question}`. Both are Scout-only and `auto`;
+  an unknown id gives `no open question <id>.`, a missing key `answer is missing: <keys>.`, a wrong
+  argument type `answer_expert needs question (a string) and answers (an object).`. An answer
+  outside a field's options is sent as `<key>_custom`. The user's question card (the open ask
+  below) appears only when Scout passes, when its wake turn ends with neither tool called, or when
+  the wake cannot run (daily budget spent, or the turn failed to start). A job that ends cancels
+  its open questions. With nobody online the card appears as before, and the same card runs with
+  no Scout involved.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
   fails naming the running jobs. A result is capped at 20,000 characters and progress keeps its
   last 2,000 (it is a running tail). `list_jobs` trims each row for Scout's context: a result to
@@ -540,9 +556,10 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
 
 ## Not built yet
 
-| Row   | Brings                                         |
-| ----- | ---------------------------------------------- |
-| Later | Live-state replay of open turns after `resync` |
+| Row   | Brings                                                      |
+| ----- | ----------------------------------------------------------- |
+| Next  | Learned approvals (Scout remembers what you allowed before) |
+| Later | Live-state replay of open turns after `resync`              |
 
 ## Tests
 
