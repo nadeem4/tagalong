@@ -232,6 +232,7 @@ class Jobs:
         elif verdict.kind == "allow" and verdict.guard == "person_ask" and picked is not None:
             outcome, result = "approved", picked.id
         elif verdict.kind in ("block", "stop"):
+            # Matches person_ask/denied by guard and code, as Toolbox._ask does.
             if verdict.guard == "anyone_online":
                 outcome = "no_one"
             elif verdict.guard == "person_ask" and verdict.code == "timeout":

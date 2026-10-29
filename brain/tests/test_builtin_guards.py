@@ -106,7 +106,7 @@ def test_anyone_online_blocks_with_denied_when_nobody_is_online():
     assert (v.kind, v.code, v.reason) == (
         "block",
         "denied",
-        "Nobody was there to ask, so t was not run.",
+        "nobody online",
     )
 
 
@@ -182,7 +182,7 @@ async def test_person_ask_deny_blocks_with_denied():
         return "deny"
 
     v = await person_ask().check(ask_ctx(deny))
-    assert (v.kind, v.code, v.reason) == ("block", "denied", "The user said no to t.")
+    assert (v.kind, v.code, v.reason) == ("block", "denied", "the person said no")
 
 
 async def test_person_ask_timeout_blocks_with_timeout_code():

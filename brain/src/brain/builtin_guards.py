@@ -90,7 +90,7 @@ def anyone_online(asks) -> Guard:
     def check(ctx: AskCtx) -> Verdict:
         if asks.anyone_online():
             return ALLOW
-        return block(f"Nobody was there to ask, so {ctx.tool} was not run.", "denied")
+        return block("nobody online", "denied")
 
     return Guard("anyone_online", Hook.ask, check)
 
@@ -123,7 +123,7 @@ def person_ask() -> Guard:
         except RpcError as exc:
             return block(exc.message, exc.code.name)
         if choice == "deny":
-            return block(f"The user said no to {ctx.tool}.", "denied")
+            return block("the person said no", "denied")
         return allow_once("the person answered", value=choice)
 
     return Guard("person_ask", Hook.ask, check)

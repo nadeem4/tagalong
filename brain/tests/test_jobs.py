@@ -926,3 +926,24 @@ async def test_permission_unexpected_allow_is_not_approval(make_rig):
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
     assert reply["result"]["outcome"]["outcome"] != "selected"
     assert logged(rig) == []
+
+
+@pytest.mark.parametrize("scenario", ["denied", "nobody_online"])
+async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
+    steps = [{"permission": {"title": "rm secret-file", "options": OPTS}}]
+    asks = FakeAsks(Answer("Plan"), Answer("Nope"))
+    rig = with_approvals(make_rig, asks, steps)
+    if scenario == "nobody_online":
+        real_open = asks.open
+
+        async def open_then_go_offline(**kw):
+            if kw.get("tool"):
+                asks.online = False
+            return await real_open(**kw)
+
+        asks.open = open_then_go_offline
+    with caplog.at_level("INFO", logger="brain.guardrails"):
+        await rig.jobs.start("go", str(rig.folder))
+        await until(lambda: rig.finished)
+    assert "guard=" in caplog.text  # the refusal was logged
+    assert "rm secret-file" not in caplog.text

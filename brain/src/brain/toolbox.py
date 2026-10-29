@@ -257,7 +257,13 @@ class Toolbox:
             elif verdict.guard == "person_ask" and verdict.code == "denied":
                 record("refused")
             # A cancelled ask is not a final outcome, so it records no row.
-            raise RpcError(_error_code(verdict.code), verdict.reason)
+            # Logged guard reasons hold no tool text; the user-facing line is built here.
+            reason = verdict.reason
+            if verdict.guard == "anyone_online":
+                reason = f"Nobody was there to ask, so {spec.name} was not run."
+            elif verdict.guard == "person_ask" and verdict.code == "denied":
+                reason = f"The user said no to {spec.name}."
+            raise RpcError(_error_code(verdict.code), reason)
         if verdict.guard == "side_check":
             return  # the guard already logged Scout's row
         record("approved")
