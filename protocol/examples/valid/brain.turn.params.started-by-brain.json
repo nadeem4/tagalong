@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn",
+  "params": {
+    "seq": 10,
+    "turn": "t4",
+    "body": "desktop",
+    "state": "started",
+    "started_by": "brain"
+  }
+}

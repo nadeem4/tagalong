@@ -59,6 +59,13 @@ export type SayResult = z.infer<typeof SayResult>;
 export const EventParams = z.object({ name: z.string(), data: z.unknown().optional() });
 export type EventParams = z.infer<typeof EventParams>;
 
+// Data of the `back` and `focus` events.
+export const BackEventData = z.object({ idle_seconds: z.number().int().nonnegative() });
+export type BackEventData = z.infer<typeof BackEventData>;
+
+export const FocusEventData = z.object({ app: z.string(), title: z.string() });
+export type FocusEventData = z.infer<typeof FocusEventData>;
+
 export const CallParams = z.object({ tool: z.string(), input: Input });
 export type CallParams = z.infer<typeof CallParams>;
 
@@ -111,6 +118,7 @@ export const TurnParams = z.object({
   body: z.string().nullable(),
   state: z.enum(['started', 'ended']),
   reason: z.enum(['done', 'cancelled', 'error', 'over_budget', 'step_cap']).optional(),
+  started_by: z.enum(['user', 'brain']).optional(),
 });
 export type TurnParams = z.infer<typeof TurnParams>;
 

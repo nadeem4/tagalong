@@ -187,6 +187,17 @@ class EventParams(Model):
     data: Any = None
 
 
+class BackData(Model):
+    # Data of the `back` event: the user returned after being idle.
+    idle_seconds: Annotated[int, Field(ge=0)]
+
+
+class FocusData(Model):
+    # Data of the `focus` event: the front window changed.
+    app: str
+    title: str
+
+
 class CallParams(Model):
     tool: str
     input: Input
@@ -250,6 +261,7 @@ class TurnParams(Model):
     body: str | None
     state: Literal["started", "ended"]
     reason: Literal["done", "cancelled", "error", "over_budget", "step_cap"] | None = None
+    started_by: Literal["user", "brain"] | None = None
 
 
 class ToolParams(Model):
