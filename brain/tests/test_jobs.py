@@ -87,6 +87,7 @@ class Rig:
         scout=None,
         approvals=False,
         side_check=None,
+        expert_timeout=30,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
@@ -101,6 +102,7 @@ class Rig:
         self.runs: list[ExpertRun] = []
         self.finished: list = []
         self.now = 0.0
+        self.expert_timeout = expert_timeout
         self.approvals = (
             Approvals(self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC))
             if approvals
@@ -120,7 +122,9 @@ class Rig:
         )
 
     def make_run(self, **callbacks) -> ExpertRun:
-        run = ExpertRun(command=[sys.executable, str(AGENT)], timeout=30, grace=2, **callbacks)
+        run = ExpertRun(
+            command=[sys.executable, str(AGENT)], timeout=self.expert_timeout, grace=2, **callbacks
+        )
         self.runs.append(run)
         return run
 
@@ -947,3 +951,23 @@ async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
         await until(lambda: rig.finished)
     assert "guard=" in caplog.text  # the refusal was logged
     assert "rm secret-file" not in caplog.text
+
+
+async def test_expert_that_hits_the_run_cap_ends_failed_and_is_told(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), expert_timeout=0.5)
+    job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.finished)
+    job = rig.memory.get_job(job_id)
+    assert (job.state, job.reason) == ("error", "timeout")
+    assert len(rig.finished) == 1  # on_finished is how Scout is woken
+    assert "State: error" in job_note(rig.finished[0]) and "timeout" in job_note(rig.finished[0])
+    assert not rig.jobs._runs  # the slot is free again
+
+
+async def test_expert_process_death_ends_failed_and_is_told(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "about to die"}, {"crash": 3}])
+    job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert rig.memory.get_job(job_id).state == "error"
+    assert len(rig.finished) == 1
+    assert "State: error" in job_note(rig.finished[0])

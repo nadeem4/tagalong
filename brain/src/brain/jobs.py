@@ -53,6 +53,7 @@ class Jobs:
         side_check: SideCheck | None = None,
         offers: Offers | None = None,
         guards: Guards | None = None,
+        on_away: Callable[[str, str], None] = lambda job_id, what: None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -60,6 +61,7 @@ class Jobs:
         self._make_run = make_run  # called with the four callbacks as keywords
         self._max_running = max_running
         self._on_finished = on_finished
+        self._on_away = on_away  # an ask found nobody online: (job id, what it asked)
         self._clock = clock
         self._scout = scout_questions
         self._approvals = approvals  # None records nothing
@@ -235,6 +237,7 @@ class Jobs:
             # Matches person_ask/denied by guard and code, as Toolbox._ask does.
             if verdict.guard == "anyone_online":
                 outcome = "no_one"
+                self._on_away(job_id, f"asked permission: {request.title}")
             elif verdict.guard == "person_ask" and verdict.code == "timeout":
                 outcome = "timed_out"
             elif verdict.guard == "person_ask" and verdict.code == "denied" and picked is not None:
@@ -289,6 +292,8 @@ class Jobs:
                 job_id=job_id, text=text, options=field.options, free_text=True
             )
             if answer is None:
+                if not self._asks.anyone_online():
+                    self._on_away(job_id, question.message)
                 self._changed()
                 return None
             if answer.text:

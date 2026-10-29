@@ -3,6 +3,7 @@
 History is append-only and always valid: a half-streamed message is never stored and a
 tool_use never goes unanswered, even when the turn is cancelled. The loop writes no words of
 its own; it only reports why it stopped.
+The one exception is the turn timeout: a stalled model gets one plain message so it is never silent.
 """
 
 import asyncio
@@ -15,6 +16,8 @@ from brain.builtin_guards import spend_guards
 from brain.guards import Guards, Hook, ModelCallCtx
 
 log = logging.getLogger(__name__)
+
+TIMEOUT_MESSAGE = "Sorry, I took too long on that and had to stop. Ask me again?"
 
 
 @dataclass(frozen=True)
@@ -87,65 +90,87 @@ async def run_turn(
     budget,
     step_cap: int,
     guards: Guards | None = None,
+    turn_timeout: float | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
     steps = 0
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
     try:
-        while True:
-            verdict = await guards.run(Hook.model_call, ModelCallCtx("turn", turn_id, steps))
-            if verdict.kind in ("stop", "block"):
-                reason = verdict.code or "error"
-                break
-            steps += 1
+        try:
+            async with asyncio.timeout(turn_timeout) as limit:
+                while True:
+                    verdict = await guards.run(
+                        Hook.model_call, ModelCallCtx("turn", turn_id, steps)
+                    )
+                    if verdict.kind in ("stop", "block"):
+                        reason = verdict.code or "error"
+                        break
+                    steps += 1
 
-            stream = model.stream(system(), history, tools()).__aiter__()
-            final = None
-            failed = False
-            while True:
-                try:
-                    item = await anext(stream)
-                except StopAsyncIteration:
-                    break
-                except Exception:
-                    log.exception("model call failed")
-                    failed = True
-                    break
-                if isinstance(item, Final):
-                    final = item
-                else:
-                    spoke = True
-                    notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
-            if failed or final is None:
-                if not failed:
-                    log.error("model stream ended without a final message")
-                reason = "error"
-                break
+                    stream = model.stream(system(), history, tools()).__aiter__()
+                    final = None
+                    failed = False
+                    while True:
+                        try:
+                            item = await anext(stream)
+                        except StopAsyncIteration:
+                            break
+                        except Exception:
+                            log.exception("model call failed")
+                            failed = True
+                            break
+                        if isinstance(item, Final):
+                            final = item
+                        else:
+                            spoke = True
+                            notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
+                    if failed or final is None:
+                        if not failed:
+                            log.error("model stream ended without a final message")
+                        reason = "error"
+                        break
 
-            history.append({"role": "assistant", "content": final.content})
-            budget.spend(final.usage, final.model or model.model_id)
-            if final.stop_reason == "pause_turn":
-                continue
+                    history.append({"role": "assistant", "content": final.content})
+                    budget.spend(final.usage, final.model or model.model_id)
+                    if final.stop_reason == "pause_turn":
+                        continue
 
-            calls = [b for b in final.content if b.get("type") == "tool_use"]
-            text = "".join(b.get("text", "") for b in final.content if b.get("type") == "text")
-            if final.stop_reason == "tool_use" and calls:
-                results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
-                history.append({"role": "user", "content": results + _drain(inbox)})
-                continue
-            closed = _close_dangling_tool_use(history)
-            if final.stop_reason == "refusal":
-                reason = "error"
-                break
-            says = _drain(inbox)
-            if not says:
-                reason = "done"
-                break
-            if closed:
-                history[-1]["content"] += says
-            else:
-                history.append({"role": "user", "content": says})
+                    calls = [b for b in final.content if b.get("type") == "tool_use"]
+                    text = "".join(
+                        b.get("text", "") for b in final.content if b.get("type") == "text"
+                    )
+                    if final.stop_reason == "tool_use" and calls:
+                        clock = asyncio.get_running_loop().time
+                        began, due = clock(), limit.when()
+                        limit.reschedule(None)  # a person's slow ask never eats the clock
+                        results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
+                        if due is not None:
+                            limit.reschedule(due + clock() - began)
+                        history.append({"role": "user", "content": results + _drain(inbox)})
+                        continue
+                    closed = _close_dangling_tool_use(history)
+                    if final.stop_reason == "refusal":
+                        reason = "error"
+                        break
+                    says = _drain(inbox)
+                    if not says:
+                        reason = "done"
+                        break
+                    if closed:
+                        history[-1]["content"] += says
+                    else:
+                        history.append({"role": "user", "content": says})
+        except TimeoutError:
+            if not limit.expired():
+                raise  # a TimeoutError from inside the loop, not our clock
+            log.warning("turn %s ran past %s s", turn_id, turn_timeout)
+            # On its own line when Scout was mid-reply, so it is not glued onto the sentence.
+            note = "\n\n" + TIMEOUT_MESSAGE if spoke else TIMEOUT_MESSAGE
+            notify("reply", {"turn": turn_id, "body": body_id, "delta": note})
+            spoke = True
+            _close_dangling_tool_use(history)
+            reason = "error"
     except BaseException as err:
         cancelled = isinstance(err, asyncio.CancelledError)
         if cancelled:

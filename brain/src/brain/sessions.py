@@ -33,6 +33,7 @@ from brain.config import (
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
     DEFAULT_OFFER_WINDOW_DAYS,
+    DEFAULT_TURN_TIMEOUT_S,
     DEFAULT_WAKES_PER_HOUR,
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
@@ -73,11 +74,13 @@ class Session:
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
         kinds: dict[str, EventKind] | None = None,
         offers: OfferSettings = DEFAULT_OFFER_SETTINGS,
+        turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
     ) -> None:
         self._model = model
         self._budget = budget
         self._bodies = bodies
         self._step_cap = step_cap
+        self._turn_timeout = turn_timeout
         self._memory = memory
         self._asks = Asks(bodies)
         # One set of spend guards for the loop, the scheduler, the side-check and offers.
@@ -120,6 +123,7 @@ class Session:
             side_check=side_check,
             offers=offer,
             guards=self.guards,
+            on_away=self._on_job_away,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -202,6 +206,11 @@ class Session:
             on_start=lambda: self._memory.mark_reported(job.id),
         )
 
+    def _on_job_away(self, job_id: str, what: str) -> None:
+        # No body was online to ask, so hold the news until one connects (no question id: nothing
+        # is waiting on Scout). One held item per job.
+        self.scheduler.emit(Event("job_question", {"job": job_id, "message": what}, key=job_id))
+
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()
 
@@ -239,6 +248,7 @@ class Session:
                 budget=self._budget,
                 step_cap=self._step_cap,
                 guards=self.guards,
+                turn_timeout=self._turn_timeout,
             )
         )
         self._task = task

@@ -117,6 +117,20 @@ def test_bad_expert_timeout_raises(value):
         load_config({"TAGALONG_EXPERT_TIMEOUT_S": value})
 
 
+def test_turn_timeout_defaults_to_300():
+    assert load_config({}).turn_timeout == 300.0
+
+
+def test_turn_timeout_from_env():
+    assert load_config({"TAGALONG_TURN_TIMEOUT_S": "45"}).turn_timeout == 45.0
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "nan", "inf", "abc"])
+def test_turn_timeout_rejects_zero_negative_nan_and_text(value):
+    with pytest.raises(ValueError, match="TAGALONG_TURN_TIMEOUT_S"):
+        load_config({"TAGALONG_TURN_TIMEOUT_S": value})
+
+
 def test_split_command_keeps_backslashes_in_a_windows_path():
     path = r"C:\Users\x\AppData\Roaming\npm\claude-agent-acp.cmd"
     assert split_command(path, posix=False) == [path]
