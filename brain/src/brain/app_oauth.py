@@ -62,6 +62,13 @@ class FileTokenStorage:
             f.write(json.dumps(data))
         os.replace(tmp, self._path)
 
+    def token_strings(self) -> list[str]:
+        """The saved access and refresh tokens, for masking."""
+        tokens = self._read().get("tokens")
+        if not isinstance(tokens, dict):
+            return []
+        return [v for k in ("access_token", "refresh_token") if isinstance(v := tokens.get(k), str)]
+
     async def get_tokens(self) -> OAuthToken | None:
         try:
             return OAuthToken.model_validate(self._read()["tokens"])

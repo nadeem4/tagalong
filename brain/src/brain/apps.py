@@ -18,7 +18,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote, unquote, urlparse, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunsplit
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -239,6 +239,9 @@ class TokenFile:
         if data.pop(app_id, None) is not None:
             self._write(data)
 
+    def items(self) -> dict[str, str]:
+        return {k: v for k, v in self._read().items() if isinstance(v, str)}
+
     def clear_app(self, app_id: str) -> None:
         """Drop the bearer token and every `<id>:...` secret of one app."""
         data = self._read()
@@ -362,6 +365,19 @@ class Apps:
             if open_url:  # a fresh sign-in starts clean: the old client id has the old port
                 self._forget_oauth(app_id)
             self._launch(row, open_url)
+
+    def secret_values(self) -> list[str]:
+        """Every stored app secret, for masking; url_query params also count one by one."""
+        out: list[str] = []
+        if self._tokens is not None:
+            for key, value in self._tokens.items().items():
+                out.append(value)
+                if key.endswith(":url_query"):
+                    out.extend(v for _, v in parse_qsl(value, keep_blank_values=True))
+        if self._data_dir is not None:
+            for f in sorted((Path(self._data_dir) / "app-oauth").glob("*.json")):
+                out.extend(FileTokenStorage(self._data_dir, f.stem).token_strings())
+        return out
 
     def _forget_oauth(self, app_id: str) -> None:
         if self._data_dir is not None:
