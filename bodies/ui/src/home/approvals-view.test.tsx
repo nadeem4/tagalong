@@ -144,6 +144,33 @@ describe('ApprovalsView preferences', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That preference is gone.');
     expect(screen.getByRole('textbox')).toBeVisible();
   });
+
+  it("drops Electron's remote-method prefix from a refused edit", async () => {
+    const bridge = createFakeHostBridge({ preferences: [GIT_PREF] });
+    bridge.editPreference = () =>
+      Promise.reject(
+        new Error(
+          "Error invoking remote method 'tagalong:approvals:preferences:edit': RpcError: That preference is gone.",
+        ),
+      );
+    renderPage(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: `Edit: ${GIT_PREF.sentence}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('That preference is gone.');
+    expect(alert).not.toHaveTextContent('Error invoking remote method');
+  });
+
+  it('Cancel clears the error a refused edit left up', async () => {
+    const bridge = createFakeHostBridge({ preferences: [GIT_PREF] });
+    bridge.editPreference = () => Promise.reject(new Error('That preference is gone.'));
+    renderPage(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: `Edit: ${GIT_PREF.sentence}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
 
 describe('ApprovalsView history', () => {
@@ -249,6 +276,50 @@ describe('ApprovalsView history', () => {
     expect(screen.getByText('Run pnpm install')).toBeVisible();
     expect(calls).toEqual([undefined, 5]);
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+
+  it('a double click on Show more reads one page, not two', async () => {
+    const bridge = createFakeHostBridge();
+    const counts = { total: 2, scout: 0, refused: 1 };
+    const calls: (number | undefined)[] = [];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    bridge.listApprovals = async (_filter, before) => {
+      calls.push(before);
+      if (before === undefined) return { approvals: [BY_PERSON], counts, next: 5 };
+      await gate;
+      return { approvals: [REFUSED], counts, next: null };
+    };
+    renderPage(bridge);
+    const more = await screen.findByRole('button', { name: 'Show more' });
+    fireEvent.click(more);
+    fireEvent.click(more);
+    release();
+    expect(await screen.findByText('Send draft to landlord')).toBeVisible();
+    expect(calls).toEqual([undefined, 5]);
+    expect(screen.getAllByText('Send draft to landlord')).toHaveLength(1);
+  });
+
+  it('a Show more answer from the old filter does not mix into the new list', async () => {
+    const bridge = createFakeHostBridge();
+    const counts = { total: 2, scout: 1, refused: 1 };
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    bridge.listApprovals = async (filter, before) => {
+      if (filter === 'refused') return { approvals: [REFUSED], counts, next: null };
+      if (before === undefined) return { approvals: [BY_PERSON], counts, next: 5 };
+      await gate;
+      return { approvals: [TIMED_OUT], counts, next: null };
+    };
+    renderPage(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show more' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Refused/ }));
+    expect(await screen.findByText('Send draft to landlord')).toBeVisible();
+    release();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByText('Open the repo in your browser')).toBeNull();
   });
 });
 

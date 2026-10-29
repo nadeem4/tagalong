@@ -419,14 +419,16 @@ The nav lists thirteen pages (`HomePage`), the companion's name filling in where
   (`preferences-list.tsx`) lists "STANDING PREFERENCES", the built-in default first: each card shows
   the sentence, "Agreed {day}", "Used {n} times" and "Last used" once used, with **Edit** (an inline
   field with **Save** and **Cancel**; an empty sentence is refused) and **Remove**. A refusal from
-  the brain shows as an alert and the list is read again. With none: "None yet. Scout offers one
+  the brain shows as an alert in the brain's own words (Electron's "Error invoking remote method"
+  prefix is stripped, as on the Connections page); **Cancel** clears it. With none: "None yet. Scout offers one
   after you approve the same kind of thing a few times." `ApprovalHistory` (`approval-history.tsx`)
   shows a summary strip (asks, Scout answered, refused), the **All** / **Decided by Scout** /
   **Refused** filter with its counts, and rows grouped by local day (Today, Yesterday, then the date):
   time, what was asked, where it came from (Claude Code expert, Scout tool, Connected app), who
   decided, and a chip (Approved, Refused, Timed out, No one online). A Scout row reads "Scout decided,
   per your preference" with the sentence it relied on, and an "Auto" pill. **Show more** pages back
-  with `before: next`. Until a read succeeds nothing is claimed; a failed read shows an alert. A
+  with `before: next`; a click while that read is out is ignored, and an answer for a list since
+  re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert. A
   bridge without `listApprovals` (an old body) renders nothing. `e2e/approvals.spec.ts` covers it on
   the fake brain.
 - **Activity.** `ActivityView` reads 30 entries a page (`PAGE`), newest first, and **Show older** pages

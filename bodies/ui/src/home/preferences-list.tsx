@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import type { PreferenceRow } from '../host-bridge';
+import { failure } from './connections-panel';
 
 interface Props {
   /** Null until a read succeeds: then nothing is claimed, not even "none yet". */
@@ -19,8 +20,6 @@ const day = (iso: string): string =>
 
 const dayAndTime = (iso: string): string =>
   `${day(iso)}, ${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-const reason = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
   const [editing, setEditing] = useState<number | null>(null);
@@ -47,14 +46,14 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
         setEditing(null);
         setError(null);
       },
-      (failure: unknown) => setError(reason(failure)),
+      (error: unknown) => setError(failure(error)),
     );
   };
 
   const remove = (pref: PreferenceRow): void => {
     onRemove(pref.id).then(
       () => setError(null),
-      (failure: unknown) => setError(reason(failure)),
+      (error: unknown) => setError(failure(error)),
     );
   };
 
@@ -91,7 +90,14 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
                   <button type="button" className="tg-btn" onClick={() => save(pref)}>
                     Save
                   </button>
-                  <button type="button" className="tg-btn-quiet" onClick={() => setEditing(null)}>
+                  <button
+                    type="button"
+                    className="tg-btn-quiet"
+                    onClick={() => {
+                      setEditing(null);
+                      setError(null);
+                    }}
+                  >
                     Cancel
                   </button>
                 </div>

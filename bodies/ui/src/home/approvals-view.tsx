@@ -49,17 +49,27 @@ export function ApprovalsView() {
     });
   }, [bridge, refresh]);
 
+  // The read Show more is waiting on, by ticket: a second click meanwhile would add the same
+  // page twice, and a read that began before a filter change must not land in the new list.
+  const loadingMore = useRef(-1);
   const showMore = (): void => {
-    if (next === null) return;
+    if (next === null || loadingMore.current === latest.current) return;
+    const mine = latest.current;
+    loadingMore.current = mine;
     bridge
       .listApprovals?.(filter, next)
       .then((page) => {
+        if (mine !== latest.current) return;
         setRows((current) => [...(current ?? []), ...page.approvals]);
         setNext(page.next);
       })
       .catch((error: unknown) => {
+        if (mine !== latest.current) return;
         console.error('could not read more approvals', error);
         setFailed(true);
+      })
+      .finally(() => {
+        if (loadingMore.current === mine) loadingMore.current = -1;
       });
   };
 

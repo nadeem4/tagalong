@@ -7,6 +7,7 @@ describe('ui package surface', () => {
   it('exports the components and the fake bridge hosts build against', () => {
     expect(Object.keys(ui).sort()).toEqual(
       [
+        'ApprovedReport',
         'ChatPanel',
         'CompanionBubble',
         'GreetingLine',
