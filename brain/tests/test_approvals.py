@@ -49,3 +49,142 @@ def test_record_notifies_changed_approvals(mem):
         "scout_tool",
     )
     assert row.at == "2026-10-28T09:00:00+00:00"
+
+
+# --- Home tools ---------------------------------------------------------------------------
+
+import json  # noqa: E402
+
+from brain.approvals import approval_home_tools  # noqa: E402
+from brain.protocol import ErrorCode, RpcError  # noqa: E402
+
+
+def tools(mem, sent):
+    return {s.name: (s, h) for s, h in approval_home_tools(make(mem, sent))}
+
+
+def add_row(mem, *, decided_by="person", outcome="approved", preference_id=None, tool="t"):
+    return mem.add_approval(
+        source="scout_tool",
+        tool=tool,
+        summary="s",
+        input={"a": 1},
+        job_id=None,
+        group_key=tool,
+        outcome=outcome,
+        decided_by=decided_by,
+        preference_id=preference_id,
+        at="2026-10-28T09:00:00+00:00",
+    )
+
+
+async def test_list_approvals_returns_counts_and_cursor(mem):
+    for _ in range(51):
+        add_row(mem)
+    add_row(mem, decided_by="scout")
+    _, h = tools(mem, [])["list_approvals"]
+
+    first = json.loads(await h({}))
+    assert len(first["approvals"]) == 50
+    assert first["counts"] == {"total": 52, "scout": 1, "refused": 0}
+    assert first["next"] == first["approvals"][-1]["id"]
+    assert set(first["approvals"][0]) == {
+        "id", "source", "tool", "summary", "input", "job_id", "outcome",
+        "decided_by", "preference_id", "preference", "at",
+    }  # fmt: skip
+
+    second = json.loads(await h({"before": first["next"]}))
+    assert len(second["approvals"]) == 2
+    assert second["next"] is None
+
+
+async def test_list_approvals_scout_filter_includes_preference_sentence(mem):
+    pref = mem.add_preference(
+        sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
+    )
+    add_row(mem)
+    add_row(mem, decided_by="scout", preference_id=pref.id)
+    _, h = tools(mem, [])["list_approvals"]
+
+    out = json.loads(await h({"filter": "scout"}))
+
+    assert [r["preference"] for r in out["approvals"]] == ["Allow reads"]
+    assert out["counts"]["total"] == 2  # counts ignore the filter
+
+    mem.remove_preference(pref.id)
+    out = json.loads(await h({"filter": "scout"}))
+    assert out["approvals"][0]["preference"] is None
+
+
+async def test_list_approvals_rejects_bad_args(mem):
+    _, h = tools(mem, [])["list_approvals"]
+    for bad in ({"filter": "x"}, {"before": "1"}, {"before": True}):
+        with pytest.raises(RpcError) as e:
+            await h(bad)
+        assert e.value.code == ErrorCode.invalid_params
+
+
+async def test_remove_preference_changes_and_notifies(mem):
+    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    sent = []
+    t = tools(mem, sent)
+
+    await t["remove_preference"][1]({"id": pref.id})
+
+    assert pref.id not in [p.id for p in mem.list_preferences()]
+    assert sent == [("changed", {"what": "approvals"})]
+    listed = json.loads(await t["list_preferences"][1]({}))["preferences"]
+    assert all(p["id"] != pref.id for p in listed)
+
+
+async def test_list_preferences_shape(mem):
+    pref = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
+    listed = json.loads(await tools(mem, [])["list_preferences"][1]({}))["preferences"]
+    row = next(p for p in listed if p["id"] == pref.id)
+    assert row == {
+        "id": pref.id, "sentence": "x", "source": "app", "tool": "t", "builtin": False,
+        "created_at": "t0", "use_count": 0, "last_used": None,
+    }  # fmt: skip
+
+
+async def test_remove_default_is_allowed(mem):
+    default = mem.default_preference()
+    await tools(mem, [])["remove_preference"][1]({"id": default.id})
+    assert mem.default_preference() is None
+
+
+async def test_edit_preference_rewrites_and_notifies(mem):
+    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    sent = []
+    await tools(mem, sent)["edit_preference"][1]({"id": pref.id, "sentence": "  new  "})
+    assert [p.sentence for p in mem.list_preferences() if p.id == pref.id] == ["new"]
+    assert sent == [("changed", {"what": "approvals"})]
+
+
+@pytest.mark.parametrize("sentence", ["", "   ", "x" * 301, 5, None])
+async def test_edit_preference_rejects_empty_and_overlong(mem, sentence):
+    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    sent = []
+    with pytest.raises(RpcError) as e:
+        await tools(mem, sent)["edit_preference"][1]({"id": pref.id, "sentence": sentence})
+    assert e.value.code == ErrorCode.invalid_params
+    assert sent == []
+
+
+async def test_unknown_preference_id_is_invalid_params(mem):
+    t = tools(mem, [])
+    for name, args in (
+        ("remove_preference", {"id": 999}),
+        ("edit_preference", {"id": 999, "sentence": "x"}),
+    ):
+        with pytest.raises(RpcError) as e:
+            await t[name][1](args)
+        assert e.value.code == ErrorCode.invalid_params
+
+
+def test_home_tools_not_offered_to_the_model(mem):
+    specs = [s for s, _ in approval_home_tools(make(mem, []))]
+    assert [s.name for s in specs] == [
+        "list_approvals", "list_preferences", "remove_preference", "edit_preference",
+    ]  # fmt: skip
+    assert all(s.audience == frozenset({"home"}) for s in specs)

@@ -650,10 +650,14 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         tools = (await call(ws, hello()))["result"]["tools"]
     names = sorted(t["name"] for t in tools)
     assert names == [
+        "edit_preference",
         "forget",
+        "list_approvals",
         "list_jobs",
         "list_memories",
         "list_permissions",
+        "list_preferences",
+        "remove_preference",
         "set_permission",
         "spend_today",
         "stop_job",

@@ -15,7 +15,7 @@ from functools import partial
 from typing import Literal
 
 from brain.app_tools import AppSource, app_home_tools
-from brain.approvals import Approvals
+from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
@@ -94,6 +94,7 @@ class Session:
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
+            + approval_home_tools(approvals)
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair

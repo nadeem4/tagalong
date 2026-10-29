@@ -319,6 +319,13 @@ class ChangedParams(Model):
     what: str
 
 
+class ApprovedParams(Model):
+    seq: Seq
+    tool: str
+    text: str
+    preference: str
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -341,4 +348,5 @@ BRAIN_TO_BODY: MethodMap = {
     "tool": (ToolParams, None),
     "ask": (AskParams, None),
     "changed": (ChangedParams, None),
+    "approved": (ApprovedParams, None),
 }

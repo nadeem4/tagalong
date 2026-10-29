@@ -252,3 +252,13 @@ def test_started_by_is_optional():
     assert turn.model_validate({**started, "started_by": "brain"}).started_by == "brain"
     with pytest.raises(ValidationError):
         turn.model_validate({**started, "started_by": None})
+
+
+def test_approved_notification_shape():
+    model = BRAIN_TO_BODY["approved"][0]
+    ok = {"seq": 3, "tool": "open_file", "text": "Open the file", "preference": "Allow reads"}
+    assert model.model_validate(ok).preference == "Allow reads"
+    assert BRAIN_TO_BODY["approved"][1] is None
+    model.model_validate({**ok, "extra": 1})  # unknown keys are ignored, like every model
+    with pytest.raises(ValidationError):
+        model.model_validate({k: v for k, v in ok.items() if k != "preference"})

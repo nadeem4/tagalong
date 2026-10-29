@@ -8,7 +8,7 @@ and the samples in `examples/` follow it, and a change here comes first. The sam
 
 - Bodies talk only to the brain, never to each other.
 - The contract carries facts and the model's own words, never canned lines. Every word Scout says comes from the model; a turn may end with no reply at all.
-- The fourteen messages below do not change when a body, tool, expert or Home screen is added. New things arrive as tools, event names or `changed` names, never as new messages.
+- The fifteen messages below do not change when a body, tool, expert or Home screen is added. New things arrive as tools, event names or `changed` names, never as new messages.
 - Single user: no TLS, pairing or accounts in v1.
 
 ## Transport
@@ -66,7 +66,7 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 | `cancel`   | notification | `{ turn }`                                           |                                                     |
 | `progress` | notification | `{ call, text }`                                     |                                                     |
 
-- **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; today the Home tools `list_memories`, `forget`, `spend_today`, `list_permissions` and `set_permission`), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
+- **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; today the Home tools `list_memories`, `forget`, `spend_today`, `list_permissions`, `set_permission`, `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
 - **say.** The user said something. At least one of `text` or `parts` is present. `context` is free-form (active window, selection) and goes to the model as-is; each body documents its own context in its doc, never here. `spoken: true` means the user spoke, so the body will speak the reply itself (voice stays in the desktop body in v1; the brain only sees text). The result returns the `turn` id at once; the reply streams as notifications. If a turn is already running (from any body), the message joins it instead of starting a new one: the result carries that turn's id and `joined: true`, and the model sees the new message at its next step. If the daily budget is spent, the turn still starts and ends at once with `reason: "over_budget"`, so every body learns it the same way.
 - **event.** A fact the body noticed (window changed, user idle). Names are free-form and documented per body. The brain decides whether it matters; most events get no reaction. Two names are shared by every body: `back {idle_seconds}` (the user returned after at least 5 minutes idle) and `focus {app, title}` (the front window changed; throttled; an empty `app` clears it, sent when the body may not report the front window). A body coming online is not an event: the brain learns it from the connection itself.
@@ -77,15 +77,16 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Brain → body
 
-| Method    | Kind         | Params                                                                                                                                        | Result               |
-| --------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `use`     | request      | `{ call, tool, input }`                                                                                                                       | `{ output: Part[] }` |
-| `cancel`  | notification | `{ call }`                                                                                                                                    |                      |
-| `reply`   | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                             |                      |
-| `turn`    | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                      |                      |
-| `tool`    | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                       |                      |
-| `ask`     | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
-| `changed` | notification | `{ seq, what }`                                                                                                                               |                      |
+| Method     | Kind         | Params                                                                                                                                        | Result               |
+| ---------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `use`      | request      | `{ call, tool, input }`                                                                                                                       | `{ output: Part[] }` |
+| `cancel`   | notification | `{ call }`                                                                                                                                    |                      |
+| `reply`    | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                             |                      |
+| `turn`     | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                      |                      |
+| `tool`     | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                       |                      |
+| `ask`      | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
+| `changed`  | notification | `{ seq, what }`                                                                                                                               |                      |
+| `approved` | notification | `{ seq, tool, text, preference }`                                                                                                             |                      |
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.
@@ -93,7 +94,8 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 - **turn.** A turn started or ended. `body` is the body the user was talking to: it shows and speaks the reply; other bodies may show it in history. For a turn the brain starts itself, `body` is the body the user last talked to if it is online, otherwise any online body, otherwise `null`. `reason` on `ended` is one of `done`, `cancelled`, `error`, `over_budget`, `step_cap`. `started_by` says who began the turn: `"user"` or `"brain"`. A body shows no thinking state or bubble for `"brain"` until a `reply` or an `ask` arrives; absent means `"user"`.
 - **tool.** A tool call in a turn started or ended, so bodies can show what Scout is doing. `name` is the full name as the model sees it. `summary` is a short line for people; it comes from the tool's result, not a template.
 - **ask.** Scout needs the user. `state: "open"` carries the question; every connected body shows it. When the ask closes, the brain sends `state: "closed"` to every body so the prompt disappears everywhere. `reason` is `answered`, `timeout` or `cancelled`; with `answered`, `option` is the chosen option and `by` is the body id that answered. First answer wins. For a confirm (see Asks and confirm) the ask has `confirm: true`, `tool` and `input`, and its options are exactly `["allow", "deny"]` or exactly `["allow", "always", "deny"]`, in that order.
-- **changed.** Something the bodies display changed (`settings`, `memory`, `permissions`, an expert's name). `what` is free-form, never a fixed list. Bodies refetch through `call`.
+- **changed.** Something the bodies display changed (`settings`, `memory`, `permissions`, `approvals`, an expert's name). `what` is free-form, never a fixed list. Bodies refetch through `call`.
+- **approved.** Scout let a tool run because a saved preference covered it. `tool` is the tool name, `text` the one-line summary of what ran, `preference` the preference sentence that applied. The bubble can show it so the person sees why no ask appeared. (The brain starts sending it in LA2.)
 
 ## Sessions and turns
 
