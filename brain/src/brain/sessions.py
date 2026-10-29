@@ -12,13 +12,14 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
+from typing import Literal
 
 from brain.app_tools import AppSource, app_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.config import DEFAULT_EXPERT_CMD, DEFAULT_EXPERT_TIMEOUT_S, DEFAULT_WAKES_PER_HOUR
-from brain.events import EVENT_KINDS, Event, EventKind
+from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.experts import ExpertRun
 from brain.jobs import Jobs, job_note
 from brain.memory import Job, Memory, _compaction_text
@@ -106,12 +107,12 @@ class Session:
             budget=budget,
             busy=self._busy,
             last_body=lambda: self._last_body,
-            start=self._start_turn,
+            start=lambda body_id, content: self._start_turn(body_id, content, "brain"),
             now=now,
             wakes_per_hour=wakes_per_hour,
             kinds=kinds or EVENT_KINDS,
         )
-        bodies.on_connect = self.scheduler.pump
+        bodies.on_connect = self._on_connect
         for job in memory.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
         timers.start()
@@ -125,6 +126,17 @@ class Session:
             return SayResult(turn=self._turn_id, joined=True)
         return SayResult(turn=self._start_turn(body_id, content), joined=False)
 
+    def body_event(self, body_id: str, name: str, data: object) -> None:
+        event = from_body(body_id, name, data)
+        if event is not None:
+            self.scheduler.emit(event)
+
+    def _on_connect(self, body_id: str, away: float | None) -> None:
+        event = from_connect(body_id, away)
+        if event is not None:
+            self.scheduler.emit(event)
+        self.scheduler.pump()  # also starts a wake that was waiting for a body
+
     def _on_job_finished(self, job: Job) -> None:
         self.scheduler.emit(
             Event("job_ended", {"report": job_note(job)}, key=job.id),
@@ -134,7 +146,9 @@ class Session:
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()
 
-    def _start_turn(self, body_id: str, content: list) -> str:
+    def _start_turn(
+        self, body_id: str, content: list, started_by: Literal["user", "brain"] = "user"
+    ) -> str:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
         if self._inbox:  # says from the finished turn come before this newer one
@@ -146,7 +160,9 @@ class Session:
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(
-            notify, "turn", {"turn": turn_id, "body": body_id, "state": "started"}
+            notify,
+            "turn",
+            {"turn": turn_id, "body": body_id, "state": "started", "started_by": started_by},
         )
         task = asyncio.create_task(
             run_turn(

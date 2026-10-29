@@ -99,13 +99,62 @@ def test_connect_first_time():
 def test_a_raising_on_connect_does_not_break_connect():
     bodies = Bodies()
 
-    def boom() -> None:
+    def boom(body_id: str, away: float | None) -> None:
         raise RuntimeError("wake failed")
 
     bodies.on_connect = boom
     joined = bodies.connect(body("a"), [], FakePeer(), None)
     assert joined == Joined(0, False, [])
     assert bodies.online() == [body("a")]
+
+
+def test_connect_reports_seconds_away_after_a_disconnect():
+    clock = Clock()
+    bodies = Bodies(clock=clock)
+    seen: list[tuple[str, float | None]] = []
+    bodies.on_connect = lambda body_id, away: seen.append((body_id, away))
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    clock.now = 10.0
+    bodies.disconnect("a", peer)
+    clock.now = 70.0
+    bodies.connect(body("a"), [], FakePeer(), None)
+    assert seen == [("a", None), ("a", 60.0)]
+
+
+def test_first_connect_reports_none():
+    bodies = Bodies()
+    seen: list[float | None] = []
+    bodies.on_connect = lambda body_id, away: seen.append(away)
+    bodies.connect(body("a"), [], FakePeer(), None)
+    assert seen == [None]
+
+
+def test_reconnect_on_an_online_id_reports_none():
+    clock = Clock()
+    bodies = Bodies(clock=clock)
+    seen: list[float | None] = []
+    bodies.on_connect = lambda body_id, away: seen.append(away)
+    bodies.connect(body("a"), [], FakePeer(), None)
+    clock.now = 500.0
+    bodies.connect(body("a"), [], FakePeer(), None)
+    assert seen == [None, None]
+
+
+def test_a_replaced_peer_disconnecting_does_not_start_the_away_clock():
+    clock = Clock()
+    bodies = Bodies(clock=clock)
+    seen: list[float | None] = []
+    bodies.on_connect = lambda body_id, away: seen.append(away)
+    old, new = FakePeer(), FakePeer()
+    bodies.connect(body("a"), [], old, None)
+    bodies.connect(body("a"), [], new, None)
+    clock.now = 100.0
+    bodies.disconnect("a", old)  # replaced: the body is still online on `new`
+    bodies.disconnect("a", new)
+    clock.now = 130.0
+    bodies.connect(body("a"), [], FakePeer(), None)
+    assert seen[-1] == 30.0
 
 
 def test_notify_reaches_online_and_queues_offline():

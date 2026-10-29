@@ -83,14 +83,17 @@ class _Online:
 
 
 class Bodies:
-    def __init__(self) -> None:
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._offline_at: dict[str, float] = {}  # when each offline body went away
         self._outboxes: dict[str, Outbox] = {}
         self._online: dict[str, _Online] = {}
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
-        # Session sets this so a wake that waited for a body can start when one joins.
-        self.on_connect: Callable[[], None] | None = None
+        # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
+        # waited for a body can start and a long absence can be noticed.
+        self.on_connect: Callable[[str, float | None], None] | None = None
 
     def connect(self, body: Body, tools: list[Tool], peer: Peer, last_seq: int | None) -> Joined:
         box = self._outboxes.setdefault(body.id, Outbox())
@@ -100,9 +103,11 @@ class Bodies:
             self._fail_pending(old.peer)
         self._online[body.id] = _Online(body, tools, peer)
         self._known[body.id] = tools
+        gone_at = self._offline_at.pop(body.id, None)
+        away = None if gone_at is None else self._clock() - gone_at
         if self.on_connect is not None:
             try:
-                self.on_connect()
+                self.on_connect(body.id, away)
             except Exception:  # a failed wake must not leave the body half-connected
                 log.exception("on_connect failed")
         if last_seq is None:
@@ -116,6 +121,7 @@ class Bodies:
         current = self._online.get(body_id)
         if current is not None and current.peer is peer:
             del self._online[body_id]
+            self._offline_at[body_id] = self._clock()
         self._fail_pending(peer)
 
     def set_tools(self, body_id: str, peer: Peer, tools: list[Tool]) -> None:

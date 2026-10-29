@@ -55,9 +55,9 @@ class Open:
 NO_WAIT = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}
 
 
-def make(model, memory=None, kinds=NO_WAIT, now=None):
+def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None):
     sent = []
-    bodies = Bodies()
+    bodies = bodies or Bodies()
     bodies.notify = lambda m, p: sent.append((m, p))
     now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0))
     session = Session(model, Open(), bodies, 10, memory or Memory(":memory:"), now=now, kinds=kinds)
@@ -82,7 +82,10 @@ async def test_say_starts_turn():
     assert result.joined is False
     assert re.fullmatch(r"[0-9a-f]{32}", result.turn)
     await finish(session)
-    assert sent[0] == ("turn", {"turn": result.turn, "body": "desktop", "state": "started"})
+    assert sent[0] == (
+        "turn",
+        {"turn": result.turn, "body": "desktop", "state": "started", "started_by": "user"},
+    )
     assert sent[-1] == (
         "turn",
         {"turn": result.turn, "body": "desktop", "state": "ended", "reason": "done"},
@@ -675,6 +678,100 @@ async def test_a_due_timer_wakes_scout_with_its_note():
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: timer" in text
     assert "look at the deploy" in text
+
+
+# --- body events and the online wake (10c) ---
+
+
+async def test_back_event_wakes_scout_once():
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Event: back" in text and "idle_seconds: 600" in text
+    assert len(model.seen) == 1
+
+
+async def test_back_events_are_capped_at_two_per_hour():
+    model = Gate(["a", "b", "c"])
+    session, sent = make(model, kinds=None)
+    join(session, "desktop")
+    for _ in range(3):
+        session.body_event("desktop", "back", {"idle_seconds": 400})
+        await idle(session)
+    assert len(model.seen) == 2
+
+
+async def test_bad_body_event_is_dropped():
+    session, sent = make(Gate([]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": -5})
+    session.body_event("desktop", "nope", None)
+    await settle()
+    assert states(sent) == []
+
+
+async def test_focus_event_does_not_wake_scout():
+    session, sent = make(Gate([]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "focus", {"app": "Code", "title": "x"})
+    await settle()
+    assert states(sent) == []
+
+
+class Tick:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+
+async def test_body_online_after_ten_minutes_wakes_scout():
+    clock = Tick()
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None, bodies=Bodies(clock=clock))
+    peer = QuietPeer()
+    body = Body(id="desktop", kind="desktop", name="desktop")
+    session._bodies.connect(body, [], peer, None)
+    session._bodies.disconnect("desktop", peer)
+    clock.now = 700.0
+    session._bodies.connect(body, [], QuietPeer(), None)
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Event: body_online" in text and "offline_seconds: 700" in text
+
+
+async def test_body_online_after_a_short_gap_does_not():
+    clock = Tick()
+    session, sent = make(Gate([]), kinds=None, bodies=Bodies(clock=clock))
+    peer = QuietPeer()
+    body = Body(id="desktop", kind="desktop", name="desktop")
+    session._bodies.connect(body, [], peer, None)
+    session._bodies.disconnect("desktop", peer)
+    clock.now = 599.0
+    session._bodies.connect(body, [], QuietPeer(), None)
+    await settle()
+    assert states(sent) == []
+
+
+async def test_wake_turn_started_notification_says_brain():
+    session, sent = make(Gate(["ok"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await idle(session)
+    started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert [p["started_by"] for p in started] == ["brain"]
+
+
+async def test_say_turn_started_notification_says_user():
+    session, sent = make(Gate(["ok"]))
+    session.say("desktop", say("hi"))
+    await finish(session)
+    started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert [p["started_by"] for p in started] == ["user"]
 
 
 async def test_set_timer_tool_is_offered_to_the_model():
