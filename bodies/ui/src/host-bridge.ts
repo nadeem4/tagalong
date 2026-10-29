@@ -70,6 +70,36 @@ export interface JobRow {
   endedAt: string | null;
 }
 
+/** One permission decision in Home's Approvals history, as the brain's list_approvals sends it. */
+export interface ApprovalRow {
+  id: number;
+  source: 'scout_tool' | 'claude_code' | 'app';
+  tool: string;
+  summary: string;
+  outcome: 'approved' | 'refused' | 'timed_out' | 'no_one';
+  decidedBy: 'person' | 'scout' | 'none';
+  /** The sentence Scout approved under; null when the person (or nobody) decided. */
+  preference: string | null;
+  at: string;
+}
+
+/** Totals over the whole history, not just the page shown. */
+export interface ApprovalCounts {
+  total: number;
+  scout: number;
+  refused: number;
+}
+
+/** One sentence the person gave Scout about what it may approve, as list_preferences sends it. */
+export interface PreferenceRow {
+  id: number;
+  sentence: string;
+  builtin: boolean;
+  createdAt: string;
+  useCount: number;
+  lastUsed: string | null;
+}
+
 /** Where the desktop dials the brain (`ws://host:port`) and whether the link is up. */
 export interface BrainLink {
   addr: string;
@@ -286,6 +316,19 @@ export interface HostBridge {
   listJobs?(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
   stopJob?(job: string): Promise<void>;
+  /** Home's Approvals history, newest first; `before` is the `next` cursor of the page above. */
+  listApprovals?(
+    filter: 'all' | 'scout' | 'refused',
+    before?: number,
+  ): Promise<{ approvals: ApprovalRow[]; counts: ApprovalCounts; next: number | null }>;
+  /** The preferences Scout follows, the built-in one included. */
+  listPreferences?(): Promise<PreferenceRow[]>;
+  /** Removes a preference; rejects when the brain refuses (already gone, say). */
+  removePreference?(id: number): Promise<void>;
+  /** Rewrites a preference's sentence; rejects when the brain refuses it. */
+  editPreference?(id: number, sentence: string): Promise<void>;
+  /** Scout approved an ask under a preference: tell the person once. Returns an unsubscribe. */
+  onApproved?(handler: (n: { tool: string; text: string; preference: string }) => void): () => void;
   /** Home's "Where things run": the brain's address and link status. Optional: no brain, no card. */
   brainLink?(): Promise<BrainLink>;
   /**

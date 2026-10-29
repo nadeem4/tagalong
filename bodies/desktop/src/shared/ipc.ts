@@ -166,6 +166,13 @@ export const IPC = {
   brainChangedEvent: 'tagalong:brain:changed',
   // Home's "Where things run": the address the desktop dials and whether the link is up.
   brainLink: 'tagalong:brain:link',
+  // Home's Approvals page: the decision history and the preferences Scout follows.
+  listApprovals: 'tagalong:approvals:list',
+  listPreferences: 'tagalong:approvals:preferences:list',
+  removePreference: 'tagalong:approvals:preferences:remove',
+  editPreference: 'tagalong:approvals:preferences:edit',
+  // Scout approved an ask under a preference: pushed to every window.
+  approvedEvent: 'tagalong:approved-event',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */

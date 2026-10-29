@@ -113,6 +113,7 @@ import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerMemoryIpc } from './ipc/memory';
+import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
 import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
@@ -320,6 +321,12 @@ async function start(): Promise<void> {
         forwardAppsChanged(what, forwardToRenderers);
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
+        }
+      }
+      // Scout approved an ask under a preference: every window may tell the person once.
+      if (method === 'approved') {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.webContents.send(IPC.approvedEvent, params);
         }
       }
       turnEvents.map(method, params).forEach(forwardTurn);
@@ -1062,6 +1069,7 @@ function registerIpc(): void {
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
+  registerApprovalsIpc(handle, { brain: required().brain });
   registerBrainLinkIpc(handle, { brain: required().brain });
   registerRoutineIpc(handle, {
     engine,

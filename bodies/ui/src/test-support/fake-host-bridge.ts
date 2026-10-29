@@ -27,12 +27,15 @@ import type {
   MemoryEntry,
 } from '@tagalong/protocol';
 import type {
+  ApprovalCounts,
+  ApprovalRow,
   AskInput,
   BrainLink,
   ConfirmHandoff,
   HostBridge,
   JobRow,
   PermissionRow,
+  PreferenceRow,
   TurnEvent,
 } from '../host-bridge';
 
@@ -63,6 +66,15 @@ export interface FakeHostBridge extends HostBridge {
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
   readonly jobStops: readonly string[];
+  /** Home's Approvals history, newest first, and the preferences Scout follows; a test may swap them. */
+  approvalRows: ApprovalRow[];
+  preferences: PreferenceRow[];
+  /** Every listApprovals call, every removePreference id and every editPreference call, in order. */
+  readonly approvalListCalls: readonly { filter: 'all' | 'scout' | 'refused'; before?: number }[];
+  readonly preferenceRemovals: readonly number[];
+  readonly preferenceEdits: readonly { id: number; sentence: string }[];
+  /** Tells every `onApproved` subscriber that Scout approved an ask under a preference. */
+  emitApproved(n: { tool: string; text: string; preference: string }): void;
   /** How many times the activity was listed. */
   activityReads: number;
   /** The experience log, newest first, and each episode's events by id. */
@@ -155,6 +167,9 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's Jobs rows. */
     jobs?: JobRow[];
+    /** Home's Approvals history and preferences. */
+    approvalRows?: ApprovalRow[];
+    preferences?: PreferenceRow[];
     /** The brain link; defaults to online at the default address. */
     brainLink?: BrainLink;
     /** Whether a calendar link is kept; absent, none is. */
@@ -167,6 +182,12 @@ export function createFakeHostBridge(
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
   const changedHandlers = new Set<(what: string) => void>();
+  const approvedHandlers = new Set<
+    (n: { tool: string; text: string; preference: string }) => void
+  >();
+  const approvalListCalls: { filter: 'all' | 'scout' | 'refused'; before?: number }[] = [];
+  const preferenceRemovals: number[] = [];
+  const preferenceEdits: { id: number; sentence: string }[] = [];
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
   const stoppedWatches: string[] = [];
@@ -563,6 +584,54 @@ export function createFakeHostBridge(
     stopJob(job) {
       jobStops.push(job);
       return Promise.resolve();
+    },
+    approvalRows: (options.approvalRows ?? []).map((row) => ({ ...row })),
+    preferences: (options.preferences ?? []).map((row) => ({ ...row })),
+    approvalListCalls,
+    preferenceRemovals,
+    preferenceEdits,
+    listApprovals(filter, before) {
+      approvalListCalls.push(before === undefined ? { filter } : { filter, before });
+      const rows = fake.approvalRows;
+      const counts: ApprovalCounts = {
+        total: rows.length,
+        scout: rows.filter((r) => r.decidedBy === 'scout').length,
+        refused: rows.filter((r) => r.outcome === 'refused').length,
+      };
+      const shown = rows
+        .filter((r) => before === undefined || r.id < before)
+        .filter((r) =>
+          filter === 'scout'
+            ? r.decidedBy === 'scout'
+            : filter === 'refused'
+              ? r.outcome === 'refused'
+              : true,
+        );
+      return Promise.resolve({ approvals: shown.map((r) => ({ ...r })), counts, next: null });
+    },
+    listPreferences() {
+      return Promise.resolve(fake.preferences.map((row) => ({ ...row })));
+    },
+    removePreference(id) {
+      preferenceRemovals.push(id);
+      fake.preferences = fake.preferences.filter((row) => row.id !== id);
+      return Promise.resolve();
+    },
+    editPreference(id, sentence) {
+      preferenceEdits.push({ id, sentence });
+      fake.preferences = fake.preferences.map((row) =>
+        row.id === id ? { ...row, sentence } : row,
+      );
+      return Promise.resolve();
+    },
+    onApproved(handler) {
+      approvedHandlers.add(handler);
+      return () => {
+        approvedHandlers.delete(handler);
+      };
+    },
+    emitApproved(n) {
+      for (const handler of [...approvedHandlers]) handler(n);
     },
     copied,
     appliedSettings,
