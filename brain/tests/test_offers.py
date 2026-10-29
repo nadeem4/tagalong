@@ -10,6 +10,7 @@ import pytest
 
 from brain.approvals import Approvals
 from brain.asks import Answer
+from brain.guards import stop
 from brain.memory import Memory, _utc_text
 from brain.mind.turn import Final
 from brain.offers import Offers, OfferSettings
@@ -292,3 +293,18 @@ async def test_exceptions_in_consider_never_escape(mem):
     rig.approve(n=3)
     mem.close()  # every read now fails
     await rig.consider()  # must not raise
+
+
+async def test_consider_skips_look_when_the_guards_stop(mem):
+    class StopGuards:
+        async def run(self, hook, ctx):
+            return stop("no", "over_budget")
+
+    r = Rig(mem)
+    r.offers = Offers(
+        r.model, r.budget, mem, r.asks, Approvals(mem, lambda m, p: None, lambda: NOW),
+        SETTINGS, lambda: NOW, guards=StopGuards(),
+    )  # fmt: skip
+    r.approve(n=3)
+    await r.consider()
+    assert r.model.calls == 0 and mem.offers_for(GROUP) == []

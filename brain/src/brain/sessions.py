@@ -19,6 +19,7 @@ from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.builtin_guards import spend_guards
 from brain.config import (
     DEFAULT_EXPERT_CMD,
     DEFAULT_EXPERT_TIMEOUT_S,
@@ -72,6 +73,8 @@ class Session:
         self._step_cap = step_cap
         self._memory = memory
         self._asks = Asks(bodies)
+        # One set of spend guards for the loop, the scheduler, the side-check and offers.
+        self.guards = spend_guards(budget, step_cap)
         notify = bodies.notify
         # main passes the configured command and timeout; the defaults keep tests short.
         make_run = make_run or partial(
@@ -82,6 +85,7 @@ class Session:
         self.scheduler = Scheduler(
             bodies=bodies,
             budget=budget,
+            guards=self.guards,
             busy=self._busy,
             last_body=lambda: self._last_body,
             start=lambda body_id, content: self._start_turn(body_id, content, "brain"),
@@ -92,9 +96,11 @@ class Session:
         questions = ScoutQuestions(self.scheduler.emit)
         approvals = Approvals(memory, notify, now)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
-        side_check = SideCheck(model, budget, memory)
+        side_check = SideCheck(model, budget, memory, guards=self.guards)
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
-        offer = Offers(model, budget, memory, self._asks, approvals, offers, now)
+        offer = Offers(
+            model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
+        )
         self.jobs = Jobs(
             memory,
             self._asks,
@@ -217,6 +223,7 @@ class Session:
                 notify=notify,
                 budget=self._budget,
                 step_cap=self._step_cap,
+                guards=self.guards,
             )
         )
         self._task = task

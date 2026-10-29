@@ -55,6 +55,8 @@ the total can run a little low.
 | `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
 | `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
 | `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
+| `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
+| `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit) and `step_cap` (model_call)                                                                                                                                                                                                         |
 | `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
 | `brain/src/brain/mind/resume.py`    | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                      |
 | `brain/src/brain/memory.py`         | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                                                                                                                                                       |
@@ -591,6 +593,91 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
+
+## Guardrails
+
+The budget and the step cap go through one runner, `guards.py`, so precedence and logging live
+once; later slices move the tool gate, asks and wake caps onto it. A guard is
+a plain function that gets a context and returns a verdict. `sessions.py` builds one `Guards` set
+and hands it to the turn loop, the scheduler, the side-check and offers. The budget ledger stays in
+`guardrails.py`; the guards that use it are in `builtin_guards.py`.
+
+### Hooks
+
+| Hook          | Runs                                          | Built in G1                                                                                                            |
+| ------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                             |
+| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (the scheduler acts only on code `over_budget`: it drops all queued events; other verdicts are ignored) |
+| `tool_call`   | Before a tool runs                            | Later slice                                                                                                            |
+| `ask`         | Before a permission ask reaches you           | Later slice                                                                                                            |
+| `tool_result` | After a tool returns                          | Later slice                                                                                                            |
+| `save`        | Before text is stored                         | Later slice                                                                                                            |
+
+`model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
+offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports
+`over_budget` even when the step cap is also reached.
+
+### Verdicts
+
+| Verdict   | Meaning                                                     |
+| --------- | ----------------------------------------------------------- |
+| `allow`   | Carry on (`allow_once` is for one call only, used on `ask`) |
+| `ask`     | Put it to the person                                        |
+| `block`   | Refuse this one action, with a reason                       |
+| `stop`    | End the whole turn, with a reason and a code                |
+| `rewrite` | Carry on with a changed value (masking)                     |
+
+`stop` carries the code the body already knows: `over_budget` or `step_cap`. The contract does not
+change. The first `block` or `stop` ends the run; otherwise the order is `ask`, then `rewrite`, then
+`allow`. A guard that raises, or returns something that is not a verdict, counts as a `block`
+(reason `guard failed (<ExceptionClassName>)`, code `error`), so a broken spend check fails closed.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart TD
+    A[Guards.run hook, context] --> B[next guard for the hook]
+    B --> C{raised or not a verdict?}
+    C -->|yes| D[block: guard failed]
+    C -->|no| E[verdict]
+    D --> F{block or stop?}
+    E --> F
+    F -->|yes| G[log one line, return it]
+    F -->|no| J{ask?}
+    J -->|yes| K[log one line, remember it]
+    J -->|no| L{allow_once on the ask hook?}
+    L -->|yes| M[return allow early]
+    L -->|no| H
+    K --> H{more guards?}
+    H -->|yes| B
+    H -->|no| I[return ask, else rewrite, else allow]
+```
+
+### The log line
+
+Each refusing verdict (`block`, `stop`, `ask`) is logged once at INFO on `brain.guardrails`:
+
+```
+guard=<name> hook=<hook> verdict=<kind> reason=<text> turn=<id>
+```
+
+`turn=<id>` is added only when a turn is known. `allow` is not logged. The line never holds tool
+input or result text, and a guard that raised logs `guard failed (<ExceptionClassName>)`, never the message.
+
+### Adding a guard
+
+One function, one test, one `add` in `sessions.py`:
+
+1. Write the guard in `builtin_guards.py`: a function that takes its settings and returns
+   `Guard(name, hook, check)`. `check` gets the hook's context and returns a verdict. It runs on
+   the event loop, so keep it quick (or `async` with its own time limit; `emit` is sync, so
+   no `async` there).
+2. Test it first in `brain/tests`: the verdict for an allowed and a refused context.
+3. Register it with `guards.add(...)`. Today `sessions.py` calls `spend_guards(budget, step_cap)`,
+   which adds the built-ins in order; a new guard gets one more `add` there, with its settings
+   passed in (never import `config`).
+
+The limits are `TAGALONG_DAILY_BUDGET_USD` and `TAGALONG_STEP_CAP` (see [Run it](#run-it)); no env
+name or meaning changed.
 
 ## Not built yet
 

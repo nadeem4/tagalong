@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 from brain.bodies import Bodies
 from brain.events import Event, EventKind
+from brain.guards import Guard, Guards, Hook, stop
 from brain.scheduler import Scheduler
 
 T0 = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
@@ -48,7 +49,14 @@ class FakeBodies(Bodies):
 
 class Rig:
     def __init__(
-        self, online=("desktop",), kinds=KINDS, last="desktop", now=None, budget=None, wakes=12
+        self,
+        online=("desktop",),
+        kinds=KINDS,
+        last="desktop",
+        now=None,
+        budget=None,
+        wakes=12,
+        guards=None,
     ) -> None:
         self.bodies = FakeBodies(list(online))
         self.starts: list[tuple[str, list]] = []
@@ -66,6 +74,7 @@ class Rig:
             kinds=kinds,
             notes=NOTES,
             wakes_per_hour=wakes,
+            guards=guards,
         )
 
     def _start(self, body_id: str, content: list) -> str:
@@ -452,3 +461,20 @@ def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(caplog):
     rig2.busy = True
     rig2.scheduler.turn_ended("t1")  # boom must not stop "b"
     assert ends == ["b"]
+
+
+def test_pump_drops_events_when_the_emit_guard_stops_with_over_budget():
+    guards = Guards()
+    guards.add(Guard("test", Hook.emit, lambda ctx: stop("no", "over_budget")))
+    rig = Rig(guards=guards)
+    rig.scheduler.emit(ev("ping"))
+    assert rig.starts == []
+    assert rig.scheduler.next_due() is None
+
+
+def test_pump_keeps_events_when_the_emit_guard_stops_with_another_code():
+    guards = Guards()
+    guards.add(Guard("test", Hook.emit, lambda ctx: stop("no", "other")))
+    rig = Rig(guards=guards)
+    rig.scheduler.emit(ev("ping"))
+    assert len(rig.starts) == 1

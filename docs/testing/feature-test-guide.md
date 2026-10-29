@@ -323,7 +323,13 @@ desktop app. You need `uv` and an Anthropic key.
    exits with status 1 and never listens.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
-   result and its turn ends at once with `reason: "over_budget"` and no deltas.
+   result and its turn ends at once with `reason: "over_budget"` and no deltas. The brain log
+   shows one line `guard=daily_budget hook=model_call verdict=stop reason=daily budget spent`
+   (plus ` turn=<id>`).
+   Then stop the brain, set `TAGALONG_STEP_CAP=1` (and a normal budget), and `say` something that
+   needs a tool, such as `Remember that I like tea.` **Expected:** the turn ends with
+   `reason: "step_cap"` after one model call, and the log shows
+   `guard=step_cap hook=model_call verdict=stop reason=step limit reached`.
 7. **Action:** start the brain normally, say hello as in step 2, then paste a `say` with the text
    `Remember that I like short answers.`
    **Expected:** a `tool` notification for `remember` with `state: "started"`, then `ended` with

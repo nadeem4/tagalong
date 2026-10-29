@@ -11,6 +11,9 @@ from datetime import datetime, timedelta
 
 from brain.approvals import SENTENCE_MAX, Approvals
 from brain.asks import Asks
+from brain.builtin_guards import spend_guards
+from brain.config import DEFAULT_STEP_CAP
+from brain.guards import Guards, Hook, ModelCallCtx
 from brain.memory import Memory, _utc_text
 from brain.mind.turn import Final, Model
 from brain.side_check import prompt_section
@@ -60,9 +63,11 @@ class Offers:
         approvals: Approvals,
         settings: OfferSettings,
         now: Callable[[], datetime],
+        guards: Guards | None = None,
     ) -> None:
         self._model = model
         self._budget = budget
+        self._guards = guards or spend_guards(budget, DEFAULT_STEP_CAP)
         self._memory = memory
         self._asks = asks
         self._approvals = approvals  # saves the preference, so Home hears about it
@@ -101,7 +106,10 @@ class Offers:
             return
         since = _utc_text(now - timedelta(days=self._settings.window_days))
         count = self._memory.person_approvals_since(group_key, since)
-        if count < self._settings.min_approvals or not self._budget.allows():
+        if count < self._settings.min_approvals:
+            return
+        verdict = await self._guards.run(Hook.model_call, ModelCallCtx("offer", None, 0))
+        if verdict.kind != "allow":
             return
         sentence = await self._look(group_key, count)
         if sentence is None:

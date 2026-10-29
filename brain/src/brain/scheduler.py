@@ -14,8 +14,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from brain.bodies import Bodies
-from brain.config import DEFAULT_WAKES_PER_HOUR
+from brain.builtin_guards import spend_guards
+from brain.config import DEFAULT_STEP_CAP, DEFAULT_WAKES_PER_HOUR
 from brain.events import EVENT_KINDS, Event, EventKind, load_notes
+from brain.guards import EmitCtx, Guards, Hook
 from brain.tools import _fence_safe
 
 log = logging.getLogger("brain")
@@ -58,9 +60,10 @@ class Scheduler:
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
         kinds: dict[str, EventKind] = EVENT_KINDS,
         notes: dict[str, str] | None = None,
+        guards: Guards | None = None,
     ) -> None:
         self._bodies = bodies
-        self._budget = budget
+        self._guards = guards or spend_guards(budget, DEFAULT_STEP_CAP)
         self._busy = busy
         self._last_body = last_body
         self._start = start
@@ -115,8 +118,10 @@ class Scheduler:
 
     def pump(self) -> None:
         try:
-            if self._groups and not self._budget.allows():
-                self._drop_all()
+            if self._groups:
+                ctx = EmitCtx(None, self._now(), self._wakes)
+                if self._guards.run_sync(Hook.emit, ctx).code == "over_budget":
+                    self._drop_all()
             if self._groups and not self._busy():
                 group = next((g for g in self._groups if self._remaining(g) <= 0), None)
                 body_id = self._choose_body() if group is not None else None
