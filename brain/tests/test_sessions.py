@@ -782,3 +782,15 @@ async def test_set_timer_tool_is_offered_to_the_model():
     await finish(session)
     names = {t["name"] for t in model.tools[-1]}
     assert {"set_timer", "list_timers", "cancel_timer"} <= names
+
+
+async def test_focus_event_updates_the_next_steps_system_prompt_and_wakes_nobody():
+    model = Gate(["hi"])
+    session, sent = make(model, kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "focus", {"app": "Figma", "title": "Landing"})
+    await settle()
+    assert states(sent) == []
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert "Figma" in model.systems[-1]

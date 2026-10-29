@@ -169,7 +169,9 @@ class Session:
                 turn_id=turn_id,
                 body_id=body_id,
                 model=self._model,
-                system=lambda: system_prompt(self._now(), self._bodies.online(), know),
+                system=lambda: system_prompt(
+                    self._now(), self._bodies.online(), know, self._focus()
+                ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
                 run_tool=self.toolbox.run,
@@ -200,6 +202,9 @@ class Session:
         """Run a Home tool through the toolbox gate (caller "home" skips the ask)."""
         out = await self.toolbox.run(Call(uuid.uuid4().hex, tool, tool_input, "", ""), "home")
         return out if isinstance(out, str) else json.dumps(out)
+
+    def _focus(self) -> dict:
+        return {key: ev.facts for key, ev in self.scheduler.latest("focus").items()}
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is
