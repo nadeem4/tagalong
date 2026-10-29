@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/protocol';
+import { AWAY_AFTER_MS } from '../presence';
 import { createBackSender, frontWindow, startFocusWatch } from './body-events';
 
 beforeEach(() => vi.useFakeTimers());
@@ -18,6 +19,26 @@ describe('createBackSender', () => {
     t += 301_900;
     onChange('back');
     expect(send).toHaveBeenCalledWith('back', { idle_seconds: 301 });
+  });
+
+  it('sends nothing for a short away, such as a brief screen lock', () => {
+    let t = 0;
+    const send = vi.fn();
+    const onChange = createBackSender({ send, now: () => t });
+    onChange('away');
+    t += 10_000;
+    onChange('back');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('sends back at exactly the away threshold', () => {
+    let t = 0;
+    const send = vi.fn();
+    const onChange = createBackSender({ send, now: () => t });
+    onChange('away');
+    t += AWAY_AFTER_MS;
+    onChange('back');
+    expect(send).toHaveBeenCalledWith('back', { idle_seconds: 300 });
   });
 
   it('sends nothing for back without a prior away', () => {

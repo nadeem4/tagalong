@@ -4,6 +4,7 @@
  * A blocked window is never reported, so an excluded app never leaves the machine.
  */
 import type { WindowEntry } from '@tagalong/protocol';
+import { AWAY_AFTER_MS } from '../presence';
 
 /** How often the front window is read. */
 export const FOCUS_POLL_MS = 5_000;
@@ -24,6 +25,8 @@ export function createBackSender(options: {
     if (awaySince === null) return;
     const seconds = Math.floor((options.now() - awaySince) / 1000);
     awaySince = null;
+    // A short screen lock is not a return: only a full away period counts.
+    if (seconds < AWAY_AFTER_MS / 1000) return;
     options.send('back', { idle_seconds: seconds });
   };
 }
