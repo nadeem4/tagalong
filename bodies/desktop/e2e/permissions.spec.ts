@@ -63,9 +63,9 @@ test('Home settings lists permissions and a switch reaches the brain', async () 
   const move = card.getByRole('switch', { name: 'desktop__move_window' });
   await expect(move).toHaveAttribute('aria-checked', 'false', { timeout: 30_000 });
 
-  // A locked tool stays Ask, and its switch cannot be pressed.
-  await expect(card.getByRole('switch', { name: 'desktop__close_window' })).toBeDisabled();
-  await expect(card).toContainText('Always asks');
+  // A locked tool is marked risky; its switch works but warns before Auto.
+  await expect(card.getByRole('switch', { name: 'desktop__close_window' })).toBeEnabled();
+  await expect(card).toContainText('Risky action');
 
   await move.click();
   await expect(move).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
