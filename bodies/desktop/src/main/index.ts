@@ -753,8 +753,7 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
   const remark =
     notification.method === 'pet.remark' ? PetRemarkParams.safeParse(notification.params) : null;
   const panel = desktop?.panel;
-  const bubbleDeaf =
-    remark?.success === true && !bubbleHearsRemark(remark.data, panelWasVisible);
+  const bubbleDeaf = remark?.success === true && !bubbleHearsRemark(remark.data, panelWasVisible);
   for (const window of BrowserWindow.getAllWindows()) {
     if (bubbleDeaf && window === panel) continue;
     window.webContents.send(IPC.turnEvent, event);
