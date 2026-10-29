@@ -6,6 +6,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  ApprovedReport,
   CompanionBubble,
   GreetingLine,
   HostBridgeProvider,
@@ -319,6 +320,11 @@ function Panel() {
               </button>
             </p>
           )}
+          {/* Above whatever the panel shows. A panel main brought up just for the card was never
+              focused and will never blur, so the card hides it again, like the lines below do;
+              a panel that was already showing is never hidden (the report only asks if main
+              brought it up). */}
+          <ApprovedReport onHide={() => void window.tagalongHost.hidePanel()} />
           {routine !== null ? (
             <GreetingLine
               petName={petName}

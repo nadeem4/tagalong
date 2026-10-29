@@ -328,7 +328,9 @@ export interface HostBridge {
   /** Rewrites a preference's sentence; rejects when the brain refuses it. */
   editPreference?(id: number, sentence: string): Promise<void>;
   /** Scout approved an ask under a preference: tell the person once. Returns an unsubscribe. */
-  onApproved?(handler: (n: { tool: string; text: string; preference: string }) => void): () => void;
+  onApproved?(
+    handler: (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void,
+  ): () => void;
   /** Home's "Where things run": the brain's address and link status. Optional: no brain, no card. */
   brainLink?(): Promise<BrainLink>;
   /**

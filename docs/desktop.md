@@ -424,7 +424,10 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   refusal from the brain rejects so the page can say so. The page reads again on `changed { what:
 "approvals" }`. The `approved { tool, text, preference }` notification is sent to every window on
   `IPC.approvedEvent` (preload: `onApproved`) and brings the bubble up without the keyboard
-  (`bringUpBubble(false)`), where the "Approved for you" card shows. `e2e/approvals.spec.ts` covers
+  (`bringUpBubble(false)`), where the "Approved for you" card shows. The event carries `cameUp`
+  (true when the panel was hidden): the panel's `ApprovedReport` shows the card over the bubble or a
+  quiet line, and hides the panel again when the card's hold ends if `cameUp` (a panel shown
+  without focus never blurs). `e2e/approvals.spec.ts` covers
   the page, Remove, the Scout filter, the report card and an offer ask on the fake brain.
 - **Job asks:** a Claude Code job asks the person through the same `ask` path, but without
   `confirm` and with its own options. Three cases, all shown as a card in the bubble even with

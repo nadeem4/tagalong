@@ -185,10 +185,12 @@ const bridge: HostBridge = {
   removePreference: (id: number) => ipcRenderer.invoke(IPC.removePreference, id) as Promise<void>,
   editPreference: (id: number, sentence: string) =>
     ipcRenderer.invoke(IPC.editPreference, id, sentence) as Promise<void>,
-  onApproved: (handler: (n: { tool: string; text: string; preference: string }) => void) => {
+  onApproved: (
+    handler: (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void,
+  ) => {
     const listener = (
       _event: IpcRendererEvent,
-      n: { tool: string; text: string; preference: string },
+      n: { tool: string; text: string; preference: string; cameUp?: boolean },
     ): void => handler(n);
     ipcRenderer.on(IPC.approvedEvent, listener);
     return () => void ipcRenderer.off(IPC.approvedEvent, listener);

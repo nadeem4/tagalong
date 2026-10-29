@@ -505,7 +505,7 @@ history and preferences with `call` as in the section above.
 2. **Action:** press **Yes, auto-approve**, then hand off another task in the same folder that
    runs a fourth read-only git command.
    **Expected:** no permission ask. The command runs, the brain sends an `approved` notification
-   naming the preference; the bubble comes up with a small card "Approved for you: ..." and the line "per '...'", which fades by itself after about 7 seconds (no speech, the composer is not touched), and
+   naming the preference; the bubble comes up with a small card "Approved for you: ..." and the line "per '...'"; the card and the bubble leave by themselves after about 7 seconds (no speech, the composer is not touched), and
    `list_approvals` has a new row with `decided_by: "scout"`, the
    preference id and the preference sentence. The Claude Code option used was Allow once, never
    Always.
@@ -557,7 +557,8 @@ The automated version of steps 1 to 5 runs on the fake brain (`e2e/approvals.spe
    changed). The next matching ask comes to you.
 7. **Action:** have Scout approve an ask while the bubble is hidden.
    **Expected:** the bubble comes up without taking the keyboard, with "Approved for you: ..." and
-   "per '...'", and leaves by itself after about 7 seconds. The new row appears on the page
+   "per '...'", and both the card and the bubble leave by themselves after about 7 seconds. If a
+   quiet line or a conversation is already showing, the card appears over it and the panel stays. The new row appears on the page
    without reopening it.
 8. **Action:** stop the brain and open the page.
    **Expected:** a line says Tagalong could not read the approvals; no list and no "None yet" is

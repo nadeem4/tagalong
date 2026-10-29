@@ -123,6 +123,11 @@ test('an approved notice shows the report card', async () => {
   await expect(card).toContainText("per 'Approve test runs in C:/work/app'");
 });
 
+test('a panel that came up only for the card hides again once the hold ends', async () => {
+  // The card holds 7 s; the panel was never focused, so only the card can hide it again.
+  await expect.poll(panelShown, { timeout: 20_000 }).toBe(false);
+});
+
 test('an offer ask is answered with Yes, auto-approve', async () => {
   const panel = await windowFor('panel');
   const field = panel.getByLabel(/^Ask /);

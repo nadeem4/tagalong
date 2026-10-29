@@ -894,47 +894,8 @@ describe('GreetingLine with a status mark', () => {
   });
 });
 
-describe('the report card for an approval Scout gave', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-  const approved = {
-    tool: 'claude_code:Edit file',
-    text: 'Edit a.ts',
-    preference: 'Edits in this repo are fine',
-  };
-
-  it('shows an approved-for-you card with the preference sentence', () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    act(() => bridge.emitApproved(approved));
-    const card = screen.getByRole('status', { name: 'Approved for you' });
-    expect(card).toHaveTextContent('Approved for you: Edit a.ts');
-    expect(card).toHaveTextContent("per 'Edits in this repo are fine'");
-  });
-
-  it('the report card does not open the composer or start a turn', () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    const input = screen.getByLabelText('Ask Scout');
-    act(() => bridge.emitApproved(approved));
-    expect(bridge.asks).toEqual([]);
-    expect(input).toHaveValue('');
-    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
-  });
-
-  it('fades away with the notice timing', () => {
-    vi.useFakeTimers();
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    act(() => bridge.emitApproved(approved));
-    expect(screen.getByRole('status', { name: 'Approved for you' })).toBeTruthy();
-    act(() => {
-      vi.advanceTimersByTime(7_300);
-    });
-    expect(screen.queryByRole('status', { name: 'Approved for you' })).toBeNull();
-  });
-
+// The "Approved for you" card is hosted by the panel (ApprovedReport, approved-card.test.tsx).
+describe('the approval offer ask', () => {
   it('an approval_offer ask renders its text and exactly two buttons and answering sends the chosen option', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

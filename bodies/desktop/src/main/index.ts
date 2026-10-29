@@ -325,11 +325,14 @@ async function start(): Promise<void> {
       }
       // Scout approved an ask under a preference: every window may tell the person once.
       if (method === 'approved') {
+        // The report card shows on the panel: bring it up quietly, without the keyboard, and
+        // say so, so the card hides it again (it never gets focus, so it never blurs).
+        const cameUp = bringUpBubble(false);
         for (const window of BrowserWindow.getAllWindows()) {
-          if (!window.isDestroyed()) window.webContents.send(IPC.approvedEvent, params);
+          if (!window.isDestroyed()) {
+            window.webContents.send(IPC.approvedEvent, { ...(params as object), cameUp });
+          }
         }
-        // The report card lives in the bubble: bring it up quietly, without the keyboard.
-        bringUpBubble(false);
       }
       turnEvents.map(method, params).forEach(forwardTurn);
     },
@@ -844,13 +847,17 @@ function deliverRoutine(params: unknown): void {
   }
 }
 
-/** Shows the bubble if it is hidden; `focus` gives it the keyboard, for something to answer. */
-function bringUpBubble(focus: boolean): void {
+/**
+ * Shows the bubble if it is hidden; `focus` gives it the keyboard, for something to answer.
+ * Returns whether it was hidden and is now up.
+ */
+function bringUpBubble(focus: boolean): boolean {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
-  if (panel == null || avatar == null || panel.isVisible()) return;
+  if (panel == null || avatar == null || panel.isVisible()) return false;
   if (focus) showPanelBeside(panel, avatar);
   else showPanelQuietly(panel, avatar);
+  return true;
 }
 
 function showPets(): void {

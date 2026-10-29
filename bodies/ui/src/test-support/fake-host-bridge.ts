@@ -74,7 +74,7 @@ export interface FakeHostBridge extends HostBridge {
   readonly preferenceRemovals: readonly number[];
   readonly preferenceEdits: readonly { id: number; sentence: string }[];
   /** Tells every `onApproved` subscriber that Scout approved an ask under a preference. */
-  emitApproved(n: { tool: string; text: string; preference: string }): void;
+  emitApproved(n: { tool: string; text: string; preference: string; cameUp?: boolean }): void;
   /** How many times the activity was listed. */
   activityReads: number;
   /** The experience log, newest first, and each episode's events by id. */
@@ -183,7 +183,7 @@ export function createFakeHostBridge(
   const handlers = new Set<(event: TurnEvent) => void>();
   const changedHandlers = new Set<(what: string) => void>();
   const approvedHandlers = new Set<
-    (n: { tool: string; text: string; preference: string }) => void
+    (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void
   >();
   const approvalListCalls: { filter: 'all' | 'scout' | 'refused'; before?: number }[] = [];
   const preferenceRemovals: number[] = [];
