@@ -328,6 +328,8 @@ async function start(): Promise<void> {
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.approvedEvent, params);
         }
+        // The report card lives in the bubble: bring it up quietly, without the keyboard.
+        bringUpBubble(false);
       }
       turnEvents.map(method, params).forEach(forwardTurn);
     },

@@ -1,6 +1,6 @@
 /**
  * Scout's bubble beside the dock pet: asks with what Scout can see, streams the answer,
- * and hosts the cards (hand-off, connector confirm, routine, settings, pick-up, drop, health).
+ * and hosts the cards (hand-off, connector confirm, approved-for-you, routine, settings, pick-up, drop, health).
  * Also the hello after setup (Try it now, under the mind's first line when it says one) and
  * the quiet GreetingLine. Contains
  * CompanionBubble, GreetingLine, BubbleTalk and their props. Used by the desktop panel window.
@@ -32,6 +32,7 @@ import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { RoutineCard } from './routine-card';
 import { SettingsCard } from './settings-card';
 import { PickUpCard } from './pick-up-card';
+import { ApprovedCard, type ApprovedNote } from './approved-card';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { wantsHealthCheck } from './health-ask';
@@ -221,6 +222,8 @@ export function CompanionBubble({
   const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
   // Settings Scout would change, waiting for Apply: a click only, never a spoken yes.
   const [settingsCard, setSettingsCard] = useState<SettingsProposedParams | null>(null);
+  // Scout approved an ask under a preference: a quiet report card, never an answer or a turn.
+  const [approved, setApproved] = useState<ApprovedNote | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
   // A draft's Copy, when this host can write the clipboard.
   const copyText = useMemo(
@@ -433,6 +436,7 @@ export function CompanionBubble({
     }
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
+  useEffect(() => bridge.onApproved?.(setApproved), [bridge]);
 
   const speakingIndicator = speaking && onStopSpeaking !== undefined && (
     <button
@@ -771,6 +775,7 @@ export function CompanionBubble({
           }}
         />
       )}
+      {approved !== null && <ApprovedCard note={approved} onDone={() => setApproved(null)} />}
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}

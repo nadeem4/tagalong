@@ -503,7 +503,7 @@ history and preferences with `call` as in the section above.
 2. **Action:** press **Yes, auto-approve**, then hand off another task in the same folder that
    runs a fourth read-only git command.
    **Expected:** no permission ask. The command runs, the brain sends an `approved` notification
-   naming the preference (a websocket client sees it; the bubble does not show it yet), and
+   naming the preference; the bubble comes up with a small card "Approved for you: ..." and the line "per '...'", which fades by itself after about 7 seconds (no speech, the composer is not touched), and
    `list_approvals` has a new row with `decided_by: "scout"`, the
    preference id and the preference sentence. The Claude Code option used was Allow once, never
    Always.

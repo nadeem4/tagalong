@@ -1,6 +1,6 @@
 /** Tests for CompanionBubble and GreetingLine: asking, chips, full chat, talk and voice. */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -891,5 +891,75 @@ describe('GreetingLine with a status mark', () => {
     expect(screen.getByTestId('status-row')).toHaveTextContent('Can’t think: no API key.');
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
     expect(onFix).toHaveBeenCalledWith('brain');
+  });
+});
+
+describe('the report card for an approval Scout gave', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const approved = {
+    tool: 'claude_code:Edit file',
+    text: 'Edit a.ts',
+    preference: 'Edits in this repo are fine',
+  };
+
+  it('shows an approved-for-you card with the preference sentence', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emitApproved(approved));
+    const card = screen.getByRole('status', { name: 'Approved for you' });
+    expect(card).toHaveTextContent('Approved for you: Edit a.ts');
+    expect(card).toHaveTextContent("per 'Edits in this repo are fine'");
+  });
+
+  it('the report card does not open the composer or start a turn', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    const input = screen.getByLabelText('Ask Scout');
+    act(() => bridge.emitApproved(approved));
+    expect(bridge.asks).toEqual([]);
+    expect(input).toHaveValue('');
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+  });
+
+  it('fades away with the notice timing', () => {
+    vi.useFakeTimers();
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emitApproved(approved));
+    expect(screen.getByRole('status', { name: 'Approved for you' })).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(7_300);
+    });
+    expect(screen.queryByRole('status', { name: 'Approved for you' })).toBeNull();
+  });
+
+  it('an approval_offer ask renders its text and exactly two buttons and answering sends the chosen option', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'connector.confirm',
+        approvalId: '20000000-0000-4000-8000-000000000001',
+        turnId: '',
+        petId: 'scout',
+        app: 'Scout',
+        tool: 'approval_offer',
+        summary: 'You often say yes to edits here. Want me to approve them?',
+        options: ['Yes, auto-approve', 'Keep asking'],
+      }),
+    );
+    const card = screen.getByRole('region', { name: 'Scout asks' });
+    expect(card).toHaveTextContent('You often say yes to edits here. Want me to approve them?');
+    const buttons = within(card).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(['Yes, auto-approve', 'Keep asking']);
+    await act(async () => {
+      fireEvent.click(buttons[0]!);
+      await Promise.resolve();
+    });
+    expect(bridge.jobAnswers).toEqual([
+      { approvalId: '20000000-0000-4000-8000-000000000001', option: 'Yes, auto-approve' },
+    ]);
   });
 });
