@@ -494,7 +494,11 @@ async function start(): Promise<void> {
   // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
   // The brain hears of a return after the same 5-minute idle, and of the front window changing.
   const sendToBrain = (name: string, data: unknown): void => desktop?.brain.event(name, data);
-  const sendBack = createBackSender({ send: sendToBrain, now: Date.now });
+  const sendBack = createBackSender({
+    send: sendToBrain,
+    now: Date.now,
+    idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
+  });
   stopPresence = watchPresence(powerMonitor, (event) => {
     const pet = desktop?.avatar;
     if (pet != null && !pet.isDestroyed()) pet.webContents.send(IPC.turnEvent, event);

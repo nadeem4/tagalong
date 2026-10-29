@@ -14,7 +14,7 @@ describe('createBackSender', () => {
   it('sends back with the whole seconds away', () => {
     let t = 1_000;
     const send = vi.fn();
-    const onChange = createBackSender({ send, now: () => t });
+    const onChange = createBackSender({ send, now: () => t, idleMs: () => 0 });
     onChange('away');
     t += 301_900;
     onChange('back');
@@ -24,7 +24,7 @@ describe('createBackSender', () => {
   it('sends nothing for a short away, such as a brief screen lock', () => {
     let t = 0;
     const send = vi.fn();
-    const onChange = createBackSender({ send, now: () => t });
+    const onChange = createBackSender({ send, now: () => t, idleMs: () => 0 });
     onChange('away');
     t += 10_000;
     onChange('back');
@@ -34,16 +34,36 @@ describe('createBackSender', () => {
   it('sends back at exactly the away threshold', () => {
     let t = 0;
     const send = vi.fn();
-    const onChange = createBackSender({ send, now: () => t });
+    const onChange = createBackSender({ send, now: () => t, idleMs: () => 0 });
     onChange('away');
     t += AWAY_AFTER_MS;
     onChange('back');
     expect(send).toHaveBeenCalledWith('back', { idle_seconds: 300 });
   });
 
+  it('counts the idle time already behind the away, not from when it was noticed', () => {
+    let t = 1_000_000;
+    const send = vi.fn();
+    const onChange = createBackSender({ send, now: () => t, idleMs: () => AWAY_AFTER_MS });
+    onChange('away');
+    t += 60_000;
+    onChange('back');
+    expect(send).toHaveBeenCalledWith('back', { idle_seconds: 360 });
+  });
+
+  it('sends nothing for a lock with no idle behind it that ends soon', () => {
+    let t = 1_000_000;
+    const send = vi.fn();
+    const onChange = createBackSender({ send, now: () => t, idleMs: () => 0 });
+    onChange('away');
+    t += 10_000;
+    onChange('back');
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('sends nothing for back without a prior away', () => {
     const send = vi.fn();
-    createBackSender({ send, now: () => 0 })('back');
+    createBackSender({ send, now: () => 0, idleMs: () => 0 })('back');
     expect(send).not.toHaveBeenCalled();
   });
 });

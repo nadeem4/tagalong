@@ -15,11 +15,13 @@ type Send = (name: string, data: unknown) => void;
 export function createBackSender(options: {
   send: Send;
   now: () => number;
+  /** The system idle time in ms: presence reports `away` only after the idle already ran. */
+  idleMs: () => number;
 }): (change: 'away' | 'back') => void {
   let awaySince: number | null = null;
   return (change) => {
     if (change === 'away') {
-      awaySince = options.now();
+      awaySince = options.now() - options.idleMs();
       return;
     }
     if (awaySince === null) return;
