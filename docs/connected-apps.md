@@ -114,11 +114,12 @@ flowchart TD
 - **change**: anything else, including a tool with no hints at all;
 - **locked**: `destructiveHint`, or a whole word in the name (split on `_`, `-`, `.`, spaces and
   camelCase) of `send`, `delete`, `remove`, `destroy`, `trash`, `pay` or `charge`. A risky word wins
-  over a read-only hint, since hints are the app's own claim. Locked tools ask every time and can
-  never be set to `auto`.
+  over a read-only hint, since hints are the app's own claim. Locked tools ask every time until you
+  unlock one on Home: its switch is on and reads "Risky action", and turning it to **Auto** first
+  warns that Scout will no longer ask. Switch it back to **Ask** to undo.
 
 Modes are the toolbox's usual ones (see [brain.md](brain.md)): reads `auto`, changes `ask`, and the
-user may save `auto` for a change (not a locked one).
+user may save `auto` for a change, and for a locked one only through that Home switch.
 
 ### Scout's side
 

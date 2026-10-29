@@ -526,7 +526,8 @@ history and preferences with `call` as in the section above.
    preference is saved. Set the values lower in `.env` to check this faster.
 6. **Action:** with a preference saved, trigger a locked tool (one that always asks) while the
    built-in "Always ask me before risky actions" default still exists.
-   **Expected:** it still asks you. Scout does not look at it.
+   **Expected:** it still asks you. Scout does not look at it, and a general preference never
+   approves it, even after the default is deleted. Only a preference that names that tool can.
 7. **Action:** on a fresh data folder with no preference of your own, approve several tools by
    hand.
    **Expected:** no delay, and `spend_today` does not rise from the asks (no look happens, only
@@ -2447,7 +2448,16 @@ three times: the wording should vary, the behaviour should not.
    use it. **Expected:** Scout stops asking and just does it. Switch it back to **Ask**: it asks
    again.
 3. **Locked.** Find a tool its body marks as always confirm (one whose ask offers only Allow and
-   Deny). **Expected:** it reads **Ask**, says "Always asks", and its switch cannot be pressed.
+   Deny). **Expected:** it reads **Ask**, says "Risky action", and its switch can be pressed.
+   Ask Scout to use it: it asks, with no **Always allow**.
+   1. Press the switch. **Expected:** a warning says it is a risky action and Scout will no longer
+      ask. **Cancel** leaves it on **Ask**; nothing changes.
+   2. Press the switch again and **Confirm**. **Expected:** it reads **Auto**; ask Scout to use it
+      and it runs without asking.
+   3. Switch it back to **Ask** (no warning). **Expected:** it asks again.
+   4. With a preference of your own saved, remove the built-in "Always ask me before risky
+      actions" default, then trigger the locked tool. **Expected:** it still asks; a general
+      preference does not approve it.
 4. **Offline body.** Close the browser extension's connection (or run with only the desktop).
    **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
    switch off limits.
