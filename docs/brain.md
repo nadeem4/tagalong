@@ -67,7 +67,7 @@ the total can run a little low.
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
 | `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
 | `brain/src/brain/app_tools.py`   | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                             |
-| `brain/src/brain/tools.py`       | The brain's own tools (memory, timer, Home and expert tools) as specs and handlers for `BrainSource`                                                             |
+| `brain/src/brain/tools.py`       | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                 |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
 | `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                                               |
@@ -500,8 +500,15 @@ shows them as Scout does.
   outside a field's options is sent as `<key>_custom`. The user's question card (the open ask
   below) appears only when Scout passes, when its wake turn ends with neither tool called, or when
   the wake cannot run (daily budget spent, or the turn failed to start). A job that ends cancels
-  its open questions. With nobody online the card appears as before, and the same card runs with
-  no Scout involved.
+  its open questions. With nobody online Scout is skipped and the question is cancelled at once
+  (the expert gets `cancel`), as before. A question is refused a second answer once it is settled
+  (passed, answered or its job ended): `answer_expert` and `pass_question` then get
+  `no open question <id>.`
+- **Known gap (questions).** A question whose job ends while its wake is still queued behind a busy
+  turn still wakes Scout once; that spends budget and `answer_expert` then gets "no open question".
+  The scheduler cannot recall a queued event (the same gap timers document). If the body goes
+  offline after the question is queued, the question waits for a body to reconnect or for the job
+  to time out.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
   fails naming the running jobs. A result is capped at 20,000 characters and progress keeps its
   last 2,000 (it is a running tail). `list_jobs` trims each row for Scout's context: a result to

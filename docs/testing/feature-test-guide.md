@@ -425,8 +425,9 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** the Jobs card lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens the result text.
-12. **Action:** with the bubble closed and Scout silent, start a Manual-mode job that needs
-    permission (or asks a question) and leave the relayed ask unanswered for a minute.
+12. **Action:** with the bubble closed, start a Manual-mode job that needs permission (or asks a
+    question; its card appears once Scout passes the question on or cannot answer it) and leave
+    the relayed ask unanswered for a minute.
     **Expected:** the bubble comes up by itself with the card (the request and its input, one
     button per option) and stays until you answer or it times out, though no chat turn is running.
     Ending a chat turn meanwhile does not remove it.
@@ -450,9 +451,9 @@ Needs the same setup as the hand-off section above, with the desktop connected.
 2. **Action:** hand off a question Scout cannot know ("ask me for the name of my first pet, then
    write it to pet.txt").
    **Expected:** Scout passes it on and you get the question card; your answer reaches the job.
-3. **Action:** set the daily budget to zero (or stop the brain's network), then hand off the colour
-   task again.
-   **Expected:** the question card appears at once, since Scout cannot wake.
+3. The fallback when the daily budget is spent (the card appears at once, since Scout cannot wake)
+   cannot be followed by hand and is covered by the test
+   `test_budget_spent_falls_back_to_the_user_card`.
 
 ## Scout speaks first: job reports (real brain)
 
