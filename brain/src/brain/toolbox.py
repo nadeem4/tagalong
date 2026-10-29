@@ -129,6 +129,11 @@ class BodySource:
         return None
 
 
+def _error_code(name: str) -> ErrorCode:
+    # Guard codes are ErrorCode names; "" or "error" (a guard that raised) means denied.
+    return ErrorCode[name] if name in ErrorCode.__members__ else ErrorCode.denied
+
+
 class Toolbox:
     def __init__(
         self,
@@ -261,8 +266,8 @@ class Toolbox:
                         kind = getattr(source, "approval_source", "scout_tool")
                         ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
                         verdict = await self._guards.run(Hook.tool_call, ctx)
-                        if verdict.kind == "block":
-                            raise RpcError(ErrorCode(int(verdict.code)), verdict.reason)
+                        if verdict.kind in ("block", "stop"):
+                            raise RpcError(_error_code(verdict.code), verdict.reason)
                         if verdict.kind == "ask":
                             await self._ask(call, spec, kind)
                     return await source.run(call, call.name)

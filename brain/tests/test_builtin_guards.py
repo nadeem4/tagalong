@@ -69,7 +69,7 @@ def test_tool_mode_stored_auto_allows():
     assert guard.check(tool_ctx(effect="change")).kind == "allow"
 
 
-def test_tool_mode_self_asks_resolves_to_ask():
+def test_tool_mode_self_asks_tool_is_allowed():
     # self_asks runs its own ask, so the gate adds none; the guard still resolves it as auto.
     assert tool_mode(lambda: {}).check(tool_ctx(self_asks=True)).kind == "allow"
 

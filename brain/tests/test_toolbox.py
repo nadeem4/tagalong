@@ -9,7 +9,7 @@ import pytest
 
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.guards import Guard, Guards, Hook, block
+from brain.guards import Guard, Guards, Hook, block, stop
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.toolbox import BodySource, BrainSource, ToolSpec
@@ -895,11 +895,37 @@ async def test_scout_approved_that_raises_still_asks_the_person(mem):
 async def test_run_blocks_when_a_tool_call_guard_blocks():
     source = FakeSource([spec("a")])
     guards = Guards()
-    guards.add(
-        Guard("no", Hook.tool_call, lambda ctx: block("not today", str(ErrorCode.denied.value)))
-    )
+    guards.add(Guard("no", Hook.tool_call, lambda ctx: block("not today", "denied")))
     box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
     with pytest.raises(RpcError) as err:
         await box.run(call("a"))
     assert (err.value.code, err.value.message) == (ErrorCode.denied, "not today")
+    assert source.ran == []
+
+
+def _box_with(guard):
+    source = FakeSource([spec("a")])
+    guards = Guards()
+    guards.add(guard)
+    box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
+    return box, source
+
+
+async def test_run_refuses_when_a_tool_call_guard_raises():
+    def boom(ctx):
+        raise RuntimeError("secret input text")
+
+    box, source = _box_with(Guard("boom", Hook.tool_call, boom))
+    with pytest.raises(RpcError) as err:
+        await box.run(call("a"))
+    assert err.value.code == ErrorCode.denied
+    assert "secret" not in err.value.message
+    assert source.ran == []
+
+
+async def test_run_refuses_when_a_tool_call_guard_stops():
+    box, source = _box_with(Guard("halt", Hook.tool_call, lambda ctx: stop("halted", "denied")))
+    with pytest.raises(RpcError) as err:
+        await box.run(call("a"))
+    assert (err.value.code, err.value.message) == (ErrorCode.denied, "halted")
     assert source.ran == []
