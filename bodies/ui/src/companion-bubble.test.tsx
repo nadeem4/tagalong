@@ -135,6 +135,28 @@ describe('CompanionBubble invitation after setup', () => {
   });
 });
 
+describe('CompanionBubble wake remarks', () => {
+  it('shows a wake’s words as Scout’s message when the bubble is open, and says them once', () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    act(() => bridge.emit(helloRemark('Time to stretch.')));
+    expect(screen.getByText('Time to stretch.')).toBeVisible();
+    expect(onSay).toHaveBeenCalledOnce();
+    expect(onSay).toHaveBeenCalledWith('Time to stretch.');
+  });
+
+  it('keeps an answer being streamed: a wake’s words never cut in on it', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    ask('hi');
+    act(() => bridge.emit(helloRemark('Time to stretch.')));
+    expect(screen.queryByText('Time to stretch.')).toBeNull();
+    expect(onSay).not.toHaveBeenCalled();
+  });
+});
+
 describe('CompanionBubble', () => {
   it('tries it at once from the hello: looks at the screen and asks about it', async () => {
     const bridge = createFakeHostBridge({ capture: SNAPSHOT });

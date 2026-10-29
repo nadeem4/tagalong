@@ -25,6 +25,7 @@ from brain.protocol import (
     CallResult,
     CancelTurnParams,
     ErrorCode,
+    EventParams,
     HelloParams,
     HelloResult,
     RpcError,
@@ -238,7 +239,16 @@ def _dispatch(
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         session.cancel(cancel.turn)
         return _result(req_id, {})
-    # event, progress and unknown notifications are dropped by the caller.
+    if method == "event":
+        # A notification: a bad shape is dropped, never answered.
+        try:
+            event = EventParams.model_validate(message.get("params"))
+        except ValidationError as exc:
+            log.debug("dropped a bad event frame: %s", exc)
+            return None
+        session.body_event(body_id, event.name, event.data)
+        return None
+    # progress and unknown notifications are dropped by the caller.
     return _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")
 
 

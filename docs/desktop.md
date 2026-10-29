@@ -20,6 +20,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
 | `src/main/brain/start.ts`                              | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
 | `src/main/brain/body-tools.ts`                         | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
+| `src/main/brain/body-events.ts`                        | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
 | `src/main/hotkeys.ts`                                  | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
 | `src/main/talk-key.ts`                                 | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`                | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
@@ -103,6 +104,26 @@ running.
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
   `desktop__open_url`, and it always asks first (`confirm`: Always allow cannot turn the ask off).
 
+- **Body events.** `brain/body-events.ts` sends two facts with `event`; the brain decides whether
+  they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
+  returns after being away at least 5 minutes (`AWAY_AFTER_MS`, a screen lock counts), with whole
+  seconds; the away starts when the idle did (the system idle time at the `away` is subtracted), so
+  `idle_seconds` is the real time away. The sight pause does not stop it, since it carries no screen
+  data. `focus {app, title}` is read every 5 s (`FOCUS_POLL_MS`) and sent only when the front
+  window changes. A blocked or excluded window is never sent, and nothing is read while sight is
+  paused. When an excluded window comes to the front, or sight is paused, an empty focus
+  (`app: ""`) goes once, so the brain stops showing the old app as in front. `BrainClient.event`
+  returns whether it was sent; a `focus` it dropped (brain offline) is sent again on the next poll.
+  A brain that restarts while the window stays the same, after the last send got through, learns
+  the front window only at the next change.
+- **Brain-started turns.** A `turn` with `started_by: "brain"` (a wake) shows no thinking state, no
+  bubble and no tool rows. If it ends `done` with words (not just whitespace), they appear once as a
+  pet remark: the quiet line beside Scout when the bubble is closed, or Scout's message in the
+  bubble when it is open and no answer is streaming (main keeps the remark from the hidden bubble,
+  so it is never shown twice). A silent, failed, cancelled or over-budget wake shows nothing. If the
+  person asks something while a wake runs, their `say` joins it (`joined: true`) and `ipc/turns.ts`
+  calls `claim(turnId)` on the mapper: the wake stops being quiet, the bubble gets `turn.started`
+  and the text so far, and the rest streams and ends as a normal turn (no pet remark).
 - **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
   running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
   brain.") when the contract versions differ. Coming online clears either; "connecting" changes
@@ -684,6 +705,7 @@ app on a new temporary `--user-data-dir`, so Welcome shows without touching real
 | Sight log and memory list           | `limit: 200`                   | `ipc/sight-log.ts`, `ipc/memory.ts` |
 | Activity and experience page        | `limit: 30` default            | `ipc/experts.ts`                    |
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`                      |
+| `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`              |
 
 ## Storage
 

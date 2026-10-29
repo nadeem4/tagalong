@@ -16,9 +16,11 @@ from brain.protocol import (
     LIMITS,
     PROTOCOL,
     AskOpen,
+    BackData,
     Body,
     ErrorCode,
     ErrorObject,
+    FocusData,
     Tool,
 )
 
@@ -225,3 +227,28 @@ def test_confirm_ask_options(options, ok):
     else:
         with pytest.raises(ValidationError):
             AskOpen.model_validate(params)
+
+
+def event_data(name: str) -> dict:
+    path = ROOT / "valid" / f"body.event.params.{name}.json"
+    return json.loads(path.read_text(encoding="utf-8"))["params"]["data"]
+
+
+def test_back_and_focus_data_parse_the_examples():
+    assert BackData.model_validate(event_data("back")).idle_seconds == 420
+    focus = FocusData.model_validate(event_data("focus"))
+    assert (focus.app, focus.title) == ("Code.exe", "protocol.py - tagalong")
+
+
+def test_negative_idle_seconds_is_rejected():
+    with pytest.raises(ValidationError):
+        BackData.model_validate({"idle_seconds": -1})
+
+
+def test_started_by_is_optional():
+    turn = BRAIN_TO_BODY["turn"][0]
+    started = {"seq": 1, "turn": "t", "body": "b", "state": "started"}
+    assert turn.model_validate(started).started_by is None
+    assert turn.model_validate({**started, "started_by": "brain"}).started_by == "brain"
+    with pytest.raises(ValidationError):
+        turn.model_validate({**started, "started_by": None})

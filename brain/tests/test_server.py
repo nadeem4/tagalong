@@ -156,6 +156,45 @@ async def test_unbuilt_request_is_method_not_found(env):
         assert reply["error"]["code"] == -32601
 
 
+async def event_env():
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    seen = []
+    session.body_event = lambda body_id, name, data: seen.append((body_id, name, data))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}", seen
+
+
+async def test_event_frame_reaches_the_session():
+    server, url, seen = await event_env()
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            frame = {"jsonrpc": "2.0", "method": "event", "params": {"name": "back", "data": {}}}
+            await ws.send(json.dumps(frame))
+            await call(ws, request("tools", {"tools": []}))  # in order: the event was handled
+        assert seen == [("desktop", "back", {})]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_event_with_bad_params_is_ignored_and_the_connection_stays_up():
+    server, url, seen = await event_env()
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            for params in ({"name": 3}, {}, "x", None):
+                await ws.send(
+                    json.dumps({"jsonrpc": "2.0", "id": 5, "method": "event", "params": params})
+                )
+            assert (await call(ws, request("tools", {"tools": []})))["result"] == {}
+        assert seen == []
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_garbage_after_hello_keeps_connection(env):
     _, url = env
     async with connect(url) as ws:

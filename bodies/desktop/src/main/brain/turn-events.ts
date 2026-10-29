@@ -23,9 +23,17 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     message,
   });
 
+  // Turns the brain started on its own (a wake). They show nothing while they run: a silent
+  // wake must leave no trace, and one with words arrives as a single pet.remark at the end.
+  const quiet = new Set<string>();
+
   function ended(p: TurnParams): TurnEvent[] {
     const text = open.get(p.turn) ?? '';
     open.delete(p.turn);
+    if (quiet.delete(p.turn)) {
+      if (p.reason !== 'done' || text.trim() === '') return [];
+      return [{ type: 'pet.remark', remarkId: crypto.randomUUID(), petId: petId(), text }];
+    }
     if (p.reason === 'over_budget') return [error(p.turn, 'over_budget', BUDGET_MESSAGE)];
     if (p.reason === 'error') return [error(p.turn, 'brain_error', ERROR_MESSAGE)];
     const stopReason =
@@ -43,6 +51,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
   }
 
   function tool(p: ToolParams): TurnEvent[] {
+    if (quiet.has(p.turn)) return [];
     if (p.state === 'started') {
       // The brain runs its own tools and asks nobody, so the call id stands in for the
       // approval id and there is no input to show.
@@ -122,6 +131,10 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         const p = params as TurnParams;
         if (p.state === 'ended') return ended(p);
         open.set(p.turn, '');
+        if (p.started_by === 'brain') {
+          quiet.add(p.turn);
+          return [];
+        }
         return [
           {
             type: 'turn.started',
@@ -135,17 +148,33 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         const p = params as ReplyParams;
         if (typeof p.delta !== 'string') return [];
         open.set(p.turn, (open.get(p.turn) ?? '') + p.delta);
-        return [{ type: 'turn.delta', turnId: p.turn, text: p.delta }];
+        return quiet.has(p.turn) ? [] : [{ type: 'turn.delta', turnId: p.turn, text: p.delta }];
       }
       if (method === 'tool') return tool(params as ToolParams);
       if (method === 'ask') return ask(params as AskParams);
       return [];
     },
 
+    /**
+     * The person spoke into a wake turn (their say joined it), so it stops being quiet: the UI
+     * gets the start and the words so far, and the rest streams like any turn.
+     */
+    claim(turnId: string): TurnEvent[] {
+      if (!quiet.delete(turnId)) return [];
+      const text = open.get(turnId) ?? '';
+      return [
+        { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
+        ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
+      ];
+    },
+
     /** The brain lost what these turns were doing; tell the UI instead of leaving them open. */
     resync(): TurnEvent[] {
-      const events = [...open.keys()].map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
+      const events = [...open.keys()]
+        .filter((id) => !quiet.has(id))
+        .map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
+      quiet.clear();
       for (const id of asks) events.push(dismiss(id));
       asks.clear();
       return events;

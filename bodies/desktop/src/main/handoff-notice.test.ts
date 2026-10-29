@@ -1,7 +1,7 @@
 /** Tests for the finished hand-off notification. */
 
 import { describe, expect, it } from 'vitest';
-import { handoffLine, handoffNotice } from './handoff-notice';
+import { bubbleHearsRemark, handoffLine, handoffNotice } from './handoff-notice';
 
 const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
@@ -87,5 +87,31 @@ describe('handoffLine', () => {
     const plain = { remarkId, petId: 'scout', text: 'Hi.' };
     expect(handoffLine(plain, false)).toEqual(plain);
     expect(handoffLine(plain, true)).toEqual(plain);
+  });
+});
+
+describe('bubbleHearsRemark', () => {
+  const plain = { remarkId: id, petId: 'scout', text: 'Hi.' };
+
+  it('panel hidden when the remark arrives: the panel’s bubble is skipped', () => {
+    // The caller passes the visibility from before showRemark brings the panel up.
+    expect(bubbleHearsRemark(plain, false)).toBe(false);
+  });
+
+  it('panel visible when the remark arrives: it goes to the bubble', () => {
+    expect(bubbleHearsRemark(plain, true)).toBe(true);
+  });
+
+  it('lets the open bubble show a plain remark, since no quiet line appears then', () => {
+    expect(bubbleHearsRemark(plain, true)).toBe(true);
+  });
+
+  it('keeps a plain remark from a closed panel’s bubble: the quiet line shows it', () => {
+    expect(bubbleHearsRemark(plain, false)).toBe(false);
+  });
+
+  it('always lets a line about a hand-off through to its card', () => {
+    expect(bubbleHearsRemark({ ...plain, handoffId: id }, true)).toBe(true);
+    expect(bubbleHearsRemark({ ...plain, handoffId: id }, false)).toBe(true);
   });
 });

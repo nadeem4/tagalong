@@ -113,6 +113,16 @@ export class BrainClient {
   }
 
   /**
+   * Tells the brain something happened on this body (focus, back). Dropped unless online;
+   * returns whether it was sent, so a caller can say it again later.
+   */
+  event(name: string, data?: unknown): boolean {
+    if (this.status !== 'online' || this.socket === null) return false;
+    this.socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'event', params: { name, data } }));
+    return true;
+  }
+
+  /**
    * Runs one of the brain's own tools for Home (list_memories, spend_today, ...) and resolves
    * with its output parts. Rejects BrainOffline when not online, RpcError on a brain error.
    */

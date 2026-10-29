@@ -21,6 +21,78 @@ const make = (session: string | null = null) =>
     () => session,
   );
 
+describe('createTurnEvents brain-started turns', () => {
+  const brainTurn = (state: string, reason?: string) => ({
+    ...turn(state, reason),
+    ...(state === 'started' ? { started_by: 'brain' } : {}),
+  });
+  const toolFrame = (state: string) => ({
+    seq: ++seq,
+    turn: T,
+    body: 'desktop',
+    call: 'c1',
+    name: 'see_screen',
+    state,
+  });
+
+  it('a brain-started turn shows nothing while it runs', () => {
+    const m = make();
+    expect(m.map('turn', brainTurn('started'))).toEqual([]);
+    expect(m.map('reply', delta('Hi'))).toEqual([]);
+    expect(m.map('tool', toolFrame('started'))).toEqual([]);
+    expect(m.map('tool', toolFrame('ended'))).toEqual([]);
+  });
+
+  it('a silent brain-started turn that ends shows nothing', () => {
+    const m = make();
+    m.map('turn', brainTurn('started'));
+    expect(m.map('turn', brainTurn('ended', 'done'))).toEqual([]);
+  });
+
+  it('a brain-started turn with words ends as one pet.remark carrying the text', () => {
+    const m = make();
+    m.map('turn', brainTurn('started'));
+    m.map('reply', delta('Time to '));
+    m.map('reply', delta('stretch.'));
+    const events = m.map('turn', brainTurn('ended', 'done'));
+    expect(events).toEqual([
+      {
+        type: 'pet.remark',
+        remarkId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        petId: 'pet-1',
+        text: 'Time to stretch.',
+      },
+    ]);
+  });
+
+  it.each(['error', 'over_budget', 'cancelled', 'step_cap'])(
+    'a brain-started turn that ends %s shows nothing',
+    (reason) => {
+      const m = make();
+      m.map('turn', brainTurn('started'));
+      m.map('reply', delta('Half a thought'));
+      expect(m.map('turn', brainTurn('ended', reason))).toEqual([]);
+    },
+  );
+
+  it('a user-started turn is unchanged', () => {
+    const user = { ...turn('started'), started_by: 'user' };
+    expect(make().map('turn', user)).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'brain' },
+    ]);
+    expect(make().map('turn', turn('started'))).toHaveLength(1);
+  });
+
+  it('resync forgets quiet turns', () => {
+    const m = make();
+    m.map('turn', brainTurn('started'));
+    m.map('reply', delta('Hi'));
+    expect(m.resync()).toEqual([]);
+    // A later turn with the same id is an ordinary one.
+    expect(m.map('turn', turn('started'))).toHaveLength(1);
+  });
+});
+
 describe('createTurnEvents', () => {
   it('maps turn started', () => {
     expect(make('sess-1').map('turn', turn('started'))).toEqual([
@@ -320,5 +392,55 @@ describe('createTurnEvents: asks', () => {
       { type: 'connector.dismiss', approvalId: 'a1' },
       { type: 'connector.dismiss', approvalId: 'a2' },
     ]);
+  });
+});
+
+describe('createTurnEvents claim and blank remarks', () => {
+  const brainStart = () => ({ ...turn('started'), started_by: 'brain' });
+
+  it('a claimed wake turn continues as a normal turn with the text so far', () => {
+    const m = make('conv-1');
+    m.map('turn', brainStart());
+    m.map('reply', delta('Time to '));
+    expect(m.claim(T)).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'conv-1' },
+      { type: 'turn.delta', turnId: T, text: 'Time to ' },
+    ]);
+    expect(m.map('reply', delta('stretch.'))).toEqual([
+      { type: 'turn.delta', turnId: T, text: 'stretch.' },
+    ]);
+    const ended = m.map('turn', turn('ended', 'done'));
+    expect(ended).toEqual([
+      {
+        type: 'turn.completed',
+        turnId: T,
+        text: 'Time to stretch.',
+        stopReason: 'end',
+        usage: { inputTokens: 0, outputTokens: 0 },
+      },
+    ]);
+    expect(ended.some((e) => e.type === 'pet.remark')).toBe(false);
+  });
+
+  it('claiming before any words sends only turn.started', () => {
+    const m = make();
+    m.map('turn', brainStart());
+    expect(m.claim(T)).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'brain' },
+    ]);
+  });
+
+  it('claiming a turn that is not a quiet one sends nothing', () => {
+    const m = make();
+    m.map('turn', turn('started'));
+    expect(m.claim(T)).toEqual([]);
+    expect(m.claim('unknown')).toEqual([]);
+  });
+
+  it('a brain-started turn with only whitespace shows nothing', () => {
+    const m = make();
+    m.map('turn', brainStart());
+    m.map('reply', delta(' \n '));
+    expect(m.map('turn', turn('ended', 'done'))).toEqual([]);
   });
 });

@@ -41,3 +41,16 @@ export function handoffLine(params: PetRemarkParams, bubbleOpen: boolean): PetRe
   const { handoffId: _handoffId, ...line } = params;
   return line;
 }
+
+/**
+ * Whether the panel's bubble should get a `pet.remark`. With the panel hidden a plain remark
+ * is the quiet line beside Scout (main sends it separately), so the bubble, which is mounted
+ * even then, must not show and say it a second time. Open, the bubble is the only place.
+ */
+export function bubbleHearsRemark(
+  params: PetRemarkParams,
+  /** Whether the panel was visible before the remark arrived (before showRemark shows it). */
+  bubbleOpen: boolean,
+): boolean {
+  return params.handoffId !== undefined || bubbleOpen;
+}

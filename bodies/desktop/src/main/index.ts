@@ -40,7 +40,7 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
-import { handoffLine, handoffNotice } from './handoff-notice';
+import { bubbleHearsRemark, handoffLine, handoffNotice } from './handoff-notice';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import {
   StatusMarks,
@@ -72,6 +72,7 @@ import type { VoiceService } from './voice/voice';
 import { openClaudeSignIn, signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
+import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
 import type { BrainStatus } from './brain/brain-client';
 import { shouldOpenWelcome } from './welcome';
 import type { BrainClient } from './brain/brain-client';
@@ -174,6 +175,8 @@ interface Desktop {
 let desktop: Desktop | null = null;
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
+/** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
+let claimTurn: (turnId: string) => void = () => undefined;
 
 /** Scout's spot goes to the settings file and the live settings: the brain has no settings. */
 function rememberAvatarSpot(position: { x: number | null; y: number | null }): void {
@@ -239,6 +242,7 @@ app.on('before-quit', () => {
   desktop?.voiceWorker.stop();
   stopListeningGuard();
   stopPresence();
+  stopFocusWatch();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -301,6 +305,7 @@ async function start(): Promise<void> {
     const { type, ...params } = event;
     forwardToRenderers({ method: type, params });
   };
+  claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   const brain = startBrain({
@@ -487,9 +492,27 @@ async function start(): Promise<void> {
   avatar.on('hide', () => pauseListening({ petsShown: false }));
   pauseListening({ petsShown: avatar.isVisible() });
   // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
+  // The brain hears of a return after the same 5-minute idle, and of the front window changing.
+  const sendToBrain = (name: string, data: unknown): boolean =>
+    desktop?.brain.event(name, data) ?? false;
+  const sendBack = createBackSender({
+    send: sendToBrain,
+    now: Date.now,
+    idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
+  });
   stopPresence = watchPresence(powerMonitor, (event) => {
     const pet = desktop?.avatar;
     if (pet != null && !pet.isDestroyed()) pet.webContents.send(IPC.turnEvent, event);
+    sendBack(event.type === 'presence.away' ? 'away' : 'back');
+  });
+  stopFocusWatch = startFocusWatch({
+    // The platform is already gated by the sight pause; enabled also skips the listing.
+    front: async () => {
+      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
+      return frontWindow((await platform.listWindows(exclusions, { countText: false })).windows);
+    },
+    send: sendToBrain,
+    enabled: () => !sightPause.paused,
   });
 
   // Deliberately not a modal, and deliberately not fatal. The only way to store an
@@ -512,6 +535,8 @@ async function start(): Promise<void> {
 let stopListeningGuard = (): void => undefined;
 /** Stops reading the idle time on quit. */
 let stopPresence = (): void => undefined;
+/** Stops reporting the front window to the brain on quit. */
+let stopFocusWatch = (): void => undefined;
 /** Why Always listening waits: a call or full screen in front, the pets hidden, or Welcome open. */
 let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
@@ -567,9 +592,10 @@ function routeHandoffLine(notification: { method: string; params: unknown }): {
 
 /**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
- * the keyboard. Not while the bubble is already open: the person is busy with it, and a
- * remark is never worth interrupting them for. A line still tied to a finished hand-off
- * (the bubble is open) goes to its card there instead, through the forward.
+ * the keyboard. While the panel is already open the bubble shows the words itself, as
+ * Scout's message (the forward reaches it), and the quiet line stays out of the way. If the
+ * panel is open on something else (a quiet line, a routine, the hello) the bubble is not
+ * showing, so the words are dropped. A line tied to a finished hand-off goes to its card.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
@@ -679,6 +705,8 @@ function hasText(params: { text?: unknown }): boolean {
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(incoming: { method: string; params: unknown }): void {
+  // Read before showRemark below, which shows the hidden panel for the quiet line.
+  const panelWasVisible = desktop?.panel?.isVisible() === true;
   const notification = routeHandoffLine(incoming);
   const params = (notification.params ?? {}) as {
     turnId?: string;
@@ -721,7 +749,13 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
   const event = { type: notification.method, ...params };
+  // A remark shown as the quiet line (panel hidden) must not also reach the mounted bubble.
+  const remark =
+    notification.method === 'pet.remark' ? PetRemarkParams.safeParse(notification.params) : null;
+  const panel = desktop?.panel;
+  const bubbleDeaf = remark?.success === true && !bubbleHearsRemark(remark.data, panelWasVisible);
   for (const window of BrowserWindow.getAllWindows()) {
+    if (bubbleDeaf && window === panel) continue;
     window.webContents.send(IPC.turnEvent, event);
   }
 }
@@ -1005,6 +1039,7 @@ function registerIpc(): void {
 
   registerTurnIpc(handle, {
     brain: required().brain,
+    claimTurn: (turnId) => claimTurn(turnId),
     status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),

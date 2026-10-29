@@ -7,6 +7,10 @@ from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
 
+from pydantic import ValidationError
+
+from brain.protocol import BackData, FocusData
+
 
 @dataclass(frozen=True)
 class Event:
@@ -30,8 +34,45 @@ class EventKind:
 _KINDS = (
     EventKind("timer", batch_seconds=0, max_per_hour=6),
     EventKind("job_ended", batch_seconds=30, max_per_hour=10),
+    EventKind("body_online", batch_seconds=0, max_per_hour=2),
+    EventKind("back", batch_seconds=0, max_per_hour=2),
+    EventKind("focus", wakes=False),
 )
 EVENT_KINDS: dict[str, EventKind] = {k.name: k for k in _KINDS}
+
+# A body that returns sooner than this was just reconnecting, not away.
+BODY_ONLINE_MIN_AWAY_S = 600
+
+
+def from_body(body_id: str, name: str, data: object) -> Event | None:
+    """An event a body reported, or None for an unknown name or data of the wrong shape.
+
+    Bodies are untrusted input: nothing here may raise on a bad frame.
+    """
+    try:
+        if name == "back":
+            back = BackData.model_validate(data)
+            return Event(
+                "back", {"body": body_id, "idle_seconds": back.idle_seconds}, key=f"back:{body_id}"
+            )
+        if name == "focus":
+            focus = FocusData.model_validate(data)
+            facts = {"body": body_id, "app": focus.app, "title": focus.title[:200]}
+            return Event("focus", facts, key=body_id)
+    except ValidationError:
+        return None
+    return None
+
+
+def from_connect(body_id: str, away_seconds: float | None) -> Event | None:
+    """Wake only when a body that was seen earlier comes back after a real absence."""
+    if away_seconds is None or away_seconds < BODY_ONLINE_MIN_AWAY_S:
+        return None
+    return Event(
+        "body_online",
+        {"body": body_id, "offline_seconds": int(away_seconds)},
+        key=f"body_online:{body_id}",
+    )
 
 
 @cache
