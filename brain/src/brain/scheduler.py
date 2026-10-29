@@ -137,25 +137,26 @@ class Scheduler:
             turn_id = self._start(body_id, [{"type": "text", "text": text}])
         except Exception:
             log.exception("could not start a %s wake", group.kind.name)
+            self._call([h[1] for h in group.hooks], "on_drop", f"{group.kind.name} wake")
             return
         ends = [h[2] for h in group.hooks if h[2] is not None]
         if ends:
             self._on_ends[turn_id] = ends
         # after the start, so a failed start stays untold
-        self._call([h[0] for h in group.hooks], "on_start", group.kind)
+        self._call([h[0] for h in group.hooks], "on_start", f"{group.kind.name} wake")
 
     def turn_ended(self, turn_id: str) -> None:
-        self._call(self._on_ends.pop(turn_id, []), "on_end", None)
+        self._call(self._on_ends.pop(turn_id, []), "on_end", "wake turn")
         self.pump()
 
     @staticmethod
-    def _call(hooks: list, name: str, kind: EventKind | None) -> None:
+    def _call(hooks: list, name: str, label: str) -> None:
         for hook in hooks:
             if hook is not None:
                 try:
                     hook()
                 except Exception:
-                    log.exception("%s failed for a %s wake", name, kind.name if kind else "")
+                    log.exception("%s failed for a %s", name, label)
 
     def next_due(self) -> float | None:
         if not self._groups:
@@ -191,7 +192,7 @@ class Scheduler:
             log.warning("budget spent, dropped %d %s event(s)", len(group.events), group.kind.name)
         groups, self._groups = self._groups, []
         for group in groups:
-            self._call([h[1] for h in group.hooks], "on_drop", group.kind)
+            self._call([h[1] for h in group.hooks], "on_drop", f"{group.kind.name} wake")
 
     def _choose_body(self) -> str | None:
         last = self._last_body()

@@ -414,3 +414,41 @@ def test_job_question_wakes_twice_even_with_the_hourly_cap_used_up():
     rig.scheduler.emit(ev("job_question", a="two"))
     assert len(rig.starts) == 3
     assert "one" in rig.text(1) and "two" in rig.text(2)
+
+
+def test_failed_start_runs_on_drop_once_per_event():
+    rig = failing_rig()
+    dropped = []
+    rig.scheduler.emit(
+        ev("ping"), on_drop=lambda: dropped.append(1), on_end=lambda: dropped.append("end")
+    )
+    assert dropped == [1]
+
+
+def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(caplog):
+    rig = Rig()
+    rig.busy = True
+    ran = []
+
+    def boom():
+        raise RuntimeError("hook broke")
+
+    rig.scheduler.emit(ev("single", a="1"), on_start=boom)
+    rig.scheduler.emit(ev("single", a="2"), on_start=lambda: ran.append("second"))
+    rig.busy = False
+    with caplog.at_level(logging.ERROR, logger="brain"):
+        rig.scheduler.pump()
+        rig.scheduler.turn_ended("t1")
+    assert len(rig.starts) == 2 and ran == ["second"]
+    assert "hook broke" in caplog.text
+
+    rig2 = Rig()
+    ends = []
+    rig2.scheduler.emit(ev("slow", a="1"), on_end=boom)
+    rig2.scheduler.emit(ev("slow", a="2"), on_end=lambda: ends.append("b"))
+    rig2.t = T0 + timedelta(seconds=30)
+    rig2.scheduler.pump()
+    rig2.scheduler.emit(ev("ping"))
+    rig2.busy = True
+    rig2.scheduler.turn_ended("t1")  # boom must not stop "b"
+    assert ends == ["b"]
