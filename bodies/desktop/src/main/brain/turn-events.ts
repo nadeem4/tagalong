@@ -31,7 +31,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     const text = open.get(p.turn) ?? '';
     open.delete(p.turn);
     if (quiet.delete(p.turn)) {
-      if (p.reason !== 'done' || text === '') return [];
+      if (p.reason !== 'done' || text.trim() === '') return [];
       return [{ type: 'pet.remark', remarkId: crypto.randomUUID(), petId: petId(), text }];
     }
     if (p.reason === 'over_budget') return [error(p.turn, 'over_budget', BUDGET_MESSAGE)];
@@ -153,6 +153,19 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       if (method === 'tool') return tool(params as ToolParams);
       if (method === 'ask') return ask(params as AskParams);
       return [];
+    },
+
+    /**
+     * The person spoke into a wake turn (their say joined it), so it stops being quiet: the UI
+     * gets the start and the words so far, and the rest streams like any turn.
+     */
+    claim(turnId: string): TurnEvent[] {
+      if (!quiet.delete(turnId)) return [];
+      const text = open.get(turnId) ?? '';
+      return [
+        { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
+        ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
+      ];
     },
 
     /** The brain lost what these turns were doing; tell the UI instead of leaving them open. */

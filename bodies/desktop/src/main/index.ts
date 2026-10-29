@@ -175,6 +175,8 @@ interface Desktop {
 let desktop: Desktop | null = null;
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
+/** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
+let claimTurn: (turnId: string) => void = () => undefined;
 
 /** Scout's spot goes to the settings file and the live settings: the brain has no settings. */
 function rememberAvatarSpot(position: { x: number | null; y: number | null }): void {
@@ -303,6 +305,7 @@ async function start(): Promise<void> {
     const { type, ...params } = event;
     forwardToRenderers({ method: type, params });
   };
+  claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   const brain = startBrain({
@@ -1022,6 +1025,7 @@ function registerIpc(): void {
 
   registerTurnIpc(handle, {
     brain: required().brain,
+    claimTurn: (turnId) => claimTurn(turnId),
     status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),

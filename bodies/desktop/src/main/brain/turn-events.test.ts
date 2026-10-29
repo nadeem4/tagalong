@@ -394,3 +394,53 @@ describe('createTurnEvents: asks', () => {
     ]);
   });
 });
+
+describe('createTurnEvents claim and blank remarks', () => {
+  const brainStart = () => ({ ...turn('started'), started_by: 'brain' });
+
+  it('a claimed wake turn continues as a normal turn with the text so far', () => {
+    const m = make('conv-1');
+    m.map('turn', brainStart());
+    m.map('reply', delta('Time to '));
+    expect(m.claim(T)).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'conv-1' },
+      { type: 'turn.delta', turnId: T, text: 'Time to ' },
+    ]);
+    expect(m.map('reply', delta('stretch.'))).toEqual([
+      { type: 'turn.delta', turnId: T, text: 'stretch.' },
+    ]);
+    const ended = m.map('turn', turn('ended', 'done'));
+    expect(ended).toEqual([
+      {
+        type: 'turn.completed',
+        turnId: T,
+        text: 'Time to stretch.',
+        stopReason: 'end',
+        usage: { inputTokens: 0, outputTokens: 0 },
+      },
+    ]);
+    expect(ended.some((e) => e.type === 'pet.remark')).toBe(false);
+  });
+
+  it('claiming before any words sends only turn.started', () => {
+    const m = make();
+    m.map('turn', brainStart());
+    expect(m.claim(T)).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'brain' },
+    ]);
+  });
+
+  it('claiming a turn that is not a quiet one sends nothing', () => {
+    const m = make();
+    m.map('turn', turn('started'));
+    expect(m.claim(T)).toEqual([]);
+    expect(m.claim('unknown')).toEqual([]);
+  });
+
+  it('a brain-started turn with only whitespace shows nothing', () => {
+    const m = make();
+    m.map('turn', brainStart());
+    m.map('reply', delta(' \n '));
+    expect(m.map('turn', turn('ended', 'done'))).toEqual([]);
+  });
+});

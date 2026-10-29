@@ -12,26 +12,33 @@ const PNG = { mime: 'image/png' as const, base64: 'AAAA', width: 1, height: 1 };
 
 function setup(
   snapshot: Partial<ContextSnapshot> | null = null,
-  options: { offline?: boolean; outdated?: boolean; takeDrop?: () => Promise<never> } = {},
+  options: {
+    offline?: boolean;
+    outdated?: boolean;
+    joined?: boolean;
+    takeDrop?: () => Promise<never>;
+  } = {},
 ) {
   const ipc = fakeIpc();
   const said: SayParams[] = [];
   const cancelled: string[] = [];
+  const claimed: string[] = [];
   registerTurnIpc(ipc.handle, {
     brain: {
       say: (params) => {
         said.push(params);
         return options.offline === true
           ? Promise.reject(new BrainOffline())
-          : Promise.resolve({ turn: 't1', joined: false });
+          : Promise.resolve({ turn: 't1', joined: options.joined === true });
       },
       cancel: (turn) => void cancelled.push(turn),
     },
+    claimTurn: (turn) => void claimed.push(turn),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
-  return { ...ipc, said, cancelled };
+  return { ...ipc, said, cancelled, claimed };
 }
 
 describe('registerTurnIpc', () => {
@@ -41,6 +48,16 @@ describe('registerTurnIpc', () => {
       turnId: 't1',
     });
     expect(said).toEqual([{ text: 'hi', spoken: true }]);
+  });
+
+  it('ask that joins a running turn claims it, so a quiet wake turn shows', async () => {
+    const joined = setup(null, { joined: true });
+    expect(await joined.invoke(IPC.ask, { petId: 'scout', text: 'hi' })).toEqual({ turnId: 't1' });
+    expect(joined.claimed).toEqual(['t1']);
+
+    const fresh = setup();
+    await fresh.invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(fresh.claimed).toEqual([]);
   });
 
   it('ask with a pending snapshot adds an image part', async () => {

@@ -14,6 +14,8 @@ import type { IpcHandle } from './handle';
 
 export interface TurnIpcDeps {
   brain: Pick<BrainClient, 'say' | 'cancel'>;
+  /** Makes a turn the question joined visible, when the brain started it on its own. */
+  claimTurn: (turnId: string) => void;
   /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
   status: () => BrainStatus;
   /** The snapshot the last hotkey captured, sent with the ask. */
@@ -69,7 +71,10 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         ...(input.spoken === true ? { spoken: true } : {}),
       };
       try {
-        return { turnId: (await deps.brain.say(say)).turn };
+        const said = await deps.brain.say(say);
+        // The question joined a running turn; if that was a quiet wake, it shows from now on.
+        if (said.joined) deps.claimTurn(said.turn);
+        return { turnId: said.turn };
       } catch (error) {
         // The desktop's own words, never the brain's message.
         if (error instanceof BrainOffline) {
