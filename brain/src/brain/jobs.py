@@ -5,6 +5,7 @@ It tells bodies through the injected notify (`changed: jobs`); the tools that ca
 """
 
 import inspect
+import logging
 import time
 import uuid
 from collections.abc import Callable
@@ -20,6 +21,8 @@ from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 from brain.side_check import AskFacts, SideCheck
+
+log = logging.getLogger("brain")
 
 AGENT = "claude_code"
 CANCEL = "cancel"
@@ -220,10 +223,14 @@ class Jobs:
         tool = f"claude_code:{request.title}"
         summary = self._approvals.summarise(request.title, tool, request.input)
         facts = AskFacts(AGENT, tool, summary, request.input, f"{AGENT}:{job.folder}", False)
-        pref = await self._side_check.decide(facts)
-        if pref is None:
+        try:
+            pref = await self._side_check.decide(facts)
+            if pref is None:
+                return None
+            self._approvals.scout_approved(facts, pref, summary, job_id)
+        except Exception:
+            log.exception("side-check failed; asking the person")
             return None
-        self._approvals.scout_approved(facts, pref, summary, job_id)
         return once.id
 
     def _offer(self, job_id: str, request: PermissionRequest) -> None:

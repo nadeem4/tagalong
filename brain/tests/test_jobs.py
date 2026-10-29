@@ -822,3 +822,31 @@ async def test_scout_approval_is_not_offered(make_rig):
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert offers.considered == []
+
+
+async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    rig, check = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps)
+
+    async def boom(facts):
+        raise RuntimeError("boom")
+
+    check.decide = boom
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by) == ("approved", "person")
+
+
+async def test_claude_code_scout_approved_that_raises_still_asks_the_person(make_rig):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    rig.jobs._approvals.scout_approved = boom
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by) == ("approved", "person")

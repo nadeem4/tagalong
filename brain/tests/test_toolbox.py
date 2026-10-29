@@ -838,15 +838,17 @@ def offered(mem, check=None, offers=None):
     return box, bodies
 
 
-@pytest.mark.parametrize("choice", ["allow", "always"])
-async def test_person_approval_is_offered_for_consideration(mem, choice):
+@pytest.mark.parametrize(
+    ("choice", "expected"), [("allow", [("t", "scout_tool", "t")]), ("always", [])]
+)
+async def test_person_allow_once_is_offered_but_always_is_not(mem, choice, expected):
     offers = FakeOffers()
     box, bodies = offered(mem, offers=offers)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
     box._asks.answer(opened_asks(bodies)[0]["id"], choice, "desktop")
     await task
-    assert offers.considered == [("t", "scout_tool", "t")]
+    assert offers.considered == expected  # "always" just made the tool Auto: no offer
 
 
 async def test_refusal_and_scout_approval_are_not_offered(mem):
@@ -860,3 +862,30 @@ async def test_refusal_and_scout_approval_are_not_offered(mem):
     scout, _ = offered(mem, FakeSideCheck(preference(mem)), offers)
     await scout.run(call_with_text("t"))
     assert offers.considered == []
+
+
+class RaisingSideCheck:
+    async def decide(self, facts):
+        raise RuntimeError("boom")
+
+
+async def _still_asks_the_person(box, bodies):
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+
+
+async def test_side_check_that_raises_still_asks_the_person(mem):
+    box, _, bodies, _, _ = scouted(mem, RaisingSideCheck())
+    await _still_asks_the_person(box, bodies)
+
+
+async def test_scout_approved_that_raises_still_asks_the_person(mem):
+    box, _, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    box._approvals.scout_approved = boom
+    await _still_asks_the_person(box, bodies)

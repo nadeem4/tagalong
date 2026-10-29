@@ -495,9 +495,10 @@ history and preferences with `call` as in the section above.
 1. **Action:** hand off a task in one folder that runs a git command (for example `git status`).
    Allow once. Do this for three different git commands in that folder (same folder, three
    asks).
-   **Expected:** after the third **Allow once**, an ask appears with two buttons, **Yes,
+   **Expected:** after the third **Allow once**, an ask usually appears with two buttons, **Yes,
    auto-approve** and **Keep asking**, worded as a preference (for example "Allow read-only git
-   commands in this folder"). Nothing is saved yet: `list_preferences` still shows only the
+   commands in this folder"). Scout may decide not to offer, and then nothing appears until the
+   next day. Nothing is saved yet: `list_preferences` still shows only the
    default.
 2. **Action:** press **Yes, auto-approve**, then hand off another task in the same folder that
    runs a fourth read-only git command.

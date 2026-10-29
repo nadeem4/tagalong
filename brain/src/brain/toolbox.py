@@ -229,11 +229,14 @@ class Toolbox:
         if self._side_check is not None and self._approvals is not None:
             summary = self._approvals.summarise(call.text, spec.name, call.input)
             facts = AskFacts(source_kind, spec.name, summary, call.input, spec.name, spec.locked)
-            pref = await self._side_check.decide(facts)
-            if pref is not None:
-                # Allow-once only: the tool's ask mode stays as it is.
-                self._approvals.scout_approved(facts, pref, summary)
-                return
+            try:
+                pref = await self._side_check.decide(facts)
+                if pref is not None:
+                    # Allow-once only: the tool's ask mode stays as it is.
+                    self._approvals.scout_approved(facts, pref, summary)
+                    return
+            except Exception:
+                log.exception("side-check failed; asking the person")
         try:
             choice = await self._asks.permission(call, spec.name, spec.locked)
         except RpcError as exc:
@@ -245,10 +248,10 @@ class Toolbox:
             record("refused")
             raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
         record("approved")
-        if self._offers is not None:
-            self._offers.consider(spec.name, source_kind, spec.name)
         if choice == "always":
-            self.set_mode(spec.name, "auto")
+            self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
+        elif self._offers is not None:
+            self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
         for source in self.sources:

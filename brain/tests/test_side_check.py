@@ -172,3 +172,12 @@ async def test_history_for_the_same_tool_is_shown(mem):
     model = Model(PASS)
     await check(mem, model).decide(facts())
     assert "Read old.txt" in str(model.seen[0][1])
+
+
+async def test_a_huge_input_is_truncated_in_the_prompt(mem):
+    pref(mem)
+    model = Model(PASS)
+    big = AskFacts("claude_code", "Write", "Write a file", {"text": "x" * 50_000}, "/repo", False)
+    await check(mem, model).decide(big)
+    text = model.seen[0][1][0]["content"]
+    assert "x" * 100 in text and len(text) < 8_000

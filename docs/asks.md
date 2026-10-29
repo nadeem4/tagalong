@@ -90,7 +90,8 @@ why. The model's spend counts toward the daily budget.
 
 ### Scout offers a preference
 
-After each approval you gave by hand, `Offers.consider` (`brain/src/brain/offers.py`, wording in
+After each approval you gave by hand (not **Always**, which already makes the tool Auto),
+`Offers.consider` (`brain/src/brain/offers.py`, wording in
 `## offer` of `mind/approvals.md`) may look at that kind of ask. A group is the job folder for
 Claude Code, and the tool name for everything else. Cheap checks first; any "no" ends it quietly:
 

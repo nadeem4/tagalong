@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 
 HISTORY_ROWS = 10
 HISTORY_SCAN = 200
+INPUT_MAX = 4000  # characters of the ask's input shown to the model
 
 TOOLS = [
     {
@@ -118,7 +119,7 @@ class SideCheck:
                 *prefs,
                 "",
                 f"Ask from {facts.source}, tool {facts.tool}: {facts.summary}",
-                f"Input: {json.dumps(facts.input)}",
+                f"Input: {json.dumps(facts.input)[:INPUT_MAX]}",
                 "",
                 "Recent history for this tool or group:",
                 *(history or ["none"]),
