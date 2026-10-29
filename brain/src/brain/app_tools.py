@@ -342,6 +342,8 @@ def app_home_tools(
 class AppSource:
     """Connected apps' tools as a toolbox source; modes reuse the permissions table."""
 
+    approval_source = "app"
+
     def __init__(self, apps: Apps) -> None:
         self._apps = apps
 

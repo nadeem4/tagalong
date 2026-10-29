@@ -15,6 +15,7 @@ from functools import partial
 from typing import Literal
 
 from brain.app_tools import AppSource, app_home_tools
+from brain.approvals import Approvals
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
@@ -110,6 +111,7 @@ class Session:
             memory.permission_modes,
             save_mode,
             self._asks,
+            Approvals(memory, notify, now),
         )
         self._now = now
         loaded = memory.load_messages()

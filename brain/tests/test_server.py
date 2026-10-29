@@ -540,7 +540,7 @@ async def test_answer_always_tells_bodies_permissions_changed(ask_env):
             while not any(f.get("method") == "use" for f in seen):
                 seen.append(json.loads(await ws.recv()))
         changed = [f["params"]["what"] for f in seen if f.get("method") == "changed"]
-        assert changed == ["permissions"]
+        assert changed == ["approvals", "permissions"]  # the ask is logged, then auto is saved
 
 
 async def test_answer_deny_keeps_the_tool_from_running(ask_env):
