@@ -115,12 +115,38 @@ def test_structural_keys_are_never_masked():
     assert mask_message(_guards(), "chat", msg) == msg
 
 
-def test_structural_names_are_masked_inside_input_and_result_content():
+def test_structural_names_are_masked_inside_tool_input_and_result_text():
     block = {"type": "tool_use", "id": "t1", "name": "n", "input": {"name": "12345678"}}
-    result = {"type": "tool_result", "tool_use_id": "t1", "content": [{"id": "12345678"}]}
+    result = {
+        "type": "tool_result",
+        "tool_use_id": "t1",
+        "content": [{"type": "text", "text": "12345678"}],
+    }
     out = mask_message(_guards(), "chat", {"role": "user", "content": [block, result]})
     assert out["content"][0]["input"] == {"name": "[secret]"}
-    assert out["content"][1]["content"] == [{"id": "[secret]"}]
+    assert out["content"][1]["content"] == [{"type": "text", "text": "[secret]"}]
+
+
+def _list_result():
+    inner = [{"type": "text", "text": "12345678"}, {"type": "image", "source": {"data": "x"}}]
+    return {
+        "role": "user",
+        "content": [{"type": "tool_result", "tool_use_id": "t", "content": inner}],
+    }
+
+
+def test_tool_result_inner_block_types_survive_a_masker_failure():
+    def boom():
+        raise RuntimeError("no")
+
+    inner = mask_message(_guards(boom), "chat", _list_result())["content"][0]["content"]
+    assert [b["type"] for b in inner] == ["text", "image"]
+    assert inner[0]["text"] == "[withheld]"
+
+
+def test_tool_result_inner_text_is_masked():
+    inner = mask_message(_guards(), "chat", _list_result())["content"][0]["content"]
+    assert inner[0] == {"type": "text", "text": "[secret]"}
 
 
 def test_mask_json_has_no_exemption():

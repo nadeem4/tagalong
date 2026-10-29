@@ -105,16 +105,26 @@ def _mask_keeping(guards: Guards, what: str, d: dict[str, Any]) -> dict[str, Any
 
 def mask_message(guards: Guards, what: str, message: dict[str, Any]) -> dict[str, Any]:
     """A masked chat message. Structural values (role, type, id, ...) stay as they are on the
-    message and its content blocks, so the saved chat rebuilds; everything inside them is masked.
+    message, its content blocks and the blocks of a tool_result's content, so the saved chat
+    rebuilds; everything else inside them (a tool_use input, text) is masked.
     A `redacted_thinking` block is opaque and passes through."""
     out = _mask_keeping(guards, what, message)
     if isinstance(message.get("content"), list):
+        out["content"] = [_mask_block(guards, what, b) for b in message["content"]]
+    return out
+
+
+def _mask_block(guards: Guards, what: str, block: Any) -> Any:
+    if not isinstance(block, dict):
+        return mask_json(guards, what, block)
+    if block.get("type") == "redacted_thinking":
+        return block
+    out = _mask_keeping(guards, what, block)
+    inner = block.get("content")
+    if block.get("type") == "tool_result" and isinstance(inner, list):
+        # the blocks inside a result keep their types too, or the provider rejects them on resume
         out["content"] = [
-            b
-            if isinstance(b, dict) and b.get("type") == "redacted_thinking"
-            else _mask_keeping(guards, what, b)
-            if isinstance(b, dict)
-            else mask_json(guards, what, b)
-            for b in message["content"]
+            _mask_keeping(guards, what, b) if isinstance(b, dict) else mask_json(guards, what, b)
+            for b in inner
         ]
     return out

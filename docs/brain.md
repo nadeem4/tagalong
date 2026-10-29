@@ -56,7 +56,7 @@ the total can run a little low.
 | `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
 | `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
 | `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
-| `brain/src/brain/masking.py`        | `Masker`, the `mask_secrets` save guard, `mask_json` and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                                                                     |
+| `brain/src/brain/masking.py`        | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                       |
 | `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
 | `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                 |
 | `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
@@ -642,15 +642,15 @@ rest are skipped). `person_ask` opens the ask and turns the answer into a verdic
 (`Toolbox`) and Claude Code's permission asks (`Jobs._permission`) share this one chain, so the
 order lives in one place. A side-check that raises or times out falls through to `person_ask`.
 
-The `save` hook runs through `mask_json` over the new chat messages (`Session._persist`, which
+The `save` hook runs through `mask_message` over the new chat messages (`Session._persist`, which
 saves a masked copy while `history` keeps the real values for the live turn), an approval's
-summary and input (`Approvals`), a job's result (`Jobs._end`) and progress (`Jobs._progress`), and, through `SecretLogFilter` on
+summary and input (`Approvals`) and a job's result (`Jobs._end`) and progress (`Jobs._progress`) through `mask_json`, and, through `SecretLogFilter` on
 every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
 characters and common key shapes with `[secret]`; its list of values is cached for 1 second. A
 guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_message` leaves
 the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
-a message and its content blocks only (a `name` or `id` inside a tool's input or result is still
-masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
+a message, its content blocks and the blocks inside a tool result's content (a `name` or `id` inside a
+tool's input is still masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
 when masking would change it (a message left empty saves `[withheld]` text); `redacted_thinking`
 blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
