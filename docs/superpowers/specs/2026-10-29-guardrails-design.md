@@ -79,13 +79,13 @@ reaches into the loop or toolbox.
 
 ### Verdicts
 
-| Verdict | Meaning | Effect |
-|---|---|---|
-| allow | nothing to say | next guard runs |
-| ask | the person must decide | the ask chain runs (tool call and expert permission only) |
-| block | do not do this, tell the model or caller why | the action is refused with an error result |
-| stop | end the whole turn or wake | the turn ends with a reason (`over_budget`, `step_cap`, a new timeout reason) |
-| rewrite | pass on a changed value | the next guard and the caller see the new value (masking, on the save hook only) |
+| Verdict | Meaning                                      | Effect                                                                           |
+| ------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| allow   | nothing to say                               | next guard runs                                                                  |
+| ask     | the person must decide                       | the ask chain runs (tool call and expert permission only)                        |
+| block   | do not do this, tell the model or caller why | the action is refused with an error result                                       |
+| stop    | end the whole turn or wake                   | the turn ends with a reason (`over_budget`, `step_cap`, a new timeout reason)    |
+| rewrite | pass on a changed value                      | the next guard and the caller see the new value (masking, on the save hook only) |
 
 "Approve once" (the side-check's answer) is `allow` with a flag, not a sixth verdict.
 
@@ -93,14 +93,14 @@ Each verdict except allow carries a short plain-words `reason`.
 
 ### Hook points
 
-| Hook | Runs | Context | Verdicts that make sense |
-|---|---|---|---|
-| model_call | before each model call in the loop (and side-check, offers) | turn, steps so far, spend | allow, stop, block |
-| tool_call | before a tool runs | tool spec, input, caller, source kind | allow, ask, block |
-| ask | before an ask reaches the person | ask facts, who is asking | allow (go to the person), approve-once (side-check), block |
-| tool_result | after a tool returns, before the model sees it | tool, result | allow, block (the model gets an error result text) |
-| emit | before the scheduler starts a wake | event kind, wake counts | allow, block (hold, as today) |
-| save | before text is written to disk | what is being saved (chat, approval, job result, log line) | allow, rewrite |
+| Hook        | Runs                                                        | Context                                                    | Verdicts that make sense                                   |
+| ----------- | ----------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| model_call  | before each model call in the loop (and side-check, offers) | turn, steps so far, spend                                  | allow, stop, block                                         |
+| tool_call   | before a tool runs                                          | tool spec, input, caller, source kind                      | allow, ask, block                                          |
+| ask         | before an ask reaches the person                            | ask facts, who is asking                                   | allow (go to the person), approve-once (side-check), block |
+| tool_result | after a tool returns, before the model sees it              | tool, result                                               | allow, block (the model gets an error result text)         |
+| emit        | before the scheduler starts a wake                          | event kind, wake counts                                    | allow, block (hold, as today)                              |
+| save        | before text is written to disk                              | what is being saved (chat, approval, job result, log line) | allow, rewrite                                             |
 
 The `save` hook is new: masking makes a separate stored copy and never changes what a tool
 receives or what the model sees, so rewrite lives here and not on tool_call.
@@ -157,21 +157,21 @@ importing `config`.
 
 Line numbers checked against the tree at drafting time.
 
-| Today | Where | Becomes | Hook |
-|---|---|---|---|
-| Daily budget (`Budget.allows`, `TAGALONG_DAILY_BUDGET_USD`) | `guardrails.py:21-71`; used at `mind/turn.py:92`, `side_check.py:77`, `offers.py:104`, `scheduler.py:118` | `daily_budget` guard (the ledger stays in `guardrails.py`) | model_call; emit |
-| Step cap (`TAGALONG_STEP_CAP`) | `mind/turn.py:95-97` | `step_cap` guard | model_call |
-| Mode resolution: self_asks, locked, stored, default, effect | `toolbox.py:149-159`, `set_mode` 161-171 | `tool_mode` guard (yields ask or allow); locked rule changes in G2 | tool_call |
-| Home caller skips the ask | `toolbox.py:262` | stays in `tool_mode` (caller is in the context) | tool_call |
-| No one online: refuse | `toolbox.py:224-228` | `anyone_online` guard (block) | ask |
-| Side-check, allow once | `toolbox.py:229-239`, `side_check.py:71-104` | `side_check` guard; locked rule changes in G2 | ask |
-| Person ask, 300 s | `toolbox.py:240-249`, `asks.py:41-56` | `person_ask` guard (Asks keeps the wire work) | ask |
-| Always -> mode auto; offer after approve | `toolbox.py:251-254`, `offers.py` | after-answer step of the ask chain | ask |
-| Expert permission relay | `jobs.py:184-234` | same `side_check` and `person_ask` guards, source `claude_code` | ask |
-| Expert question to Scout first | `jobs.py:259-285`, `questions.py` | stays as is; no new limit (G3 checks the person is told) | ask |
-| Scheduler wake caps (per hour, per kind) | `scheduler.py:116-188`, `events.py` | `wake_caps` guard | emit |
-| Locked heuristic for app tools | `app_tools.py:37-70` | stays a classifier feeding `ToolSpec.locked`; `tool_mode` reads it | tool_call |
-| App result 8000 chars and fence | `app_tools.py:100` | stays plumbing (output size), not a guard | tool_result (n/a) |
+| Today                                                       | Where                                                                                                     | Becomes                                                            | Hook              |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ----------------- |
+| Daily budget (`Budget.allows`, `TAGALONG_DAILY_BUDGET_USD`) | `guardrails.py:21-71`; used at `mind/turn.py:92`, `side_check.py:77`, `offers.py:104`, `scheduler.py:118` | `daily_budget` guard (the ledger stays in `guardrails.py`)         | model_call; emit  |
+| Step cap (`TAGALONG_STEP_CAP`)                              | `mind/turn.py:95-97`                                                                                      | `step_cap` guard                                                   | model_call        |
+| Mode resolution: self_asks, locked, stored, default, effect | `toolbox.py:149-159`, `set_mode` 161-171                                                                  | `tool_mode` guard (yields ask or allow); locked rule changes in G2 | tool_call         |
+| Home caller skips the ask                                   | `toolbox.py:262`                                                                                          | stays in `tool_mode` (caller is in the context)                    | tool_call         |
+| No one online: refuse                                       | `toolbox.py:224-228`                                                                                      | `anyone_online` guard (block)                                      | ask               |
+| Side-check, allow once                                      | `toolbox.py:229-239`, `side_check.py:71-104`                                                              | `side_check` guard; locked rule changes in G2                      | ask               |
+| Person ask, 300 s                                           | `toolbox.py:240-249`, `asks.py:41-56`                                                                     | `person_ask` guard (Asks keeps the wire work)                      | ask               |
+| Always -> mode auto; offer after approve                    | `toolbox.py:251-254`, `offers.py`                                                                         | after-answer step of the ask chain                                 | ask               |
+| Expert permission relay                                     | `jobs.py:184-234`                                                                                         | same `side_check` and `person_ask` guards, source `claude_code`    | ask               |
+| Expert question to Scout first                              | `jobs.py:259-285`, `questions.py`                                                                         | stays as is; no new limit (G3 checks the person is told)           | ask               |
+| Scheduler wake caps (per hour, per kind)                    | `scheduler.py:116-188`, `events.py`                                                                       | `wake_caps` guard                                                  | emit              |
+| Locked heuristic for app tools                              | `app_tools.py:37-70`                                                                                      | stays a classifier feeding `ToolSpec.locked`; `tool_mode` reads it | tool_call         |
+| App result 8000 chars and fence                             | `app_tools.py:100`                                                                                        | stays plumbing (output size), not a guard                          | tool_result (n/a) |
 
 Plumbing that stays where it is, by the rule in Goals: body tool call 30 s (`bodies.py:162-191`),
 app tool call 60 s (`apps.py:336-357`), app connect and sign-in timeouts, expert run 1800 s and
@@ -292,6 +292,7 @@ Layout line for `guardrails.py` if files move. `README.md` where it lists settin
 ## Decided
 
 User:
+
 - One framework in the Python brain for all guardrails; new ones added as needed.
 - Verdicts allow, ask, block, stop, rewrite; a guard is a small unit with a hook point;
   ordered, logged, one config. Adding a guard changes neither the loop nor the toolbox.

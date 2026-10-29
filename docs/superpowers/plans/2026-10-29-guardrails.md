@@ -36,13 +36,13 @@
 
 ## File Structure
 
-| File | Responsibility |
-| --- | --- |
-| `brain/src/brain/guards.py` (new, G1) | `Hook`, `Verdict`, contexts, `Guard`, `Guards` runner, the log line |
+| File                                          | Responsibility                                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
+| `brain/src/brain/guards.py` (new, G1)         | `Hook`, `Verdict`, contexts, `Guard`, `Guards` runner, the log line               |
 | `brain/src/brain/builtin_guards.py` (new, G1) | built-in guards as plain functions; `spend_guards(budget, step_cap)` default list |
-| `brain/src/brain/guardrails.py` | `Budget` ledger and prices only (unchanged) |
-| `brain/src/brain/masking.py` (new, G4) | `Masker` and the `mask_secrets` save guard |
-| `brain/src/brain/sessions.py` | builds the one `Guards` list and registers guards in order |
+| `brain/src/brain/guardrails.py`               | `Budget` ledger and prices only (unchanged)                                       |
+| `brain/src/brain/masking.py` (new, G4)        | `Masker` and the `mask_secrets` save guard                                        |
+| `brain/src/brain/sessions.py`                 | builds the one `Guards` list and registers guards in order                        |
 
 ---
 
@@ -57,10 +57,12 @@ Branch `feat/g1-guardrail-framework`. About 600 changed lines, 4 tasks. PR title
 ### Task 1: Types and runner
 
 **Files:**
+
 - Create: `brain/src/brain/guards.py`
 - Test: `brain/tests/test_guards.py`
 
 **Interfaces:**
+
 - Produces `class Hook(StrEnum)`: `model_call, tool_call, ask, tool_result, emit, save`.
 - Produces `@dataclass(frozen=True) class Verdict(kind: Literal["allow","ask","block","stop","rewrite"], reason: str = "", code: str = "", value: Any = None, once: bool = False, guard: str = "")`. `code` is the machine reason (`over_budget`, `step_cap`, an `ErrorCode` value). `once=True` on allow means "approved for this one call" (side-check). `guard` is filled by the runner.
 - Produces helpers `ALLOW`, `ask(reason)`, `block(reason, code="")`, `stop(reason, code)`, `rewrite(value)`, `allow_once(reason, value=None)`.
@@ -77,11 +79,13 @@ Branch `feat/g1-guardrail-framework`. About 600 changed lines, 4 tasks. PR title
 ### Task 2: Budget and step-cap guards on `model_call`; the turn loop uses them
 
 **Files:**
+
 - Create: `brain/src/brain/builtin_guards.py`
 - Modify: `brain/src/brain/mind/turn.py:68-97` (`run_turn` signature and the two checks)
 - Test: `brain/tests/test_builtin_guards.py`; `brain/tests/test_turn.py` (no assertion edited)
 
 **Interfaces:**
+
 - Consumes: `Guards`, `Guard`, `Hook`, `ModelCallCtx`, `stop` from T1; `Budget.allows()`.
 - Produces `daily_budget(budget: Budget) -> Guard` (hooks `model_call`; returns `stop("daily budget spent", "over_budget")` when `not budget.allows()`), `step_cap(cap: int) -> Guard` (`model_call`; `stop("step limit reached", "step_cap")` when `ctx.kind == "turn" and ctx.steps >= cap`), `spend_guards(budget, cap) -> Guards` (budget first, then step cap).
 - Produces `run_turn(..., guards: Guards | None = None)`: `None` builds `spend_guards(budget, step_cap)`, so existing callers and tests are unchanged. The loop runs `await guards.run(Hook.model_call, ModelCallCtx("turn", turn_id, steps))` where it now checks `budget.allows()` then `steps == step_cap`, and ends with `verdict.code` as the reason. Order stays budget before step cap.
@@ -95,10 +99,12 @@ Branch `feat/g1-guardrail-framework`. About 600 changed lines, 4 tasks. PR title
 ### Task 3: Side-check, offers and scheduler use the runner
 
 **Files:**
+
 - Modify: `brain/src/brain/side_check.py:65-77`, `brain/src/brain/offers.py:104`, `brain/src/brain/scheduler.py:116-120`, `brain/src/brain/sessions.py:54-110`
 - Test: `brain/tests/test_side_check.py`, `test_offers.py`, `test_scheduler.py` (no assertion edited); one new test each as named
 
 **Interfaces:**
+
 - Consumes: T2 `spend_guards`, `Guards.run`, `Guards.run_sync`.
 - Produces optional `guards: Guards | None = None` on `SideCheck.__init__`, `Offers.__init__` and `Scheduler.__init__`; `None` builds `spend_guards(budget, 25)` so existing constructors in tests are unchanged. `SideCheck.decide` replaces `self._budget.allows()` with `(await guards.run(Hook.model_call, ModelCallCtx("side_check", None, 0))).kind != "allow"` (return `None`); `Offers` likewise with kind `"offer"`. `Scheduler.pump` replaces `not self._budget.allows()` with `guards.run_sync(Hook.emit, EmitCtx(kind=None, ...)).code == "over_budget"` then `_drop_all()`. Budget `spend` calls stay on `Budget`.
 - Produces `EmitCtx(kind: EventKind | None, now: datetime, wakes: Sequence[tuple[datetime, str]])` in `guards.py`; `daily_budget` is also registered on `emit` (one guard, two hooks: give `daily_budget` a `hooks` tuple or register two `Guard`s with the same check; builder's choice, one name `daily_budget` in logs).
@@ -131,10 +137,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 1: `tool_mode` guard on `tool_call` (behavior-preserving)
 
 **Files:**
+
 - Modify: `brain/src/brain/builtin_guards.py`, `brain/src/brain/toolbox.py:149-159,256-265`
 - Test: `brain/tests/test_builtin_guards.py`, `brain/tests/test_toolbox.py` (existing unchanged)
 
 **Interfaces:**
+
 - Consumes: `ToolCallCtx` (T1 of G1).
 - Produces `resolve_mode(spec: ToolSpec, stored: str | None) -> Literal["ask","auto"]` (today's order: `self_asks` -> ask; `locked` -> ask; stored ask/auto; `default_mode`; auto for `effect == "read"`, else ask). `Toolbox.mode(spec)` becomes `resolve_mode(spec, self._modes().get(spec.name))` so the Home permission list uses the same function.
 - Produces `tool_mode(modes: Callable[[], dict[str, str]]) -> Guard` on `tool_call`: `ALLOW` when `ctx.caller == "home"`; `ask("needs your yes")` when the resolved mode is ask; else `ALLOW`. `Toolbox.run` replaces `caller != "home" and self._asks is not None and self.mode(spec) == "ask"` with: guards `tool_call` verdict; `ask` -> `_ask`, `block` -> `RpcError(ErrorCode(code), reason)`.
@@ -148,10 +156,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 2: Ask chain on the `ask` hook (tool gate)
 
 **Files:**
+
 - Modify: `brain/src/brain/builtin_guards.py`, `brain/src/brain/guards.py` (add `AskCtx`), `brain/src/brain/toolbox.py:208-254` (`_ask`), `brain/src/brain/sessions.py`
 - Test: `brain/tests/test_builtin_guards.py`, `brain/tests/test_toolbox.py`
 
 **Interfaces:**
+
 - Produces `AskCtx(source: str, tool: str, summary: str, input: dict, group_key: str, locked: bool, turn_id: str | None, ask_person: Callable[[], Awaitable[str]])`. `ask_person` does the wire work and returns `"allow"`, `"always"` or `"deny"`; it raises `RpcError` for timeout or cancel.
 - Produces three guards on `ask`, registered in this order: `anyone_online(asks) -> Guard` (`block(<existing "not connected" message>, "denied")` when nobody is online; the builder copies the current text from `toolbox.py:224-228`), `side_check_guard(side_check, approvals) -> Guard` (calls `side_check.decide(AskFacts(...))`; a preference returns `allow_once("approved under a preference", value=pref)` after `approvals.scout_approved(...)`; `None` returns `ALLOW`; any exception is logged and returns `ALLOW`, falling through to the person), `person_ask() -> Guard` (awaits `ctx.ask_person()`; `"deny"` -> `block("The user said no to <tool>.", "denied")`; `RpcError` with timeout/cancelled -> `block(exc.message, exc.code)`; `"allow"`/`"always"` -> `allow_once(value=choice)`).
 - `Toolbox._ask` builds `AskCtx`, runs `Hook.ask`, then the after-answer steps stay in `_ask` outside the list: record the row (`approved`, `refused`, `timed_out` on a timeout block, `no_one` when the guard is `anyone_online`; a `cancelled` block records nothing), set `auto` on `"always"`, call `offers.consider`. It re-raises blocks as `RpcError(code, reason)` with the exact existing messages and codes.
@@ -165,10 +175,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 3: Expert permission relay uses the same chain
 
 **Files:**
+
 - Modify: `brain/src/brain/jobs.py:184-257` (`_permission`, `_scout_approval`), `brain/src/brain/sessions.py`
 - Test: `brain/tests/test_jobs.py`
 
 **Interfaces:**
+
 - Consumes: T2 guards and `AskCtx` with `source="claude_code"`, `tool=f"claude_code:{request.title}"`, `group_key=f"claude_code:{folder}"`, `locked=False`.
 - Produces: `Jobs(..., guards: Guards | None = None)` (None keeps today's behavior by building the chain locally from its own `asks`, `side_check`, `approvals`, so existing `Jobs` tests are unchanged). `_permission` builds `AskCtx` whose `ask_person` calls `_open_ask` and maps the picked ACP option (by `kind`, never by name) to `"allow"`/`"deny"`; the option it picked is kept in a closure for the return value. A `once` approval from the side-check returns the `allow_once` option id; people-approved returns `picked.id`; refused returns the picked reject option id; `timed_out` returns None. `_record`, `_offer`, `_changed` stay as after-answer steps. `_scout_approval` is deleted.
 
@@ -181,10 +193,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 4: `wake_caps` guard on `emit`
 
 **Files:**
+
 - Modify: `brain/src/brain/builtin_guards.py`, `brain/src/brain/scheduler.py:116-188`
 - Test: `brain/tests/test_builtin_guards.py`, `brain/tests/test_scheduler.py` (unchanged)
 
 **Interfaces:**
+
 - Produces `wake_caps(per_hour: int) -> Guard` on `emit`: for a ctx with a `kind` that has `max_per_hour`, counts `ctx.wakes` inside the last 3600 s (per kind, then overall against `per_hour`); when a cap is reached returns `block("wake cap reached", "held")` with `value` = seconds until enough wakes age out (a float). `Scheduler._cap_wait(kind)` becomes: run the `emit` hook, return `verdict.value` when `verdict.code == "held"`, else `0.0`. The over-budget drop in `pump` keeps its `code == "over_budget"` branch from G1. `_wakes` recording and pruning stay in the scheduler.
 
 - [ ] **Step 1: Write failing tests:** `test_wake_caps_allow_under_both_caps`; `test_wake_caps_hold_when_the_kind_cap_is_reached_with_wait_seconds`; `test_wake_caps_hold_when_the_overall_cap_is_reached`; `test_wake_caps_ignore_kinds_without_a_cap`; `test_wake_caps_wait_is_zero_after_the_window_ages_out`. Existing scheduler cap tests unchanged.
@@ -196,10 +210,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 5: Locked-tool rule in the brain
 
 **Files:**
+
 - Modify: `brain/src/brain/builtin_guards.py` (`resolve_mode`), `brain/src/brain/toolbox.py:161-171` (`set_mode`), `brain/src/brain/side_check.py:71-110`
 - Test: `brain/tests/test_toolbox.py`, `test_side_check.py`, `test_builtin_guards.py` (edit only the assertions that encoded "locked always asks")
 
 **Interfaces:**
+
 - `resolve_mode`: `self_asks` -> ask; stored `auto` or `ask` wins for locked tools too; a locked tool with nothing stored -> ask. (`default_mode` and `effect` never open a locked tool.)
 - `Toolbox.set_mode`: drops the `spec.locked and mode == "auto"` refusal. `self_asks` refusal stays.
 - `SideCheck.decide`: for `facts.locked`, the candidate list is the non-builtin preferences whose `tool` column equals `facts.tool`; with none, return None before any model call (the builtin default no longer matters). Non-locked asks are unchanged. The prompt for a locked ask lists only those candidates. A returned preference id outside the candidate list returns None.
@@ -213,10 +229,12 @@ Branch `feat/g2-tool-gate-locked-rule`. About 900 changed lines, 6 tasks. PR tit
 ### Task 6: Home switch for locked tools, with a risk warning
 
 **Files:**
+
 - Modify: `bodies/ui/src/home/permissions-panel.tsx:63-91`, `bodies/ui/src/home/permissions-panel.test.tsx`; check `bodies/ui/src/test-support/fake-host-bridge.ts` and `bodies/desktop/src/main` for any place that refuses `locked` (the bridge `setPermission` is expected to need no change)
 - Test: `bodies/ui/src/home/permissions-panel.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `row.locked`, `bridge.setPermission(name, mode)`.
 - Produces: for locked rows the switch is enabled (`fixed` no longer includes `row.locked`), the note reads "Risky action" instead of "Always asks", and switching Ask to Auto shows an inline warning with Confirm and Cancel before calling `setPermission`; switching Auto to Ask calls it at once. Warning wording is the builder's (plain words, says it is a risky action and Scout will no longer ask).
 
@@ -239,10 +257,12 @@ Branch `feat/g3-turn-timeout-expert-news`. About 450 changed lines, 3 tasks. PR 
 ### Task 1: Scout turn timeout
 
 **Files:**
+
 - Modify: `brain/src/brain/config.py` (const `DEFAULT_TURN_TIMEOUT_S = 300.0`, field `turn_timeout`, loader), `brain/src/brain/mind/turn.py` (`run_turn`), `brain/src/brain/sessions.py`, `brain/src/brain/main.py:46-60`
 - Test: `brain/tests/test_config.py`, `brain/tests/test_turn.py`, `brain/tests/test_sessions.py`
 
 **Interfaces:**
+
 - Produces `Config.turn_timeout: float`; env `TAGALONG_TURN_TIMEOUT_S` (positive finite float, same validation style as `_expert_timeout`; bad value raises `ValueError` naming the variable).
 - Produces `run_turn(..., turn_timeout: float | None = None)`; `None` means no limit so existing tests are unchanged; `Session(..., turn_timeout=DEFAULT_TURN_TIMEOUT_S)`.
 - Behavior: the loop body runs inside `asyncio.timeout(turn_timeout)`. Time spent inside the tool batch (`await _run_tools(...)`) is added back with `Timeout.reschedule`, so a person's slow ask never eats the clock. On `TimeoutError`: log a warning, notify one `reply` delta with the message (builder's wording, plain words, says Scout took too long), close dangling tool_use via `_close_dangling_tool_use`, end with reason `error`. Contract unchanged.
@@ -256,10 +276,12 @@ Branch `feat/g3-turn-timeout-expert-news`. About 450 changed lines, 3 tasks. PR 
 ### Task 2: Verify and fix expert news while away
 
 **Files:**
+
 - Modify (only where a test finds a gap): `brain/src/brain/jobs.py:259-285` (`_question`), `brain/src/brain/asks.py:73-74`, `brain/src/brain/sessions.py:178-182`
 - Test: `brain/tests/test_jobs.py`, `brain/tests/test_sessions.py`
 
 **Interfaces:**
+
 - Consumes: scheduler `job_ended` (batch 30 s) and `job_question` events; `Jobs.on_finished`; `unreported_jobs` on start.
 - Rule to prove: for each of finished, stalled (expert run cap hit), died (process exits), asked a question, asked a permission, the person is told once, and when no body is online the news is held and told when one connects.
 
@@ -272,10 +294,12 @@ Branch `feat/g3-turn-timeout-expert-news`. About 450 changed lines, 3 tasks. PR 
 ### Task 3: Count text parts in the body output size check
 
 **Files:**
+
 - Modify: `brain/src/brain/toolbox.py:115-121`
 - Test: `brain/tests/test_toolbox.py`
 
 **Interfaces:**
+
 - Consumes: `LIMITS["part_bytes"]` (5 MB), `LIMITS["message_bytes"]` (20 MB), `TextPart.text` (`protocol.py:113`).
 - Behavior: a part's size is `len(part.text.encode("utf-8"))` for text, the existing base64-decoded estimate for data parts. Same `over_limit` error and message.
 
@@ -298,10 +322,12 @@ Branch `feat/g4-secrets`. About 800 changed lines, 4 tasks. PR title `feat(brain
 ### Task 1: App secrets move to the token file, with a migration
 
 **Files:**
+
 - Modify: `brain/src/brain/apps.py:99-135,153-190,236-300,440-470` (validation split, `TokenFile`, connect, startup migration), `brain/src/brain/memory.py:360-375` (`update_app_config(app_id, config)`)
 - Test: `brain/tests/test_apps.py`, `brain/tests/test_memory.py`
 
 **Interfaces:**
+
 - Consumes: `TokenFile.get/set` (keys are strings; the existing app bearer token key stays the bare app id).
 - Produces `TokenFile.set_many`-free helpers: `TokenFile.clear_app(app_id)` removing every key that equals the id or starts with `f"{app_id}:"`; `Apps.remove` uses it.
 - Rule: for stdio apps, env entries whose value is a literal (not a `${VAR}` or `${VAR:-x}` reference) move to token key `f"{app_id}:env:{NAME}"`; the row keeps `config["env"]` with only the reference entries and gains `config["secret_env"]: list[str]` of moved names. For http apps, userinfo and query params whose lowercased name is in `SECRET_PARAMS = {"token","access_token","api_key","apikey","key","secret","password","auth","sig","signature"}` move as one query string to token key `f"{app_id}:url_query"`; the row URL keeps the rest and `config["url_secret"] = True`. At connect time the secrets are merged back (env merged into the expanded env; query appended to the URL). A missing token key raises `AppError(f"{row.name} needs its secret added again.")` in the same style as the existing token message.
@@ -316,11 +342,13 @@ Branch `feat/g4-secrets`. About 800 changed lines, 4 tasks. PR title `feat(brain
 ### Task 2: `Masker` and the `mask_secrets` save guard
 
 **Files:**
+
 - Create: `brain/src/brain/masking.py`
 - Modify: `brain/src/brain/builtin_guards.py` (register helper), `brain/src/brain/apps.py` (`Apps.secret_values() -> list[str]`)
 - Test: `brain/tests/test_masking.py`
 
 **Interfaces:**
+
 - Produces `class Masker(values: Callable[[], Iterable[str]])` with `mask(text: str) -> str`. Exact values of length >= 8 are replaced longest first with `[secret]`; shapes also replaced: `sk-ant-[A-Za-z0-9_-]{20,}`, `Bearer\s+[A-Za-z0-9._~+/=-]{16,}` (keeps the word Bearer), `gh[pousr]_[A-Za-z0-9]{36,}`, `xox[abprs]-[A-Za-z0-9-]{10,}`, `AKIA[0-9A-Z]{16}`, and the value of `[?&](token|access_token|api_key|apikey|key|secret|password|sig|signature)=` up to `&`, whitespace or a quote (the parameter name stays).
 - Produces `mask_secrets(masker: Masker) -> Guard` on `save`: returns `rewrite(masked)` when the text changed, else `ALLOW`. A raise follows the runner rule (block); callers store the placeholder `[withheld]` on a block.
 - Produces `mask_json(guards: Guards, what: str, obj: Any) -> Any`, walking dicts, lists and strings and returning a masked copy (input never mutated); a block anywhere returns `"[withheld]"` for that string.
@@ -335,10 +363,12 @@ Branch `feat/g4-secrets`. About 800 changed lines, 4 tasks. PR title `feat(brain
 ### Task 3: Apply the `save` hook to chat, approvals, job results and log lines
 
 **Files:**
+
 - Modify: `brain/src/brain/sessions.py:244-251` (chat save), `brain/src/brain/approvals.py:37-65` (`record`), `brain/src/brain/jobs.py:294-300` (`_end` result), `brain/src/brain/main.py` (build `Masker`, register `mask_secrets` on `save`, attach the log filter)
 - Test: `brain/tests/test_sessions.py`, `test_approvals.py`, `test_jobs.py`, `test_main.py`
 
 **Interfaces:**
+
 - Consumes: T2 `Masker`, `mask_secrets`, `mask_json`; `Guards.run_sync(Hook.save, SaveCtx(what, text))`.
 - Rules: the chat save writes a masked copy (`mask_json(guards, "chat", new_messages)`); `Session.history` and `_saved` are untouched, so the live turn keeps the real values. `Approvals.record` masks `summary` and `input` (`"approval"`). `Jobs._end` masks `result` (`"job_result"`). `class SecretLogFilter(logging.Filter)` in `masking.py` masks `record.getMessage()` then clears `record.args` and sets `record.msg`; attached to the root handler(s) in `main.py`. Optional `guards=None` keeps existing constructors unchanged (None means no masking). The runner does not log rewrites (see the logging constraint), which also prevents the log filter from recursing into itself.
 
