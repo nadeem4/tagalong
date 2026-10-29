@@ -1,7 +1,7 @@
 /**
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
- * twelve pages (overview, waiting on you, Scout, experts, routines, connections, activity, how
- * Scout decided, what Scout saw, what Scout remembers, what Scout learned, settings). Contains
+ * thirteen pages (overview, waiting on you, Scout, experts, routines, connections, approvals,
+ * activity, how Scout decided, what Scout saw, what Scout remembers, what Scout learned, settings). Contains
  * HomeView, HomeHost, HomeProvider, HomePage and the Scout page. Rendered by the desktop `home`
  * page.
  */
@@ -14,6 +14,7 @@ import { BeanClip } from '../theme/bean-clip';
 import type { BeanClipData } from '../theme/bean-clip';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
+import { ApprovalsView } from './approvals-view';
 import { brainLabel, modelLabel } from './brain-label';
 import { ConnectionsPanel } from './connections-panel';
 import { DecisionsView } from './decisions-view';
@@ -36,6 +37,7 @@ export type HomePage =
   | 'experts'
   | 'routines'
   | 'connections'
+  | 'approvals'
   | 'activity'
   | 'decisions'
   | 'sightLog'
@@ -50,6 +52,7 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'experts', label: () => 'Experts' },
   { id: 'routines', label: () => 'Routines' },
   { id: 'connections', label: () => 'Connections' },
+  { id: 'approvals', label: () => 'Approvals' },
   { id: 'activity', label: () => 'Activity' },
   { id: 'decisions', label: (name) => `How ${name} decided` },
   { id: 'sightLog', label: (name) => `What ${name} saw` },
@@ -95,9 +98,9 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and twelve pages: an
+ * Home: the one window for everything. The companion in the corner, and thirteen pages: an
  * overview, what waits on the person, how the companion thinks, the experts it hands work to, what it does on its own,
- * the apps it can use, what happened, why it decided what it did, what it looked at and sent,
+ * the apps it can use, what it may do alone and what you approved, what happened, why it decided what it did, what it looked at and sent,
  * what it remembers, what it has learned about them and itself, and the app's settings.
  */
 export function HomeView({
@@ -206,6 +209,7 @@ export function HomeView({
           </div>
         )}
         {page === 'connections' && <ConnectionsPanel />}
+        {page === 'approvals' && <ApprovalsView />}
         {page === 'activity' && <ActivityView name={name} scout={scout} />}
         {page === 'decisions' && <DecisionsView name={name} />}
         {page === 'sightLog' && (

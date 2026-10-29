@@ -227,6 +227,71 @@ export const HOME_CSS = `
   margin: 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
+.apv-section { display: flex; flex-direction: column; gap: ${t.space.lg}px; }
+.apv-sub { margin: ${t.space.xs}px 0 0; font-size: ${t.fontSize.body}px; }
+.apv-error { color: ${t.color.errInk}; margin: 0; }
+.apv-btn {
+  height: 28px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.small - 2}px;
+  border: 1px solid ${t.color.panelMuted}; background: transparent; color: ${t.color.panelText};
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
+}
+.apv-btn:hover { background: ${t.color.panelTile}; }
+.apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; }
+.apv-pref {
+  position: relative; flex-direction: row; align-items: center; justify-content: space-between;
+  gap: ${t.space.xl}px; padding: ${t.space.lg}px ${t.space.xl}px ${t.space.lg}px ${t.space.xxl}px;
+}
+.apv-pref::before {
+  content: ''; position: absolute; left: 0; top: ${t.space.lg}px; bottom: ${t.space.lg}px; width: 3px;
+  border-radius: 0 3px 3px 0; background: ${t.color.gold};
+}
+.apv-pref__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.apv-pref__sentence { font-size: ${t.fontSize.field + 1}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.apv-pref__meta { display: flex; flex-wrap: wrap; gap: ${t.space.xs}px ${t.space.xl - 2}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.apv-pref__meta b { font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
+.apv-pref__actions { flex: none; display: flex; gap: ${t.space.md}px; }
+.apv-pref__edit.tg-panel { flex: 1; min-width: 0; padding: 0; background: transparent; }
+.apv-pref__edit label { margin-bottom: ${t.space.md}px; }
+.apv-summary { flex-direction: row; align-items: center; gap: ${t.space.xxl}px; padding: ${t.space.lg}px ${t.space.xl}px; }
+.apv-summary div { display: flex; flex-direction: column; }
+.apv-summary b { font-size: ${t.fontSize.title}px; font-weight: ${t.fontWeight.semibold}; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.apv-summary span { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.apv-summary__sep { width: 1px; align-self: stretch; background: ${t.color.panelLine}; }
+.apv-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: ${t.space.lg}px; }
+.apv-seg { display: inline-flex; gap: ${t.space.xs}px; padding: 3px; border-radius: ${t.radius.row}px; background: ${t.color.panelTile}; }
+.apv-seg button {
+  height: 28px; padding: 0 ${t.space.lg}px; border: 0; border-radius: 7px; background: transparent;
+  color: ${t.color.chipFreeInk}; font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px;
+  font-weight: ${t.fontWeight.semibold}; cursor: pointer;
+}
+.apv-seg button[aria-pressed='true'] { background: #fff; color: ${t.color.panelText}; outline: 1px solid ${t.color.panelLine}; }
+.apv-seg__n { margin-left: ${t.space.xs}px; font-weight: 400; color: ${t.color.panelMuted}; }
+.apv-day { margin: ${t.space.lg}px 0 ${t.space.sm}px; }
+.apv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.apv-row {
+  position: relative; display: grid; grid-template-columns: 48px 20px 1fr auto; align-items: start;
+  gap: ${t.space.lg}px; padding: ${t.space.md}px ${t.space.md}px; border: 1px solid transparent; border-radius: ${t.radius.row}px;
+}
+.apv-row:hover { background: ${t.color.panelTile}; }
+.apv-row__time { padding-top: ${t.space.xxs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.apv-row__icon { width: 16px; height: 16px; margin-top: ${t.space.xs}px; stroke: ${t.color.panelMuted}; fill: none; stroke-width: 1.6; }
+.apv-row__body { min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.apv-row__what { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; overflow-wrap: anywhere; }
+.apv-row__source, .apv-row__by { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.apv-row__by { margin-top: ${t.space.xs}px; }
+.apv-row__by b { font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
+.apv-row__by em { font-style: normal; color: ${t.color.link}; overflow-wrap: anywhere; }
+.apv-row__side { display: flex; flex-direction: column; align-items: flex-end; gap: ${t.space.sm}px; }
+.apv-row--scout { background: ${t.color.panelTile}; border-color: ${t.color.panelLine}; }
+.apv-row--scout::before {
+  content: ''; position: absolute; left: -1px; top: ${t.space.md}px; bottom: ${t.space.md}px; width: 3px;
+  border-radius: 3px; background: ${t.color.page};
+}
+.apv-pill {
+  padding: ${t.space.xxs}px ${t.space.md}px; border-radius: ${t.radius.chip}px; background: ${t.color.page};
+  color: ${t.color.text}; font-size: ${t.fontSize.min}px; font-weight: ${t.fontWeight.semibold};
+}
+.apv-more { align-self: flex-start; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
 .home-controls .tg-footer { margin-top: ${t.space.xxl}px; }

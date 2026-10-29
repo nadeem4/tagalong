@@ -85,7 +85,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and twelve pages', async () => {
+  it('is one window: Scout and thirteen pages', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -100,6 +100,7 @@ describe('HomeView', () => {
       'Experts',
       'Routines',
       'Connections',
+      'Approvals',
       'Activity',
       'How Scout decided',
       'What Scout saw',
@@ -107,6 +108,12 @@ describe('HomeView', () => {
       'What Scout learned',
       'Settings',
     ]);
+  });
+
+  it('home nav has an Approvals item that opens the page', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));
+    expect(await screen.findByRole('heading', { name: 'Approvals' })).toBeVisible();
   });
 
   it('counts what waits on you in the nav, and follows asks.changed', async () => {
