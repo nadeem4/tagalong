@@ -319,7 +319,8 @@ describe('the hand-off card', () => {
     expect(onSay).not.toHaveBeenCalled();
     const line = 'The database closed first; Claude Code moved it.';
     const remarkId = 'a3bb189e-8bf9-4888-9912-ace4e6543999';
-    // A line about another hand-off, or about none, is not this card's.
+    // A line about another hand-off, or about none, is not this card's (a plain one is Scout's
+    // own message in the open bubble, said once, but never on the card).
     act(() =>
       bridge.emit({
         type: 'pet.remark',
@@ -343,7 +344,7 @@ describe('the hand-off card', () => {
     expect(done).toHaveTextContent(line);
     expect(done).not.toHaveTextContent('Not this one.');
     expect(done).not.toHaveTextContent('Nor this.');
-    expect(onSay).toHaveBeenCalledExactlyOnceWith(line);
+    expect(onSay.mock.calls).toEqual([['Nor this.'], [line]]);
   });
 });
 

@@ -410,7 +410,17 @@ export function CompanionBubble({
           if (greeting && !tried && hello === '') {
             setHello(event.text);
             onSay?.(event.text);
+            return;
           }
+          // A wake's words with the bubble open: Scout's message, unless an answer is streaming.
+          if (reply.state === 'running' || health !== null) return;
+          if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
+            const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
+            setPast((current) => [...current, answered]);
+          }
+          setQuestion(null);
+          setReply({ state: 'done', text: event.text });
+          onSay?.(event.text);
           return;
         }
         // The mind's line about the hand-off on the card: shown on it and said once.

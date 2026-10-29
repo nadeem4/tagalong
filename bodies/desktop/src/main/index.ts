@@ -40,7 +40,7 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
-import { handoffLine, handoffNotice } from './handoff-notice';
+import { bubbleHearsRemark, handoffLine, handoffNotice } from './handoff-notice';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import {
   StatusMarks,
@@ -592,9 +592,9 @@ function routeHandoffLine(notification: { method: string; params: unknown }): {
 
 /**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
- * the keyboard. Not while the bubble is already open: the person is busy with it, and a
- * remark is never worth interrupting them for. A line still tied to a finished hand-off
- * (the bubble is open) goes to its card there instead, through the forward.
+ * the keyboard. While the bubble is already open it shows the words itself, as Scout's
+ * message (the forward reaches it), so nothing is lost and the quiet line stays out of the
+ * way. A line still tied to a finished hand-off goes to its card there instead.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
@@ -746,7 +746,14 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
   const event = { type: notification.method, ...params };
+  // A remark shown as the quiet line (panel hidden) must not also reach the mounted bubble.
+  const remark =
+    notification.method === 'pet.remark' ? PetRemarkParams.safeParse(notification.params) : null;
+  const panel = desktop?.panel;
+  const bubbleDeaf =
+    remark?.success === true && !bubbleHearsRemark(remark.data, panel?.isVisible() === true);
   for (const window of BrowserWindow.getAllWindows()) {
+    if (bubbleDeaf && window === panel) continue;
     window.webContents.send(IPC.turnEvent, event);
   }
 }
