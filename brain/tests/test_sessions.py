@@ -436,16 +436,57 @@ async def test_clean_thinking_block_is_saved_unchanged(tmp_path):
     assert first == {"type": "thinking", "thinking": "plain thought", "signature": "sig-abc"}
 
 
+async def test_nested_structural_names_in_tool_input_are_masked(tmp_path):
+    other = "second-fake-secret-9876"
+    block = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "recall",
+        "input": {"name": SECRET, "id": other},
+    }
+    memory = file_memory(tmp_path)
+    session, _ = make(
+        Gate([Final([block], "tool_use", SimpleNamespace()), "ok"]),
+        memory,
+        masker=Masker(lambda: [SECRET, other]),
+    )
+    with_secret_tool(session, [])
+    session.say("desktop", say("go"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[1]["content"][0]["input"] == {"name": "[secret]", "id": "[secret]"}
+    assert saved[1]["content"][0]["id"] == "t1"
+
+
+async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
+    turn = Final(
+        [{"type": "thinking", "thinking": f"key {SECRET}", "signature": "s"}],
+        "end_turn",
+        SimpleNamespace(),
+    )
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([turn]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[-1]["content"] == [{"type": "text", "text": "[withheld]"}]
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert resumed.history[-1]["content"]
+
+
 async def test_saved_chat_stays_valid_after_a_masker_failure(tmp_path):
     def broken():
         raise RuntimeError("no values")
 
     memory = file_memory(tmp_path)
-    session, _ = make(Gate([secret_tool_call(), "ok"]), memory, masker=Masker(broken))
+    call = secret_tool_call()
+    call.content.append({"type": "redacted_thinking", "data": "opaque-data"})
+    session, _ = make(Gate([call, "ok"]), memory, masker=Masker(broken))
     with_secret_tool(session, [])
     session.say("desktop", say("look it up"))
     await finish_quietly(session)
     saved = memory.load_messages()
+    assert {"type": "redacted_thinking", "data": "opaque-data"} in saved[1]["content"]
     assert [m["role"] for m in saved] == ["user", "assistant", "user", "assistant"]
     use = saved[1]["content"][0]
     assert (use["type"], use["id"], use["name"]) == ("tool_use", "t1", "recall")

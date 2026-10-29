@@ -77,12 +77,12 @@ def test_record_masks_an_api_key_value(mem):
         source="scout_tool",
         tool="t",
         summary=f"uses {key}",
-        input={"k": key},
+        input={"k": key, "name": key},
         group_key="t",
         outcome="approved",
     )
     [row] = mem.list_approvals("all", 10, None)
-    assert row.summary == "uses [secret]" and row.input == {"k": "[secret]"}
+    assert row.summary == "uses [secret]" and row.input == {"k": "[secret]", "name": "[secret]"}
 
 
 # --- Home tools ---------------------------------------------------------------------------

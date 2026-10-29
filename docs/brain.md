@@ -647,10 +647,12 @@ saves a masked copy while `history` keeps the real values for the live turn), an
 summary and input (`Approvals`), a job's result (`Jobs._end`) and progress (`Jobs._progress`), and, through `SecretLogFilter` on
 every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
 characters and common key shapes with `[secret]`; its list of values is cached for 1 second. A
-guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_json` leaves
-the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone, so
-a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
-when masking would change it; `redacted_thinking` blocks are kept. The log filter calls the
+guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_message` leaves
+the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
+a message and its content blocks only (a `name` or `id` inside a tool's input or result is still
+masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
+when masking would change it (a message left empty saves `[withheld]` text); `redacted_thinking`
+blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
 prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 

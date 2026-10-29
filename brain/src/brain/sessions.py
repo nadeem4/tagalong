@@ -39,7 +39,7 @@ from brain.config import (
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.experts import ExpertRun
 from brain.jobs import Jobs, job_note
-from brain.masking import Masker, mask_json, mask_secrets
+from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
@@ -314,8 +314,9 @@ class Session:
         content = message["content"]
         if message["role"] == "assistant" and isinstance(content, list):
             content = [b for b in content if not self._thinking_changes(b)]
-            message = {**message, "content": content}
-        return mask_json(self.guards, "chat", message)
+            # an empty content list would not rebuild into valid history
+            message = {**message, "content": content or [{"type": "text", "text": WITHHELD}]}
+        return mask_message(self.guards, "chat", message)
 
     def _thinking_changes(self, block: Any) -> bool:
         if not isinstance(block, dict) or block.get("type") != "thinking":

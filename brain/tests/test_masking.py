@@ -7,7 +7,7 @@ import pytest
 
 from brain.apps import Apps, TokenFile
 from brain.guards import Guards, Hook, SaveCtx
-from brain.masking import Masker, mask_json, mask_secrets
+from brain.masking import Masker, mask_json, mask_message, mask_secrets
 
 
 def test_masks_an_exact_value():
@@ -102,7 +102,7 @@ def test_withheld_keeps_structural_values_intact():
 
     block = {"type": "tool_use", "id": "t1", "name": "n", "input": {"q": "x"}}
     msg = {"role": "assistant", "content": [block, {"type": "text", "text": "hi"}]}
-    out = mask_json(_guards(boom), "chat", msg)
+    out = mask_message(_guards(boom), "chat", msg)
     assert out["role"] == "assistant"
     assert out["content"][0]["type"] == "tool_use"
     assert (out["content"][0]["id"], out["content"][0]["name"]) == ("t1", "n")
@@ -111,8 +111,27 @@ def test_withheld_keeps_structural_values_intact():
 
 
 def test_structural_keys_are_never_masked():
-    out = mask_json(_guards(), "chat", {"tool_use_id": "12345678", "signature": "12345678"})
-    assert out == {"tool_use_id": "12345678", "signature": "12345678"}
+    msg = {"role": "user", "content": [{"tool_use_id": "12345678", "signature": "12345678"}]}
+    assert mask_message(_guards(), "chat", msg) == msg
+
+
+def test_structural_names_are_masked_inside_input_and_result_content():
+    block = {"type": "tool_use", "id": "t1", "name": "n", "input": {"name": "12345678"}}
+    result = {"type": "tool_result", "tool_use_id": "t1", "content": [{"id": "12345678"}]}
+    out = mask_message(_guards(), "chat", {"role": "user", "content": [block, result]})
+    assert out["content"][0]["input"] == {"name": "[secret]"}
+    assert out["content"][1]["content"] == [{"id": "[secret]"}]
+
+
+def test_mask_json_has_no_exemption():
+    assert mask_json(_guards(), "approval", {"name": "12345678"}) == {"name": "[secret]"}
+
+
+def test_redacted_thinking_passes_through_untouched():
+    block = {"type": "redacted_thinking", "data": "12345678"}
+    assert mask_message(_guards(), "chat", {"role": "assistant", "content": [block]})[
+        "content"
+    ] == [block]
 
 
 def test_bearer_and_url_param_are_case_insensitive():

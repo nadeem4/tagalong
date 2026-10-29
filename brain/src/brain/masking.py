@@ -13,8 +13,9 @@ from brain.guards import ALLOW, Guard, Guards, Hook, SaveCtx, Verdict, rewrite
 
 _MIN_LEN = 8  # shorter values would mask ordinary words
 WITHHELD = "[withheld]"
-# Values of these keys are structure (roles, ids, block types), not content: masking or
-# withholding them would leave a saved chat that no longer rebuilds into valid history.
+# Values of these keys are structure (roles, ids, block types), not content. They are exempt
+# only on a message and its content blocks, never inside a tool's input or result, where the
+# same names (`name`, `id`) can hold real secrets.
 _STRUCTURAL = frozenset({"role", "type", "id", "tool_use_id", "name", "signature"})
 
 _SHAPES = [
@@ -82,20 +83,38 @@ def mask_secrets(masker: Masker) -> Guard:
 
 
 def mask_json(guards: Guards, what: str, obj: Any) -> Any:
-    """A masked copy of dicts, lists and strings; a blocked string becomes `[withheld]`.
-
-    String values of structural keys (role, type, id, ...) are left as they are.
-    """
+    """A masked copy of dicts, lists and strings; a blocked string becomes `[withheld]`."""
     if isinstance(obj, str):
         v = guards.run_sync(Hook.save, SaveCtx(what, obj))  # type: ignore[arg-type]
         if v.kind == "rewrite":
             return v.value
         return WITHHELD if v.kind in ("block", "stop") else obj
     if isinstance(obj, dict):
-        return {
-            k: v if k in _STRUCTURAL and isinstance(v, str) else mask_json(guards, what, v)
-            for k, v in obj.items()
-        }
+        return {k: mask_json(guards, what, v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [mask_json(guards, what, v) for v in obj]
     return obj
+
+
+def _mask_keeping(guards: Guards, what: str, d: dict[str, Any]) -> dict[str, Any]:
+    return {
+        k: v if k in _STRUCTURAL and isinstance(v, str) else mask_json(guards, what, v)
+        for k, v in d.items()
+    }
+
+
+def mask_message(guards: Guards, what: str, message: dict[str, Any]) -> dict[str, Any]:
+    """A masked chat message. Structural values (role, type, id, ...) stay as they are on the
+    message and its content blocks, so the saved chat rebuilds; everything inside them is masked.
+    A `redacted_thinking` block is opaque and passes through."""
+    out = _mask_keeping(guards, what, message)
+    if isinstance(message.get("content"), list):
+        out["content"] = [
+            b
+            if isinstance(b, dict) and b.get("type") == "redacted_thinking"
+            else _mask_keeping(guards, what, b)
+            if isinstance(b, dict)
+            else mask_json(guards, what, b)
+            for b in message["content"]
+        ]
+    return out
