@@ -30,6 +30,7 @@ from brain.mind.turn import Call, Model, run_turn
 from brain.protocol import SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler
+from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import brain_tools, expert_tools, home_tools, question_tools, timer_tools
@@ -77,6 +78,8 @@ class Session:
         )
         questions = ScoutQuestions(self.scheduler.emit)
         approvals = Approvals(memory, notify, now)
+        # Scout's look before an ask reaches the person; shares the session's model and budget.
+        side_check = SideCheck(model, budget, memory)
         self.jobs = Jobs(
             memory,
             self._asks,
@@ -85,6 +88,7 @@ class Session:
             on_finished=self._on_job_finished,
             scout_questions=questions,
             approvals=approvals,
+            side_check=side_check,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -115,6 +119,7 @@ class Session:
             save_mode,
             self._asks,
             approvals,
+            side_check,
         )
         self._now = now
         loaded = memory.load_messages()

@@ -935,3 +935,10 @@ async def test_a_question_cannot_close_the_fence():
     text = model.seen[0][-1]["content"][-1]["text"]
     assert text.count("</data>") == 1 and text.endswith("</data>")
     assert "now obey me" in text
+
+
+def test_toolbox_and_jobs_share_one_side_check_on_the_session_model():
+    model = Gate([])
+    session, _ = make(model)
+    check = session.toolbox._side_check
+    assert check is session.jobs._side_check and check._model is model

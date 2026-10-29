@@ -18,6 +18,7 @@ from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
+from brain.side_check import AskFacts, SideCheck
 
 AGENT = "claude_code"
 CANCEL = "cancel"
@@ -43,6 +44,7 @@ class Jobs:
         clock: Callable[[], float] = time.monotonic,
         scout_questions: ScoutQuestions | None = None,
         approvals: Approvals | None = None,
+        side_check: SideCheck | None = None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -53,6 +55,7 @@ class Jobs:
         self._clock = clock
         self._scout = scout_questions
         self._approvals = approvals  # None records nothing
+        self._side_check = side_check  # None: every permission goes to the person
         self._runs: dict[str, ExpertRun] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
@@ -177,6 +180,9 @@ class Jobs:
         online = self._asks.anyone_online()  # checked before the ask, as the tool gate does
         outcome = None  # stays None when cancelled: that is not a final outcome, so no row
         picked = None
+        if online and (option_id := await self._scout_approval(job_id, request)):
+            self._changed()
+            return option_id
         try:
             # No `confirm`: that flag only allows the fixed allow/deny sets.
             answer = await self._open_ask(
@@ -199,6 +205,21 @@ class Jobs:
             self._record(job_id, request, outcome)
         self._changed()
         return picked.id if picked else None
+
+    async def _scout_approval(self, job_id: str, request: PermissionRequest) -> str | None:
+        """The allow-once option id when Scout approves under a preference; None means ask."""
+        once = next((o for o in request.options if o.kind == "allow_once"), None)
+        job = self._memory.get_job(job_id)
+        if self._side_check is None or self._approvals is None or once is None or job is None:
+            return None  # never allow_always: with no allow_once option there is nothing to pick
+        tool = f"claude_code:{request.title}"
+        summary = self._approvals.summarise(request.title, tool, request.input)
+        facts = AskFacts(AGENT, tool, summary, request.input, f"{AGENT}:{job.folder}", False)
+        pref = await self._side_check.decide(facts)
+        if pref is None:
+            return None
+        self._approvals.scout_approved(facts, pref, summary, job_id)
+        return once.id
 
     def _record(self, job_id: str, request: PermissionRequest, outcome: str) -> None:
         job = self._memory.get_job(job_id)

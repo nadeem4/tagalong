@@ -161,6 +161,11 @@ MIGRATIONS = (
     INSERT INTO preferences(sentence, builtin, created_at)
         VALUES ('Always ask me before risky actions', 1, strftime('%Y-%m-%dT%H:%M:%S+00:00','now'));
     """,
+    # A scout approval keeps the sentence it was made under, so editing or removing the
+    # preference later does not rewrite history.
+    """
+    ALTER TABLE approvals ADD COLUMN preference_sentence TEXT;
+    """,
 )
 
 
@@ -218,6 +223,7 @@ class Approval:
     decided_by: str
     preference_id: int | None
     at: str
+    preference_sentence: str | None = None
 
 
 @dataclass(frozen=True)
@@ -475,12 +481,13 @@ class Memory:
         decided_by: str,
         preference_id: int | None,
         at: str,
+        preference_sentence: str | None = None,
     ) -> int:
         cur = self._db.execute(
             "INSERT INTO approvals(source, tool, summary, input, job_id, group_key, outcome,"
-            " decided_by, preference_id, at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            " decided_by, preference_id, at, preference_sentence) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (source, tool, summary, json.dumps(input), job_id, group_key, outcome, decided_by,
-             preference_id, at),
+             preference_id, at, preference_sentence),
         )  # fmt: skip
         return cur.lastrowid
 
@@ -498,7 +505,8 @@ class Memory:
         clause = f"WHERE {' AND '.join(where)}" if where else ""
         rows = self._db.execute(
             f"SELECT id, source, tool, summary, input, job_id, group_key, outcome, decided_by,"
-            f" preference_id, at FROM approvals {clause} ORDER BY id DESC LIMIT ?",
+            f" preference_id, at, preference_sentence FROM approvals {clause}"
+            " ORDER BY id DESC LIMIT ?",
             (*args, limit),
         ).fetchall()
         return [Approval(r[0], r[1], r[2], r[3], json.loads(r[4]), *r[5:]) for r in rows]

@@ -78,7 +78,15 @@ class FakeScout:
 
 class Rig:
     def __init__(
-        self, tmp_path, monkeypatch, asks, steps, max_running=2, scout=None, approvals=False
+        self,
+        tmp_path,
+        monkeypatch,
+        asks,
+        steps,
+        max_running=2,
+        scout=None,
+        approvals=False,
+        side_check=None,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
@@ -108,6 +116,7 @@ class Rig:
             clock=lambda: self.now,
             scout_questions=scout,
             approvals=self.approvals,
+            side_check=side_check,
         )
 
     def make_run(self, **callbacks) -> ExpertRun:
@@ -602,8 +611,8 @@ async def test_cancel_job_is_called_when_a_job_ends(make_rig):
     assert scout.cancelled == [job_id]
 
 
-def with_approvals(make_rig, asks, steps):
-    return make_rig(asks, steps, approvals=True)
+def with_approvals(make_rig, asks, steps, side_check=None):
+    return make_rig(asks, steps, approvals=True, side_check=side_check)
 
 
 def logged(rig):
@@ -693,3 +702,90 @@ async def test_jobs_without_approvals_unchanged(make_rig):
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
     assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "allow-once"}
+
+
+# --- Scout answers Claude Code's permission asks under a preference ----------------------
+
+
+class FakeSideCheck:
+    def __init__(self, result=None):
+        self.result = result
+        self.facts = []
+
+    async def decide(self, facts):
+        self.facts.append(facts)
+        return self.result
+
+
+def pref_in(rig, sentence="Reading files is fine"):
+    return rig.memory.add_preference(
+        sentence=sentence, source=None, tool=None, group_key=None, at="2026-10-28T09:00:00Z"
+    )
+
+
+def make_scouted(make_rig, asks, steps, approve=True):
+    check = FakeSideCheck()
+    rig = with_approvals(make_rig, asks, steps, side_check=check)
+    if approve:
+        check.result = pref_in(rig)
+    return rig, check
+
+
+async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
+    steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
+    asks = FakeAsks(Answer("Plan"))  # no second answer: the person is never asked
+    rig, check = make_scouted(make_rig, asks, steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
+    assert len(asks.opened) == 1  # only the hand-off ask
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
+    assert row.preference_id == check.result.id and row.job_id == rig.finished[0].id
+    assert row.preference_sentence == "Reading files is fine"
+    [facts] = check.facts
+    assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
+        "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}", False,
+    )  # fmt: skip
+
+
+async def test_claude_code_without_allow_once_option_passes(make_rig):
+    no_once = [OPTS[1], OPTS[2]]  # allow_always and reject_once only
+    steps = [{"permission": {"title": "ls", "options": no_once}}]
+    rig, check = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Nope")), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by) == ("refused", "person")  # never allow_always
+
+
+async def test_claude_code_pass_falls_through_to_the_person(make_rig):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    rig, check = make_scouted(
+        make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps, approve=False
+    )
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert len(check.facts) == 1
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "person", None)
+
+
+async def test_claude_code_no_one_online_skips_side_check(make_rig):
+    steps = [{"permission": {"title": "rm x"}}]
+    asks = FakeAsks(Answer("Plan"), Answer(None))
+    rig, check = make_scouted(make_rig, asks, steps)
+    real_open = asks.open
+
+    async def open_then_go_offline(**kw):
+        if kw.get("tool"):
+            asks.online = False
+        return await real_open(**kw)
+
+    asks.open = open_then_go_offline
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert check.facts == []
+    [row] = logged(rig)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")

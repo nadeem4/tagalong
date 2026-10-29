@@ -63,7 +63,15 @@ def tools(mem, sent):
     return {s.name: (s, h) for s, h in approval_home_tools(make(mem, sent))}
 
 
-def add_row(mem, *, decided_by="person", outcome="approved", preference_id=None, tool="t"):
+def add_row(
+    mem,
+    *,
+    decided_by="person",
+    outcome="approved",
+    preference_id=None,
+    tool="t",
+    preference_sentence=None,
+):
     return mem.add_approval(
         source="scout_tool",
         tool=tool,
@@ -75,6 +83,7 @@ def add_row(mem, *, decided_by="person", outcome="approved", preference_id=None,
         decided_by=decided_by,
         preference_id=preference_id,
         at="2026-10-28T09:00:00+00:00",
+        preference_sentence=preference_sentence,
     )
 
 
@@ -98,12 +107,12 @@ async def test_list_approvals_returns_counts_and_cursor(mem):
     assert second["next"] is None
 
 
-async def test_list_approvals_scout_filter_includes_preference_sentence(mem):
+async def test_list_approvals_scout_filter_includes_stored_preference_sentence(mem):
     pref = mem.add_preference(
         sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
     )
     add_row(mem)
-    add_row(mem, decided_by="scout", preference_id=pref.id)
+    add_row(mem, decided_by="scout", preference_id=pref.id, preference_sentence=pref.sentence)
     _, h = tools(mem, [])["list_approvals"]
 
     out = json.loads(await h({"filter": "scout"}))
@@ -111,9 +120,19 @@ async def test_list_approvals_scout_filter_includes_preference_sentence(mem):
     assert [r["preference"] for r in out["approvals"]] == ["Allow reads"]
     assert out["counts"]["total"] == 2  # counts ignore the filter
 
+    # The row keeps the sentence it was approved under, whatever happens to the preference.
+    mem.edit_preference(pref.id, "Allow nothing")
+    out = json.loads(await h({"filter": "scout"}))
+    assert out["approvals"][0]["preference"] == "Allow reads"
     mem.remove_preference(pref.id)
     out = json.loads(await h({"filter": "scout"}))
-    assert out["approvals"][0]["preference"] is None
+    assert out["approvals"][0]["preference"] == "Allow reads"
+
+
+async def test_person_row_has_no_preference_sentence(mem):
+    add_row(mem)
+    _, h = tools(mem, [])["list_approvals"]
+    assert json.loads(await h({}))["approvals"][0]["preference"] is None
 
 
 async def test_list_approvals_rejects_bad_args(mem):
@@ -188,3 +207,32 @@ def test_home_tools_not_offered_to_the_model(mem):
         "list_approvals", "list_preferences", "remove_preference", "edit_preference",
     ]  # fmt: skip
     assert all(s.audience == frozenset({"home"}) for s in specs)
+
+
+# --- scout_approved ----------------------------------------------------------------------
+
+
+def test_scout_approved_records_uses_and_notifies(mem):
+    from brain.side_check import AskFacts
+
+    pref = mem.add_preference(
+        sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
+    )
+    sent = []
+    facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo", False)
+
+    make(mem, sent).scout_approved(facts, pref, "ls -la", job_id="j1")
+
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "scout", pref.id)
+    assert (row.source, row.tool, row.group_key, row.job_id, row.input) == (
+        "claude_code", "claude_code:ls", "claude_code:/repo", "j1", {"c": 1},
+    )  # fmt: skip
+    assert (row.summary, row.preference_sentence) == ("ls -la", "Allow reads")
+    used = next(p for p in mem.list_preferences() if p.id == pref.id)
+    assert used.use_count == 1 and used.last_used == "2026-10-28T09:00:00+00:00"
+    assert (
+        "approved",
+        {"tool": "claude_code:ls", "text": "ls -la", "preference": "Allow reads"},
+    ) in sent
+    assert ("changed", {"what": "approvals"}) in sent

@@ -671,3 +671,151 @@ async def test_toolbox_without_approvals_behaves_as_before():
     assert box._approvals is None
     task = await answer_with(box, bodies, "allow")
     assert await task == "ran t"
+
+
+# --- Scout answers an ask under a preference (the side-check) ----------------------------
+
+from datetime import UTC, datetime  # noqa: E402
+
+from brain.approvals import Approvals  # noqa: E402
+from brain.memory import Memory  # noqa: E402
+from brain.mind.turn import Final  # noqa: E402
+from brain.side_check import SideCheck  # noqa: E402
+
+NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
+AT = "2026-10-28T09:00:00Z"
+
+
+class FakeSideCheck:
+    def __init__(self, result=None, gate=None):
+        self.result = result
+        self.gate = gate
+        self.facts = []
+
+    async def decide(self, facts):
+        self.facts.append(facts)
+        if self.gate is not None:
+            await self.gate.wait()
+        return self.result
+
+
+@pytest.fixture
+def mem(tmp_path):
+    m = Memory(tmp_path / "s.db")
+    yield m
+    m.close()
+
+
+def scouted(mem, check, online=("desktop",), locked=False):
+    sent = []
+    approvals = Approvals(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
+    bodies = AskBodies(online)
+    source = FakeSource([ToolSpec("t", "t tool", {"type": "object"}, locked=locked)])
+    stored = {}
+    box = RealToolbox([source], lambda: stored, stored.__setitem__, Asks(bodies), approvals, check)
+    return box, source, bodies, stored, sent
+
+
+def preference(mem, sentence="Fine to run t"):
+    return mem.add_preference(sentence=sentence, source=None, tool=None, group_key=None, at=AT)
+
+
+async def test_scout_approval_runs_the_tool_without_asking_the_person(mem):
+    box, source, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
+    assert await box.run(call_with_text("t")) == "ran t"
+    assert bodies.sent == []  # no Ask was ever opened
+    assert source.ran == ["t"]
+
+
+async def test_scout_approval_row_and_notification(mem):
+    pref = preference(mem)
+    box, _, _, _, sent = scouted(mem, FakeSideCheck(pref))
+    await box.run(call_with_text("t"))
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "scout", pref.id)
+    assert (row.source, row.tool, row.group_key, row.summary) == (
+        "scout_tool", "t", "t", "Doing it.",
+    )  # fmt: skip
+    assert row.preference_sentence == pref.sentence
+    assert ("approved", {"tool": "t", "text": "Doing it.", "preference": pref.sentence}) in sent
+    used = next(p for p in mem.list_preferences() if p.id == pref.id)
+    assert used.use_count == 1
+
+
+async def test_pass_falls_through_to_the_person_ask(mem):
+    check = FakeSideCheck(None)
+    box, _, bodies, _, _ = scouted(mem, check, locked=True)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+    [facts] = check.facts
+    assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
+        "scout_tool", "t", "t", True,
+    )  # fmt: skip
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.decided_by, row.preference_id, row.preference_sentence) == ("person", None, None)
+
+
+async def test_allow_always_is_never_used_for_scout(mem):
+    box, source, _, stored, _ = scouted(mem, FakeSideCheck(preference(mem)))
+    await box.run(call_with_text("t"))
+    assert stored == {}  # the tool's ask mode is untouched
+    assert box.mode(source.specs()[0]) == "ask"
+
+
+class _ApprovingModel:
+    model_id = "m"
+
+    def __init__(self, pref_id):
+        self.pref_id = pref_id
+
+    async def stream(self, system, messages, tools):
+        block = {"type": "tool_use", "id": "x", "name": "approve_under_preference"}
+        content = [{**block, "input": {"preference": self.pref_id, "reason": "r"}}]
+        yield Final(content, "tool_use", SimpleNamespace(input_tokens=1, output_tokens=1))
+
+
+class _OpenBudget:
+    def allows(self):
+        return True
+
+    def spend(self, usage, model):
+        pass
+
+
+async def test_removed_preference_sends_next_ask_to_the_person(mem):
+    pref = preference(mem)
+    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
+    box, _, bodies, _, _ = scouted(mem, check)
+    await box.run(call_with_text("t"))
+    assert bodies.sent == []
+    mem.remove_preference(pref.id)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))  # the person is asked now
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
+
+
+async def test_no_one_online_skips_side_check(mem):
+    check = FakeSideCheck(preference(mem))
+    box, _, _, _, _ = scouted(mem, check, online=())
+    with pytest.raises(RpcError):
+        await box.run(call_with_text("t"))
+    assert check.facts == []
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")
+
+
+async def test_side_check_runs_while_a_turn_is_running(mem):
+    gate = asyncio.Event()
+    check = FakeSideCheck(preference(mem), gate=gate)
+    box, _, bodies, _, _ = scouted(mem, check)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: check.facts)
+    other = asyncio.create_task(asyncio.sleep(0, "other work"))
+    assert await other == "other work"  # the loop is free while Scout thinks
+    assert not task.done() and bodies.sent == []  # no ask opens while Scout looks
+    gate.set()
+    assert await task == "ran t"
