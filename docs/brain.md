@@ -270,9 +270,11 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
   (Scout's tools in `Toolbox._ask`, Claude Code in `Jobs._permission`). When it approves, no ask
   opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
-  `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its approval) or a 20 s timeout leaves the ask
-  as described below. A very long input is cut to 4,000 characters in what the model sees. A locked tool gets this look only under a preference you made that names the tool; the built-in default and general preferences never approve it. A tool
-  stays in `ask` mode. Details: [asks.md](asks.md#scout-approves-under-your-preferences).
+  `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
+  approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
+  A locked tool gets this look only under a preference you made that names the tool; the
+  built-in default and general preferences never approve it. A tool stays in `ask` mode.
+  Details: [asks.md](asks.md#scout-approves-under-your-preferences).
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
   `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
@@ -608,14 +610,14 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 
 ### Hooks
 
-| Hook          | Runs                                          | Built in                                                                                                                                                             |
-| ------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                           |
-| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind hourly cap frees up) |
-| `tool_call`   | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                     |
-| `ask`         | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                           |
-| `tool_result` | After a tool returns                          | Later slice                                                                                                                                                          |
-| `save`        | Before text is stored                         | Later slice                                                                                                                                                          |
+| Hook          | Runs                                          | Built in                                                                                                                                                                            |
+| ------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
+| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
+| `tool_call`   | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
+| `ask`         | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
+| `tool_result` | After a tool returns                          | Later slice                                                                                                                                                                         |
+| `save`        | Before text is stored                         | Later slice                                                                                                                                                                         |
 
 The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
 body is connected. `side_check` lets Scout approve once under a preference (an allow-once, so the

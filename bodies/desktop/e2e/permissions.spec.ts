@@ -1,6 +1,6 @@
 /**
  * Home's Permissions list on the fake brain: Settings shows each tool, a click on a switch
- * reaches the brain as set_permission, and a locked tool cannot be switched.
+ * reaches the brain as set_permission, and a locked tool is marked risky.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

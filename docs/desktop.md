@@ -102,7 +102,7 @@ running.
   and answers `timeout` (-32004) past that. The brain now offers these to Scout as `desktop__<tool>`.
   `open_url(url)` opens an https address in the default browser (`shell.openExternal`) and refuses
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
-  `desktop__open_url`, and it always asks first (`confirm`: Always allow cannot turn the ask off).
+  `desktop__open_url`, and it always asks first (`confirm`: there is no Always allow button; only its Home switch can unlock it).
 
 - **Body events.** `brain/body-events.ts` sends two facts with `event`; the brain decides whether
   they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
@@ -400,8 +400,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
   pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
-  reaches the brain, and a brain refusal (a locked tool) rejects so the panel reads the list again.
-  Each row has an Ask/Auto switch; a locked tool shows Ask, "Always asks", and a disabled switch; a
+  reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
+  Each row has an Ask/Auto switch; a locked tool shows Ask and "Risky action", its switch works, and turning it to Auto asks you to confirm first; a
   tool of an offline body is dimmed, marked "Not connected", and its switch is disabled (the brain
   cannot set a mode for it yet). The list reads again on `changed { what: "permissions" }`. The e2e
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`

@@ -79,7 +79,8 @@ const tools: Tool[] = [
       'Open a web page in the default browser on this machine. Only https addresses. ' +
       'The brain uses it for sign-in pages.',
     effect: 'change',
-    // Always asks: Always allow must not let Scout open any page an app's text talks it into.
+    // Locked: no Always allow button, so no click can let Scout open any page an app's text
+    // talks it into; only the Home switch unlocks it.
     confirm: true,
     input_schema: {
       type: 'object',

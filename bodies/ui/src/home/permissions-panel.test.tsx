@@ -136,6 +136,28 @@ describe('PermissionsPanel', () => {
     await waitFor(() => expect(bridge.permissionSets).toHaveLength(1));
     expect(screen.queryByRole('alert')).toBeNull();
   });
+  it('puts focus on Cancel when the warning opens and describes the switch by it', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [FORGET] }));
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
+    fireEvent.click(toggle);
+    const cancel = await screen.findByRole('button', { name: 'Cancel' });
+    await waitFor(() => expect(cancel).toHaveFocus());
+    const warning = screen.getByRole('alert');
+    expect(toggle).toHaveAttribute('aria-describedby', warning.id);
+  });
+
+  it('Escape cancels the warning, calls nothing and returns focus to the switch', async () => {
+    const bridge = createFakeHostBridge({ permissions: [FORGET] });
+    renderPanel(bridge);
+    const toggle = await screen.findByRole('switch', { name: 'forget' });
+    fireEvent.click(toggle);
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Cancel' }), { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(toggle).toHaveFocus();
+    expect(toggle).not.toHaveAttribute('aria-describedby');
+    expect(bridge.permissionSets).toEqual([]);
+  });
+
   it('says a tool that asks itself does so, with the switch disabled', async () => {
     const bridge = createFakeHostBridge({
       permissions: [{ ...MOVE, name: 'hand_off', self_asks: true }],

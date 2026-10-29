@@ -524,7 +524,7 @@ history and preferences with `call` as in the section above.
    **Keep asking**. Approve more commands in the same folder over the next days.
    **Expected:** no new offer for that folder for 7 days (`TAGALONG_KEEP_ASKING_DAYS`). No
    preference is saved. Set the values lower in `.env` to check this faster.
-6. **Action:** with a preference saved, trigger a locked tool (one that always asks) while the
+6. **Action:** with a preference saved, trigger a locked tool (one that asks until unlocked on Home) while the
    built-in "Always ask me before risky actions" default still exists.
    **Expected:** it still asks you. Scout does not look at it, and a general preference never
    approves it, even after the default is deleted. Only a preference that names that tool can.
