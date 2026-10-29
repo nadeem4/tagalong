@@ -2457,7 +2457,7 @@ three times: the wording should vary, the behaviour should not.
    3. Switch it back to **Ask** (no warning). **Expected:** it asks again.
    4. With a preference of your own saved, remove the built-in "Always ask me before risky
       actions" default, then trigger the locked tool. **Expected:** it still asks; a general
-      preference does not approve it.
+      preference does not approve it. (A preference naming the tool comes from accepting Scout's offer for that tool.)
 4. **Offline body.** Close the browser extension's connection (or run with only the desktop).
    **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
    switch off limits.

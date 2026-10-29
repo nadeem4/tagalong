@@ -9,7 +9,7 @@ import pytest
 
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.guards import Guard, Guards, Hook, ask, block, stop
+from brain.guards import ALLOW, Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.toolbox import BodySource, BrainSource, ToolSpec
@@ -992,3 +992,32 @@ async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_
     assert source.ran == []  # the general preference did not approve it
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
+
+
+async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_person(mem):
+    pref = mem.add_preference(
+        sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
+    )
+    mem.remove_preference(mem.default_preference().id)
+    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
+    box, source, bodies, _, _ = scouted(mem, check, locked=True)
+    assert await box.run(call_with_text("t")) == "ran t"
+    assert bodies.sent == []  # Scout approved under the named preference: nobody was asked
+    assert source.ran == ["t"]
+
+
+async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
+    approvals = Approvals(mem, lambda m, p: None, lambda: NOW)
+    source = FakeSource([spec("a")])
+    guards = Guards()
+    guards.add(Guard("ask_all", Hook.tool_call, lambda ctx: ask("needs your yes")))
+    guards.add(Guard("always_allow", Hook.ask, lambda ctx: ALLOW))  # allows, but not once
+    box = RealToolbox(
+        [source], lambda: {}, lambda n, m: None, Asks(AskBodies(("desktop",))), approvals,
+        guards=guards,
+    )  # fmt: skip
+    with pytest.raises(RpcError) as err:
+        await box.run(call("a"))
+    assert err.value.code == ErrorCode.denied
+    assert source.ran == []
+    assert mem.list_approvals("all", 10, None) == []

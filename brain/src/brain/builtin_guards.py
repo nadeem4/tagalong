@@ -26,7 +26,7 @@ from brain.guards import (
     block,
     stop,
 )
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 
 if TYPE_CHECKING:
     from brain.toolbox import ToolSpec
@@ -140,12 +140,19 @@ def side_check_guard(side_check, approvals) -> Guard:
     return Guard("side_check", Hook.ask, check)
 
 
+_ASK_REASONS = {
+    ErrorCode.timeout: "nobody answered the ask in time",
+    ErrorCode.cancelled: "the ask was cancelled",
+}
+
+
 def person_ask() -> Guard:
     async def check(ctx: AskCtx) -> Verdict:
         try:
             choice = await ctx.ask_person()
         except RpcError as exc:
-            return block(exc.message, exc.code.name)
+            # Plain words only: logged guard reasons must never carry tool text.
+            return block(_ASK_REASONS.get(exc.code, exc.code.name), exc.code.name)
         if choice == "deny":
             return block("the person said no", "denied")
         return allow_once("the person answered", value=choice)

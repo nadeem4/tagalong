@@ -195,7 +195,7 @@ async def test_person_ask_timeout_blocks_with_timeout_code():
         raise RpcError(ErrorCode.timeout, "No answer in time.")
 
     v = await person_ask().check(ask_ctx(late))
-    assert (v.kind, v.code, v.reason) == ("block", "timeout", "No answer in time.")
+    assert (v.kind, v.code, v.reason) == ("block", "timeout", "nobody answered the ask in time")
 
 
 def test_ask_chain_order_is_online_then_side_check_then_person():

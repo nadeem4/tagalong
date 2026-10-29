@@ -264,6 +264,9 @@ class Toolbox:
             raise RpcError(_error_code(verdict.code), reason)
         if verdict.guard == "side_check":
             return  # the guard already logged Scout's row
+        if verdict.guard != "person_ask":
+            # An allow nobody vouched for (not a once-allow from side_check or person_ask) refuses.
+            raise RpcError(ErrorCode.denied, f"Nobody approved {spec.name}, so it was not run.")
         record("approved")
         if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise

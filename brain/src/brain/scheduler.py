@@ -71,7 +71,6 @@ class Scheduler:
         self._last_body = last_body
         self._start = start
         self._now = now
-        self._wakes_per_hour = wakes_per_hour
         self._kinds = kinds
         self._notes = load_notes() if notes is None else notes
         self._groups: list[_Group] = []  # oldest first

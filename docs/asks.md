@@ -87,7 +87,7 @@ to you as before, with no wait.
 1. You have at least one preference you made. The built-in default does not count, so with none
    there is no model call and no cost.
 2. If the tool is `locked`, only a preference you made whose tool is that tool's name can cover
-   it; the built-in default and general preferences never do. (Claude Code asks have no such
+   it (one comes from accepting Scout's offer for that tool); the built-in default and general preferences never do. (Claude Code asks have no such
    flag: their risk is the model's judgment.)
 3. The daily budget allows it.
 4. The model, given the ask, your preferences and the recent history for that tool or folder,
