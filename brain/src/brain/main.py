@@ -19,6 +19,7 @@ from brain.experts import ExpertRun
 from brain.guardrails import Budget
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
+from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
 
@@ -56,6 +57,9 @@ async def _run() -> None:
         apps=apps,
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
+        offers=OfferSettings(
+            config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
+        ),
     )
     try:
         server = await start_server(

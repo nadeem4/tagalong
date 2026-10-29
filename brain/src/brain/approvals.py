@@ -9,10 +9,11 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from brain.memory import Memory, _utc_text
+from brain.memory import Memory, Preference, _utc_text
 from brain.protocol import ErrorCode, RpcError
 
 if TYPE_CHECKING:
+    from brain.side_check import AskFacts
     from brain.toolbox import Handler, ToolSpec
 
 SUMMARY_MAX = 200
@@ -45,6 +46,7 @@ class Approvals:
         job_id: str | None = None,
         decided_by: str = "person",
         preference_id: int | None = None,
+        preference_sentence: str | None = None,
     ) -> None:
         self._memory.add_approval(
             source=source,
@@ -57,8 +59,54 @@ class Approvals:
             decided_by=decided_by,
             preference_id=preference_id,
             at=_utc_text(self._now()),
+            preference_sentence=preference_sentence,
         )
         self._notify("changed", {"what": "approvals"})
+
+    def scout_approved(
+        self, facts: "AskFacts", pref: Preference, summary: str, job_id: str | None = None
+    ) -> None:
+        """Log an ask Scout answered under a preference and tell the person what he did."""
+        self.record(
+            source=facts.source,
+            tool=facts.tool,
+            summary=summary,
+            input=facts.input,
+            group_key=facts.group_key,
+            outcome="approved",
+            job_id=job_id,
+            decided_by="scout",
+            preference_id=pref.id,
+            preference_sentence=pref.sentence,
+        )
+        self._memory.use_preference(pref.id, _utc_text(self._now()))
+        self._notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})
+
+    # Preference writes live here so every writer (Home, the offer) notifies the same way.
+    def add_preference(
+        self, *, sentence: str, source: str | None, tool: str | None, group_key: str | None
+    ) -> Preference:
+        pref = self._memory.add_preference(
+            sentence=sentence,
+            source=source,
+            tool=tool,
+            group_key=group_key,
+            at=_utc_text(self._now()),
+        )
+        self._notify("changed", {"what": "approvals"})
+        return pref
+
+    def edit_preference(self, id: int, sentence: str) -> bool:
+        changed = self._memory.edit_preference(id, sentence)
+        if changed:
+            self._notify("changed", {"what": "approvals"})
+        return changed
+
+    def remove_preference(self, id: int) -> bool:
+        removed = self._memory.remove_preference(id)
+        if removed:
+            self._notify("changed", {"what": "approvals"})
+        return removed
 
 
 PAGE = 50
@@ -94,7 +142,6 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
         rows = memory.list_approvals(filter, PAGE + 1, before)
         more = len(rows) > PAGE
         rows = rows[:PAGE]
-        sentences = {p.id: p.sentence for p in memory.list_preferences()}
         return json.dumps(
             {
                 "approvals": [
@@ -108,7 +155,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
                         "outcome": r.outcome,
                         "decided_by": r.decided_by,
                         "preference_id": r.preference_id,
-                        "preference": sentences.get(r.preference_id),
+                        "preference": r.preference_sentence,
                         "at": r.at,
                     }
                     for r in rows
@@ -139,8 +186,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
 
     async def remove_preference(args: dict) -> str:
         pid = known_id(args)
-        memory.remove_preference(pid)
-        approvals._notify("changed", {"what": "approvals"})
+        approvals.remove_preference(pid)
         return json.dumps({"id": pid, "removed": True})
 
     async def edit_preference(args: dict) -> str:
@@ -149,8 +195,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
         sentence = sentence.strip() if isinstance(sentence, str) else ""
         if not 1 <= len(sentence) <= SENTENCE_MAX:
             raise refuse(f"A preference is 1 to {SENTENCE_MAX} characters.")
-        memory.edit_preference(pid, sentence)
-        approvals._notify("changed", {"what": "approvals"})
+        approvals.edit_preference(pid, sentence)
         return json.dumps({"id": pid, "sentence": sentence})
 
     home = frozenset({"home"})

@@ -143,3 +143,26 @@ def test_wakes_per_hour_default_and_override():
 def test_wakes_per_hour_must_be_at_least_one(value):
     with pytest.raises(ValueError, match="TAGALONG_WAKES_PER_HOUR"):
         load_config({"TAGALONG_WAKES_PER_HOUR": value})
+
+
+@pytest.mark.parametrize(
+    ("name", "attr", "default"),
+    [
+        ("TAGALONG_OFFER_MIN_APPROVALS", "offer_min_approvals", 3),
+        ("TAGALONG_OFFER_WINDOW_DAYS", "offer_window_days", 14),
+        ("TAGALONG_KEEP_ASKING_DAYS", "keep_asking_days", 7),
+    ],
+)
+def test_offer_settings_default_and_override(name, attr, default):
+    assert getattr(load_config({}), attr) == default
+    assert getattr(load_config({name: "2"}), attr) == 2
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "x"])
+@pytest.mark.parametrize(
+    "name",
+    ["TAGALONG_OFFER_MIN_APPROVALS", "TAGALONG_OFFER_WINDOW_DAYS", "TAGALONG_KEEP_ASKING_DAYS"],
+)
+def test_offer_settings_must_be_positive_integers(name, value):
+    with pytest.raises(ValueError, match=name):
+        load_config({name: value})

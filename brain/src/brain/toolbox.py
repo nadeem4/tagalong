@@ -18,7 +18,9 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
+from brain.offers import Offers
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
+from brain.side_check import AskFacts, SideCheck
 
 log = logging.getLogger("brain")
 
@@ -133,12 +135,16 @@ class Toolbox:
         save_mode: Callable[[str, str], None],
         asks: Asks | None = None,
         approvals: Approvals | None = None,
+        side_check: SideCheck | None = None,
+        offers: Offers | None = None,
     ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
         self._approvals = approvals  # None records nothing
+        self._side_check = side_check  # None: every ask goes to the person
+        self._offers = offers  # None: no offers to auto-approve
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
         if spec.self_asks:
@@ -220,6 +226,17 @@ class Toolbox:
             raise RpcError(
                 ErrorCode.denied, f"Nobody was there to ask, so {spec.name} was not run."
             )
+        if self._side_check is not None and self._approvals is not None:
+            summary = self._approvals.summarise(call.text, spec.name, call.input)
+            facts = AskFacts(source_kind, spec.name, summary, call.input, spec.name, spec.locked)
+            try:
+                pref = await self._side_check.decide(facts)
+                if pref is not None:
+                    # Allow-once only: the tool's ask mode stays as it is.
+                    self._approvals.scout_approved(facts, pref, summary)
+                    return
+            except Exception:
+                log.exception("side-check failed; asking the person")
         try:
             choice = await self._asks.permission(call, spec.name, spec.locked)
         except RpcError as exc:
@@ -232,7 +249,9 @@ class Toolbox:
             raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
         record("approved")
         if choice == "always":
-            self.set_mode(spec.name, "auto")
+            self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
+        elif self._offers is not None:
+            self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
         for source in self.sources:

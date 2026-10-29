@@ -20,6 +20,9 @@ DEFAULT_STEP_CAP = 25
 DEFAULT_EXPERT_CMD = "claude-agent-acp"
 DEFAULT_EXPERT_TIMEOUT_S = 1800.0
 DEFAULT_WAKES_PER_HOUR = 12
+DEFAULT_OFFER_MIN_APPROVALS = 3
+DEFAULT_OFFER_WINDOW_DAYS = 14
+DEFAULT_KEEP_ASKING_DAYS = 7
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,9 @@ class Config:
     expert_cmd: list[str] = field(default_factory=lambda: [DEFAULT_EXPERT_CMD])
     expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
     wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
+    offer_min_approvals: int = DEFAULT_OFFER_MIN_APPROVALS
+    offer_window_days: int = DEFAULT_OFFER_WINDOW_DAYS
+    keep_asking_days: int = DEFAULT_KEEP_ASKING_DAYS
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -69,6 +75,13 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
         expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
         wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
+        offer_min_approvals=_positive_int(
+            env, "TAGALONG_OFFER_MIN_APPROVALS", DEFAULT_OFFER_MIN_APPROVALS
+        ),
+        offer_window_days=_positive_int(
+            env, "TAGALONG_OFFER_WINDOW_DAYS", DEFAULT_OFFER_WINDOW_DAYS
+        ),
+        keep_asking_days=_positive_int(env, "TAGALONG_KEEP_ASKING_DAYS", DEFAULT_KEEP_ASKING_DAYS),
     )
 
 
@@ -117,6 +130,19 @@ def _wakes_per_hour(text: str | None) -> int:
         raise ValueError(f"bad TAGALONG_WAKES_PER_HOUR: {text!r}") from None
     if value < 1:
         raise ValueError(f"TAGALONG_WAKES_PER_HOUR must be at least 1: {text!r}")
+    return value
+
+
+def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
+    text = env.get(name)
+    if not text:
+        return default
+    try:
+        value = int(text)
+    except ValueError:
+        raise ValueError(f"bad {name}: {text!r}") from None
+    if value < 1:
+        raise ValueError(f"{name} must be at least 1: {text!r}")
     return value
 
 

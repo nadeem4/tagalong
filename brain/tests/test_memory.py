@@ -670,3 +670,37 @@ def test_migration_is_one_step_after_timers(tmp_path):
     assert v == n + 1 == len(memory.MIGRATIONS)
     assert m.default_preference() is not None
     m.close()
+
+
+def test_approval_stores_the_preference_sentence_it_was_made_under(mem):
+    mem.add_approval(
+        source="scout_tool",
+        tool="run",
+        summary="s",
+        input={},
+        job_id=None,
+        group_key="g",
+        outcome="approved",
+        decided_by="scout",
+        preference_id=7,
+        at="2026-01-01T00:00:00+00:00",
+        preference_sentence="Allow reads",
+    )
+    assert mem.list_approvals("all", 10, None)[0].preference_sentence == "Allow reads"
+    _ap(mem)
+    assert mem.list_approvals("all", 1, None)[0].preference_sentence is None
+
+
+def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.execute(
+        "INSERT INTO approvals(source, tool, summary, input, group_key, outcome, decided_by, at)"
+        " VALUES ('app','t','s','{}','g','approved','person','2026-01-01T00:00:00+00:00')"
+    )
+    db.close()
+    m = Memory(path)
+    assert m.list_approvals("all", 10, None)[0].preference_sentence is None
+    m.close()
