@@ -11,7 +11,8 @@ export type ApprovalFilter = 'all' | 'scout' | 'refused';
 interface Props {
   /** Null until the first read lands. */
   rows: readonly ApprovalRow[] | null;
-  counts: ApprovalCounts;
+  /** Null until a read succeeds. */
+  counts: ApprovalCounts | null;
   filter: ApprovalFilter;
   onFilter(filter: ApprovalFilter): void;
   hasMore: boolean;
@@ -109,6 +110,8 @@ function Row({ row }: { row: ApprovalRow }) {
 }
 
 export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMore }: Props) {
+  // Before a successful read there is nothing true to show; the page's alert speaks instead.
+  if (rows === null || counts === null) return null;
   return (
     <section aria-label="Approvals history" className="apv-section">
       <div className="home-card apv-summary" role="group" aria-label="Summary">
@@ -143,18 +146,17 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
           ))}
         </div>
       </div>
-      {rows !== null && rows.length === 0 && <p className="home-note">Nothing here yet.</p>}
-      {rows !== null &&
-        groupByDay(rows).map((group) => (
-          <div key={group.label + group.rows[0]?.id}>
-            <h3 className="home-card__label apv-day">{group.label}</h3>
-            <ul className="apv-rows">
-              {group.rows.map((row) => (
-                <Row key={row.id} row={row} />
-              ))}
-            </ul>
-          </div>
-        ))}
+      {rows.length === 0 && <p className="home-note">Nothing here yet.</p>}
+      {groupByDay(rows).map((group) => (
+        <div key={group.label + group.rows[0]?.id}>
+          <h3 className="home-card__label apv-day">{group.label}</h3>
+          <ul className="apv-rows">
+            {group.rows.map((row) => (
+              <Row key={row.id} row={row} />
+            ))}
+          </ul>
+        </div>
+      ))}
       {hasMore && (
         <button type="button" className="apv-btn apv-more" onClick={onMore}>
           Show more

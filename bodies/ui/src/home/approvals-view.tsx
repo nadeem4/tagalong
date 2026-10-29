@@ -16,7 +16,7 @@ export function ApprovalsView() {
   const [filter, setFilter] = useState<ApprovalFilter>('all');
   const [preferences, setPreferences] = useState<PreferenceRow[] | null>(null);
   const [rows, setRows] = useState<ApprovalRow[] | null>(null);
-  const [counts, setCounts] = useState<ApprovalCounts>({ total: 0, scout: 0, refused: 0 });
+  const [counts, setCounts] = useState<ApprovalCounts | null>(null);
   const [next, setNext] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   // Only the latest read may land: a slow answer for an earlier filter must not overwrite it.
@@ -90,7 +90,7 @@ export function ApprovalsView() {
           changes.
         </p>
       )}
-      <PreferencesList preferences={preferences ?? []} onRemove={remove} onEdit={edit} />
+      <PreferencesList preferences={preferences} onRemove={remove} onEdit={edit} />
       <ApprovalHistory
         rows={rows}
         counts={counts}

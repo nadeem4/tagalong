@@ -7,7 +7,8 @@ import { useState } from 'react';
 import type { PreferenceRow } from '../host-bridge';
 
 interface Props {
-  preferences: readonly PreferenceRow[];
+  /** Null until a read succeeds: then nothing is claimed, not even "none yet". */
+  preferences: readonly PreferenceRow[] | null;
   /** Reject when the brain refuses, so the card can say why. */
   onRemove(id: number): Promise<void>;
   onEdit(id: number, sentence: string): Promise<void>;
@@ -27,7 +28,7 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Stable sort: the default first, the rest in the order the brain sent.
-  const shown = [...preferences].sort((a, b) => Number(b.builtin) - Number(a.builtin));
+  const shown = [...(preferences ?? [])].sort((a, b) => Number(b.builtin) - Number(a.builtin));
 
   const start = (pref: PreferenceRow): void => {
     setEditing(pref.id);
@@ -62,7 +63,7 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
       <h2 className="home-card__label" id="apv-prefs">
         STANDING PREFERENCES
       </h2>
-      {shown.length === 0 && (
+      {preferences !== null && shown.length === 0 && (
         <p className="tg-note">
           None yet. Scout offers one after you approve the same kind of thing a few times.
         </p>

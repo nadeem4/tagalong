@@ -271,6 +271,34 @@ describe('ApprovalsView brain link', () => {
     expect(screen.getByRole('heading', { name: 'Approvals' })).toBeVisible();
   });
 
+  it('a failed preferences read shows the alert but not the empty line', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const bridge = createFakeHostBridge({ preferences: [DEFAULT_PREF] });
+    bridge.listPreferences = () => Promise.reject(new Error('brain offline'));
+    renderPage(bridge);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not read/i);
+    expect(screen.queryByText(/None yet/)).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Summary' })).toBeNull();
+  });
+
+  it('the summary strip and empty lines are hidden until the first read lands', async () => {
+    const bridge = createFakeHostBridge();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const read = bridge.listApprovals;
+    bridge.listApprovals = async (filter, before) => {
+      await gate;
+      return read?.call(bridge, filter, before) as ReturnType<NonNullable<typeof read>>;
+    };
+    renderPage(bridge);
+    expect(screen.queryByRole('group', { name: 'Summary' })).toBeNull();
+    expect(screen.queryByText(/None yet/)).toBeNull();
+    expect(screen.queryByText('Nothing here yet.')).toBeNull();
+    release();
+    expect(await screen.findByRole('group', { name: 'Summary' })).toBeVisible();
+    expect(screen.getByText(/None yet/)).toBeVisible();
+  });
+
   it('renders nothing when the bridge has no listApprovals', () => {
     const bridge = createFakeHostBridge();
     delete (bridge as { listApprovals?: unknown }).listApprovals;
