@@ -123,6 +123,7 @@ class Session:
             side_check=side_check,
             offers=offer,
             guards=self.guards,
+            on_away=self._on_job_away,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -204,6 +205,11 @@ class Session:
             Event("job_ended", {"report": job_note(job)}, key=job.id),
             on_start=lambda: self._memory.mark_reported(job.id),
         )
+
+    def _on_job_away(self, job_id: str, what: str) -> None:
+        # No body was online to ask, so hold the news until one connects (no question id: nothing
+        # is waiting on Scout). One held item per job.
+        self.scheduler.emit(Event("job_question", {"job": job_id, "message": what}, key=job_id))
 
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()

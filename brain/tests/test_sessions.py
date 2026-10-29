@@ -12,7 +12,7 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.events import EventKind
-from brain.experts import Question, QuestionField
+from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
@@ -988,3 +988,92 @@ async def test_session_shares_one_guards_with_scheduler_and_loop():
     await settle()
     brain_started = [p for m, p in sent if m == "turn" and p.get("started_by") == "brain"]
     assert brain_started == [] and session.scheduler.next_due() is None
+
+
+# --- the person hears what an expert did while they were away (G3) ---
+
+AWAY_KINDS = {
+    "job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10),
+    "job_question": EventKind("job_question", batch_seconds=None, max_per_hour=None),
+}
+
+
+def told(model):
+    return [m[-1]["content"][-1]["text"] for m in model.seen]
+
+
+async def test_finished_job_is_told_when_the_person_returns():
+    model = Gate(["ok"])
+    memory = Memory(":memory:")
+    session, _ = make(model, memory)
+    session.jobs._on_finished(end_job(memory, state="error", result="stalled"))
+    await settle()
+    assert model.seen == []  # nobody online: held, not lost
+    join(session, "desktop")
+    await idle(session)
+    assert len(model.seen) == 1
+    assert "Job j1 ended" in told(model)[0] and "State: error" in told(model)[0]
+
+
+async def test_job_ended_while_the_brain_was_down_is_told_on_start():
+    memory = Memory(":memory:")
+    end_job(memory)  # ended, never told
+    memory.add_job("j2", "claude_code", "still going", "C:/x", "default")  # killed by the restart
+    model = Gate(["ok"])
+    session, _ = make(model, memory)
+    await settle()
+    assert model.seen == []
+    join(session, "desktop")
+    await idle(session)
+    text = told(model)[0]
+    assert "Job j1 ended" in text and "Job j2 ended" in text and "brain restarted" in text
+
+
+async def test_question_while_nobody_is_online_is_told_when_someone_returns():
+    memory = Memory(":memory:")
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=AWAY_KINDS)
+    memory.add_job("j1", "claude_code", "fix the build", "C:/x", "default")
+    question = Question("Which database?", [QuestionField("db", "Database", ["pg", "sqlite"])])
+    assert await session.jobs._question("j1", question) is None
+    await settle()
+    assert model.seen == []
+    join(session, "desktop")
+    await idle(session)
+    text = told(model)[0]
+    assert "Event: job_question" in text and "Which database?" in text and "j1" in text
+
+
+async def test_permission_while_nobody_is_online_is_told_when_someone_returns():
+    memory = Memory(":memory:")
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=AWAY_KINDS)
+    # added after the Session starts, which stops rows left running by a dead brain
+    memory.add_job("j1", "claude_code", "fix the build", "C:/x", "default")
+    request = PermissionRequest(
+        "Run rm -rf build", "execute", {}, [PermissionOption("a", "Allow once", "allow_once")]
+    )
+    assert await session.jobs._permission("j1", request) is None
+    await settle()
+    assert model.seen == []
+    join(session, "desktop")
+    await idle(session)
+    text = told(model)[0]
+    assert "Event: job_question" in text and "Run rm -rf build" in text and "j1" in text
+
+
+async def test_news_is_told_once_not_twice():
+    memory = Memory(":memory:")
+    model = Gate(["ok", "never"])
+    session, _ = make(model, memory)
+    session.jobs._on_finished(end_job(memory))
+    join(session, "desktop")
+    await idle(session)
+    join(session, "extension")  # a second body connecting does not repeat it
+    await idle(session)
+    assert len(model.seen) == 1
+    again, _ = make(Gate(["never"]), memory)  # nor does a restart
+    assert not memory.unreported_jobs()
+    join(again, "desktop")
+    await idle(again)
+    assert again._model.seen == []
