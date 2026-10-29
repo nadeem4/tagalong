@@ -14,6 +14,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
 - [Scout's timers (real brain)](#scouts-timers-real-brain)
+- [Scout notices you (real brain, desktop)](#scout-notices-you-real-brain-desktop)
 - [Connected apps on the Python brain (real brain, a real stdio app)](#connected-apps-on-the-python-brain-real-brain-a-real-stdio-app)
 - [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
@@ -474,6 +475,27 @@ expect a word right when one is due.
 4. **Action:** ask Scout to repeat something every 1 minute.
    **Expected:** Scout says in plain words that a repeat must be at least 5 minutes, and sets no
    such timer.
+
+## Scout notices you (real brain, desktop)
+
+Needs the real brain running and the desktop connected. Scout decides every time whether to speak,
+so staying silent is a pass. Each kind wakes Scout at most twice an hour.
+
+1. **Action:** leave the desk for 6 minutes (no keyboard or mouse), then come back.
+   **Expected:** Scout may say something or stay silent. If it speaks, it appears once as a short
+   remark, with no thinking state or bubble beforehand.
+2. **Action:** quit the desktop, wait 11 minutes with the brain still running, then reopen it.
+   **Expected:** Scout may greet you once or stay silent. Quitting for only 2 minutes and reopening
+   never makes Scout speak because of the return.
+3. **Action:** switch between windows quickly for a minute, then ask "what am I looking at?".
+   **Expected:** nothing is said while you switch; the answer names the app that is in front.
+4. **Action:** add an app to the exclusions, put it in front for a while, then ask Scout which app
+   you are in.
+   **Expected:** the excluded app never appears in what Scout knows or says.
+5. **Action:** pause sight, switch windows, then ask what you are looking at.
+   **Expected:** Scout does not know the new window.
+6. **Action:** watch the pet and bubble during any wake that ends with Scout saying nothing.
+   **Expected:** no thinking state, no bubble and no error appears.
 
 ## Connected apps on the Python brain (real brain, a real stdio app)
 

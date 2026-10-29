@@ -20,6 +20,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
 | `src/main/brain/start.ts`                              | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
 | `src/main/brain/body-tools.ts`                         | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
+| `src/main/brain/body-events.ts`                        | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
 | `src/main/hotkeys.ts`                                  | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
 | `src/main/talk-key.ts`                                 | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`                | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
@@ -103,6 +104,15 @@ running.
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
   `desktop__open_url`, and it always asks first (`confirm`: Always allow cannot turn the ask off).
 
+- **Body events.** `brain/body-events.ts` sends two facts with `event`; the brain decides whether
+  they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
+  returns after being away at least 5 minutes (`AWAY_AFTER_MS`, a screen lock counts), with whole
+  seconds; the sight pause does not stop it, since it carries no screen data. `focus {app, title}`
+  is read every 5 s (`FOCUS_POLL_MS`) and sent only when the front window changes. A blocked or
+  excluded window is never sent, and nothing is read or sent while sight is paused.
+- **Brain-started turns.** A `turn` with `started_by: "brain"` (a wake) shows no thinking state, no
+  bubble and no tool rows. If it ends `done` with words, they appear once as a pet remark. A silent,
+  failed, cancelled or over-budget wake shows nothing.
 - **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
   running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
   brain.") when the contract versions differ. Coming online clears either; "connecting" changes
