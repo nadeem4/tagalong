@@ -90,10 +90,10 @@ def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["ask", "auto"]
     """The mode a tool runs in; Home's permission list uses this too, so both always agree."""
     if spec.self_asks:
         return "auto"
-    if spec.locked:
-        return "ask"
     if stored in ("ask", "auto"):
-        return stored
+        return stored  # for a locked tool too: the Home switch is its explicit unlock
+    if spec.locked:
+        return "ask"  # default_mode and effect never open a locked tool
     if spec.default_mode is not None:
         return spec.default_mode
     return "auto" if spec.effect == "read" else "ask"

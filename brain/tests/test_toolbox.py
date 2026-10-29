@@ -232,7 +232,8 @@ def test_mode_defaults():
     assert Toolbox([], stored).mode(mode_spec(effect="read")) == "ask"
     stored = {"a": "auto"}
     assert Toolbox([], stored).mode(mode_spec(effect="change", default_mode="ask")) == "auto"
-    assert Toolbox([], stored).mode(mode_spec(locked=True)) == "ask"
+    assert Toolbox([], {}).mode(mode_spec(locked=True, default_mode="auto")) == "ask"
+    assert Toolbox([], {}).mode(mode_spec(locked=True, effect="read")) == "ask"
 
 
 def test_body_tool_without_effect_asks():
@@ -262,7 +263,7 @@ def test_body_tool_confirm_true_is_locked():
     )
     (s,) = BodySource(bodies).specs()
     assert s.locked
-    assert Toolbox([BodySource(bodies)], {"desktop__rm": "auto"}).mode(s) == "ask"
+    assert Toolbox([BodySource(bodies)], {}).mode(s) == "ask"
 
 
 def test_set_mode_saves_and_changes_mode():
@@ -273,15 +274,13 @@ def test_set_mode_saves_and_changes_mode():
     assert box.mode(box.sources[0].specs()[0]) == "auto"
 
 
-def test_set_mode_refuses_auto_on_locked():
+def test_set_mode_auto_on_locked_tool_is_saved():
     locked = ToolSpec("a", "d", {"type": "object"}, locked=True)
     stored = {}
     box = Toolbox([FakeSource([locked])], stored)
-    with pytest.raises(RpcError) as e:
-        box.set_mode("a", "auto")
-    assert e.value.code == ErrorCode.invalid_params
-    assert stored == {}
-    box.set_mode("a", "ask")  # tightening a locked tool is fine
+    box.set_mode("a", "auto")
+    assert stored == {"a": "auto"}
+    assert box.mode(locked) == "auto"
 
 
 def test_self_asking_tool_is_auto_even_when_locked_or_stored_ask():
@@ -415,6 +414,43 @@ async def test_locked_tool_never_saves_auto_and_cannot_be_answered_always():
     box._asks.answer(ask["id"], "allow", "desktop")
     assert await task == "ran t"
     assert stored == {}
+
+
+async def test_locked_tool_asks_by_default():
+    box, source, bodies, _ = gated(locked=True)
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    assert source.ran == []
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+
+
+async def test_locked_tool_runs_without_ask_after_set_mode_auto():
+    box, source, bodies, _ = gated(locked=True)
+    box.set_mode("t", "auto")
+    assert await box.run(call("t")) == "ran t"
+    assert bodies.sent == []
+
+
+async def test_locked_tool_asks_again_after_set_mode_ask():
+    box, source, bodies, _ = gated(locked=True)
+    box.set_mode("t", "auto")
+    box.set_mode("t", "ask")
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    assert source.ran == []
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+
+
+async def test_always_button_stays_hidden_for_locked():
+    box, _, bodies, _ = gated(locked=True)
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    assert opened_asks(bodies)[0]["options"] == ["allow", "deny"]
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
 
 
 async def test_self_asking_tool_opens_no_gate_ask():
@@ -555,9 +591,8 @@ def test_app_tool_default_modes_and_locked():
     assert box.mode(by_name["lin__get"]) == "auto"
     assert box.mode(by_name["lin__update"]) == "ask"
     assert box.mode(by_name["lin__delete_issue"]) == "ask"
-    with pytest.raises(RpcError) as e:
-        box.set_mode("lin__delete_issue", "auto")
-    assert e.value.code == ErrorCode.invalid_params
+    box.set_mode("lin__delete_issue", "auto")  # the Home switch unlocks it
+    assert box.mode(by_name["lin__delete_issue"]) == "auto"
     box.set_mode("lin__get", "ask")  # modes reuse the permissions store, no new storage
 
 
@@ -945,3 +980,15 @@ async def test_chain_error_in_an_ask_guard_refuses_the_tool():
     assert err.value.code == ErrorCode.denied
     assert "secret" not in err.value.message
     assert source.ran == []
+
+
+async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_the_person(mem):
+    preference(mem)
+    mem.remove_preference(mem.default_preference().id)
+    check = SideCheck(_ApprovingModel(mem.list_preferences()[0].id), _OpenBudget(), mem)
+    box, source, bodies, _, _ = scouted(mem, check, locked=True)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    assert source.ran == []  # the general preference did not approve it
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"

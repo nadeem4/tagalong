@@ -459,12 +459,13 @@ async def test_set_permission_changes_mode_and_sends_changed_permissions(home):
     assert {t["name"]: t["mode"] for t in tools}["desktop__see_screen"] == "ask"
 
 
-async def test_set_permission_locked_to_auto_is_invalid_params(home):
+async def test_set_permission_locked_to_auto_is_saved(home):
     declare(home.bodies, "desktop", ("type_text", "change", True))
-    with pytest.raises(RpcError) as err:
+    out = json.loads(
         await home.run("set_permission", {"tool": "desktop__type_text", "mode": "auto"})
-    assert err.value.code == ErrorCode.invalid_params
-    assert home.sent == []
+    )
+    assert out == {"tool": "desktop__type_text", "mode": "auto"}
+    assert home.sent == [("changed", {"what": "permissions"})]
 
 
 async def test_set_permission_unknown_tool_sends_nothing(home):

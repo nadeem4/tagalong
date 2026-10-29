@@ -107,7 +107,19 @@ async def test_builtin_default_cannot_be_approved_under(mem):
     assert await check(mem, Model(approve(other.id))).decide(facts()) == other
 
 
-async def test_locked_tool_with_default_present_skips_the_model(mem):
+def named(mem, tool="Read", sentence="Fine to read files in the repo"):
+    return mem.add_preference(sentence=sentence, source=None, tool=tool, group_key=None, at=AT)
+
+
+async def test_side_check_locked_without_a_naming_preference_makes_no_model_call(mem):
+    p = pref(mem)  # general: names no tool
+    mem.remove_preference(mem.default_preference().id)
+    model = Model(approve(p.id))
+    assert await check(mem, model).decide(facts(locked=True)) is None
+    assert model.calls == 0
+
+
+async def test_side_check_locked_with_general_preference_and_default_present_is_none(mem):
     p = pref(mem)
     assert mem.default_preference() is not None
     model = Model(approve(p.id))
@@ -115,10 +127,26 @@ async def test_locked_tool_with_default_present_skips_the_model(mem):
     assert model.calls == 0
 
 
-async def test_locked_tool_after_default_removed_may_be_approved(mem):
-    p = pref(mem)
-    mem.remove_preference(mem.default_preference().id)
+async def test_side_check_locked_approves_under_a_preference_naming_the_tool(mem):
+    p = named(mem, tool="Read")
     assert await check(mem, Model(approve(p.id))).decide(facts(locked=True)) == p
+
+
+async def test_side_check_locked_candidates_exclude_other_tools_preferences(mem):
+    mine = named(mem, tool="Read")
+    other = named(mem, tool="Write", sentence="Fine to write files")
+    general = pref(mem, "Anything in the repo is fine")
+    model = Model(approve(mine.id))
+    await check(mem, model).decide(facts(locked=True))
+    text = str(model.seen[0][1])
+    assert mine.sentence in text
+    assert other.sentence not in text and general.sentence not in text
+    assert await check(mem, Model(approve(other.id))).decide(facts(locked=True)) is None
+
+
+async def test_side_check_locked_unknown_preference_id_is_none(mem):
+    named(mem, tool="Read")
+    assert await check(mem, Model(approve(999))).decide(facts(locked=True)) is None
 
 
 async def test_preference_removed_while_thinking_is_a_pass(mem):

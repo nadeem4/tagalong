@@ -45,7 +45,7 @@ class ToolSpec:
     audience: frozenset[str] = frozenset({"scout"})  # the design's `for`; a Python keyword
     effect: Literal["read", "change"] = "change"  # unknown effect is treated as a change
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
-    locked: bool = False  # always asks; the person cannot turn this to auto
+    locked: bool = False  # asks until the person sets it to auto; no "Always" button
     self_asks: bool = False  # runs its own ask with the user, so the gate adds none
 
 
@@ -181,8 +181,6 @@ class Toolbox:
             raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
         if spec.self_asks:
             raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
-        if spec.locked and mode == "auto":
-            raise RpcError(ErrorCode.invalid_params, f"{name} always asks first.")
         self._save_mode(name, mode)
 
     def known_specs(self) -> list[ToolSpec]:
