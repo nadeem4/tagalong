@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
-from typing import Literal
+from typing import Any, Literal
 
 from brain.app_tools import AppSource, app_home_tools
 from brain.approvals import Approvals, approval_home_tools
@@ -308,11 +308,25 @@ class Session:
         )
         self.scheduler.turn_ended(turn_id)  # after ended, so the next turn's started comes second
 
+    def _masked(self, message: dict[str, Any]) -> dict[str, Any]:
+        """The copy saved to disk. A thinking block that masking would change is dropped: its
+        signature covers the original text, so a rewritten block could never be replayed."""
+        content = message["content"]
+        if message["role"] == "assistant" and isinstance(content, list):
+            content = [b for b in content if not self._thinking_changes(b)]
+            message = {**message, "content": content}
+        return mask_json(self.guards, "chat", message)
+
+    def _thinking_changes(self, block: Any) -> bool:
+        if not isinstance(block, dict) or block.get("type") != "thinking":
+            return False
+        return mask_json(self.guards, "chat", block.get("thinking", "")) != block.get("thinking")
+
     def _persist(self) -> None:
         # Saving is best effort: a full disk must not stop the ended notification.
         try:
             # A masked copy goes to disk; self.history keeps the real values for the live turn.
-            new = mask_json(self.guards, "chat", self.history[self._saved :])
+            new = [self._masked(m) for m in self.history[self._saved :]]
             self._memory.save_messages(new)
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
             for message in new:

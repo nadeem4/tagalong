@@ -705,3 +705,28 @@ def test_migration_is_idempotent(tmp_path):
     assert apps.migrate_secrets() == 0
     assert mem.list_apps() == before
     mem.close()
+
+
+def test_migration_survives_a_failing_row_and_logs_only_the_app(tmp_path, caplog):
+    from brain.memory import Memory
+
+    mem = Memory(tmp_path / "m.db")
+    mem.add_app(stdio_row(env={"K": "super-secret-value"}))
+    mem.add_app(
+        AppRow("web", "web", "http", {"url": "https://h.example/m?api_key=SECRET9"}, "none", False)
+    )
+    tokens = TokenFile(tmp_path)
+    real_set = tokens.set
+
+    def flaky(key, value):
+        if key.startswith("fake"):
+            raise OSError("disk full")
+        real_set(key, value)
+
+    tokens.set = flaky
+    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
+    with caplog.at_level("ERROR", logger="brain"):
+        assert apps.migrate_secrets() == 1
+    assert "fake" in caplog.text
+    assert "super-secret-value" not in caplog.text and "SECRET9" not in caplog.text
+    mem.close()

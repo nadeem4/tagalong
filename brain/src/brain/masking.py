@@ -13,17 +13,21 @@ from brain.guards import ALLOW, Guard, Guards, Hook, SaveCtx, Verdict, rewrite
 
 _MIN_LEN = 8  # shorter values would mask ordinary words
 WITHHELD = "[withheld]"
+# Values of these keys are structure (roles, ids, block types), not content: masking or
+# withholding them would leave a saved chat that no longer rebuilds into valid history.
+_STRUCTURAL = frozenset({"role", "type", "id", "tool_use_id", "name", "signature"})
 
 _SHAPES = [
     (re.compile(r"sk-ant-[A-Za-z0-9_-]{20,}"), "[secret]"),
-    (re.compile(r"(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}"), r"\1[secret]"),
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9._~+/=-]{16,}", re.IGNORECASE), r"\1[secret]"),
     (re.compile(r"gh[pousr]_[A-Za-z0-9]{36,}"), "[secret]"),
     (re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}"), "[secret]"),
     (re.compile(r"AKIA[0-9A-Z]{16}"), "[secret]"),
     (
         re.compile(
             r"""([?&](?:token|access_token|api_key|apikey|key|secret|password|sig|signature)=)"""
-            r"""[^&\s"']+"""
+            r"""[^&\s"']+""",
+            re.IGNORECASE,
         ),
         r"\1[secret]",
     ),
@@ -78,14 +82,20 @@ def mask_secrets(masker: Masker) -> Guard:
 
 
 def mask_json(guards: Guards, what: str, obj: Any) -> Any:
-    """A masked copy of dicts, lists and strings; a blocked string becomes `[withheld]`."""
+    """A masked copy of dicts, lists and strings; a blocked string becomes `[withheld]`.
+
+    String values of structural keys (role, type, id, ...) are left as they are.
+    """
     if isinstance(obj, str):
         v = guards.run_sync(Hook.save, SaveCtx(what, obj))  # type: ignore[arg-type]
         if v.kind == "rewrite":
             return v.value
         return WITHHELD if v.kind in ("block", "stop") else obj
     if isinstance(obj, dict):
-        return {k: mask_json(guards, what, v) for k, v in obj.items()}
+        return {
+            k: v if k in _STRUCTURAL and isinstance(v, str) else mask_json(guards, what, v)
+            for k, v in obj.items()
+        }
     if isinstance(obj, list):
         return [mask_json(guards, what, v) for v in obj]
     return obj

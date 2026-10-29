@@ -383,6 +383,79 @@ async def test_saved_chat_has_secret_masked_but_history_keeps_it(tmp_path):
     assert SECRET in json.dumps(session.history)
 
 
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "sk-ant-" + "a1B2" * 6,
+        "Bearer " + "A1b2C3d4E5f6G7h8i9",
+        "https://x.example/y?token=abc12345xyz",
+    ],
+)
+async def test_saved_chat_masks_key_shapes(tmp_path, shape):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory, masker=Masker(lambda: []))
+    session.say("desktop", say(f"here: {shape} end"))
+    await finish_quietly(session)
+    saved = json.dumps(memory.load_messages())
+    assert "[secret]" in saved
+    assert shape.split()[-1].split("=")[-1] not in saved
+
+
+def thinking_turn(thought):
+    blocks = [
+        {"type": "thinking", "thinking": thought, "signature": "sig-abc"},
+        {"type": "redacted_thinking", "data": "opaque"},
+        {"type": "text", "text": f"I will use {SECRET}"},
+    ]
+    return Final(blocks, "end_turn", SimpleNamespace())
+
+
+async def test_thinking_block_with_a_secret_is_dropped_from_the_saved_copy(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn(f"the key is {SECRET}")]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    types = [b["type"] for b in saved[-1]["content"]]
+    assert types == ["redacted_thinking", "text"]
+    assert saved[-1]["content"][1]["text"] == "I will use [secret]"
+    assert SECRET not in json.dumps(saved)
+    assert saved[-1]["content"][0] == {"type": "redacted_thinking", "data": "opaque"}
+    assert [b["type"] for b in session.history[-1]["content"]][0] == "thinking"
+    assert SECRET in json.dumps(session.history)
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert resumed.history[-1]["role"] == "assistant"
+
+
+async def test_clean_thinking_block_is_saved_unchanged(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn("plain thought")]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    first = memory.load_messages()[-1]["content"][0]
+    assert first == {"type": "thinking", "thinking": "plain thought", "signature": "sig-abc"}
+
+
+async def test_saved_chat_stays_valid_after_a_masker_failure(tmp_path):
+    def broken():
+        raise RuntimeError("no values")
+
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([secret_tool_call(), "ok"]), memory, masker=Masker(broken))
+    with_secret_tool(session, [])
+    session.say("desktop", say("look it up"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert [m["role"] for m in saved] == ["user", "assistant", "user", "assistant"]
+    use = saved[1]["content"][0]
+    assert (use["type"], use["id"], use["name"]) == ("tool_use", "t1", "recall")
+    result = saved[2]["content"][0]
+    assert (result["type"], result["tool_use_id"]) == ("tool_result", "t1")
+    assert result["content"] == "[withheld]"
+    resumed, _ = make(Gate(["ok"]), memory, masker=Masker(broken))
+    assert resumed.history[1]["content"][0]["id"] == "t1"
+
+
 async def test_saved_chat_masks_tool_use_input_and_tool_result_text(tmp_path):
     memory = file_memory(tmp_path)
     session, _ = make(Gate([secret_tool_call(), "ok"]), memory, masker=secret_masker())

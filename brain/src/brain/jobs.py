@@ -305,7 +305,7 @@ class Jobs:
         return content
 
     async def _progress(self, job_id: str, text: str) -> None:
-        self._memory.update_job(job_id, progress=text)
+        self._memory.update_job(job_id, progress=mask_json(self._guards, "job_progress", text))
         now = self._clock()
         if now - self._progress_sent.get(job_id, -PROGRESS_NOTIFY_S) >= PROGRESS_NOTIFY_S:
             self._progress_sent[job_id] = now

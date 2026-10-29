@@ -96,6 +96,31 @@ def test_save_guard_raising_withholds():
     assert mask_json(_guards(boom), "chat", {"a": "text"}) == {"a": "[withheld]"}
 
 
+def test_withheld_keeps_structural_values_intact():
+    def boom():
+        raise RuntimeError("no")
+
+    block = {"type": "tool_use", "id": "t1", "name": "n", "input": {"q": "x"}}
+    msg = {"role": "assistant", "content": [block, {"type": "text", "text": "hi"}]}
+    out = mask_json(_guards(boom), "chat", msg)
+    assert out["role"] == "assistant"
+    assert out["content"][0]["type"] == "tool_use"
+    assert (out["content"][0]["id"], out["content"][0]["name"]) == ("t1", "n")
+    assert out["content"][0]["input"] == {"q": "[withheld]"}
+    assert out["content"][1] == {"type": "text", "text": "[withheld]"}
+
+
+def test_structural_keys_are_never_masked():
+    out = mask_json(_guards(), "chat", {"tool_use_id": "12345678", "signature": "12345678"})
+    assert out == {"tool_use_id": "12345678", "signature": "12345678"}
+
+
+def test_bearer_and_url_param_are_case_insensitive():
+    m = Masker(lambda: [])
+    assert m.mask("bearer " + "A1b2C3d4E5f6G7h8i9") == "bearer [secret]"
+    assert m.mask("https://x/y?Token=abc12345") == "https://x/y?Token=[secret]"
+
+
 def test_values_are_read_fresh_each_time():
     vals = []
     m = Masker(lambda: vals)

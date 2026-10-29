@@ -400,8 +400,31 @@ async def test_job_result_is_masked_in_the_row_and_reported_note(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    assert rig.memory.get_job(job_id).result == "key is [secret]"
+    job = rig.memory.get_job(job_id)
+    assert job.result == "key is [secret]"
+    assert "fake-token-12345678" not in (job.progress or "")
     assert "fake-token-12345678" not in job_note(rig.finished[0])
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "sk-ant-" + "a1B2" * 6,
+        "Bearer " + "A1b2C3d4E5f6G7h8i9",
+        "https://x.example/y?token=abc12345xyz",
+    ],
+)
+async def test_job_result_masks_key_shapes(make_rig, shape):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: [])))
+    steps = [{"text": f"saw {shape} there"}, {"end": "end_turn"}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    job = rig.memory.get_job(job_id)
+    secret_part = shape.split()[-1].split("=")[-1]
+    assert "[secret]" in job.result
+    assert secret_part not in job.result and secret_part not in (job.progress or "")
 
 
 async def test_a_crashed_run_ends_as_error(make_rig):

@@ -69,6 +69,22 @@ def test_record_masks_summary_and_input(mem):
     assert row.input == {"url": "https://x/y?token=[secret]", "h": "Bearer [secret]"}
 
 
+def test_record_masks_an_api_key_value(mem):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: [])))
+    key = "sk-ant-" + "a1B2" * 6
+    Approvals(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
+        source="scout_tool",
+        tool="t",
+        summary=f"uses {key}",
+        input={"k": key},
+        group_key="t",
+        outcome="approved",
+    )
+    [row] = mem.list_approvals("all", 10, None)
+    assert row.summary == "uses [secret]" and row.input == {"k": "[secret]"}
+
+
 # --- Home tools ---------------------------------------------------------------------------
 
 import json  # noqa: E402

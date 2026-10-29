@@ -323,12 +323,16 @@ class Apps:
             return 0
         count = 0
         for row in self._memory.list_apps():
-            clean, secrets = split_secrets(row.id, row.config, row.transport)
-            if not secrets:
+            try:
+                clean, secrets = split_secrets(row.id, row.config, row.transport)
+                if not secrets:
+                    continue
+                for key, value in secrets.items():  # file first: a crash between keeps the secret
+                    self._tokens.set(key, value)
+                self._memory.update_app_config(row.id, clean)
+            except Exception as e:  # boot goes on; name only the app, never the config
+                log.error("could not move the secrets of app %s (%s)", row.id, type(e).__name__)
                 continue
-            for key, value in secrets.items():  # file first: a crash between keeps the secret
-                self._tokens.set(key, value)
-            self._memory.update_app_config(row.id, clean)
             count += 1
         return count
 
