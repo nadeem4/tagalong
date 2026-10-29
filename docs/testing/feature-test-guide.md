@@ -1649,7 +1649,7 @@ database with `sqlite3` or DB Browser for SQLite.
 - [ ] **Remove** an app with secrets: no `<app id>` or `<app id>:...` key is left in
       `app-tokens.json`.
 - [ ] In the chat, paste `my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz` and
-      `Authorization: Bearer abcdefghijklmnop1234`. Scout still sees them in that turn. In the
+      an `Authorization: Bearer` header followed by any 16+ letters. Scout still sees them in that turn. In the
       saved chat (`messages` table), both read `[secret]`. Restart the brain: the restored history
       shows `[secret]`.
 - [ ] Search the brain's log output for the same strings: they read `[secret]`.
