@@ -40,23 +40,76 @@ flowchart TD
 Every ask that reaches an end is logged in `tagalong.db` by `Approvals`
 (`brain/src/brain/approvals.py`). The log is never pruned. Each new row sends `changed {what: "approvals"}` to every body.
 
-| Table         | Holds                                                                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `approvals`   | One row per ask: `source`, `tool`, `summary` (at most 200 characters), `input`, `job_id`, `group_key`, `outcome`, `decided_by`, `preference_id`, `at` |
-| `preferences` | Plain sentences. "Always ask me before risky actions" is seeded once as the built-in default; it can be edited or removed, and stays removed          |
-| `offers`      | Reserved for LA2 (Scout asking whether to handle a kind of ask for you); nothing writes it yet                                                        |
+| Table         | Holds                                                                                                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `approvals`   | One row per ask: `source`, `tool`, `summary` (at most 200 characters), `input`, `job_id`, `group_key`, `outcome`, `decided_by`, `preference_id`, `preference_sentence`, `at` |
+| `preferences` | Plain sentences. "Always ask me before risky actions" is seeded once as the built-in default; it can be edited or removed, and stays removed                                 |
+| `offers`      | One row each time Scout looked at a group of asks: when, and the result (`none` for no offer, `yes`, `keep_asking` or `no_answer`)                                           |
 
 - **outcome** is `approved`, `refused`, `timed_out` or `no_one`. **decided_by** is `person`,
-  `scout` or `none` (a timeout or nobody online). Only `person` is written today; `scout` comes
-  with LA2.
+  `scout` or `none` (a timeout or nobody online). A Scout row also holds the preference id and
+  `preference_sentence`, the words as they were when Scout approved. Editing or removing the
+  preference later does not change old rows.
 - **Where it is recorded.** `Toolbox._ask` logs Scout's tools (`source` `scout_tool`), body tools
   (`scout_tool`) and connected-app tools (`app`); `group_key` is the tool name. `Always` counts as
   `approved`. `Jobs._permission` logs Claude Code's permission asks (`claude_code`): `tool` is
   `claude_code:<title>` and `group_key` is `claude_code:<job folder>`.
-- **Not recorded.** A cancelled ask, and tools in `auto` mode, which never ask.
+- **Not recorded.** A cancelled ask, tools in `auto` mode, which never ask, and a side-check
+  that passed (the ask simply went to you, and its row is yours).
+- **No timeout for Claude Code.** A Claude Code permission ask waits until you answer or the job
+  ends, so a Claude Code row is never `timed_out`.
 - **Home calls** (audience `home`, never offered to the model): `list_approvals`,
   `list_preferences`, `remove_preference`, `edit_preference`. See
   [brain.md](brain.md#home-tools).
+
+### Scout approves under your preferences
+
+Code decides when Scout looks; the model decides whether a preference covers the ask. There is no
+rules engine, allowlist or command matching in code. Code is
+`brain/src/brain/side_check.py` (`SideCheck`), called from `Toolbox._ask` (tools) and
+`Jobs._permission` (Claude Code), wording in `brain/src/brain/mind/approvals.md` (`## decide`).
+
+Before an ask reaches you, `SideCheck.decide` runs these checks in order. Any "no" sends the ask
+to you as before, with no wait.
+
+1. You have at least one preference you made. The built-in default does not count, so with none
+   there is no model call and no cost.
+2. The tool is not `locked` while the default preference exists. A locked tool always asks you.
+   (Claude Code asks have no such flag: their risk is the model's judgment.)
+3. The daily budget allows it.
+4. The model, given the ask, your preferences and the recent history for that tool or folder,
+   either approves under one preference id or passes. It has 20 seconds; an error, a timeout or
+   an unknown or built-in id is a pass. The preference is read again after the answer, so one
+   removed meanwhile is a pass.
+
+Scout never refuses; only you do. When it approves, it approves once: for tools the ask mode stays
+as it is, and for Claude Code it picks the `allow_once` option, never `allow_always`. The row is
+saved with `decided_by: "scout"` and the preference, the preference's use count goes up, and the
+`approved` notification `{tool, text, preference}` goes to every body so you see what Scout did and
+why. The model's spend counts toward the daily budget.
+
+### Scout offers a preference
+
+After each approval you gave by hand, `Offers.consider` (`brain/src/brain/offers.py`, wording in
+`## offer` of `mind/approvals.md`) may look at that kind of ask. A group is the job folder for
+Claude Code, and the tool name for everything else. Cheap checks first; any "no" ends it quietly:
+
+- someone is online, and the group has no preference yet;
+- no look at this group in the last day, and none within `TAGALONG_KEEP_ASKING_DAYS` of a "Keep
+  asking";
+- you approved this group at least `TAGALONG_OFFER_MIN_APPROVALS` times in the last
+  `TAGALONG_OFFER_WINDOW_DAYS` days, and the budget allows a look.
+
+Then the model either offers one plain sentence naming the kind of action, or makes no offer (it
+should not offer when the approvals differ in risk, or could delete, send, spend or publish). The
+offer is an ask with exactly two options, **Yes, auto-approve** and **Keep asking**, and waits up
+to 10 minutes. A preference is saved only on **Yes**; a timeout, a cancel or **Keep asking** saves
+nothing. **Keep asking** also stops new offers for that group for the keep-asking days. The look
+runs in the background and never delays the ask that caused it; one group has at most one look
+or offer in flight.
+
+You can edit or remove any preference later with the Home calls; removing one means the next
+matching ask reaches you.
 
 ## Where it lives (old brain)
 

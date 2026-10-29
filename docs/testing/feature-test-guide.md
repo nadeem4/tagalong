@@ -13,6 +13,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Approvals history (real brain)](#approvals-history-real-brain)
+- [Learned approvals (real brain, real Claude Code)](#learned-approvals-real-brain-real-claude-code)
 - [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
 - [Scout's timers (real brain)](#scouts-timers-real-brain)
 - [Scout notices you (real brain, desktop)](#scout-notices-you-real-brain-desktop)
@@ -482,6 +483,47 @@ that sends `hello`, then `call {tool: "list_approvals", input: {}}`).
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
    stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is
    `invalid_params`.
+7. **Note:** a Claude Code permission ask has no timeout, so a Claude Code row is never
+   `timed_out`; leaving one unanswered leaves it open until the job ends.
+
+## Learned approvals (real brain, real Claude Code)
+
+Needs the real brain, the desktop, the hand-off setup above and a fresh data folder with an
+`ANTHROPIC_API_KEY`. Hand-offs run in Manual mode so Claude Code asks for permission. Read the
+history and preferences with `call` as in the section above.
+
+1. **Action:** hand off a task in one folder that runs a git command (for example `git status`).
+   Allow once. Do this for three different git commands in that folder (same folder, three
+   asks).
+   **Expected:** after the third **Allow once**, an ask appears with two buttons, **Yes,
+   auto-approve** and **Keep asking**, worded as a preference (for example "Allow read-only git
+   commands in this folder"). Nothing is saved yet: `list_preferences` still shows only the
+   default.
+2. **Action:** press **Yes, auto-approve**, then hand off another task in the same folder that
+   runs a fourth read-only git command.
+   **Expected:** no permission ask. The command runs, the brain sends an `approved` notification
+   naming the preference (a websocket client sees it; the bubble does not show it yet), and
+   `list_approvals` has a new row with `decided_by: "scout"`, the
+   preference id and the preference sentence. The Claude Code option used was Allow once, never
+   Always.
+3. **Action:** `edit_preference` that preference to a different sentence, then check the older
+   Scout row.
+   **Expected:** the old row still shows the sentence as it was when Scout approved.
+4. **Action:** `remove_preference` for it, then run another git command in that folder.
+   **Expected:** the ask comes to you again. No auto-approval.
+5. **Action:** start over (a fresh data folder), approve three commands as in step 1, then press
+   **Keep asking**. Approve more commands in the same folder over the next days.
+   **Expected:** no new offer for that folder for 7 days (`TAGALONG_KEEP_ASKING_DAYS`). No
+   preference is saved. Set the values lower in `.env` to check this faster.
+6. **Action:** with a preference saved, trigger a locked tool (one that always asks) while the
+   built-in "Always ask me before risky actions" default still exists.
+   **Expected:** it still asks you. Scout does not look at it.
+7. **Action:** on a fresh data folder with no preference of your own, approve several tools by
+   hand.
+   **Expected:** no delay, and `spend_today` does not rise from the asks (no look happens, only
+   offers after three approvals can spend).
+8. **Action:** let an offer ask sit unanswered for 10 minutes.
+   **Expected:** it closes and nothing is saved.
 
 ## Scout speaks first: job reports (real brain)
 

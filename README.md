@@ -73,8 +73,11 @@ queue and show one at a time; if the brain is offline when you click, the card s
 
 The brain keeps a history of every such ask and how it ended (approved, refused, timed out, or no
 one was there), for Scout's tools, connected-app tools and Claude Code's permission asks. It also keeps plain-sentence
-preferences, starting with "Always ask me before risky actions". Nothing in Home shows them yet; Scout
-acting on them and the Approvals page come later. See [docs/asks.md](docs/asks.md).
+preferences, starting with "Always ask me before risky actions". After you have allowed the same
+kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
+preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
+under that preference, then tells you which one. Anything unclear still comes to you. Nothing in
+Home shows the history yet; the Approvals page comes later. See [docs/asks.md](docs/asks.md).
 
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is

@@ -20,21 +20,24 @@ It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl
 It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 `<TAGALONG_HOME>/.env`, it logs one line saying where to put it and exits with status 1.
 
-| Variable                    | Default            | Meaning                                                                   |
-| --------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                      |
-| `TAGALONG_HOME`             | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`        |
-| `TAGALONG_MODEL`            | `claude-opus-5-5`  | Model Scout thinks with                                                   |
-| `TAGALONG_DAILY_BUDGET_USD` | `5`                | Most Scout may spend per local day, in USD                                |
-| `TAGALONG_STEP_CAP`         | `25`               | Most model calls in one turn                                              |
-| `TAGALONG_EXPERT_CMD`       | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line) |
-| `TAGALONG_EXPERT_TIMEOUT_S` | `1800`             | Longest an expert run may take, in seconds                                |
-| `TAGALONG_WAKES_PER_HOUR`   | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)  |
-| `ANTHROPIC_API_KEY`         | none, required     | Anthropic key                                                             |
+| Variable                       | Default            | Meaning                                                                                                 |
+| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                    |
+| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                      |
+| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                 |
+| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                              |
+| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                            |
+| `TAGALONG_EXPERT_CMD`          | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line)                               |
+| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`             | Longest an expert run may take, in seconds                                                              |
+| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                |
+| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more) |
+| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                             |
+| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)        |
+| `ANTHROPIC_API_KEY`            | none, required     | Anthropic key                                                                                           |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
-fills keys the environment lacks, so the environment wins. A bad budget, step cap or wakes-per-hour value stops the brain at
+fills keys the environment lacks, so the environment wins. A bad budget, step cap, wakes-per-hour or offer value stops the brain at
 start.
 
 The `session` file keeps one id across restarts. `hello` returns it.
@@ -47,34 +50,37 @@ the total can run a little low.
 
 ## Files
 
-| File                             | What it does                                                                                                                                                     |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                                                                                    |
-| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                                                                                           |
-| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                                                                                    |
-| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                           |
-| `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
-| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
-| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                     |
-| `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
-| `brain/src/brain/approvals.py`   | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the four Home calls for the history and preferences                 |
-| `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
-| `brain/src/brain/events.py`      | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                        |
-| `brain/src/brain/scheduler.py`   | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                       |
-| `brain/src/brain/timers.py`      | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                 |
-| `brain/src/brain/mind/events.md` | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                   |
-| `brain/src/brain/questions.py`   | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                       |
-| `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
-| `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
-| `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
-| `brain/src/brain/app_tools.py`   | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                             |
-| `brain/src/brain/tools.py`       | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                 |
-| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
-| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
-| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                                               |
-| `brain/src/brain/bodies.py`      | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                       |
-| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer |
-| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                                                                                   |
+| File                                | What it does                                                                                                                                                                                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                       |
+| `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                              |
+| `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                       |
+| `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                              |
+| `brain/src/brain/mind/resume.py`    | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                               |
+| `brain/src/brain/memory.py`         | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                                                                                                                |
+| `brain/src/brain/toolbox.py`        | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                        |
+| `brain/src/brain/asks.py`           | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                                                                                                                 |
+| `brain/src/brain/approvals.py`      | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the Home calls for the history and preferences, and the preference writes (`scout_approved`, `add_preference`, `edit_preference`, `remove_preference`) |
+| `brain/src/brain/side_check.py`     | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes (the order is in [asks.md](asks.md#scout-approves-under-your-preferences))                                                                         |
+| `brain/src/brain/offers.py`         | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                         |
+| `brain/src/brain/mind/approvals.md` | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                        |
+| `brain/src/brain/experts.py`        | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                                                                                                    |
+| `brain/src/brain/events.py`         | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                           |
+| `brain/src/brain/scheduler.py`      | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                          |
+| `brain/src/brain/timers.py`         | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                    |
+| `brain/src/brain/mind/events.md`    | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                      |
+| `brain/src/brain/questions.py`      | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                          |
+| `brain/src/brain/jobs.py`           | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                        |
+| `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                         |
+| `brain/src/brain/app_oauth.py`      | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                |
+| `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                |
+| `brain/src/brain/tools.py`          | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                    |
+| `brain/src/brain/mind/soul.md`      | Scout's character, the start of the system prompt                                                                                                                                                                                                   |
+| `brain/src/brain/mind/prompt.py`    | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                                                                                                       |
+| `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                  |
+| `brain/src/brain/bodies.py`         | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                          |
+| `brain/src/brain/server.py`         | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                    |
+| `brain/src/brain/main.py`           | The `uv run brain` entry point                                                                                                                                                                                                                      |
 
 ## What a connection does
 
@@ -255,6 +261,16 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Answering.** Any online body can send `answer {ask, option}`. The first answer wins: the brain
   closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
   `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
+- **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
+  (Scout's tools in `Toolbox._ask`, Claude Code in `Jobs._permission`). When it approves, no ask
+  opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
+  `{tool, text, preference}` goes to every body. A pass, an error or a 20 s timeout leaves the ask
+  as described below. A locked tool never gets this look while the built-in default exists. A tool
+  stays in `ask` mode. Details: [asks.md](asks.md#scout-approves-under-your-preferences).
+- **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
+  `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
+  Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
+  `TAGALONG_KEEP_ASKING_DAYS`. Rules: [asks.md](asks.md#scout-offers-a-preference).
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
 - **No answer.** After 5 minutes the ask closes with `reason: "timeout"` and the call fails with a
   timeout error.
@@ -308,7 +324,8 @@ so there is one gate and no second path.
 
 The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
 plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
-every recorded ask. The history is described in [asks.md](asks.md#approvals-history-and-preferences).
+every recorded ask and every preference the offer saves. In `list_approvals`, `preference` is the
+sentence as it was when Scout approved, so later edits or removals do not change old rows. The history is described in [asks.md](asks.md#approvals-history-and-preferences).
 
 | Tool                | Input                                                    | Result text (JSON)                                                                                                                                                                                                                                              |
 | ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -577,13 +594,14 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
 
 ## Not built yet
 
-| Row   | Brings                                                                                                         |
-| ----- | -------------------------------------------------------------------------------------------------------------- |
-| Next  | Learned approvals, the rest: Scout approving under your preferences (LA2) and the Approvals page in Home (LA3) |
-| Later | Live-state replay of open turns after `resync`                                                                 |
+| Row   | Brings                                                        |
+| ----- | ------------------------------------------------------------- |
+| Next  | Learned approvals, the rest: the Approvals page in Home (LA3) |
+| Later | Live-state replay of open turns after `resync`                |
 
 Built (LA1): the approvals history and preferences, and their Home calls (see
-[Home tools](#home-tools)).
+[Home tools](#home-tools)). Built (LA2): Scout approving under your preferences and offering them
+(see [Permissions and asks](#permissions-and-asks)).
 
 ## Tests
 
