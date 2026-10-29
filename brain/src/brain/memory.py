@@ -369,6 +369,9 @@ class Memory:
             (row.id, row.name, row.transport, json.dumps(row.config), row.auth, int(row.enabled)),
         )
 
+    def update_app_config(self, app_id: str, config: dict) -> None:
+        self._db.execute("UPDATE apps SET config=? WHERE id=?", (json.dumps(config), app_id))
+
     def set_app_enabled(self, app_id: str, enabled: bool) -> None:
         self._db.execute("UPDATE apps SET enabled=? WHERE id=?", (int(enabled), app_id))
 

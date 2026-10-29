@@ -461,3 +461,17 @@ def test_main_boots_despite_a_hanging_app(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError):
         asyncio.run(asyncio.wait_for(main._run(), 60))
     assert booted == [True]
+
+
+async def test_add_app_keeps_env_and_url_secrets_out_of_the_row(rig):
+    out = await rig.call("add_app", stdio(env={"API_KEY": "topsecret"}))
+    await rig.call(
+        "add_app",
+        {"name": "Web", "transport": "http", "url": "https://127.0.0.1:1/mcp?token=urlsecret"},
+    )
+    raw = json.dumps([r.config for r in rig.mem.list_apps()])
+    assert "topsecret" not in raw and "urlsecret" not in raw
+    assert rig.tokens.get(f"{out['id']}:env:API_KEY") == "topsecret"
+    assert rig.tokens.get("web:url_query") == "token=urlsecret"
+    await rig.call("remove_app", {"id": "web"})
+    assert rig.tokens.get("web:url_query") is None
