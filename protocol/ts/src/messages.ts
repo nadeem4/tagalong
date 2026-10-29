@@ -1,5 +1,5 @@
 /**
- * Params and result schema for each of the fourteen messages, plus the two method maps
+ * Params and result schema for each of the fifteen messages, plus the two method maps
  * (body to brain, brain to body). The maps let a receiver, and the examples test, look
  * a schema up by method name. `protocol` is any integer so a newer body gets
  * version_mismatch from the handler instead of a schema failure.
@@ -171,6 +171,14 @@ export type AskParams = z.infer<typeof AskParams>;
 export const ChangedParams = z.object({ seq: Seq, what: z.string() });
 export type ChangedParams = z.infer<typeof ChangedParams>;
 
+export const ApprovedParams = z.object({
+  seq: Seq,
+  tool: z.string(),
+  text: z.string(),
+  preference: z.string(),
+});
+export type ApprovedParams = z.infer<typeof ApprovedParams>;
+
 export interface MethodSchemas {
   params: ZodType;
   result?: ZodType;
@@ -195,6 +203,7 @@ export const brainToBody = {
   tool: { params: ToolParams },
   ask: { params: AskParams },
   changed: { params: ChangedParams },
+  approved: { params: ApprovedParams },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

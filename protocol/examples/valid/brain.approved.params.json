@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "approved",
+  "params": {
+    "seq": 11,
+    "tool": "open_file",
+    "text": "Open the file",
+    "preference": "Always allow reading files"
+  }
+}

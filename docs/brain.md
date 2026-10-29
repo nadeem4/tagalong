@@ -57,6 +57,7 @@ the total can run a little low.
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                     |
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
+| `brain/src/brain/approvals.py`   | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the four Home calls for the history and preferences                 |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/events.py`      | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                        |
 | `brain/src/brain/scheduler.py`   | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                       |
@@ -304,6 +305,19 @@ so there is one gate and no second path.
 | `stop_job`         | `{"job": str}`               | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
+
+The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
+plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
+every recorded ask. The history is described in [asks.md](asks.md#approvals-history-and-preferences).
+
+| Tool                | Input                                                    | Result text (JSON)                                                                                                                                                                                                                                              |
+| ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_approvals`    | `{"filter"?: "all"\|"scout"\|"refused", "before"?: int}` | `{"approvals": [{"id", "source", "tool", "summary", "input", "job_id", "outcome", "decided_by", "preference_id", "preference", "at"}], "counts": {"total", "scout", "refused"}, "next": int\|null}`; newest first, 50 a page, `next` is the cursor for `before` |
+| `list_preferences`  | `{}`                                                     | `{"preferences": [{"id", "sentence", "source", "tool", "builtin", "created_at", "use_count", "last_used"}]}`, the built-in first                                                                                                                                |
+| `remove_preference` | `{"id": int}`                                            | `{"id", "removed": true}`; an unknown id is `invalid_params`                                                                                                                                                                                                    |
+| `edit_preference`   | `{"id": int, "sentence": str}`                           | `{"id", "sentence"}`; the sentence is trimmed and must be 1 to 300 characters                                                                                                                                                                                   |
+
+`counts` are all-time totals, not just the page.
 
 The app calls below are Home-only. A refusal is `invalid_params` with a plain line. Each change
 sends `changed {what: "apps"}`, as does every status change of an app. Home's Connections page calls
@@ -563,10 +577,13 @@ needs `id` as a whole number. Refusals are plain sentences the model reads, for 
 
 ## Not built yet
 
-| Row   | Brings                                                      |
-| ----- | ----------------------------------------------------------- |
-| Next  | Learned approvals (Scout remembers what you allowed before) |
-| Later | Live-state replay of open turns after `resync`              |
+| Row   | Brings                                                                                                         |
+| ----- | -------------------------------------------------------------------------------------------------------------- |
+| Next  | Learned approvals, the rest: Scout approving under your preferences (LA2) and the Approvals page in Home (LA3) |
+| Later | Live-state replay of open turns after `resync`                                                                 |
+
+Built (LA1): the approvals history and preferences, and their Home calls (see
+[Home tools](#home-tools)).
 
 ## Tests
 

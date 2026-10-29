@@ -12,10 +12,11 @@ from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
+from brain.approvals import Approvals
 from brain.asks import Answer, Asks
 from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.memory import Job, Memory
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 
 AGENT = "claude_code"
@@ -41,6 +42,7 @@ class Jobs:
         on_finished: Callable[[Job], object] = lambda job: None,
         clock: Callable[[], float] = time.monotonic,
         scout_questions: ScoutQuestions | None = None,
+        approvals: Approvals | None = None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -50,6 +52,7 @@ class Jobs:
         self._on_finished = on_finished
         self._clock = clock
         self._scout = scout_questions
+        self._approvals = approvals  # None records nothing
         self._runs: dict[str, ExpertRun] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
@@ -150,32 +153,69 @@ class Jobs:
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
 
-    async def _ask_or_none(self, *, job_id: str | None = None, **kw) -> Answer | None:
-        """Open an ask; None when nobody can answer (offline, timed out, cancelled)."""
+    async def _open_ask(self, *, job_id: str | None = None, **kw) -> Answer:
+        """Open an ask and raise its RpcError, so callers can tell a timeout from a cancel."""
         ask_id = uuid.uuid4().hex
         if job_id is not None:
             self._ask_ids.setdefault(job_id, set()).add(ask_id)
         try:
-            answer = await self._asks.open(ask_id=ask_id, **kw)
-        except RpcError:
-            return None
+            return await self._asks.open(ask_id=ask_id, **kw)
         finally:
             if job_id is not None:
                 self._ask_ids.get(job_id, set()).discard(ask_id)
+
+    async def _ask_or_none(self, **kw) -> Answer | None:
+        """Open an ask; None when nobody can answer (offline, timed out, cancelled)."""
+        try:
+            answer = await self._open_ask(**kw)
+        except RpcError:
+            return None
         return answer if answer.option is not None else None
 
     async def _permission(self, job_id: str, request: PermissionRequest) -> str | None:
-        ids = {o.name: o.id for o in request.options}
-        # No `confirm`: that flag only allows the fixed allow/deny sets.
-        answer = await self._ask_or_none(
-            job_id=job_id,
-            text="",
-            tool=f"claude_code:{request.title}",
-            input=request.input,
-            options=list(ids),
-        )
+        by_name = {o.name: o for o in request.options}
+        online = self._asks.anyone_online()  # checked before the ask, as the tool gate does
+        outcome = None  # stays None when cancelled: that is not a final outcome, so no row
+        picked = None
+        try:
+            # No `confirm`: that flag only allows the fixed allow/deny sets.
+            answer = await self._open_ask(
+                job_id=job_id,
+                text="",
+                tool=f"claude_code:{request.title}",
+                input=request.input,
+                options=list(by_name),
+            )
+        except RpcError as exc:
+            if exc.code == ErrorCode.timeout:
+                outcome = "timed_out"
+        else:
+            picked = by_name.get(answer.option)
+            if picked is not None:
+                outcome = "approved" if picked.kind.startswith("allow") else "refused"
+            elif not online:
+                outcome = "no_one"
+        if outcome is not None:
+            self._record(job_id, request, outcome)
         self._changed()
-        return ids.get(answer.option) if answer else None
+        return picked.id if picked else None
+
+    def _record(self, job_id: str, request: PermissionRequest, outcome: str) -> None:
+        job = self._memory.get_job(job_id)
+        if self._approvals is None or job is None:
+            return
+        tool = f"claude_code:{request.title}"
+        answered = outcome in ("approved", "refused")
+        self._approvals.record(
+            source=AGENT,
+            tool=tool,
+            summary=self._approvals.summarise(request.title, tool, request.input),
+            input=request.input,
+            group_key=f"{AGENT}:{job.folder}",
+            outcome=outcome,
+            job_id=job_id,
+            decided_by="person" if answered else "none",
+        )
 
     async def _question(self, job_id: str, question: Question) -> dict | None:
         if self._scout is not None and self._asks.anyone_online():

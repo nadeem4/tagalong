@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  ApprovedParams,
   BackEventData,
   FocusEventData,
   TurnParams,
@@ -27,7 +28,7 @@ describe('method maps', () => {
   });
   it('has literal brain to body method names', () => {
     expectTypeOf<BrainToBodyMethod>().toEqualTypeOf<
-      'use' | 'cancel' | 'reply' | 'turn' | 'tool' | 'ask' | 'changed'
+      'use' | 'cancel' | 'reply' | 'turn' | 'tool' | 'ask' | 'changed' | 'approved'
     >();
   });
 });
@@ -51,5 +52,16 @@ describe('turn started_by', () => {
     expect(TurnParams.safeParse(started).success).toBe(true);
     expect(TurnParams.safeParse({ ...started, started_by: 'brain' }).success).toBe(true);
     expect(TurnParams.safeParse({ ...started, started_by: 'oops' }).success).toBe(false);
+  });
+});
+
+describe('approved notification', () => {
+  const ok = { seq: 3, tool: 'open_file', text: 'Open the file', preference: 'Allow reads' };
+  it('accepts an approved notification', () => {
+    expect(ApprovedParams.safeParse(ok).success).toBe(true);
+  });
+  it('rejects an approved notification without a preference', () => {
+    const { preference: _, ...rest } = ok;
+    expect(ApprovedParams.safeParse(rest).success).toBe(false);
   });
 });

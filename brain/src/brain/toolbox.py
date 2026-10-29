@@ -13,6 +13,7 @@ from typing import Literal, Protocol
 
 from pydantic import ValidationError
 
+from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.prompt import part_blocks
@@ -53,6 +54,8 @@ class Source(Protocol):
 
 
 class BrainSource:
+    approval_source = "scout_tool"  # how the approvals log names this source
+
     def __init__(self, tools: list[tuple[ToolSpec, Handler]]) -> None:
         self._tools = {spec.name: (spec, handler) for spec, handler in tools}
 
@@ -74,6 +77,8 @@ SEP = "__"  # joins body id and tool name; bodies may not use it in tool names
 
 class BodySource:
     """Each online body's declared tools, offered as `body__tool` and run through Bodies.use."""
+
+    approval_source = "scout_tool"
 
     def __init__(self, bodies: Bodies) -> None:
         self._bodies = bodies
@@ -127,11 +132,13 @@ class Toolbox:
         modes: Callable[[], dict[str, str]],
         save_mode: Callable[[str, str], None],
         asks: Asks | None = None,
+        approvals: Approvals | None = None,
     ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
+        self._approvals = approvals  # None records nothing
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
         if spec.self_asks:
@@ -192,16 +199,38 @@ class Toolbox:
                 )
         return out
 
-    async def _ask(self, call: Call, spec: ToolSpec) -> None:
+    async def _ask(self, call: Call, spec: ToolSpec, source_kind: str) -> None:
         """Gate step 3: wait for a person to allow the call; return only if it may run."""
         assert self._asks is not None
+
+        def record(outcome: str, decided_by: str = "person") -> None:
+            if self._approvals is not None:
+                self._approvals.record(
+                    source=source_kind,
+                    tool=spec.name,
+                    summary=self._approvals.summarise(call.text, spec.name, call.input),
+                    input=call.input,
+                    group_key=spec.name,
+                    outcome=outcome,
+                    decided_by=decided_by,
+                )
+
         if not self._asks.anyone_online():
+            record("no_one", "none")
             raise RpcError(
                 ErrorCode.denied, f"Nobody was there to ask, so {spec.name} was not run."
             )
-        choice = await self._asks.permission(call, spec.name, spec.locked)
+        try:
+            choice = await self._asks.permission(call, spec.name, spec.locked)
+        except RpcError as exc:
+            # A cancelled ask is not a final outcome, so it records no row.
+            if exc.code == ErrorCode.timeout:
+                record("timed_out", "none")
+            raise
         if choice == "deny":
+            record("refused")
             raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
+        record("approved")
         if choice == "always":
             self.set_mode(spec.name, "auto")
 
@@ -212,7 +241,8 @@ class Toolbox:
                     if caller not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
                     if caller != "home" and self._asks is not None and self.mode(spec) == "ask":
-                        await self._ask(call, spec)
+                        kind = getattr(source, "approval_source", "scout_tool")
+                        await self._ask(call, spec, kind)
                     return await source.run(call, call.name)
         for source in self.sources:
             error = source.unavailable(call.name)

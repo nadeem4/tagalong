@@ -15,10 +15,10 @@ from brain.toolbox import BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
 
-def Toolbox(sources, stored=None, asks=None):
+def Toolbox(sources, stored=None, asks=None, approvals=None):
     """A toolbox whose stored modes are a plain dict, as the tests need no database."""
     stored = {} if stored is None else stored
-    return RealToolbox(sources, lambda: stored, stored.__setitem__, asks)
+    return RealToolbox(sources, lambda: stored, stored.__setitem__, asks, approvals)
 
 
 def spec(name, audience=("scout",)):
@@ -569,3 +569,105 @@ async def test_offline_app_raises_the_plain_error():
     with pytest.raises(RpcError) as e:
         await app_box("error").run(call("lin__get"))
     assert e.value.message == "Linear is not connected right now."
+
+
+# --- recording every ask in the approvals log --------------------------------
+
+
+class FakeApprovals:
+    def __init__(self):
+        self.rows = []
+
+    def summarise(self, text, tool, input):
+        return text or tool
+
+    def record(self, **row):
+        self.rows.append(row)
+
+
+def recorded(online=("desktop",), **kw):
+    box, source, bodies, stored = gated(online=online, **kw)
+    log = FakeApprovals()
+    box._approvals = log
+    return box, source, bodies, log
+
+
+async def answer_with(box, bodies, option):
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], option, "desktop")
+    return task
+
+
+async def test_allow_records_approved_by_person():
+    box, _, bodies, log = recorded()
+    await (await answer_with(box, bodies, "allow"))
+    [row] = log.rows
+    assert (row["outcome"], row["decided_by"], row["tool"], row["group_key"]) == (
+        "approved",
+        "person",
+        "t",
+        "t",
+    )
+    assert row["source"] == "scout_tool" and row["summary"] == "Doing it."
+
+
+async def test_always_records_approved_and_sets_auto():
+    box, _, bodies, log = recorded()
+    await (await answer_with(box, bodies, "always"))
+    assert [r["outcome"] for r in log.rows] == ["approved"]
+    assert box._modes()["t"] == "auto"
+
+
+async def test_deny_records_refused_and_still_raises_denied():
+    box, _, bodies, log = recorded()
+    task = await answer_with(box, bodies, "deny")
+    with pytest.raises(RpcError) as err:
+        await task
+    assert str(err.value) == "The user said no to t."
+    assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("refused", "person")]
+
+
+async def test_timeout_records_timed_out_and_reraises():
+    box, _, bodies, log = recorded()
+    box._asks._timeout = 0.01
+    with pytest.raises(RpcError) as err:
+        await box.run(call("t"))
+    assert err.value.code == ErrorCode.timeout
+    assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("timed_out", "none")]
+
+
+async def test_nobody_online_records_no_one():
+    box, _, _, log = recorded(online=())
+    with pytest.raises(RpcError) as err:
+        await box.run(call("t"))
+    assert str(err.value) == "Nobody was there to ask, so t was not run."
+    assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("no_one", "none")]
+
+
+async def test_app_tool_row_has_source_app():
+    class AppLike(FakeSource):
+        approval_source = "app"
+
+    bodies = AskBodies()
+    log = FakeApprovals()
+    source = AppLike([ToolSpec("a__x", "x", {"type": "object"})])
+    box = Toolbox([source], asks=Asks(bodies), approvals=log)
+    task = asyncio.create_task(box.run(call("a__x")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    await task
+    assert log.rows[0]["source"] == "app"
+
+
+async def test_auto_tool_records_nothing():
+    box, _, _, log = recorded(tool_effect="read")
+    await box.run(call("t"))
+    assert log.rows == []
+
+
+async def test_toolbox_without_approvals_behaves_as_before():
+    box, source, bodies, _ = gated()
+    assert box._approvals is None
+    task = await answer_with(box, bodies, "allow")
+    assert await task == "ran t"

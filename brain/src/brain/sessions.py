@@ -15,6 +15,7 @@ from functools import partial
 from typing import Literal
 
 from brain.app_tools import AppSource, app_home_tools
+from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
@@ -75,6 +76,7 @@ class Session:
             kinds=kinds or EVENT_KINDS,
         )
         questions = ScoutQuestions(self.scheduler.emit)
+        approvals = Approvals(memory, notify, now)
         self.jobs = Jobs(
             memory,
             self._asks,
@@ -82,6 +84,7 @@ class Session:
             make_run,
             on_finished=self._on_job_finished,
             scout_questions=questions,
+            approvals=approvals,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -91,6 +94,7 @@ class Session:
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
+            + approval_home_tools(approvals)
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
@@ -110,6 +114,7 @@ class Session:
             memory.permission_modes,
             save_mode,
             self._asks,
+            approvals,
         )
         self._now = now
         loaded = memory.load_messages()

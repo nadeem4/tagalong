@@ -124,6 +124,43 @@ MIGRATIONS = (
         fired INTEGER NOT NULL DEFAULT 0
     );
     """,
+    # Learned approvals. approvals is the audit log of every ask; preferences are the person's
+    # sentences (the one builtin default is seeded here, so deleting it sticks); offers record
+    # each "want me to handle these?" so Scout does not nag.
+    """
+    CREATE TABLE approvals(
+        id INTEGER PRIMARY KEY,
+        source TEXT NOT NULL CHECK(source IN ('scout_tool','claude_code','app')),
+        tool TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        input TEXT NOT NULL,
+        job_id TEXT,
+        group_key TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK(outcome IN ('approved','refused','timed_out','no_one')),
+        decided_by TEXT NOT NULL CHECK(decided_by IN ('person','scout','none')),
+        preference_id INTEGER,
+        at TEXT NOT NULL
+    );
+    CREATE TABLE preferences(
+        id INTEGER PRIMARY KEY,
+        sentence TEXT NOT NULL,
+        source TEXT,
+        tool TEXT,
+        group_key TEXT,
+        builtin INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        use_count INTEGER NOT NULL DEFAULT 0,
+        last_used TEXT
+    );
+    CREATE TABLE offers(
+        id INTEGER PRIMARY KEY,
+        group_key TEXT NOT NULL,
+        at TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK(outcome IN ('yes','keep_asking','no_answer','none'))
+    );
+    INSERT INTO preferences(sentence, builtin, created_at)
+        VALUES ('Always ask me before risky actions', 1, strftime('%Y-%m-%dT%H:%M:%S+00:00','now'));
+    """,
 )
 
 
@@ -166,6 +203,34 @@ class Timer:
     repeat_s: int | None
     created_at: str
     fired: bool
+
+
+@dataclass(frozen=True)
+class Approval:
+    id: int
+    source: str
+    tool: str
+    summary: str
+    input: dict
+    job_id: str | None
+    group_key: str
+    outcome: str
+    decided_by: str
+    preference_id: int | None
+    at: str
+
+
+@dataclass(frozen=True)
+class Preference:
+    id: int
+    sentence: str
+    source: str | None
+    tool: str | None
+    group_key: str | None
+    builtin: bool
+    created_at: str
+    use_count: int
+    last_used: str | None
 
 
 @dataclass(frozen=True)
@@ -396,6 +461,117 @@ class Memory:
 
     def fired_timers(self) -> list[Timer]:
         return self._timers("WHERE fired=1")
+
+    def add_approval(
+        self,
+        *,
+        source: str,
+        tool: str,
+        summary: str,
+        input: dict,
+        job_id: str | None,
+        group_key: str,
+        outcome: str,
+        decided_by: str,
+        preference_id: int | None,
+        at: str,
+    ) -> int:
+        cur = self._db.execute(
+            "INSERT INTO approvals(source, tool, summary, input, job_id, group_key, outcome,"
+            " decided_by, preference_id, at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (source, tool, summary, json.dumps(input), job_id, group_key, outcome, decided_by,
+             preference_id, at),
+        )  # fmt: skip
+        return cur.lastrowid
+
+    def list_approvals(
+        self, filter: Literal["all", "scout", "refused"], limit: int, before: int | None
+    ) -> list[Approval]:
+        where, args = [], []
+        if filter == "scout":
+            where.append("decided_by='scout'")
+        elif filter == "refused":
+            where.append("outcome='refused'")
+        if before is not None:
+            where.append("id<?")
+            args.append(before)
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        rows = self._db.execute(
+            f"SELECT id, source, tool, summary, input, job_id, group_key, outcome, decided_by,"
+            f" preference_id, at FROM approvals {clause} ORDER BY id DESC LIMIT ?",
+            (*args, limit),
+        ).fetchall()
+        return [Approval(r[0], r[1], r[2], r[3], json.loads(r[4]), *r[5:]) for r in rows]
+
+    def approval_counts(self) -> dict[str, int]:
+        total, scout, refused = self._db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(decided_by='scout'),0),"
+            " COALESCE(SUM(outcome='refused'),0) FROM approvals"
+        ).fetchone()
+        return {"total": total, "scout": scout, "refused": refused}
+
+    def person_approvals_since(self, group_key: str, since_iso: str) -> int:
+        return self._db.execute(
+            "SELECT COUNT(*) FROM approvals WHERE group_key=? AND outcome='approved'"
+            " AND decided_by='person' AND at>=?",
+            (group_key, since_iso),
+        ).fetchone()[0]
+
+    def _preferences(self, where: str = "", args: tuple = ()) -> list[Preference]:
+        rows = self._db.execute(
+            "SELECT id, sentence, source, tool, group_key, builtin, created_at, use_count,"
+            f" last_used FROM preferences {where} ORDER BY builtin DESC, id",
+            args,
+        ).fetchall()
+        return [Preference(*r[:5], bool(r[5]), *r[6:]) for r in rows]
+
+    def add_preference(
+        self, *, sentence: str, source: str | None, tool: str | None, group_key: str | None, at: str
+    ) -> Preference:
+        cur = self._db.execute(
+            "INSERT INTO preferences(sentence, source, tool, group_key, created_at)"
+            " VALUES (?,?,?,?,?)",
+            (sentence, source, tool, group_key, at),
+        )
+        return self._preferences("WHERE id=?", (cur.lastrowid,))[0]
+
+    def list_preferences(self) -> list[Preference]:
+        return self._preferences()
+
+    def remove_preference(self, id: int) -> bool:
+        return self._db.execute("DELETE FROM preferences WHERE id=?", (id,)).rowcount > 0
+
+    def edit_preference(self, id: int, sentence: str) -> bool:
+        cur = self._db.execute("UPDATE preferences SET sentence=? WHERE id=?", (sentence, id))
+        return cur.rowcount > 0
+
+    def use_preference(self, id: int, at: str) -> None:
+        self._db.execute(
+            "UPDATE preferences SET use_count=use_count+1, last_used=? WHERE id=?", (at, id)
+        )
+
+    def has_user_preferences(self) -> bool:
+        return bool(self._db.execute("SELECT 1 FROM preferences WHERE builtin=0").fetchone())
+
+    def has_preference_for(self, group_key: str) -> bool:
+        row = self._db.execute("SELECT 1 FROM preferences WHERE group_key=?", (group_key,))
+        return bool(row.fetchone())
+
+    def default_preference(self) -> Preference | None:
+        rows = self._preferences("WHERE builtin=1")
+        return rows[0] if rows else None
+
+    def add_offer(self, group_key: str, at: str, outcome: str) -> None:
+        self._db.execute(
+            "INSERT INTO offers(group_key, at, outcome) VALUES (?,?,?)", (group_key, at, outcome)
+        )
+
+    def offers_for(self, group_key: str) -> list[tuple[str, str]]:
+        rows = self._db.execute(
+            "SELECT at, outcome FROM offers WHERE group_key=? ORDER BY at DESC, id DESC",
+            (group_key,),
+        ).fetchall()
+        return [(a, o) for a, o in rows]
 
     def _item(self, item_id: int) -> Item | None:
         row = self._db.execute(f"SELECT {_COLUMNS} FROM memories WHERE id=?", (item_id,)).fetchone()
