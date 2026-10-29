@@ -4,6 +4,8 @@ The emit callable is a fake that records the event and its hooks, so no schedule
 
 import asyncio
 
+import pytest
+
 from brain.experts import Question, QuestionField
 from brain.questions import ScoutQuestions
 
@@ -100,6 +102,37 @@ async def test_answer_twice_the_second_is_refused():
     sq.answer(qid, {"way": "a"})
     await task
     assert sq.answer(qid, {"way": "b"}) == f"no open question {qid}."
+
+
+async def test_pass_then_answer_the_answer_is_refused():
+    emit = _Emit()
+    sq = ScoutQuestions(emit)
+    task = await _ask(sq, emit)
+    qid = emit.id()
+    assert sq.pass_to_user(qid) == "passed to the owner"
+    assert sq.answer(qid, {"way": "a"}) == f"no open question {qid}."
+    assert sq.pass_to_user(qid) == f"no open question {qid}."
+    assert await task is None
+
+
+async def test_cancel_job_then_answer_is_refused():
+    emit = _Emit()
+    sq = ScoutQuestions(emit)
+    task = await _ask(sq, emit)
+    qid = emit.id()
+    sq.cancel_job("j1")
+    assert sq.answer(qid, {"way": "a"}) == f"no open question {qid}."
+    assert await task is None
+
+
+async def test_emit_failure_does_not_leak_the_open_question():
+    def boom(*args, **kwargs):
+        raise RuntimeError("emit failed")
+
+    sq = ScoutQuestions(boom)
+    with pytest.raises(RuntimeError):
+        await sq.ask("j1", _q())
+    assert sq._open == {}
 
 
 async def test_pass_resolves_none():

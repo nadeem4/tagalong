@@ -52,15 +52,16 @@ class ScoutQuestions:
         }
         # Resolving twice is harmless: on_end fires after an answer too, so settle() guards.
         settle = lambda: self._settle(qid, None)  # noqa: E731
-        self._emit(Event("job_question", facts, key=None), on_drop=settle, on_end=settle)
         try:
+            self._emit(Event("job_question", facts, key=None), on_drop=settle, on_end=settle)
             return await future
         finally:
             self._open.pop(qid, None)
 
     def answer(self, question_id: str, answers: dict) -> str:
         entry = self._open.get(question_id)
-        if entry is None:
+        # A settled question stays in _open until ask() resumes; treat it as gone.
+        if entry is None or entry.future.done():
             return f"no open question {question_id}."
         missing = [f.key for f in entry.question.fields if f.key not in answers]
         if missing:
@@ -82,7 +83,8 @@ class ScoutQuestions:
         return ANSWERED
 
     def pass_to_user(self, question_id: str) -> str:
-        if question_id not in self._open:
+        entry = self._open.get(question_id)
+        if entry is None or entry.future.done():
             return f"no open question {question_id}."
         self._settle(question_id, None)
         return PASSED

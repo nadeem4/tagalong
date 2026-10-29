@@ -566,8 +566,10 @@ async def test_ask_with_nobody_online_skips_scout_and_cancels(make_rig):
 async def test_job_stopped_while_scout_thinks_opens_no_ask(make_rig, result):
     scout = FakeScout(result)
     rig = make_rig(FakeAsks(), scout=scout)
+    rig.jobs._runs["j1"] = object()  # a running job, stopped while Scout thinks
+    scout.before_return = lambda: rig.jobs._runs.pop("j1")
     question = Question("Which?", [QuestionField("question_0", "Q", ["A"])])
-    assert await rig.jobs._question("gone", question) is None  # "gone" is not a running job
+    assert await rig.jobs._question("j1", question) is None
     assert scout.asked and rig.asks.opened == []
 
 
