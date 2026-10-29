@@ -361,6 +361,24 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toEqual({ jsonrpc: '2.0', method: 'cancel', params: { turn: 't1' } });
   });
 
+  it('event sends a notification when online', async () => {
+    const { client, s } = await online();
+    client.event('focus', { app: 'Code' });
+    expect(s.sent.at(-1)).toEqual({
+      jsonrpc: '2.0',
+      method: 'event',
+      params: { name: 'focus', data: { app: 'Code' } },
+    });
+  });
+
+  it('event is dropped when offline', async () => {
+    const { client, s } = await online();
+    s.drop();
+    const before = s.sent.length;
+    client.event('back');
+    expect(s.sent).toHaveLength(before);
+  });
+
   it.each([
     ['once', 'allow'],
     ['always', 'always'],
