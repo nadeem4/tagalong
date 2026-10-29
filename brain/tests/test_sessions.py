@@ -942,3 +942,9 @@ def test_toolbox_and_jobs_share_one_side_check_on_the_session_model():
     session, _ = make(model)
     check = session.toolbox._side_check
     assert check is session.jobs._side_check and check._model is model
+
+
+def test_toolbox_and_jobs_share_one_offers_service():
+    session, _ = make(Gate([]))
+    assert session.toolbox._offers is session.jobs._offers
+    assert session.toolbox._offers is not None

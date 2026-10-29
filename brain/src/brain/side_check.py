@@ -50,13 +50,14 @@ class AskFacts:
 
 
 @cache
-def _decide_prompt() -> str:
+def prompt_section(name: str) -> str:
+    """One `## name` section of mind/approvals.md; the wording lives there, not in code."""
     text = files("brain.mind").joinpath("approvals.md").read_text(encoding="utf-8")
     for part in ("\n" + text).split("\n## ")[1:]:
-        name, _, body = part.partition("\n")
-        if name.strip() == "decide":
+        head, _, body = part.partition("\n")
+        if head.strip() == name:
             return body.strip()
-    raise RuntimeError("mind/approvals.md has no ## decide section")
+    raise RuntimeError(f"mind/approvals.md has no ## {name} section")
 
 
 class SideCheck:
@@ -96,7 +97,7 @@ class SideCheck:
     async def _ask(self, facts: AskFacts) -> Final | None:
         message = self._message(facts)
         final = None
-        async for item in self._model.stream(_decide_prompt(), message, TOOLS):
+        async for item in self._model.stream(prompt_section("decide"), message, TOOLS):
             if isinstance(item, Final):
                 final = item
         return final

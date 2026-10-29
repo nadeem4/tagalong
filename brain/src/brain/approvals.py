@@ -82,6 +82,32 @@ class Approvals:
         self._memory.use_preference(pref.id, _utc_text(self._now()))
         self._notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})
 
+    # Preference writes live here so every writer (Home, the offer) notifies the same way.
+    def add_preference(
+        self, *, sentence: str, source: str | None, tool: str | None, group_key: str | None
+    ) -> Preference:
+        pref = self._memory.add_preference(
+            sentence=sentence,
+            source=source,
+            tool=tool,
+            group_key=group_key,
+            at=_utc_text(self._now()),
+        )
+        self._notify("changed", {"what": "approvals"})
+        return pref
+
+    def edit_preference(self, id: int, sentence: str) -> bool:
+        changed = self._memory.edit_preference(id, sentence)
+        if changed:
+            self._notify("changed", {"what": "approvals"})
+        return changed
+
+    def remove_preference(self, id: int) -> bool:
+        removed = self._memory.remove_preference(id)
+        if removed:
+            self._notify("changed", {"what": "approvals"})
+        return removed
+
 
 PAGE = 50
 SENTENCE_MAX = 300
@@ -160,8 +186,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
 
     async def remove_preference(args: dict) -> str:
         pid = known_id(args)
-        memory.remove_preference(pid)
-        approvals._notify("changed", {"what": "approvals"})
+        approvals.remove_preference(pid)
         return json.dumps({"id": pid, "removed": True})
 
     async def edit_preference(args: dict) -> str:
@@ -170,8 +195,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
         sentence = sentence.strip() if isinstance(sentence, str) else ""
         if not 1 <= len(sentence) <= SENTENCE_MAX:
             raise refuse(f"A preference is 1 to {SENTENCE_MAX} characters.")
-        memory.edit_preference(pid, sentence)
-        approvals._notify("changed", {"what": "approvals"})
+        approvals.edit_preference(pid, sentence)
         return json.dumps({"id": pid, "sentence": sentence})
 
     home = frozenset({"home"})

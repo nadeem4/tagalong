@@ -18,6 +18,7 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
+from brain.offers import Offers
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 from brain.side_check import AskFacts, SideCheck
 
@@ -135,6 +136,7 @@ class Toolbox:
         asks: Asks | None = None,
         approvals: Approvals | None = None,
         side_check: SideCheck | None = None,
+        offers: Offers | None = None,
     ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
         self._modes = modes  # stored per-tool choices, read on every call
@@ -142,6 +144,7 @@ class Toolbox:
         self._asks = asks  # None skips gate step 3 (the ask)
         self._approvals = approvals  # None records nothing
         self._side_check = side_check  # None: every ask goes to the person
+        self._offers = offers  # None: no offers to auto-approve
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
         if spec.self_asks:
@@ -242,6 +245,8 @@ class Toolbox:
             record("refused")
             raise RpcError(ErrorCode.denied, f"The user said no to {spec.name}.")
         record("approved")
+        if self._offers is not None:
+            self._offers.consider(spec.name, source_kind, spec.name)
         if choice == "always":
             self.set_mode(spec.name, "auto")
 

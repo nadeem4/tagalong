@@ -236,3 +236,27 @@ def test_scout_approved_records_uses_and_notifies(mem):
         {"tool": "claude_code:ls", "text": "ls -la", "preference": "Allow reads"},
     ) in sent
     assert ("changed", {"what": "approvals"}) in sent
+
+
+# --- Preference writes live in the service so every writer notifies the same way ----------
+
+
+def test_add_preference_saves_and_notifies(mem):
+    sent = []
+    pref = make(mem, sent).add_preference(sentence="ok", source="app", tool="t", group_key="g")
+    assert (pref.sentence, pref.source, pref.tool, pref.group_key) == ("ok", "app", "t", "g")
+    assert pref.created_at == "2026-10-28T09:00:00+00:00"
+    assert sent == [("changed", {"what": "approvals"})]
+
+
+def test_edit_and_remove_preference_notify_only_when_something_changed(mem):
+    sent = []
+    service = make(mem, sent)
+    pref = service.add_preference(sentence="a", source=None, tool=None, group_key=None)
+    sent.clear()
+    assert service.edit_preference(pref.id, "b") is True
+    assert [p.sentence for p in mem.list_preferences() if p.id == pref.id] == ["b"]
+    assert service.remove_preference(pref.id) is True
+    assert service.remove_preference(pref.id) is False
+    assert service.edit_preference(pref.id, "c") is False
+    assert sent == [("changed", {"what": "approvals"})] * 2

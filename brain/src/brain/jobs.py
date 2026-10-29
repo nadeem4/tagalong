@@ -16,6 +16,7 @@ from brain.approvals import Approvals
 from brain.asks import Answer, Asks
 from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.memory import Job, Memory
+from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 from brain.side_check import AskFacts, SideCheck
@@ -45,6 +46,7 @@ class Jobs:
         scout_questions: ScoutQuestions | None = None,
         approvals: Approvals | None = None,
         side_check: SideCheck | None = None,
+        offers: Offers | None = None,
     ) -> None:
         self._memory = memory
         self._asks = asks
@@ -56,6 +58,7 @@ class Jobs:
         self._scout = scout_questions
         self._approvals = approvals  # None records nothing
         self._side_check = side_check  # None: every permission goes to the person
+        self._offers = offers  # None: no offers to auto-approve
         self._runs: dict[str, ExpertRun] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
@@ -203,6 +206,8 @@ class Jobs:
                 outcome = "no_one"
         if outcome is not None:
             self._record(job_id, request, outcome)
+        if outcome == "approved":
+            self._offer(job_id, request)
         self._changed()
         return picked.id if picked else None
 
@@ -220,6 +225,12 @@ class Jobs:
             return None
         self._approvals.scout_approved(facts, pref, summary, job_id)
         return once.id
+
+    def _offer(self, job_id: str, request: PermissionRequest) -> None:
+        """A person allowed this: Scout may offer to approve the whole folder's kind of ask."""
+        job = self._memory.get_job(job_id)
+        if self._offers is not None and job is not None:
+            self._offers.consider(f"{AGENT}:{job.folder}", AGENT, f"{AGENT}:{request.title}")
 
     def _record(self, job_id: str, request: PermissionRequest, outcome: str) -> None:
         job = self._memory.get_job(job_id)

@@ -789,3 +789,36 @@ async def test_claude_code_no_one_online_skips_side_check(make_rig):
     assert check.facts == []
     [row] = logged(rig)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
+
+
+# --- Scout offers to auto-approve after the person allows a Claude Code ask ---------------
+
+
+class FakeOffers:
+    def __init__(self):
+        self.considered = []
+
+    def consider(self, group_key, source, tool):
+        self.considered.append((group_key, source, tool))
+
+
+@pytest.mark.parametrize(
+    ("pick", "expected"), [("Sure", True), ("Whatever", True), ("Nope", False)]
+)
+async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, expected):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    rig.jobs._offers = offers = FakeOffers()
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    group = f"claude_code:{rig.folder}"
+    assert offers.considered == ([(group, "claude_code", "claude_code:ls")] if expected else [])
+
+
+async def test_scout_approval_is_not_offered(make_rig):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
+    rig.jobs._offers = offers = FakeOffers()
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert offers.considered == []

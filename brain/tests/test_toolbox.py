@@ -819,3 +819,44 @@ async def test_side_check_runs_while_a_turn_is_running(mem):
     assert not task.done() and bodies.sent == []  # no ask opens while Scout looks
     gate.set()
     assert await task == "ran t"
+
+
+# --- Scout offers to auto-approve after a person's approval ------------------------------
+
+
+class FakeOffers:
+    def __init__(self):
+        self.considered = []
+
+    def consider(self, group_key, source, tool):
+        self.considered.append((group_key, source, tool))
+
+
+def offered(mem, check=None, offers=None):
+    box, source, bodies, stored, sent = scouted(mem, check or FakeSideCheck(None))
+    box._offers = offers
+    return box, bodies
+
+
+@pytest.mark.parametrize("choice", ["allow", "always"])
+async def test_person_approval_is_offered_for_consideration(mem, choice):
+    offers = FakeOffers()
+    box, bodies = offered(mem, offers=offers)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], choice, "desktop")
+    await task
+    assert offers.considered == [("t", "scout_tool", "t")]
+
+
+async def test_refusal_and_scout_approval_are_not_offered(mem):
+    offers = FakeOffers()
+    box, bodies = offered(mem, offers=offers)
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
+    scout, _ = offered(mem, FakeSideCheck(preference(mem)), offers)
+    await scout.run(call_with_text("t"))
+    assert offers.considered == []

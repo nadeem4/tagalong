@@ -19,7 +19,14 @@ from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.config import DEFAULT_EXPERT_CMD, DEFAULT_EXPERT_TIMEOUT_S, DEFAULT_WAKES_PER_HOUR
+from brain.config import (
+    DEFAULT_EXPERT_CMD,
+    DEFAULT_EXPERT_TIMEOUT_S,
+    DEFAULT_KEEP_ASKING_DAYS,
+    DEFAULT_OFFER_MIN_APPROVALS,
+    DEFAULT_OFFER_WINDOW_DAYS,
+    DEFAULT_WAKES_PER_HOUR,
+)
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.experts import ExpertRun
 from brain.jobs import Jobs, job_note
@@ -27,6 +34,7 @@ from brain.memory import Job, Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
+from brain.offers import Offers, OfferSettings
 from brain.protocol import SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler
@@ -36,6 +44,10 @@ from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import brain_tools, expert_tools, home_tools, question_tools, timer_tools
 
 log = logging.getLogger("brain")
+
+DEFAULT_OFFER_SETTINGS = OfferSettings(
+    DEFAULT_OFFER_MIN_APPROVALS, DEFAULT_OFFER_WINDOW_DAYS, DEFAULT_KEEP_ASKING_DAYS
+)
 
 
 class Session:
@@ -52,6 +64,7 @@ class Session:
         tokens: TokenFile | None = None,
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
         kinds: dict[str, EventKind] | None = None,
+        offers: OfferSettings = DEFAULT_OFFER_SETTINGS,
     ) -> None:
         self._model = model
         self._budget = budget
@@ -80,6 +93,8 @@ class Session:
         approvals = Approvals(memory, notify, now)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory)
+        # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
+        offer = Offers(model, budget, memory, self._asks, approvals, offers, now)
         self.jobs = Jobs(
             memory,
             self._asks,
@@ -89,6 +104,7 @@ class Session:
             scout_questions=questions,
             approvals=approvals,
             side_check=side_check,
+            offers=offer,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -120,6 +136,7 @@ class Session:
             self._asks,
             approvals,
             side_check,
+            offer,
         )
         self._now = now
         loaded = memory.load_messages()
