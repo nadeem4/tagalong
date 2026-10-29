@@ -98,6 +98,8 @@ class AskCtx:
     locked: bool
     turn_id: str | None
     ask_person: Callable[[], Awaitable[str]]
+    job_id: str | None = None  # an expert's job, so Scout's approval row names it
+    can_approve: bool = True  # False: Scout may not answer (an expert offered no allow-once)
 
 
 @dataclass(frozen=True)

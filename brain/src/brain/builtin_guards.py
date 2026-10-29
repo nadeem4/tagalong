@@ -97,6 +97,8 @@ def anyone_online(asks) -> Guard:
 
 def side_check_guard(side_check, approvals) -> Guard:
     async def check(ctx: AskCtx) -> Verdict:
+        if not ctx.can_approve:
+            return ALLOW
         from brain.side_check import AskFacts  # side_check imports this module
 
         facts = AskFacts(ctx.source, ctx.tool, ctx.summary, ctx.input, ctx.group_key, ctx.locked)
@@ -105,7 +107,7 @@ def side_check_guard(side_check, approvals) -> Guard:
             if pref is None:
                 return ALLOW
             # Allow-once only: the tool's ask mode stays as it is.
-            approvals.scout_approved(facts, pref, ctx.summary)
+            approvals.scout_approved(facts, pref, ctx.summary, ctx.job_id)
             return allow_once("approved under a preference", value=pref)
         except Exception:
             log.exception("side-check failed; asking the person")

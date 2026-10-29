@@ -117,6 +117,7 @@ class Session:
             approvals=approvals,
             side_check=side_check,
             offers=offer,
+            guards=self.guards,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)

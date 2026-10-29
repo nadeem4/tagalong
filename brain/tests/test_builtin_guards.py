@@ -131,7 +131,7 @@ class StubApprovals:
     def __init__(self):
         self.scouted = []
 
-    def scout_approved(self, facts, pref, summary):
+    def scout_approved(self, facts, pref, summary, job_id=None):
         self.scouted.append((facts, pref, summary))
 
 
