@@ -76,6 +76,7 @@ class Session:
             kinds=kinds or EVENT_KINDS,
         )
         questions = ScoutQuestions(self.scheduler.emit)
+        approvals = Approvals(memory, notify, now)
         self.jobs = Jobs(
             memory,
             self._asks,
@@ -83,6 +84,7 @@ class Session:
             make_run,
             on_finished=self._on_job_finished,
             scout_questions=questions,
+            approvals=approvals,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -111,7 +113,7 @@ class Session:
             memory.permission_modes,
             save_mode,
             self._asks,
-            Approvals(memory, notify, now),
+            approvals,
         )
         self._now = now
         loaded = memory.load_messages()

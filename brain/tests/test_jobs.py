@@ -7,10 +7,12 @@ opens and how it maps the answers matters. No Node, no Claude Code, no network.
 import asyncio
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from brain.approvals import Approvals
 from brain.asks import Answer
 from brain.experts import ExpertRun, Question, QuestionField
 from brain.jobs import JobError, Jobs, job_note
@@ -75,7 +77,9 @@ class FakeScout:
 
 
 class Rig:
-    def __init__(self, tmp_path, monkeypatch, asks, steps, max_running=2, scout=None) -> None:
+    def __init__(
+        self, tmp_path, monkeypatch, asks, steps, max_running=2, scout=None, approvals=False
+    ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
@@ -89,6 +93,11 @@ class Rig:
         self.runs: list[ExpertRun] = []
         self.finished: list = []
         self.now = 0.0
+        self.approvals = (
+            Approvals(self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC))
+            if approvals
+            else None
+        )
         self.jobs = Jobs(
             self.memory,
             asks,
@@ -98,6 +107,7 @@ class Rig:
             on_finished=self.finished.append,
             clock=lambda: self.now,
             scout_questions=scout,
+            approvals=self.approvals,
         )
 
     def make_run(self, **callbacks) -> ExpertRun:
@@ -590,3 +600,96 @@ async def test_cancel_job_is_called_when_a_job_ends(make_rig):
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert scout.cancelled == [job_id]
+
+
+def with_approvals(make_rig, asks, steps):
+    return make_rig(asks, steps, approvals=True)
+
+
+def logged(rig):
+    return rig.memory.list_approvals("all", 50, None)
+
+
+OPTS = [
+    {"id": "a1", "name": "Sure", "kind": "allow_once"},
+    {"id": "a2", "name": "Whatever", "kind": "allow_always"},
+    {"id": "r1", "name": "Nope", "kind": "reject_once"},
+    {"id": "r2", "name": "Never", "kind": "reject_always"},
+]
+
+
+@pytest.mark.parametrize("pick", ["Sure", "Whatever"])
+async def test_permission_allow_kinds_record_approved(make_rig, pick):
+    steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    (row,) = logged(rig)
+    assert (row.outcome, row.decided_by, row.source) == ("approved", "person", "claude_code")
+    assert row.tool == "claude_code:ls -la" and row.job_id == rig.finished[0].id
+
+
+@pytest.mark.parametrize("pick", ["Nope", "Never"])
+async def test_permission_reject_kinds_record_refused(make_rig, pick):
+    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    (row,) = logged(rig)
+    assert (row.outcome, row.decided_by) == ("refused", "person")
+
+
+async def test_permission_no_answer_records_timed_out(make_rig):
+    steps = [{"permission": {"title": "rm x"}}]
+    timeout = RpcError(ErrorCode.timeout, "nobody answered")
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), timeout), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    (row,) = logged(rig)
+    assert (row.outcome, row.decided_by) == ("timed_out", "none")
+
+
+async def test_permission_nobody_online_records_no_one(make_rig):
+    steps = [{"permission": {"title": "rm x"}}]
+    asks = FakeAsks(Answer("Plan"), Answer(None))
+    rig = with_approvals(make_rig, asks, steps)
+    real_open = asks.open
+
+    async def open_then_go_offline(**kw):
+        if kw.get("tool"):  # the permission ask, not the hand-off
+            asks.online = False
+        return await real_open(**kw)
+
+    asks.open = open_then_go_offline
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    (row,) = logged(rig)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")
+
+
+async def test_cancelled_permission_records_nothing(make_rig):
+    steps = [{"permission": {"title": "rm x"}}]
+    cancelled = RpcError(ErrorCode.cancelled, "the ask was cancelled")
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), cancelled), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert logged(rig) == []
+
+
+async def test_group_key_is_the_job_folder_for_every_title(make_rig):
+    steps = [{"permission": {"title": "ls"}}, {"permission": {"title": "cat y"}}]
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer("Yes"), Answer("No")), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    rows = logged(rig)
+    assert len(rows) == 2
+    assert {r.group_key for r in rows} == {f"claude_code:{rig.folder}"}
+
+
+async def test_jobs_without_approvals_unchanged(make_rig):
+    steps = [{"permission": {"title": "ls"}}]
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Yes")), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "allow-once"}
