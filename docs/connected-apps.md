@@ -53,11 +53,24 @@ An app row is `{ id, name, transport, config, auth, enabled }`.
   or `oauth` (the app's own sign-in page in the browser; see [Sign-in](#sign-in-oauth)).
 - A stdio app's `env` values may hold `${VAR}` or `${VAR:-default}`. They stay as written in the row
   and are filled from the brain's environment only when the app is launched. An unset variable ends
-  as `needs VAR set in brain's environment` (the variable name only, never a value). Literal env
-  values are saved in the apps table as typed, so put secrets in the brain's environment and refer
-  to them as `${VAR}`.
+  as `needs VAR set in brain's environment` (the variable name only, never a value).
 
-A token is never in the row. It is in `app-tokens.json` in the data directory, by app id.
+A secret is never in the row. All of them are in `app-tokens.json` in the data directory:
+
+- **Bearer token**: key `<id>`.
+- **Literal env value** of a stdio app: key `<id>:env:<NAME>`. Every literal value moves, whether or
+  not it looks like a secret. A `${VAR}` or `${VAR:-x}` reference stays in the row, and so does a
+  value that mixes a reference with literal text (it counts as a reference). The row keeps only the
+  names of the moved variables (`secret_env`).
+- **Secret url parts** of an http app: key `<id>:url_query`. Query params named `token`,
+  `access_token`, `api_key`, `apikey`, `key`, `secret`, `password`, `auth`, `sig` or `signature`,
+  and any `user:pass@` in the url, move there. The rest of the url stays in the row (`url_secret`
+  marks that a part was taken).
+
+At connect time the brain puts these back (env into the process environment, the url parts onto the
+url) and nowhere else. If a key is missing the app ends as `error` with `<name> needs its secret
+added again.`. Rows saved by an older build are migrated once at startup: the secrets move to the
+file first, then the row is rewritten clean, so they connect as before.
 
 ### Connecting
 
@@ -139,9 +152,10 @@ dropped is offline ("<app> is not connected right now."), and a disabled app's t
 ### Home calls
 
 Home-only tools (see the table in [brain.md](brain.md#home-tools)): `list_apps`, `add_app`,
-`set_app_enabled`, `remove_app`, `restart_app`. `add_app` stores a token in `app-tokens.json` only
-after the rest is valid, and removes it again if saving the row fails. `remove_app` stops the app
-and deletes its row and token. A bad request is a plain line, such as `a stdio app needs a command.`,
+`set_app_enabled`, `remove_app`, `restart_app`. `add_app` stores the token and the other secrets in
+`app-tokens.json` only after the rest is valid, and removes them again if saving the row fails.
+`remove_app` stops the app and deletes its row and every key of that app (token, env values, url
+parts). A bad request is a plain line, such as `a stdio app needs a command.`,
 `the url must use https (http is only allowed for localhost).` or `an app with token sign-in needs
 its token.`.
 
@@ -178,8 +192,8 @@ flowchart LR
   computer.
 - **Where things run**: Overview has a read-only card with each app's command line
   (`node files-server.js`) or web address, plus its status. Secrets never show: the brain strips
-  them from `list_apps` (see [brain.md](brain.md#home-tools)). Do not put secrets in args; use `${VAR}` env
-  references, which stay in the env.
+  them from `list_apps` (see [brain.md](brain.md#home-tools)). Env values and secret url parts are
+  moved to the token file for you; do not put secrets in args, which stay in the row.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
 
 ### Out of scope
@@ -190,12 +204,12 @@ than the brain's; TLS, pairing and multi-user.
 
 ## Storage
 
-| Where                         | Holds                                                             |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`     |
-| `permissions` table           | The user's saved `ask` or `auto` per tool, like any other tool    |
-| `app-tokens.json`             | `{ "<app id>": "<token>" }`, owner-only where the platform allows |
-| `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app           |
+| Where                         | Holds                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`                                                    |
+| `permissions` table           | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
+| `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows |
+| `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                          |
 
 ## Failure handling
 
@@ -205,7 +219,8 @@ than the brain's; TLS, pairing and multi-user.
 
 ## Privacy notes
 
-- Tokens are only in `app-tokens.json` and `app-oauth/`, never in a row, a tool list, a log line or an error.
+- Tokens and secrets are only in `app-tokens.json` and `app-oauth/`, never in a row, a tool list, a log line or an error.
+  What reaches disk is also masked if a secret shows up in it anyway (see [privacy](privacy.md)).
 - App answers are fenced as data so the model reads them but never obeys them.
 - Arguments go to the app as Scout filled them in, after the user allowed the change.
 
@@ -215,6 +230,8 @@ than the brain's; TLS, pairing and multi-user.
   hostless url), the store, and the manager against a real fake server over stdio and http (connect,
   call, hang, exit, drop, restart, process cleanup).
 - `brain/tests/test_app_tools.py`: classification, names, results and `AppSource`.
+- `brain/tests/test_apps.py` also pins the secret split, the merge at connect, the startup
+  migration and clearing every key on remove.
 - `brain/tests/test_app_oauth.py`: token storage, the loopback listener, and sign-in against a
   fake OAuth server.
 - `bodies/ui/src/home/connections-panel.test.tsx`: the Sign in button, Waiting for the browser, the

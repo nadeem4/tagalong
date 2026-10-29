@@ -230,6 +230,21 @@ Tests use `InMemorySecretStore`.
 
 `connections.remove` deletes that connection's token, OAuth entry and env values.
 
+### App secrets in the Python brain
+
+The Python brain does not use `SecretStore` for connected apps. Its secrets live in the data
+directory, never in the `apps` table:
+
+| Where                 | Holds                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| `app-tokens.json`     | `<id>` (bearer token), `<id>:env:<NAME>` (a literal env value), `<id>:url_query` (secret url parts) |
+| `app-oauth/<id>.json` | An app's OAuth client and tokens                                                                    |
+
+`${VAR}` references stay in the row and are filled from the brain's environment at connect. The
+rules, the startup migration and the missing-key error are in [connected apps](connected-apps.md).
+Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
+by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
+
 ### safeStorage in the desktop
 
 `SafeStorageSecretStore` (`bodies/desktop/src/main/secret-store.ts`) stores

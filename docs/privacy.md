@@ -277,7 +277,26 @@ when Scout calls one of their tools in a turn you started.
   same way. It goes to Scout's brain provider like any window text, and is not stored.
 - **Tokens and keys.** Sign-in tokens, a pasted key and a local tool's secret values are kept in
   the OS keychain through Electron safe storage (`connection.<id>.*`), never in settings, the
-  database, the repository or logs. **Disconnect** deletes them.
+  database, the repository or logs. **Disconnect** deletes them. (The Python brain keeps them in
+  `app-tokens.json` and `app-oauth/` instead, never in the apps table; see
+  [connected apps](connected-apps.md) and the next section.)
+
+### What is masked on disk, what is not
+
+The Python brain replaces secrets with `[secret]` before text is saved:
+
+- **Masked:** the saved chat (including a tool's input and a tool's result text), an approval's
+  summary and input, a job's result, and log lines (message, traceback and stack).
+- **What is matched:** the exact stored secret values of 8 or more characters (app tokens, env
+  secrets, url query values, OAuth access and refresh tokens, `ANTHROPIC_API_KEY`), and common key
+  shapes: `sk-ant-`, `Bearer <token>`, `ghp_`-style GitHub tokens, `xox*-` Slack tokens, `AKIA`
+  keys, and `?token=`-style url params.
+- **If masking fails,** the text is stored as `[withheld]`, never raw. The list of secret values
+  is reused for up to 1 second.
+- **Not masked:** Scout's live turn (the model sees and uses the real value), the side-check
+  prompt, the tool's own input (an app gets the real arguments), a job's progress and task text,
+  the sentence of an approval preference, and any secret shorter than 8 characters that has no
+  recognisable shape.
 - **Sign-in** opens the app's own page in your system browser, which sends you back to a one-time
   address on `127.0.0.1`. Tagalong never sees your password. Only a reply carrying this sign-in's
   own random state is accepted.
