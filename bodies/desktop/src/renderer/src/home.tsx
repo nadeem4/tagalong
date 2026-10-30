@@ -1,13 +1,12 @@
 /**
  * The Home window's page (built as `home.html`): HomeView from @tagalong/ui with the
  * desktop's host calls, Settings embedded as one of its pages, and the routing main asks
- * for (a page, a Settings section, a routine draft to edit).
+ * for (a page, a Settings section).
  */
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomeView, HostBridgeProvider } from '@tagalong/ui';
 import type { HomeHost, HomePage } from '@tagalong/ui';
-import type { RoutineProposedParams } from '@tagalong/protocol';
 // Bundled, not fetched: Home's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -33,11 +32,8 @@ const homeHost: HomeHost = {
       providers: view.providers
         .filter((choice) => choice.id !== 'fake')
         .map(({ id, label, needsKey }) => ({ id, label, needsKey })),
-      sightLogDays: view.settings.sightLog.days,
     };
   },
-  listModels: (providerId) => window.tagalongHost.listModels(providerId),
-  savePet: (pet) => window.tagalongHost.savePet(pet),
   // The overview's line: Ready only when Scout can think (signed in, or a key) and see.
   status: async () => {
     const view = await window.tagalongHost.getHostView();
@@ -57,8 +53,6 @@ const homeHost: HomeHost = {
  */
 function Home() {
   const [page, setPage] = useState<HomePage | undefined>(undefined);
-  // Scout's routine card, opened here by its Edit button.
-  const [routineDraft, setRoutineDraft] = useState<RoutineProposedParams | undefined>(undefined);
   // A Fix it names a Settings section too: Home scrolls to it once Settings has drawn it.
   const [section, setSection] = useState<{ id: string } | null>(null);
   useEffect(
@@ -79,22 +73,13 @@ function Home() {
     }, 100);
     return () => clearInterval(timer);
   }, [section]);
-  useEffect(
-    () =>
-      window.tagalongHost.onRoutineDraft((proposal) => {
-        setRoutineDraft(proposal);
-        setPage('routines');
-      }),
-    [],
-  );
   return (
     <HostBridgeProvider bridge={window.tagalong}>
       <HomeView
         host={homeHost}
         scout={FIGURE.idle}
-        settings={<SettingsPage embedded onOpenScout={() => setPage('scout')} />}
+        settings={<SettingsPage embedded />}
         {...(page === undefined ? {} : { page })}
-        {...(routineDraft === undefined ? {} : { routineDraft })}
         onPage={setPage}
       />
     </HostBridgeProvider>

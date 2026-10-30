@@ -24,8 +24,6 @@ schedule is days of the week and a time, and the triggers are a fixed set of fiv
 | `bodies/desktop/src/main/routine-delivery.ts` | `routineDelivery`: line, voice, notification on the desktop                                                                                                           |
 | `bodies/desktop/src/main/index.ts`            | `deliverRoutine`: applies it, and the notification click                                                                                                              |
 | `bodies/desktop/src/main/ipc/routines.ts`     | IPC for Home and the card, and the calendar link                                                                                                                      |
-| `bodies/ui/src/routine-card.tsx`              | `RoutineCard` in the bubble                                                                                                                                           |
-| `bodies/ui/src/home/routines-panel.tsx`       | Home's Routines page, its form and its templates                                                                                                                      |
 
 ## How it works
 
@@ -403,4 +401,4 @@ See [privacy.md](privacy.md).
 - `tools/builtin/routines.test.ts`: the card only; days and triggers; meeting default 10; refusals
   by name; not offered on a routine's own turn; `change_routine` lists saved routines.
 - `tools/builtin/experts.test.ts` ("in a routine"), `tools/registry.test.ts`.
-- `bodies/desktop/src/main/routine-delivery.test.ts`, `bodies/ui/src/routine-card.test.tsx`.
+- `bodies/desktop/src/main/routine-delivery.test.ts`.

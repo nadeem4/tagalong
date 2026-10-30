@@ -402,15 +402,14 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
   checks the card. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
   job) shows "Asks itself" with a disabled switch.
-- **Jobs panel:** Home's Experts page opens with a Jobs card (`bodies/ui/src/home/jobs-panel.tsx`)
-  above the old Experts list. It uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
+- **Jobs panel:** Home's Jobs page (`bodies/ui/src/home/jobs-panel.tsx`)
+  uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
   while running, reason when ended, and a Show result toggle once finished. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
-  The old `ExpertsPanel` under it calls the retired engine (`engine()` throws), so it does not
-  work; do not rely on it. `e2e/jobs.spec.ts` covers the panel on the fake brain.
+  `e2e/jobs.spec.ts` covers the panel on the fake brain.
 - **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses
   `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`
   (`ipc/approvals.ts`, channels `tagalong:approvals:list`, `tagalong:approvals:preferences:list`,

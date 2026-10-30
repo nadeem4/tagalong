@@ -1,7 +1,7 @@
 /**
  * The HostBridge contract: every call and notification a ui component may use, which each
  * host (the Electron app, the browser extension) implements. Contains HostBridge, TurnEvent,
- * AskInput, ConfirmHandoff, and the HostBridgeProvider / useHostBridge React context.
+ * AskInput, and the HostBridgeProvider / useHostBridge React context.
  */
 
 import { createContext, createElement, useContext } from 'react';
@@ -9,27 +9,11 @@ import type { ReactNode } from 'react';
 import type {
   AppAddParams,
   AppsList,
-  CalendarCheckResult,
-  ActivityListResult,
-  AsksListResult,
-  ExperienceGetResult,
-  ExperienceListResult,
-  SelfGetResult,
-  SelfListResult,
-  Brief,
   ContextSnapshot,
   CoreToHostNotification,
-  CatalogStatus,
-  Expert,
   NotificationParamsOf,
   PerceptionTarget,
   Pet,
-  ProjectCandidate,
-  RoutineDraftInput,
-  RoutineProposedParams,
-  RoutineView,
-  SettingsPatch,
-  SightLogEntry,
   MemoryEntry,
 } from '@tagalong/protocol';
 import type { FixTarget, HealthFacts } from './health';
@@ -107,25 +91,13 @@ export interface BrainLink {
 }
 
 /**
- * The core-to-host notifications a panel renders: everything about a turn in flight, a
- * watch, a hand-off to an expert as it goes, connector confirms and routines.
+ * The notifications a panel renders: everything about a turn in flight, the brain's asks
+ * (shown as confirm cards) and Scout's own words from a wake.
  */
 type TurnNotification =
   | Extract<CoreToHostNotification, `turn.${string}`>
-  | 'watch.fired'
-  | 'watch.status'
-  | 'handoff.proposed'
-  | 'handoff.progress'
-  | 'handoff.finished'
   | 'connector.confirm'
   | 'connector.dismiss'
-  | 'asks.changed'
-  | 'routine.proposed'
-  | 'routine.result'
-  | 'routines.changed'
-  | 'pet.mood'
-  | 'settings.proposed'
-  // Only the line about a finished hand-off (with `handoffId`); other lines show beside Scout.
   | 'pet.remark';
 
 /**
@@ -172,59 +144,6 @@ export interface HostBridge {
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
-  /**
-   * Ends a watch from its Watching chip. Optional: a host that cannot start
-   * watches never shows a chip to stop.
-   */
-  stopWatch?(watchId: string): Promise<void>;
-  /**
-   * Home. What Scout did — turns, hand-offs to experts, app calls, routines — newest first, a page
-   * at a time (`before` is the previous page's `next`). Optional: a host without Home never
-   * shows the activity view.
-   */
-  listActivity?(params?: { before?: string; limit?: number }): Promise<ActivityListResult>;
-  /**
-   * Home's decisions page: the experience log, every turn and check-in with what Scout was
-   * shown, what it decided and what came of it, newest first, a page at a time. Optional, like
-   * the activity view.
-   */
-  listExperience?(params?: { before?: string; limit?: number }): Promise<ExperienceListResult>;
-  /** One episode with its tool calls and outcomes, or null once it is gone. */
-  getExperience?(id: string): Promise<ExperienceGetResult>;
-  /** Delete all: every decision and its steps. Resolves with how many went. */
-  clearExperience?(): Promise<number>;
-  /**
-   * Home's What Scout learned: Scout's own notes (the Self), their versions, the person's
-   * edits and undo. Optional, like the activity view.
-   */
-  listSelf?(): Promise<SelfListResult>;
-  getSelf?(path: string): Promise<SelfGetResult>;
-  writeSelf?(path: string, text: string): Promise<{ ok: boolean; reason?: string; note?: string }>;
-  undoSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
-  /** A proposed change: accepted applies it, rejected keeps it on record, never applied. */
-  acceptSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
-  rejectSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
-  /**
-   * Home's Experts page: the tools a companion hands work to. All optional: a host without
-   * Home, such as the browser extension, never shows the page.
-   */
-  listExperts?(): Promise<Expert[]>;
-  saveExpert?(expert: Expert): Promise<Expert>;
-  deleteExpert?(expertId: string): Promise<boolean>;
-  /** Whether the expert can be reached, at no cost: Claude Code's `--version`. */
-  testExpert?(expertId: string): Promise<{ ok: boolean; error?: string }>;
-  /** The built-in expert catalog, with what this computer has for each entry. */
-  expertCatalog?(): Promise<CatalogStatus[]>;
-  /** Installs an entry's missing plugins with `claude plugin install`, on the person's press. */
-  installExpert?(catalogId: string): Promise<{ ok: boolean; installed: string[]; error?: string }>;
-  /** The host's folder picker; null when the user cancelled. */
-  pickFolder?(): Promise<string | null>;
-  /** Sends a proposed hand-off, in the folder the person settled on. */
-  confirmHandoff?(params: ConfirmHandoff): Promise<{ handoffId: string }>;
-  dismissHandoff?(proposalId: string): Promise<void>;
-  cancelHandoff?(handoffId: string): Promise<void>;
-  /** Projects on this computer matching a name or path, for "Change project". */
-  searchProjects?(query: string): Promise<ProjectCandidate[]>;
   /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
   approveTool?(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
   /**
@@ -232,14 +151,6 @@ export interface HostBridge {
    * question. Separate from approveTool because these options are not allow/always/deny.
    */
   answerJobAsk?(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
-  /**
-   * Home's Waiting on you: what waits on the person and the last answered. Allow once and
-   * Decline answer an ask (resolves false when it no longer waited); Open brings a hand-off
-   * card up again in the bubble. All optional: a host without Home never shows the page.
-   */
-  listAsks?(): Promise<AsksListResult>;
-  answerAsk?(id: string, decision: 'approve' | 'decline'): Promise<boolean>;
-  openAsk?(id: string): Promise<boolean>;
   /**
    * Home's Connections page: the apps the brain keeps (MCP). All optional: a host without
    * Home never shows the page. They reject with "brain offline" while the brain is away.
@@ -255,40 +166,6 @@ export interface HostBridge {
   /** Remove: the brain forgets the app and deletes its stored key. */
   removeConnection?(id: string): Promise<unknown>;
   /**
-   * Home's Routines page and the routine card. All optional: a host without Home never shows
-   * either. Saving, in Home or on the card, is the person's consent.
-   */
-  listRoutines?(): Promise<RoutineView[]>;
-  saveRoutine?(routine: RoutineDraftInput & { id?: string }): Promise<RoutineView>;
-  deleteRoutine?(id: string): Promise<boolean>;
-  setRoutineEnabled?(id: string, enabled: boolean): Promise<RoutineView>;
-  /** Runs it once now; the result arrives as `routine.result`. */
-  runRoutine?(id: string): Promise<boolean>;
-  /** Save on Scout's card, with the person's edit when there is one. */
-  confirmRoutine?(
-    proposalId: string,
-    routine?: RoutineDraftInput,
-  ): Promise<{ routine?: RoutineView; deleted?: boolean }>;
-  dismissRoutine?(proposalId: string): Promise<void>;
-  /** Edit on Scout's card: Home opens on Routines with the card's routine in the form. */
-  editRoutine?(proposal: RoutineProposedParams): Promise<void>;
-  /**
-   * Pick up where you left off. Open reopens one project of the current pick-up, by item id:
-   * the host opens only what that pick-up named. Brief again puts a saved ask on the hand-off
-   * card, unsent. Not now drops the offer. All optional: a host without it never shows the card.
-   */
-  openPickUp?(itemId: string): Promise<void>;
-  rebriefPickUp?(itemId: string): Promise<void>;
-  dismissPickUp?(): Promise<void>;
-  /**
-   * Home's What Scout saw: each look and each send, newest first, as metadata. All
-   * optional: a host without Home never shows the page.
-   */
-  listSightLog?(): Promise<SightLogEntry[]>;
-  deleteSightLog?(id: string): Promise<boolean>;
-  /** Deletes the whole log; resolves to how many rows went. */
-  clearSightLog?(): Promise<number>;
-  /**
    * Home's What Scout remembers: its facts, preferences and summaries, newest first, each
    * deletable. Optional: a host without Home never shows the page.
    */
@@ -299,13 +176,6 @@ export interface HostBridge {
    * never reads the clipboard and never pastes. Optional: without it a draft has no Copy.
    */
   copyText?(text: string): Promise<void>;
-  /**
-   * Meeting prep's .ics link, kept in the keychain by the engine (null forgets it). The
-   * answer says whether it reads, and never holds the link.
-   */
-  setCalendarLink?(link: string | null): Promise<CalendarCheckResult>;
-  /** Whether a calendar link is kept, without showing it. */
-  checkCalendar?(): Promise<CalendarCheckResult>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
   usageSummary?(): Promise<SpendToday>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
@@ -348,21 +218,6 @@ export interface HostBridge {
   openFix?(target: FixTarget): Promise<void>;
   /** The health card's Open logs folder: shows the folder; no log text leaves the host. */
   openLogs?(): Promise<void>;
-  /**
-   * Apply on Scout's settings card: saves the card's patch through the host's ordinary
-   * settings path, on the person's click only. Optional: without it the card cannot apply.
-   */
-  applySettings?(patch: SettingsPatch): Promise<void>;
-}
-
-export interface ConfirmHandoff {
-  proposalId: string;
-  /** Left out for an expert that works in its own folder. */
-  folder?: string;
-  canEdit: boolean;
-  brief?: Brief;
-  /** A two-step hand-off: step 2's access and edited ask, or null when it was removed. */
-  then?: { canEdit: boolean; ask?: string } | null;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);

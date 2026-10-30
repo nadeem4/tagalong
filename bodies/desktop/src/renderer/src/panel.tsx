@@ -1,7 +1,7 @@
 /**
  * The panel window's page: Scout's bubble beside the pet and the full chat one click behind
  * it, with talk-to-Scout (talk.ts), Scout's voice, the health check (health-facts.ts) and the
- * cards Scout opens (keep-an-eye lines, routine results, pick-up, dropped items).
+ * cards Scout opens (Scout's own wake lines and dropped items).
  */
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -13,13 +13,7 @@ import {
   QueueMouth,
   SpeechQueue,
 } from '@tagalong/ui';
-import type {
-  ContextSnapshot,
-  PetRemarkParams,
-  PickUpReadyParams,
-  RoutineResultParams,
-  StatusMark,
-} from '@tagalong/protocol';
+import type { ContextSnapshot, PetRemarkParams, StatusMark } from '@tagalong/protocol';
 import type { DropOffer } from '@tagalong/ui';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
@@ -56,12 +50,9 @@ function bubbleBridge(): HostBridge {
       gatherHealth({
         getHostView: () => host.getHostView(),
         checkClaudeSignIn: () => host.checkClaudeSignIn(),
-        listExperts: () => bridge.listExperts?.() ?? unavailable(),
-        testExpert: (id) => bridge.testExpert?.(id) ?? unavailable(),
         listConnections: () => bridge.listConnections?.() ?? unavailable(),
         listMicrophones: () => listMicrophones(),
         voiceModels: () => host.voiceModels(),
-        hostsStatus: () => host.hostsStatus(),
         testBudgetMs: HEALTH_TEST_BUDGET_MS,
       }),
     openFix: (target: FixTarget) => host.openSettings(target),
@@ -85,15 +76,6 @@ function Panel() {
   const [line, setLine] = useState<GreetLine | null>(null);
   // A line Scout says on its own, from keeping an eye on things, with Not now on it.
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
-  // A routine's result: a quiet line that opens to the full answer in its conversation.
-  const [routine, setRoutine] = useState<RoutineResultParams | null>(null);
-  // Pick up where you left off: the card Pick up on the line opened.
-  const [pickUp, setPickUp] = useState<PickUpReadyParams | null>(null);
-  const [resume, setResume] = useState<{
-    conversationId: string;
-    question: string;
-    answer: string;
-  } | null>(null);
   // Something dropped on Scout: its card, until a button on it is pressed.
   const [drop, setDrop] = useState<DropOffer | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
@@ -136,7 +118,6 @@ function Panel() {
       setGreeting(false);
       setLine(null);
       setRemark(null);
-      setRoutine(null);
     },
   });
 
@@ -145,8 +126,7 @@ function Panel() {
     return window.tagalongHost.onSightPause((paused) => setSeeing(!paused));
   }, []);
 
-  // The stop key cuts Scout off mid-sentence, and a watch that fires says its reason aloud.
-  // A watch with no reason says nothing: its card shows the condition.
+  // The stop key cuts Scout off mid-sentence.
   useEffect(
     () =>
       window.tagalongHost.onStopVoice(() => {
@@ -155,14 +135,6 @@ function Panel() {
       }),
     [mouth, hush],
   );
-  useEffect(
-    () =>
-      window.tagalong.onTurnEvent((event) => {
-        if (event.type === 'watch.fired' && event.message !== '') mouth.say(event.message);
-      }),
-    [mouth],
-  );
-
   // Transparent around the bubble's rounded corners; the window itself is transparent.
   useEffect(() => {
     document.body.style.background = 'transparent';
@@ -212,19 +184,6 @@ function Panel() {
     [mouth],
   );
 
-  useEffect(
-    () =>
-      window.tagalongHost.onRoutine((result, how) => {
-        if (how.speak) mouth.say(result.text || result.line);
-        if (!how.line) return;
-        setMode('bubble');
-        setLine(null);
-        setRemark(null);
-        setRoutine(result);
-      }),
-    [mouth],
-  );
-
   // The window follows what is shown: the chat at its full height, the bubble at its own.
   useEffect(() => {
     if (mode === 'chat') {
@@ -254,8 +213,6 @@ function Panel() {
       setGreeting(false);
       setLine(null);
       setRemark(null);
-      setRoutine(null);
-      setResume(null);
       setDrop(null);
     });
   }, []);
@@ -268,8 +225,6 @@ function Panel() {
         setGreeting(false);
         setLine(null);
         setRemark(null);
-        setRoutine(null);
-        setResume(null);
         setDrop(offer);
       }),
     [],
@@ -325,31 +280,7 @@ function Panel() {
               a panel that was already showing is never hidden (the report only asks if main
               brought it up). */}
           <ApprovedReport onHide={() => void window.tagalongHost.hidePanel()} />
-          {routine !== null ? (
-            <GreetingLine
-              petName={petName}
-              text={routine.line}
-              tail={side === 'left' ? 'right' : 'left'}
-              holdMs={12_000}
-              onDone={() => {
-                setRoutine(null);
-                mouth.stop();
-                void window.tagalongHost.hidePanel();
-              }}
-              onOpen={() => {
-                setRoutine(null);
-                setResume(
-                  routine.conversationId === undefined
-                    ? null
-                    : {
-                        conversationId: routine.conversationId,
-                        question: routine.name,
-                        answer: routine.text,
-                      },
-                );
-              }}
-            />
-          ) : remark !== null ? (
+          {remark !== null ? (
             <GreetingLine
               petName={petName}
               text={remark.text}
@@ -362,18 +293,6 @@ function Panel() {
               }}
               onOpen={() => setRemark(null)}
               onNotNow={() => void window.tagalongHost.remarkNotNow()}
-              {...(remark.offer !== undefined
-                ? {
-                    offer: {
-                      label: 'Hand it over',
-                      // The bubble comes back first, so it is there to show the card.
-                      onAccept: () => {
-                        setRemark(null);
-                        void window.tagalongHost.remarkAccept(remark.remarkId);
-                      },
-                    },
-                  }
-                : {})}
             />
           ) : line !== null && 'status' in line ? (
             <GreetingLine
@@ -398,28 +317,12 @@ function Panel() {
               onDone={() => {
                 setLine(null);
                 mouth.stop();
-                // A pick-up let go (Not now, the close, or the fade) is dropped.
-                if (line.pickUp !== undefined) void window.tagalong.dismissPickUp?.();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setLine(null)}
-              {...(line.pickUp !== undefined
-                ? {
-                    onNotNow: () => undefined,
-                    offer: {
-                      label: 'Pick up',
-                      // The bubble opens on the card; nothing opens until a button there.
-                      onAccept: () => {
-                        setPickUp(line.pickUp ?? null);
-                        setLine(null);
-                      },
-                    },
-                  }
-                : {})}
             />
           ) : (
             <CompanionBubble
-              key={resume?.conversationId ?? 'bubble'}
               petId={petId}
               petName={petName}
               greeting={greeting}
@@ -443,8 +346,6 @@ function Panel() {
                 mouth.stop();
               }}
               {...(snapshot !== null ? { snapshot } : {})}
-              {...(resume !== null ? { resume } : {})}
-              {...(pickUp !== null ? { pickUp, onPickUpDone: () => setPickUp(null) } : {})}
               {...(drop !== null ? { drop } : {})}
               onDropDone={() => setDrop(null)}
               status={status}

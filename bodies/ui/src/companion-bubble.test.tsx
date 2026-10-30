@@ -105,10 +105,6 @@ describe('CompanionBubble invitation after setup', () => {
     expect(screen.getByRole('button', { name: 'Try it now' })).toBeVisible();
     expect(onSay).toHaveBeenCalledOnce();
     expect(onSay).toHaveBeenCalledWith(HELLO);
-    // A line about a finished hand-off is not the hello.
-    act(() => bridge.emit(helloRemark('All green.', { handoffId: crypto.randomUUID() })));
-    expect(screen.getByRole('status')).toHaveTextContent(HELLO);
-    expect(onSay).toHaveBeenCalledOnce();
   });
 
   it('types the line in, while a screen reader hears it whole', () => {
@@ -494,23 +490,6 @@ describe('GreetingLine', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(onNotNow).toHaveBeenCalledOnce();
     expect(onDone).toHaveBeenCalledOnce();
-  });
-
-  it('a remark with an offer opens the hand-off card only when the person takes it', () => {
-    const onDone = vi.fn();
-    const onAccept = vi.fn();
-    render(
-      <GreetingLine
-        petName="Scout"
-        text="That build broke on a missing import."
-        onDone={onDone}
-        onNotNow={() => undefined}
-        offer={{ label: 'Hand it over', onAccept }}
-      />,
-    );
-    expect(onAccept).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Hand it over' }));
-    expect(onAccept).toHaveBeenCalledOnce();
   });
 });
 

@@ -41,9 +41,6 @@ last session after a long break.
 | `bodies/desktop/src/main/ipc/experts.ts`, `ipc/pick-up.ts` | IPC from the renderers to these methods                                                                                              |
 | `bodies/desktop/src/main/handoff-notice.ts`                | The system notification for a finished hand-off                                                                                      |
 | `bodies/desktop/src/main/pick-up-open.ts`                  | `openFor`, `PickUpAllowlist`, `PickUpWaiting`                                                                                        |
-| `bodies/ui/src/handoff-card.tsx`                           | The hand-off cards in the bubble (proposal, at work, answer)                                                                         |
-| `bodies/ui/src/home/experts-panel.tsx`                     | Home's Experts page and the catalog install confirm                                                                                  |
-| `bodies/ui/src/pick-up-card.tsx`                           | The pick-up card                                                                                                                     |
 
 ## How it works
 
@@ -391,7 +388,7 @@ the middle of. The code decides when; whether to say anything, and what, is the 
   otherwise `onReady` calls `CheckIn#back`. A closed gate leaves it for the next tick. `take()`
   returns `{ items, takenAt }` once and starts an empty snapshot. A line from the mind goes out as
   `pickUp.ready { text, items }`; a silent mind spends the snapshot.
-- **The card** (`pick-up-card.tsx`): **Open in VS Code**, **Open in Cursor** or **Open folder** per
+- **The card** (removed with the old brain; was `pick-up-card.tsx`): **Open in VS Code**, **Open in Cursor** or **Open folder** per
   project, **Brief again** per hand-off (`pickUp.rebrief { itemId }` calls `HandoffManager.propose`
   with the saved ask: the normal card, nothing runs until Send), and **Not now**
   (`pickUp.dismiss`).

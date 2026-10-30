@@ -1,6 +1,5 @@
 /**
- * The full chat panel used by the browser extension's side panel: sight bar, watch chips,
- * messages, Stop and the composer, driven by the HostBridge turn events. Contains ChatPanel.
+ * The full chat panel used by the browser extension's side panel: sight bar, messages, Stop and the composer, driven by the HostBridge turn events. Contains ChatPanel.
  */
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -15,7 +14,7 @@ import { stopStatus } from './stop-status';
 const LOOK_TARGETS = ['screenshot', 'activeWindow'] as const;
 
 export interface ChatPanelProps {
-  /** The companion: who the next ask goes to, and the name on its answers and watches. */
+  /** The companion: who the next ask goes to, and the name on its answers. */
   pet: Pet;
   /** What the host captured for this ask: named in the sight bar and sent with the turn. */
   snapshot?: ContextSnapshot;
@@ -23,15 +22,6 @@ export interface ChatPanelProps {
   lookTargets?: readonly PerceptionTarget[];
   /** The Look button's words, to match what `lookTargets` captures. */
   lookLabel?: string;
-}
-
-/** A watch in progress, from its latest `watch.status`. */
-interface RunningWatch {
-  watchId: string;
-  condition: string;
-  checks: number;
-  maxChecks: number;
-  checkModel?: string;
 }
 
 export function ChatPanel({
@@ -53,11 +43,9 @@ export function ChatPanel({
   const [modelCalls, setModelCalls] = useState<number | null>(null);
   // The conversation the last answer came from, so a follow-up continues that thread.
   const [conversationId, setConversationId] = useState<string | null>(null);
-  // Watches running now, shown as chips with a Stop button each.
-  const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
   // Who answered each turn, "Scout · haiku", from its `turn.started`.
   const speakers = useRef(new Map<string, string>());
-  // Background turns (routines, Scout's own jobs): nobody asked them here, so none streams in.
+  // Background turns (Scout's own wakes and jobs): nobody asked them here, so none streams in.
   const background = useRef(new Set<string>());
 
   // React's documented way to reset state when a prop changes: a fresh host capture
@@ -141,44 +129,8 @@ export function ChatPanel({
       case 'turn.error':
         settle({ id: `${event.turnId}:error`, role: 'assistant', text: event.message });
         break;
-      case 'watch.status':
-        if (event.state === 'watching') {
-          const running: RunningWatch = {
-            watchId: event.watchId,
-            condition: event.condition,
-            checks: event.checks,
-            maxChecks: event.maxChecks,
-            ...(event.checkModel === undefined ? {} : { checkModel: event.checkModel }),
-          };
-          setWatches((current) => [
-            ...current.filter((watch) => watch.watchId !== event.watchId),
-            running,
-          ]);
-        } else {
-          setWatches((current) => current.filter((watch) => watch.watchId !== event.watchId));
-          // Fired says so with its own card, and Stop was the user's own doing; the other
-          // endings happened while nobody was looking, so the reason is put in the log.
-          if (event.state !== 'fired' && event.state !== 'stopped') {
-            note(event.detail ?? `Stopped watching for “${event.condition}”.`);
-          }
-        }
-        break;
-      case 'watch.fired':
-        // The judge's reason, when it gave one; the card always names the condition.
-        setMessages((current) => [
-          ...current,
-          {
-            id: `watch:${event.watchId}`,
-            role: 'assistant',
-            kind: 'watch',
-            text: event.message,
-            condition: event.condition,
-          },
-        ]);
-        break;
       default:
-        // Every other notification (tool calls, warnings, hand-offs, connector confirms,
-        // routines, connections, moods, settings) is not shown in this panel.
+        // Every other notification (tool calls, warnings, connector confirms, connections) is not shown in this panel.
         break;
     }
   });
@@ -221,39 +173,9 @@ export function ChatPanel({
         onClear={handleClear}
         {...(lookLabel !== undefined ? { lookLabel } : {})}
       />
-      {watches.map((watch) => (
-        <div
-          key={watch.watchId}
-          data-testid="watching"
-          className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
-        >
-          <span aria-hidden="true">⏱</span>
-          <span className="font-semibold">Watching</span>
-          <span className="truncate">
-            {pet.name}: “{watch.condition}”
-          </span>
-          <span
-            className="ml-auto shrink-0 text-sky-700"
-            title="Model checks spent, and the small model answering them"
-          >
-            {watch.checks}/{watch.maxChecks} checks
-            {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
-          </span>
-          {bridge.stopWatch !== undefined && (
-            <button
-              type="button"
-              onClick={() => void bridge.stopWatch?.(watch.watchId)}
-              className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
-            >
-              Stop
-            </button>
-          )}
-        </div>
-      ))}
       <MessageList
         messages={messages}
         streamingText={streamingText}
-        petName={pet.name}
         {...(streamingSpeaker !== '' ? { streamingSpeaker } : {})}
       />
       {busy && (

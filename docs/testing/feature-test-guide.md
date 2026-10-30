@@ -126,7 +126,7 @@ _Only on a data folder from a build before Nebius was removed._
    key; (e) type "what's wrong with this code?", then "what's broken?"; (f) press **Open logs
    folder** on the card.
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
-   row each for Brain ("Signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
+   row each for Brain ("Signed out of Claude."), Connections, Voice ("The ElevenLabs
    voice has no key."), Microphone and Browser extension ("Not connected (optional)", grey, with
    **Set up**); nothing is spoken; no key appears anywhere on the
    card. No row says "I" or "my". (b) Home opens
@@ -537,6 +537,10 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
 
 ## Hand-offs to Claude Code (old engine)
 
+Home no longer has the Experts, Routines, Activity, Waiting on you, How Scout decided, What Scout saw
+or What Scout learned pages, nor a Scout page or Browser extension settings. Steps below that open
+them, or use the hand-off, routine, settings or pick-up cards, cannot be run.
+
 These sections cover the old packages/core engine, which the desktop no longer boots. For the
 Python brain see "Hand off to Claude Code (real brain, real Claude Code)" above.
 
@@ -653,11 +657,6 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 3. **Action:** make Home as narrow as it goes.
 4. **Expected:** it stops at 880 px; the nav and every page stay usable, the overview cards two
    across, nothing cut off.
-5. **Action:** press **Edit** on Scout's routine card, change its name in Home → Routines, look at
-   Experts, then come back to Routines; Save; leave Routines and come back again.
-6. **Expected:** the changed name is still in the form after the detour; after Save the list shows
-   and the card's form does not reopen. With Home closed, **Edit** opens Home on Routines with the
-   card in the form.
 
 ### S.7. The ⓘ notes
 

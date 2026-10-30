@@ -6,7 +6,6 @@ import type { HealthFacts, HealthRow } from './health';
 
 const ALL_GOOD: HealthFacts = {
   brain: 'ready',
-  experts: [{ name: 'Coder', ok: true }],
   connections: [{ name: 'GitHub', status: 'connected' }],
   voice: {
     enabled: true,
@@ -17,7 +16,6 @@ const ALL_GOOD: HealthFacts = {
     earsReady: true,
   },
   microphone: { count: 1, pickedMissing: false },
-  extension: true,
 };
 
 const row = (rows: HealthRow[], id: HealthRow['id']): HealthRow => {
@@ -29,24 +27,15 @@ const row = (rows: HealthRow[], id: HealthRow['id']): HealthRow => {
 describe('healthRows', () => {
   it('gives one row per check, in order, all ok, and says everything works', () => {
     const rows = healthRows(ALL_GOOD);
-    expect(rows.map((each) => each.id)).toEqual([
-      'brain',
-      'experts',
-      'connections',
-      'voice',
-      'microphone',
-      'extension',
-    ]);
+    expect(rows.map((each) => each.id)).toEqual(['brain', 'connections', 'voice', 'microphone']);
     expect(rows.every((each) => each.state === 'ok')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
     expect(healthHeadline(rows)).toBe('Everything’s working.');
     expect(rows.map((each) => each.line)).toEqual([
       'Ready.',
-      'All experts reachable.',
       'All apps connected.',
       'Ready.',
       'A microphone is ready.',
-      'Connected.',
     ]);
   });
 
@@ -56,7 +45,7 @@ describe('healthRows', () => {
       ...healthRows(ALL_GOOD),
       ...healthRows({ ...ALL_GOOD, brain: 'signed-out' }),
       ...healthRows({ ...ALL_GOOD, brain: 'no-sign-in' }),
-      ...healthRows({ ...ALL_GOOD, brain: 'no-key', experts: 'unknown' }),
+      ...healthRows({ ...ALL_GOOD, brain: 'no-key' }),
       ...healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }),
       ...healthRows({ ...ALL_GOOD, voice: { ...voice, mouth: 'kokoro', mouthReady: false } }),
     ].map((each) => each.line);
@@ -72,34 +61,6 @@ describe('healthRows', () => {
       state: 'broken',
       line,
       fix: 'brain',
-    });
-  });
-
-  it('names an expert that cannot be reached, and says when none are on', () => {
-    const unreachable = healthRows({
-      ...ALL_GOOD,
-      experts: [
-        { name: 'Coder', ok: false },
-        { name: 'Writer', ok: true },
-      ],
-    });
-    expect(row(unreachable, 'experts')).toMatchObject({
-      state: 'broken',
-      line: 'Coder can’t be reached.',
-      fix: 'experts',
-    });
-    const two = healthRows({
-      ...ALL_GOOD,
-      experts: [
-        { name: 'Coder', ok: false },
-        { name: 'Writer', ok: false },
-      ],
-    });
-    expect(row(two, 'experts').line).toBe('Coder and Writer can’t be reached.');
-    expect(row(healthRows({ ...ALL_GOOD, experts: [] }), 'experts')).toMatchObject({
-      state: 'broken',
-      line: 'No experts are on.',
-      fix: 'experts',
     });
   });
 
@@ -152,32 +113,24 @@ describe('healthRows', () => {
     ).toMatchObject({ state: 'broken', line: 'The one you picked is unplugged.', fix: 'voice' });
   });
 
-  it('shows a missing extension as info, never counted', () => {
-    const rows = healthRows({ ...ALL_GOOD, extension: false });
-    expect(row(rows, 'extension')).toMatchObject({
-      state: 'info',
-      line: 'Not connected (optional)',
-      fix: 'browser',
-    });
-    expect(healthHeadline(rows)).toBe('Everything’s working.');
-  });
-
   it('turns a fact it could not read into an unknown row, not a problem', () => {
     const rows = healthRows({
       brain: 'unknown',
-      experts: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
-      extension: 'unknown',
     });
     expect(rows.every((each) => each.state === 'unknown')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
-    expect(row(rows, 'experts').line).toBe('Not checked.');
+    expect(row(rows, 'brain').line).toBe('Not checked.');
   });
 
   it('counts what needs the person in the headline', () => {
-    const rows = healthRows({ ...ALL_GOOD, brain: 'signed-out', experts: [] });
+    const rows = healthRows({
+      ...ALL_GOOD,
+      brain: 'signed-out',
+      connections: [{ name: 'GitHub', status: 'error' }],
+    });
     expect(healthHeadline(rows)).toBe('Two things need you.');
     expect(healthHeadline(healthRows({ ...ALL_GOOD, brain: 'no-key' }))).toBe(
       'One thing needs you.',

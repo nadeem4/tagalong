@@ -9,7 +9,6 @@ export { HostBridgeProvider } from './host-bridge';
 export type {
   AskInput,
   BrainLink,
-  ConfirmHandoff,
   HostBridge,
   JobRow,
   ApprovalRow,
@@ -34,7 +33,7 @@ export type { ChatPanelProps } from './chat-panel';
 /** Exported so hosts can test their renderer wiring without booting an engine. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 
-/** Home: the one window for the companion, its experts, activity and settings. */
+/** Home: the one window for jobs, permissions, approvals, connections, memory and settings. */
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { brainLabel } from './home/brain-label';

@@ -571,9 +571,8 @@ insert and once at engine boot. RPC (`packages/protocol/src/sight-log.ts`):
 | `sightLog.clear`  | `{}`                       | `{ deleted: count }`        |
 
 None is in `EXTENSION_METHODS`, so the extension cannot read or delete the log. Home's
-`SightLogView` (`bodies/ui/src/home/sight-log-view.tsx`) uses `IPC.listSightLog`,
-`IPC.deleteSightLog`, `IPC.clearSightLog` (`tagalong:sight-log:*`), registered in
-`ipc/sight-log.ts`, which lists the newest 200. Deleting removes the record only, not what was
+Home no longer has a page for the log (`SightLogView` was removed with the old brain); the IPC
+(`tagalong:sight-log:*`, `ipc/sight-log.ts`, newest 200) is retired in a later task. Deleting removes the record only, not what was
 sent and not conversations. `SightLog.list(limit, since, until)` also serves the daily briefing.
 
 The sight log and rolling memory are independent: the log is metadata on disk, rolling memory is

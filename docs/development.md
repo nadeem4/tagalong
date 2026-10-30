@@ -78,10 +78,10 @@ tagalong/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
       dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
-      handoff-card.tsx, connector-confirm.tsx, routine-card.tsx, settings-card.tsx, drop-card.tsx,
-      pick-up-card.tsx, health-card.tsx, status-mark.tsx, answer.tsx
-      home/                         # Home: HomeView and its pages (Experts, Routines, Connections, Activity,
-                                    # Waiting on you, What Scout saw, remembers and learned, How Scout decided, Spend)
+      connector-confirm.tsx, drop-card.tsx,
+      health-card.tsx, status-mark.tsx, answer.tsx
+      home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
+                                    # What Scout remembers, Settings, Spend)
       settings/settings-styles.ts   # the Settings sheet's styles
       voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
       theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)

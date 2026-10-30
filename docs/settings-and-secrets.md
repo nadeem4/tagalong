@@ -26,7 +26,6 @@ that leaves the machine.
 | `bodies/desktop/src/main/ipc/settings.ts`       | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
 | `bodies/desktop/src/main/ipc/apply-settings.ts` | `applySettings`: Apply on Scout's settings card                                                                                         |
 | `bodies/desktop/src/main/index.ts`              | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
-| `bodies/ui/src/settings-card.tsx`               | The settings card in the bubble                                                                                                         |
 
 ## How it works
 

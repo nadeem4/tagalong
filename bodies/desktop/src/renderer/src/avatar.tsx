@@ -14,7 +14,7 @@ import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
 import { FIGURE } from './bean-assets';
-import { IDLE_DOCK, REACTION_MS, dockMood, nextDock } from './dock';
+import { IDLE_DOCK, dockMood, nextDock } from './dock';
 import { petInput } from './pet-input';
 
 /** How long "Seeing" shows after a capture. */
@@ -102,22 +102,8 @@ function Avatar() {
     return window.tagalongHost.onStatusMark(setStatus);
   }, []);
 
-  // Engine events, and main's presence.away and presence.back on the same channel. A wince
-  // or a cheer clears after a few seconds; a new one starts the time again.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = window.tagalong.onTurnEvent((event) => {
-      send(event);
-      // Tired and rested are sticky: they never start or restart the reaction's time.
-      if (event.type !== 'pet.mood' || event.mood === 'tired' || event.mood === 'rested') return;
-      clearTimeout(timer);
-      timer = setTimeout(() => send({ type: 'reacted' }), REACTION_MS);
-    });
-    return () => {
-      clearTimeout(timer);
-      off();
-    };
-  }, []);
+  // Brain turn events, and main's presence.away and presence.back on the same channel.
+  useEffect(() => window.tagalong.onTurnEvent((event) => send(event)), []);
 
   // Every capture is announced: the pet looks up and says "Seeing" for a moment.
   useEffect(() => {

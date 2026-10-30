@@ -21,13 +21,11 @@ export function BrainSection({
   providers,
   onCheckAgain,
   onSwitched,
-  onOpenScout,
 }: {
   brain: ScoutBrain;
   providers: readonly ProviderChoice[];
   onCheckAgain: () => void;
   onSwitched: (pet: Pet, providerId: string) => void;
-  onOpenScout: (() => void) | undefined;
 }) {
   const [picking, setPicking] = useState(false);
 
@@ -37,8 +35,8 @@ export function BrainSection({
         <div className="tg-alert tg-alert--err" role="status">
           <p className="tg-alert__title">Scout&apos;s engine didn&apos;t start</p>
           <p>
-            Settings can still be changed. Sign-in status, model lists and the pairing token come
-            back once it&apos;s running.
+            Settings can still be changed. Sign-in status and model lists come back once it&apos;s
+            running.
           </p>
         </div>
       </Section>
@@ -104,14 +102,6 @@ export function BrainSection({
         </div>
       )}
       {canFix && picking && <KeyPicker providers={providers} onSwitched={onSwitched} />}
-      {onOpenScout !== undefined && (
-        <p className="tg-help">
-          This is Scout&apos;s own brain.{' '}
-          <button type="button" className="tg-link" onClick={onOpenScout}>
-            Change it on the Scout page
-          </button>
-        </p>
-      )}
     </Section>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Claude Code jobs on the fake brain: Home's Experts page lists a job and Stop reaches
+ * Claude Code jobs on the fake brain: Home's Jobs page lists a job and Stop reaches
  * `stop_job`; a hand-off opens a mode ask, a relayed permission ask and a question with no turn
  * running, each answered from its card; and a `changed: jobs` from the brain refreshes the list.
  */
@@ -60,7 +60,7 @@ test('Home lists the job and Stop reaches the brain', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Experts', exact: true }).click();
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
 
   const jobs = home.getByRole('region', { name: 'Jobs' });
   await expect(jobs).toContainText('Fix the build', { timeout: 30_000 });

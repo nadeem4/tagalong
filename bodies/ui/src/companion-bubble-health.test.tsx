@@ -10,7 +10,6 @@ import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 const FACTS: HealthFacts = {
   brain: 'signed-out',
-  experts: [{ name: 'Coder', ok: true }],
   connections: [],
   voice: {
     enabled: true,
@@ -21,7 +20,6 @@ const FACTS: HealthFacts = {
     earsReady: false,
   },
   microphone: { count: 1, pickedMissing: false },
-  extension: false,
 };
 
 function setup(health: Partial<HostBridge> = {}, props: { onSay?: (text: string) => void } = {}) {

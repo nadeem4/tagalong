@@ -18,7 +18,6 @@ import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
 import { BudgetSection } from './budget-section';
-import { BrowserSection } from './browser-section';
 import { ElevenLabsSection } from './elevenlabs-section';
 import { KeysSection } from './keys-section';
 import { PrivacySection } from './privacy-section';
@@ -34,7 +33,7 @@ import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
  * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
- * browser extension, then Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen
+ * then Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen
  * memory and watches), closed by default. Embedded in Home it has no header or side menu of its
  * own.
  *
@@ -42,14 +41,7 @@ import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
  * base URL changes, so they apply on the next ask. Main re-registers hotkeys on save, and the
  * sight settings are read per capture.
  */
-export function SettingsPage({
-  embedded = false,
-  onOpenScout,
-}: {
-  embedded?: boolean;
-  /** Home's Scout page, where Scout's brain is changed. Absent in the standalone window. */
-  onOpenScout?: () => void;
-}) {
+export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<HostView | null>(null);
   const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
   const [models, setModels] = useState<Record<string, string[]>>({});
@@ -324,14 +316,12 @@ export function SettingsPage({
             providers={view.providers}
             onCheckAgain={checkSignIn}
             onSwitched={switched}
-            onOpenScout={onOpenScout}
           />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
           <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
-          <BrowserSection token={view.pairingToken} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
             <SummariesSection
               groups={summarizerGroups({

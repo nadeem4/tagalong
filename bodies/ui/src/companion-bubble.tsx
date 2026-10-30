@@ -1,6 +1,6 @@
 /**
  * Scout's bubble beside the dock pet: asks with what Scout can see, streams the answer,
- * and hosts the cards (hand-off, connector confirm, routine, settings, pick-up, drop, health).
+ * and hosts the cards (connector confirm, drop, health).
  * Also the hello after setup (Try it now, under the mind's first line when it says one) and
  * the quiet GreetingLine. Contains
  * CompanionBubble, GreetingLine, BubbleTalk and their props. Used by the desktop panel window.
@@ -13,25 +13,12 @@ import type {
   ConnectorConfirmParams,
   ContextSnapshot,
   Mouth,
-  PickUpReadyParams,
-  RoutineProposedParams,
-  SettingsProposedParams,
   StatusMark as StatusMarkValue,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
 import { StatusMark } from './status-mark';
-import {
-  HANDOFF_CSS,
-  HandoffStatus,
-  ProposalCard,
-  undelivered,
-  withProgress,
-  type Handoff,
-} from './handoff-card';
+import { CARD_CSS } from './card-styles';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
-import { RoutineCard } from './routine-card';
-import { SettingsCard } from './settings-card';
-import { PickUpCard } from './pick-up-card';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { wantsHealthCheck } from './health-ask';
@@ -88,7 +75,7 @@ export interface CompanionBubbleProps {
   tail?: 'left' | 'right';
   /**
    * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
-   * and the mind's line about a finished hand-off. Called once per line, with the text as shown.
+   * and a wake's words. Called once per line, with the text as shown.
    */
   onSay?: (text: string) => void;
   /** Speaks the answer to a spoken question, sentence by sentence as it streams. */
@@ -96,19 +83,10 @@ export interface CompanionBubbleProps {
   /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
   speaking?: boolean;
   onStopSpeaking?: () => void;
-  /**
-   * Opens on a routine's result: its name stands for the question, its answer is shown, and
-   * the next question continues its conversation.
-   */
-  resume?: { conversationId: string; question: string; answer: string };
   /** Talk to Scout: the mic button, the listening state and what was heard. */
   talk?: BubbleTalk;
   /** Whether Scout may look at the screen: the Seeing switch in the header. */
   seeing?: { on: boolean; onToggle: () => void };
-  /** Pick up where you left off: the card Pick up on the line opened. */
-  pickUp?: PickUpReadyParams;
-  /** The pick-up card is done: Not now, or Brief again handed it to the hand-off card. */
-  onPickUpDone?: () => void;
   /** Something dropped on Scout: the drop card, until one of its buttons is pressed. */
   drop?: DropOffer;
   /** The drop card was answered or cancelled. */
@@ -191,11 +169,8 @@ export function CompanionBubble({
   mouth,
   speaking = false,
   onStopSpeaking,
-  resume,
   talk,
   seeing,
-  pickUp,
-  onPickUpDone,
   drop,
   onDropDone,
   status,
@@ -203,10 +178,7 @@ export function CompanionBubble({
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
-  const [reply, setReply] = useState<Reply>(
-    resume === undefined ? { state: 'idle' } : { state: 'done', text: resume.answer },
-  );
-  const [handoff, setHandoff] = useState<Handoff | null>(null);
+  const [reply, setReply] = useState<Reply>({ state: 'idle' });
   // A change Scout wants to make in a connected app, waiting for Allow once, Always allow or Deny.
   // The brain can ask about several tools at once, so they queue oldest first and the card
   // shows the head; answering or dismissing it brings up the next.
@@ -217,22 +189,18 @@ export function CompanionBubble({
       const next = current.filter((c) => !gone(c));
       return next.length === current.length ? current : next;
     });
-  // A routine Scout wrote or changed, waiting for Save.
-  const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
-  // Settings Scout would change, waiting for Apply: a click only, never a spoken yes.
-  const [settingsCard, setSettingsCard] = useState<SettingsProposedParams | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
   // A draft's Copy, when this host can write the clipboard.
   const copyText = useMemo(
     () => (bridge.copyText === undefined ? undefined : (text: string) => bridge.copyText!(text)),
     [bridge],
   );
-  const [question, setQuestion] = useState<string | null>(resume?.question ?? null);
+  const [question, setQuestion] = useState<string | null>(null);
   // Try it now ends the hello here, even when the screen could not be seen.
   const [tried, setTried] = useState(false);
   // The first hello's line, from the mind's check-in; empty until (unless) it says one.
   const [hello, setHello] = useState('');
-  const conversation = useRef<string | undefined>(resume?.conversationId);
+  const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
   // A spoken question's answer, said sentence by sentence as it streams.
   const spoken = useRef<{ stream: SpokenStream; lines: Pushable<string> } | null>(null);
@@ -280,27 +248,8 @@ export function CompanionBubble({
         // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
         dropConfirms((c) => c.approvalId === event.approvalId);
         return;
-      case 'asks.changed': {
-        // Answered in Home, expired or closed: a card whose ask no longer waits goes.
-        const still = new Set(event.waiting.map((ask) => ask.id));
-        dropConfirms((c) => !still.has(c.approvalId));
-        setHandoff((current) =>
-          current?.phase === 'proposed' && !still.has(current.proposal.proposalId) ? null : current,
-        );
-        return;
-      }
-      case 'routine.proposed': {
-        const { type: _type, ...params } = event;
-        setRoutine(params);
-        return;
-      }
-      case 'settings.proposed': {
-        const { type: _type, ...params } = event;
-        setSettingsCard(params);
-        return;
-      }
       case 'turn.started':
-        // A background turn (a routine's, a job's) runs on its own; it never answers here.
+        // A background turn (Scout's own wake) runs on its own; it never answers here.
         if (reply.state !== 'running' || event.background === true) return;
         mine.current = event.turnId;
         conversation.current = event.conversationId;
@@ -343,89 +292,21 @@ export function CompanionBubble({
         spoken.current = null;
         setReply({ state: 'failed', text: event.message });
         return;
-      case 'handoff.proposed':
-        setHandoff({ phase: 'proposed', proposal: event });
-        return;
-      case 'handoff.progress': {
-        const isThis = (
-          current: Handoff | null,
-        ): current is Extract<Handoff, { phase: 'working' }> =>
-          current?.phase === 'working' &&
-          current.expertId === event.expertId &&
-          (current.handoffId === null || current.handoffId === event.handoffId);
-        // The expert's narration, tool steps and notes stay on the card, never said aloud.
-        const { type: _type, ...params } = event;
-        setHandoff((current) => (isThis(current) ? withProgress(current, params) : current));
-        return;
-      }
-      case 'handoff.finished': {
-        const isThis = (
-          current: Handoff | null,
-        ): current is Extract<Handoff, { phase: 'working' }> =>
-          current?.phase === 'working' &&
-          current.expertId === event.expertId &&
-          (current.handoffId === null || current.handoffId === event.handoffId);
-        // Step 1 of a chain hands on to step 2. The finish itself says nothing: the mind's
-        // check-in may send one line about it (pet.remark with this hand-off's id).
-        const next = event.state === 'done' ? event.next : undefined;
-        setHandoff((current) => {
-          if (!isThis(current)) return current;
-          if (next !== undefined) {
-            return {
-              phase: 'working',
-              handoffId: next.handoffId,
-              expertId: next.expertId,
-              expertName: next.expertName,
-              project: current.project,
-              steps: [],
-              notes: current.notes,
-              chain: {
-                step: 2,
-                earlier: {
-                  expertName: current.expertName,
-                  text: event.text,
-                  changedFiles: event.changedFiles,
-                },
-              },
-            };
-          }
-          return {
-            phase: 'finished',
-            handoffId: event.handoffId,
-            expertName: current.expertName,
-            state: event.state,
-            text: event.text,
-            changedFiles: event.changedFiles,
-            error: event.error,
-            earlier: current.chain?.step === 2 ? current.chain.earlier : undefined,
-            skipped: current.chain?.step === 1 ? current.chain.nextName : undefined,
-            dropped: undelivered(current).length > 0 ? undelivered(current) : undefined,
-          };
-        });
-        return;
-      }
       case 'pet.remark':
-        if (event.handoffId === undefined) {
-          // The first hello's line, above Try it now, said once.
-          if (greeting && !tried && hello === '') {
-            setHello(event.text);
-            onSay?.(event.text);
-            return;
-          }
-          // A wake's words with the bubble open: Scout's message, unless an answer is streaming.
-          if (reply.state === 'running' || health !== null) return;
-          if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
-            const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
-            setPast((current) => [...current, answered]);
-          }
-          setQuestion(null);
-          setReply({ state: 'done', text: event.text });
+        // The first hello's line, above Try it now, said once.
+        if (greeting && !tried && hello === '') {
+          setHello(event.text);
           onSay?.(event.text);
           return;
         }
-        // The mind's line about the hand-off on the card: shown on it and said once.
-        if (handoff?.phase !== 'finished' || handoff.handoffId !== event.handoffId) return;
-        setHandoff({ ...handoff, line: event.text });
+        // A wake's words with the bubble open: Scout's message, unless an answer is streaming.
+        if (reply.state === 'running' || health !== null) return;
+        if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
+          const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
+          setPast((current) => [...current, answered]);
+        }
+        setQuestion(null);
+        setReply({ state: 'done', text: event.text });
         onSay?.(event.text);
         return;
       default:
@@ -752,9 +633,8 @@ export function CompanionBubble({
     setOpenDrop(undefined);
     onDropDone?.();
   };
-  const handoffCard = (
+  const cards = (
     <>
-      {pickUp !== undefined && <PickUpCard pickUp={pickUp} onDone={() => onPickUpDone?.()} />}
       {openDrop !== undefined && (
         <DropCard
           offer={openDrop}
@@ -777,46 +657,6 @@ export function CompanionBubble({
           confirm={confirm}
           onAnswer={answerConfirm}
           onReply={replyConfirm}
-        />
-      )}
-      {routine !== null && (
-        <RoutineCard key={routine.proposalId} proposal={routine} onDone={() => setRoutine(null)} />
-      )}
-      {settingsCard !== null && (
-        <SettingsCard
-          key={settingsCard.proposalId}
-          proposal={settingsCard}
-          onDone={() => setSettingsCard(null)}
-        />
-      )}
-      {handoff?.phase === 'proposed' && (
-        <ProposalCard
-          key={handoff.proposal.proposalId}
-          proposal={handoff.proposal}
-          // A quick expert can finish before Send hears back its id: keep what it sent, or
-          // the chain's step 2 it already handed on to.
-          onSent={(next) =>
-            setHandoff((current) =>
-              current?.phase === 'finished' ||
-              (current?.phase === 'working' &&
-                current.handoffId !== null &&
-                current.handoffId !== next.handoffId)
-                ? current
-                : next,
-            )
-          }
-          onCancelled={() => setHandoff(null)}
-        />
-      )}
-      {handoff !== null && handoff.phase !== 'proposed' && (
-        <HandoffStatus
-          handoff={handoff}
-          onStop={() => {
-            if (handoff.phase === 'working' && handoff.handoffId !== null) {
-              void bridge.cancelHandoff?.(handoff.handoffId);
-            }
-          }}
-          onDismiss={() => setHandoff(null)}
         />
       )}
     </>
@@ -851,7 +691,7 @@ export function CompanionBubble({
         <div className="bubble bubble--chat">
           <style>{BUBBLE_CSS}</style>
           <style>{ANSWER_CSS}</style>
-          <style>{HANDOFF_CSS}</style>
+          <style>{CARD_CSS}</style>
           <header className="bubble-head">
             <strong>{petName}</strong>
             <span className="bubble-row">
@@ -886,7 +726,7 @@ export function CompanionBubble({
                 {answer}
               </div>
             )}
-            {handoffCard}
+            {cards}
           </div>
           <footer className="bubble-foot">
             {chipList}
@@ -905,7 +745,7 @@ export function CompanionBubble({
       <div className="bubble">
         <style>{BUBBLE_CSS}</style>
         <style>{ANSWER_CSS}</style>
-        <style>{HANDOFF_CSS}</style>
+        <style>{CARD_CSS}</style>
         <div className="bubble-top">
           {chipList || <span />}
           <span className="bubble-row">
@@ -922,7 +762,7 @@ export function CompanionBubble({
           </p>
         )}
         {answer}
-        {handoffCard}
+        {cards}
         {statusRow}
         {talkStatus}
         {field(`Ask ${petName}`)}
@@ -1043,11 +883,6 @@ export interface GreetingLineProps {
   holdMs?: number;
   /** A remark Scout made on its own: Not now quiets it for an hour and closes the line. */
   onNotNow?: () => void;
-  /**
-   * A button on the line. For a task an expert could take it opens the hand-off card (nothing
-   * is sent yet); for a pick-up, Pick up opens its card.
-   */
-  offer?: { label: string; onAccept: () => void };
 }
 
 /** How long the fade out takes before the line is gone. */
@@ -1055,7 +890,7 @@ const LEAVE_MS = 300;
 
 /**
  * One quiet line beside the pet that fades after a few seconds: the hello on a later launch,
- * or a remark from keeping an eye on things, which adds Not now and, sometimes, an offer.
+ * or a remark from keeping an eye on things, which adds Not now.
  * Pointing at it or tabbing into it keeps it there; clicking it opens the bubble to ask.
  */
 export function GreetingLine({
@@ -1066,7 +901,6 @@ export function GreetingLine({
   tail,
   holdMs = 7_000,
   onNotNow,
-  offer,
   status,
   onFix,
 }: GreetingLineProps) {
@@ -1116,13 +950,8 @@ export function GreetingLine({
             ×
           </button>
         </div>
-        {(onNotNow !== undefined || offer !== undefined) && (
+        {onNotNow !== undefined && (
           <div className="bubble-row">
-            {offer !== undefined && (
-              <button type="button" className="bubble-primary" onClick={offer.onAccept}>
-                {offer.label}
-              </button>
-            )}
             {onNotNow !== undefined && (
               <button
                 type="button"

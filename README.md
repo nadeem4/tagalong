@@ -327,63 +327,16 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in thirteen pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in six pages:
 
-- **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code)
-  (**Spend**), and the latest activity. Spend shows the dollars spent today against the daily limit,
+- **Overview**: whether Scout is ready and what it thinks with, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code).
+  **Spend** shows the dollars spent today against the daily limit,
   as the brain reports them. The brain's limit is $5 a day unless `TAGALONG_DAILY_BUDGET_USD` sets
   another when the brain starts; the **Settings → Daily budget** box does not change it. A single
   Scout turn is also stopped after 300 seconds unless `TAGALONG_TURN_TIMEOUT_S` sets another;
   Scout then says it took too long. Time spent in tools, or waiting for you to answer, does not count.
-- **Waiting on you**: every change Scout wants to make in a connected app and every hand-off card
-  still waiting for Send, with **Allow once**, **Open** and **Decline**, and the last ones answered
-  with how each ended. The nav shows how many wait. A change waits an hour and a card a day; a
-  change still waiting when Tagalong closes is never run later. "Can’t be undone" marks a delete,
-  a send and the like.
-- **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
-- **Experts**: the tools Scout hands work to. **Add expert** starts from a template (**Coder**,
-  **Debugger**, **Designer**, **Reviewer**) or **Blank**, which fills in the name, what it is good
-  at, its **Standing instructions** (what it is told on every task, shown in full) and its switches;
-  change any of it before you save. Claude Code is the first kind; it must be installed and signed
-  in on this computer. It only reads and searches unless you
-  switch on **Let it edit files by default** (Coder starts with it on) or allow edits when you send
-  a task, and it searches the web only when **Let it search the web** is on. **Save and test**
-  checks that Claude Code starts, which costs nothing. There is no default project folder: each
-  task picks its project, and you confirm before anything is sent. A **Jobs** card on this page
-  lists the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show
-  result** for a finished one.
-  - **From the catalog**, below the templates: **Researcher**, **Trip planner** and **Social media
-    manager**. Each card shows the Claude Code plugins it uses (**Installed** or **Missing**), the
-    apps it may use from your own Claude Code connectors, what it may do in plain words, and the
-    exact app tools it is allowed; every other tool is refused. **Install** first lists each plugin
-    it will add, then runs Claude Code's own `claude plugin install` and opens the filled form for
-    a last look. These experts work in their own folder, never in your projects, and only they
-    may use plugins and apps; templates and experts you make stay sealed.
-- **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
-  - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
-    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**, **Meeting
-    prep**) or **Blank**. Pick **When** (every day, weekdays, chosen days at a time, or when Tagalong
-    opens, an app or site appears, an expert finishes, a watch fires, or 10 or 30 minutes before each
-    meeting), say **What** in your own words, and where the **Result goes**: Scout's bubble,
-    read aloud, a Windows notification. Activity always keeps each run.
-  - **May hand to** lets each run hand work to one expert without asking, read-only, with web search
-    and no project, so it never touches your files. Morning papers uses this to search the web with
-    Claude Code, or a paper app such as arXiv when you have connected one.
-  - **Meeting prep** reads your calendar from its secret .ics link (Google: Secret address in iCal
-    format; Outlook: Publish), kept in your keychain. Before each meeting with someone, Scout's line
-    gives the gist, and the full prep has the agenda, the last thread, related docs and open
-    questions, from your connected apps. A prep still waiting when a call runs past the start comes
-    as a Windows notification.
-  - Each routine shows its switch, its last run (with **See in Activity**) and its next run, with
-    **Run now** and **Edit**.
-  - You can also ask Scout: "every weekday at 8, give me new papers on AI agents and explain the best
-    one simply". Scout shows a routine card (name, when, what, what it uses, where the result goes)
-    with **Save**, **Edit** and **Cancel**; nothing is saved until you press **Save**, and then it
-    offers **Run it now** to test. Ask Scout to pause, change or delete a routine by name the same
-    way.
-  - A routine that was due while the PC was asleep or Tagalong was closed runs once when it is back,
-    and says it ran late. Results wait while a full-screen app or a call is in front. Click the
-    result's line to read it all and ask a follow-up.
+- **Jobs**: the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show
+  result** for a finished one. Claude Code must be installed and signed in on this computer.
 - **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
@@ -405,25 +358,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
     **Cancel**.
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
-- **Activity**: every answer, every hand-off, every call to an app and every routine run, newest
-  first. Click one to read it.
-- **How Scout decided**: every decision Scout made, newest first, including each time it chose to
-  stay quiet. Click one to see why it woke, what it was shown, each tool it used, what it said and
-  what you did about it (**Not now**, an offer taken, a hand-off sent or dismissed). Kept 30 days,
-  on this computer, with no screen text or window titles. **Delete all** clears it.
-- **What Scout saw**: every time Scout looked at your screen or sent something to an AI or an
-  expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
-- **What Scout learned**: Scout's own notes, the pages it keeps about you (**you.md**), what it
-  does differently now (**lessons.md**), what it promised to follow up on (**commitments.md**)
-  and procedures that worked (**skills**). In a conversation Scout updates you.md and
-  commitments.md at once; a new lesson or skill, and everything from **sleep** (once a day, while
-  you are away, Scout reads back what it did and what you made of it), arrives as a **proposed**
-  change you **Accept** or **Reject**, with its text shown. Each page says how many changes wait
-  on you. Every change shows who made it and why, and opens to its text; the newest one has
-  **Undo**. Edit any page and **Save** (a page longer than it holds is cut to fit, and says so).
-  The pages are plain files in `%APPDATA%\Tagalong\self`.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
@@ -438,7 +374,6 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
-  - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
     the ElevenLabs voice (your key and a voice ID from your ElevenLabs library), sight detail,
     screen memory and watches.
@@ -458,7 +393,7 @@ If Scout answers "model not found", open Settings and pick the id from the live 
 model box: it is the authority.
 
 Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
-URL in the base URL box, store its key there, and pick its model on the Scout page.
+URL in the base URL box, store its key there, and pick its model under **Settings → How Scout thinks**.
 
 ## The Chrome extension
 
@@ -549,14 +484,11 @@ screenshot is attached.
   leaves your computer, and Claude Code is told not to open secret files.
 - Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
   away when you pause sight or quit.
-- **Home → What Scout saw** lists every look (windows listed, text read, screenshots) and every send
-  to an AI or an expert: the app and window, where it went and how much, never the content. Kept 7
-  days (1 to 30 in Settings → Privacy); delete one row or all.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
 - Once a day Scout sends up to 150 of its memories, 30 conversation summaries and the notes of up
   to 10 recent background jobs to its summaries model to tidy them. Background jobs are deleted
-  after 14 days, Home's Activity after 90.
+  after 14 days.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.
@@ -582,7 +514,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Scout shows **Signed out**, **No brain** or **No key**         | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
 | Scout says "No … API key is stored"                            | Paste that provider's key in Settings. It works on the next question.                                                                           |
 | Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
-| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) on Home's Scout page.                                          |
+| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) under **Settings → How Scout thinks**.                         |
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
 | Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
 | Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |

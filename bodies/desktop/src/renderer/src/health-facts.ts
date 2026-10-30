@@ -1,10 +1,10 @@
 /**
  * "Scout, what's wrong?": gatherHealth reads the health card's rows (brain and sign-in,
- * experts, connections, voice, microphone, browser extension) from host calls that already
+ * connections, voice, microphone) from host calls that already
  * exist, each within a time budget, with no model call. Used by the bubble (panel.tsx).
  */
 import { chosenMouth } from '@tagalong/protocol';
-import type { AppsList, Expert } from '@tagalong/protocol';
+import type { AppsList } from '@tagalong/protocol';
 import type { HealthFacts } from '@tagalong/ui';
 import type { ClaudeSignIn, HostView, VoiceModels } from '../../shared/ipc';
 import { scoutBrain } from './settings/brain';
@@ -13,13 +13,10 @@ import { scoutBrain } from './settings/brain';
 export interface HealthDeps {
   getHostView(): Promise<HostView>;
   checkClaudeSignIn(): Promise<ClaudeSignIn>;
-  listExperts(): Promise<Expert[]>;
-  testExpert(expertId: string): Promise<{ ok: boolean }>;
   listConnections(): Promise<AppsList>;
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
-  hostsStatus(): Promise<{ extension: boolean }>;
-  /** How long each call (one expert's test, the sign-in, every read) may take before it fails. */
+  /** How long each call (the sign-in, every read) may take before it fails. */
   testBudgetMs: number;
 }
 
@@ -60,42 +57,22 @@ async function brainOf(
     : 'unknown';
 }
 
-async function expertsOf(deps: HealthDeps): Promise<HealthFacts['experts']> {
-  const experts = await within(() => deps.listExperts(), deps.testBudgetMs, 'unknown' as const);
-  if (experts === 'unknown') return 'unknown';
-  return Promise.all(
-    experts
-      .filter((expert) => expert.enabled)
-      .map(async (expert) => ({
-        name: expert.name,
-        ok: await within(
-          async () => (await deps.testExpert(expert.id)).ok,
-          deps.testBudgetMs,
-          false,
-        ),
-      })),
-  );
-}
-
 /** Reads every row at once. Never throws. Never reads a key: only whether one is stored. */
 export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
   const attempt = <T>(work: () => Promise<T>) =>
     within(work, deps.testBudgetMs, 'unknown' as const);
-  const [view, experts, connections, microphones, models, hosts] = await Promise.all([
+  const [view, connections, microphones, models] = await Promise.all([
     attempt(() => deps.getHostView()),
-    expertsOf(deps),
     attempt(() => deps.listConnections()),
     attempt(() => deps.listMicrophones()),
     attempt(() => deps.voiceModels()),
-    attempt(() => deps.hostsStatus()),
   ]);
   const brain = await brainOf(view, deps);
   const settings = view === 'unknown' ? null : view.settings;
   const picked = settings?.voice.microphoneId;
   return {
     brain,
-    experts,
     connections:
       connections === 'unknown'
         ? 'unknown'
@@ -120,6 +97,5 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
             pickedMissing:
               picked !== undefined && !microphones.some((microphone) => microphone.id === picked),
           },
-    extension: hosts === 'unknown' ? 'unknown' : hosts.extension,
   };
 }

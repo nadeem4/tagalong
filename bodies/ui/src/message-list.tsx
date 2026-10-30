@@ -1,5 +1,5 @@
 /**
- * The chat panel's message list: user and assistant bubbles, fired-watch cards, notes, and
+ * The chat panel's message list: user and assistant bubbles, notes, and
  * the answer still streaming. Contains MessageList and ChatMessage. Used by ChatPanel.
  */
 
@@ -7,7 +7,7 @@ import type { MessageRole } from '@tagalong/protocol';
 
 /**
  * A message as the panel shows it: the stored content blocks flattened to text, with who
- * said it and on which model (`speaker`), or what it records — a fired watch, or a note.
+ * said it and on which model (`speaker`), or a note.
  */
 export interface ChatMessage {
   id: string;
@@ -15,9 +15,7 @@ export interface ChatMessage {
   text: string;
   /** "Scout · haiku": who said it, on what. */
   speaker?: string;
-  kind?: 'note' | 'watch';
-  /** For a fired watch: what the pet was watching for. */
-  condition?: string;
+  kind?: 'note';
 }
 
 export interface MessageListProps {
@@ -26,11 +24,9 @@ export interface MessageListProps {
   streamingText: string;
   /** Labels the streaming bubble with the pet and model answering. */
   streamingSpeaker?: string;
-  /** The companion's name, for the fired-watch line. */
-  petName: string;
 }
 
-/** One colour for every speaker label and fired-watch border. */
+/** One colour for every speaker label. */
 const SPEAKER_COLOR = '#64748b';
 
 const BUBBLE_BY_ROLE: Record<MessageRole, string> = {
@@ -51,12 +47,7 @@ function Speaker({ text, color }: { text: string; color: string }) {
   );
 }
 
-export function MessageList({
-  messages,
-  streamingText,
-  streamingSpeaker,
-  petName,
-}: MessageListProps) {
+export function MessageList({ messages, streamingText, streamingSpeaker }: MessageListProps) {
   return (
     <div
       role="log"
@@ -64,25 +55,6 @@ export function MessageList({
       className="flex flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm"
     >
       {messages.map((message) => {
-        if (message.kind === 'watch') {
-          return (
-            <div
-              key={message.id}
-              data-testid="watch-fired"
-              role="note"
-              className="self-start max-w-[90%] rounded-lg border-2 px-3 py-2 text-sm"
-              style={{ borderColor: SPEAKER_COLOR }}
-            >
-              <p className="text-[11px] font-medium" style={{ color: SPEAKER_COLOR }}>
-                ⏰ {petName}
-                {message.condition === undefined ? '' : ` — watching for “${message.condition}”`}
-              </p>
-              {message.text === '' ? null : (
-                <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
-              )}
-            </div>
-          );
-        }
         if (message.kind === 'note') {
           return (
             <div

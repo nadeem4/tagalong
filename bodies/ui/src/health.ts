@@ -15,8 +15,6 @@ export type { FixTarget };
  */
 export interface HealthFacts {
   brain: 'ready' | 'signed-out' | 'no-sign-in' | 'no-key' | 'unknown';
-  /** The experts that are on, each with whether it answered its test. */
-  experts: readonly { name: string; ok: boolean }[] | 'unknown';
   connections: readonly { name: string; status: ConnectionStatus }[] | 'unknown';
   voice:
     | {
@@ -32,11 +30,9 @@ export interface HealthFacts {
       }
     | 'unknown';
   microphone: { count: number; pickedMissing: boolean } | 'unknown';
-  extension: boolean | 'unknown';
 }
 
-export type HealthCheckId =
-  'brain' | 'experts' | 'connections' | 'voice' | 'microphone' | 'extension';
+export type HealthCheckId = 'brain' | 'connections' | 'voice' | 'microphone';
 
 /** `info` and `unknown` rows are never counted as needing the person. */
 export interface HealthRow {
@@ -51,11 +47,9 @@ const UNKNOWN = 'Not checked.';
 
 const LABELS: Record<HealthCheckId, string> = {
   brain: 'Brain',
-  experts: 'Experts',
   connections: 'Connections',
   voice: 'Voice',
   microphone: 'Microphone',
-  extension: 'Browser extension',
 };
 
 const make = (
@@ -71,12 +65,6 @@ const make = (
   ...(fix !== undefined && (state === 'broken' || state === 'info') ? { fix } : {}),
 });
 
-/** "Coder", "Coder and Writer", "Coder, Writer and Tester". */
-function names(list: readonly string[]): string {
-  if (list.length <= 1) return list.join('');
-  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1] ?? ''}`;
-}
-
 function brainRow(brain: HealthFacts['brain']): HealthRow {
   switch (brain) {
     case 'ready':
@@ -90,15 +78,6 @@ function brainRow(brain: HealthFacts['brain']): HealthRow {
     default:
       return make('brain', 'unknown', UNKNOWN);
   }
-}
-
-function expertsRow(experts: HealthFacts['experts']): HealthRow {
-  if (experts === 'unknown') return make('experts', 'unknown', UNKNOWN);
-  if (experts.length === 0) return make('experts', 'broken', 'No experts are on.', 'experts');
-  const down = experts.filter((expert) => !expert.ok).map((expert) => expert.name);
-  return down.length > 0
-    ? make('experts', 'broken', `${names(down)} can’t be reached.`, 'experts')
-    : make('experts', 'ok', 'All experts reachable.');
 }
 
 function connectionsRow(connections: HealthFacts['connections']): HealthRow {
@@ -142,26 +121,17 @@ function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
   return make('microphone', 'ok', 'A microphone is ready.');
 }
 
-function extensionRow(extension: HealthFacts['extension']): HealthRow {
-  if (extension === 'unknown') return make('extension', 'unknown', UNKNOWN);
-  return extension
-    ? make('extension', 'ok', 'Connected.')
-    : make('extension', 'info', 'Not connected (optional)', 'browser');
-}
-
 /** One row per check, in the card's order. Pure: no call, no model. */
 export function healthRows(facts: HealthFacts): HealthRow[] {
   return [
     brainRow(facts.brain),
-    expertsRow(facts.experts),
     connectionsRow(facts.connections),
     voiceRow(facts.voice),
     microphoneRow(facts.microphone),
-    extensionRow(facts.extension),
   ];
 }
 
-const COUNT = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+const COUNT = ['One', 'Two', 'Three', 'Four'];
 
 /** The card's first line, and the only one said aloud (only when the question was spoken). */
 export function healthHeadline(rows: readonly HealthRow[]): string {

@@ -17,7 +17,7 @@ const STATE_WORDS: Record<HealthRow['state'], string> = {
 
 /**
  * "Scout, what's wrong?": a headline, then one row per check with a dot and a plain line.
- * A broken row has Fix it; an optional one (the browser extension) has Set up. `rows` is
+ * A broken row has Fix it; an optional one (voice off) has Set up. `rows` is
  * null while the facts are still being read. Without `onFix` the card only reports.
  * `onOpenLogs` adds Open logs folder, so the person chooses what log to send.
  */
