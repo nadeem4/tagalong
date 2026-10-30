@@ -1,5 +1,5 @@
 /**
- * Home's Jobs panel, on the Experts page: the Claude Code jobs Scout handed work to, newest first,
+ * Home's Jobs panel, on the Jobs page: the Claude Code jobs Scout handed work to, newest first,
  * with a Stop on running ones and the result of finished ones. The brain owns the jobs; this
  * lists them and reads again when the brain says they changed. Contains JobsPanel.
  */

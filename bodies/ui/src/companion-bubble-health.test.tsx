@@ -10,7 +10,6 @@ import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 const FACTS: HealthFacts = {
   brain: 'signed-out',
-  experts: [{ name: 'Coder', ok: true }],
   connections: [],
   voice: {
     enabled: true,

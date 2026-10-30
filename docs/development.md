@@ -77,11 +77,11 @@ tagalong/
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
-      dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
-      handoff-card.tsx, connector-confirm.tsx, routine-card.tsx, settings-card.tsx, drop-card.tsx,
-      pick-up-card.tsx, health-card.tsx, status-mark.tsx, answer.tsx
-      home/                         # Home: HomeView and its pages (Experts, Routines, Connections, Activity,
-                                    # Waiting on you, What Scout saw, remembers and learned, How Scout decided, Spend)
+      dock-pet.tsx, companion-bubble.tsx
+      connector-confirm.tsx, drop-card.tsx,
+      health-card.tsx, status-mark.tsx, answer.tsx
+      home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
+                                    # What Scout remembers, Settings, Spend)
       settings/settings-styles.ts   # the Settings sheet's styles
       voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
       theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
@@ -93,18 +93,16 @@ tagalong/
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       scripts/start-fresh.mjs       # runs the app on a new temp data folder
-      e2e/                          # smoke, brain-offline, launch-greeting, hotkey-recovery, listening
-                                    # (Always listening) and cards.spec.ts (the hand-off, connector
-                                    # confirm and routine cards), asks, permissions and jobs.spec.ts
+      e2e/                          # smoke, brain-offline, hotkey-recovery, listening
+                                    # (Always listening), asks, permissions and jobs.spec.ts
                                     # (Home's Jobs panel and a job's asks)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
-      e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, launch.ts,
                                     # claude-sign-in.ts, sight-pause.ts, drop.ts,
-                                    # routine-delivery.ts, log-file.ts, links.ts, awareness/, ipc/,
+                                    # log-file.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
@@ -133,7 +131,7 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
-| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
+| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context.                                                                              |
 | `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.                                   |
 | `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                                                  |
 
@@ -283,10 +281,9 @@ runs somewhere.
 
 The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds the Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Home),
-`launch-greeting.spec.ts`
-(the launch across launches on one profile), `hotkey-recovery.spec.ts`
+`hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
-that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`, plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
+that starts with "Scout" is heard and answered, switched off), plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
 test:e2e`.
 
 The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
@@ -297,7 +294,7 @@ its address as `TAGALONG_BRAIN_ADDR`.
 `brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
 `test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
-the feature back): the tool-call round trip, the Experts page, `cards.spec.ts` and `launch-greeting.spec.ts`.
+the feature back): the tool-call round trip.
 A quit that does not finish in 45 s is
 killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
 cannot hold the single-instance lock or the data folder. When an e2e suite
@@ -309,27 +306,19 @@ second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
 The smoke suite saves screenshots of Home to `bodies/desktop/test-results/` (gitignored) for design
-review: `home.png`, `connections.png` and `routines.png`.
+review: `home.png` and `connections.png`.
 
 ## Running the desktop app
 
-PowerShell (the primary dev shell on Windows):
+Start the brain, then the desktop (see Commands in CLAUDE.md):
 
 ```powershell
+cd brain; uv run brain   # leave it running
 pnpm install
-$env:TAGALONG_FAKE_PROVIDERS = '1'
 pnpm dev:desktop
 ```
 
-bash (Git Bash, WSL, macOS, Linux):
-
-```bash
-pnpm install
-TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
-```
-
-PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
-`TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
+The desktop dials the brain at `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and retries every 2 s, so the order does not matter.
 
 To see what a new user sees, run `pnpm --filter @tagalong/desktop
 start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
@@ -341,44 +330,9 @@ reads like a broken machine. `bodies/desktop/scripts/ensure-electron.mjs` runs t
 `install.js` when `dist/` is missing, and it is wired into the `dev`, `build`, and `start` scripts — so
 you normally never call it yourself.
 
-**`TAGALONG_FAKE_PROVIDERS=1`.** With this set, `createProvider` returns the scripted
-`FakeBrainProvider` whatever settings say: no API key, no network, and a deterministic word-by-word
-stream. Hand-offs go to a scripted expert, so no Claude Code usage is spent. It is how the
-Playwright suites run, and the easiest way to see the app work before you have a key. Without
-it, Scout asks the provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
-with the Claude sign-in (`claude-code`, Sonnet), which needs Claude Code installed and signed in;
-A key goes in the brain's `.env`. The engine itself boots without any key.
-
 ### Choosing Scout's brain
 
-Home's Scout page picks Scout's **provider** (each says whether it needs a key) and **model**.
-Keys live in **Settings → Advanced → API keys**: one row per keyed provider, with Add or Replace
-key, a base URL box for each OpenAI-compatible preset, and **Remove key**. Settings' **How Scout
-thinks** card shows the brain Scout really uses and whether the Claude Code sign-in works
-(`claude auth status --json`, run locally with no model call).
-
-| Provider      | Base URL (overridable)         | Key                  | Models                                          |
-| ------------- | ------------------------------ | -------------------- | ----------------------------------------------- |
-| `claude-code` | none: runs the `claude` CLI    | your Claude sign-in  | `haiku`, `sonnet`, `opus`                       |
-| `openrouter`  | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model |
-| `anthropic`   | the Anthropic API              | Anthropic key        | Claude, directly                                |
-| `fake`        | none                           | none                 | scripted, offline                               |
-
-The OpenRouter preset goes through `OpenAiCompatibleProvider`, so any other OpenAI-format service is
-a settings change: put its URL in the base URL box, store its key, and type its model id. The
-model box suggests ids from the service's own `GET /models` once a key is stored, and says when it is
-showing the built-in list instead.
-
-**Pictures.** A turn that carries a picture — a screenshot, or an image a tool such as
-`look_closer` returns — goes to Scout's own model. Every built-in provider sees; on a provider that
-cannot (`capabilities.vision` false), pixels are never sent: the screenshot is dropped with a
-warning.
-
-Scout's provider and model apply on its next ask, and so does a new key or base URL: the engine
-re-reads the keychain before every ask, so no restart is needed.
-
-The OpenRouter fallback ids are a static list in `packages/core/src/providers/presets.ts`. The live
-list in Settings is the authority.
+The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker and no API key rows. Settings' **How Scout thinks** card shows whether the Claude Code sign-in works (`claude auth status --json`, run locally with no model call).
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -463,24 +417,16 @@ focused window against the capture exclusions in settings (password managers and
 credential prompts by default); when one matches, no picture is taken at all and the bubble is told
 that capture is blocked here, naming only the exclusion entry that matched.
 
-### The pairing token
+### No pairing token
 
-On boot the engine writes a 32-byte hex token to `pairing.token` in its data dir, alongside
-`tagalong.db`, `settings.json`, and `secrets.json`. On Windows that directory is
-`%APPDATA%\Tagalong`, which is `productName` in `bodies/desktop/package.json` — Electron derives the
-data directory from it, and changing it moves everyone's settings, database and saved keys with no
-migration. The token is stable across restarts, so a host that has already paired does not have to
-pair again.
+The Python brain has no pairing token: it is single user and listens on `127.0.0.1`, and a body's
+`hello` carries only the protocol version, its kind and its tools (see
+[protocol/README.md](../protocol/README.md)). The desktop shows no pairing step. The old engine's
+token (`readOrCreatePairingToken`, `packages/core`) goes when `packages/core` is deleted.
 
-Every host must present that token in its `hello` call. A connection that sends anything else gets
-RPC error `-32000` and the socket is closed; a connection that calls any other method before `hello`
-gets the same error.
-
-The token exists because **loopback is not a permission boundary**. Any process running as the user
-can open a socket to `127.0.0.1:47321` — binding to loopback only keeps other machines out, not other
-programs on this one. Without the token, any local program could drive Scout, read the user's
-conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
-the length of the shared prefix through timing.
+The data directory is still `%APPDATA%\Tagalong` on Windows, which is `productName` in
+`bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
+settings and saved keys with no migration.
 
 ## The browser body in detail
 
@@ -527,20 +473,17 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `bodies/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Eight environment variables are read, all straight from the process environment. **Set them in the
+Three environment variables are read by the desktop, all straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
-| Variable                    | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_SIGN_IN`     | **Read** (`bodies/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as `signed-in` unless this says otherwise.                                                                                        |
-| `TAGALONG_FAKE_PROVIDERS=1` | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                                                                                                                                                    |
-| `TAGALONG_FAKE_TOOL`        | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                                                                                                                                                                                                                     |
-| `TAGALONG_FAKE_TOOL_INPUT`  | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                                                                                                                                                                                                            |
-| `TAGALONG_FAKE_TTS=1`       | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
-| `TAGALONG_FAKE_STT=1`       | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
-| `ANTHROPIC_API_KEY`         | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
-| `OPENROUTER_API_KEY`        | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
-| `ELEVENLABS_API_KEY`        | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
+| Variable                | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_SIGN_IN` | **Read** (`bodies/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. The Electron suites set `signed-in`.                                                                                                                                                |
+| `TAGALONG_FAKE_TTS=1`   | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
+| `TAGALONG_FAKE_STT=1`   | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
+| `ANTHROPIC_API_KEY`     | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
+| `OPENROUTER_API_KEY`    | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
+| `ELEVENLABS_API_KEY`    | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
@@ -559,7 +502,7 @@ the browser body, or something new. Adding one never touches the core.
    The shared React components in `bodies/ui` do this already — hand them a `HostBridge` and nothing
    else.
 3. Speak the JSON-RPC protocol over the localhost WebSocket the engine exposes
-   (`ws://127.0.0.1:47321` by default), presenting the pairing token in `hello`. The method catalog and
+   (`ws://127.0.0.1:47321` by default), sending `hello` first. The method catalog and
    every payload schema live in `packages/protocol`.
 4. Never import core internals. A host uses the protocol, and the engine's public API only where it
    embeds the engine in process. `bodies/browser` imports nothing from core at all.
@@ -572,7 +515,7 @@ than one planned implementation.
 - **BrainProvider** for the AI engine. Existing: `claude-code` (the Claude sign-in, through the
   `claude` CLI), `openrouter` (a preset of the OpenAI-compatible `OpenAiCompatibleProvider`),
   `anthropic`, and `fake` (tests and demos). Another OpenAI-format
-  service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain); a new named preset
+  service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain) (old brain only); a new named preset
   is one entry in `packages/core/src/providers/presets.ts`.
 - **Text to speech** lives in the desktop host, not in core: `Tts` in
   `bodies/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
@@ -650,9 +593,6 @@ together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
 
 Gaps that are real in the code on `main`, each explained in the doc it links to.
 
-- **No Tailwind build.** `@tagalong/ui`'s chat parts (`ChatPanel`, `MessageList`, `Composer`,
-  `SightBar`) use Tailwind utility classes, but the desktop does not ship Tailwind; `app.css`
-  hand-writes the structure instead. See [bubble.md](bubble.md).
 - **No Fast Refresh in dev.** The renderer uses Vite's esbuild JSX transform, not
   `@vitejs/plugin-react`. See [desktop.md](desktop.md#bundling-the-workspace-packages).
 - **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app

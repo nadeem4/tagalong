@@ -128,7 +128,7 @@ export function useTalk(options: TalkOptions): {
         micOk();
         cue.asked();
         done(null);
-        // No bubble to ask it (a one-line hello, remark or routine line is up): the line
+        // No bubble to ask it (a one-line remark is up): the line
         // gives way and the bubble that mounts asks the question held for it.
         if (!inbox.deliver(text)) latest.current.onBegin();
       },

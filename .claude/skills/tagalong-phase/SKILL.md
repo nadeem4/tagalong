@@ -62,8 +62,7 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
   exception already in the plan is the Ctrl+C selection trick in the desktop host, which is
   scoped to reading the selection and restoring the clipboard.
 - **Test with the fake provider. Always.** Every test, every manual check, every launch you
-  do yourself runs on `FakeBrainProvider` — set `TAGALONG_FAKE_PROVIDERS=1`, or `providerId:
-'fake'`. **Never** run a real Anthropic, OpenAI or ElevenLabs call to verify your own work.
+  do yourself runs on a fake brain (the e2e fake brain in `bodies/desktop/e2e/fixtures`, or `FakeBrainProvider` in packages/core tests). **Never** run a real Anthropic, OpenAI or ElevenLabs call to verify your own work.
   The user pays per token for API calls; burning their budget to satisfy your curiosity is not
   yours to spend. Acceptance steps that genuinely need a real provider — "the answer references
   the selected text" — are handed to the user to run, listed under "Needs a human run", and left

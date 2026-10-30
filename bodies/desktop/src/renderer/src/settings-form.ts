@@ -1,13 +1,10 @@
 /**
  * Turns the Settings form into a settings patch, kept apart from React so it is tested in plain
  * Node. Contains SettingsFormValues, buildSettingsPatch and its field checks, SettingsFieldError,
- * and helpers the sections share (summarizer list, key caps, voice facts, cleanUserName).
+ * and helpers the sections share (key caps, voice facts, cleanUserName).
  */
 import {
-  MAX_DAILY_BUDGET_USD,
   MAX_ROLLING_MEMORY_MINUTES,
-  MAX_SIGHT_LOG_DAYS,
-  MIN_SIGHT_LOG_DAYS,
   MAX_USER_NAME_CHARS,
   MAX_VOICE_SPEED,
   MAX_WINDOW_TEXT_CHARS,
@@ -15,26 +12,19 @@ import {
   SettingsPatch,
 } from '@tagalong/protocol';
 import type { SettingsPatch as SettingsPatchType, VoiceAdapterFacts } from '@tagalong/protocol';
-import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 
 /** The settings form's raw values, as `FormData` hands them over: every field a string. */
 export interface SettingsFormValues {
-  /** One box per OpenAI-compatible preset. Blank means the preset's own URL. */
-  baseUrls: readonly { providerId: string; label: string; value: string }[];
   askHotkey: string;
   pauseSightHotkey: string;
   stopVoiceHotkey: string;
   talkHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
-  /** The summarizer list's value: blank for "Same as Scout", else `summarizerValue(…)`. */
-  summarizer?: string;
   /** Whether Scout greets you on a later launch. Absent leaves the setting alone. */
   greeting?: boolean;
   /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
   keepAnEye?: boolean;
-  /** Whether Scout keeps a pick-up snapshot. Absent leaves the setting alone. */
-  pickUp?: boolean;
   /** Whether Scout gives gentle nudges. Absent leaves the setting alone. */
   wellbeing?: boolean;
   /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
@@ -54,10 +44,6 @@ export interface SettingsFormValues {
   microphoneId?: string;
   mouth?: string;
   ears?: string;
-  /** How many days What Scout saw keeps. Absent leaves the setting alone. */
-  sightLogDays?: string;
-  /** The daily budget in dollars. Blank is no cap; absent leaves the setting alone. */
-  dailyBudget?: string;
 }
 
 /**
@@ -76,7 +62,6 @@ export class SettingsFieldError extends Error {
 
 /** The fields that live under Advanced: a refusal on one of them opens it. */
 const ADVANCED_FIELDS = new Set([
-  'summarizer',
   'sightDetail',
   'windowTextBudget',
   'rollingMemoryMinutes',
@@ -87,7 +72,7 @@ const ADVANCED_FIELDS = new Set([
 ]);
 
 export function isAdvancedField(field: string): boolean {
-  return ADVANCED_FIELDS.has(field) || field.startsWith('baseUrl:') || field.startsWith('key:');
+  return ADVANCED_FIELDS.has(field) || field.startsWith('key:');
 }
 
 /**
@@ -105,7 +90,6 @@ export function isAdvancedField(field: string): boolean {
 export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchType {
   refuseSharedHotkeys(values);
   return SettingsPatch.parse({
-    providerBaseUrls: parseBaseUrls(values.baseUrls),
     hotkeys: {
       ask: values.askHotkey.trim(),
       pauseSight: values.pauseSightHotkey.trim(),
@@ -129,28 +113,10 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
       : {}),
     sightDetail: values.sightDetail,
     windowTextBudget: parseBudget(values.windowTextBudget),
-    ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
-    ...(values.pickUp !== undefined ? { pickUp: values.pickUp } : {}),
     ...(values.wellbeing !== undefined ? { wellbeing: { enabled: values.wellbeing } } : {}),
     ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
-    ...(values.sightLogDays !== undefined
-      ? {
-          sightLog: {
-            days: wholeNumber(
-              'sightLogDays',
-              values.sightLogDays,
-              MIN_SIGHT_LOG_DAYS,
-              MAX_SIGHT_LOG_DAYS,
-              `What Scout saw keeps between ${MIN_SIGHT_LOG_DAYS} and ${MAX_SIGHT_LOG_DAYS} days.`,
-            ),
-          },
-        }
-      : {}),
-    ...(values.dailyBudget !== undefined
-      ? { budget: { dailyUsd: parseDailyBudget(values.dailyBudget) } }
-      : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
@@ -237,20 +203,6 @@ export function cleanUserName(raw: string): string {
   return raw.trim().slice(0, MAX_USER_NAME_CHARS).trim();
 }
 
-/** Blank is no cap; otherwise dollars above zero, up to the typo guard. */
-function parseDailyBudget(raw: string): number | null {
-  const typed = raw.trim().replace(/^\$/, '');
-  if (typed === '') return null;
-  const usd = Number(typed);
-  if (!Number.isFinite(usd) || usd <= 0 || usd > MAX_DAILY_BUDGET_USD) {
-    throw new SettingsFieldError(
-      'dailyBudget',
-      `The daily budget must be an amount in dollars above 0 and at most $${MAX_DAILY_BUDGET_USD}, or blank for no cap.`,
-    );
-  }
-  return usd;
-}
-
 /** The speaking speed, within what still sounds like speech. */
 function parseSpeed(raw: string): number {
   const speed = Number(raw.trim());
@@ -283,82 +235,6 @@ function wholeNumber(
   return value;
 }
 
-/** Joins a provider and a model into one summarizer list value. Provider ids hold no `|`. */
-export function summarizerValue(providerId: string, model: string): string {
-  return `${providerId}|${model}`;
-}
-
-/** Blank is "Same as Scout"; anything else must be `provider|model`. */
-function parseSummarizer(raw: string): { providerId: string; model: string } | null {
-  if (raw.trim().length === 0) return null;
-  const split = raw.indexOf('|');
-  const providerId = split < 0 ? '' : raw.slice(0, split).trim();
-  const model = split < 0 ? '' : raw.slice(split + 1).trim();
-  if (providerId.length === 0 || model.length === 0) {
-    throw new SettingsFieldError('summarizer', 'Pick a summarizer from the list.');
-  }
-  return { providerId, model };
-}
-
-/** One `<optgroup>` of the summarizer list. */
-export interface SummarizerGroup {
-  label: string;
-  options: { value: string; label: string }[];
-}
-
-/** The Claude sign-in models a summary may use. Opus is left out: a summary is small work. */
-const SIGN_IN_SUMMARY_MODELS = ['haiku', 'sonnet'] as const;
-
-/**
- * The summarizer list's groups after "Same as Scout": Haiku and Sonnet on the Claude
- * sign-in when it is signed in, then each keyed service that has a key, with its models.
- * The saved choice is always listed, so opening Settings and saving cannot drop it.
- */
-export function summarizerGroups({
-  providers,
-  signIn,
-  models,
-  current,
-}: {
-  providers: readonly ProviderChoice[];
-  signIn: ClaudeSignIn | null;
-  models: Readonly<Record<string, readonly string[]>>;
-  current: { providerId: string; model: string } | null;
-}): SummarizerGroup[] {
-  const option = (providerId: string, model: string, label = model) => ({
-    value: summarizerValue(providerId, model),
-    label,
-  });
-  const groups: SummarizerGroup[] = [];
-  if (signIn === 'signed-in') {
-    groups.push({
-      label: 'Claude sign-in',
-      options: SIGN_IN_SUMMARY_MODELS.map((model) =>
-        option('claude-code', model, model[0]!.toUpperCase() + model.slice(1)),
-      ),
-    });
-  }
-  for (const provider of providers) {
-    const list = models[provider.id] ?? [];
-    if (!provider.needsKey || !provider.hasKey || list.length === 0) continue;
-    groups.push({
-      label: provider.label,
-      options: list.map((model) => option(provider.id, model)),
-    });
-  }
-  if (current !== null) {
-    const value = summarizerValue(current.providerId, current.model);
-    if (!groups.some((group) => group.options.some((listed) => listed.value === value))) {
-      const label =
-        current.providerId === 'claude-code'
-          ? 'Claude sign-in'
-          : (providers.find((p) => p.id === current.providerId)?.label ?? current.providerId);
-      groups.push({ label, options: [option(current.providerId, current.model)] });
-    }
-  }
-  return groups;
-}
-
 /** An accelerator as the keys to press: `CommandOrControl` is Cmd on a Mac, Ctrl elsewhere. */
 export function keyCaps(accelerator: string, platform: string): string[] {
   const command = platform === 'darwin' ? 'Cmd' : 'Ctrl';
@@ -389,29 +265,6 @@ function parseBudget(raw: string): number {
     );
   }
   return budget;
-}
-
-/**
- * Reads the base URL boxes into the override map.
- *
- * Every preset is shown, so the map is sent whole and a box emptied by the user really
- * does go back to the preset's URL. A value is checked here, with the service named,
- * because the schema's own complaint would point at `providerBaseUrls.openrouter`.
- */
-function parseBaseUrls(boxes: SettingsFormValues['baseUrls']): Record<string, string> {
-  const overrides: Record<string, string> = {};
-  for (const box of boxes) {
-    const value = box.value.trim();
-    if (value.length === 0) continue;
-    if (!URL.canParse(value)) {
-      throw new SettingsFieldError(
-        `baseUrl:${box.providerId}`,
-        `${box.label} base URL must be a full URL, such as https://example.com/v1 — or blank for the default.`,
-      );
-    }
-    overrides[box.providerId] = value;
-  }
-  return overrides;
 }
 
 /** An adapter's facts as one plain line under the picker. */

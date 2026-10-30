@@ -200,12 +200,6 @@ export const SETTINGS_CSS = `
 .tg-disclosure[aria-expanded='true'] .tg-disclosure__chevron { transform: rotate(180deg); }
 .tg-advanced { display: flex; flex-direction: column; gap: 28px; margin-top: ${t.space.xxxl}px; }
 .tg-group { display: flex; flex-direction: column; gap: ${t.space.lg}px; padding-top: ${t.space.xl}px; border-top: 1px solid ${t.color.panelLine}; }
-.tg-keys { list-style: none; margin: 0; padding: 0; border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px; }
-.tg-keys__row { display: flex; flex-direction: column; gap: 14px; padding: 14px 18px; }
-.tg-keys__row + .tg-keys__row { border-top: 1px solid ${t.color.panelLine}; }
-.tg-keys__head { display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.lg}px; }
-.tg-keys__name { flex: 1 1 200px; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
-.tg-keys__none { font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .tg-panel [aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-panel .tg-error, .tg-settings--embedded .tg-error { color: ${t.color.errInk}; }
 .tg-field-error { margin: ${t.space.xs}px 0 0; white-space: pre-line; }

@@ -13,22 +13,10 @@ import { themeTokens as t } from './theme/tokens';
 
 /**
  * What the pet on the dock is doing, as its pose and tag show it. `listening` is "Seeing"
- * (a capture); `reading` is a screen tool in flight, `thinking` Scout's own turn, `expert` a
- * hand-off running and `working` one of Scout's own background jobs. Dozing, wince, cheer and
- * tired are moods with a pose and no tag.
+ * (a capture); `reading` is a screen tool in flight, `thinking` Scout's own turn and `working`
+ * one of Scout's own background jobs. Dozing is a mood with a pose and no tag.
  */
-export type DockMood =
-  | 'idle'
-  | 'listening'
-  | 'reading'
-  | 'thinking'
-  | 'expert'
-  | 'working'
-  | 'done'
-  | 'dozing'
-  | 'wince'
-  | 'cheer'
-  | 'tired';
+export type DockMood = 'idle' | 'listening' | 'reading' | 'thinking' | 'working' | 'dozing';
 
 /** The moods Bean blinks in; each has a blink clip rendered from frame 0 of its loop. */
 type BlinkMood = 'idle' | 'listening';
@@ -74,19 +62,15 @@ const LISTENING: Readonly<Record<ListeningDot, { title: string; words: string }>
 const SIZE = 96;
 
 /**
- * The moods with a tag. Working covers the two long back-office states, an expert's and a
- * job's. Thinking and reading last seconds, their signs (the cloud, the glasses) say it and
- * the bubble is already answering, so they go without; so do the moods, in the pose alone.
+ * The moods with a tag: Working covers a job's long back-office state. Thinking and reading
+ * last seconds, their signs (the cloud, the glasses) say it and the bubble is already
+ * answering, so they go without; so does dozing, in the pose alone.
  */
-type TaggedMood = 'listening' | 'expert' | 'working' | 'done';
-
-const WORKING = { text: 'Working', color: t.color.gold };
+type TaggedMood = 'listening' | 'working';
 
 const TAGS: Readonly<Record<TaggedMood, { text: string; color: string }>> = {
   listening: { text: 'Seeing', color: '#7CB8F2' },
-  expert: WORKING,
-  working: WORKING,
-  done: { text: 'Done', color: '#7DD87F' },
+  working: { text: 'Working', color: t.color.gold },
 };
 
 const WORDS: Readonly<Record<DockMood, string>> = {
@@ -94,13 +78,8 @@ const WORDS: Readonly<Record<DockMood, string>> = {
   listening: 'is looking at your screen',
   reading: 'is reading your screen',
   thinking: 'is thinking',
-  expert: 'has an expert working',
   working: 'is working on a job of its own',
-  done: 'has an answer for you',
   dozing: 'is dozing',
-  wince: 'winces',
-  cheer: 'is cheering',
-  tired: 'looks tired',
 };
 
 function isTagged(mood: DockMood): mood is TaggedMood {
@@ -113,8 +92,8 @@ function canBlinkIn(mood: DockMood): mood is BlinkMood {
 
 /**
  * The companion on the dock: Bean in a pose and a small tag for what it is doing (seeing,
- * working, done), a pose alone for thinking and reading and for its moods (dozing, wince,
- * cheer, tired), plus the sight-paused, recording and listening marks, which show in every mood.
+ * working), a pose alone for thinking, reading and dozing, plus the sight-paused, recording
+ * and listening marks, which show in every mood.
  */
 export function DockPet({
   pet,
@@ -186,7 +165,7 @@ export function DockPet({
       style={{ position: 'relative', display: 'block', width: SIZE, height: SIZE, padding: 0 }}
     >
       <style>{DOCK_CSS}</style>
-      {/* Keyed by mood, so a one-shot (cheer, wince) always plays from its first frame. */}
+      {/* Keyed by mood, so each mood's clip always plays from its first frame. */}
       <BeanClip
         key={mood}
         name={mood}

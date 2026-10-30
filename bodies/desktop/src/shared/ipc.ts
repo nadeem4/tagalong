@@ -1,6 +1,6 @@
 /**
  * The contract between main and the preload: every IPC channel name (IPC) and the shapes
- * that cross it (HostView, GreetLine, CaptureNotice, SpeakResult and the rest), plus
+ * that cross it (HostView, CaptureNotice, SpeakResult and the rest), plus
  * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
  */
 
@@ -11,13 +11,8 @@ import type {
   ListenMode,
   Pet,
   PetRemarkParams,
-  PickUpReadyParams,
-  ProvidersCheckResult,
-  RoutineProposedParams,
-  RoutineResultParams,
   Settings,
   SettingsPatch,
-  StatusId,
   StatusMark,
   MouthId,
   VoiceId,
@@ -30,60 +25,23 @@ export const IPC = {
   interrupt: 'tagalong:interrupt',
   listPets: 'tagalong:pets:list',
   // Home.
-  listActivity: 'tagalong:activity:list',
-  listExperience: 'tagalong:experience:list',
-  getExperience: 'tagalong:experience:get',
-  clearExperience: 'tagalong:experience:clear',
-  listSelf: 'tagalong:self:list',
-  getSelf: 'tagalong:self:get',
-  writeSelf: 'tagalong:self:write',
-  undoSelf: 'tagalong:self:undo',
-  acceptSelf: 'tagalong:self:accept',
-  rejectSelf: 'tagalong:self:reject',
-  listExperts: 'tagalong:experts:list',
-  saveExpert: 'tagalong:experts:save',
-  deleteExpert: 'tagalong:experts:delete',
-  testExpert: 'tagalong:experts:test',
-  pickFolder: 'tagalong:dialog:pick-folder',
   browserFolder: 'tagalong:browser:folder',
   showBrowserFolder: 'tagalong:browser:show-folder',
-  confirmHandoff: 'tagalong:handoffs:confirm',
-  dismissHandoff: 'tagalong:handoffs:dismiss',
-  cancelHandoff: 'tagalong:handoffs:cancel',
-  searchProjects: 'tagalong:projects:search',
   approveTool: 'tagalong:tool:approve',
   answerJobAsk: 'tagalong:jobask:answer',
-  listAsks: 'tagalong:asks:list',
-  answerAsk: 'tagalong:asks:answer',
-  openAsk: 'tagalong:asks:open',
   listConnections: 'tagalong:connections:list',
   addConnection: 'tagalong:connections:add',
   setConnectionEnabled: 'tagalong:connections:set-enabled',
   signInConnection: 'tagalong:connections:sign-in',
   removeConnection: 'tagalong:connections:remove',
   restartConnection: 'tagalong:connections:restart',
-  listRoutines: 'tagalong:routines:list',
-  saveRoutine: 'tagalong:routines:save',
-  deleteRoutine: 'tagalong:routines:delete',
-  setRoutineEnabled: 'tagalong:routines:set-enabled',
-  runRoutine: 'tagalong:routines:run',
-  confirmRoutine: 'tagalong:routines:confirm',
-  dismissRoutine: 'tagalong:routines:dismiss',
-  editRoutine: 'tagalong:routines:edit',
-  listSightLog: 'tagalong:sight-log:list',
-  deleteSightLog: 'tagalong:sight-log:delete',
-  clearSightLog: 'tagalong:sight-log:clear',
   listMemories: 'tagalong:memory:list',
   deleteMemory: 'tagalong:memory:delete',
   listPermissions: 'tagalong:permissions:list',
   setPermission: 'tagalong:permissions:set',
   listJobs: 'tagalong:jobs:list',
   stopJob: 'tagalong:jobs:stop',
-  setCalendarLink: 'tagalong:calendar:set-link',
-  checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',
-  routineEvent: 'tagalong:panel:routine',
-  routineDraftEvent: 'tagalong:home:routine-draft',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',
@@ -91,18 +49,12 @@ export const IPC = {
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
   saveApiKey: 'tagalong:secret:api-key',
-  checkKey: 'tagalong:secret:check-key',
-  savePet: 'tagalong:pets:save',
-  listModels: 'tagalong:models:list',
   openSettings: 'tagalong:settings:open',
   openLogsFolder: 'tagalong:logs:open',
   hidePanel: 'tagalong:panel:hide',
   fitPanel: 'tagalong:panel:fit',
-  greetEvent: 'tagalong:panel:greet',
-  greetLineEvent: 'tagalong:panel:greet-line',
   remarkEvent: 'tagalong:panel:remark',
   remarkNotNow: 'tagalong:remark:not-now',
-  remarkAccept: 'tagalong:remark:accept',
   panelSideEvent: 'tagalong:panel:side',
   dragAvatar: 'tagalong:avatar:drag',
   dropAvatar: 'tagalong:avatar:drop',
@@ -116,11 +68,9 @@ export const IPC = {
   openBubble: 'tagalong:bubble:open',
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
-  stopWatch: 'tagalong:watch:stop',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
-  switchScout: 'tagalong:pets:switch-scout',
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
@@ -137,10 +87,6 @@ export const IPC = {
   setListening: 'tagalong:voice:set-listening',
   setFollowUp: 'tagalong:voice:set-follow-up',
   listeningEvent: 'tagalong:voice:listening',
-  // Pick up where you left off: the card's buttons. Open names an item id, never a path.
-  openPickUp: 'tagalong:pick-up:open',
-  rebriefPickUp: 'tagalong:pick-up:rebrief',
-  dismissPickUp: 'tagalong:pick-up:dismiss',
   // Draft it for me: a draft's Copy, from the bubble only. Writes the clipboard, never reads it.
   copyText: 'tagalong:clipboard:copy-text',
   // Drop it on Scout: a file, link or text dropped on the figure (not dropAvatar, which
@@ -149,10 +95,6 @@ export const IPC = {
   dropEvent: 'tagalong:panel:drop',
   // The health check: whether the voice models are on disk.
   voiceModels: 'tagalong:voice:models',
-  // Change settings by talking: Apply on Scout's settings card, a click only.
-  applySettings: 'tagalong:settings:apply',
-  expertCatalog: 'tagalong:experts:catalog',
-  installExpert: 'tagalong:experts:install',
   // Status marks: the top one on Scout and in the bubble, read on mount and broadcast on change.
   getStatusMark: 'tagalong:status:get',
   statusMarkEvent: 'tagalong:status:event',
@@ -250,24 +192,12 @@ export interface ProviderChoice {
  */
 export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
 
-/**
- * The line main hands the bubble as the app opens: the brain's words (with a pick-up, maybe),
- * or, when Scout cannot think, a status mark shown as a row with Fix it and never spoken.
- */
-export type GreetLine = { text: string; pickUp?: PickUpReadyParams } | { status: StatusId };
-
 /** Whether the voice models are on disk, for the health check: a look, never a download. */
 export interface VoiceModels {
   /** The local voice (Kokoro). */
   mouth: boolean;
   /** Every one of the ears' files. */
   ears: boolean;
-}
-
-/** The models a provider offers, and whether the list is the service's own. */
-export interface ModelList {
-  models: string[];
-  source: 'live' | 'fallback';
 }
 
 /**
@@ -334,12 +264,8 @@ export interface TagalongHostApi {
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
-  /** One test of the key just saved for `providerId`. */
-  checkKey(providerId: string): Promise<ProvidersCheckResult>;
-  savePet(pet: Pet): Promise<Pet>;
   /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
   openBubble(): Promise<void>;
-  listModels(providerId: string): Promise<ModelList>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
   openSettings(target?: FixTarget): Promise<void>;
   /** Opens the logs folder (the health card's Open logs folder). */
@@ -350,11 +276,6 @@ export interface TagalongHostApi {
   onHomePage(handler: (page: string) => void): () => void;
   /** Asks Claude Code, locally and with no model call, whether it is signed in. */
   checkClaudeSignIn(): Promise<ClaudeSignIn>;
-  /**
-   * Scout becomes the Companion thinking on `providerId`, on that provider's recommended
-   * model. Settings calls it after storing a key when no Claude sign-in was found.
-   */
-  switchScout(providerId: string): Promise<Pet>;
   /** The browser add-on's folder, for Settings' Load unpacked steps. */
   browserFolder(): Promise<BrowserFolder>;
   /** Reveals that folder in the file manager; rejects when it is not built yet. */
@@ -362,25 +283,10 @@ export interface TagalongHostApi {
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;
-  /** Main asks the bubble for its one-time hello. */
-  onGreet(handler: () => void): () => void;
-  /** Main hands the bubble the launch line, or the brain's status mark when Scout cannot think. */
-  onGreetLine(handler: (line: GreetLine) => void): () => void;
   /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
-  /**
-   * A routine's result, for the bubble: `line` shows the quiet line beside Scout, `speak`
-   * says it aloud. Either may be false; main has already decided.
-   */
-  onRoutine(
-    handler: (result: RoutineResultParams, how: { line: boolean; speak: boolean }) => void,
-  ): () => void;
-  /** Home opens on Routines with Scout's card in the form, from the card's Edit. */
-  onRoutineDraft(handler: (proposal: RoutineProposedParams) => void): () => void;
   /** "Not now" on a remark: Scout stays quiet for an hour. */
   remarkNotNow(): Promise<void>;
-  /** The person took a remark's offer: its brief goes to the hand-off card, unsent. */
-  remarkAccept(remarkId: string): Promise<void>;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */
   onPanelSide(handler: (side: 'left' | 'right') => void): () => void;
   /** Moves the pet by a drag's step; the bubble follows. */

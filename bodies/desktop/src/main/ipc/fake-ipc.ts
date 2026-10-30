@@ -1,10 +1,8 @@
 /**
- * Test doubles for the ipc handlers: fakeIpc stands in for ipcMain, fakeEngine for the engine
- * connection. Used only by tests.
+ * Test double for the ipc handlers: fakeIpc stands in for ipcMain. Used only by tests.
  */
 
-import type { HostToCoreMethod } from '@tagalong/protocol';
-import type { EngineCall, IpcHandle, IpcListener, IpcOn } from './handle';
+import type { IpcHandle, IpcListener, IpcOn } from './handle';
 
 /**
  * Stands in for ipcMain in tests: records each handler and invokes it as a renderer would,
@@ -29,16 +27,4 @@ export function fakeIpc() {
   const send = (channel: string, ...args: unknown[]): void =>
     ons.get(channel)?.({}, ...(args as never[]));
   return { handle, invoke, invokeWith, on, send, channels: () => [...handlers.keys()].sort() };
-}
-
-/** An engine connection that answers each method from `answers` and records every call. */
-export function fakeEngine(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
-  const calls: [method: string, params: unknown][] = [];
-  const client = {
-    call: (method: HostToCoreMethod, params: unknown) => {
-      calls.push([method, params]);
-      return Promise.resolve(answers[method]);
-    },
-  } as unknown as EngineCall;
-  return { client, calls };
 }

@@ -131,8 +131,8 @@ export class EarsNotes {
 
 /**
  * Where each heard question goes: to the bubble listening for it, or held until one does.
- * The bubble is not there while a one-line hello, remark or routine line takes its place,
- * nor while Scout is still waking; a question heard then is asked as soon as it mounts,
+ * The bubble is not there while a one-line remark takes its place, nor while Scout is
+ * still waking; a question heard then is asked as soon as it mounts,
  * never dropped. Only the latest is held: as with talking over Scout, a newer question
  * replaces one not yet asked.
  */

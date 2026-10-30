@@ -15,13 +15,8 @@ const MOODS: readonly DockMood[] = [
   'listening',
   'reading',
   'thinking',
-  'expert',
   'working',
-  'done',
   'dozing',
-  'wince',
-  'cheer',
-  'tired',
 ];
 const NEEDED = [...MOODS, 'idle-blink', 'listening-blink'];
 
@@ -39,12 +34,12 @@ describe('the Bean strips', () => {
     expect(existsSync(join(BEAN, clip!.file))).toBe(true);
   });
 
-  it('plays cheer, wince and the blinks once, and loops the rest', () => {
+  it('plays the blinks once, and loops the moods', () => {
     const clips = manifest.clips as Record<string, { loop: boolean }>;
-    for (const name of ['cheer', 'wince', 'idle-blink', 'listening-blink']) {
+    for (const name of ['idle-blink', 'listening-blink']) {
       expect(clips[name]!.loop).toBe(false);
     }
-    for (const name of MOODS.filter((m) => m !== 'cheer' && m !== 'wince')) {
+    for (const name of MOODS) {
       expect(clips[name]!.loop).toBe(true);
     }
   });
@@ -64,12 +59,12 @@ describe('beanFigure', () => {
   });
 
   it('refuses a manifest with a clip missing', () => {
-    const { tired: _tired, ...rest } = manifest.clips;
-    expect(() => beanFigure({ ...manifest, clips: rest }, urls)).toThrow(/tired/);
+    const { dozing: _dozing, ...rest } = manifest.clips;
+    expect(() => beanFigure({ ...manifest, clips: rest }, urls)).toThrow(/dozing/);
   });
 
   it('refuses a clip whose strip was not bundled', () => {
-    const { './bean/done.webp': _done, ...rest } = urls;
-    expect(() => beanFigure(manifest, rest)).toThrow(/done\.webp/);
+    const { './bean/working.webp': _working, ...rest } = urls;
+    expect(() => beanFigure(manifest, rest)).toThrow(/working\.webp/);
   });
 });

@@ -10,23 +10,21 @@ that leaves the machine.
 
 ## Where it lives
 
-| File                                            | What it holds                                                                                                                           |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.ts`             | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `SettingsChangeRow`, `SettingsProposedParams`, the retired-value cleaners |
-| `packages/protocol/src/methods.ts`              | `settings.get`, `settings.set` (`byTalk`), `settings.proposed`                                                                          |
-| `packages/core/src/settings/settings.ts`        | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                                                   |
-| `packages/core/src/engine.ts`                   | The `settings.get` and `settings.set` handlers; settings passed into stores as functions                                                |
-| `packages/core/src/tools/builtin/settings.ts`   | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                                                        |
-| `packages/core/src/providers/presets.ts`        | `SECRET_KEYS`: where each brain's key is filed                                                                                          |
-| `packages/core/src/providers/key-resolver.ts`   | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes                                    |
-| `packages/core/src/privacy/secrets.ts`          | `hideSecrets`                                                                                                                           |
-| `packages/core/src/providers/guard.ts`          | `guardBrain`: hides secrets in every request to a model                                                                                 |
-| `bodies/desktop/src/main/secret-store.ts`       | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                                                       |
-| `bodies/desktop/src/main/provider-choices.ts`   | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`                                           |
-| `bodies/desktop/src/main/ipc/settings.ts`       | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
-| `bodies/desktop/src/main/ipc/apply-settings.ts` | `applySettings`: Apply on Scout's settings card                                                                                         |
-| `bodies/desktop/src/main/index.ts`              | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
-| `bodies/ui/src/settings-card.tsx`               | The settings card in the bubble                                                                                                         |
+| File                                          | What it holds                                                                                                                           |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.ts`           | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `SettingsChangeRow`, `SettingsProposedParams`, the retired-value cleaners |
+| `packages/protocol/src/methods.ts`            | `settings.get`, `settings.set` (`byTalk`), `settings.proposed`                                                                          |
+| `packages/core/src/settings/settings.ts`      | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                                                   |
+| `packages/core/src/engine.ts`                 | The `settings.get` and `settings.set` handlers; settings passed into stores as functions                                                |
+| `packages/core/src/tools/builtin/settings.ts` | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                                                        |
+| `packages/core/src/providers/presets.ts`      | `SECRET_KEYS`: where each brain's key is filed                                                                                          |
+| `packages/core/src/providers/key-resolver.ts` | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes                                    |
+| `packages/core/src/privacy/secrets.ts`        | `hideSecrets`                                                                                                                           |
+| `packages/core/src/providers/guard.ts`        | `guardBrain`: hides secrets in every request to a model                                                                                 |
+| `bodies/desktop/src/main/secret-store.ts`     | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                                                       |
+| `bodies/desktop/src/main/provider-choices.ts` | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`                                           |
+| `bodies/desktop/src/main/ipc/settings.ts`     | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
+| `bodies/desktop/src/main/index.ts`            | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
 
 ## How it works
 
@@ -177,39 +175,9 @@ refuses the whole call (`A routine's turn cannot loosen a setting.`). Otherwise 
 `settings.proposed { proposalId, petId, patch, rows }` and tells the model that nothing changes
 until the person clicks Apply, and that a spoken "yes" does not apply it.
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-sequenceDiagram
-  participant Tool as change_settings
-  participant Engine
-  participant Main as Desktop main
-  participant Bubble
-  Tool->>Engine: emit settings.proposed
-  Engine->>Main: settings.proposed (desktop sessions only)
-  Main->>Bubble: bring up the bubble, show the card
-  Bubble->>Main: IPC.applySettings(patch) on Apply
-  Main->>Main: fromPanel, SettingsPatch.parse, talkPatchProblem
-  Main->>Engine: settings.set { patch, byTalk: true }
-  Engine->>Engine: save, sight_log changed_by_talk
-  Main->>Bubble: IPC.settingsChangedEvent
-```
-
-**Apply.** The engine sends `settings.proposed` only to desktop sessions (the patch carries the
-current voice, hotkeys and exclusions), and main brings the bubble up. Core keeps no proposal;
-Cancel is local to the card. Apply calls `HostBridge.applySettings(patch)`, mapped to
-`IPC.applySettings` (`tagalong:settings:apply`). Main:
-
-1. Refuses a call from any window but the bubble's (`fromPanel`).
-2. Parses the patch with `SettingsPatch.parse` (a non-patch throws).
-3. Refuses `listening.always: true`.
-4. Runs `talkPatchProblem(currentSettings, patch)`, which refuses the whole patch if it reaches a
-   setting off the allowlist, changes or wipes another field of an object setting (`voice`,
-   `hotkeys`, `listening`, `rollingMemory`, `sightLog`, `budget`, `wellbeing`), removes a capture
-   exclusion, raises `sightLog.days` or switches listening on. Loosening is allowed: the person
-   clicked Turn on.
-5. Takes `listening` out and switches it off through `AlwaysListening.set(false)` (saving the file
-   alone would leave the microphone open), then saves the rest with `settings.set { byTalk: true }`
-   through the ordinary save path above.
+**Apply.** The desktop no longer has the Apply path: its `IPC.applySettings` and
+`apply-settings.ts` were deleted with the old brain, and nothing on the Python brain sends
+`settings.proposed`. The tool and card above describe `packages/core`, which goes with it.
 
 ## Secrets
 
@@ -221,7 +189,7 @@ Tests use `InMemorySecretStore`.
 
 | Key                                                     | Holds                                            | Written by                                                              | Read by                                                  |
 | ------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------- |
-| `anthropic.apiKey`, `openrouter.apiKey` (`SECRET_KEYS`) | A brain's API key                                | Desktop `IPC.saveApiKey`                                                | `KeyedProviderResolver.refresh`, `listModels`            |
+| `anthropic.apiKey`, `openrouter.apiKey` (`SECRET_KEYS`) | A brain's API key                                | Desktop `IPC.saveApiKey`                                                | `KeyedProviderResolver.refresh`                          |
 | `elevenlabs.apiKey` (`ELEVENLABS_SECRET_KEY`)           | The ElevenLabs voice key                         | Desktop `IPC.saveApiKey` (`elevenlabs`)                                 | Desktop main only (the engine never reads it)            |
 | `calendar.ics` (`CALENDAR_SECRET`)                      | The private calendar link                        | `calendar.setLink` (https only, at most 2,000 characters, null deletes) | `CalendarFeed`                                           |
 | `connection.<id>.token`, `connection.<id>.env.<NAME>`   | A pasted app token, a local command's env values | `connections.add` (`secrets`)                                           | `ConnectionManager` when it connects                     |
@@ -266,8 +234,8 @@ invent an entry). An empty key deletes the stored one.
 
 Nothing sends a key back to a renderer. `IPC.hostView` returns `providers` with `hasKey` booleans
 (`storedKeys`) and `elevenLabsKeyStored`, never a value. The renderer does not receive the
-`envVar` name either. `checkKey` asks the engine's `providers.check`, which tests the stored key with
-one guarded (not recorded) call and answers `{ ok, message }`.
+`envVar` name either. The engine's `providers.check` tests a stored key with one guarded (not recorded) call and
+answers `{ ok, message }`; the desktop no longer calls it.
 
 In the engine, `KeyedProviderResolver.refresh` re-reads every `SECRET_KEYS` entry at boot, before
 every `ask`, and before `providers.check`, so a key saved a moment ago answers the next question
@@ -330,10 +298,7 @@ neither read nor change settings.
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `IPC.hostView`                                                 | Settings, pets, `providers` with `hasKey`, `elevenLabsKeyStored`, pairing token, hotkey problem |
 | `IPC.saveSettings`                                             | `save(patch, false)`                                                                            |
-| `IPC.applySettings` (`tagalong:settings:apply`)                | `applySettings` from the bubble only                                                            |
 | `IPC.saveApiKey` (`tagalong:secret:api-key`)                   | Stores or (empty) deletes a key                                                                 |
-| `IPC.checkKey`                                                 | `providers.check`, or "engine isn't running"                                                    |
-| `IPC.listModels`                                               | `models.list`, or `{ models: [], source: 'fallback' }` with no engine                           |
 | `IPC.settingsChangedEvent` (`tagalong:settings-changed-event`) | Main to windows, after every save                                                               |
 
 ## Constants and limits
@@ -395,15 +360,14 @@ renderer, a log line or a model. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test file                                            | Pins                                                                                                                                                                                            |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.test.ts`             | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                                          |
-| `packages/core/src/settings/settings.test.ts`        | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                                                  |
-| `packages/core/src/tools/builtin/settings.test.ts`   | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, days lower only, budget, no secret store, `talkPatchProblem` |
-| `bodies/desktop/src/main/ipc/apply-settings.test.ts` | Listening off path, never on, re-check against the allowlist, refused patch keeps listening                                                                                                     |
-| `bodies/desktop/src/main/ipc/settings.test.ts`       | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                                                  |
-| `bodies/desktop/src/main/secret-store.test.ts`       | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                                                 |
-| `bodies/desktop/src/main/provider-choices.test.ts`   | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                                                   |
-| `packages/core/src/providers/key-resolver.test.ts`   | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                                              |
-| `packages/core/src/privacy/secrets.test.ts`          | Each `hideSecrets` rule, ordinary text untouched                                                                                                                                                |
-| `packages/core/src/providers/guard.test.ts`          | Messages and tool results hidden, images and ids kept                                                                                                                                           |
+| Test file                                          | Pins                                                                                                                                                                                            |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.test.ts`           | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                                          |
+| `packages/core/src/settings/settings.test.ts`      | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                                                  |
+| `packages/core/src/tools/builtin/settings.test.ts` | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, days lower only, budget, no secret store, `talkPatchProblem` |
+| `bodies/desktop/src/main/ipc/settings.test.ts`     | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                                                  |
+| `bodies/desktop/src/main/secret-store.test.ts`     | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                                                 |
+| `bodies/desktop/src/main/provider-choices.test.ts` | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                                                   |
+| `packages/core/src/providers/key-resolver.test.ts` | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                                              |
+| `packages/core/src/privacy/secrets.test.ts`        | Each `hideSecrets` rule, ordinary text untouched                                                                                                                                                |
+| `packages/core/src/providers/guard.test.ts`        | Messages and tool results hidden, images and ids kept                                                                                                                                           |

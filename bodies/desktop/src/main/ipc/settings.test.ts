@@ -1,4 +1,4 @@
-/** Tests for the host view, saving settings, Apply, keys and models. */
+/** Tests for the host view, saving settings and keys. */
 
 import { describe, expect, it, vi } from 'vitest';
 import { InMemorySecretStore } from '@tagalong/core';
@@ -29,8 +29,6 @@ function setup({ problem = null as string | null } = {}) {
     applyHotkeys: vi.fn(),
     configureRolling: vi.fn(),
     broadcast: vi.fn(),
-    listeningOff: vi.fn(),
-    fromPanel: (event: unknown) => (event as { sender?: string }).sender === 'panel',
   };
   registerSettingsIpc(ipc.handle, deps);
   return { ...ipc, secrets, settingsStore, deps };
@@ -85,54 +83,7 @@ describe('registerSettingsIpc: saveSettings', () => {
   });
 });
 
-describe('registerSettingsIpc: applySettings', () => {
-  const PANEL = { sender: 'panel' };
-
-  it('refuses a card from any window but the bubble, and saves nothing', async () => {
-    const { invokeWith, settingsStore, deps } = setup();
-    await expect(
-      invokeWith({ sender: 'home' }, IPC.applySettings, { userName: 'Sam' }),
-    ).rejects.toThrow('only from the bubble');
-    expect(settingsStore.set).not.toHaveBeenCalled();
-    expect(deps.listeningOff).not.toHaveBeenCalled();
-  });
-
-  it('re-checks the patch against the settings now, never trusting the renderer', async () => {
-    const { invokeWith, settingsStore } = setup();
-    await expect(
-      invokeWith(PANEL, IPC.applySettings, {
-        providerBaseUrls: { openrouter: 'https://evil.example' },
-      }),
-    ).rejects.toThrow();
-    expect(settingsStore.set).not.toHaveBeenCalled();
-  });
-
-  it('saves a settings card to the local store', async () => {
-    const { invokeWith, settingsStore, deps } = setup();
-    await invokeWith(PANEL, IPC.applySettings, { userName: 'Sam' });
-    expect(settingsStore.set).toHaveBeenCalledWith({ userName: 'Sam' });
-    expect(deps.broadcast).toHaveBeenCalledOnce();
-    expect(deps.listeningOff).not.toHaveBeenCalled();
-  });
-
-  it('switches Always listening off through its own path, and saves the rest', async () => {
-    const { invokeWith, settingsStore, deps } = setup();
-    await invokeWith(PANEL, IPC.applySettings, { listening: { always: false }, greeting: false });
-    expect(deps.listeningOff).toHaveBeenCalledTimes(1);
-    expect(settingsStore.set).toHaveBeenCalledWith({ greeting: false });
-  });
-
-  it('never switches Always listening on', async () => {
-    const { invokeWith, settingsStore, deps } = setup();
-    await expect(
-      invokeWith(PANEL, IPC.applySettings, { listening: { always: true } }),
-    ).rejects.toThrow('Only you can switch Always listening on');
-    expect(settingsStore.set).not.toHaveBeenCalled();
-    expect(deps.listeningOff).not.toHaveBeenCalled();
-  });
-});
-
-describe('registerSettingsIpc: keys and models', () => {
+describe('registerSettingsIpc: keys', () => {
   it('stores a key, and deletes it when the key is empty', async () => {
     const { invoke, secrets } = setup();
     const key = secretKeyFor('openrouter')!;
@@ -147,21 +98,5 @@ describe('registerSettingsIpc: keys and models', () => {
     await expect(invoke(IPC.saveApiKey, 'nonsense', 'x')).rejects.toThrow(
       "'nonsense' does not take an API key",
     );
-  });
-
-  it('lists no models: the brain does not serve them yet', async () => {
-    const { invoke } = setup();
-    expect(await invoke(IPC.listModels, 'openrouter')).toEqual({
-      models: [],
-      source: 'fallback',
-    });
-  });
-
-  it('says plainly that it could not test a key', async () => {
-    const { invoke } = setup();
-    expect(await invoke(IPC.checkKey, 'openrouter')).toEqual({
-      ok: false,
-      message: 'Keys are checked by the brain now; Tagalong can’t test one here yet.',
-    });
   });
 });

@@ -43,7 +43,7 @@ test.beforeAll(async () => {
       ...process.env,
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_FAKE_SIGN_IN: 'signed-in',
       TAGALONG_FAKE_TTS: '1',
       // Talk to Scout hears a fixed question, through Chromium's fake microphone.
       TAGALONG_FAKE_STT: '1',
@@ -485,8 +485,7 @@ test('sight detail and the window text budget save and read back', async () => {
   }
 });
 
-test('Home is one window: Scout, experts, activity and settings', async () => {
-  test.skip(true, 'returns with row 8: the Experts page and its hand-off');
+test('Home is one window: Scout, jobs, connections and settings', async () => {
   const panel = await windowFor('panel');
   // The tray's Open Tagalong item calls the same main-process function as this host call;
   // a tray menu cannot be clicked from Playwright.
@@ -494,23 +493,10 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('home');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and twelve pages.
+  // One companion and six pages, all fed by the brain.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    [
-      'Overview',
-      'Waiting on you',
-      'Scout',
-      'Experts',
-      'Routines',
-      'Connections',
-      'Activity',
-      'How Scout decided',
-      'What Scout saw',
-      'What Scout remembers',
-      'What Scout learned',
-      'Settings',
-    ],
+    ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers', 'Settings'],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
@@ -527,15 +513,12 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
-  // Advanced is closed until asked for; it holds keys, summaries and sight detail.
+  // Advanced is closed until asked for; it holds the ElevenLabs voice, sight detail and watches.
   const advanced = home.getByRole('button', { name: /Advanced/ });
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
   await advanced.click();
-  await expect(home.getByRole('list', { name: 'API keys' })).toBeVisible();
-
-  // The Experts page lists the tools the companion hands work to.
-  await nav.getByRole('button', { name: 'Experts' }).click();
-  await expect(home.getByRole('button', { name: 'Add expert' })).toBeVisible();
+  await expect(advanced).toHaveAttribute('aria-expanded', 'true');
+  await expect(home.getByText('With several monitors, a look sends')).toBeVisible();
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();
@@ -543,31 +526,6 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
     timeout: 15_000,
   });
   await home.screenshot({ path: join(appDir, 'test-results', 'connections.png') });
-
-  // A routine made in Home runs now on the fake brain and lands in Activity.
-  await nav.getByRole('button', { name: 'Routines' }).click();
-  await home.getByRole('button', { name: 'New routine' }).click();
-  await home.getByRole('button', { name: /Blank/ }).click();
-  await home.getByLabel('Name').fill('Smoke check');
-  await home.getByLabel('What').fill('Say hello in one line.');
-  await home.getByRole('button', { name: 'Save' }).click();
-  const routines = home.getByRole('list', { name: 'Routines' });
-  await expect(routines).toContainText('Smoke check', { timeout: 15_000 });
-  await routines.getByRole('button', { name: 'Run now' }).click();
-  await home.screenshot({ path: join(appDir, 'test-results', 'routines.png') });
-  await nav.getByRole('button', { name: 'Activity' }).click();
-  await expect(
-    home
-      .getByRole('list', { name: 'Activity' })
-      .getByRole('button', { name: /Scout ran Smoke check/ }),
-  ).toBeVisible({ timeout: 30_000 });
-  // Each entry carries Bean, still, and its strip loads too.
-  const entryBean = home
-    .getByRole('list', { name: 'Activity' })
-    .locator('.home-entry__tile [data-testid=bean-clip]')
-    .first();
-  await expect(entryBean).toBeVisible();
-  expect(await stripLoaded(entryBean)).toBe('loaded');
 
   // The bundled typefaces must load under the page's CSP, or Home falls back to system
   // fonts without saying so.
@@ -577,14 +535,6 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   }));
   expect(fontsLoaded.onest).toBeGreaterThan(0);
   expect(fontsLoaded.pixel).toBeGreaterThan(0);
-
-  // A question to Scout shows up in Activity, from the activity record.
-  await home.evaluate(() => window.tagalong.ask({ petId: 'scout', text: 'what is open?' }));
-  await nav.getByRole('button', { name: 'Activity' }).click();
-  const activity = home.getByRole('list', { name: 'Activity' });
-  await expect(activity.getByRole('button', { name: /Scout answered/ }).first()).toBeVisible({
-    timeout: 30_000,
-  });
 
   // A screenshot for design review, in the gitignored test-results folder.
   await home.screenshot({ path: join(appDir, 'test-results', 'home.png') });

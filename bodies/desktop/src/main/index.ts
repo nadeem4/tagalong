@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 import {
   BrowserWindow,
   Menu,
-  Notification,
   Tray,
   app,
   clipboard,
@@ -24,14 +23,11 @@ import {
 } from 'electron';
 import {
   ContextSnapshot,
-  HandoffFinishedParams,
-  PetRemarkParams,
-  RoutineResultParams,
   SCOUT_ID,
   TALK_KEY_LABELS,
   TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
-import type { PerceptionTarget, PickUpReadyParams, Settings } from '@tagalong/protocol';
+import type { PerceptionTarget, Settings } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
 import {
   AlwaysListening,
@@ -41,7 +37,6 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
-import { bubbleHearsRemark, handoffLine, handoffNotice } from './handoff-notice';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import {
   StatusMarks,
@@ -52,7 +47,6 @@ import {
 } from './status-marks';
 import { recordCleanClose, recordLaunch } from './launch';
 import type { PreviousLaunch } from './launch';
-import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
@@ -101,21 +95,16 @@ import {
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
-import { registerAskIpc } from './ipc/asks';
 import { forwardAppsChanged, registerConnectionIpc } from './ipc/connections';
 import { registerScoutIpc } from './ipc/scout';
-import { registerExpertIpc } from './ipc/experts';
-import type { EngineCall, IpcHandle } from './ipc/handle';
-import { registerRoutineIpc } from './ipc/routines';
-import { registerPickUpIpc } from './ipc/pick-up';
-import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
-import { registerSightLogIpc } from './ipc/sight-log';
+import type { IpcHandle } from './ipc/handle';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
 import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
+import { registerSpendIpc } from './ipc/spend';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
@@ -533,66 +522,16 @@ let stopFocusWatch = (): void => undefined;
 let listeningWhy = { blocked: false, petsShown: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
-/** The projects the pick-up last shown named: the only ones its Open may reach. */
-const pickUpAllowlist = new PickUpAllowlist();
-/** A pick-up waiting for the open bubble to hide: one at most, the latest. */
-const pickUpWaiting = new PickUpWaiting();
-
-/**
- * A pick-up check-in spoke (at launch, or back after a long break found on a tick): the mind's
- * line beside Scout with the Pick up card, like a remark. With the bubble open, it waits until
- * the bubble next hides, and is dropped if pick-up was switched off meanwhile.
- */
-function showPickUp(params: unknown): void {
-  const pickUp = params as PickUpReadyParams;
-  const panel = desktop?.panel;
-  const avatar = desktop?.avatar;
-  if (panel == null || avatar == null || !avatar.isVisible()) return;
-  // Right after launch the panel may still be loading: a line sent now would be lost.
-  if (panel.webContents.isLoading()) {
-    panel.webContents.once('did-finish-load', () => showPickUp(params));
-    return;
-  }
-  if (panel.isVisible()) {
-    if (pickUpWaiting.hold(pickUp)) {
-      panel.once('hide', () => {
-        const next = pickUpWaiting.release();
-        if (next !== null && desktop?.settings.pickUp !== false) showPickUp(next);
-      });
-    }
-    return;
-  }
-  pickUpAllowlist.set(pickUp);
-  panel.webContents.send(IPC.greetLineEvent, { text: pickUp.text, pickUp });
-  showPanelQuietly(panel, avatar);
-}
-
-/**
- * A line about a finished hand-off lands on its card while the bubble is open; with the
- * bubble closed it loses its hand-off id and comes as an ordinary line, so it is not lost.
- */
-function routeHandoffLine(notification: { method: string; params: unknown }): {
-  method: string;
-  params: unknown;
-} {
-  if (notification.method !== 'pet.remark') return notification;
-  const parsed = PetRemarkParams.safeParse(notification.params);
-  if (!parsed.success) return notification;
-  const bubbleOpen = desktop?.panel?.isVisible() === true;
-  return { method: notification.method, params: handoffLine(parsed.data, bubbleOpen) };
-}
-
 /**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
  * the keyboard. While the panel is already open the bubble shows the words itself, as
  * Scout's message (the forward reaches it), and the quiet line stays out of the way. If the
- * panel is open on something else (a quiet line, a routine, the hello) the bubble is not
- * showing, so the words are dropped. A line tied to a finished hand-off goes to its card.
+ * panel is open on something else (a quiet line, a drop card) the bubble is not showing, so
+ * the words are dropped.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
-  if ((params as { handoffId?: unknown } | null)?.handoffId !== undefined) return;
   if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
   // Right after launch the panel may still be loading: a line sent now would be lost.
   if (panel.webContents.isLoading()) {
@@ -674,17 +613,6 @@ function stopVoice(): void {
   }
 }
 
-/**
- * The old engine is gone; the brain has no equivalent of these calls yet. Handlers not yet
- * moved over fail with this one sentence (`engine`) or do nothing (`maybeEngine`).
- */
-function engine(): EngineCall {
-  throw new Error('Scout cannot do that yet on the new brain.');
-}
-function maybeEngine(): EngineCall | null {
-  return null;
-}
-
 /** A finished turn that said something. */
 function hasText(params: { text?: unknown }): boolean {
   return typeof params.text === 'string' && params.text !== '';
@@ -694,13 +622,13 @@ function hasText(params: { text?: unknown }): boolean {
 function forwardToRenderers(incoming: { method: string; params: unknown }): void {
   // Read before showRemark below, which shows the hidden panel for the quiet line.
   const panelWasVisible = desktop?.panel?.isVisible() === true;
-  const notification = routeHandoffLine(incoming);
+  const notification = incoming;
   const params = (notification.params ?? {}) as {
     turnId?: string;
     text?: unknown;
     background?: boolean;
   };
-  // A background turn (a routine's, a job's) is not the panel streaming an answer.
+  // A background turn (a job's, a wake's) is not the panel streaming an answer.
   if (
     notification.method === 'turn.started' &&
     params.turnId !== undefined &&
@@ -719,106 +647,19 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
     clearBrainMarks(desktop.statusMarks);
   }
 
-  if (notification.method === 'watch.fired') announceWatch(notification.params);
-  if (notification.method === 'handoff.finished') announceHandoff(notification.params);
   if (notification.method === 'pet.remark') showRemark(notification.params);
-  if (notification.method === 'pickUp.ready') showPickUp(notification.params);
-  // A brief to check: the bubble comes up beside the pet with the card in it.
-  if (notification.method === 'handoff.proposed') bringUpBubble(true);
   // A change Scout wants to make in a connected app: the confirm card must be seen.
   if (notification.method === 'connector.confirm') bringUpBubble(true);
-  // A routine Scout wrote: the card waits in the bubble for Save.
-  if (notification.method === 'routine.proposed') bringUpBubble(true);
-  // Settings Scout would change: the card waits in the bubble for Apply.
-  if (notification.method === 'settings.proposed') bringUpBubble(true);
-  if (notification.method === 'routine.result') deliverRoutine(notification.params);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
   const event = { type: notification.method, ...params };
   // A remark shown as the quiet line (panel hidden) must not also reach the mounted bubble.
-  const remark =
-    notification.method === 'pet.remark' ? PetRemarkParams.safeParse(notification.params) : null;
   const panel = desktop?.panel;
-  const bubbleDeaf = remark?.success === true && !bubbleHearsRemark(remark.data, panelWasVisible);
+  const bubbleDeaf = notification.method === 'pet.remark' && !panelWasVisible;
   for (const window of BrowserWindow.getAllWindows()) {
     if (bubbleDeaf && window === panel) continue;
     window.webContents.send(IPC.turnEvent, event);
-  }
-}
-
-/**
- * A watch fired: say so where the user will see it. The panel gets it as a card through the
- * ordinary event forward; this adds a system toast and brings the panel up beside the avatar.
- * The toast carries the judge's reason, or the condition when it gave none; the panel says a
- * reason aloud when Scout talks is on, and nothing without one.
- */
-function announceWatch(params: unknown): void {
-  const { message, condition } = (params ?? {}) as { message?: string; condition?: string };
-  const body = message || condition;
-  if (body !== undefined && body !== '' && Notification.isSupported()) {
-    new Notification({ title: 'Tagalong — a watch fired', body, silent: false }).show();
-  }
-  if (desktop?.panel != null && desktop.avatar != null && !desktop.panel.isVisible()) {
-    showPanelBeside(desktop.panel, desktop.avatar);
-  }
-}
-
-/**
- * An expert finished a hand-off: the bubble comes up beside the pet with the answer,
- * without taking the keyboard. A system notification says so too when the pets are hidden,
- * since then there is no bubble to see.
- */
-function announceHandoff(params: unknown): void {
-  const parsed = HandoffFinishedParams.safeParse(params);
-  if (!parsed.success) return;
-  if (desktop?.avatar?.isVisible() === true) {
-    bringUpBubble(false);
-    return;
-  }
-  // The notice names the expert as Home does; its id stands in when the list cannot be read.
-  void (async () => {
-    const experts = await maybeEngine()
-      ?.call('experts.list', {})
-      .then((result) => result.experts)
-      .catch(() => undefined);
-    const name = experts?.find((expert) => expert.id === parsed.data.expertId)?.name;
-    const notice = handoffNotice(parsed.data, name);
-    if (notice !== null && Notification.isSupported()) {
-      new Notification({ ...notice, silent: false }).show();
-    }
-  })();
-}
-
-/**
- * A routine ran: the quiet line beside Scout, its voice, a Windows notification, as the
- * routine chose (Activity already has it). The engine held it while a call or a full-screen
- * app was in front. Clicking the notification opens the bubble on the full answer.
- */
-function deliverRoutine(params: unknown): void {
-  const parsed = RoutineResultParams.safeParse(params);
-  const current = desktop;
-  if (!parsed.success || current === null) return;
-  const result = parsed.data;
-  const { panel, avatar } = current;
-  const how = routineDelivery(result, {
-    avatarVisible: avatar?.isVisible() === true,
-    panelVisible: panel?.isVisible() === true,
-  });
-  if (panel !== null && (how.line || how.speak)) {
-    panel.webContents.send(IPC.routineEvent, result, { line: how.line, speak: how.speak });
-    if (how.line && avatar !== null) showPanelQuietly(panel, avatar);
-  }
-  if (how.notice !== null && Notification.isSupported()) {
-    const notice = new Notification({ ...how.notice, silent: false });
-    notice.on('click', () => {
-      const shown = desktop;
-      if (shown?.panel == null || shown.avatar == null) return;
-      shown.avatar.show();
-      shown.panel.webContents.send(IPC.routineEvent, result, { line: true, speak: false });
-      showPanelBeside(shown.panel, shown.avatar);
-    });
-    notice.show();
   }
 }
 
@@ -1013,30 +854,17 @@ function registerIpc(): void {
     takeDrop: () => drops.take(),
   });
   registerScoutIpc(handle);
-  registerExpertIpc(handle, { engine, brain: required().brain });
+  registerSpendIpc(handle, { brain: required().brain });
   registerConnectionIpc(handle, {
     brain: required().brain,
     answer: (ask, decision) => required().brain.answer(ask, decision),
     reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
   });
-  registerAskIpc(handle, { engine });
-  registerPickUpIpc(handle, {
-    engine,
-    allowlist: pickUpAllowlist,
-    openExternal: (url) => shell.openExternal(url),
-    openPath: (folder) => shell.openPath(folder),
-  });
-  registerSightLogIpc(handle, { engine });
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
   registerBrainLinkIpc(handle, { brain: required().brain });
-  registerRoutineIpc(handle, {
-    engine,
-    openHome: (page) => openHome(page),
-    homeWindow: () => required().homeWindow,
-  });
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,
     secrets: () => required().secrets,
@@ -1057,10 +885,6 @@ function registerIpc(): void {
         if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
       }
     },
-    listeningOff: () => {
-      required().listening.set(false);
-    },
-    fromPanel: fromWindow(() => required().panel),
   });
   registerVoiceIpc(handle, {
     voice: () => required().voice,
@@ -1081,18 +905,6 @@ function registerIpc(): void {
     appPath: app.getAppPath(),
     exists: existsSync,
     showItemInFolder: (path) => shell.showItemInFolder(path),
-  });
-
-  ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
-    const owner = BrowserWindow.fromWebContents(event.sender);
-    const options = { title: 'Choose a project folder', properties: ['openDirectory' as const] };
-    const picked = owner
-      ? await dialog.showOpenDialog(owner, options)
-      : await dialog.showOpenDialog(options);
-    // The dialog took focus, which hides the bubble; bring it back with the folder in it.
-    const { panel, avatar } = required();
-    if (owner !== null && owner === panel && avatar !== null) showPanelBeside(panel, avatar);
-    return picked.canceled ? null : (picked.filePaths[0] ?? null);
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);

@@ -43,13 +43,11 @@ const SIGN_IN_STATES: readonly ClaudeSignIn[] = [
 ];
 
 /**
- * The sign-in a test asks for: `TAGALONG_FAKE_SIGN_IN` names a state, and fake providers
- * read as signed in, so no test ever runs this machine's claude.
+ * The sign-in a test asks for: `TAGALONG_FAKE_SIGN_IN` names a state, so no test ever
+ * runs this machine's claude.
  */
 export function fakeSignIn(env: Record<string, string | undefined>): ClaudeSignIn | undefined {
-  const forced = SIGN_IN_STATES.find((state) => state === env.TAGALONG_FAKE_SIGN_IN);
-  if (forced !== undefined) return forced;
-  return env.TAGALONG_FAKE_PROVIDERS === '1' ? 'signed-in' : undefined;
+  return SIGN_IN_STATES.find((state) => state === env.TAGALONG_FAKE_SIGN_IN);
 }
 
 export function signInFor(

@@ -1,15 +1,13 @@
 /**
  * The public surface of @tagalong/ui: React components and helpers shared by the desktop
- * renderer and the extension side panel. Contains the HostBridge contract and its provider,
- * the bubble, dock pet, chat panel, Home, the Settings sheet, Scout's voice helpers and the
- * fake bridge for host tests. Never imports electron or opens a socket: hosts hand it a
+ * renderer. Contains the HostBridge contract and its provider, the bubble, dock pet, Home,
+ * the Settings styles, Scout's voice helpers and the fake bridge for host tests. Never imports electron or opens a socket: hosts hand it a
  * HostBridge.
  */
 export { HostBridgeProvider } from './host-bridge';
 export type {
   AskInput,
   BrainLink,
-  ConfirmHandoff,
   HostBridge,
   JobRow,
   ApprovalRow,
@@ -20,7 +18,6 @@ export type {
   TurnEvent,
 } from './host-bridge';
 
-export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
 export { ApprovedReport } from './approved-card';
 export type { DropOffer } from './drop-card';
@@ -29,12 +26,11 @@ export type { BeanFigure, DockMood, DockPetProps, ListeningDot } from './dock-pe
 export { BeanClip } from './theme/bean-clip';
 export type { BeanClipData } from './theme/bean-clip';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
-export type { ChatPanelProps } from './chat-panel';
 
 /** Exported so hosts can test their renderer wiring without booting an engine. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 
-/** Home: the one window for the companion, its experts, activity and settings. */
+/** Home: the one window for jobs, permissions, approvals, connections, memory and settings. */
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { brainLabel } from './home/brain-label';

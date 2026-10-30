@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 
 const T = '10000000-0000-4000-8000-000000000001';
-const H = '10000000-0000-4000-8000-0000000000a1';
 const J = '10000000-0000-4000-8000-0000000000b1';
 
 describe('the dock', () => {
@@ -20,16 +19,11 @@ describe('the dock', () => {
     );
   });
 
-  it('thinks while the companion answers, and has an expert working while one has a task', () => {
+  it('thinks while the companion answers', () => {
     let dock = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
     expect(dockMood(dock)).toBe('thinking');
     dock = nextDock(dock, { type: 'turn.completed', turnId: T });
     expect(dockMood(dock)).toBe('idle');
-
-    dock = nextDock(dock, { type: 'handoff.progress', handoffId: H });
-    expect(dockMood(dock)).toBe('expert');
-    dock = nextDock(dock, { type: 'handoff.finished', handoffId: H });
-    expect(dockMood(dock)).toBe('done');
   });
 
   it('works on a job of its own while a background turn runs, until it ends or fails', () => {
@@ -44,14 +38,6 @@ describe('the dock', () => {
     expect(nextDock(IDLE_DOCK, { type: 'turn.completed', turnId: T })).toBe(IDLE_DOCK);
   });
 
-  it('stays done until the person looks', () => {
-    const done = nextDock(nextDock(IDLE_DOCK, { type: 'handoff.progress', handoffId: H }), {
-      type: 'handoff.finished',
-      handoffId: H,
-    });
-    expect(dockMood(nextDock(done, { type: 'looked' }))).toBe('idle');
-  });
-
   it('returns the same state for events it does not read', () => {
     expect(nextDock(IDLE_DOCK, { type: 'watch.status' })).toBe(IDLE_DOCK);
   });
@@ -59,30 +45,16 @@ describe('the dock', () => {
 
 describe('moods on the dock', () => {
   const away = (dock = IDLE_DOCK) => nextDock(dock, { type: 'presence.away' });
-  const wince = (dock = IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'wince' });
 
   it('dozes while the person is away, and wakes when they come back', () => {
     expect(dockMood(away())).toBe('dozing');
     expect(dockMood(nextDock(away(), { type: 'presence.back' }))).toBe('idle');
   });
 
-  it('winces or cheers until the reaction is over', () => {
-    expect(dockMood(wince())).toBe('wince');
-    expect(dockMood(nextDock(IDLE_DOCK, { type: 'pet.mood', mood: 'cheer' }))).toBe('cheer');
-    expect(dockMood(nextDock(wince(), { type: 'reacted' }))).toBe('idle');
-    expect(nextDock(IDLE_DOCK, { type: 'pet.mood', mood: 'sulk' })).toBe(IDLE_DOCK);
-  });
-
-  it('keeps the order: seeing, thinking, a reaction, done, dozing, idle', () => {
+  it('keeps the order: seeing, thinking, dozing, idle', () => {
     const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
-    const done = nextDock(nextDock(IDLE_DOCK, { type: 'handoff.progress', handoffId: H }), {
-      type: 'handoff.finished',
-      handoffId: H,
-    });
-    expect(dockMood(nextDock(wince(away(working)), { type: 'seeing' }))).toBe('listening');
-    expect(dockMood(wince(away(working)))).toBe('thinking');
-    expect(dockMood(wince(away(done)))).toBe('wince');
-    expect(dockMood(away(done))).toBe('done');
+    expect(dockMood(nextDock(away(working), { type: 'seeing' }))).toBe('listening');
+    expect(dockMood(away(working))).toBe('thinking');
     expect(dockMood(away())).toBe('dozing');
   });
 
@@ -174,44 +146,14 @@ describe('reading the screen', () => {
 });
 
 describe('the activity order', () => {
-  it('keeps seeing over reading, over thinking, over an expert, over a job', () => {
+  it('keeps seeing over reading, over thinking, over a job', () => {
     let dock = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: J, background: true });
     expect(dockMood(dock)).toBe('working');
-    dock = nextDock(dock, { type: 'handoff.progress', handoffId: H });
-    expect(dockMood(dock)).toBe('expert');
     dock = nextDock(dock, { type: 'turn.started', turnId: T, petId: 'scout' });
     expect(dockMood(dock)).toBe('thinking');
     dock = nextDock(dock, { type: 'turn.toolRequest', turnId: T, tool: 'look_at_screen' });
     expect(dockMood(dock)).toBe('reading');
     expect(dockMood(nextDock(dock, { type: 'seeing' }))).toBe('listening');
-  });
-});
-
-describe('tired on the dock', () => {
-  const tired = (dock = IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'tired' });
-  const rested = (dock: typeof IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'rested' });
-
-  it('stays tired until rested, whatever clears a reaction', () => {
-    expect(dockMood(tired())).toBe('tired');
-    expect(dockMood(nextDock(tired(), { type: 'reacted' }))).toBe('tired');
-    expect(dockMood(nextDock(tired(), { type: 'looked' }))).toBe('tired');
-    expect(dockMood(rested(tired()))).toBe('idle');
-    expect(rested(IDLE_DOCK)).toBe(IDLE_DOCK);
-    expect(tired(tired())).toEqual(tired());
-  });
-
-  it('sits below thinking and a wince, and above done and dozing', () => {
-    const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
-    const done = nextDock(nextDock(IDLE_DOCK, { type: 'handoff.progress', handoffId: H }), {
-      type: 'handoff.finished',
-      handoffId: H,
-    });
-    const wince = (dock: typeof IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'wince' });
-    expect(dockMood(tired(working))).toBe('thinking');
-    expect(dockMood(wince(tired()))).toBe('wince');
-    expect(dockMood(nextDock(wince(tired()), { type: 'reacted' }))).toBe('tired');
-    expect(dockMood(tired(done))).toBe('tired');
-    expect(dockMood(tired(nextDock(IDLE_DOCK, { type: 'presence.away' })))).toBe('tired');
   });
 });
 

@@ -1,7 +1,5 @@
 /*
- * Shared sheet for the avatar and bubble windows. @tagalong/ui's chat parts are written
- * against Tailwind utility classes and the desktop does not ship Tailwind, so these rules give the
- * structure those classes would.
+ * Shared sheet for the avatar and bubble windows: the base font and colours.
  */
 
 :root {

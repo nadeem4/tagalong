@@ -90,9 +90,9 @@ describe('checkClaudeSignIn with the real runner', () => {
 });
 
 describe('fakeSignIn', () => {
-  it('lets a test pick the sign-in state, and fake providers read as signed in', () => {
+  it('lets a test pick the sign-in state', () => {
     expect(fakeSignIn({ TAGALONG_FAKE_SIGN_IN: 'signed-out' })).toBe('signed-out');
-    expect(fakeSignIn({ TAGALONG_FAKE_PROVIDERS: '1' })).toBe('signed-in');
+    expect(fakeSignIn({ TAGALONG_FAKE_PROVIDERS: '1' })).toBeUndefined();
     expect(fakeSignIn({ TAGALONG_FAKE_SIGN_IN: 'nonsense' })).toBeUndefined();
     expect(fakeSignIn({})).toBeUndefined();
   });

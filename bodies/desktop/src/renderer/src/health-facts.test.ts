@@ -1,22 +1,12 @@
 /** Tests for gatherHealth: each row, budgets and calls that fail or hang. */
 import { describe, expect, it, vi } from 'vitest';
 import { Settings } from '@tagalong/protocol';
-import type { Expert, Pet } from '@tagalong/protocol';
+import type { Pet } from '@tagalong/protocol';
 import type { HostView } from '../../shared/ipc';
 import { gatherHealth } from './health-facts';
 import type { HealthDeps } from './health-facts';
 
 const scout = { id: 'scout', name: 'Scout', providerId: 'claude-code', model: 'sonnet' } as Pet;
-
-const expert = (id: string, enabled = true): Expert =>
-  ({
-    id,
-    name: id === 'coder' ? 'Coder' : 'Writer',
-    goodAt: '',
-    enabled,
-    instructions: '',
-    connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
-  }) as Expert;
 
 function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> = {}): HostView {
   return {
@@ -34,8 +24,6 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
   return {
     getHostView: () => Promise.resolve(view()),
     checkClaudeSignIn: () => Promise.resolve('signed-in'),
-    listExperts: () => Promise.resolve([expert('coder'), expert('writer', false)]),
-    testExpert: () => Promise.resolve({ ok: true }),
     listConnections: () =>
       Promise.resolve({
         apps: [
@@ -60,12 +48,9 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
 
 describe('gatherHealth', () => {
   it('reads every check from the host’s own calls', async () => {
-    const testExpert = vi.fn(() => Promise.resolve({ ok: false }));
-    const facts = await gatherHealth(deps({ testExpert }));
+    const facts = await gatherHealth(deps());
     expect(facts).toEqual({
       brain: 'ready',
-      // Only the experts that are on are tested.
-      experts: [{ name: 'Coder', ok: false }],
       connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
       voice: {
         enabled: true,
@@ -77,7 +62,6 @@ describe('gatherHealth', () => {
       },
       microphone: { count: 1, pickedMissing: false },
     });
-    expect(testExpert).toHaveBeenCalledExactlyOnceWith('coder');
   });
 
   it('reads Scout signed out, and a picked microphone that is gone', async () => {
@@ -106,8 +90,6 @@ describe('gatherHealth', () => {
     const facts = await gatherHealth({
       getHostView: fail,
       checkClaudeSignIn: fail,
-      listExperts: fail,
-      testExpert: fail,
       listConnections: fail,
       listMicrophones: fail,
       voiceModels: fail,
@@ -115,32 +97,10 @@ describe('gatherHealth', () => {
     });
     expect(facts).toEqual({
       brain: 'unknown',
-      experts: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
     });
-  });
-
-  it('counts an expert whose test fails or takes too long as not reached', async () => {
-    vi.useFakeTimers();
-    try {
-      const pending = gatherHealth(
-        deps({
-          listExperts: () => Promise.resolve([expert('coder'), expert('writer')]),
-          testExpert: (id) =>
-            id === 'coder' ? new Promise(() => undefined) : Promise.reject(new Error('no')),
-          testBudgetMs: 5_000,
-        }),
-      );
-      await vi.advanceTimersByTimeAsync(5_000);
-      expect((await pending).experts).toEqual([
-        { name: 'Coder', ok: false },
-        { name: 'Writer', ok: false },
-      ]);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('gives up on any call that hangs: that row is unknown, the rest still read', async () => {
@@ -149,7 +109,6 @@ describe('gatherHealth', () => {
       const hang = () => new Promise<never>(() => undefined);
       const pending = gatherHealth(
         deps({
-          listExperts: hang,
           listConnections: hang,
           listMicrophones: hang,
           voiceModels: hang,
@@ -159,7 +118,6 @@ describe('gatherHealth', () => {
       await vi.advanceTimersByTimeAsync(5_000);
       expect(await pending).toEqual({
         brain: 'ready',
-        experts: 'unknown',
         connections: 'unknown',
         voice: 'unknown',
         microphone: 'unknown',

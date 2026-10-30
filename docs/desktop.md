@@ -30,11 +30,11 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
 | `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
 | `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`)                                                                                                              |
-| `src/main/links.ts`, `fix-target.ts`       | `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                                            |
+| `src/main/fix-target.ts`                   | `fixPage` (the Fix it allowlist)                                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
-| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                   |
+| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
 | `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
 | `electron.vite.config.ts`                  | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
 | `electron-builder.json`                    | The installer                                                                                                                                                               |
@@ -138,9 +138,8 @@ running.
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
-- **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
-  and routines come back as the brain's rows land. Any IPC that needs them throws "Scout cannot do
-  that yet on the new brain."
+- **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye and wellbeing
+  come back as the brain's rows land; the old engine's IPC for them is deleted, not stubbed.
 
 `shutdown()` stops the client.
 
@@ -192,19 +191,15 @@ Rules each module enforces:
 - `showPanelQuietly(panel, avatar)`: `placePanel`, `showInactive()`. The bubble appears without
   taking focus from the app the person is typing in.
 
-| Trigger                                                                          | Shown with                                                            |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Ask hotkey or tray click (`openPanelWithContext`)                                | `showPanelBeside`                                                     |
-| Click on the pet (`IPC.openBubble`, `IPC.togglePanel` when hidden)               | `showPanelBeside`                                                     |
-| Second launch (`showPets`)                                                       | `showPanelBeside`                                                     |
-| `handoff.proposed`, `connector.confirm`, `routine.proposed`, `settings.proposed` | `showPanelBeside` (via `bringUpBubble(true)`)                         |
-| `watch.fired`; a routine's notification clicked                                  | `showPanelBeside`                                                     |
-| The folder dialog closed (`IPC.pickFolder` from the panel)                       | `showPanelBeside` (the dialog's focus hid it)                         |
-| Launch line or brain status (`greetOnLaunch`), `pet.remark`, `pickUp.ready`      | `showPanelQuietly`                                                    |
-| `handoff.finished` with the pet visible (`bringUpBubble(false)`)                 | `showPanelQuietly`                                                    |
-| A routine result with a line (`deliverRoutine`)                                  | `showPanelQuietly`                                                    |
-| Talk key held (`talkPressed`)                                                    | `showPanelQuietly`                                                    |
-| Words addressed to Scout from Always listening (`forwardEars` `onSpoken`)        | `showPanelQuietly`, only when the pet is visible and the panel hidden |
+| Trigger                                                                   | Shown with                                                            |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Ask hotkey or tray click (`openPanelWithContext`)                         | `showPanelBeside`                                                     |
+| Click on the pet (`IPC.openBubble`, `IPC.togglePanel` when hidden)        | `showPanelBeside`                                                     |
+| Second launch (`showPets`)                                                | `showPanelBeside`                                                     |
+| `connector.confirm`                                                       | `showPanelBeside` (via `bringUpBubble(true)`)                         |
+| `pet.remark`                                                              | `showPanelQuietly`                                                    |
+| Talk key held (`talkPressed`)                                             | `showPanelQuietly`                                                    |
+| Words addressed to Scout from Always listening (`forwardEars` `onSpoken`) | `showPanelQuietly`, only when the pet is visible and the panel hidden |
 
 The talk key must not take focus: its release comes from the key hook in main, and a focused
 bubble would swallow the shortcut the person meant if the press turns into Right Ctrl+C.
@@ -217,10 +212,7 @@ back. A click on the pet never closes the bubble: `openBubble` opens it, or give
 keyboard back.
 
 **Lines that wait.** `showRemark` drops a line when the bubble is already open or the pet is
-hidden, skips a line with a `handoffId` (that one goes to the hand-off card), and waits for
-`did-finish-load` when the panel is still loading. `showPickUp` holds at most one pick-up while the
-bubble is open (`PickUpWaiting`), shows it on the bubble's next `hide`, and drops it if pick-up was
-switched off meanwhile.
+hidden, and waits for `did-finish-load` when the panel is still loading.
 
 ### The tray
 
@@ -304,30 +296,26 @@ and the settings card's checks are in [settings-and-secrets.md](settings-and-sec
 
 Each module in `src/main/ipc/` exports `register…Ipc(handle, deps)`. `handle` is
 `ipcMain.handle` in the app and a recording fake in tests (`fake-ipc.ts`), and `deps` carries
-only what the module reads, so every module is tested without Electron. `deps.engine()` throws
-"Scout cannot do that yet on the new brain." for the calls that have no brain equivalent yet;
-`maybeEngine()` returns null instead. `ask` and `interrupt` use the brain client directly.
+only what the module reads, so every module is tested without Electron. `ask` and `interrupt`
+use the brain client directly; the rest call brain tools through `callJson`. A guard test
+(`ipc/ipc-channels.test.ts`) fails when a channel in `shared/ipc.ts` is not used by both main and
+the preload, so a dead channel cannot linger.
 
-| Module              | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                                                                                                                                 | Engine calls / notes                                                                                                                                                                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `turns.ts`          | `ask` (`ask`), `stopWatch` (`watch:stop`), `interrupt` (`interrupt`), `remarkNotNow` (`remark:not-now`), `remarkAccept` (`remark:accept`)                                                                                                                                                                                            | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `watch.stop`, `interrupt`, `keepAnEye.notNow`, `keepAnEye.accept`                                                                                                                                                                                        |
-| `scout.ts`          | `listPets` (`pets:list`), `savePet` (`pets:save`), `switchScout` (`pets:switch-scout`)                                                                                                                                                                                                                                               | `pets.list`, `pets.upsert`, `experts.list`, `experts.upsert`, `settings.set`; reloads the avatar after a pet changes                                                                                                                                                                                                                                 |
-| `experts.ts`        | `listActivity`, `listExperience`, `getExperience`, `clearExperience`, `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`, `usageSummary`, `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`, `confirmHandoff`, `dismissHandoff`, `cancelHandoff`, `searchProjects` | `activity.list` and `experience.list` (default `limit` 30), `experience.*`, `self.*`, brain tool `spend_today` (`usageSummary`), `experts.*`, `handoffs.*`, `projects.search`                                                                                                                                                                        |
-| `connections.ts`    | `approveTool` (`tool:approve`), `answerJobAsk`, `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `signInConnection`                                                                                                                                                              | `approveTool` goes to the brain client's `answer` (`once`, `always` or `deny`); the connection calls go through `callJson` to the brain's `list_apps`, `add_app` (params parsed with `AppAddParams` first), `set_app_enabled`, `restart_app` and `remove_app`, and reject with `brain offline` while offline; `signInConnection` calls `sign_in_app` |
-| `asks.ts`           | `listAsks` (`asks:list`), `answerAsk` (`asks:answer`), `openAsk` (`asks:open`)                                                                                                                                                                                                                                                       | `asks.list`, `asks.answer`, `asks.open` (see [asks.md](asks.md))                                                                                                                                                                                                                                                                                     |
-| `pick-up.ts`        | `openPickUp` (`pick-up:open`), `rebriefPickUp` (`pick-up:rebrief`), `dismissPickUp` (`pick-up:dismiss`)                                                                                                                                                                                                                              | Open is by item id, checked against `PickUpAllowlist`, then `shell.openExternal` or `shell.openPath`; `pickUp.rebrief`, `pickUp.dismiss`                                                                                                                                                                                                             |
-| `routines.ts`       | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, `confirmRoutine`, `dismissRoutine`, `setCalendarLink` (`calendar:set-link`), `checkCalendar` (`calendar:check`), `editRoutine`                                                                                                                    | `routines.*` (drafts parsed with `RoutineDraft`), `calendar.setLink`, `calendar.check`; `editRoutine` opens Home on Routines and sends `IPC.routineDraftEvent`                                                                                                                                                                                       |
-| `sight-log.ts`      | `listSightLog`, `deleteSightLog`, `clearSightLog`                                                                                                                                                                                                                                                                                    | `sightLog.list { limit: 200 }`, `sightLog.delete`, `sightLog.clear`                                                                                                                                                                                                                                                                                  |
-| `memory.ts`         | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                                                                                                                                     | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
-| `permissions.ts`    | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                                                                                                                          | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
-| `jobs.ts`           | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                                                                                                                                    | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
-| `settings.ts`       | `hostView` (`host:view`), `saveSettings` (`settings:save`), `applySettings` (`settings:apply`), `saveApiKey` (`secret:api-key`), `checkKey` (`secret:check-key`), `listModels` (`models:list`)                                                                                                                                       | Works with no engine, from `SettingsStore`. `applySettings` only from the panel's window (`fromPanel`)                                                                                                                                                                                                                                               |
-| `apply-settings.ts` | none (the logic behind `applySettings`)                                                                                                                                                                                                                                                                                              | Re-checks the card's patch with `talkPatchProblem`, refuses `listening.always: true`, switches listening off through `AlwaysListening.set(false)`, saves the rest `byTalk`                                                                                                                                                                           |
-| `voice.ts`          | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent`                                                                                                         | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
-| `clipboard.ts`      | `copyText` (`clipboard:copy-text`)                                                                                                                                                                                                                                                                                                   | `clipboard.writeText` only, from the panel only, strings up to `MAX_COPY_CHARS` (20,000); also exports `fromWindow`                                                                                                                                                                                                                                  |
-| `browser.ts`        | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                                                                                                                                    | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
-| `handle.ts`         | none                                                                                                                                                                                                                                                                                                                                 | `IpcHandle`, `IpcOn`, `IpcListener`, `EngineCall`                                                                                                                                                                                                                                                                                                    |
-| `fake-ipc.ts`       | none                                                                                                                                                                                                                                                                                                                                 | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
+| Module           | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                         | Engine calls / notes                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turns.ts`       | `ask` (`ask`), `interrupt` (`interrupt`), `remarkNotNow` (`remark:not-now`)                                                                                                                                                  | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `interrupt`; `remarkNotNow` does nothing on the Python brain                                                                                                                                                                                             |
+| `scout.ts`       | `listPets` (`pets:list`)                                                                                                                                                                                                     | The one fixed local Scout, no brain call                                                                                                                                                                                                                                                                                                             |
+| `connections.ts` | `approveTool` (`tool:approve`), `answerJobAsk`, `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `signInConnection`                                                      | `approveTool` goes to the brain client's `answer` (`once`, `always` or `deny`); the connection calls go through `callJson` to the brain's `list_apps`, `add_app` (params parsed with `AppAddParams` first), `set_app_enabled`, `restart_app` and `remove_app`, and reject with `brain offline` while offline; `signInConnection` calls `sign_in_app` |
+| `spend.ts`       | `usageSummary` (`usage:summary`)                                                                                                                                                                                             | brain tool `spend_today` (parsed as `SpendToday`; a bad answer throws)                                                                                                                                                                                                                                                                               |
+| `memory.ts`      | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                             | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
+| `permissions.ts` | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                  | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
+| `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                            | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
+| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`), `saveApiKey` (`secret:api-key`)                                                                                                                                  | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
+| `voice.ts`       | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent` | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
+| `clipboard.ts`   | `copyText` (`clipboard:copy-text`)                                                                                                                                                                                           | `clipboard.writeText` only, from the panel only, strings up to `MAX_COPY_CHARS` (20,000); also exports `fromWindow`                                                                                                                                                                                                                                  |
+| `browser.ts`     | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                            | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
+| `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`                                                                                                                                                                                                                                                                                                                  |
+| `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
 `HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `providers` (`ProviderChoice[]`, with `hasKey` and never the key), `engineVersion`,
 `hotkeyError`, `platform` (`process.platform`) and
@@ -338,7 +326,6 @@ shell, the screen):
 
 | Channel (`IPC.<key>`)                                | What main does                                                                                                                                    |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pickFolder`                                         | `dialog.showOpenDialog` (`openDirectory`), then shows the panel again if it asked                                                                 |
 | `getContext`                                         | returns `pendingSnapshot`                                                                                                                         |
 | `capture`                                            | `captureForPanel`: announces the capture, returns null when blocked or paused, otherwise a parsed `ContextSnapshot` (also sent on `contextEvent`) |
 | `getSightPaused`, `toggleSightPause`                 | the `SightPause` state, and flipping it                                                                                                           |
@@ -353,14 +340,13 @@ shell, the screen):
 
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
 `sightPauseEvent`, `recordingEvent`, `hotkeyProblemEvent`, `settingsChangedEvent`,
-`statusMarkEvent`, `listeningEvent`, `homePageEvent`, `routineEvent`, `routineDraftEvent`,
-`greetEvent`, `greetLineEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
+`statusMarkEvent`, `listeningEvent`, `homePageEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
 `talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`,
 `earsProgressEvent`.
 
 Three handlers check the sender with `fromWindow(window)`, which compares `event.sender` (set by
-Electron in main, so a page cannot forge it) with that window's `webContents`: `copyText` and
-`applySettings` (the panel only) and `dropOnPet` (the avatar only).
+Electron in main, so a page cannot forge it) with that window's `webContents`: `copyText`
+(the panel only) and `dropOnPet` (the avatar only).
 
 ### Talking to the brain
 
@@ -392,7 +378,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   the single JSON text part the Home tools return. Home's What Scout remembers uses `list_memories`
   and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
-  rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/experts.ts`,
+  rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/spend.ts`,
   answering `{ spentUsd, limitUsd }`): the by-provider rows and the month are gone until the brain can
   report them. Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
@@ -405,15 +391,14 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
   checks the card. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
   job) shows "Asks itself" with a disabled switch.
-- **Jobs panel:** Home's Experts page opens with a Jobs card (`bodies/ui/src/home/jobs-panel.tsx`)
-  above the old Experts list. It uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
+- **Jobs panel:** Home's Jobs page (`bodies/ui/src/home/jobs-panel.tsx`)
+  uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
   while running, reason when ended, and a Show result toggle once finished. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
-  The old `ExpertsPanel` under it calls the retired engine (`engine()` throws), so it does not
-  work; do not rely on it. `e2e/jobs.spec.ts` covers the panel on the fake brain.
+  `e2e/jobs.spec.ts` covers the panel on the fake brain.
 - **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses
   `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`
   (`ipc/approvals.ts`, channels `tagalong:approvals:list`, `tagalong:approvals:preferences:list`,
@@ -481,12 +466,12 @@ data over the channels in `shared/ipc.ts`:
   (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](bubble.md#the-health-check)).
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
   the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys,
-  Home, the panel's placement and fit, the avatar's drag, the greeting, remark and routine lines,
+  Home, the panel's placement and fit, the avatar's drag, remark lines,
   voice and ears, Always listening, drops, the health facts and status marks.
 
 Each `on…` returns an unsubscribe function. `heldUntilHeard` (`preload/held.ts`) keeps the last
 value that arrived with no listener and hands it to the first one, for three events main may send
-before React subscribes: `greetLineEvent`, `homePageEvent` and `routineDraftEvent`. `micFrame`
+before React subscribes: Home's page (`homePageEvent`). `micFrame`
 uses `ipcRenderer.send` (no answer). `dropOnPet` turns each `File` into its path with
 `webUtils.getPathForFile` (`File.path` is gone in Electron 44; `webUtils` is available to a
 sandboxed preload) and drops an empty path.
@@ -620,9 +605,9 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 - `startBrain({ onNotification, onStatus, onResync, env?, openSocket? })` returns the `BrainClient`.
 - `HotkeyBindings { ask, pauseSight, stopVoice }`, `HotkeyOutcome`, `HotkeyAction`
   (`ask | pauseSight | stopVoice | talk`), `HotkeyRegistrar` (the test seam over `globalShortcut`).
-- `IPC`, `HostView`, `TagalongHostApi`, `GreetLine` (`{ text, pickUp? } | { status }`),
+- `IPC`, `HostView`, `TagalongHostApi`,
   `CaptureNotice`, `SpeakResult`, `ListeningState`, `PetDrop`, `ProviderChoice`,
-  `ClaudeSignIn`, `VoiceModels`, `FoundAgent`, `ModelList` (`shared/ipc.ts`).
+  `ClaudeSignIn`, `VoiceModels`, `FoundAgent` (`shared/ipc.ts`).
 - `Platform`, `WindowInventory`, `ActiveWindowInfo`, `CapturedImage` (`platform/index.ts`).
 
 ## Constants and limits
@@ -641,8 +626,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | `SIGN_IN_BUDGET_MS`                 | 1,000 ms                       | `launch.ts`                         |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`                       |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`                  |
-| Sight log and memory list           | `limit: 200`                   | `ipc/sight-log.ts`, `ipc/memory.ts` |
-| Activity and experience page        | `limit: 30` default            | `ipc/experts.ts`                    |
+| Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`                     |
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`                      |
 | `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`              |
 
@@ -677,15 +661,13 @@ the clean close and stops the brain client.
 - **A hotkey cannot be registered.** Reported, never fatal (see
   [The hotkey-problem path](#global-hotkeys)). The key hook failing to start reports the talk key
   the same way.
-- **A window not ready.** `showRemark`, `showPickUp`, `greetOnLaunch` and `editRoutine` wait for
-  `did-finish-load` when the target page is still loading; the preload holds the greeting, Home's
-  page and the routine draft until a listener subscribes.
+- **A window not ready.** `showRemark` waits for `did-finish-load` when the panel is still
+  loading; the preload holds Home's page until a listener subscribes.
 - **Logging fails.** Swallowed; the console still has the line.
 - **Unsupported OS.** `createPlatform` throws, `start` rejects, and the app shows the error and
   quits.
 - **Refused inputs.** `openSettings` throws for an
-  unknown Fix it target; `openPickUp` throws for an item the current pick-up did not name;
-  `copyText`, `applySettings` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
+  unknown Fix it target; `copyText` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
   `fitPanel` ignore non-finite numbers.
 
 ## Privacy notes
@@ -708,7 +690,6 @@ when a button on its card asks. See [privacy.md](privacy.md).
 | `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
 | `src/main/ipc/*.test.ts`                                                                   | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
 | `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
-| `e2e/launch-greeting.spec.ts`                                                              | the brain mark with Fix it, the clean close record, the mind's launch line, the pick-up card                                                                                                                                                  |
 | `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                          |
 | `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                              |
 | `src/main/platform/index.test.ts`                                                          | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                            |

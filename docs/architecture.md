@@ -141,7 +141,7 @@ Exclusions and the built-in blind spots are checked before anything is read; the
 [sight.md](sight.md).
 
 **Presentation.** The host renders Scout and its bubble, streams `turn.*` notifications, shows the
-cards (hand-off, connector confirm, routine, settings) and speaks. The UI package draws all of it
+cards (the connector confirm card, the drop card) and speaks. The UI package draws all of it
 against `HostBridge` (`bodies/ui/src/host-bridge.ts`), which each host implements: the desktop
 over IPC. The browser body has no presentation: it only offers tools. See [bubble.md](bubble.md).
 

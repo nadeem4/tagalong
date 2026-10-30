@@ -55,9 +55,9 @@ export function ApprovedCard({ note, onDone }: { note: ApprovedNote; onDone: () 
     return () => clearTimeout(gone);
   }, [note]);
   return (
-    <section className="handoff" role="status" aria-label="Approved for you">
+    <section className="card" role="status" aria-label="Approved for you">
       <p className="bubble-text">Approved for you: {note.text}</p>
-      <p className="handoff-brief">{`per '${note.preference}'`}</p>
+      <p className="card-brief">{`per '${note.preference}'`}</p>
     </section>
   );
 }

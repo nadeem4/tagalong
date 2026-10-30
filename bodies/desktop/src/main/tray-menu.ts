@@ -12,7 +12,7 @@ export interface TrayActions {
 
 /**
  * The tray menu, rebuilt whenever pause flips so the checkmark cannot drift. Four items:
- * Home holds everything else (Scout, experts, activity, settings).
+ * Home holds everything else (Scout, jobs, connections, approvals, memory, settings).
  */
 export function trayMenuTemplate(
   actions: TrayActions,

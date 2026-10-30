@@ -8,7 +8,6 @@ describe('ui package surface', () => {
     expect(Object.keys(ui).sort()).toEqual(
       [
         'ApprovedReport',
-        'ChatPanel',
         'CompanionBubble',
         'GreetingLine',
         'DockPet',

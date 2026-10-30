@@ -13,7 +13,7 @@ describe('fixPage', () => {
     ['voice', 'settings#voice'],
     ['browser', 'settings#browser'],
     ['privacy', 'settings#privacy'],
-    ['experts', 'experts'],
+    ['experts', 'jobs'],
     ['connections', 'connections'],
   ])('sends %s to %s', (target, page) => {
     expect(fixPage(target)).toBe(page);

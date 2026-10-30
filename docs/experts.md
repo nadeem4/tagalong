@@ -16,34 +16,28 @@
 Scout, the companion on screen, never does long work itself. It writes a brief and hands it to an
 **expert**, a back-office worker reached through a **connector**. The only connector that ships is
 Claude Code. Scout can also start background **jobs** of its own and read one **task board** over
-everything in flight. **Pick up where you left off** offers the projects and unsent briefs from the
-last session after a long break.
+everything in flight. **Pick up where you left off** (old brain only, no Settings switch now) offers the projects and
+unsent briefs from the last session after a long break.
 
 ## Where it lives
 
-| File                                                       | What it holds                                                                                                                        |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/protocol/src/experts.ts`                         | `Expert`, `ClaudeCodeConnection`, `CatalogEntry`, `Brief`, every `experts.*`, `handoffs.*`, `handoff.*` and `projects.search` schema |
-| `packages/core/src/experts/connector.ts`                   | `Connector`, `ConnectorResult`, `NoteQueue`, `renderBrief`, `CANCELLED`                                                              |
-| `packages/core/src/experts/claude-code.ts`                 | `ClaudeCodeConnector`, `sealedArgs`, `bundledArgs`, `spawnChild` (shared with the Claude Code brain)                                 |
-| `packages/core/src/experts/catalog.json`, `catalog.ts`     | The built-in expert catalog; `catalogStatus`, `catalogBundle`, `fromCatalog`                                                         |
-| `packages/core/src/experts/claude-setup.ts`                | Reads Claude Code's own setup: `installedPlugins`, `connectedApps`, `userAllowRules`, `installPlugin`                                |
-| `packages/core/src/experts/handoffs.ts`                    | `HandoffManager`: propose, confirm, run, steer, follow-up step, cancel                                                               |
-| `packages/core/src/experts/store.ts`                       | `ExpertStore` (table `experts`)                                                                                                      |
-| `packages/core/src/experts/record-expert.ts`               | `recordExpertSends`: one "Sent to expert" row in the sight log per brief and per note                                                |
-| `packages/core/src/experts/fake.ts`                        | `FakeConnector`, used by tests and fake mode                                                                                         |
-| `packages/core/src/projects/finder.ts`                     | `ProjectFinder`, `ProjectMemory` (table `projects`)                                                                                  |
-| `packages/core/src/tools/builtin/experts.ts`               | Scout's tools `hand_to_expert` and `tell_expert`                                                                                     |
-| `packages/core/src/jobs/`                                  | `Jobs`, `JobStore` (table `jobs`), `machineCapacity`, the board read model (`board.ts`)                                              |
-| `packages/core/src/tools/builtin/jobs.ts`                  | Scout's tools `work_on_it`, `board`, `open_result`, `stop_work`                                                                      |
-| `packages/core/src/pick-up/`                               | `PickUp`, `takeSnapshot`, `readBranch`, `PickUpStore` (table `pick_up`)                                                              |
-| `packages/core/src/engine.ts`                              | `defaultConnectorFor`, wiring, and the RPC handlers                                                                                  |
-| `bodies/desktop/src/main/ipc/experts.ts`, `ipc/pick-up.ts` | IPC from the renderers to these methods                                                                                              |
-| `bodies/desktop/src/main/handoff-notice.ts`                | The system notification for a finished hand-off                                                                                      |
-| `bodies/desktop/src/main/pick-up-open.ts`                  | `openFor`, `PickUpAllowlist`, `PickUpWaiting`                                                                                        |
-| `bodies/ui/src/handoff-card.tsx`                           | The hand-off cards in the bubble (proposal, at work, answer)                                                                         |
-| `bodies/ui/src/home/experts-panel.tsx`                     | Home's Experts page and the catalog install confirm                                                                                  |
-| `bodies/ui/src/pick-up-card.tsx`                           | The pick-up card                                                                                                                     |
+| File                                                   | What it holds                                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/protocol/src/experts.ts`                     | `Expert`, `ClaudeCodeConnection`, `CatalogEntry`, `Brief`, every `experts.*`, `handoffs.*`, `handoff.*` and `projects.search` schema |
+| `packages/core/src/experts/connector.ts`               | `Connector`, `ConnectorResult`, `NoteQueue`, `renderBrief`, `CANCELLED`                                                              |
+| `packages/core/src/experts/claude-code.ts`             | `ClaudeCodeConnector`, `sealedArgs`, `bundledArgs`, `spawnChild` (shared with the Claude Code brain)                                 |
+| `packages/core/src/experts/catalog.json`, `catalog.ts` | The built-in expert catalog; `catalogStatus`, `catalogBundle`, `fromCatalog`                                                         |
+| `packages/core/src/experts/claude-setup.ts`            | Reads Claude Code's own setup: `installedPlugins`, `connectedApps`, `userAllowRules`, `installPlugin`                                |
+| `packages/core/src/experts/handoffs.ts`                | `HandoffManager`: propose, confirm, run, steer, follow-up step, cancel                                                               |
+| `packages/core/src/experts/store.ts`                   | `ExpertStore` (table `experts`)                                                                                                      |
+| `packages/core/src/experts/record-expert.ts`           | `recordExpertSends`: one "Sent to expert" row in the sight log per brief and per note                                                |
+| `packages/core/src/experts/fake.ts`                    | `FakeConnector`, used by tests and fake mode                                                                                         |
+| `packages/core/src/projects/finder.ts`                 | `ProjectFinder`, `ProjectMemory` (table `projects`)                                                                                  |
+| `packages/core/src/tools/builtin/experts.ts`           | Scout's tools `hand_to_expert` and `tell_expert`                                                                                     |
+| `packages/core/src/jobs/`                              | `Jobs`, `JobStore` (table `jobs`), `machineCapacity`, the board read model (`board.ts`)                                              |
+| `packages/core/src/tools/builtin/jobs.ts`              | Scout's tools `work_on_it`, `board`, `open_result`, `stop_work`                                                                      |
+| `packages/core/src/pick-up/`                           | `PickUp`, `takeSnapshot`, `readBranch`, `PickUpStore` (table `pick_up`)                                                              |
+| `packages/core/src/engine.ts`                          | `defaultConnectorFor`, wiring, and the RPC handlers                                                                                  |
 
 ## How it works
 
@@ -391,15 +385,10 @@ the middle of. The code decides when; whether to say anything, and what, is the 
   otherwise `onReady` calls `CheckIn#back`. A closed gate leaves it for the next tick. `take()`
   returns `{ items, takenAt }` once and starts an empty snapshot. A line from the mind goes out as
   `pickUp.ready { text, items }`; a silent mind spends the snapshot.
-- **The card** (`pick-up-card.tsx`): **Open in VS Code**, **Open in Cursor** or **Open folder** per
+- **The card** (removed with the old brain; was `pick-up-card.tsx`): **Open in VS Code**, **Open in Cursor** or **Open folder** per
   project, **Brief again** per hand-off (`pickUp.rebrief { itemId }` calls `HandoffManager.propose`
   with the saved ask: the normal card, nothing runs until Send), and **Not now**
   (`pickUp.dismiss`).
-- **Reopen** (`pick-up-open.ts`): the renderer names an item id, never a path. `PickUpAllowlist`
-  holds only the items of the pick-up last shown and refuses anything else. VS Code and Cursor open
-  through `shell.openExternal('vscode://file/<path>')` or `cursor://file/<path>`; any other editor
-  opens the folder with `shell.openPath`. `PickUpWaiting` holds at most one line while the bubble is
-  open and drops it if pick-up was switched off.
 - **Setting**: `settings.pickUp`, on by default. Off means no snapshot; switching it off deletes the
   row.
 
@@ -448,9 +437,7 @@ None of these is in `EXTENSION_METHODS`: the browser extension cannot call them.
 
 ### Desktop IPC
 
-`ipc/experts.ts` forwards `tagalong:experts:list|save|delete|test|install`,
-`tagalong:handoffs:confirm|dismiss|cancel` and `tagalong:projects:search`. `ipc/pick-up.ts` handles
-`tagalong:pick-up:open|rebrief|dismiss`.
+None: the desktop's IPC for experts, hand-offs and pick-up was deleted with the old brain.
 
 ### Types
 
@@ -551,5 +538,5 @@ See [privacy.md](privacy.md).
   pre-approved hand-off; `tell_expert`.
 - `projects/finder.test.ts`; `jobs/jobs.test.ts`, `store.test.ts`, `machine.test.ts`,
   `board.test.ts`; `tools/builtin/jobs.test.ts`.
-- `pick-up/pick-up.test.ts`, `pick-up/store.test.ts`, `bodies/desktop/src/main/pick-up-open.test.ts`.
+- `pick-up/pick-up.test.ts`, `pick-up/store.test.ts`.
 - `tools/registry.test.ts`: which tools a routine's turn and a job's turn get.

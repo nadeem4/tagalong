@@ -291,7 +291,7 @@ components:
 
 **Creative North Star: "A Clay Friend in Modern Chrome"**
 
-Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips. Bean is the one figure everywhere: it moves on the dock and stands still (the first idle frame) beside Scout's line in Home's nav and on each Activity entry. It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
+Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips. Bean is the one figure everywhere: it moves on the dock and stands still (the first idle frame) beside Scout's line in Home's nav. It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
 Tokens live in `bodies/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav hard-code several hex values, recorded below as hard-coded. Scout is drawn from one WebP strip per mood (192px frames, 12 fps, in `bodies/desktop/src/renderer/src/bean/`) by `BeanClip`: stepped through with CSS `steps()` on the dock, held on frame 0 of the idle strip everywhere else. No canvas, no live 3D, no pixel sprites.
 
@@ -303,7 +303,7 @@ Scout's state is always a pose plus a word: Bean's clip changes per mood (with a
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
 - Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
-- Bean outside the dock is always a still frame: 56px in Home's nav, 32px on Activity entries.
+- Bean outside the dock is always a still frame: 56px in Home's nav.
 - Flat: tone and hairlines, no drop shadows.
 
 ## Colors
@@ -360,9 +360,9 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Page title** (Onest 600, 20px): each Home page's heading.
 - **Companion name** (Pixelify 700, 18px, 0.5px): Scout's name in Home's nav; the chat header uses the same face at 16px.
 - **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
-- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("EXPERTS", "RECENT").
+- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("JOBS", "SPEND").
 - **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
-- **Title** (Onest 600, 14px): buttons, nav items, Activity headlines, template names.
+- **Title** (Onest 600, 14px): buttons, nav items, headlines.
 - **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
 - **Body** (Onest 400, 13px): card text, previews, the chat's messages, help text (1.55).
 - **Label** (Onest 400, 12px): meta lines, field labels, quiet bubble buttons, bubble chips.
@@ -384,7 +384,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
 
-**The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile and Activity's 32px tile it is drawn larger (76px and 44px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
+**The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile it is drawn larger (76px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
 
 ## Elevation & Depth
 
@@ -404,7 +404,7 @@ Gently rounded chrome. The bubble, Home cards use 12px; fields and primary butto
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), expert (a walkie-talkie, a badge at the top left), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav and Activity show the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (for expert and for working, Scout's own job), **Done** on Done Green; thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood; in the expert pose it covers the badge, and the walkie-talkie still shows); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), expert (a walkie-talkie, a badge at the top left), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (for expert and for working, Scout's own job), **Done** on Done Green; thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood; in the expert pose it covers the badge, and the walkie-talkie still shows); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 
@@ -413,7 +413,6 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 - **Ask:** chips for what Scout can see (Avatar Tile pills, Soft Text, each with a 24px round remove button), then the field: Field Navy, a 1px Sky border, 44px, 14px text, with a 12px Shell Muted label. Gold **primary** (36px, 8px radius, 600) and **quiet** buttons (28px, 6px radius, 1px Field Line border, Soft Text 12px). A 28px close button (Shell Muted, Avatar Tile on hover).
 - **Answer:** Markdown at 14px/1.5, up to 260px then scrolling; code on Avatar Tile, code blocks on Field Navy, tables with Field Line borders, links in Sky (shown as text with the address on hover). Errors are a Navy Error box.
 - **Full chat:** the bubble at full height with a Sidebar Navy header (Scout's name in Pixelify 16px), a scrolling log (your messages right-aligned on Avatar Tile) and a footer with the field, both behind Shell Line hairlines.
-- **Invitation:** one line typed in at 22ms a character, held at full height so the bubble does not grow, with Try it now and Got it (no Next, no step dots).
 - **Launch line:** one short line in a compact bubble (10px 8px 10px 14px padding) that fades out over 300ms. When Scout cannot think it shows the status row instead of words, with **Fix it**.
 - **Status marks:** neutral words, never Scout speaking. On Scout, a 1-2 word pill at the bottom centre, just above the corner dots (Onest 600 11px, 2px 7px, full radius; Warn Fill on Warn Ink for problems, `#6B7290` on Text for the rest), its sentence as the tooltip. In the bubble, a 12px `role="status"` row above the question box (`#F2D48A` for problems, Muted Text otherwise) with a quiet **Fix it** when there is a fix. No animation.
 - **Dock listening dot (Always listening):** the 8px green dot at Scout's bottom right, solid while on, outlined while paused, a lighter green (`#B8F5B9`) quick pulse (0.6s, to 1.35x) while speech is heard, and a 2px green ring outside its white ring during the follow-up window. Its tooltip names the state. Reduced motion stops the pulse.
@@ -421,16 +420,13 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 
 ### Cards in the bubble
 
-The hand-off card, connector confirm card and routine card share `HANDOFF_CSS`: a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column, 72px for the routine card; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Send** for a hand-off, **Allow once** for a connector change, **Save** (or Pause, Turn on, Delete) for a routine. While an expert works, a Gold dot leads "Claude Code is on it" and its steps list in mono, the newest in Frost Text. Long details scroll inside 160px and take keyboard focus.
+The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Allow once** for a connector change or a permission ask, with Always allow and Deny beside it. Long details scroll inside 160px and take keyboard focus.
 
 ### Home
 
-- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the eight pages (Overview, Scout, Experts, Routines, Connections, Activity, What Scout saw, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
+- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Jobs, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
-- **Activity:** entries are full-width buttons (`aria-expanded`), 10px radius, 8px padding: Bean, still, in a 32px tile, an Onest 600 14px headline, a 12px meta line (a 14px state icon, the state word, tool, model, calls, time) and a 13px one-line preview. Hover and open fill Panel Tile; the open thread is indented behind a 2px Panel Line rule. "Show older" is a 40px quiet button.
-- **What Scout saw:** a header (the 20px title, a 13px Panel Muted retention line, and a quiet **Delete all** that turns into **Delete all for good** / **Keep them**), then Today, Yesterday and Earlier as 12px uppercase Panel Muted labels. Each row, 10px radius, 8px padding, Panel Tile on hover: a 12px tabular time, a 16px line icon per kind in Panel Muted, the kind in Onest 600 14px, the app and window or the destination in 13px (one line, ellipsis), the counts in 12px Panel Muted, and a 28px quiet × at the end.
-- **Routines:** template tiles (white, 2px Panel Line border, 10px radius, Panel Tile on hover) and day toggles (32px, min 52px, 1px Panel Muted border; Gold when pressed).
-- **Experts and Connections:** rows between Panel Line hairlines with status chips and switches.
+- **Jobs and Connections:** rows between Panel Line hairlines with status chips and switches.
 
 ### Settings controls
 
@@ -446,7 +442,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
-- **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
+- **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`), and Sky in the bubble.
 - **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 

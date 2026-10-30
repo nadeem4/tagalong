@@ -140,11 +140,6 @@ matching ask reaches you.
 | `packages/core/src/engine.ts`                    | Builds `Asks`, calls `boot` and `prune`, the `asks.*` and `tool.approve` handlers, `closeHeld` on shutdown                            |
 | `packages/core/src/tools/builtin/connections.ts` | Holds an app change through `deps.confirm` (`Asks.hold`); see [connected-apps.md](connected-apps.md)                                  |
 | `packages/core/src/experts/handoffs.ts`          | Adds a hand-off card (`Asks.add`), settles it on Send, Dismiss or a gone expert; see [experts.md](experts.md)                         |
-| `bodies/desktop/src/main/ipc/asks.ts`            | `registerAskIpc`: `tagalong:asks:list`, `tagalong:asks:answer`, `tagalong:asks:open`                                                  |
-| `bodies/desktop/src/preload/index.ts`            | `listAsks`, `answerAsk`, `openAsk` on the bridge                                                                                      |
-| `bodies/ui/src/home/waiting-view.tsx`            | `WaitingView`, Home's Waiting on you page                                                                                             |
-| `bodies/ui/src/home/home-view.tsx`               | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
-| `bodies/ui/src/companion-bubble.tsx`             | Drops a confirm card or proposed hand-off card that `asks.changed` no longer lists                                                    |
 | `bodies/ui/src/connector-confirm.tsx`            | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
 
 ## How it works
@@ -253,25 +248,8 @@ Nothing is resumed after a restart.
 
 ### Home's Waiting on you
 
-`WaitingView` reads `listAsks()` and reads again on every `asks.changed`, so an ask answered on its
-card, expired or closed leaves the list at once.
-
-- **Waiting**, oldest first: a title (`Change in <app> · <tool>` or `Hand to <expert>`), the risk
-  label (`Changes something` or `Can’t be undone`), the summary's first line, the rest of the summary
-  in full in a scrollable, focusable block, `Asked <time> · ends <time>`, and the buttons: **Allow
-  once** and **Decline** for an app change, **Open** and **Decline** for a hand-off. No Allow once is
-  ever shown for a hand-off.
-- **Answered**, the last 20, newest first, with fixed words for how each ended: `Approved by you`,
-  `Declined by you`, `Expired: no answer in time`, `Expired: Tagalong closed first`,
-  `Cancelled: the conversation was stopped`, `Cancelled: expert no longer available`. Every outcome
-  but Approved adds `Nothing was changed.`
-- A failed call shows as an alert (`Not answered: …`, `Could not read what is waiting: …`).
-
-The nav item reads `Waiting on you (n)` while anything waits.
-
-The bubble removes its `ConnectorConfirmCard` and a proposed hand-off card when `asks.changed` no
-longer lists their id (answered in Home, expired, closed). `asks.open` raises the bubble through
-`handoff.proposed`.
+Home has no Waiting on you page and the bubble does not watch `asks.changed`. The Python brain's permission asks are answered on their cards in the bubble and
+listed in Home's Approvals page.
 
 ## Interfaces
 
@@ -383,4 +361,3 @@ rows keep one short line for 30 days. See [privacy.md](privacy.md).
   second answer loses; a write waiting at quit is `expired/closed` after relaunch and nothing ran; a
   hand-off card survives a relaunch and Send starts it; Delete all keeps the waiting.
 - `packages/core/src/tools/registry.test.ts`: no role's tool can answer an ask.
-- `bodies/ui/src/home/waiting-view.test.tsx`, `bodies/desktop/src/main/ipc/asks.test.ts`.

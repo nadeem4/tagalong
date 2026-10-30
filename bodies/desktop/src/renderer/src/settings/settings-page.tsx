@@ -1,60 +1,35 @@
 /**
  * Settings: the form, one section per file in this folder, saved as one patch through
- * settings-form.ts. Home embeds it as its Settings page; the standalone window shows it only
- * when the engine failed to start.
+ * settings-form.ts. It is the Settings page of Home; there is no standalone window.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Pet } from '@tagalong/protocol';
 import { SETTINGS_CSS } from '@tagalong/ui';
-import {
-  SettingsFieldError,
-  buildSettingsPatch,
-  isAdvancedField,
-  summarizerGroups,
-  summarizerValue,
-} from '../settings-form';
+import { SettingsFieldError, buildSettingsPatch, isAdvancedField } from '../settings-form';
 import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
-import { BudgetSection } from './budget-section';
 import { BrowserSection } from './browser-section';
 import { ElevenLabsSection } from './elevenlabs-section';
-import { KeysSection } from './keys-section';
 import { PrivacySection } from './privacy-section';
-import { SECTIONS, SettingsUiContext } from './section';
+import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
 import { SightSection } from './sight-section';
-import { SummariesSection } from './summaries-section';
 import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
 import { YouSection } from './you-section';
 import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
- * browser extension, then Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen
- * memory and watches), closed by default. Embedded in Home it has no header or side menu of its
- * own.
- *
- * Keys are re-read by the engine before every ask and a provider is rebuilt when its key or
- * base URL changes, so they apply on the next ask. Main re-registers hotkeys on save, and the
- * sight settings are read per capture.
+ * Sections in page order: how Scout thinks, You, Privacy, Voice, Shortcuts, the browser, then
+ * Advanced (the ElevenLabs voice, sight detail, screen memory and watches), closed by default.
+ * Main re-registers hotkeys on save, and the sight settings are read per capture.
  */
-export function SettingsPage({
-  embedded = false,
-  onOpenScout,
-}: {
-  embedded?: boolean;
-  /** Home's Scout page, where Scout's brain is changed. Absent in the standalone window. */
-  onOpenScout?: () => void;
-}) {
+export function SettingsPage() {
   const [view, setView] = useState<HostView | null>(null);
   const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
-  const [models, setModels] = useState<Record<string, string[]>>({});
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const [summarizer, setSummarizer] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
@@ -67,11 +42,7 @@ export function SettingsPage({
   useEffect(() => {
     window.tagalongHost
       .getHostView()
-      .then((loaded) => {
-        setView(loaded);
-        const chosen = loaded.settings.summarizer;
-        setSummarizer(chosen === null ? '' : summarizerValue(chosen.providerId, chosen.model));
-      })
+      .then(setView)
       .catch((error: unknown) => {
         setStatus(String(error));
         setStatusIsError(true);
@@ -93,27 +64,6 @@ export function SettingsPage({
       .catch(() => setSignIn('unknown'));
   }, []);
   useEffect(checkSignIn, [checkSignIn]);
-
-  // The summarizer list offers each keyed service's models once it has a key.
-  const keyedWithKey = (view?.providers ?? [])
-    .filter((choice) => choice.needsKey && choice.hasKey)
-    .map((choice) => choice.id)
-    .join(',');
-  useEffect(() => {
-    if (keyedWithKey === '') return;
-    let current = true;
-    for (const providerId of keyedWithKey.split(',')) {
-      window.tagalongHost
-        .listModels(providerId)
-        .then((list) => {
-          if (current) setModels((known) => ({ ...known, [providerId]: list.models }));
-        })
-        .catch(() => undefined);
-    }
-    return () => {
-      current = false;
-    };
-  }, [keyedWithKey]);
 
   // Saving a fixed accelerator re-registers it in main, which is where the outcome is
   // known. Without this the window would keep showing the old failure next to the very
@@ -156,46 +106,17 @@ export function SettingsPage({
   }
 
   const { settings } = view;
-  const presets = view.providers.filter((choice) => choice.defaultBaseUrl !== undefined);
   const scout = view.pets[0];
   const brain = scoutBrain(scout, view.providers, signIn);
 
-  const markProviders = (providerId: string, hasKey: boolean): void =>
-    setView((current) =>
-      current === null
-        ? current
-        : {
-            ...current,
-            providers: current.providers.map((choice) =>
-              choice.id === providerId ? { ...choice, hasKey } : choice,
-            ),
-          },
-    );
-
-  const switched = (pet: Pet, providerId: string): void => {
-    markProviders(providerId, true);
-    setView((current) =>
-      current === null
-        ? current
-        : { ...current, pets: current.pets.map((known) => (known.id === pet.id ? pet : known)) },
-    );
-  };
-
-  const removeKey = async (providerId: string): Promise<void> => {
-    const label =
-      providerId === 'elevenlabs'
-        ? 'ElevenLabs'
-        : (view.providers.find((choice) => choice.id === providerId)?.label ?? providerId);
+  const removeElevenLabsKey = async (): Promise<void> => {
     try {
       // An empty key deletes the stored one.
-      await window.tagalongHost.saveApiKey(providerId, '');
-      markProviders(providerId, false);
-      if (providerId === 'elevenlabs') {
-        setView((current) =>
-          current === null ? current : { ...current, elevenLabsKeyStored: false },
-        );
-      }
-      setStatus(`${label} key removed.`);
+      await window.tagalongHost.saveApiKey('elevenlabs', '');
+      setView((current) =>
+        current === null ? current : { ...current, elevenLabsKeyStored: false },
+      );
+      setStatus('ElevenLabs key removed.');
       setStatusIsError(false);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -212,11 +133,6 @@ export function SettingsPage({
       // Everything is validated before anything is written, so a typo in one field cannot
       // leave the hotkeys saved and the keys not.
       const patch = buildSettingsPatch({
-        baseUrls: presets.map((choice) => ({
-          providerId: choice.id,
-          label: choice.label,
-          value: field(`baseUrl:${choice.id}`),
-        })),
         askHotkey: field('askHotkey'),
         pauseSightHotkey: field('pauseSightHotkey'),
         stopVoiceHotkey: field('stopVoiceHotkey'),
@@ -230,19 +146,15 @@ export function SettingsPage({
         elevenLabsVoiceId: field('elevenLabsVoiceId'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),
-        summarizer: field('summarizer'),
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
-        pickUp: form.get('pickUp') !== null,
         wellbeing: form.get('wellbeing') !== null,
         userName: field('userName'),
-        dailyBudget: field('dailyBudget'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),
         watchMaxConcurrent: field('watchMaxConcurrent'),
         watchTimeoutMinutes: field('watchTimeoutMinutes'),
-        sightLogDays: field('sightLogDays'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
       // Empty boxes are left alone: removing a key is the Remove key button's job.
@@ -284,86 +196,35 @@ export function SettingsPage({
 
   return (
     <SettingsUiContext.Provider value={ui}>
-      <form
-        className={embedded ? 'tg-settings tg-settings--embedded' : 'tg-settings'}
-        onSubmit={(event) => void save(event)}
-      >
+      <form className="tg-settings tg-settings--embedded" onSubmit={(event) => void save(event)}>
         <style>{SETTINGS_CSS}</style>
-        {!embedded && (
-          <>
-            <header className="tg-bar">
-              <h1 className="tg-px tg-bar__title">Settings</h1>
-              <span className="tg-bar__meta">
-                Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}
-              </span>
-              <button type="submit" className="tg-btn">
-                Save
-              </button>
-            </header>
-            <nav className="tg-nav" aria-label="Settings">
-              <ul>
-                {SECTIONS.map((section) => (
-                  <li key={section.id}>
-                    <a href={`#${section.id}`}>{section.title}</a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </>
-        )}
         <main className="tg-main">
-          {embedded && (
-            <div className="tg-intro">
-              <div className="tg-intro__text">
-                <h1 className="tg-intro__title">Settings</h1>
-                <p className="tg-help">
-                  Everything works out of the box. Change only what you need. Press{' '}
-                  <span aria-hidden="true">ⓘ</span>
-                  <span className="tg-sr">the information button</span> for more on any setting.
-                </p>
-              </div>
-              <button type="submit" className="tg-btn">
-                Save
-              </button>
+          <div className="tg-intro">
+            <div className="tg-intro__text">
+              <h1 className="tg-intro__title">Settings</h1>
+              <p className="tg-help">
+                Everything works out of the box. Change only what you need. Press{' '}
+                <span aria-hidden="true">ⓘ</span>
+                <span className="tg-sr">the information button</span> for more on any setting.
+              </p>
             </div>
-          )}
-          <BrainSection
-            brain={brain}
-            providers={view.providers}
-            onCheckAgain={checkSignIn}
-            onSwitched={switched}
-            onOpenScout={onOpenScout}
-          />
+            <button type="submit" className="tg-btn">
+              Save
+            </button>
+          </div>
+          <BrainSection brain={brain} onCheckAgain={checkSignIn} />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
-          <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
-            <SummariesSection
-              groups={summarizerGroups({
-                providers: view.providers,
-                signIn,
-                models,
-                current: settings.summarizer,
-              })}
-              value={summarizer}
-              onChange={setSummarizer}
-            />
-            <KeysSection
-              providers={view.providers}
-              settings={settings}
-              keys={keys}
-              onKeysChange={setKeys}
-              onRemove={(providerId) => void removeKey(providerId)}
-            />
             <ElevenLabsSection
               settings={settings}
               keyStored={view.elevenLabsKeyStored}
               typed={keys.elevenlabs ?? ''}
               onType={(value) => setKeys({ ...keys, elevenlabs: value })}
-              onRemove={() => void removeKey('elevenlabs')}
+              onRemove={() => void removeElevenLabsKey()}
             />
             <SightSection settings={settings} />
             <WatchesSection settings={settings} />
