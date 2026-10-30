@@ -360,7 +360,7 @@ answers on mount.
 
 **PerceptionMemory** (`perception-memory.ts`) answers both methods:
 
-- `recall` reads the rolling ring with `nearest(now - secondsAgo, displayId)`. Rolling memory off
+- The body keeps the frames; the brain has no tool that reads them yet, so Scout cannot recall from them. `recall` reads the rolling ring with `nearest(now - secondsAgo, displayId)`. Rolling memory off
   returns `recording: false` and no frames.
 - `diff` takes a fresh 640-pixel frame of every display (reused if under `FRESH_MS` = 1,000 old), refusing first if an excluded window has focus. It pushes the
   frame into a per-display scratch ring, finds the earlier frame nearest `sinceSeconds` ago in the

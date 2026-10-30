@@ -616,7 +616,7 @@ def pose(F, name, ph=0.0, blink=0.0):
     # ----- signs
     for k in ('cloud', 'gear'):
         bx, by, bz = F.base[k]
-        F.signs[k].location = (bx, by + .03 * wave() - (y - st.get('y', 0)), bz)   # cancel the body's own y offset (only dozing has one) so the signs stay put
+        F.signs[k].location = (bx, by + .03 * wave() - (y - st.get('y', 0)), bz)   # cancel the breath bob so the signs stay put; the state's own y (only dozing has one) is kept
     for i, a in F.waves:
         r = math.sin(PI * ((2 * ph - i * .3) % 1)) ** 2
         a.scale = (.85 + .3 * r,) * 3

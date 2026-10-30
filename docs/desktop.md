@@ -319,7 +319,7 @@ the preload, so a dead channel cannot linger.
 | `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`                                                                                                                                                                                                                                                                                                                  |
 | `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
-`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `engineVersion`,
+`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `appVersion`,
 `hotkeyError`, `platform` (`process.platform`) and
 `elevenLabsKeyStored`.
 

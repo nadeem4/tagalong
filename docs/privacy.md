@@ -437,7 +437,7 @@ it is on:
   far back memory actually reaches.
 - **Turning it off clears it**, at once, without a restart.
 
-Only the frame a pet asks for with `recall_screen` or `what_changed` is ever sent to a model.
+The body keeps these frames, but the brain has no tool that reads them yet, so none is sent to a model.
 
 ## What Scout remembers: see it, delete it
 

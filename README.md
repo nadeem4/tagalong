@@ -112,7 +112,7 @@ its bodies fit together.
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             | ElevenLabs voice cost on the Spend card                             |
 |                                                                                                                                                                                                                                                                                                               | Data export and delete-all in Settings                              |
-| Memory across restarts, and rolling screen memory Scout recalls from (opt-in)                                                                                                                                                                                                                                 | Code signing (the installer is unsigned) and an app icon of its own |
+| Memory across restarts, and rolling screen memory the body keeps (opt-in; the brain cannot read it yet)                                                                                                                                                                                                       | Code signing (the installer is unsigned) and an app icon of its own |
 | The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, searches history, bookmarks and downloads, acts on tabs, and takes questions from a right-click or the address bar, in Chrome, Edge and other Chromium browsers, after you allow each step |                                                                     |
 
 # Using Tagalong
@@ -276,8 +276,7 @@ so on), a small window asks you. More in
 
 **Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
 small picture of each screen every five seconds, in memory only, for the last ten minutes. A red dot
-on Scout shows while it records. Ask "what was on screen a few minutes ago?" or "what changed?" and
-Scout looks back through it.
+on Scout shows while it records. The body keeps the frames, but the brain has no tool that reads them yet, so Scout cannot recall from them.
 
 **Draft it for me.** Say "reply to this email, yes but Friday" or "write the PR description" and
 Scout reads what is in front of you and writes a short draft in the bubble with a **Copy** button.
