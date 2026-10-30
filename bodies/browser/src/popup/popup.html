@@ -1,0 +1,26 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tagalong</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <h1>Scout</h1>
+    <p id="status" class="status" role="status">Connecting to Scout's brain...</p>
+
+    <label for="addr">Brain address</label>
+    <input id="addr" type="text" spellcheck="false" autocomplete="off" />
+    <p id="addr-error" class="error" role="alert" hidden></p>
+
+    <label for="name">Name for this browser</label>
+    <input id="name" type="text" maxlength="32" autocomplete="off" />
+
+    <h2>Allowed</h2>
+    <ul id="grants" class="grants"></ul>
+    <p id="grants-empty" class="muted">Nothing yet. Scout asks when it needs something.</p>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

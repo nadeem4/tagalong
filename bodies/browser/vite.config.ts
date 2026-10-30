@@ -1,4 +1,4 @@
-/** Vite build for the extension pages and service worker. */
+﻿/** Vite build for the extension pages and service worker. */
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import { manifest } from './src/manifest';
@@ -40,6 +40,7 @@ export default defineConfig({
         sidepanel: 'src/sidepanel.html',
         options: 'src/options.html',
         permission: 'src/permission/permission.html',
+        popup: 'src/popup/popup.html',
         'service-worker': 'src/service-worker.ts',
       },
       output: {
