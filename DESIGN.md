@@ -448,7 +448,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`), and Sky in the bubble.
-- **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
+- **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 
