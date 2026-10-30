@@ -102,35 +102,21 @@ describe('reading the screen', () => {
     expect(dockMood(nextDock(look(), { type: 'turn.error', turnId: T }))).toBe('idle');
   });
 
-  const READS = [
-    'look_at_screen',
-    'look_at_display',
-    'look_at_window',
-    'look_closer',
-    'read_window_text',
-    'get_selection',
-    'list_windows',
-    'list_displays',
-    'recall_screen',
-    'what_changed',
-  ];
+  const READS = ['list_windows', 'read_window_text', 'look_at_window'];
 
   it.each(READS)('counts %s as reading', (tool) => {
     expect(dockMood(look(turn, tool))).toBe('reading');
   });
 
-  // The renderer never bundles core, so the names are spelled out in dock.ts. Read core's
-  // sources here so a perception tool added or renamed there fails this test.
-  it('names every perception and screen memory tool core defines', () => {
-    const names = (file: string) => {
-      const source = readFileSync(
-        new URL(`../../../../../packages/core/src/tools/builtin/${file}`, import.meta.url),
-        'utf8',
-      );
-      return [...source.matchAll(/^export const \w+ = '(\w+)';\r?$/gm)].map((m) => m[1]);
-    };
-    const awareness = names('awareness.ts').filter((name) => name !== 'watch_for');
-    expect([...names('perception.ts'), ...awareness].sort()).toEqual([...READS].sort());
+  // The renderer never bundles main, so the names are spelled out in dock.ts. Read the
+  // desktop's declared body tools here so a screen tool added or renamed there fails this test.
+  it('names every screen-reading tool the desktop declares, and no other', () => {
+    const source = readFileSync(new URL('../../main/brain/body-tools.ts', import.meta.url), 'utf8');
+    const declared = [...source.matchAll(/^\s{4}name: '(\w+)',/gm)].map((m) => m[1]);
+    expect(declared.filter((name) => name !== 'open_url').sort()).toEqual([...READS].sort());
+    for (const tool of ['look_at_screen', 'get_selection', 'recall_screen', 'open_url']) {
+      expect(dockMood(look(turn, tool))).toBe('thinking');
+    }
   });
 
   it('changes nothing for a tool that does not read the screen, or a result never asked for', () => {
@@ -151,7 +137,7 @@ describe('the activity order', () => {
     expect(dockMood(dock)).toBe('working');
     dock = nextDock(dock, { type: 'turn.started', turnId: T, petId: 'scout' });
     expect(dockMood(dock)).toBe('thinking');
-    dock = nextDock(dock, { type: 'turn.toolRequest', turnId: T, tool: 'look_at_screen' });
+    dock = nextDock(dock, { type: 'turn.toolRequest', turnId: T, tool: 'look_at_window' });
     expect(dockMood(dock)).toBe('reading');
     expect(dockMood(nextDock(dock, { type: 'seeing' }))).toBe('listening');
   });

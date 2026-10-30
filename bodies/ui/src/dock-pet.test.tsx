@@ -165,7 +165,7 @@ describe('DockPet', () => {
     rerender(<DockPet pet={SCOUT} mood="idle" listening="paused" />);
     expect(screen.getByTestId('listening-mark')).toHaveAttribute(
       'title',
-      'Always listening is paused for a call, a full-screen window or Welcome.',
+      'Always listening is paused for a call or a full-screen window.',
     );
   });
 

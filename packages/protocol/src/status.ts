@@ -75,7 +75,7 @@ export const STATUS_WORDS: Readonly<
   'ears-loading': { tag: 'Ears', detail: 'Speech models downloading, about 43 MB.' },
   'listening-paused': {
     tag: 'Not listening',
-    detail: 'Always listening is paused for a call, a full-screen window or Welcome.',
+    detail: 'Always listening is paused for a call or a full-screen window.',
   },
   'say-name': { tag: 'Say “Scout”', detail: 'Start with “Scout” to ask.' },
   'listening-on': {

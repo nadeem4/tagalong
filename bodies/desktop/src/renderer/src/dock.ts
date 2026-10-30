@@ -47,21 +47,14 @@ export interface DockEvent {
 }
 
 /**
- * The tools that read the screen: perception and screen memory. Spelled out here, as the
- * renderer never bundles core. Scout has no file-read tool; a dropped file is read by the
- * host before the turn starts.
+ * The tools that read the screen: the ones the desktop body declares in
+ * main/brain/body-tools.ts (dock.test.ts keeps the two in step). Spelled out here, as the
+ * renderer never bundles main.
  */
 const READING_TOOLS: ReadonlySet<string> = new Set([
-  'look_at_screen',
-  'look_at_display',
-  'look_at_window',
-  'look_closer',
-  'read_window_text',
-  'get_selection',
   'list_windows',
-  'list_displays',
-  'recall_screen',
-  'what_changed',
+  'read_window_text',
+  'look_at_window',
 ]);
 
 function without(set: ReadonlySet<string>, id: string): ReadonlySet<string> {

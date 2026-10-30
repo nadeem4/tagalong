@@ -1,7 +1,7 @@
 /** Tests for the pet IPC on the brain: Scout is a fixed local pet. */
 
 import { describe, expect, it } from 'vitest';
-import { SCOUT } from '@tagalong/core';
+import { SCOUT_ID } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
 import { localScout, registerScoutIpc } from './scout';
@@ -13,13 +13,15 @@ function setup() {
 }
 
 describe('registerScoutIpc', () => {
-  it('lists the one local Scout, built from the default seed', async () => {
+  it('lists the one local Scout', async () => {
     const { invoke } = setup();
     expect(await invoke(IPC.listPets)).toEqual([localScout()]);
-    expect(localScout()).toEqual(SCOUT);
+    expect(localScout()).toMatchObject({ id: SCOUT_ID, name: 'Scout', avatar: '🦊' });
   });
 
-  it('hands out a copy, so a caller cannot change the seed', () => {
-    expect(localScout()).not.toBe(SCOUT);
+  it('hands out a copy, so a caller cannot change the one Scout', () => {
+    const first = localScout();
+    first.name = 'Changed';
+    expect(localScout().name).toBe('Scout');
   });
 });

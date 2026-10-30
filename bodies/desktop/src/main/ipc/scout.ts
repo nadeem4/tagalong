@@ -3,12 +3,25 @@
  * Contains registerScoutIpc and localScout.
  */
 
-import { SCOUT } from '@tagalong/core';
+import { SCOUT_ID } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 
-/** The one pet there is: core's default Scout, copied so no caller can change the seed. */
+/**
+ * The one pet there is. The role, model and provider fields are still required by the Pet
+ * shape; the brain, not this record, decides who answers.
+ */
+const SCOUT: Pet = {
+  id: SCOUT_ID,
+  name: 'Scout',
+  avatar: '🦊',
+  roleId: 'companion',
+  model: 'sonnet',
+  providerId: 'claude-code',
+};
+
+/** A copy of Scout, so no caller can change the one record. */
 export function localScout(): Pet {
   return { ...SCOUT };
 }
