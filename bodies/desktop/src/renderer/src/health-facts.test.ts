@@ -53,7 +53,6 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
       }),
     listMicrophones: () => Promise.resolve([{ id: 'mic-1', label: 'Desk mic' }]),
     voiceModels: () => Promise.resolve({ mouth: true, ears: false }),
-    hostsStatus: () => Promise.resolve({ extension: false }),
     testBudgetMs: 5_000,
     ...patch,
   };
@@ -77,7 +76,6 @@ describe('gatherHealth', () => {
         earsReady: false,
       },
       microphone: { count: 1, pickedMissing: false },
-      extension: false,
     });
     expect(testExpert).toHaveBeenCalledExactlyOnceWith('coder');
   });
@@ -113,7 +111,6 @@ describe('gatherHealth', () => {
       listConnections: fail,
       listMicrophones: fail,
       voiceModels: fail,
-      hostsStatus: fail,
       testBudgetMs: 5_000,
     });
     expect(facts).toEqual({
@@ -122,7 +119,6 @@ describe('gatherHealth', () => {
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
-      extension: 'unknown',
     });
   });
 
@@ -157,7 +153,6 @@ describe('gatherHealth', () => {
           listConnections: hang,
           listMicrophones: hang,
           voiceModels: hang,
-          hostsStatus: hang,
           testBudgetMs: 5_000,
         }),
       );
@@ -168,7 +163,6 @@ describe('gatherHealth', () => {
         connections: 'unknown',
         voice: 'unknown',
         microphone: 'unknown',
-        extension: 'unknown',
       });
     } finally {
       vi.useRealTimers();
@@ -202,13 +196,12 @@ describe('gatherHealth', () => {
         getHostView: () =>
           Promise.resolve(
             view(
-              { elevenLabsKeyStored: true, pairingToken: 'secret-token' },
+              { elevenLabsKeyStored: true },
               { voice: { ...Settings.parse({}).voice, mouth: 'elevenlabs' } },
             ),
           ),
       }),
     );
     expect(facts.voice).toMatchObject({ mouth: 'elevenlabs', elevenLabsKey: true });
-    expect(JSON.stringify(facts)).not.toContain('secret-token');
   });
 });

@@ -61,7 +61,6 @@ function bubbleBridge(): HostBridge {
         listConnections: () => bridge.listConnections?.() ?? unavailable(),
         listMicrophones: () => listMicrophones(),
         voiceModels: () => host.voiceModels(),
-        hostsStatus: () => host.hostsStatus(),
         testBudgetMs: HEALTH_TEST_BUDGET_MS,
       }),
     openFix: (target: FixTarget) => host.openSettings(target),

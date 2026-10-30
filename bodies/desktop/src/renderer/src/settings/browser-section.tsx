@@ -6,7 +6,10 @@
 import type { BrowserFolder } from '../../../shared/ipc';
 import { Section } from './section';
 
-const copy = (text: string): void => void navigator.clipboard.writeText(text);
+// A blocked clipboard or a missing folder is not worth a message here, so rejections are dropped.
+const copy = (text: string): void => {
+  navigator.clipboard.writeText(text).catch(() => undefined);
+};
 
 export function BrowserSection({ folder }: { folder: BrowserFolder | null }) {
   return (
@@ -31,7 +34,9 @@ export function BrowserSection({ folder }: { folder: BrowserFolder | null }) {
           <button
             type="button"
             className="tg-btn-quiet"
-            onClick={() => void window.tagalongHost.showBrowserFolder()}
+            onClick={() => {
+              window.tagalongHost.showBrowserFolder().catch(() => undefined);
+            }}
           >
             Show folder
           </button>

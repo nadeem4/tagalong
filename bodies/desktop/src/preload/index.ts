@@ -394,7 +394,6 @@ const host: TagalongHostApi = {
     return () => void ipcRenderer.off(IPC.dropEvent, listener);
   },
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
-  hostsStatus: () => ipcRenderer.invoke(IPC.hostsStatus) as Promise<{ extension: boolean }>,
   getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
   setStatusMark: (id, on) => ipcRenderer.invoke(IPC.setStatusMark, id, on) as Promise<void>,
   onStatusMark: (handler) => {

@@ -124,7 +124,6 @@ import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
 import { registerBrowserIpc } from './ipc/browser';
-import { registerHealthIpc } from './ipc/health';
 import { fixPage } from './fix-target';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice } from '../shared/ipc';
@@ -1125,7 +1124,6 @@ function registerIpc(): void {
     writeText: (text) => clipboard.writeText(text),
     fromPanel: fromWindow(() => required().panel),
   });
-  registerHealthIpc(handle, { engine });
   registerBrowserIpc(handle, {
     packaged: app.isPackaged,
     resourcesPath: process.resourcesPath,

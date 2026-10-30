@@ -21,7 +21,6 @@ const FACTS: HealthFacts = {
     earsReady: false,
   },
   microphone: { count: 1, pickedMissing: false },
-  extension: false,
 };
 
 function setup(health: Partial<HostBridge> = {}, props: { onSay?: (text: string) => void } = {}) {
