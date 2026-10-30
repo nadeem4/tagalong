@@ -6,7 +6,7 @@
  */
 import { STATUS_WORDS, addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
-import { micFailure } from './setup-ears';
+import { micFailure } from './mic-failure';
 
 export const FIRST_TIME =
   'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';

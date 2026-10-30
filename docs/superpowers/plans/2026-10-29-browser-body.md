@@ -63,22 +63,22 @@ Most likely to bite first. Each line names the task whose tests pin it.
 
 ## File Structure
 
-| File                                                                          | Responsibility                                                                                |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `protocol/ts/src/brain-client.ts` (moved, 12a)                                | `BrainClient`, `BrainOffline`, `RpcError`, `SeqStore`, keepalive; used by both bodies         |
-| `bodies/browser/src/layer/api.ts` (12a)                                       | The thin browser-API interfaces (`TabsApi`, `PageApi`, ...) the tools use; no `chrome.*`      |
-| `bodies/browser/src/layer/chromium.ts` (12a)                                  | The Chromium implementations of those interfaces; the only file with `chrome.*` besides glue  |
-| `bodies/browser/src/identity.ts`, `settings.ts` (12a)                         | Browser detection and body id; address and name in storage                                    |
-| `bodies/browser/src/permissions.ts` (12a)                                     | `PermissionBroker`, `Need`, plain denial sentences                                            |
-| `bodies/browser/src/permission/` (12a)                                        | The permission window: `model.ts` (tested), `permission.html`, `permission.ts` (glue)         |
-| `bodies/browser/src/popup/` (12a)                                             | The toolbar popup: `model.ts` (tested), `popup.html`, `popup.ts`, `popup.css`                 |
-| `bodies/browser/src/tools/` (12a-c)                                           | `registry.ts`, `tabs.ts`, `page-parts.ts`, `browser-search.ts`, `tab-actions.ts`              |
-| `bodies/browser/src/body.ts` (12a)                                            | Builds the `BrainClient` from identity, settings and tools; restart on settings change        |
-| `bodies/browser/src/service-worker.ts`                                        | One screen of wiring and top-level listeners                                                  |
-| `bodies/browser/src/content/` (kept)                                          | `read-page.ts`, `page-reader.ts`, (12b) `page-parts.ts`: injected on demand                   |
-| `bodies/browser/src/events.ts` (12b), `ask-scout.ts` (12c)                    | `tab`/`download` events; context menu and omnibox `say`                                       |
-| `bodies/desktop/src/main/ipc/browser.ts`, `renderer/.../browser-section.tsx`  | Settings "Add Scout to your browser": folder lookup, Show folder, copy buttons                |
-| `brain/src/brain/events.py`, `sessions.py`, `bodies.py`, `asks.py`, `mind/`   | no-wake rule (12a); `tab`/`download` kinds and prompt line (12b); `display` routing (12c)     |
+| File                                                                         | Responsibility                                                                               |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `protocol/ts/src/brain-client.ts` (moved, 12a)                               | `BrainClient`, `BrainOffline`, `RpcError`, `SeqStore`, keepalive; used by both bodies        |
+| `bodies/browser/src/layer/api.ts` (12a)                                      | The thin browser-API interfaces (`TabsApi`, `PageApi`, ...) the tools use; no `chrome.*`     |
+| `bodies/browser/src/layer/chromium.ts` (12a)                                 | The Chromium implementations of those interfaces; the only file with `chrome.*` besides glue |
+| `bodies/browser/src/identity.ts`, `settings.ts` (12a)                        | Browser detection and body id; address and name in storage                                   |
+| `bodies/browser/src/permissions.ts` (12a)                                    | `PermissionBroker`, `Need`, plain denial sentences                                           |
+| `bodies/browser/src/permission/` (12a)                                       | The permission window: `model.ts` (tested), `permission.html`, `permission.ts` (glue)        |
+| `bodies/browser/src/popup/` (12a)                                            | The toolbar popup: `model.ts` (tested), `popup.html`, `popup.ts`, `popup.css`                |
+| `bodies/browser/src/tools/` (12a-c)                                          | `registry.ts`, `tabs.ts`, `page-parts.ts`, `browser-search.ts`, `tab-actions.ts`             |
+| `bodies/browser/src/body.ts` (12a)                                           | Builds the `BrainClient` from identity, settings and tools; restart on settings change       |
+| `bodies/browser/src/service-worker.ts`                                       | One screen of wiring and top-level listeners                                                 |
+| `bodies/browser/src/content/` (kept)                                         | `read-page.ts`, `page-reader.ts`, (12b) `page-parts.ts`: injected on demand                  |
+| `bodies/browser/src/events.ts` (12b), `ask-scout.ts` (12c)                   | `tab`/`download` events; context menu and omnibox `say`                                      |
+| `bodies/desktop/src/main/ipc/browser.ts`, `renderer/.../browser-section.tsx` | Settings "Add Scout to your browser": folder lookup, Show folder, copy buttons               |
+| `brain/src/brain/events.py`, `sessions.py`, `bodies.py`, `asks.py`, `mind/`  | no-wake rule (12a); `tab`/`download` kinds and prompt line (12b); `display` routing (12c)    |
 
 ---
 

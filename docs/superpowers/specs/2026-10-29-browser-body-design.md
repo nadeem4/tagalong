@@ -86,15 +86,16 @@ My calls (the person can overturn any):
     person can tell profiles apart; tool descriptions mention the body's name.
 12. **Few, broad tools** (each has an `action` or `source` field) so the tool list stays short:
 
-    | Tool | Effect | Slice | What it does |
-    | --- | --- | --- | --- |
-    | `tabs` | read | 12a (list, read), 12b (picture) | `list` open tabs (id, title, url, active, asleep); `read` one tab (default the active tab of the focused window): url, title, readable text, selection; `picture` one tab as an image when text is not enough |
-    | `page_parts` | read | 12b | Just the `links`, `tables`, `forms` or `headings` of one tab, as text |
-    | `browser_search` | read | 12b | Search `history`, `bookmarks`, `reading_list`, `downloads` or `closed` tabs by words and date |
-    | `tab_actions` | change | 12c | `open` (url or search), `close`, `switch`, `group`, `reopen` (a closed tab), `bookmark`, `reading_list` |
+    | Tool             | Effect | Slice                           | What it does                                                                                                                                                                                                  |
+    | ---------------- | ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `tabs`           | read   | 12a (list, read), 12b (picture) | `list` open tabs (id, title, url, active, asleep); `read` one tab (default the active tab of the focused window): url, title, readable text, selection; `picture` one tab as an image when text is not enough |
+    | `page_parts`     | read   | 12b                             | Just the `links`, `tables`, `forms` or `headings` of one tab, as text                                                                                                                                         |
+    | `browser_search` | read   | 12b                             | Search `history`, `bookmarks`, `reading_list`, `downloads` or `closed` tabs by words and date                                                                                                                 |
+    | `tab_actions`    | change | 12c                             | `open` (url or search), `close`, `switch`, `group`, `reopen` (a closed tab), `bookmark`, `reading_list`                                                                                                       |
 
     `tab_actions` is `effect: "change"`, so it asks under the person's permissions like every change tool.
     Read tools carry `effect: "read"` and no `confirm`; the person's per-tool Ask/Auto setting decides.
+
 13. **Reading rules.** Page text is the Readability text the extension already extracts, capped at 40,000
     characters with a plain "truncated" note. A sleeping (discarded) tab is never reloaded: `read` fails with
     `tool_failed` saying the tab is asleep. Pages the browser locks (`chrome://`, the Web Store, other
@@ -116,12 +117,12 @@ My calls (the person can overturn any):
     - Once granted, never asked again. The popup lists what has been granted, with a Remove for each.
     - Right-click "Ask Scout" (12c) needs `contextMenus` before the menu item can exist, so the popup offers
       to turn it on; the `scout` address-bar keyword needs no permission.
-    `readingList` is Chrome-only; elsewhere that source answers `tool_failed` "not supported in this browser".
+      `readingList` is Chrome-only; elsewhere that source answers `tool_failed` "not supported in this browser".
 15. **Events** (12b). Two new body event names, documented in the browser body's doc:
     - `tab {title, url}`: the active tab changed (throttled like `focus`, at most one per 2 s, URL without query
       string or fragment). Brain kind `tab`, `wakes=False`: a fact Scout sees on its next turn, never a wake.
     - `download {name, state}`: a download finished or failed. Brain kind `download`, `wakes=False`.
-    Each gets a note in `brain/src/brain/mind/events.md`; wording stays the model's.
+      Each gets a note in `brain/src/brain/mind/events.md`; wording stays the model's.
 16. **Shared connection.** The desktop's `bodies/desktop/src/main/brain/brain-client.ts` moves into
     `@tagalong/contract` (`protocol/ts`) as `BrainClient`, used by both bodies. It already imports only the
     contract and the global `WebSocket`. Changes: the body is a constructor argument (not hardcoded `desktop`);

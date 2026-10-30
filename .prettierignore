@@ -10,3 +10,4 @@ packages/core/src/roles/library.generated.ts
 .impeccable/
 bodies/desktop/.impeccable/
 .claude/worktrees/
+.superpowers/
