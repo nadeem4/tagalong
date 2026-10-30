@@ -63,7 +63,9 @@ function fieldLabel(doc: Document, el: Element): string {
 
 function forms(doc: Document): string[] {
   return Array.from(doc.querySelectorAll('form')).map((form, i) => {
-    const lines = [`Form ${i + 1}: ${form.getAttribute('action') ?? '(no action)'}`];
+    // Query and fragment can carry tokens; keep only where the form posts to.
+    const action = form.getAttribute('action')?.split(/[?#]/)[0] ?? '(no action)';
+    const lines = [`Form ${i + 1}: ${action}`];
     for (const el of Array.from(form.querySelectorAll('input, select, textarea'))) {
       const tag = el.tagName.toLowerCase();
       const type = tag === 'input' ? (el.getAttribute('type') ?? 'text').toLowerCase() : tag;

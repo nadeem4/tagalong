@@ -334,17 +334,22 @@ offline, a fact is dropped, not queued.
 - **Throttled.** At most one `tab` every 2 seconds. A burst sends the first at once and the last
   value when the 2 seconds end. The same title and URL twice in a row is sent once. If the send
   fails (offline), the next change tries again.
-- **Downloads keep the file name only.** The folder is dropped.
-- **Never prompts.** The events do not ask for permissions. Without the `tabs` permission a tab
-  arrives with no address and nothing is sent. `chrome.downloads` exists only once the `downloads`
-  permission is granted; the worker watches it from the start and again when a permission is added.
+- **Downloads keep the file name only.** The folder is dropped, and a download with no file name
+  sends nothing.
+- **Never prompts.** The events do not ask for permissions. A tab is sent only while the `tabs`
+  permission is held: the worker checks it before each `tab` fact, because Chrome also fills in the
+  address and title of a site the extension has host access to. Tabs and downloads from a private
+  window are never sent. `chrome.downloads` exists only once the `downloads` permission is granted;
+  the worker watches it from the start and again when a permission is added.
 - **Listeners are top level.** They are registered when the worker starts, as Chrome requires.
 
 ## Tests that pin it
 
 | Test file (under `bodies/browser/src/`) | What it pins                                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `body.test.ts`                          | Hello, tool dispatch, restart, stop, keepalive                                                          |
+| `body.test.ts`                          | Hello, tool dispatch, restart, stop, keepalive, the `tab` and `download` events                         |
+| `tab-facts.test.ts`                     | The worker's tab wiring: sent only with the `tabs` allow held, never from a private window              |
+| `layer/chromium.test.ts`                | The search layer over `chrome.*`: closed tabs, history, bookmarks, limits                               |
 | `reconnect.test.ts`                     | The alarm redials unless the body is online or outdated                                                 |
 | `identity.test.ts`                      | The id shape and the browser kind                                                                       |
 | `settings.test.ts`                      | Address and name validation                                                                             |

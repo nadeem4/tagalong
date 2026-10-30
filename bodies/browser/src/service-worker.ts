@@ -19,6 +19,7 @@ import { PermissionBroker } from './permissions';
 import type { WorkerQuery } from './popup/model';
 import { shouldRedial } from './reconnect';
 import { ADDR_KEY, NAME_KEY } from './settings';
+import { tabFactSender } from './tab-facts';
 
 /** Wakes a stopped worker so it notices the brain coming back. */
 const RECONNECT_ALARM = 'tagalong-reconnect';
@@ -56,17 +57,19 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void body.restart().catch(() => undefined);
 });
 
-// Facts for Scout. They never prompt: without the `tabs` permission a tab arrives with no url
-// and the reporter drops it; `chrome.downloads` only exists once its permission is granted.
+// Facts for Scout. They never prompt: a tab is only reported while the `tabs` permission is held
+// (host access alone fills url and title), and private windows are skipped; `chrome.downloads`
+// only exists once its permission is granted.
+const sendTab = tabFactSender(chromePermissions, (fact) => body.tabChanged(fact));
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs
     .get(tabId)
-    .then((tab) => body.tabChanged({ title: tab.title ?? '', url: tab.url ?? '' }))
+    .then(sendTab)
     .catch(() => undefined);
 });
 chrome.tabs.onUpdated.addListener((_id, change, tab) => {
   if (tab.active && (change.url !== undefined || change.title !== undefined))
-    body.tabChanged({ title: tab.title ?? '', url: tab.url ?? '' });
+    sendTab(tab).catch(() => undefined);
 });
 
 let downloadsWatched = false;
@@ -79,7 +82,7 @@ function watchDownloads(): void {
     chrome.downloads
       .search({ id: delta.id })
       .then(([item]) => {
-        if (item) body.downloadChanged({ filename: item.filename, state });
+        if (item && !item.incognito) body.downloadChanged({ filename: item.filename, state });
       })
       .catch(() => undefined);
   });

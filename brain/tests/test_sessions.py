@@ -1324,4 +1324,4 @@ async def test_tab_event_reaches_the_next_turns_system_prompt():
     await finish(session)
     system = model.systems[0]
     assert '; tab: "Docs" https://a.example' in system
-    assert "last download: a.pdf (complete)" in system
+    assert 'last download: "a.pdf" (complete)' in system

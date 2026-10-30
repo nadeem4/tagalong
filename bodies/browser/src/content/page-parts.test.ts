@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
-/** Tests for readParts: links, tables, headings and forms, and what a form must never leak. */
+/**
+ * Tests for readParts: links, tables, headings and forms.
+ * Forms must never leak what the person typed, nor a token in the action's query or fragment.
+ */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MAX_PAGE_TEXT_CHARS } from './limits';
 import { readParts } from './page-parts';
@@ -51,6 +54,14 @@ describe('readParts headings', () => {
 });
 
 describe('readParts forms', () => {
+  it('forms_action_drops_query_and_fragment', () => {
+    body('<form action="https://a.test/login?token=s3cret#frag"></form>');
+    const out = readParts(document, 'forms');
+    expect(out).toContain('https://a.test/login');
+    expect(out).not.toContain('s3cret');
+    expect(out).not.toContain('frag');
+  });
+
   it('forms_list_field_labels_and_types_only', () => {
     body(`<form action="/login">
       <label for="u">Username</label><input id="u" type="text" value="hunter2">

@@ -94,4 +94,9 @@ describe('downloadEvent', () => {
     expect(downloadEvent({ filename: 'a.zip', state: 'interrupted' })?.state).toBe('interrupted');
     expect(downloadEvent({ filename: 'a.zip', state: 'in_progress' })).toBeNull();
   });
+
+  it('downloadEvent_sends_nothing_when_the_name_is_empty', () => {
+    expect(downloadEvent({ filename: '', state: 'interrupted' })).toBeNull();
+    expect(downloadEvent({ filename: 'C:\\dl\\', state: 'interrupted' })).toBeNull();
+  });
 });

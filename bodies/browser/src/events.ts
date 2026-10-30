@@ -68,5 +68,6 @@ export function downloadEvent(item: {
 }): { name: string; state: 'complete' | 'interrupted' } | null {
   if (item.state !== 'complete' && item.state !== 'interrupted') return null;
   const name = item.filename.split(/[\\/]/).pop() ?? '';
+  if (name === '') return null;
   return { name, state: item.state };
 }

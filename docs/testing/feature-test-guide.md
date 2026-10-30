@@ -2341,7 +2341,8 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 3. **Expected:** Scout names that tab's title from what the browser told it, with no permission
    window. Switch to another tab, wait 3 seconds, and ask again: it names the new one.
 4. **Action:** remove `tabs` in the popup and switch tabs.
-5. **Expected:** nothing new is reported; no window opens and Scout does not speak by itself.
+5. **Expected:** nothing new is reported, even on a site you allowed earlier; no window opens and
+   Scout does not speak by itself. A tab in a private window is never reported either.
 6. **Action:** open a tab on a page whose address has a query, like `?token=abc#frag`.
 7. **Expected:** if you ask Scout for the address, it has no `?token=abc` and no `#frag`.
 
