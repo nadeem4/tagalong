@@ -2353,6 +2353,83 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 3. **Expected:** Scout names the file and says it completed, without the folder. Scout does not
    speak up on its own when the download ends. A cancelled or failed download shows as interrupted.
 
+### X.19. Open, close, switch and reopen tabs
+
+1. **Setup:** the article open, a few other tabs open, `tabs` allowed (X.2), and `search` and
+   `sessions` not yet allowed (remove them in the popup's **Allowed** list).
+2. **Action:** ask "Open https://example.com in a new tab."
+3. **Expected:** a new tab opens at example.com with no permission window. Scout says it opened it.
+4. **Action:** ask "Switch to the article tab", then "Close the example.com tab."
+5. **Expected:** the article comes to the front, then the example.com tab closes. No permission
+   window for either.
+6. **Action:** ask "Reopen the tab I just closed."
+7. **Expected:** a window asks to "see recently closed tabs". **Allow** reopens example.com.
+   **Not now** (try it once with the permission removed) gives Scout a plain reason and reopens
+   nothing.
+8. **Action:** ask "Open javascript:alert(1)" and then "Open file:///C:/Windows/win.ini".
+9. **Expected:** Scout says it only opens web addresses; nothing opens.
+10. **Action:** ask "Search the web for tagalong desktop companion."
+11. **Expected:** a window asks to "search the web for you". **Allow** opens a new tab with your
+    default search engine's results. **Not now** opens nothing.
+
+### X.20. Group tabs, bookmark and reading list
+
+1. **Setup:** two or three tabs open, `tabGroups`, `bookmarks` and `readingList` not yet allowed.
+2. **Action:** ask "Group these tabs as Research." (Scout lists the tabs first if it needs ids.)
+3. **Expected:** a window asks to "use tab groups". After **Allow** the named tabs sit in one group
+   called Research. After **Not now** nothing is grouped.
+4. **Action:** with the article in front, ask "Bookmark this page."
+5. **Expected:** a window asks to "use bookmarks" (and, if `tabs` was removed, to see open tabs).
+   After **Allow** the page is in your bookmarks, with the article's title.
+6. **Action:** ask "Add this page to my reading list."
+7. **Expected:** a window asks to "use the reading list". After **Allow** the page is in the
+   reading list (Chrome's side panel). **Not now** adds nothing. In a browser with no reading list
+   Scout says it is not supported.
+8. **Action:** ask any of these again.
+9. **Expected:** no window: each grant is made once.
+
+### X.21. Right-click: Ask Scout about this
+
+1. **Setup:** the article open, `contextMenus` not yet granted, the desktop app and brain running.
+2. **Action:** select a sentence on the page and right-click.
+3. **Expected:** no "Ask Scout about this" item yet.
+4. **Action:** open the toolbar popup and press **Turn on right-click**, then **Allow** in Chrome's
+   own prompt.
+5. **Expected:** the button disappears from the popup and **contextMenus** appears in the Allowed
+   list (removing it there brings the button back).
+6. **Action:** select a sentence on the article and right-click, then choose **Ask Scout about
+   this**.
+7. **Expected:** the answer appears in the desktop bubble, about the selected text and the page,
+   and nothing is shown in the browser. Right-click with nothing selected shows no item.
+8. **Action:** do it on a page whose address has `?token=abc#frag`, and ask Scout which page it was.
+9. **Expected:** Scout knows the title and the origin and path, never `?token=abc` or `#frag`.
+10. **Action:** stop the brain and ask again from the right-click.
+11. **Expected:** nothing is sent and nothing crashes; the popup says the brain is not reachable.
+
+### X.22. The address-bar keyword
+
+1. **Setup:** the article open, brain and desktop running. No permission is needed.
+2. **Action:** click the address bar, type `scout`, press Space, type "what is this page about?"
+   and press Enter.
+3. **Expected:** the answer appears in the desktop bubble, not in the browser, about the page in
+   front.
+4. **Action:** type `scout` and press Enter with nothing after it.
+5. **Expected:** nothing is sent.
+
+### X.23. Only the browser online: an ask is refused
+
+1. **Setup:** the brain running, the browser body connected, the desktop app quit. A tool that
+   needs approval has not been set to `auto` (for example one of the desktop tools).
+2. **Action:** from the browser, right-click an ask (X.21) that makes Scout use a tool needing your
+   approval, or wait for Scout to need one.
+3. **Expected:** no approval is requested anywhere, the tool does not run, and Scout is told
+   nobody was there to ask.
+4. **Action:** leave only the browser connected while something would wake Scout (for example a
+   timer set earlier, or a finished expert job), then start the desktop app.
+5. **Expected:** no wake is shown on the browser (it shows nothing); the wake waits and appears in
+   the desktop bubble once the desktop connects. Opening the browser never wakes Scout to greet.
+   Tools with no approval, like `tabs` `list`, still work from the browser.
+
 ## Installer
 
 ### I.1. Build the Windows installer

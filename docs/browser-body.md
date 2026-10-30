@@ -5,10 +5,12 @@
 `bodies/browser` is a Chromium Manifest V3 extension that makes your browser a body for the Python
 brain. Scout can list your open tabs and read a page when you ask, after you say yes. It holds no
 brain of its own: it dials the brain over the websocket contract in
-[protocol/README.md](../protocol/README.md) and offers three tools: `tabs`, `page_parts` and
-`browser_search`. It also tells Scout, as plain facts, which tab you are on and which download
-just finished. It works in Chrome, Edge, Brave, Opera, Vivaldi, Arc and any other Chromium browser
-from version 116.
+[protocol/README.md](../protocol/README.md) and offers four tools: `tabs`, `page_parts`,
+`browser_search` and `tab_actions`. It also tells Scout, as plain facts, which tab you are on and
+which download just finished, and lets you ask Scout from a right-click or the address bar. The
+browser shows no answers itself (it says `display: false`), so Scout's reply appears in the desktop
+bubble. It works in Chrome, Edge, Brave, Opera, Vivaldi, Arc and any other Chromium browser from
+version 116.
 
 The store listing, permission justifications and the public privacy policy are in
 [chrome-web-store/listing.md](chrome-web-store/listing.md) and
@@ -25,6 +27,8 @@ The store listing, permission justifications and the public privacy policy are i
 | `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`      |
 | `src/tools/page-parts.ts`            | The `page_parts` tool                                               |
 | `src/tools/browser-search.ts`        | The `browser_search` tool                                           |
+| `src/tools/tab-actions.ts`           | The `tab_actions` tool                                              |
+| `src/ask-scout.ts`                   | Turns a right-click or an address-bar entry into what you say       |
 | `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle             |
 | `src/permissions.ts`                 | The permission broker and its 25 s wait                             |
 | `src/permission/`                    | The permission window page                                          |
@@ -44,7 +48,7 @@ The build (`pnpm --filter @tagalong/browser build`) writes `bodies/browser/dist`
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart LR
   B["Python brain"] -->|"tool call"| W["Service worker<br>BrainClient"]
-  W --> T["tools: tabs,<br>page_parts, browser_search"]
+  W --> T["tools: tabs, page_parts,<br>browser_search, tab_actions"]
   T --> P{"Permission<br>granted?"}
   P -->|"no"| X["Permission window<br>25 s wait"]
   X -->|"Allow"| P
@@ -56,20 +60,20 @@ flowchart LR
 ```
 
 1. The service worker starts and builds one `BrainClient`. It dials the brain at the saved
-   address, then sends a hello with the body kind `browser`, the body id, the name and its three
-   tools.
+   address, then sends a hello with the body kind `browser`, the body id, the name, `display: false`
+   and its four tools.
 2. The brain calls a tool. The tool asks the broker for what it needs. If a permission is missing,
    the broker opens a small window and waits up to 25 seconds for an answer.
 3. With the permissions in place the tool returns the tab list as JSON, injects the page reader
    into one tab and returns its text, takes a picture of the tab in front, injects the parts reader,
-   or asks the browser's own records.
+   asks the browser's own records, or does one of the `tab_actions`.
 4. If the connection drops, the client retries. A 30-second alarm named `tagalong-reconnect` wakes a
    stopped worker and restarts the body, because Chrome stops idle workers.
 
 The `BrainClient` options this body sets (see
 [protocol/README.md](../protocol/README.md#the-typescript-client)):
 
-- `body`: the kind `browser`, plus the id and name.
+- `body`: the kind `browser`, plus the id and name, and `display: false`.
 - `seqStore`: keeps the last sequence number in `chrome.storage.session` under `lastSeq`, so a
   worker restart resumes where it was; Chrome clears it when the browser closes.
 - `keepalive`: `{everyMs: 20000, tool: 'spend_today'}` sends a cheap call every 20 s so Chrome does
@@ -87,8 +91,9 @@ its own, which makes it a second body. The name can be changed in the popup (32 
 
 ## Tools
 
-Three tools, all with effect `read`: none of them changes a page or switches a tab. The brain shows
-them as `<body id>__<tool>`.
+Four tools. `tabs`, `page_parts` and `browser_search` have effect `read`: none of them changes a
+page or switches a tab. `tab_actions` has effect `change` and no `confirm`. The brain shows them as
+`<body id>__<tool>`.
 
 ### `tabs`
 
@@ -235,6 +240,56 @@ Looks through the browser's own records.
 
 Each source asks for its own optional permission first, in one window (see below).
 
+### `tab_actions`
+
+Does one thing with the browser's tabs. It changes the browser, but only in ways you can see and
+undo, so it has no confirm of its own; each action asks for the one permission it needs.
+
+```json
+{
+  "name": "tab_actions",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": ["open", "close", "switch", "group", "reopen", "bookmark", "reading_list"]
+      },
+      "url": { "type": "string" },
+      "search": { "type": "string" },
+      "tab_id": { "type": "number" },
+      "tab_ids": { "type": "array", "items": { "type": "number" } },
+      "title": { "type": "string" }
+    },
+    "required": ["action"]
+  }
+}
+```
+
+| `action`       | Input                         | Needs                        | Result                                      |
+| -------------- | ----------------------------- | ---------------------------- | ------------------------------------------- |
+| `open`         | `url`                         | nothing                      | A new tab at the address                    |
+| `open`         | `search` (instead of `url`)   | the `search` permission      | A new tab with a web search, default engine |
+| `close`        | `tab_id`                      | nothing                      | The tab is closed                           |
+| `switch`       | `tab_id`                      | nothing                      | The tab comes to the front                  |
+| `group`        | `tab_ids`, optional `title`   | the `tabGroups` permission   | The tabs go into one group                  |
+| `reopen`       | none                          | the `sessions` permission    | The tab closed last is brought back         |
+| `bookmark`     | optional `url` and/or `title` | the `bookmarks` permission   | The page is bookmarked                      |
+| `reading_list` | optional `url` and/or `title` | the `readingList` permission | The page is added to the reading list       |
+
+- **Web addresses only.** `open` (and a `url` given to `bookmark` or `reading_list`) accepts http and
+  https. `javascript:`, `file:`, `chrome:` and anything else fails with `invalid_params`, before any
+  permission is asked.
+- **Bookmark and reading list default to the tab in front.** With no `url` or `title`, the missing
+  one comes from the tab you are looking at, which also needs the `tabs` permission. The two
+  questions share one 25-second deadline, like `tabs` `read`.
+- **No search without a yes.** `open` with `search` needs the `search` permission, asked like any
+  other; `open` with a `url` asks nothing.
+- **Plain failures.** A missing `tab_id`, a `group` with no `tab_ids`, or an `open` with neither
+  `url` nor `search` fails with `invalid_params`. If Chrome refuses (a tab that is already closed,
+  say), the tool fails with `tool_failed` and "I could not close that tab: ..." and the reason. A
+  `reopen` with nothing recently closed answers that nothing was reopened.
+
 ## Permissions
 
 The manifest asks only for `alarms`, `scripting` and `storage` at install. Everything else is
@@ -251,6 +306,12 @@ optional and asked for when a tool needs it. The window is the only place a gran
 | `browser_search` `reading_list` | the `readingList` permission         | **Allow** or **Not now**                                                |
 | `browser_search` `downloads`    | the `downloads` permission           | **Allow** or **Not now**                                                |
 | `browser_search` `closed`       | the `sessions` permission            | **Allow** or **Not now**                                                |
+| `tab_actions` `open` `search`   | the `search` permission              | **Allow** or **Not now**                                                |
+| `tab_actions` `group`           | the `tabGroups` permission           | **Allow** or **Not now**                                                |
+| `tab_actions` `reopen`          | the `sessions` permission            | **Allow** or **Not now**                                                |
+| `tab_actions` `bookmark`        | the `bookmarks` permission           | **Allow** or **Not now**                                                |
+| `tab_actions` `reading_list`    | the `readingList` permission         | **Allow** or **Not now**                                                |
+| Right-click "Ask Scout"         | the `contextMenus` permission        | The popup's **Turn on right-click** button (Chrome's own prompt)        |
 
 A `file:` page uses the origin `file://`. **Allow on all sites** grants `<all_urls>`.
 
@@ -266,8 +327,11 @@ One call has one 25-second deadline, however many questions it asks. `tabs` `rea
 25 seconds, so the pair never outlasts the brain's 30-second tool timeout. A grant is made once and
 kept, so the next call asks nothing.
 
-The manifest also lists `tabGroups` and `contextMenus` as optional, for later tools. Nothing asks for
-them yet. There is no side panel and no keyboard command.
+`tab_actions` `bookmark` and `reading_list` also need the `tabs` permission when they have to look up
+the tab in front. `tab_actions` `open` with a `url`, `close` and `switch` ask for nothing. The
+`contextMenus` permission is the one grant not made in the permission window: the popup's button asks
+for it directly, because it is a choice you make on purpose, not something a tool call needs. The
+omnibox keyword `scout` needs no permission. There is no side panel and no keyboard command.
 
 ## Popup
 
@@ -279,7 +343,42 @@ message `{type: 'status'}` and shows:
 - the **Brain address** (`host:port` only, default `127.0.0.1:47321`; a bad value is refused and not
   saved);
 - the **Name** of this browser;
+- a **Turn on right-click** button, shown until `contextMenus` is granted, with a line saying how to
+  ask from the page;
 - an **Allowed** list of what you have granted, each with a remove button.
+
+## Asking Scout from the page
+
+Two ways to ask without opening the desktop app. Both send a `say` to the brain; the answer shows
+in the desktop bubble, not in the browser.
+
+- **Right-click.** Select some text, right-click and choose **Ask Scout about this**. The item only
+  exists for a selection, and only after you press **Turn on right-click** in the popup (the
+  `contextMenus` permission). A click with no selected text asks nothing.
+- **Address bar.** Type `scout`, a space and your question, then Enter. No permission is needed.
+
+The `say` carries your text and the context `{url, title}` of the tab you asked from. The address is
+the origin plus the path, with no query string and no fragment, the same as the `tab` fact. Nothing
+else from the page is sent; Scout reads more only if it calls a tool and you have allowed it.
+
+Because the browser says `display: false`, the brain shows the turn on a displaying body: the body
+you last talked to if it is online, otherwise the first online body that displays. The browser does
+not become the body you last talked to. If the brain is not running, the ask is dropped and the
+popup's status line is where you see it.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+sequenceDiagram
+  participant P as You
+  participant W as Browser body
+  participant B as Python brain
+  participant D as Desktop body
+  P->>W: right-click or "scout ..." in the address bar
+  W->>B: say {text, context: url + title}
+  B->>D: turn started, body = desktop
+  B->>D: reply (streamed)
+  D->>P: answer in the bubble
+```
 
 ## Install from the desktop
 
@@ -302,11 +401,26 @@ unpacked**.
 | `picture` of a background tab    | `tool_failed`: only the tab in front can be pictured; nothing is switched |
 | `picture`, tab changed on allow  | `tool_failed`: the tab in front changed; no picture is taken              |
 | Search source not supported      | `tool_failed` with the browser's reason ("not supported in this browser") |
+| `tab_actions` bad input          | `invalid_params`; non-web addresses (`javascript:`, `file:`) never open   |
+| `tab_actions`, Chrome refuses    | `tool_failed`: "I could not close that tab: ..." with the reason          |
+| Only the browser is online       | Scout can still read tabs, but an ask is refused at once; see below       |
+| Ask from the page, brain down    | Nothing is sent; the popup says the brain is not reachable                |
+
+## Only the browser is online
+
+A body with `display: false` shows nothing, so the brain never counts it when it picks where to
+show a turn, and never opens an ask on it. If the desktop is closed and only the browser is
+connected, a tool that needs your approval is not run: the ask is refused at once, as if nobody were
+online, and Scout is told nobody was there to ask. A wake (Scout speaking first) is never labelled
+with the browser either. Tools that need no approval, like `tabs` `list`, still work. The rule is in
+"Permissions and asks" and "Wake and finish a turn" in [brain.md](brain.md).
 
 ## Privacy notes
 
 - Nothing is read until Scout asks and you have allowed it. No script runs in a page before that.
-  The two facts under Events are the only thing sent on the body's own.
+  The two facts under Events are the only thing sent on the body's own. A right-click or
+  address-bar ask is sent because you made it: it carries the text you selected or typed, the page
+  title and the page's origin plus path, to your own brain.
 - A read takes the selection, the URL, the title and the main text, and nothing else. A
   `page_parts` read of forms takes labels and types, never what you typed. A `picture` is taken only
   when Scout asks, and only of the tab in front.
@@ -347,16 +461,18 @@ offline, a fact is dropped, not queued.
 
 | Test file (under `bodies/browser/src/`) | What it pins                                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `body.test.ts`                          | Hello, tool dispatch, restart, stop, keepalive, the `tab` and `download` events                         |
+| `body.test.ts`                          | Hello (`display: false`, four tools), dispatch, restart, stop, keepalive, events, `say` offline         |
+| `ask-scout.test.ts`                     | Right-click and address-bar text and context, stripped URL, empty text asks nothing                     |
+| `tools/tab-actions.test.ts`             | Each action and its permission, web addresses only, defaults to the tab in front, plain failures        |
 | `tab-facts.test.ts`                     | The worker's tab wiring: sent only with the `tabs` allow held, never from a private window              |
-| `layer/chromium.test.ts`                | The search layer over `chrome.*`: closed tabs, history, bookmarks, limits                               |
+| `layer/chromium.test.ts`                | The layers over `chrome.*`: search (closed tabs, history, bookmarks, limits) and tab actions            |
 | `reconnect.test.ts`                     | The alarm redials unless the body is online or outdated                                                 |
 | `identity.test.ts`                      | The id shape and the browser kind                                                                       |
 | `settings.test.ts`                      | Address and name validation                                                                             |
-| `manifest.test.ts`                      | Permissions, optional permissions, CSP, popup path                                                      |
+| `manifest.test.ts`                      | Permissions, optional permissions, omnibox keyword, CSP, popup path                                     |
 | `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                 |
 | `permission/model.test.ts`              | The window's wording and buttons                                                                        |
-| `popup/model.test.ts`                   | The popup's status lines and allowed list                                                               |
+| `popup/model.test.ts`                   | The popup's status lines, allowed list and when the right-click button shows                            |
 | `events.test.ts`                        | Stripped URLs, the 2 s throttle, no repeats, download names and states                                  |
 | `tools/tabs.test.ts`                    | List, read, picture (front tab only, same tab after the allow), asleep, locked, truncation              |
 | `tools/page-parts.test.ts`              | Same needs as read, asleep and locked tabs, unknown part                                                |

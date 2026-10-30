@@ -122,6 +122,7 @@ function addMenuItem(): void {
     });
   });
 }
+// Keep this call, and the onClicked listener it registers, synchronous at load so a woken worker gets the click.
 addMenuItem();
 chrome.permissions.onAdded.addListener(addMenuItem);
 

@@ -19,6 +19,11 @@ companion, asks for it while you are talking to Scout, and only after you allow 
   for that one source. It returns the matching entries (title, address and date, or the file name
   for a download), up to a small limit.
 
+- Acting on your tabs (opening an address or a web search, closing, switching to or grouping tabs,
+  reopening the one closed last, adding a bookmark or a reading list entry) happens only when Scout
+  asks while you are talking to it, and the ones that need a browser permission ask you for it the
+  first time. It only opens web addresses (http and https). It does not read what a search returns.
+
 When it reads one tab, it takes the text you selected there, the page's URL and title, and the
 page's main text with menus and footers removed, up to 40,000 characters. It does not wake a
 sleeping tab, and it does not read Chrome's own pages, the Web Store or other extensions' pages.
@@ -29,6 +34,12 @@ brain and you have allowed them: the title and address of the tab in front when 
 the "see open tabs" yes), and the name and outcome of a download that finishes or fails (needs the
 downloads yes). The address is sent without its query string or fragment, and a private (incognito)
 window is never reported. They are context for Scout, not a reason for it to speak.
+
+You can also ask Scout from the page: select text, right-click and choose "Ask Scout about this"
+(after you turn it on in the popup), or type `scout` and your question in the address bar. That
+ask sends the text you selected or typed, the page's title, and the page's address without its
+query string or fragment, to your own brain, because you made the ask. Nothing more is read from
+the page.
 
 The toolbar button opens a popup that lists what you have allowed. You can also remove any of it
 there, or on Chrome's extensions page.
