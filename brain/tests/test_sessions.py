@@ -946,6 +946,31 @@ async def test_body_online_after_ten_minutes_wakes_scout():
     assert "Event: body_online" in text and "offline_seconds: 700" in text
 
 
+async def _returns_after_an_hour(body_id, kind):
+    clock = Tick()
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None, bodies=Bodies(clock=clock))
+    peer = QuietPeer()
+    body = Body(id=body_id, kind=kind, name=body_id)
+    session._bodies.connect(body, [], peer, None)
+    session._bodies.disconnect(body_id, peer)
+    clock.now = 3600.0
+    session._bodies.connect(body, [], QuietPeer(), None)
+    await idle(session)
+    return model, session
+
+
+async def test_a_browser_body_returning_after_an_hour_starts_no_wake():
+    model, session = await _returns_after_an_hour("chrome-7k2f", "browser")
+    assert model.seen == []
+    assert not session.scheduler._groups
+
+
+async def test_a_desktop_body_returning_after_an_hour_wakes():
+    model, _ = await _returns_after_an_hour("desktop", "desktop")
+    assert len(model.seen) == 1
+
+
 async def test_body_online_after_a_short_gap_does_not():
     clock = Tick()
     session, sent = make(Gate([]), kinds=None, bodies=Bodies(clock=clock))

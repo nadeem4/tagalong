@@ -199,7 +199,8 @@ class Session:
             self.scheduler.emit(event)
 
     def _on_connect(self, body_id: str, away: float | None) -> None:
-        event = from_connect(body_id, away)
+        kind = next((b.kind for b in self._bodies.online() if b.id == body_id), None)
+        event = from_connect(body_id, away, kind)
         if event is not None:
             self.scheduler.emit(event)
         self.scheduler.pump()  # also starts a wake that was waiting for a body
