@@ -508,14 +508,10 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
 5. **Expected:** nothing is saved; the message reads "Stop Scout speaking uses the same keys as Ask
    Scout. Pick a different combination." and that field has the focus.
 
-### S.6b. Home's overview says what is wrong, and Home fits a small screen
+### S.6b. Home fits a small screen
 
-1. **Action:** sign out of Claude Code (`claude /logout`) with Scout on the Claude sign-in, and
-   open Home → Overview. Sign in again and reopen Home. Then pause sight from the tray.
-2. **Expected:** the Scout card reads "Signed out of Claude Code" with an amber dot, then "Ready"
-   with a green one, then "Ready, sight paused". A Scout on a service with no key reads "No API key".
-3. **Action:** make Home as narrow as it goes.
-4. **Expected:** it stops at 880 px; the nav and every page stay usable, the overview cards two
+1. **Action:** make Home as narrow as it goes.
+2. **Expected:** it stops at 880 px; the nav and every page stay usable, the overview cards two
    across, nothing cut off.
 
 ### S.7. The ⓘ notes
@@ -572,14 +568,6 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 4. **Expected:** a screenshot first shows Seeing for 2.5 s; while the screen tool still runs Bean
    wears glasses and reads, with **no tag** ("Scout is reading your screen"), then thinks again until
    the answer ends. Stop a turn mid-read: Bean never stays reading.
-5. **Action:** hand off a task to an expert, then ask Scout something while it runs.
-6. **Expected:** the expert pose (walkie-talkie, badge) with the **Working** tag ("Scout has an expert
-   working"); your question shows thinking on top, and the expert pose comes back after the answer.
-7. **Action:** ask Scout to take something on as a job of its own ("look into this in the
-   background").
-8. **Expected:** while the job's turn runs, Bean types at a laptop under a turning gear, with the
-   **Working** tag ("Scout is working on a job of its own"). An expert's task wins over a job, and
-   your own question wins over both.
 
 ### M.5a. Bean, still, in Home
 
@@ -961,7 +949,7 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
 ## Connections: your apps over MCP
 
 These use real apps and a real provider, so they are yours to run. Scout must think with a provider
-that calls tools (your Claude sign-in or OpenRouter + Claude).
+that calls tools (the brain with its Anthropic key).
 
 ### C1. Add a local app
 
@@ -1142,7 +1130,7 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
 ## Spend and the daily budget
 
-### SP.1. Home shows what Scout and the experts used
+### SP.1. Home shows what Scout used
 
 1. **Setup:** the brain running with its model and key as usual. Its daily limit is $5 unless
    `TAGALONG_DAILY_BUDGET_USD` sets another (read at brain start, from the environment or the data
@@ -1467,7 +1455,7 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 2. Press **Explain**: the answer is about the file's contents. Type your own words first and the
    answer follows them.
 3. Drop a PDF: only **Hand it to an expert** and **Cancel** show. Press **Hand it to an expert**:
-   the hand-off card appears with the brief naming the file's path, and nothing runs until **Send**.
+   the hand-off ask card appears, where you pick a mode, and nothing runs until you pick one.
 4. Drop a PNG with a brain that cannot see images: Scout says the image was not sent.
 5. Drop a `.env` file: "Looks like a secrets file: not read, not passed on." and no
    buttons.

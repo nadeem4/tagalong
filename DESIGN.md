@@ -317,7 +317,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 ### Secondary
 
 - **Sky** (sky, hard-coded): inside the bubble, the focus ring, the ask field's border, links in an answer, the "hearing" listening dot; also the Seeing tag, the "Your companion" line in Home's nav.
-- **Done Green** (done-green, hard-coded): the Done tag on the dock.
+- **Done Green** (done-green, hard-coded): the listening mark on the dock (the dot while Always listening is on).
 - **Recording Red** (recording-red, hard-coded): the 8px rolling-memory dot on the dock, with a 1px white ring.
 
 ### Neutral
@@ -367,7 +367,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Body** (Onest 400, 13px): card text, previews, the chat's messages, help text (1.55).
 - **Label** (Onest 400, 12px): meta lines, field labels, quiet bubble buttons, bubble chips.
 - **Label min** (Onest 600, 11px): chips, the dock's Paused chip, bubble hints.
-- **Dock tag** (Onest 600, 9px, 11px line): Seeing, Working and Done on the dock, small so they sit beside Bean's floating sign rather than on it.
+- **Dock tag** (Onest 600, 9px, 11px line): Seeing and Working on the dock, small so they sit beside Bean's floating sign rather than on it.
 - **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12.5px.
 
 ### Named Rules

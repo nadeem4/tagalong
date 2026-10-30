@@ -65,7 +65,7 @@ export interface Platform {
    */
   listWindows(
     exclusions: CaptureExclusions,
-    /** `countText: false` skips the text count, for keeping an eye: titles are all it needs. */
+    /** `countText: false` skips the text count, for the focus watch, listening guard and list_windows: titles are all they need. */
     options?: { countText?: boolean },
   ): Promise<WindowInventory>;
   /**

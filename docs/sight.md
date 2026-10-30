@@ -121,7 +121,7 @@ calls this function rather than its own copy of the arguments.
 `handleOf` turns an id back into a handle and returns null for anything the host did not mint, so a
 model-invented id fails as "no such window" rather than reaching a script.
 
-Callers that need titles only pass `countText: false`: gentle nudges and the listening guard.
+Callers that need titles only pass `countText: false`: the focus watch, the listening guard and the `list_windows` tool.
 
 ### Active window and title handling
 

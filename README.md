@@ -108,7 +108,6 @@ its bodies fit together.
 | Scout thinks with your Anthropic key, set in the brain's `.env`                                                                                                                                                                                                                                               | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                                                                                          |                                                                     |
 | Timers: Scout sets its own reminders and repeating checks, and speaks first when a job ends or you come back                                                                                                                                                                                                  |                                                                     |
-| Background work: Scout reads, compares and summarises on its own while you keep talking; what finishes comes back together, once                                                                                                                                                                              |                                                                     |
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             | ElevenLabs voice cost on the Spend card                             |
 |                                                                                                                                                                                                                                                                                                               | Data export and delete-all in Settings                              |
@@ -245,8 +244,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 
 ## Providers and keys
 
-Scout thinks through the Python brain. It reads `ANTHROPIC_API_KEY` from its environment or its
-`.env` file, or runs on your Claude Code sign-in (nothing to paste). Keys never pass through the
+Scout thinks through the Python brain. It needs `ANTHROPIC_API_KEY` in its environment or in `<TAGALONG_HOME>/.env` (see
+`.env.example`). Experts run on your Claude Code sign-in instead. Keys never pass through the
 desktop, except the ElevenLabs voice key under **Settings → Advanced**, kept in the OS keychain
 and sent only to ElevenLabs.
 
@@ -289,7 +288,7 @@ such as `.env` are refused.
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory, which
-  you turn on. Every look badges Scout and the tray says what
+  you turn on, and the title of your front window, which the desktop sends to the brain. Every look badges Scout and the tray says what
   was read and when.
 - **Scout's face** dozes after five minutes with no input or when the screen locks (one idle time
   number from the OS, kept on this computer).

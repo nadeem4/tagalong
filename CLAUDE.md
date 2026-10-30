@@ -41,4 +41,4 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md.
-- CI: branch protection on main requires build (Linux), brain (Linux) and e2e (Windows); docs-only PRs skip both.
+- CI: branch protection on main requires build (Linux), brain (Linux) and e2e (Windows); docs-only PRs skip all three.

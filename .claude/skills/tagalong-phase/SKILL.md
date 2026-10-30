@@ -40,7 +40,7 @@ cd brain && uv run pytest && uv run ruff check && uv run ruff format --check
 
 The Electron e2e suites (`pnpm --filter @tagalong/desktop test:e2e`) run on request or when the
 slice touches the desktop. CI requires build (Linux), e2e (Windows) and brain; docs-only PRs skip
-the first two.
+all three.
 
 Keep the PR to 500-1,000 changed lines, lockfiles and generated files excluded. Go bigger only
 when it cannot be split, and say why under "Why" in the PR.

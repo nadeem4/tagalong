@@ -180,10 +180,10 @@ when Scout calls one of their tools in a turn you started.
   and nothing changes. A change still waiting when Tagalong closes is never run later. A change too
   long to show in full (over 4,000 characters) is not offered at all. A change that cannot be undone
   (the app says so, or its name says send, delete, merge and the like) is labelled "Can’t be undone".
-- **Approvals.** Each change waiting for you, and each hand-off card, is saved as an ask in
+- **Approvals.** Each change waiting for you, and each hand-off ask (the card where you pick a mode), is saved as an ask in
   `tagalong.db` on this computer, listed in Home › **Approvals**, where you can answer it too. An
   ask keeps Scout's summary of what will happen (the app, the tool and what Scout filled in, with
-  keys and passwords hidden) and, for a hand-off card, the brief. Tagalong never puts a window
+  keys and passwords hidden). Tagalong never puts a window
   title, your selection or window text into an ask by itself, though the summary keeps what Scout
   wrote, which can quote the screen when you asked for that (a bug report, say).
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
@@ -523,8 +523,8 @@ expert** and **Cancel**.
   way out, like everything sent to a brain.
 - **Only a button sends it.** With Always listening on, saying "Scout, explain it" while the card
   is open is an ordinary question and does not carry the dropped item.
-- **Hand it to an expert** goes through Scout, which writes the brief. The usual hand-off card
-  appears, and nothing reaches the expert until you press **Send**.
+- **Hand it to an expert** goes through Scout, which writes the brief. The hand-off ask card
+  appears, and nothing reaches the expert until you pick a mode there.
 - **Stored like a selection.** The conversation keeps the dropped item's name, path and text like
   a selection. A dropped image is kept as the marker `[screenshot]`, and a brain that cannot see
   images never gets it (Scout says so).
