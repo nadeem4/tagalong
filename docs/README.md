@@ -26,7 +26,7 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, models and downloads, the voice process           |
 | [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                    |
 
-### The engine
+### Perception, memory and apps
 
 | Doc                                    | Covers                                                                                                          |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -36,10 +36,10 @@ source of truth; each doc cites the files it describes. How to build and run fro
 
 ### Foundations
 
-| Doc                                                | Covers                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, changing settings by talking, the secret store, secrets on the way out |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                                   |
+| Doc                                                | Covers                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, the secret store, secrets on the way out |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                     |
 
 ### Working on the code
 
@@ -56,7 +56,7 @@ For an engineer new to the repo:
 
 1. [architecture.md](architecture.md): the processes, the packages and one turn end to end.
 2. [development.md](development.md): get it running locally.
-3. [protocol.md](protocol.md): the contract every host and the engine share.
+3. [protocol.md](protocol.md): the contract every host and the brain share.
 4. [memory.md](memory.md): what happens inside a turn and what is kept.
 5. [sight.md](sight.md) and [privacy.md](privacy.md): what is read from the screen and the rules
    around it.

@@ -236,7 +236,7 @@ Only the mind speaks in Scout's voice. What the body knows (it cannot think, the
 busy, the speech models are downloading, listening is paused) shows as a neutral status mark.
 
 - **The wording table** is `packages/protocol/src/status.ts`. `StatusId`, in the order that picks
-  the top mark: `brain-signed-out`, `brain-no-sign-in`, `brain-no-key`, `ears-failed`, `mic-busy`,
+  the top mark: `brain-offline`, `brain-outdated`, `ears-failed`, `mic-busy`,
   `mic-failed`, `ears-loading`, `listening-paused`, `say-name`, `listening-on`. `StatusMark { id,
 percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail` (the tooltip,
   the aria label and the bubble row) and an optional `fix` (a `FixTarget`: `brain`, `voice`,
@@ -254,13 +254,13 @@ percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail
   optional time limit per mark, and a callback that broadcasts the top mark on
   `IPC.statusMarkEvent`. Windows read `getStatusMark()` on mount. Who sets what:
 
-| Mark                                                   | Set by                                                                                                                                         | Cleared by                                                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `brain-signed-out`, `brain-no-sign-in`, `brain-no-key` | nothing now (the launch check is gone); still cleared as shown                                                                                 | a `turn.completed` with text, or a sign-in check that finds Claude signed in (`clearBrainMarks`) |
-| `listening-on`                                         | `markListening`: at launch when Always listening is on, and each time it is switched on, for 8 s (`LISTENING_MARK_MS`)                         | the time, or switching it off                                                                    |
-| `listening-paused`                                     | `markListening`: on but paused (a call, full screen)                                                                                           | resuming or switching off                                                                        |
-| `ears-loading` (with `percent`), `ears-failed`         | `forwardEars` from the voice process's `ears.status` and `ears.progress`; a voice process that exits after the ears were used is `ears-failed` | the next `ready`                                                                                 |
-| `mic-busy`, `mic-failed`, `say-name`                   | the panel only, through `IPC.setStatusMark(id, on)`; `say-name` for 8 s (`SAY_NAME_MARK_MS`)                                                   | the panel; `setPanelMark` refuses every other id                                                 |
+| Mark                                           | Set by                                                                                                                                         | Cleared by                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `brain-offline`, `brain-outdated`              | `markBrainLink`: from the brain link status (offline, or an outdated brain)                                                                    | the link coming back to online                   |
+| `listening-on`                                 | `markListening`: at launch when Always listening is on, and each time it is switched on, for 8 s (`LISTENING_MARK_MS`)                         | the time, or switching it off                    |
+| `listening-paused`                             | `markListening`: on but paused (a call, full screen)                                                                                           | resuming or switching off                        |
+| `ears-loading` (with `percent`), `ears-failed` | `forwardEars` from the voice process's `ears.status` and `ears.progress`; a voice process that exits after the ears were used is `ears-failed` | the next `ready`                                 |
+| `mic-busy`, `mic-failed`, `say-name`           | the panel only, through `IPC.setStatusMark(id, on)`; `say-name` for 8 s (`SAY_NAME_MARK_MS`)                                                   | the panel; `setPanelMark` refuses every other id |
 
 A turn that ends with nothing said is not a status mark; it shows `stopStatus`'s line.
 
@@ -337,14 +337,14 @@ home.tsx`) gives it `window.tagalong` as the bridge, a `HomeHost`, Bean's idle c
 (drawn still in the nav tile) and the settings form as the `settings`
 slot.
 
-`HomeHost`: `setup()` (`providers` with `needsKey`) and an optional `status()` (the overview's line:
-"Ready" only when Scout can think and see, from `overviewStatus(scoutBrain(...), paused)`).
+`HomeHost`: an optional `status()` (the overview's line: "Ready", or "Ready, sight paused"
+when sight is paused).
 
 The nav lists six pages (`HomePage`), the companion's name filling in where it appears:
 
 | Page (`HomePage`)               | Component                  | Reads and writes                                                                                                    |
 | ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Overview (`overview`)           | `Overview`                 | `host.status()`, `host.setup()` for the "Thinks with" line; `WhereThingsRun`; the Spend card (`usageSummary`)       |
+| Overview (`overview`)           | `Overview`                 | `host.status()`; `WhereThingsRun`; the Spend card (`usageSummary`)                                                  |
 | Jobs (`jobs`)                   | `JobsPanel`                | `listJobs`, `stopJob`, and the hand-off questions; re-reads on `onBrainChanged('jobs')`                             |
 | Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`                 |
 | Approvals (`approvals`)         | `ApprovalsView`            | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')` |
@@ -406,7 +406,7 @@ status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
 
 None. The bubble's conversation, cards and chips live in component state for as long as the panel
 window exists (main hides it rather than closing it). Everything durable is behind the bridge in
-the engine.
+the brain.
 
 ## Failure handling
 

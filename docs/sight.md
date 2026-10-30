@@ -419,7 +419,6 @@ not block a drop.
 | `COUNT_PASS_TIMEOUT_MS`      | 5,000           | `platform/text-layer.ts`             |
 | `MAX_OUTPUT_BYTES`           | 1,000,000       | `platform/window-helper.ts`          |
 | `MAX_WINDOWS`                | 64              | `platform/window-list.ts`            |
-| `MAX_TITLE_CHARS`            | 28              | `platform/inventory.ts`              |
 | `THIN_TEXT_CHARS`            | 500             | `platform/text-layer-notes.ts`       |
 | `COPY_SETTLE_MS`             | 150             | `platform/selection.ts`              |
 | `MAX_SELECTION_CHARS`        | 20,000          | `packages/protocol/src/limits.ts`    |

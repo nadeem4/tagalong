@@ -231,10 +231,9 @@ it.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - A pasted key is saved to the OS keychain
   before its one test (one tiny request to that service); a key that fails the test stays there
-  until you replace it or remove it in Settings. It is never spoken, shown or logged. Checking your
-  Claude sign-in only reads the local sign-in and sends nothing.
+  until you replace it or remove it in Settings. It is never spoken, shown or logged.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
-  computer and the engine: whether you are signed in to Claude Code, whether a key is stored (never
+  computer and the brain: whether a key is stored (never
   the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
   the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the
   card never shows a key, token or secret.
@@ -959,8 +958,7 @@ wrong. It never leaves your computer on its own.
 - **Where.** `%APPDATA%\Tagalong\logs\tagalong.log`. The health card ("Scout, what's wrong?") has
   **Open logs folder**, which only opens the folder: you choose what to send, and no log text is
   copied anywhere.
-- **What is written.** Only the desktop app's warnings and errors: main's (the engine's included,
-  since it runs in the same process), the windows' (marked `[renderer]`) and the voice process's
+- **What is written.** Only the desktop app's warnings and errors: main's, the windows' (marked `[renderer]`) and the voice process's
   (marked `[voice process]`). Each is a time, `WARN` or `ERROR`, the app's own fixed text and, for
   an error, its name and message, for example
   `2026-10-16T21:40:00.000Z WARN [main] could not save Always listening Error: EPERM`. When Always

@@ -1462,7 +1462,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
    opens what the page held then.
 5. **Action:** paste more than 6,000 characters into you.md and **Save**. **Expected:** "Saved the
    first 6000 characters: the page holds no more."
-6. **Action:** quit the engine (or unplug it in a dev build) and press **Save**. **Expected:** "Not
+6. **Action:** stop the brain (or make the settings file read-only) and press **Save**. **Expected:** "Not
    saved: …" beside Save, never a silent failure.
 
 ### SL.2. Scout writes a note in a conversation _(real brain)_

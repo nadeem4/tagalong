@@ -10,8 +10,7 @@ There are three ways in:
 
 1. [Download and run it](#download-and-run-it): install the Windows app and use it.
 2. [Run it from source](#run-it-from-source): clone the repo and start the desktop app.
-3. [Use the engine in your own app](#use-the-engine-in-your-own-app): boot the engine and talk to
-   it over its local protocol.
+3. [Build your own body](#build-your-own-body): talk to the Python brain over its local protocol.
 
 The [user guide](#using-tagalong) follows. Plan, task board and decisions live in
 [Notion](https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc).
@@ -275,8 +274,6 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
   and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
-  - **How Scout thinks**: whether Scout's brain can think, and whether your Claude Code sign-in
-    works (checked locally with `claude auth status`). The brain reads its own key from its `.env`.
   - **Privacy**: screen memory (on or off, and how many minutes it keeps) and what Scout never
     looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
@@ -415,7 +412,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 - [Engineering docs](docs/README.md): the index of every subsystem doc, with a reading order.
 - [Developer guide](docs/development.md): build, run, test and package from source.
-- [Architecture](docs/architecture.md): how the engine and its hosts fit together.
+- [Architecture](docs/architecture.md): how the brain and its bodies fit together.
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
 - [Product](PRODUCT.md) and [design system](DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.
