@@ -18,6 +18,7 @@ from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.experts import ExpertRun, PermissionRequest, Question
 from brain.guards import AskCtx, Guards, Hook
+from brain.masking import mask_json
 from brain.memory import Job, Memory
 from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
@@ -304,13 +305,14 @@ class Jobs:
         return content
 
     async def _progress(self, job_id: str, text: str) -> None:
-        self._memory.update_job(job_id, progress=text)
+        self._memory.update_job(job_id, progress=mask_json(self._guards, "job_progress", text))
         now = self._clock()
         if now - self._progress_sent.get(job_id, -PROGRESS_NOTIFY_S) >= PROGRESS_NOTIFY_S:
             self._progress_sent[job_id] = now
             self._changed()
 
     async def _end(self, job_id: str, state: str, reason: str, result: str | None) -> None:
+        result = mask_json(self._guards, "job_result", result)
         self._memory.update_job(job_id, state=state, reason=reason, result=result, ended_at=_now())
         self._runs.pop(job_id, None)
         self._progress_sent.pop(job_id, None)

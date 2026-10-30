@@ -1,9 +1,10 @@
 """Connected apps (MCP servers): the row type, helpers, validation, and the Apps manager.
 
 The store lives in memory.py (which imports this module, so Memory is type-only here). Secrets
-never enter a row: `${VAR}` refs stay verbatim and are expanded only at connect time, and tokens
-go to their own file. Apps keeps one long-lived task per app so each SDK transport opens and
-closes in the same task (anyio cancel scopes break when they are closed from another one).
+never enter a row: `${VAR}` refs stay verbatim and are expanded only at connect time, and tokens,
+literal env values and secret url parts go to their own file. Apps keeps one long-lived task per
+app so each SDK transport opens and closes in the same task (anyio cancel scopes break when they
+are closed from another one).
 """
 
 import asyncio
@@ -17,7 +18,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunsplit
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -52,6 +53,11 @@ AUTHS = ("none", "token", "oauth")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 OpenUrl = Callable[[str], Awaitable[None]]  # opens the sign-in page; the body decides how
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+SECRET_PARAMS = frozenset(
+    {"token", "access_token", "api_key", "apikey", "key", "secret", "password", "auth", "sig"}
+    | {"signature"}
+)
+_USERINFO = "__userinfo"  # where a url's user:pass rides inside the stored query string
 
 
 class AppError(Exception):
@@ -150,6 +156,51 @@ def validate_app(params: dict[str, Any], taken: set[str] | frozenset[str] = froz
     return AppRow(slug_for(name, taken), name, transport, checked, auth, True)
 
 
+def split_secrets(
+    app_id: str, config: dict[str, Any], transport: str
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Pull literal secrets out of a checked config; returns the clean config and token-file
+    entries. Idempotent: a config that is already clean comes back unchanged with no entries."""
+    secrets: dict[str, str] = {}
+    clean = dict(config)
+    if transport == "stdio":
+        env = config.get("env", {})
+        keep = {k: v for k, v in env.items() if _ENV_REF.search(v)}
+        moved = [k for k in env if k not in keep]
+        for name in moved:
+            secrets[f"{app_id}:env:{name}"] = env[name]
+        if moved:
+            clean["env"] = keep
+            clean["secret_env"] = [*config.get("secret_env", []), *moved]
+    else:
+        parts = urlsplit(config["url"])
+        userinfo, at, host = parts.netloc.rpartition("@")
+        pairs = parts.query.split("&") if parts.query else []
+        taken = [p for p in pairs if unquote(p.partition("=")[0]).lower() in SECRET_PARAMS]
+        if at:
+            taken.append(f"{_USERINFO}={quote(userinfo, safe='')}")
+        if taken:
+            secrets[f"{app_id}:url_query"] = "&".join(taken)
+            rest = "&".join(p for p in pairs if p not in taken)
+            clean["url"] = urlunsplit((parts.scheme, host, parts.path, rest, parts.fragment))
+            clean["url_secret"] = True
+    return clean, secrets
+
+
+def merge_url_secret(url: str, secret: str) -> str:
+    """Put a stored query string (and userinfo) back onto a url, for connecting only."""
+    parts = urlsplit(url)
+    netloc = parts.netloc
+    pairs = []
+    for pair in secret.split("&"):
+        if pair.startswith(f"{_USERINFO}="):
+            netloc = f"{unquote(pair.partition('=')[2])}@{netloc}"
+        else:
+            pairs.append(pair)
+    query = "&".join(q for q in (parts.query, *pairs) if q)
+    return urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
+
+
 class TokenFile:
     """App tokens live in `data_dir/app-tokens.json`, never in the apps table or an error line.
 
@@ -187,6 +238,16 @@ class TokenFile:
         data = self._read()
         if data.pop(app_id, None) is not None:
             self._write(data)
+
+    def items(self) -> dict[str, str]:
+        return {k: v for k, v in self._read().items() if isinstance(v, str)}
+
+    def clear_app(self, app_id: str) -> None:
+        """Drop the bearer token and every `<id>:...` secret of one app."""
+        data = self._read()
+        kept = {k: v for k, v in data.items() if k != app_id and not k.startswith(f"{app_id}:")}
+        if len(kept) != len(data):
+            self._write(kept)
 
 
 @dataclass(frozen=True)
@@ -252,8 +313,28 @@ class Apps:
 
     async def start(self) -> None:
         """Begin connecting every enabled app in the background and return at once."""
+        self.migrate_secrets()
         for row in self._memory.list_apps():
             self._launch(row)
+
+    def migrate_secrets(self) -> int:
+        """Move literal secrets of stored rows into the token file; returns how many rows moved."""
+        if self._tokens is None:
+            return 0
+        count = 0
+        for row in self._memory.list_apps():
+            try:
+                clean, secrets = split_secrets(row.id, row.config, row.transport)
+                if not secrets:
+                    continue
+                for key, value in secrets.items():  # file first: a crash between keeps the secret
+                    self._tokens.set(key, value)
+                self._memory.update_app_config(row.id, clean)
+            except Exception as e:  # boot goes on; name only the app, never the config
+                log.error("could not move the secrets of app %s (%s)", row.id, type(e).__name__)
+                continue
+            count += 1
+        return count
 
     async def restart(self, app_id: str) -> None:
         await self._relaunch(app_id)
@@ -288,6 +369,19 @@ class Apps:
             if open_url:  # a fresh sign-in starts clean: the old client id has the old port
                 self._forget_oauth(app_id)
             self._launch(row, open_url)
+
+    def secret_values(self) -> list[str]:
+        """Every stored app secret, for masking; url_query params also count one by one."""
+        out: list[str] = []
+        if self._tokens is not None:
+            for key, value in self._tokens.items().items():
+                out.append(value)
+                if key.endswith(":url_query"):
+                    out.extend(v for _, v in parse_qsl(value, keep_blank_values=True))
+        if self._data_dir is not None:
+            for f in sorted((Path(self._data_dir) / "app-oauth").glob("*.json")):
+                out.extend(FileTokenStorage(self._data_dir, f.stem).token_strings())
+        return out
 
     def _forget_oauth(self, app_id: str) -> None:
         if self._data_dir is not None:
@@ -453,6 +547,8 @@ class Apps:
             if exe is None:
                 raise AppError(f"cannot find the command {command}")
             env = {k: expand_env(v, self._env) for k, v in row.config.get("env", {}).items()}
+            for name in row.config.get("secret_env", []):
+                env[name] = self._secret(row, f"{row.id}:env:{name}")
             params = StdioServerParameters(command=exe, args=row.config.get("args", []), env=env)
             errlog = stack.enter_context(open(os.devnull, "w"))  # noqa: SIM115
             read, write = await stack.enter_async_context(stdio_client(params, errlog=errlog))
@@ -467,8 +563,11 @@ class Apps:
             client = await stack.enter_async_context(
                 create_mcp_http_client(headers=headers, auth=auth)
             )
+            url = row.config["url"]
+            if row.config.get("url_secret"):
+                url = merge_url_secret(url, self._secret(row, f"{row.id}:url_query"))
             read, write = await stack.enter_async_context(
-                streamable_http_client(row.config["url"], http_client=client)
+                streamable_http_client(url, http_client=client)
             )
 
         async def on_message(message: object) -> None:
@@ -480,6 +579,12 @@ class Apps:
         return await stack.enter_async_context(
             ClientSession(read, write, message_handler=on_message)
         )
+
+    def _secret(self, row: AppRow, key: str) -> str:
+        value = self._tokens.get(key) if self._tokens else None
+        if value is None:
+            raise AppError(f"{row.name} needs its secret added again.")
+        return value
 
     async def _oauth(self, stack: AsyncExitStack, slot: _Slot) -> Any:
         """The SDK's auth for this app. Without a user-asked sign-in it never opens a browser."""

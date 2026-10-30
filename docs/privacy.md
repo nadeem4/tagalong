@@ -275,9 +275,33 @@ when Scout calls one of their tools in a turn you started.
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
   written in it, and the app cannot end that fence early. An app's error message is fenced the
   same way. It goes to Scout's brain provider like any window text, and is not stored.
-- **Tokens and keys.** Sign-in tokens, a pasted key and a local tool's secret values are kept in
-  the OS keychain through Electron safe storage (`connection.<id>.*`), never in settings, the
-  database, the repository or logs. **Disconnect** deletes them.
+- **Tokens and keys.** The Python brain keeps sign-in tokens, a pasted key, a local tool's secret
+  env values and secret url parts in its own files, `app-tokens.json` and `app-oauth/`, never in
+  the apps table, the repository or logs; see [connected apps](connected-apps.md) and the next
+  section. **Disconnect** deletes them. (Legacy, the old TypeScript core: the same secrets sat in
+  the OS keychain through Electron safe storage, `connection.<id>.*`.)
+
+### What is masked on disk, what is not
+
+The Python brain replaces secrets with `[secret]` before text is saved:
+
+- **Masked:** the saved chat (including a tool's input and a tool's result text), an approval's
+  summary and input, a job's result and progress, and log lines (message, traceback and stack).
+  In the saved chat, roles, block types and ids are never touched, so it always rebuilds into valid
+  history. A thinking block that holds a secret is dropped from the saved copy (its signature
+  cannot be rewritten); the live turn keeps it.
+- **What is matched:** the exact stored secret values of 8 or more characters (app tokens, env
+  secrets, url query values, OAuth access and refresh tokens, `ANTHROPIC_API_KEY`), and common key
+  shapes: `sk-ant-`, `Bearer <token>`, `ghp_`-style GitHub tokens, `xox*-` Slack tokens, `AKIA`
+  keys, and `?token=`-style url params (Bearer and url param names match in any letter case).
+  Every literal env value of 8 or more characters from an app's env config is treated as a secret,
+  so an ordinary word or path in it reads `[secret]` wherever it shows up in saved text.
+- **If masking fails,** the text is stored as `[withheld]`, never raw. The list of secret values
+  is reused for up to 1 second.
+- **Not masked:** Scout's live turn (the model sees and uses the real value), the side-check
+  prompt, the tool's own input (an app gets the real arguments), a job's task text,
+  the sentence of an approval preference, and any secret shorter than 8 characters that has no
+  recognisable shape.
 - **Sign-in** opens the app's own page in your system browser, which sends you back to a one-time
   address on `127.0.0.1`. Tagalong never sees your password. Only a reply carrying this sign-in's
   own random state is accepted.

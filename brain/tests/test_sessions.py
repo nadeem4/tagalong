@@ -5,6 +5,7 @@ A fake model stands in for the API; an Event step makes it wait so tests can act
 
 import asyncio
 import datetime
+import json
 import re
 from types import SimpleNamespace
 
@@ -13,6 +14,7 @@ import pytest
 from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField
+from brain.masking import Masker
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
@@ -56,12 +58,21 @@ class Open:
 NO_WAIT = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}
 
 
-def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None):
+def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     sent = []
     bodies = bodies or Bodies()
     bodies.notify = lambda m, p: sent.append((m, p))
     now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0))
-    session = Session(model, Open(), bodies, 10, memory or Memory(":memory:"), now=now, kinds=kinds)
+    session = Session(
+        model,
+        Open(),
+        bodies,
+        10,
+        memory or Memory(":memory:"),
+        now=now,
+        kinds=kinds,
+        masker=masker,
+    )
     return session, sent
 
 
@@ -339,6 +350,196 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
     assert rows == session.history
     assert rows[-1]["content"][0]["type"] == "tool_result"
     assert rows[-1]["content"][0]["content"] == "cancelled"
+
+
+SECRET = "fake-bearer-token-0123456789"
+
+
+def secret_masker():
+    return Masker(lambda: [SECRET])
+
+
+def secret_tool_call():
+    block = {"type": "tool_use", "id": "t1", "name": "recall", "input": {"query": SECRET}}
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+def with_secret_tool(session, received):
+    async def handler(args):
+        received.append(args["query"])
+        return f"found {SECRET}"
+
+    spec = ToolSpec("recall", "echoes", {"type": "object"}, effect="read")
+    session.toolbox.sources[:] = [BrainSource([(spec, handler)])]
+
+
+async def test_saved_chat_has_secret_masked_but_history_keeps_it(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    session.say("desktop", say(f"my key is {SECRET}"))
+    await finish_quietly(session)
+    saved = json.dumps(memory.load_messages())
+    assert SECRET not in saved and "[secret]" in saved
+    assert SECRET in json.dumps(session.history)
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "sk-ant-" + "a1B2" * 6,
+        "Bearer " + "A1b2C3d4E5f6G7h8i9",
+        "https://x.example/y?token=abc12345xyz",
+    ],
+)
+async def test_saved_chat_masks_key_shapes(tmp_path, shape):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory, masker=Masker(lambda: []))
+    session.say("desktop", say(f"here: {shape} end"))
+    await finish_quietly(session)
+    saved = json.dumps(memory.load_messages())
+    assert "[secret]" in saved
+    assert shape.split()[-1].split("=")[-1] not in saved
+
+
+def thinking_turn(thought):
+    blocks = [
+        {"type": "thinking", "thinking": thought, "signature": "sig-abc"},
+        {"type": "redacted_thinking", "data": "opaque"},
+        {"type": "text", "text": f"I will use {SECRET}"},
+    ]
+    return Final(blocks, "end_turn", SimpleNamespace())
+
+
+async def test_thinking_block_with_a_secret_is_dropped_from_the_saved_copy(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn(f"the key is {SECRET}")]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    types = [b["type"] for b in saved[-1]["content"]]
+    assert types == ["redacted_thinking", "text"]
+    assert saved[-1]["content"][1]["text"] == "I will use [secret]"
+    assert SECRET not in json.dumps(saved)
+    assert saved[-1]["content"][0] == {"type": "redacted_thinking", "data": "opaque"}
+    assert [b["type"] for b in session.history[-1]["content"]][0] == "thinking"
+    assert SECRET in json.dumps(session.history)
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert resumed.history[-1]["role"] == "assistant"
+
+
+async def test_clean_thinking_block_is_saved_unchanged(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn("plain thought")]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    first = memory.load_messages()[-1]["content"][0]
+    assert first == {"type": "thinking", "thinking": "plain thought", "signature": "sig-abc"}
+
+
+async def test_nested_structural_names_in_tool_input_are_masked(tmp_path):
+    other = "second-fake-secret-9876"
+    block = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "recall",
+        "input": {"name": SECRET, "id": other},
+    }
+    memory = file_memory(tmp_path)
+    session, _ = make(
+        Gate([Final([block], "tool_use", SimpleNamespace()), "ok"]),
+        memory,
+        masker=Masker(lambda: [SECRET, other]),
+    )
+    with_secret_tool(session, [])
+    session.say("desktop", say("go"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[1]["content"][0]["input"] == {"name": "[secret]", "id": "[secret]"}
+    assert saved[1]["content"][0]["id"] == "t1"
+
+
+async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
+    turn = Final(
+        [{"type": "thinking", "thinking": f"key {SECRET}", "signature": "s"}],
+        "end_turn",
+        SimpleNamespace(),
+    )
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([turn]), memory, masker=secret_masker())
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[-1]["content"] == [{"type": "text", "text": "[withheld]"}]
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert resumed.history[-1]["content"]
+
+
+async def test_saved_chat_stays_valid_after_a_masker_failure(tmp_path):
+    def broken():
+        raise RuntimeError("no values")
+
+    memory = file_memory(tmp_path)
+    call = secret_tool_call()
+    call.content.append({"type": "redacted_thinking", "data": "opaque-data"})
+    session, _ = make(Gate([call, "ok"]), memory, masker=Masker(broken))
+    with_secret_tool(session, [])
+    session.say("desktop", say("look it up"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert {"type": "redacted_thinking", "data": "opaque-data"} in saved[1]["content"]
+    assert [m["role"] for m in saved] == ["user", "assistant", "user", "assistant"]
+    use = saved[1]["content"][0]
+    assert (use["type"], use["id"], use["name"]) == ("tool_use", "t1", "recall")
+    result = saved[2]["content"][0]
+    assert (result["type"], result["tool_use_id"]) == ("tool_result", "t1")
+    assert result["content"] == "[withheld]"
+    resumed, _ = make(Gate(["ok"]), memory, masker=Masker(broken))
+    assert resumed.history[1]["content"][0]["id"] == "t1"
+
+
+async def test_saved_chat_masks_tool_use_input_and_tool_result_text(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([secret_tool_call(), "ok"]), memory, masker=secret_masker())
+    with_secret_tool(session, [])
+    session.say("desktop", say("look it up"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert SECRET not in json.dumps(saved)
+    assert saved[1]["content"][0]["input"] == {"query": "[secret]"}
+    assert saved[2]["content"][0]["content"] == "found [secret]"
+
+
+async def test_the_tool_still_receives_the_real_value(tmp_path):
+    memory = file_memory(tmp_path)
+    received: list[str] = []
+    session, _ = make(Gate([secret_tool_call(), "ok"]), memory, masker=secret_masker())
+    with_secret_tool(session, received)
+    session.say("desktop", say("look it up"))
+    await finish_quietly(session)
+    assert received == [SECRET]
+    assert SECRET not in json.dumps(memory.load_messages())
+
+
+async def test_resumed_history_shows_secret_placeholder(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    session.say("desktop", say(f"my key is {SECRET}"))
+    await finish_quietly(session)
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert SECRET not in json.dumps(resumed.history)
+    assert "my key is [secret]" in json.dumps(resumed.history)
+
+
+async def test_masking_guard_failure_saves_withheld_not_raw(tmp_path):
+    def broken():
+        raise RuntimeError("no values")
+
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory, masker=Masker(broken))
+    session.say("desktop", say(f"my key is {SECRET}"))
+    await finish_quietly(session)
+    saved = json.dumps(memory.load_messages())
+    assert SECRET not in saved and "[withheld]" in saved
 
 
 async def test_late_says_are_saved(tmp_path):

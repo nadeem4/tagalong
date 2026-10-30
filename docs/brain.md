@@ -56,6 +56,7 @@ the total can run a little low.
 | `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
 | `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
 | `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
+| `brain/src/brain/masking.py`        | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                       |
 | `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
 | `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                 |
 | `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
@@ -360,9 +361,9 @@ all six (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 | Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                                            |
 | ----------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "url" (http) or "command" + "args" (stdio), "status", "error", "tools": [{"name", "effect", "locked"}]}]}`                          |
-| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                                                                                      |
+| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`), env literals and secret url parts go to `app-tokens.json`, never the row                                                     |
 | `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                                                                                           |
-| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                                                                                           |
+| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and every secret of it                                                                                                              |
 | `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                                                                                                  |
 | `sign_in_app`     | `{"id"}`                                                                                         | `{"id", "status": "connecting"}` at once; asks an online body's `open_url` to open the sign-in page. Refuses an unknown id, a non-`oauth` app, a switched-off app, or no body with `open_url` |
 
@@ -633,13 +634,27 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 | `tool_call`   | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
 | `ask`         | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
 | `tool_result` | After a tool returns                          | Later slice                                                                                                                                                                         |
-| `save`        | Before text is stored                         | Later slice                                                                                                                                                                         |
+| `save`        | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
 The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
 body is connected. `side_check` lets Scout approve once under a preference (an allow-once, so the
 rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Scout's tools
 (`Toolbox`) and Claude Code's permission asks (`Jobs._permission`) share this one chain, so the
 order lives in one place. A side-check that raises or times out falls through to `person_ask`.
+
+The `save` hook runs through `mask_message` over the new chat messages (`Session._persist`, which
+saves a masked copy while `history` keeps the real values for the live turn), an approval's
+summary and input (`Approvals`) and a job's result (`Jobs._end`) and progress (`Jobs._progress`) through `mask_json`, and, through `SecretLogFilter` on
+every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
+characters and common key shapes with `[secret]`; its list of values is cached for 1 second. A
+guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_message` leaves
+the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
+a message, its content blocks and the blocks inside a tool result's content (a `name` or `id` inside a
+tool's input is still masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
+when masking would change it (a message left empty saves `[withheld]` text); `redacted_thinking`
+blocks are kept. The log filter calls the
+masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
+prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
 `model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
 offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports

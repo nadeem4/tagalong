@@ -477,7 +477,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 ## Providers and keys
 
 Scout runs on one provider and one model. Keys are entered in Welcome or in **Settings → Advanced →
-API keys**, encrypted with the OS keychain, and only ever sent to the provider they belong to.
+API keys** (old TypeScript core: encrypted with the OS keychain; the Python brain reads `ANTHROPIC_API_KEY` from its environment or `.env`), and only ever sent to the provider they belong to.
 
 | Setup                   | Where to get the key                                                                                                       | Model ids                                                                                                                                                                        |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -593,13 +593,16 @@ screenshot is attached.
   says are sent to ElevenLabs, never your screen or your questions.
 - When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
   it and is never stored; only the text goes to Scout's provider, like a typed question.
-- API keys are encrypted with the OS keychain.
+- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs. (The old TypeScript core kept API keys in the OS keychain.)
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
   **Allow once**; every call is logged in Activity (which app and tool, never the content).
-- Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. Their
-  sign-in tokens are kept in the OS keychain and deleted on **Disconnect**.
+- Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
+  Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
+  the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and
+  progress and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
+  The OS keychain applies only to the old TypeScript core.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 

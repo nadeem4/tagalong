@@ -704,3 +704,13 @@ def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
     m = Memory(path)
     assert m.list_approvals("all", 10, None)[0].preference_sentence is None
     m.close()
+
+
+def test_update_app_config_replaces_only_config(mem):
+    from brain.apps import AppRow
+
+    mem.add_app(AppRow("a", "A", "stdio", {"command": "x", "args": [], "env": {}}, "none", False))
+    mem.update_app_config("a", {"command": "y", "args": [], "env": {"K": "${K}"}})
+    [row] = mem.list_apps()
+    assert row.config["command"] == "y" and row.config["env"] == {"K": "${K}"}
+    assert (row.name, row.transport, row.auth, row.enabled) == ("A", "stdio", "none", False)

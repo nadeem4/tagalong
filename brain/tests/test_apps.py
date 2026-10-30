@@ -507,9 +507,11 @@ def test_token_never_reaches_the_apps_table(tmp_path, mem):
 
 class _Recorder(BaseHTTPRequestHandler):
     seen: list[str | None] = []
+    paths: list[str] = []
 
     def do_POST(self):  # noqa: N802
         _Recorder.seen.append(self.headers.get("Authorization"))
+        _Recorder.paths.append(self.path)
         self.send_response(500)
         self.end_headers()
 
@@ -557,3 +559,174 @@ async def test_apps_lists_ids_and_names(make):
     await rig.apps.start()
     assert rig.apps.ids() == ["fake"]
     assert rig.apps.name("fake") == "fake"
+
+
+# ---- G4 Task 1: env and url secrets live in the token file ----
+
+
+def _split(config, transport="stdio", app_id="app"):
+    from brain.apps import split_secrets
+
+    return split_secrets(app_id, config, transport)
+
+
+def test_add_stdio_app_moves_literal_env_values_to_the_token_file():
+    cfg = {"command": "x", "args": [], "env": {"API_KEY": "sk-live-1", "PLAIN": "ok"}}
+    clean, secrets = _split(cfg)
+    assert secrets == {"app:env:API_KEY": "sk-live-1", "app:env:PLAIN": "ok"}
+    assert clean["env"] == {} and clean["secret_env"] == ["API_KEY", "PLAIN"]
+    assert "sk-live-1" not in str(clean)
+
+
+def test_add_stdio_app_keeps_env_references_in_the_row():
+    cfg = {"command": "x", "args": [], "env": {"A": "${A}", "B": "${B:-dflt}", "C": "lit"}}
+    clean, secrets = _split(cfg)
+    assert clean["env"] == {"A": "${A}", "B": "${B:-dflt}"}
+    assert clean["secret_env"] == ["C"] and secrets == {"app:env:C": "lit"}
+
+
+def test_add_http_app_moves_secret_query_params_and_keeps_the_rest():
+    clean, secrets = _split({"url": "https://h.example/mcp?token=abc&v=2&API_KEY=k1"}, "http")
+    assert clean["url"] == "https://h.example/mcp?v=2"
+    assert clean["url_secret"] is True
+    assert secrets == {"app:url_query": "token=abc&API_KEY=k1"}
+
+
+def test_add_http_app_moves_userinfo():
+    clean, secrets = _split({"url": "https://bob:pw%40@h.example/mcp"}, "http")
+    assert clean["url"] == "https://h.example/mcp" and clean["url_secret"] is True
+    assert "bob" not in str(clean) and "pw" not in str(clean)
+    from brain.apps import merge_url_secret
+
+    assert merge_url_secret(clean["url"], secrets["app:url_query"]) == (
+        "https://bob:pw%40@h.example/mcp"
+    )
+
+
+def test_split_leaves_a_clean_http_url_alone():
+    clean, secrets = _split({"url": "https://h.example/mcp?v=2"}, "http")
+    assert clean == {"url": "https://h.example/mcp?v=2"} and secrets == {}
+
+
+async def test_connect_merges_env_secrets_back_in(make, tmp_path):
+    pidfile = tmp_path / "pid.txt"
+    tokens = TokenFile(tmp_path)
+    tokens.set("fake:env:FAKE_PIDFILE", str(pidfile))
+    row = stdio_row()
+    row = AppRow(
+        row.id,
+        row.name,
+        row.transport,
+        {**row.config, "secret_env": ["FAKE_PIDFILE"]},
+        "none",
+        True,
+    )
+    rig = make([row], tokens=tokens)
+    await rig.apps.start()
+    await rig.up("fake")
+    assert pidfile.exists()  # the fake server saw the real value
+
+
+async def test_connect_appends_the_url_query_back(make, recorder, tmp_path):
+    tokens = TokenFile(tmp_path)
+    tokens.set("web:url_query", "token=zzz")
+    row = AppRow("web", "web", "http", {"url": recorder, "url_secret": True}, "none", True)
+    rig = make([row], tokens=tokens)
+    seen = []
+    _Recorder.paths = seen
+    await rig.apps.start()
+    await rig.up("web", "error")
+    assert seen and all(p.endswith("/mcp?token=zzz") for p in seen)
+
+
+def test_remove_app_clears_every_secret_key_for_the_app(tmp_path):
+    t = TokenFile(tmp_path)
+    for k in ("web", "web:env:K", "web:url_query", "web2", "web2:env:K"):
+        t.set(k, "v")
+    t.clear_app("web")
+    assert [k for k in ("web", "web:env:K", "web:url_query", "web2", "web2:env:K") if t.get(k)] == [
+        "web2",
+        "web2:env:K",
+    ]
+
+
+async def test_missing_secret_key_says_add_it_again(make, tmp_path):
+    row = stdio_row()
+    row = AppRow(row.id, "Fake", row.transport, {**row.config, "secret_env": ["K"]}, "none", True)
+    rig = make([row], tokens=TokenFile(tmp_path))
+    await rig.apps.start()
+    await rig.up("fake", "error")
+    assert rig.apps.status("fake").error == "Fake needs its secret added again."
+
+
+def _raw_config(path, app_id):
+    db = sqlite3.connect(path)
+    try:
+        return db.execute("SELECT config FROM apps WHERE id=?", (app_id,)).fetchone()[0]
+    finally:
+        db.close()
+
+
+async def test_migration_rewrites_an_old_row_and_leaves_no_secret_in_the_table(tmp_path):
+    from brain.memory import Memory
+
+    mem = Memory(tmp_path / "m.db")
+    pidfile = tmp_path / "pid.txt"
+    old = stdio_row(env={"FAKE_PIDFILE": str(pidfile), "REF": "${HOME_X:-d}"})
+    mem.add_app(old)
+    mem.add_app(
+        AppRow("web", "web", "http", {"url": "https://h.example/m?api_key=SECRET9"}, "none", False)
+    )
+    tokens = TokenFile(tmp_path)
+    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
+    assert apps.migrate_secrets() == 2
+    mem.close()
+    raw = _raw_config(tmp_path / "m.db", "fake") + _raw_config(tmp_path / "m.db", "web")
+    assert str(pidfile) not in raw and "SECRET9" not in raw
+    mem = Memory(tmp_path / "m.db")
+    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
+    await apps.start()
+    try:
+        await until(lambda: apps.status("fake").state == "connected")
+        assert pidfile.exists()
+    finally:
+        await apps.shutdown()
+        mem.close()
+
+
+def test_migration_is_idempotent(tmp_path):
+    from brain.memory import Memory
+
+    mem = Memory(tmp_path / "m.db")
+    mem.add_app(stdio_row(env={"K": "v1"}))
+    apps = Apps(mem, lambda m, p: None, {}, tokens=TokenFile(tmp_path))
+    assert apps.migrate_secrets() == 1
+    before = mem.list_apps()
+    assert apps.migrate_secrets() == 0
+    assert mem.list_apps() == before
+    mem.close()
+
+
+def test_migration_survives_a_failing_row_and_logs_only_the_app(tmp_path, caplog):
+    from brain.memory import Memory
+
+    mem = Memory(tmp_path / "m.db")
+    mem.add_app(stdio_row(env={"K": "super-secret-value"}))
+    mem.add_app(
+        AppRow("web", "web", "http", {"url": "https://h.example/m?api_key=SECRET9"}, "none", False)
+    )
+    tokens = TokenFile(tmp_path)
+    real_set = tokens.set
+
+    def flaky(key, value):
+        if key.startswith("fake"):
+            raise OSError("disk full")
+        real_set(key, value)
+
+    tokens.set = flaky
+    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
+    with caplog.at_level("ERROR", logger="brain"):
+        assert apps.migrate_secrets() == 1
+    assert "fake" in caplog.text
+    assert "super-secret-value" not in caplog.text and "SECRET9" not in caplog.text
+    mem.close()

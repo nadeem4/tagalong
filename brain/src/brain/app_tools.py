@@ -21,7 +21,16 @@ from mcp.types import (
     Tool,
 )
 
-from brain.apps import AUTHS, TRANSPORTS, AppError, Apps, TokenFile, validate_app
+from brain.apps import (
+    AUTHS,
+    TRANSPORTS,
+    AppError,
+    AppRow,
+    Apps,
+    TokenFile,
+    split_secrets,
+    validate_app,
+)
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
@@ -204,12 +213,16 @@ def app_home_tools(
             raise refuse("an app with token sign-in needs its token.")
         if token is not None and row.auth != "token":
             raise refuse("a token only goes with auth token.")
-        if token is not None:
-            tokens.set(row.id, token)
+        clean, secrets = split_secrets(row.id, row.config, row.transport)
+        row = AppRow(row.id, row.name, row.transport, clean, row.auth, row.enabled)
         try:
+            if token is not None:
+                tokens.set(row.id, token)
+            for key, value in secrets.items():
+                tokens.set(key, value)
             memory.add_app(row)
         except BaseException:
-            tokens.delete(row.id)  # a failed save must not leave a secret behind
+            tokens.clear_app(row.id)  # a failed save must not leave a secret behind
             raise
         await apps.restart(row.id)
         notify("changed", {"what": "apps"})
@@ -228,7 +241,7 @@ def app_home_tools(
     async def remove_app(args: dict) -> str:
         app_id = known(args)
         memory.remove_app(app_id)
-        tokens.delete(app_id)
+        tokens.clear_app(app_id)
         try:
             await apps.restart(app_id)  # row gone: it stops the app and forgets its slot
         except AppError:

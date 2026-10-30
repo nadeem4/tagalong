@@ -9,6 +9,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from brain.guards import Guards
+from brain.masking import mask_json
 from brain.memory import Memory, Preference, _utc_text
 from brain.protocol import ErrorCode, RpcError
 
@@ -25,10 +27,12 @@ class Approvals:
         memory: Memory,
         notify: Callable[[str, dict], None],
         now: Callable[[], datetime],
+        guards: Guards | None = None,
     ) -> None:
         self._memory = memory
         self._notify = notify
         self._now = now
+        self._guards = guards  # None: rows are stored as given
 
     def summarise(self, text: str, tool: str, input: dict) -> str:
         line = text or f"{tool} {json.dumps(input, sort_keys=True, separators=(',', ':'))}"
@@ -48,6 +52,9 @@ class Approvals:
         preference_id: int | None = None,
         preference_sentence: str | None = None,
     ) -> None:
+        if self._guards is not None:  # the table is read by Home and Scout, so it holds no secret
+            summary = mask_json(self._guards, "approval", summary)
+            input = mask_json(self._guards, "approval", input)
         self._memory.add_approval(
             source=source,
             tool=tool,

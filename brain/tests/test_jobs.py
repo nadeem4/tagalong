@@ -15,7 +15,9 @@ import pytest
 from brain.approvals import Approvals
 from brain.asks import Answer
 from brain.experts import ExpertRun, Question, QuestionField
+from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
+from brain.masking import Masker, mask_secrets
 from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
 
@@ -88,6 +90,7 @@ class Rig:
         approvals=False,
         side_check=None,
         expert_timeout=30,
+        guards=None,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
@@ -119,6 +122,7 @@ class Rig:
             scout_questions=scout,
             approvals=self.approvals,
             side_check=side_check,
+            guards=guards,
         )
 
     def make_run(self, **callbacks) -> ExpertRun:
@@ -387,6 +391,40 @@ async def test_end_writes_the_row_and_calls_on_finished(make_rig):
     assert rig.changed() >= 2
     with pytest.raises(JobError, match="not running"):
         await rig.jobs.stop(job_id)
+
+
+async def test_job_result_is_masked_in_the_row_and_reported_note(make_rig):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
+    steps = [{"text": "key is fake-token-12345678"}, {"end": "end_turn"}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    job = rig.memory.get_job(job_id)
+    assert job.result == "key is [secret]"
+    assert "fake-token-12345678" not in (job.progress or "")
+    assert "fake-token-12345678" not in job_note(rig.finished[0])
+
+
+@pytest.mark.parametrize(
+    "shape",
+    [
+        "sk-ant-" + "a1B2" * 6,
+        "Bearer " + "A1b2C3d4E5f6G7h8i9",
+        "https://x.example/y?token=abc12345xyz",
+    ],
+)
+async def test_job_result_masks_key_shapes(make_rig, shape):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: [])))
+    steps = [{"text": f"saw {shape} there"}, {"end": "end_turn"}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    job = rig.memory.get_job(job_id)
+    secret_part = shape.split()[-1].split("=")[-1]
+    assert "[secret]" in job.result
+    assert secret_part not in job.result and secret_part not in (job.progress or "")
 
 
 async def test_a_crashed_run_ends_as_error(make_rig):
