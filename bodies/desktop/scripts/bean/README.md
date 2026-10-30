@@ -26,7 +26,8 @@ cp out/delivery/*.webp out/delivery/manifest.json ../../src/renderer/src/bean/
 
 - One fixed camera for every clip, so Bean never jumps when the mood changes.
 - 12 fps. Loop lengths vary per clip; the app reads them from the manifest.
-- `cheer`, `wince` and the blinks are one-shots (`loop: false`) and end on a frame that holds.
+- The blinks are one-shots (`loop: false`) and end on a frame that holds. The other clips (`idle`,
+  `listening`, `thinking`, `reading`, `working`, `dozing`) loop.
 - Each `<mood>-blink` clip is rendered from frame 0 of that mood's loop: the dock starts a blink
   when the loop comes back round to frame 0, so nothing jumps.
 - A new clip the dock should draw needs its name in `bean-figure.ts` and in `DockPet`'s `BeanFigure`.

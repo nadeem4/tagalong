@@ -295,7 +295,7 @@ Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D
 
 Tokens live in `bodies/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav hard-code several hex values, recorded below as hard-coded. Scout is drawn from one WebP strip per mood (192px frames, 12 fps, in `bodies/desktop/src/renderer/src/bean/`) by `BeanClip`: stepped through with CSS `steps()` on the dock, held on frame 0 of the idle strip everywhere else. No canvas, no live 3D, no pixel sprites.
 
-Scout's state is always a pose plus a word: Bean's clip changes per mood (with a floating sign for some: a thought cloud, glasses, a badge, a gear, a check mark, z's), a small tag says Seeing, Working or Done for the states that last, and the accessible name says it in full. Motion is baked into the frames (a breath, typing, a hop) and becomes a still frame for reduced motion.
+Scout's state is always a pose plus a word: Bean's clip changes per mood (with a floating sign for some: a thought cloud, glasses, a gear, z's, waves), a small tag says Seeing or Working for the states that last, and the accessible name says it in full. Motion is baked into the frames (a breath, typing, a page turn) and becomes a still frame for reduced motion.
 
 **Key Characteristics:**
 

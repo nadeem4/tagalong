@@ -22,11 +22,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'out')
 
 # ---------- Palette (from the preview) ----------
-NAVY, NAVY_DEEP, OFF, GOLD = '#2E3566', '#1C2142', '#F6F7FB', '#F2C14E'
+NAVY, OFF, GOLD = '#2E3566', '#F6F7FB', '#F2C14E'
 EYE, NOSE, PERI = '#2A2738', '#2A1E1A', '#5A64B0'
 PAL = {'fur': '#F39B5E', 'cream': '#FFF3E6', 'tip': '#5A3A2C', 'acc': '#F2A9A0'}
 BOOK = '#5FA8A0'
-SWEAT = '#9CC9F0'
 
 SIZE = 512
 CAM_YAW = math.radians(28)   # camera swung to Scout's right so the tail nub peeks out
@@ -245,20 +244,6 @@ def octa(r):
     return _mesh('octa', v, f, smooth=False)
 
 
-def star(outer, inner, depth):
-    pts = []
-    for i in range(10):
-        a = PI / 2 + i * PI / 5
-        r = inner if i % 2 else outer
-        pts.append((math.cos(a) * r, math.sin(a) * r))
-    v = [(x, y, 0) for x, y in pts] + [(x, y, depth) for x, y in pts] + [(0, 0, 0), (0, 0, depth)]
-    f = [(i, (i + 1) % 10, 20) for i in range(10)]
-    f = [tuple(reversed(t)) for t in f]
-    f += [(10 + i, 10 + (i + 1) % 10, 21)[::1] for i in range(10)]
-    f += [(i, (i + 1) % 10, 10 + (i + 1) % 10, 10 + i) for i in range(10)]
-    return _mesh('star', v, f, smooth=False)
-
-
 # ---------- Scene graph helpers ----------
 COLL = None
 
@@ -334,16 +319,7 @@ def add_eyes(head, x, y, z, r, yaw, eye_mat, white):
         m(e.open, sph(r), eye_mat, s=(.8, 1.1, .42))
         m(e.open, sph(r * .28), white, (r * .26, r * .5, r * .36))
         m(e.open, sph(r * .13), white, (-r * .26, -r * .4, r * .38))
-        e.happy = m(e.g, tor(r * .62, r * .18, PI), eye_mat, (0, -r * .2, r * .28), name='eye happy')
         e.closed = m(e.g, tor(r * .6, r * .16, PI), eye_mat, (0, r * .15, r * .28), r=(0, 0, PI), name='eye closed')
-        # wince: > on the left eye, < on the right
-        e.wince = g(e.g, (0, 0, r * .3), 'eye wince')
-        k = -s
-        stick(e.wince, (-k * r * .5, r * .45, 0), (k * r * .45, 0, 0), r * .17, eye_mat)
-        stick(e.wince, (k * r * .45, 0, 0), (-k * r * .5, -r * .45, 0), r * .17, eye_mat)
-        # tired: a heavy lid line over a half-open eye
-        # outer corner lower than the inner one: sleepy, not cross
-        e.lid = stick(e.g, (-s * r * .7, r * .2, r * .34), (s * r * .75, -r * .08, r * .34), r * .13, eye_mat)
         eyes.append(e)
     return eyes
 
@@ -381,12 +357,11 @@ def build_bean():
     eye_mat = glossy(EYE, 'eye')
     white = glow('#FFFFFF', 'eye light', 1.0)
     F.eyes = add_eyes(head, .28, 1.18, .61, .14, .4, eye_mat, white)
-    # mouth: a small 'w', or open
+    # mouth: a small 'w'
     F.mouth_w = g(head, name='mouth')
     w = .034
     for s in (-1, 1):
         m(F.mouth_w, tor(w, w * .3, PI, 24, 10), NOSE, (s * w, .97, .77), r=(0, 0, PI))
-    F.mouth_open = m(head, sph(w * 1.6), '#7A2E36', (0, .97 - w * .4, .75), (1, .5, .45), name='mouth open')
     # ears
     F.ears = []
     for s in (-1, 1):
@@ -404,11 +379,7 @@ def build_bean():
     F.tail = g(head, (.38, .34, -.58), 'tail')
     for p, r, c in (((0, 0, 0), .18, 'fur'), ((.12, .08, -.08), .17, 'fur'), ((.22, .2, -.1), .13, 'cream')):
         m(F.tail, sph(r), PAL[c], p)
-    # sweat drop for the wince
-    F.sweat = g(head, (.72, 1.55, .3), 'sweat')
-    m(F.sweat, sph(.07), SWEAT, (0, 0, 0), (1, 1, .7))
-    m(F.sweat, cone(.06, .12), SWEAT, (0, .02, 0), (1, 1, .7))
-    F.dims = dict(signY=2.32, headC=(0, 1.1, 0), headTop=2.0, headRx=.8, cloudX=.4, badgeX=-.5, zX=.3, S=1.2)
+    F.dims = dict(signY=2.32, headC=(0, 1.1, 0), headTop=2.0, headRx=.8, cloudX=.4, zX=.3, S=1.2)
     return F
 
 
@@ -463,23 +434,6 @@ def make_laptop(F):
     F.key_grips = [g(lap, (-.1, .06, -.06), 'keyL'), g(lap, (.1, .06, -.06), 'keyR')]
 
 
-def make_walkie(F):
-    holder = g(F.head, (.8, 1.0, .3), 'walkie')
-    holder.scale = (1.45,) * 3
-    w = g(holder)
-    w.rotation_euler = (0, 0, -.14)
-    m(w, cap(.075, .17), NAVY, s=(1, 1, .72))
-    for i in range(3):
-        m(w, cap(.008, .07, 4, 10), '#8A92C4', (0, .04 - i * .035, .052), r=(0, 0, PI / 2))
-    F.walkie_light = glow(GOLD, 'walkie light', 2.0)
-    m(w, sph(.022), F.walkie_light, (.035, .11, .04))
-    m(w, cyl(.012, .012, .2), OFF, (.04, .24, 0))
-    m(w, sph(.026), OFF, (.04, .345, 0))
-    F.walkie = holder
-    F.walkie_tip = g(w, (.04, .35, 0), 'tip')
-    F.walkie_grip = g(w, (0, -.06, -.02), 'grip')
-
-
 # ---------- Signs: what Scout is busy with, floating above ----------
 def make_signs(F):
     d, S = F.dims, F.dims['S']
@@ -528,22 +482,6 @@ def make_signs(F):
     signs['gear'] = o
     F.gear, F.spark = gear, spark
 
-    # Checking with an expert: a badge joined to the walkie by a dotted link
-    o = at((d['badgeX'], d['signY'] + .22, 0), 'sign badge')   # top-left: clear of the app's tag at top right
-    m(o, cyl(.25, .25, .07), NAVY_DEEP, r=(PI / 2, 0, 0))
-    m(o, tor(.25, .036), GOLD)
-    bevel(m(o, star(.12, .052, .02), OFF, (0, -.005, .04)), .012, 2)
-    signs['badge'] = o
-    F.link = g(F.bob, name='sign link')
-    F.link_dots = [m(F.link, sph(.03 * S, 10, 16), GOLD) for _ in range(6)]
-
-    # Done: a gold check
-    o = at((0, d['signY'] + .17, .05), 'sign check')
-    F.check = g(o)
-    stick(F.check, (-.19, .02, 0), (-.06, -.11, 0), .062, GOLD)
-    stick(F.check, (-.06, -.11, 0), (.21, .19, 0), .062, GOLD)
-    signs['check'] = o
-
     # Dozing: three z rising
     o = at((d['zX'], d['headTop'] + .02, .1), 'sign zzz')
     F.zs = []
@@ -559,37 +497,21 @@ def make_signs(F):
         stick(z, (-ww, -ww, 0), (ww, -ww, 0), .028, PERI)
     signs['zzz'] = o
 
-    # Cheer: two little sparks beside the head
-    o = g(F.bob, (0, 0, 0), 'sign sparks')
-    F.sparks = []
-    for x, y, k in ((-.95, 1.75, .9), (.98, 1.95, .7), (.8, 1.45, .45)):
-        sp = g(o, (x, y, .2))
-        sp.scale = (k,) * 3
-        F.sparks.append((sp, k))
-        m(sp, octa(.13), GOLD, s=(.32, 1, .32))
-        m(sp, octa(.13), GOLD, s=(1, .32, .32))
-    signs['sparks'] = o
-    for k in ('cloud', 'gear', 'badge', 'check', 'zzz'):
+    for k in ('cloud', 'gear', 'zzz'):
         signs[k].rotation_euler = (0, CAM_YAW, 0)   # flat signs face the camera
     F.base = {k: tuple(o.location) for k, o in signs.items()}
     F.signs = signs
 
 
 # ---------- States ----------
-# arms: (left, right) target names. eyes: open | happy | closed | wince | tired
+# arms: (left, right) target names. eyes: open | closed
 STATES = {
     'idle':      dict(),
     'listening': dict(pitch=-.06, roll=.1, ear=1, eyeScale=1.1, sign='waves'),
     'thinking':  dict(arms=('rest', 'chin'), pitch=-.12, roll=-.1, ear=-.1, look=(.45, .7), sign='cloud'),
     'reading':   dict(arms=('bookL', 'bookR'), props=('book', 'glasses'), pitch=.26, look=(-.25, -.75)),
     'working':   dict(arms=('keyL', 'keyR'), props=('laptop',), pitch=.2, look=(0, -.45), sign='gear'),
-    'expert':    dict(arms=('rest', 'walkie'), props=('walkie',), pitch=-.08, roll=-.12, look=(.55, .45),
-                      sign='badge', mouth='open'),
-    'done':      dict(arms=('cheer', 'cheer'), pitch=-.08, ear=.5, eyes='happy', sign='check'),
     'dozing':    dict(pitch=.22, roll=.14, ear=-.8, eyes='closed', sign='zzz', y=-.02, sq=.985),
-    'cheer':     dict(arms=('up', 'up'), pitch=-.1, ear=.7, eyes='happy', mouth='open', sign='sparks'),
-    'wince':     dict(arms=('face', 'face'), pitch=.06, roll=.1, ear=-.6, eyes='wince', sweat=True),
-    'tired':     dict(pitch=.16, roll=.12, ear=-.7, eyes='tired', sq=.98),
 }
 
 
@@ -597,24 +519,15 @@ def arm_target(F, arm, name):
     """World position an arm reaches for."""
     def world(obj, p=(0, 0, 0)):
         return obj.matrix_world @ Vector(p)
-    sh = arm.pivot.location
     if name == 'chin':
         return world(F.head, (.3, .9, .72))
     if name == 'belly':
         return world(F.bob, (-arm.s * .04, .56, .8))
-    if name == 'face':
-        return world(F.head, (arm.s * .4, 1.02, .75))
     if name in ('bookL', 'bookR'):
         return world(F.book_grips[0 if name == 'bookL' else 1])
     if name in ('keyL', 'keyR'):
         i = 0 if name == 'keyL' else 1
         return world(F.key_grips[i]) + Vector((0, 0, F.key_lift[i]))
-    if name == 'walkie':
-        return world(F.walkie_grip)
-    if name == 'cheer':
-        return world(F.head, sh + Vector((arm.s * arm.L * .85, -arm.L * .25, arm.L * .45)))
-    if name == 'up':
-        return world(F.head, sh + Vector((arm.s * arm.L * .75, arm.L * .85, arm.L * .25)))
     return world(F.head, arm.rest)
 
 
@@ -627,19 +540,14 @@ def aim_arm(F, arm, w):
     arm.paw.location = (0, -ln, 0)
 
 
-def bezier(p0, p1, p2, u):
-    return p0 * (1 - u) ** 2 + p1 * 2 * u * (1 - u) + p2 * u * u
-
-
 # ---------- Clips: frames at 12 fps; one-shots end on a frame that holds ----------
 FPS = 12
 CLIPS = {
     'idle': (36, True), 'listening': (36, True), 'working': (24, True), 'thinking': (36, True),
-    'expert': (24, True), 'reading': (36, True), 'done': (30, True), 'cheer': (12, False),
-    'wince': (12, False), 'tired': (36, True), 'dozing': (48, True),
+    'reading': (36, True), 'dozing': (48, True),
 }
 BLINKS = ('idle', 'listening')   # 2-frame blink clips the app plays at random
-STILL_PH = {'done': .1, 'cheer': .3, 'wince': 1.0, 'expert': .2, 'reading': .4, 'idle': .5}
+STILL_PH = {'reading': .4, 'idle': .5}
 
 
 def smooth(x):
@@ -658,11 +566,8 @@ def pose(F, name, ph=0.0, blink=0.0):
     show(F.book, 'book' in props)
     show(F.glasses, 'glasses' in props)
     show(F.laptop, 'laptop' in props)
-    show(F.walkie, 'walkie' in props)
     for k, o in F.signs.items():
         show(o, st.get('sign') == k)
-    show(F.link, st.get('sign') == 'badge')
-    show(F.sweat, bool(st.get('sweat')))
 
     # ----- motion for this phase
     breath = (1 - math.cos(TAU * ph)) / 2
@@ -670,9 +575,8 @@ def pose(F, name, ph=0.0, blink=0.0):
     pitch, roll, ear = st.get('pitch', 0), st.get('roll', 0), st.get('ear', 0)
     look = list(st.get('look', (0, 0)))
     twitch, wag = 0.0, .16 * wave()
-    mouth = 1.0 if st.get('mouth') == 'open' else 0.0
     F.key_lift = (0.0, 0.0)
-    if name in ('idle', 'listening', 'thinking', 'reading', 'expert', 'working', 'tired'):
+    if name in ('idle', 'listening', 'thinking', 'reading', 'working'):
         y += .02 * breath
     if name == 'idle' and .25 <= ph < .35:
         twitch = .22 * math.sin(PI * (ph - .25) / .1)
@@ -681,24 +585,8 @@ def pose(F, name, ph=0.0, blink=0.0):
     if name == 'working':
         pitch += .025 * wave(3)
         F.key_lift = (.03 * max(0, wave(4)), .03 * max(0, wave(4, .5)))
-    if name == 'expert':
-        mouth = .25 + .6 * abs(math.sin(TAU * 4 * ph) * math.sin(TAU * 2 * ph + 1)) if wave() > -.3 else 0
     if name == 'reading':
         look[0] = -.6 + 1.2 * (ph / .82) if ph < .82 else .6 - 1.2 * ((ph - .82) / .18)
-    if name in ('done', 'cheer'):
-        t = ph * (2.5 if name == 'done' else 1.0)
-        wag = .32 * wave(5 if name == 'done' else 4)
-        if t < .6:
-            p = t / .6
-            y += (.28 if name == 'done' else .34) * math.sin(PI * p)
-            sq = 1 + .05 * math.sin(PI * p)
-        elif t < .78:
-            sq = 1 - .07 * math.sin(PI * (t - .6) / .18)
-    if name == 'wince':
-        x = .05 * math.sin(TAU * 3 * ph) * (1 - ph)
-        F.sweat.location = (.72, 1.55 - .1 * smooth(ph), .3)
-    if name == 'tired':
-        pitch += .04 * breath
     if name == 'dozing':
         y += .015 * breath
         pitch += .04 * breath
@@ -721,20 +609,12 @@ def pose(F, name, ph=0.0, blink=0.0):
     es = st.get('eyeScale', 1)
     for e in F.eyes:
         e.g.location = e.base + Vector((look[0] * e.range, look[1] * e.range * .8, 0))
-        show(e.open, mode in ('open', 'tired'))
-        show(e.happy, mode == 'happy')
+        show(e.open, mode == 'open')
         show(e.closed, mode == 'closed')
-        show(e.wince, mode == 'wince')
-        show(e.lid, mode == 'tired')
-        sy = blink if blink else (.5 if mode == 'tired' else 1)
-        e.open.scale = (es, es * sy, 1)
-        e.open.location = (0, -e.r * .3 if mode == 'tired' else 0, 0)
-    show(F.mouth_open, mouth > .05)
-    show(F.mouth_w, mouth <= .05)
-    F.mouth_open.scale = (1, .5 * (.4 + .6 * min(mouth, 1)), .45)
+        e.open.scale = (es, es * (blink or 1), 1)
 
     # ----- signs
-    for k in ('cloud', 'gear', 'badge', 'check'):
+    for k in ('cloud', 'gear'):
         bx, by, bz = F.base[k]
         F.signs[k].location = (bx, by + .03 * wave() - (y - st.get('y', 0)), bz)   # signs stay put while the body hops
     for i, a in F.waves:
@@ -745,14 +625,10 @@ def pose(F, name, ph=0.0, blink=0.0):
     F.gear.rotation_euler = (0, 0, .2 - TAU / 8 * ph)
     F.spark.scale = (.65 + .45 * (.5 + .5 * wave(2)),) * 3
     F.spark.rotation_euler = (0, 0, TAU / 4 * ph)
-    F.check.rotation_euler = (0, .25 * wave(), 0)
     for i, z in enumerate(F.zs):
         p = (ph + i / 3) % 1
         z.location = (p * .5, p * .75, 0)
         z.scale = (max(.01, (.6 + .8 * p) * math.sin(PI * p) ** .6),) * 3
-    for j, (sp, k) in enumerate(F.sparks):
-        sp.scale = (k * (.7 + .4 * (.5 + .5 * math.sin(TAU * 2 * ph + j * 2))),) * 3
-    F.walkie_light.node_tree.nodes['Emission'].inputs['Strength'].default_value = 2.0 if wave(4) > 0 else .3
     if name == 'reading' and ph > .7:
         show(F.page, True)
         F.page.rotation_euler = (0, -(.26 + (PI - .52) * smooth((ph - .7) / .3)), 0)
@@ -765,20 +641,6 @@ def pose(F, name, ph=0.0, blink=0.0):
     for arm in F.arms:
         aim_arm(F, arm, arm_target(F, arm, arms[0 if arm.s < 0 else 1]))
 
-    # ----- dotted link from the walkie to the badge, a bright dot travelling up it
-    if st.get('sign') == 'badge':
-        bpy.context.view_layer.update()
-        inv = F.bob.matrix_world.inverted()
-        p0 = inv @ F.walkie_tip.matrix_world.translation
-        S = F.dims['S']
-        p2 = F.signs['badge'].location + Vector((.2 * S, -.16 * S, 0))   # link meets the badge's lower right
-        p1 = p0.lerp(p2, .5) + Vector((.05, .22, 0))
-        n = len(F.link_dots)
-        for i, o in enumerate(F.link_dots):
-            u = (i + 1) / (n + 1)
-            o.location = bezier(p0, p1, p2, u)
-            near = max(0, 1 - abs(u - ph) * 6)
-            o.scale = (1 + .7 * near,) * 3
     bpy.context.view_layer.update()
 
 
@@ -868,7 +730,6 @@ def build():
     make_book(F)
     make_glasses(F)
     make_laptop(F)
-    make_walkie(F)
     make_signs(F)
     # blob shadow on the ground (Blender space)
     pm = _mesh('blob', [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)], [(0, 1, 2, 3)], smooth=False)
