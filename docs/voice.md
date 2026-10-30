@@ -591,7 +591,7 @@ flowchart LR
   sentence is pushed as soon as it is complete. The finished answer is not said again.
 - **A typed question.** Its answer goes whole to `onSay` on `turn.completed` and is said through
   `QueueMouth.say`.
-- **Other lines.** The panel also speaks `watch.fired` reasons (never an empty one) and the lines
+- **Other lines.** The panel also speaks the lines
   described in `bubble.md`.
 - **Status rows.** A turn that ends with a status reason (`stopStatus`) says nothing.
 

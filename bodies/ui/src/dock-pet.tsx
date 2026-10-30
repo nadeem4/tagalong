@@ -1,6 +1,6 @@
 /**
  * Scout on the dock: Bean, the 3D figure, drawn from a pre-rendered clip per mood, with a small
- * tag (Seeing, Working, Done), blinking, the sight-paused, recording and listening marks, and
+ * tag (Seeing, Working), blinking, the sight-paused, recording and listening marks, and
  * the status tag. Contains DockPet, DockMood and BeanFigure. Used by the desktop avatar window.
  */
 
@@ -149,7 +149,7 @@ export function DockPet({
 
   const showBlink = blinking && blinkMood !== undefined;
   // The Paused mark takes the top while sight is off: the two would overlap in 96 px, and the
-  // pose (the gear, the check) and the label still say what Bean is doing.
+  // pose (the gear) and the label still say what Bean is doing.
   const tag = isTagged(mood) && !sightPaused ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
@@ -190,7 +190,7 @@ export function DockPet({
             top: 4,
             right: 0,
             // Small and tucked into the corner, so it stays clear of Bean's floating sign (the
-            // gear, the check) beside it.
+            // gear) beside it.
             padding: '1px 3px',
             borderRadius: 999,
             background: tag.color,

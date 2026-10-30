@@ -73,7 +73,7 @@ jobs:
       - name: Test (with coverage)
         run: pnpm test:coverage
 
-  # The Python brain. Gated like `build`; not a required check yet.
+  # The Python brain. Gated like `build`; a required check.
   brain:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}

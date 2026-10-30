@@ -79,8 +79,8 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
-   `applyHotkeys(settings)`. There is no launch greeting, launch record, keep-an-eye or
-   wellbeing tick.
+   `applyHotkeys(settings)`. The desktop makes no launch greeting of its own; the brain decides
+   whether Scout speaks first.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -143,8 +143,7 @@ running.
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
-- **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye and wellbeing
-  come back as the brain's rows land; the old TypeScript brain's IPC for them is deleted, not stubbed.
+- **Not wired yet.** Pets are a fixed local Scout; they come back when the brain plans them.
 
 `shutdown()` stops the client.
 
