@@ -34,7 +34,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - packages/core: the old brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server); the desktop no longer boots it, and it will be deleted
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
 - bodies/desktop: Electron body (dials the Python brain; no longer boots packages/core)
-- bodies/browser: Chrome extension body
+- bodies/browser: browser body (Chromium)
 - docs/: one doc per subsystem; docs/development.md has the full layout and how-tos
 
 ## Conventions

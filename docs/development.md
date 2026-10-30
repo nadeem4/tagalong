@@ -17,7 +17,7 @@ tagalong/
   docs/
     README.md                       # the index and reading order
     architecture.md, protocol.md    # the whole system; the wire protocol
-    desktop.md, bubble.md, voice.md, browser-extension.md   # the hosts
+    desktop.md, bubble.md, voice.md, browser-body.md   # the hosts
     sight.md, mind.md, memory.md, experts.md, asks.md, routines.md,
     connected-apps.md               # the engine's subsystems
     settings-and-secrets.md, storage.md, privacy.md, development.md
@@ -121,10 +121,11 @@ tagalong/
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
-    browser/                        # Chrome MV3 host, built by Vite into dist/ (load unpacked)
+    browser/                        # browser body (Chromium MV3), built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
-      src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
-      src/sidepanel/, src/options/  # side panel (bodies/ui) and the pairing page
+      src/body.ts, identity.ts      # the body: one BrainClient, tools, body id <browser>-<4 chars>
+      src/tools/, permissions.ts    # the tabs tool and the permission broker
+      src/popup/, src/permission/   # the toolbar popup and the permission window
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
@@ -134,7 +135,7 @@ tagalong/
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
 | `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
 | `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.                          |
-| `bodies/browser`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
+| `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                                                  |
 
 ## How to run
 
@@ -209,7 +210,7 @@ the root `vitest.config.ts`.
 
 The `bodies/ui` and desktop host floors sit just below what they measured when they were added.
 Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and
-the extension are not measured: the Playwright suites cover them.
+the browser body are not measured: the Playwright suites cover them.
 
 Inside `packages/core`:
 
@@ -241,7 +242,7 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   packaged app loads at runtime (the native modules and the voice libraries), which electron-builder
   copies. The full list is under "Bundling the workspace packages" in
   [desktop.md](desktop.md#bundling-the-workspace-packages).
-- **The Chrome extension ships inside.** `bodies/browser/dist` is copied to `resources/extension`, so
+- **The browser body ships inside.** `bodies/browser/dist` is copied to `resources/extension`, so
   someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
   it first.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
@@ -456,9 +457,6 @@ moment of each capture rather than at boot.
 | **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                           |
 | **Window text budget**                | 8,000 characters                   | How much of a window a read returns when Scout does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
 
-In the Chrome side panel, the sight bar shows roughly what the attached pictures cost — `~1,843
-image tokens · 3 images` — at width × height ÷ 750 per image.
-
 The budget is a ceiling, not a target — Scout asks for less when it only needs the top of a
 terminal, and the number it does not ask for is the one set here.
 
@@ -487,56 +485,37 @@ programs on this one. Without the token, any local program could drive Scout, re
 conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
 the length of the shared prefix through timing.
 
-## The Chrome extension in detail
+## The browser body in detail
 
-The extension is a second host for the same engine: same Scout, same memory, same settings. It gives
-Scout the **exact** selection and the readable text of the page you are on, and puts Scout in
-Chrome's side panel.
+The browser body is a second body for the Python brain: it offers Scout a `tabs` tool (list the open
+tabs, read one). It has no chat and no side panel; Scout talks in the desktop bubble. Everything is in
+[browser-body.md](browser-body.md).
 
-**It needs the desktop app running.** The extension holds no engine of its own; it connects to the
-one inside the Tagalong desktop app on `ws://127.0.0.1:47321`. With the app closed, the side panel
-says "Disconnected … Is the Tagalong app running?" and reconnects by itself — within a second or two
-with the panel open, within about thirty seconds without.
+**It needs the brain running.** The body dials the brain on `127.0.0.1:47321` (change it in the
+popup) and retries by itself, so start `cd brain && uv run brain` first.
 
 ### Build and load it
 
 ```bash
 pnpm install
-pnpm --filter @tagalong/browser build    # writes bodies/browser/dist
+pnpm --filter @tagalong/browser build   # writes bodies/browser/dist
 ```
 
-1. Open `chrome://extensions` and switch on **Developer mode** (top right).
-2. Click **Load unpacked** and choose `bodies/browser/dist`.
-3. Pin Tagalong from the puzzle-piece menu so its toolbar button is visible.
+1. In the desktop app, open **Home → Settings → Add Scout to your browser**. It shows the folder to
+   load and has **Show folder** and **Copy chrome://extensions** buttons.
+2. Open `chrome://extensions` (or `edge://extensions`) and switch on **Developer mode**.
+3. Click **Load unpacked** and choose that folder (`bodies/browser/dist` from source,
+   `resources/extension` in the installed app).
+4. Pin Tagalong in the puzzle-piece menu so the toolbar button is visible.
 
-After a rebuild, click the reload arrow on the Tagalong card in `chrome://extensions`.
-
-### Pair it, once
-
-1. In the desktop app, open the Settings window (tray → **Open Tagalong** → **Settings**). In its
-   **Browser extension (optional)** section, click **Copy** beside the pairing token. How pairing
-   works is in [browser-extension.md](browser-extension.md#pairing).
-2. Chrome opens the extension's options page on first use (or right-click the toolbar button →
-   **Options**). Paste the token and click **Save and connect**. Leave the port empty unless you
-   moved the engine off `47321`.
-3. The options page says "Connected to Tagalong …". The token is stored in this browser's local
-   extension storage only, never synced.
+After a rebuild, click the reload arrow on the Tagalong card in `chrome://extensions`. Load it in
+Chrome and Edge at once if you like: each gets its own body id.
 
 ### Use it
 
-| Do this                                     | What happens                                                                                                                |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Click the toolbar button                    | The side panel opens with Scout and attaches the page it opened beside (selection, title, readable text).                   |
-| Select text, press `Alt+Shift+Space`        | The side panel opens with that exact selection and the page title in the sight bar.                                         |
-| Press the desktop hotkey `Ctrl+Shift+Space` | The desktop bubble opens as usual; when Chrome is in front, the engine swaps in the exact selection and adds the page text. |
-| Click **Read this page** / **Clear**        | Re-reads the tab, or sends the next ask with nothing attached.                                                              |
-
-`Ctrl+Shift+Space` stays the desktop app's: it is a global hotkey and Chrome never sees it, so the
-extension's own shortcut is `Alt+Shift+Space`. Rebind it at `chrome://extensions/shortcuts`.
-
-The extension reads a tab only after you use it there (Chrome's `activeTab`). To let it read
-whichever tab is in front when you ask — including from the desktop hotkey — click **Allow reading
-any tab when I ask** on its options page. It still reads nothing until you ask.
+Nothing to pair. Ask Scout about your tabs ("what tabs do I have open?", "read this page"). The
+first time a tool needs something, a small window asks you to allow it. The toolbar popup shows the
+link to the brain, the brain's address, a name for this browser and what you have allowed.
 
 ### Publish it
 
@@ -574,7 +553,7 @@ rather than leaving a key readable on disk.
 ## How to add a host
 
 A host is anything that can show Scout and capture what the user is looking at: the Electron app, the
-Chrome extension, or something new. Adding one never touches the core.
+the browser body, or something new. Adding one never touches the core.
 
 1. Implement the **Perception** contract: answer `perception.capture` for selection, active window,
    clipboard, page text and screenshot, returning a `ContextSnapshotPatch` from
@@ -676,11 +655,8 @@ together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
 Gaps that are real in the code on `main`, each explained in the doc it links to.
 
 - **No Tailwind build.** `@tagalong/ui`'s chat parts (`ChatPanel`, `MessageList`, `Composer`,
-  `SightBar`) use Tailwind utility classes, but neither host ships Tailwind; `app.css` (desktop) and
-  `sidepanel.css` (extension) hand-write the structure instead. See [bubble.md](bubble.md) and
-  [browser-extension.md](browser-extension.md).
-- **No cards in the Chrome side panel.** It draws no hand-off, connector confirm or routine card;
-  only the desktop bubble does. See [browser-extension.md](browser-extension.md).
+  `SightBar`) use Tailwind utility classes, but the desktop does not ship Tailwind; `app.css`
+  hand-writes the structure instead. See [bubble.md](bubble.md).
 - **No Fast Refresh in dev.** The renderer uses Vite's esbuild JSX transform, not
   `@vitejs/plugin-react`. See [desktop.md](desktop.md#bundling-the-workspace-packages).
 - **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app

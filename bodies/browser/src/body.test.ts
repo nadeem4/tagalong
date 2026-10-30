@@ -1,4 +1,8 @@
-/** Tests for the browser body: hello, tools, restart, stop and keepalive. */
+/**
+ * Tests for the browser body: hello, tools, restart, stop and keepalive.
+ * They run the body on fake storage, tabs and sockets, so no real Chrome
+ * or brain is needed and every case is fast and repeatable.
+ */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PermissionBroker } from './permissions';
 import { createBody, type BodyDeps } from './body';
