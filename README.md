@@ -23,7 +23,7 @@ on Windows with Node.js 22 and pnpm 10:
 
 ```powershell
 pnpm install
-pnpm package:win     # writes apps\desktop\release\Tagalong-Setup-<version>-x64.exe
+pnpm package:win     # writes bodies\desktop\release\Tagalong-Setup-<version>-x64.exe
 ```
 
 Then run `Tagalong-Setup-<version>-x64.exe`.
@@ -330,7 +330,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Overview**: whether Scout is ready and what it thinks with, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code).
   **Spend** shows the dollars spent today against the daily limit,
   as the brain reports them. The brain's limit is $5 a day unless `TAGALONG_DAILY_BUDGET_USD` sets
-  another when the brain starts; the **Settings → Daily budget** box does not change it. A single
+  another when the brain starts. A single
   Scout turn is also stopped after 300 seconds unless `TAGALONG_TURN_TIMEOUT_S` sets another;
   Scout then says it took too long. Time spent in tools, or waiting for you to answer, does not count.
 - **Jobs**: the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show

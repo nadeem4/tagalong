@@ -47,7 +47,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 ## Configuration
 
 Every test runs on the Windows desktop app, either installed ([Installer](#installer)) or from
-source with `pnpm dev:desktop` **without** `TAGALONG_FAKE_PROVIDERS`, unless a step says otherwise.
+source (start the brain with `cd brain; uv run brain`, then `pnpm dev:desktop`), unless a step says otherwise.
 Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A saved key or brain is
 used from the next question, with no restart.
 
@@ -58,8 +58,8 @@ in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thin
 Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
 and **Model** to a Claude id (for example `anthropic/claude-sonnet-5`). Save.
 
-**Fake provider (no key).** Steps marked _fake provider_ need no key: launch from source with
-`TAGALONG_FAKE_PROVIDERS=1` (PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Scout streams a
+**Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
+(`bodies/desktop/e2e/fixtures/fake-brain.ts`) and point the desktop at it. Scout streams a
 scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine.
 
 **A fresh profile.** Run `pnpm --filter @tagalong/desktop start:fresh` (a new temp data folder each
@@ -591,7 +591,7 @@ change".
    "Reviewer did not start."; Activity has only Coder's row.
 6. **Action:** repeat, press **Remove step 2**, then **Send**. **Expected:** only Coder runs.
 
-_Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted experts.
+_Fake brain:_ both steps are scripted experts.
 
 ## Settings
 
@@ -1000,7 +1000,7 @@ Run each three times with a real brain (a fast summaries model is fine). Pass: l
 ## Voice: Scout talks
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
-fake brain is fine: `TAGALONG_FAKE_PROVIDERS=1` keeps the answers free. The first line downloads the
+any brain is fine. The first line downloads the
 voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bills your own account.
 
 ### V.1. Scout reads an answer aloud
@@ -1082,7 +1082,7 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.7. Read aloud: the mind decides what is said
 
-1. **Setup:** a real brain (not `TAGALONG_FAKE_PROVIDERS`), Scout talks on. Have a research paper
+1. **Setup:** a real brain, Scout talks on. Have a research paper
    (a PDF or an arXiv page, well over 300 words) and a short paragraph of plain text to hand.
 2. **Action:** (a) select the short paragraph and type "read this to me" in the bubble. (b) Type
    "summarise this". (c) Put the research paper in front and type "read this to me". (d) Ask
@@ -1549,7 +1549,7 @@ connected app (see [Connections](#connections-your-apps-over-mcp)).
 ## Routines
 
 Scout does things on its own, at a time or when something happens. Most of this runs on the fake
-provider (`TAGALONG_FAKE_PROVIDERS=1`); the steps marked _(real brain)_ need Scout on a real provider,
+brain; the steps marked _(real brain)_ need Scout on a real provider,
 and Morning papers needs Claude Code installed and signed in.
 
 ### R1. Home → Routines, from a template
@@ -1797,7 +1797,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 
 ### DC.1. A question, its tools and its answer
 
-1. **Setup:** any brain (the fake one is enough: `TAGALONG_FAKE_PROVIDERS=1`).
+1. **Setup:** any brain (the fake one is enough).
 2. **Action:** ask Scout a question that makes it look at the screen ("what is on my screen?"),
    then open Home → **How Scout decided**.
 3. **Expected:** the newest row reads **Scout answered**, with **You asked**, the model, a token
