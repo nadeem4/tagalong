@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "name": "tab",
+    "data": { "title": "Release notes", "url": "https://example.com/releases" }
+  }
+}
