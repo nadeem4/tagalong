@@ -1,9 +1,8 @@
 /**
  * Scout's bubble beside the dock pet: asks with what Scout can see, streams the answer,
  * and hosts the cards (connector confirm, drop, health).
- * Also the hello after setup (Try it now, under the mind's first line when it says one) and
- * the quiet GreetingLine. Contains
- * CompanionBubble, GreetingLine, BubbleTalk and their props. Used by the desktop panel window.
+ * Also the quiet GreetingLine. Contains CompanionBubble, GreetingLine, BubbleTalk and their
+ * props. Used by the desktop panel window.
  */
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
@@ -58,12 +57,6 @@ export interface CompanionBubbleProps {
   petName: string;
   /** What the hotkey captured. Each part shows as a chip the person can remove. */
   snapshot?: ContextSnapshot;
-  /**
-   * The hello after setup, instead of the question box: Try it now and Got it, under the
-   * first hello's check-in line (a `pet.remark`) when the mind says one.
-   */
-  greeting?: boolean;
-  onDismiss?: () => void;
   onOpenChat?: () => void;
   /** The full chat: the whole conversation, not just the latest answer. */
   expanded?: boolean;
@@ -139,9 +132,6 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
   };
 }
 
-/** What Try it now asks, from the hello: a first look at the screen. */
-const TRY_IT = 'What am I working on, and what could you hand to an expert?';
-
 type Reply =
   | { state: 'idle' }
   | { state: 'running'; turnId: string | null; text: string }
@@ -158,8 +148,6 @@ export function CompanionBubble({
   petId,
   petName,
   snapshot,
-  greeting = false,
-  onDismiss,
   onOpenChat,
   expanded = false,
   onCollapse,
@@ -196,10 +184,6 @@ export function CompanionBubble({
     [bridge],
   );
   const [question, setQuestion] = useState<string | null>(null);
-  // Try it now ends the hello here, even when the screen could not be seen.
-  const [tried, setTried] = useState(false);
-  // The first hello's line, from the mind's check-in; empty until (unless) it says one.
-  const [hello, setHello] = useState('');
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
   // A spoken question's answer, said sentence by sentence as it streams.
@@ -293,12 +277,6 @@ export function CompanionBubble({
         setReply({ state: 'failed', text: event.message });
         return;
       case 'pet.remark':
-        // The first hello's line, above Try it now, said once.
-        if (greeting && !tried && hello === '') {
-          setHello(event.text);
-          onSay?.(event.text);
-          return;
-        }
         // A wake's words with the bubble open: Scout's message, unless an answer is streaming.
         if (reply.state === 'running' || health !== null) return;
         if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
@@ -528,25 +506,6 @@ export function CompanionBubble({
   });
   const onListen = talk?.onListen;
   useEffect(() => onListen?.(() => bargeIn()), [onListen]);
-
-  const tryIt = async (): Promise<void> => {
-    setTried(true);
-    const seen = await bridge.capture(['activeWindow', 'screenshot']).catch(() => null);
-    submit(TRY_IT, seen ?? undefined);
-  };
-
-  if (greeting && !tried) {
-    return (
-      <Speech tail={tail}>
-        <TryItInvite
-          text={hello}
-          onTry={() => void tryIt()}
-          {...(onDismiss !== undefined ? { onDismiss } : {})}
-          indicator={speakingIndicator}
-        />
-      </Speech>
-    );
-  }
 
   const stop = (): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
@@ -781,91 +740,6 @@ export function CompanionBubble({
   );
 }
 
-/** Whether the person asked the system for less motion. */
-function reducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
-/** How fast a line types in: quick enough to read along, slow enough to feel spoken. */
-const TYPE_MS = 22;
-
-/** `text` revealed a character at a time, or whole at once when motion is reduced. */
-function useTyped(text: string): string {
-  const [still] = useState(reducedMotion);
-  const [shown, setShown] = useState(still ? text.length : 0);
-  const [typing, setTyping] = useState(text);
-  if (typing !== text) {
-    setTyping(text);
-    setShown(still ? text.length : 0);
-  }
-  useEffect(() => {
-    if (still) return;
-    const timer = setInterval(() => {
-      setShown((count) => {
-        if (count + 1 >= text.length) clearInterval(timer);
-        return Math.min(count + 1, text.length);
-      });
-    }, TYPE_MS);
-    return () => clearInterval(timer);
-  }, [text, still]);
-  return text.slice(0, shown);
-}
-
-/**
- * After setup, once: Try it now and Got it. The line above them is the mind's, from the first
- * hello's check-in, typed in as it arrives; until then, or if the mind says nothing, there is
- * none: Scout's words are never written here. A screen reader hears the line whole.
- */
-function TryItInvite({
-  text,
-  onTry,
-  onDismiss,
-  indicator,
-}: {
-  /** The mind's line; empty for none. */
-  text: string;
-  onTry: () => void;
-  onDismiss?: () => void;
-  /** The speaking indicator, while Scout speaks. */
-  indicator?: ReactNode;
-}) {
-  const typed = useTyped(text);
-  const primary = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    primary.current?.focus();
-  }, []);
-  return (
-    <div className="bubble bubble--intro">
-      <style>{BUBBLE_CSS}</style>
-      <div className="bubble-hello">
-        {text !== '' && (
-          <p className="bubble-text bubble-typed" aria-hidden="true">
-            <span data-testid="intro-typed">{typed}</span>
-            {/* Holds the bubble at the line's full height, so it does not grow as it types. */}
-            <span className="bubble-ghost">{text.slice(typed.length)}</span>
-          </p>
-        )}
-        <p role="status" className="bubble-sr">
-          {text}
-        </p>
-      </div>
-      <div className="bubble-row">
-        <button ref={primary} type="button" className="bubble-primary" onClick={onTry}>
-          Try it now
-        </button>
-        <button type="button" className="bubble-quiet" onClick={onDismiss}>
-          Got it
-        </button>
-        {indicator}
-      </div>
-    </div>
-  );
-}
-
 export interface GreetingLineProps {
   petName: string;
   /** The one line the pet says as the app opens. */
@@ -1091,7 +965,6 @@ const BUBBLE_CSS = `
 }
 .bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
-.bubble-hello { display: grid; gap: 6px; }
 .bubble-hints { font-size: 11px; color: ${t.color.textMuted}; }
 .bubble-hints .bubble-quiet { margin-left: auto; }
 .bubble-primary {
@@ -1105,9 +978,7 @@ const BUBBLE_CSS = `
 .bubble-primary:focus-visible, .bubble-quiet:focus-visible, .bubble-close:focus-visible, .bubble-say:focus-visible {
   outline: 2px solid #7CB8F2; outline-offset: 2px;
 }
-.bubble--intro, .bubble--line { animation: bubble-in 220ms ease-out both; }
-.bubble-typed { min-height: 3em; }
-.bubble-ghost { visibility: hidden; }
+.bubble--line { animation: bubble-in 220ms ease-out both; }
 .bubble-sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -1121,7 +992,7 @@ const BUBBLE_CSS = `
 }
 @keyframes bubble-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .bubble--intro, .bubble--line { animation: none; transition: none; }
+  .bubble--line { animation: none; transition: none; }
   .bubble--line[data-leaving='true'] { transform: none; }
 }
 `;

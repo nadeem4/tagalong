@@ -6,46 +6,32 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { SETTINGS_CSS } from '@tagalong/ui';
-import {
-  SettingsFieldError,
-  buildSettingsPatch,
-  isAdvancedField,
-  summarizerGroups,
-  summarizerValue,
-} from '../settings-form';
+import { SettingsFieldError, buildSettingsPatch, isAdvancedField } from '../settings-form';
 import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
 import { BrowserSection } from './browser-section';
-import { BudgetSection } from './budget-section';
 import { ElevenLabsSection } from './elevenlabs-section';
-import { KeysSection } from './keys-section';
 import { PrivacySection } from './privacy-section';
 import { SECTIONS, SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
 import { SightSection } from './sight-section';
-import { SummariesSection } from './summaries-section';
 import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
 import { YouSection } from './you-section';
 import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
- * then Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen
- * memory and watches), closed by default. Embedded in Home it has no header or side menu of its
- * own.
- *
- * Keys are re-read by the engine before every ask and a provider is rebuilt when its key or
- * base URL changes, so they apply on the next ask. Main re-registers hotkeys on save, and the
- * sight settings are read per capture.
+ * Sections in page order: how Scout thinks, You, Privacy, Voice, Shortcuts, the browser, then
+ * Advanced (the ElevenLabs voice, sight detail, screen memory and watches), closed by default.
+ * Embedded in Home it has no header or side menu of its own. Main re-registers hotkeys on save,
+ * and the sight settings are read per capture.
  */
 export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<HostView | null>(null);
   const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
-  const [summarizer, setSummarizer] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
@@ -58,11 +44,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     window.tagalongHost
       .getHostView()
-      .then((loaded) => {
-        setView(loaded);
-        const chosen = loaded.settings.summarizer;
-        setSummarizer(chosen === null ? '' : summarizerValue(chosen.providerId, chosen.model));
-      })
+      .then(setView)
       .catch((error: unknown) => {
         setStatus(String(error));
         setStatusIsError(true);
@@ -126,37 +108,17 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   }
 
   const { settings } = view;
-  const presets = view.providers.filter((choice) => choice.defaultBaseUrl !== undefined);
   const scout = view.pets[0];
   const brain = scoutBrain(scout, view.providers, signIn);
 
-  const markProviders = (providerId: string, hasKey: boolean): void =>
-    setView((current) =>
-      current === null
-        ? current
-        : {
-            ...current,
-            providers: current.providers.map((choice) =>
-              choice.id === providerId ? { ...choice, hasKey } : choice,
-            ),
-          },
-    );
-
-  const removeKey = async (providerId: string): Promise<void> => {
-    const label =
-      providerId === 'elevenlabs'
-        ? 'ElevenLabs'
-        : (view.providers.find((choice) => choice.id === providerId)?.label ?? providerId);
+  const removeElevenLabsKey = async (): Promise<void> => {
     try {
       // An empty key deletes the stored one.
-      await window.tagalongHost.saveApiKey(providerId, '');
-      markProviders(providerId, false);
-      if (providerId === 'elevenlabs') {
-        setView((current) =>
-          current === null ? current : { ...current, elevenLabsKeyStored: false },
-        );
-      }
-      setStatus(`${label} key removed.`);
+      await window.tagalongHost.saveApiKey('elevenlabs', '');
+      setView((current) =>
+        current === null ? current : { ...current, elevenLabsKeyStored: false },
+      );
+      setStatus('ElevenLabs key removed.');
       setStatusIsError(false);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -173,11 +135,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
       // Everything is validated before anything is written, so a typo in one field cannot
       // leave the hotkeys saved and the keys not.
       const patch = buildSettingsPatch({
-        baseUrls: presets.map((choice) => ({
-          providerId: choice.id,
-          label: choice.label,
-          value: field(`baseUrl:${choice.id}`),
-        })),
         askHotkey: field('askHotkey'),
         pauseSightHotkey: field('pauseSightHotkey'),
         stopVoiceHotkey: field('stopVoiceHotkey'),
@@ -191,13 +148,11 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         elevenLabsVoiceId: field('elevenLabsVoiceId'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),
-        summarizer: field('summarizer'),
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
         pickUp: form.get('pickUp') !== null,
         wellbeing: form.get('wellbeing') !== null,
         userName: field('userName'),
-        dailyBudget: field('dailyBudget'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),
@@ -291,35 +246,16 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
           <BrainSection brain={brain} onCheckAgain={checkSignIn} />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
-          <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
-            <SummariesSection
-              groups={summarizerGroups({
-                providers: view.providers,
-                signIn,
-                // The brain serves no model lists, so each service offers only the typed id.
-                models: {},
-                current: settings.summarizer,
-              })}
-              value={summarizer}
-              onChange={setSummarizer}
-            />
-            <KeysSection
-              providers={view.providers}
-              settings={settings}
-              keys={keys}
-              onKeysChange={setKeys}
-              onRemove={(providerId) => void removeKey(providerId)}
-            />
             <ElevenLabsSection
               settings={settings}
               keyStored={view.elevenLabsKeyStored}
               typed={keys.elevenlabs ?? ''}
               onType={(value) => setKeys({ ...keys, elevenlabs: value })}
-              onRemove={() => void removeKey('elevenlabs')}
+              onRemove={() => void removeElevenLabsKey()}
             />
             <SightSection settings={settings} />
             <WatchesSection settings={settings} />

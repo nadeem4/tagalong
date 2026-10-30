@@ -10,7 +10,6 @@ export const SECTIONS = [
   { id: 'brain', title: 'How Scout thinks' },
   { id: 'you', title: 'You' },
   { id: 'privacy', title: 'Privacy' },
-  { id: 'budget', title: 'Daily budget' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Add Scout to your browser' },

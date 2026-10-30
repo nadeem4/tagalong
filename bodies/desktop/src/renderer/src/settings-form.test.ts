@@ -7,14 +7,11 @@ import {
   buildSettingsPatch,
   isAdvancedField,
   keyCaps,
-  summarizerGroups,
-  summarizerValue,
   voiceFacts,
 } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
-  baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: '' }],
   askHotkey: 'CommandOrControl+Shift+Space',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
@@ -23,30 +20,7 @@ const values: SettingsFormValues = {
   windowTextBudget: '8000',
 };
 
-describe('buildSettingsPatch base URLs', () => {
-  it('sends an empty override map when every box is left blank', () => {
-    expect(buildSettingsPatch(values).providerBaseUrls).toEqual({});
-  });
-
-  it('carries a trimmed override for the box that was filled', () => {
-    const patch = buildSettingsPatch({
-      ...values,
-      baseUrls: [
-        { providerId: 'openrouter', label: 'OpenRouter', value: ' http://127.0.0.1:8080/v1 ' },
-      ],
-    });
-    expect(patch.providerBaseUrls).toEqual({ openrouter: 'http://127.0.0.1:8080/v1' });
-  });
-
-  it('refuses a base URL that is not a URL, naming the service', () => {
-    expect(() =>
-      buildSettingsPatch({
-        ...values,
-        baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: 'openrouter.ai' }],
-      }),
-    ).toThrow('OpenRouter base URL must be a full URL');
-  });
-
+describe('buildSettingsPatch retired fields', () => {
   it('never sends the retired provider fields', () => {
     const patch = buildSettingsPatch(values);
     expect(patch).not.toHaveProperty('providerId');
@@ -151,33 +125,6 @@ describe('buildSettingsPatch', () => {
   });
 });
 
-describe('buildSettingsPatch daily budget', () => {
-  it('leaves the budget alone when the form does not carry it', () => {
-    expect(buildSettingsPatch(values).budget).toBeUndefined();
-  });
-
-  it('sends no cap for an empty box, and dollars for a number', () => {
-    expect(buildSettingsPatch({ ...values, dailyBudget: '' }).budget).toEqual({ dailyUsd: null });
-    expect(buildSettingsPatch({ ...values, dailyBudget: ' 1 ' }).budget).toEqual({ dailyUsd: 1 });
-    expect(buildSettingsPatch({ ...values, dailyBudget: '2.50' }).budget).toEqual({
-      dailyUsd: 2.5,
-    });
-  });
-
-  it('refuses a cap that is not a positive amount, naming the field', () => {
-    for (const typed of ['-1', '0', 'a dollar', '5000']) {
-      let thrown: unknown;
-      try {
-        buildSettingsPatch({ ...values, dailyBudget: typed });
-      } catch (error) {
-        thrown = error;
-      }
-      expect(thrown).toBeInstanceOf(SettingsFieldError);
-      expect((thrown as SettingsFieldError).field).toBe('dailyBudget');
-    }
-  });
-});
-
 describe('what a rejected save tells the user', () => {
   it('names the field, not just that something was wrong', () => {
     // A save that refuses with "invalid input" is the same lie as one that silently keeps
@@ -205,88 +152,6 @@ describe('what a rejected save tells the user', () => {
   });
 });
 
-describe('buildSettingsPatch optional settings', () => {
-  it('leaves optional settings out when the form does not carry them', () => {
-    const patch = buildSettingsPatch(values);
-    expect(patch).not.toHaveProperty('summarizer');
-  });
-
-  it('sends no summarizer for "Same as Scout"', () => {
-    expect(buildSettingsPatch({ ...values, summarizer: '' }).summarizer).toBeNull();
-  });
-
-  it('carries the summarizer picked from the list as a provider and a model', () => {
-    const patch = buildSettingsPatch({
-      ...values,
-      summarizer: summarizerValue('openrouter', 'anthropic/claude-haiku-4.5:free'),
-    });
-    expect(patch.summarizer).toEqual({
-      providerId: 'openrouter',
-      model: 'anthropic/claude-haiku-4.5:free',
-    });
-  });
-
-  it('refuses a summarizer choice it cannot read, naming the field', () => {
-    expect(() => buildSettingsPatch({ ...values, summarizer: 'openrouter' })).toThrow(
-      expect.objectContaining({ field: 'summarizer' }),
-    );
-  });
-});
-
-describe('summarizerGroups', () => {
-  const providers = [
-    { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false, hasKey: false },
-    { id: 'openrouter', label: 'OpenRouter', needsKey: true, hasKey: true },
-    { id: 'anthropic', label: 'Anthropic', needsKey: true, hasKey: false },
-  ];
-  const models = { openrouter: ['anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-5'] };
-
-  it('offers Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key', () => {
-    expect(summarizerGroups({ providers, signIn: 'signed-in', models, current: null })).toEqual([
-      {
-        label: 'Claude sign-in',
-        options: [
-          { value: summarizerValue('claude-code', 'haiku'), label: 'Haiku' },
-          { value: summarizerValue('claude-code', 'sonnet'), label: 'Sonnet' },
-        ],
-      },
-      {
-        label: 'OpenRouter',
-        options: [
-          {
-            value: summarizerValue('openrouter', 'anthropic/claude-haiku-4.5'),
-            label: 'anthropic/claude-haiku-4.5',
-          },
-          {
-            value: summarizerValue('openrouter', 'anthropic/claude-sonnet-5'),
-            label: 'anthropic/claude-sonnet-5',
-          },
-        ],
-      },
-    ]);
-  });
-
-  it('leaves the Claude sign-in out when it was not found', () => {
-    const groups = summarizerGroups({ providers, signIn: 'not-installed', models, current: null });
-    expect(groups.map((group) => group.label)).toEqual(['OpenRouter']);
-  });
-
-  it('keeps the saved summarizer listed even when its service is no longer offered', () => {
-    const groups = summarizerGroups({
-      providers,
-      signIn: 'not-installed',
-      models: {},
-      current: { providerId: 'anthropic', model: 'claude-haiku-4-5' },
-    });
-    expect(groups).toContainEqual({
-      label: 'Anthropic',
-      options: [
-        { value: summarizerValue('anthropic', 'claude-haiku-4-5'), label: 'claude-haiku-4-5' },
-      ],
-    });
-  });
-});
-
 describe('advanced field errors', () => {
   it('names the field a refused value belongs to, so Settings can open Advanced on it', () => {
     let caught: unknown;
@@ -305,20 +170,7 @@ describe('advanced field errors', () => {
     expect(caught).toBeInstanceOf(SettingsFieldError);
     expect(caught).toMatchObject({ field: 'watchMaxConcurrent' });
     expect(isAdvancedField('watchMaxConcurrent')).toBe(true);
-    expect(isAdvancedField('baseUrl:openrouter')).toBe(true);
     expect(isAdvancedField('askHotkey')).toBe(false);
-  });
-
-  it('names the base URL box and the budget box too', () => {
-    expect(() =>
-      buildSettingsPatch({
-        ...values,
-        baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: 'nope' }],
-      }),
-    ).toThrow(expect.objectContaining({ field: 'baseUrl:openrouter' }));
-    expect(() => buildSettingsPatch({ ...values, windowTextBudget: 'x' })).toThrow(
-      expect.objectContaining({ field: 'windowTextBudget' }),
-    );
   });
 });
 

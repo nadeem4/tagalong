@@ -43,7 +43,7 @@ test.beforeAll(async () => {
       ...process.env,
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_FAKE_SIGN_IN: 'signed-in',
       TAGALONG_FAKE_TTS: '1',
       // Talk to Scout hears a fixed question, through Chromium's fake microphone.
       TAGALONG_FAKE_STT: '1',

@@ -15,8 +15,6 @@ const SNAPSHOT: ContextSnapshot = {
   selection: 'shuts down while a turn is running',
 };
 
-const TRY_IT = 'What am I working on, and what could you hand to an expert?';
-
 const CONVERSATION = '10000000-0000-4000-8000-0000000000c1';
 
 function renderBubble(
@@ -67,70 +65,6 @@ const helloRemark = (text = HELLO, extra: Record<string, unknown> = {}) =>
     ...extra,
   }) as const;
 
-/** Says whether the person asked for reduced motion; jsdom has no matchMedia of its own. */
-function prefersReducedMotion(reduce: boolean): void {
-  vi.stubGlobal(
-    'matchMedia',
-    (query: string) => ({ matches: reduce && query.includes('reduce'), media: query }) as never,
-  );
-}
-
-describe('CompanionBubble invitation after setup', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.useRealTimers();
-  });
-
-  it('writes no line of its own: Try it now and Got it, until the mind says one', () => {
-    prefersReducedMotion(true);
-    const onDismiss = vi.fn();
-    const onSay = vi.fn();
-    renderBubble(createFakeHostBridge(), { greeting: true, onDismiss, onSay });
-    expect(screen.getByRole('status')).toHaveTextContent('');
-    expect(screen.queryByText(/Here I am/)).toBeNull();
-    expect(onSay).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Try it now' })).toHaveFocus();
-    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
-    expect(onDismiss).toHaveBeenCalledOnce();
-  });
-
-  it('shows the first hello’s check-in line above Try it now, and says it once', () => {
-    prefersReducedMotion(true);
-    const bridge = createFakeHostBridge();
-    const onSay = vi.fn();
-    renderBubble(bridge, { greeting: true, onSay });
-    act(() => bridge.emit(helloRemark()));
-    expect(screen.getByRole('status')).toHaveTextContent(HELLO);
-    expect(screen.getByRole('button', { name: 'Try it now' })).toBeVisible();
-    expect(onSay).toHaveBeenCalledOnce();
-    expect(onSay).toHaveBeenCalledWith(HELLO);
-  });
-
-  it('types the line in, while a screen reader hears it whole', () => {
-    prefersReducedMotion(false);
-    vi.useFakeTimers();
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge, { greeting: true });
-    act(() => bridge.emit(helloRemark()));
-    const shown = screen.getByTestId('intro-typed');
-    expect(shown.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(shown.textContent!.length).toBeLessThan(HELLO.length);
-    act(() => vi.advanceTimersByTime(10_000));
-    expect(shown).toHaveTextContent(HELLO);
-  });
-
-  it('takes no line once the hello is over', async () => {
-    const bridge = createFakeHostBridge({ capture: null });
-    const onSay = vi.fn();
-    renderBubble(bridge, { greeting: true, onSay });
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
-    act(() => bridge.emit(helloRemark()));
-    expect(screen.queryByText(HELLO)).toBeNull();
-    expect(onSay).not.toHaveBeenCalled();
-  });
-});
-
 describe('CompanionBubble wake remarks', () => {
   it('shows a wake’s words as Scout’s message when the bubble is open, and says them once', () => {
     const bridge = createFakeHostBridge();
@@ -154,27 +88,6 @@ describe('CompanionBubble wake remarks', () => {
 });
 
 describe('CompanionBubble', () => {
-  it('tries it at once from the hello: looks at the screen and asks about it', async () => {
-    const bridge = createFakeHostBridge({ capture: SNAPSHOT });
-    const onDismiss = vi.fn();
-    renderBubble(bridge, { greeting: true, onDismiss });
-
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
-
-    expect(bridge.captures).toEqual([['activeWindow', 'screenshot']]);
-    expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT, snapshot: SNAPSHOT }]);
-    expect(onDismiss).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Try it now' })).toBeNull();
-    expect(screen.getByText('Scout is thinking…')).toBeVisible();
-  });
-
-  it('still tries it when it cannot see the screen, without a snapshot', async () => {
-    const bridge = createFakeHostBridge({ capture: null });
-    renderBubble(bridge, { greeting: true });
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
-    expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT }]);
-  });
-
   it('shows what it can see as chips, and asks with that context on Enter', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { snapshot: SNAPSHOT });
@@ -404,7 +317,7 @@ describe('CompanionBubble, attached to the pet', () => {
     expect(container.querySelector('[data-tail]')).toHaveAttribute('data-tail', 'right');
     rerender(
       <HostBridgeProvider bridge={bridge}>
-        <CompanionBubble petId="scout" petName="Scout" tail="left" greeting />
+        <CompanionBubble petId="scout" petName="Scout" tail="left" />
       </HostBridgeProvider>,
     );
     expect(container.querySelector('[data-tail]')).toHaveAttribute('data-tail', 'left');

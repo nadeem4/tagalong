@@ -1,4 +1,4 @@
-﻿/**
+/**
  * End-to-end: the launch across launches on one profile (signed out, clean quit, signed in).
  * With a brain, the line is the launch check-in's: the fake mind's.
  */
@@ -25,7 +25,6 @@ function launch(signIn: string): Promise<ElectronApplication> {
     cwd: appDir,
     env: {
       ...process.env,
-      TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
       TAGALONG_FAKE_SIGN_IN: signIn,
     },
