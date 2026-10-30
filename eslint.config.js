@@ -14,30 +14,30 @@ const PURE_PACKAGES = ['protocol/ts/**/*.ts'];
 const PURITY_PATHS = [
   {
     name: 'electron',
-    message: 'The protocol packages must stay host-agnostic.',
+    message: 'protocol/ts must stay host-agnostic.',
   },
   {
     name: 'react',
-    message: 'The protocol packages must stay UI-agnostic.',
+    message: 'protocol/ts must stay UI-agnostic.',
   },
   {
     name: 'react-dom',
-    message: 'The protocol packages must stay UI-agnostic.',
+    message: 'protocol/ts must stay UI-agnostic.',
   },
 ];
 
 const PURITY_PATTERNS = [
   {
     group: ['electron/*', 'electron-*'],
-    message: 'The protocol packages must stay host-agnostic.',
+    message: 'protocol/ts must stay host-agnostic.',
   },
   {
     group: ['react/*', 'react-dom/*'],
-    message: 'The protocol packages must stay UI-agnostic.',
+    message: 'protocol/ts must stay UI-agnostic.',
   },
   {
     group: ['@tagalong/ui', '@tagalong/ui/*'],
-    message: 'The protocol packages must not depend on the UI package.',
+    message: 'protocol/ts must not depend on the UI package.',
   },
 ];
 
@@ -74,10 +74,10 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { paths: PURITY_PATHS, patterns: PURITY_PATTERNS }],
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'No DOM globals in the protocol packages.' },
-        { name: 'document', message: 'No DOM globals in the protocol packages.' },
-        { name: 'navigator', message: 'No DOM globals in the protocol packages.' },
-        { name: 'localStorage', message: 'No DOM globals in the protocol packages.' },
+        { name: 'window', message: 'No DOM globals in protocol/ts.' },
+        { name: 'document', message: 'No DOM globals in protocol/ts.' },
+        { name: 'navigator', message: 'No DOM globals in protocol/ts.' },
+        { name: 'localStorage', message: 'No DOM globals in protocol/ts.' },
       ],
     },
   },
@@ -136,7 +136,11 @@ export default tseslint.config(
   },
   {
     // Desktop main and the voice process import these, so no React may sneak in.
+    // They also run in node, so no DOM globals, and they stay inside their folder.
     files: ['bodies/ui/src/shapes/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
     rules: {
       'no-restricted-imports': [
         'error',
@@ -149,6 +153,10 @@ export default tseslint.config(
             {
               group: ['react/*', 'react-dom/*'],
               message: '@tagalong/ui/shapes must stay React-free.',
+            },
+            {
+              group: ['../*'],
+              message: '@tagalong/ui/shapes must not import out of its folder.',
             },
           ],
         },
