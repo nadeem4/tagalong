@@ -392,4 +392,4 @@ host's `SecretStore`. Both are described in [settings-and-secrets.md](settings-a
 | `packages/protocol/src/context.test.ts`, `pet.test.ts`, `message.test.ts`, `settings.test.ts` | The main schemas and their caps and defaults                                                              |
 | `packages/protocol/src/index.test.ts`                                                         | `PROTOCOL_VERSION` is semver; the loopback URL                                                            |
 | `packages/core/src/server/ws-server.test.ts`                                                  | Pairing, hello deadline and size cap, extension scoping, every error code, core-to-host result validation |
-| `apps/extension/src/engine-connection.test.ts`                                                | The extension's hello, calls and answers                                                                  |
+| `bodies/browser/src/engine-connection.test.ts`                                                | The extension's hello, calls and answers                                                                  |

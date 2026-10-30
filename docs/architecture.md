@@ -57,9 +57,9 @@ flowchart LR
 | Electron main            | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
 | Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `welcome` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                |
 | Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)           |
-| Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                         |
-| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                      |
-| Extension content script | `apps/extension/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                |
+| Extension service worker | `bodies/browser/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                         |
+| Extension side panel     | `bodies/browser/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                      |
+| Extension content script | `bodies/browser/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                |
 
 How they connect:
 
@@ -90,7 +90,7 @@ flowchart BT
   C["packages/core"]
   U["bodies/ui"]
   D["bodies/desktop"]
-  X["apps/extension"]
+  X["bodies/browser"]
   C --> P
   U --> P
   D --> P
@@ -111,7 +111,7 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 | `packages/core` (runner, engine) | `conversation/**` and `engine.ts` reach tools through the registry                                                                                      | `tools/builtin/**`                                                                                                              | `eslint.config.js` (block for `conversation/**` and `engine.ts`)                                                     |
 | `bodies/ui`                      | React components shared by both hosts: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge   | `electron`, `ws`, `node:*`, `@tagalong/core`                                                                                    | Dependencies and references only (`protocol`, `react`); browser globals in ESLint. No lint rule names these imports. |
 | `bodies/desktop`                 | Electron host: windows, tray, hotkeys, talk key, platform adapter, perception, voice, `SafeStorageSecretStore`                                          | core internals                                                                                                                  | `@tagalong/core` exports only `.` (`packages/core/package.json`), so deep imports do not resolve                     |
-| `apps/extension`                 | Chrome MV3 host: selection and page text, side panel, pairing                                                                                           | `@tagalong/core`                                                                                                                | Not a dependency and not a project reference                                                                         |
+| `bodies/browser`                 | Chrome MV3 host: selection and page text, side panel, pairing                                                                                           | `@tagalong/core`                                                                                                                | Not a dependency and not a project reference                                                                         |
 
 The protocol's ESLint block replaces the shared purity options for its own files rather than
 adding to them, so for `packages/protocol` the lint list is exactly `electron`, `react`, `node:*`
@@ -136,7 +136,7 @@ advertised.
 | Host      | Capabilities (`hello`)                                                                               | Source                                                         |
 | --------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts`   |
-| Extension | `selection`, `pageText`, `activeWindow`                                                              | `EXTENSION_CAPABILITIES`, `apps/extension/src/capabilities.ts` |
+| Extension | `selection`, `pageText`, `activeWindow`                                                              | `EXTENSION_CAPABILITIES`, `bodies/browser/src/capabilities.ts` |
 
 Exclusions and the built-in blind spots are checked before anything is read; the details are in
 [sight.md](sight.md).
@@ -184,7 +184,7 @@ unauthenticated until `hello` presents that token; `tokensMatch` compares in con
 mismatch answers `-32000` and closes the socket; any other method before `hello` answers `-32000`.
 Loopback is not a permission boundary, which is why the token exists. The desktop reads the token
 from the engine in-process; the extension stores it in `chrome.storage.local` after the person
-pastes it into the options page (`apps/extension/src/pairing.ts`).
+pastes it into the options page (`bodies/browser/src/pairing.ts`).
 
 **Scoping.** A session that said `host: 'extension'` may call only `EXTENSION_METHODS`: `ask`,
 `interrupt` and `pets.list`. Everything else answers `-32000` before any handler runs. The
@@ -370,7 +370,7 @@ flowchart LR
 | [asks.md](asks.md)                                 | Saved asks (Waiting on you), risk, expiry, outcomes                                    | `packages/core/src/asks`                                                                                          |
 | [routines.md](routines.md)                         | Triggers, schedule, delivery, results, the calendar feed                               | `packages/core/src/routines`, `meetings`                                                                          |
 | [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `packages/core/src/connections`                                                                                   |
-| [browser-extension.md](browser-extension.md)       | The Chrome host, pairing, routing, what it reads                                       | `apps/extension/src`, `packages/core/src/perception/browser-route.ts`                                             |
+| [browser-extension.md](browser-extension.md)       | The Chrome host, pairing, routing, what it reads                                       | `bodies/browser/src`, `packages/core/src/perception/browser-route.ts`                                             |
 | [settings-and-secrets.md](settings-and-secrets.md) | Settings store, change by talking, the secret store, secrets on the way out            | `packages/core/src/settings`, `privacy`, `providers/guard.ts`, `bodies/desktop/src/main/secret-store.ts`          |
 | [storage.md](storage.md)                           | SQLite tables, migrations, retention jobs                                              | `packages/core/src/memory/db.ts`                                                                                  |
 | [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                  |

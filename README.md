@@ -499,7 +499,7 @@ needs the desktop app running.
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and choose the extension folder. The installer ships it in
    `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with
-   `pnpm --filter @tagalong/extension build` and choose `apps/extension/dist`.
+   `pnpm --filter @tagalong/browser build` and choose `bodies/browser/dist`.
 3. Copy the pairing token from **Home → Settings → Browser extension**, paste it into the
    extension's options page, and click **Save and connect**.
 

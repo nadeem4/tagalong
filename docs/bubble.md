@@ -35,7 +35,7 @@ decides to hand to it.
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home),
-`apps/extension/src/sidepanel/app.tsx` (the chat panel).
+`bodies/browser/src/sidepanel/app.tsx` (the chat panel).
 
 ## How it works
 

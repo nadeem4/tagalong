@@ -8,7 +8,7 @@ Product intent: PRODUCT.md. Visual design: DESIGN.md. Engineering reference: doc
 The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 
 - Today: everything in this repo is TypeScript. packages/core is the current brain.
-- Target: a Python brain (runs on any machine) talks to TypeScript bodies (bodies/desktop, apps/extension) over the contract in protocol/README.md.
+- Target: a Python brain (runs on any machine) talks to TypeScript bodies (bodies/desktop, bodies/browser) over the contract in protocol/README.md.
 - Bodies talk only to the brain. Single user: no TLS, pairing or multi-user work yet.
 - The plan, decisions and build order live in Notion (links in CLAUDE.local.md). Read it before working on the brain.
 - Don't add new features to packages/core unless the task asks for it; new brain work goes into the Python brain.
@@ -34,7 +34,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - packages/core: the old brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server); the desktop no longer boots it, and it will be deleted
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
 - bodies/desktop: Electron body (dials the Python brain; no longer boots packages/core)
-- apps/extension: Chrome extension body
+- bodies/browser: Chrome extension body
 - docs/: one doc per subsystem; docs/development.md has the full layout and how-tos
 
 ## Conventions

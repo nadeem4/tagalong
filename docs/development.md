@@ -11,7 +11,7 @@ tagalong/
   package.json                      # pnpm workspace root (private)
   pnpm-workspace.yaml
   tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
-  vitest.config.ts                  # projects: packages/*, apps/*, bodies/*; coverage thresholds
+  vitest.config.ts                  # projects: packages/*, bodies/*; coverage thresholds
   eslint.config.js
   .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
   docs/
@@ -121,8 +121,7 @@ tagalong/
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
-  apps/
-    extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
+    browser/                        # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
       src/sidepanel/, src/options/  # side panel (bodies/ui) and the pairing page
@@ -135,7 +134,7 @@ tagalong/
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
 | `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
 | `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.                          |
-| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
+| `bodies/browser`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
 ## How to run
 
@@ -242,7 +241,7 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   packaged app loads at runtime (the native modules and the voice libraries), which electron-builder
   copies. The full list is under "Bundling the workspace packages" in
   [desktop.md](desktop.md#bundling-the-workspace-packages).
-- **The Chrome extension ships inside.** `apps/extension/dist` is copied to `resources/extension`, so
+- **The Chrome extension ships inside.** `bodies/browser/dist` is copied to `resources/extension`, so
   someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
   it first.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
@@ -503,11 +502,11 @@ with the panel open, within about thirty seconds without.
 
 ```bash
 pnpm install
-pnpm --filter @tagalong/extension build    # writes apps/extension/dist
+pnpm --filter @tagalong/browser build    # writes bodies/browser/dist
 ```
 
 1. Open `chrome://extensions` and switch on **Developer mode** (top right).
-2. Click **Load unpacked** and choose `apps/extension/dist`.
+2. Click **Load unpacked** and choose `bodies/browser/dist`.
 3. Pin Tagalong from the puzzle-piece menu so its toolbar button is visible.
 
 After a rebuild, click the reload arrow on the Tagalong card in `chrome://extensions`.
@@ -548,7 +547,7 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 ## Environment variables
 
 `.env.example` is a **reference list of the variables the project uses**, not a file the app loads.
-Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `apps/`
+Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `bodies/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
 Eight environment variables are read, all straight from the process environment. **Set them in the
@@ -588,7 +587,7 @@ Chrome extension, or something new. Adding one never touches the core.
    (`ws://127.0.0.1:47321` by default), presenting the pairing token in `hello`. The method catalog and
    every payload schema live in `packages/protocol`.
 4. Never import core internals. A host uses the protocol, and the engine's public API only where it
-   embeds the engine in process. `apps/extension` imports nothing from core at all.
+   embeds the engine in process. `bodies/browser` imports nothing from core at all.
 
 ## How to add a provider
 

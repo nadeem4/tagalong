@@ -1,5 +1,5 @@
 {
-  "name": "@tagalong/extension",
+  "name": "@tagalong/browser",
   "version": "0.0.0",
   "private": true,
   "type": "module",

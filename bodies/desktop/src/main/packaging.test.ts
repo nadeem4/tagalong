@@ -71,9 +71,9 @@ describe('electron-builder config', () => {
     expect(config.npmRebuild).toBe(false);
   });
 
-  it('ships the built Chrome extension next to app.asar, for Load unpacked', () => {
+  it('ships the built browser body next to app.asar, for Load unpacked', () => {
     expect(config.extraResources).toContainEqual({
-      from: '../../apps/extension/dist',
+      from: '../browser/dist',
       to: 'extension',
     });
   });

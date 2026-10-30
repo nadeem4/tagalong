@@ -2195,10 +2195,10 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 ### X.1. Build and load the unpacked extension
 
 1. **Setup:** a checkout with dependencies installed (`pnpm install`).
-2. **Action:** run `pnpm --filter @tagalong/extension build`. In Chrome open `chrome://extensions`,
-   switch on **Developer mode**, click **Load unpacked**, choose `apps/extension/dist`. Pin Tagalong.
+2. **Action:** run `pnpm --filter @tagalong/browser build`. In Chrome open `chrome://extensions`,
+   switch on **Developer mode**, click **Load unpacked**, choose `bodies/browser/dist`. Pin Tagalong.
    (Installed app: load `%LOCALAPPDATA%\Programs\Tagalong\resources\extension` instead.)
-3. **Expected:** `apps/extension/dist` holds `manifest.json`, `service-worker.js`, `sidepanel.html`,
+3. **Expected:** `bodies/browser/dist` holds `manifest.json`, `service-worker.js`, `sidepanel.html`,
    `options.html` and `page-reader.js`. The Tagalong card shows no errors, and a new tab opens with
    the options page ("Pair Tagalong with this browser"), whose connection line says "Not paired. …".
 

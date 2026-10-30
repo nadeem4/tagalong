@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`apps/extension` is a Chrome Manifest V3 extension: a second host for the same engine, with the same
+`bodies/browser` is a Chrome Manifest V3 extension: a second host for the same engine, with the same
 Scout, memory and settings. It gives Scout the **exact** selection and the readable text of the page
 in front, and puts Scout in Chrome's side panel. It holds no engine of its own: it connects to the
 one inside the Tagalong desktop app over the loopback WebSocket, so it needs the desktop app running.
@@ -16,23 +16,23 @@ The store listing, permission justifications and the public privacy policy are i
 
 | File                                                           | What it holds                                                                                                                           |
 | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/extension/src/manifest.ts`                               | The manifest as data (`manifest`, `COMMAND_OPEN_PANEL`); the build writes `dist/manifest.json`                                          |
-| `apps/extension/src/service-worker.ts`                         | The entry point: wires `EngineConnection`, `PortHub` and Chrome's events                                                                |
-| `apps/extension/src/engine-connection.ts`                      | `EngineConnection`: the one socket, `hello`, heartbeat, reconnect, answering `perception.capture`; `reconnectDelay`, `ConnectionStatus` |
-| `apps/extension/src/port-hub.ts`                               | `PortHub`: the worker's side of every open extension page                                                                               |
-| `apps/extension/src/port-bridge.ts`                            | `createPortBridge`: the side panel's `HostBridge` over a `chrome.runtime` port                                                          |
-| `apps/extension/src/port-messages.ts`                          | `PORT_NAME`, `PageMessage`, `WorkerMessage`, `PortLike`                                                                                 |
-| `apps/extension/src/pairing.ts`                                | `parsePairingInput`, `readPairing`, `savePairing`, `clearPairing` over `chrome.storage.local`                                           |
-| `apps/extension/src/tab-capture.ts`                            | `captureTab` (answers `perception.capture`), `captureSnapshot` (an ask's snapshot)                                                      |
-| `apps/extension/src/chrome-adapters.ts`                        | `localStorageArea`, `chromeTabAccess`: the real Chrome APIs behind the tested interfaces                                                |
-| `apps/extension/src/content/read-page.ts`                      | `readPage`: selection and Readability text, run inside the tab                                                                          |
-| `apps/extension/src/content/page-reader.ts`                    | The injected entry point; installs `globalThis.__tagalongReadPage`                                                                      |
-| `apps/extension/src/capabilities.ts`                           | `EXTENSION_CAPABILITIES`                                                                                                                |
-| `apps/extension/src/page-targets.ts`                           | `PAGE_TARGETS`                                                                                                                          |
-| `apps/extension/src/status-text.ts`                            | `describeStatus`: one sentence per connection state                                                                                     |
-| `apps/extension/src/sidepanel/`                                | `SidePanelApp` (the shared `ChatPanel` for Scout) and its glue                                                                          |
-| `apps/extension/src/options/main.ts`, `options.html`           | Pairing and the optional all-sites grant                                                                                                |
-| `apps/extension/vite.config.ts`, `vite.content.config.ts`      | The two builds                                                                                                                          |
+| `bodies/browser/src/manifest.ts`                               | The manifest as data (`manifest`, `COMMAND_OPEN_PANEL`); the build writes `dist/manifest.json`                                          |
+| `bodies/browser/src/service-worker.ts`                         | The entry point: wires `EngineConnection`, `PortHub` and Chrome's events                                                                |
+| `bodies/browser/src/engine-connection.ts`                      | `EngineConnection`: the one socket, `hello`, heartbeat, reconnect, answering `perception.capture`; `reconnectDelay`, `ConnectionStatus` |
+| `bodies/browser/src/port-hub.ts`                               | `PortHub`: the worker's side of every open extension page                                                                               |
+| `bodies/browser/src/port-bridge.ts`                            | `createPortBridge`: the side panel's `HostBridge` over a `chrome.runtime` port                                                          |
+| `bodies/browser/src/port-messages.ts`                          | `PORT_NAME`, `PageMessage`, `WorkerMessage`, `PortLike`                                                                                 |
+| `bodies/browser/src/pairing.ts`                                | `parsePairingInput`, `readPairing`, `savePairing`, `clearPairing` over `chrome.storage.local`                                           |
+| `bodies/browser/src/tab-capture.ts`                            | `captureTab` (answers `perception.capture`), `captureSnapshot` (an ask's snapshot)                                                      |
+| `bodies/browser/src/chrome-adapters.ts`                        | `localStorageArea`, `chromeTabAccess`: the real Chrome APIs behind the tested interfaces                                                |
+| `bodies/browser/src/content/read-page.ts`                      | `readPage`: selection and Readability text, run inside the tab                                                                          |
+| `bodies/browser/src/content/page-reader.ts`                    | The injected entry point; installs `globalThis.__tagalongReadPage`                                                                      |
+| `bodies/browser/src/capabilities.ts`                           | `EXTENSION_CAPABILITIES`                                                                                                                |
+| `bodies/browser/src/page-targets.ts`                           | `PAGE_TARGETS`                                                                                                                          |
+| `bodies/browser/src/status-text.ts`                            | `describeStatus`: one sentence per connection state                                                                                     |
+| `bodies/browser/src/sidepanel/`                                | `SidePanelApp` (the shared `ChatPanel` for Scout) and its glue                                                                          |
+| `bodies/browser/src/options/main.ts`, `options.html`           | Pairing and the optional all-sites grant                                                                                                |
+| `bodies/browser/vite.config.ts`, `vite.content.config.ts`      | The two builds                                                                                                                          |
 | `packages/core/src/perception/browser-route.ts`                | Engine side: `captureSelection`, `browserContextFor`, `BROWSER_HOST_TIMEOUT_MS`, `isBrowserHost`                                        |
 | `packages/core/src/server/ws-server.ts`                        | `EXTENSION_METHODS`, the hello timeout and size limit                                                                                   |
 | `bodies/desktop/src/renderer/src/settings/browser-section.tsx` | Settings' Browser extension section: the token and its Copy button                                                                      |
@@ -225,8 +225,8 @@ connected; the extension itself may not call it.
 
 ### How it is built
 
-`pnpm --filter @tagalong/extension build` runs `tsc -b && vite build && vite build --config
-vite.content.config.ts` into `apps/extension/dist`, the folder Chrome loads unpacked.
+`pnpm --filter @tagalong/browser build` runs `tsc -b && vite build && vite build --config
+vite.content.config.ts` into `bodies/browser/dist`, the folder Chrome loads unpacked.
 
 - **`vite.config.ts`**: `root: 'src'`, inputs `sidepanel.html`, `options.html` and
   `service-worker.ts`, built as ES modules; the worker is emitted as `service-worker.js` and the rest
@@ -239,7 +239,7 @@ vite.content.config.ts` into `apps/extension/dist`, the folder Chrome loads unpa
   `@tagalong/protocol/limits` subpath, never the protocol barrel, because it ships into the page on
   every read (about 35 kB).
 
-To load it: `chrome://extensions` → **Developer mode** → **Load unpacked** → `apps/extension/dist`.
+To load it: `chrome://extensions` → **Developer mode** → **Load unpacked** → `bodies/browser/dist`.
 After a rebuild, reload the card there. See [development.md](development.md).
 
 ## Interfaces

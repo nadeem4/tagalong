@@ -1,8 +1,8 @@
 # Chrome Web Store listing
 
 Everything to paste into the Chrome Web Store developer dashboard for the Tagalong extension, plus
-the steps to submit it. Each claim here matches the code in `apps/extension/src` and the manifest in
-`apps/extension/src/manifest.ts`. The public privacy policy is in
+the steps to submit it. Each claim here matches the code in `bodies/browser/src` and the manifest in
+`bodies/browser/src/manifest.ts`. The public privacy policy is in
 [privacy-policy.md](privacy-policy.md).
 
 ## Before you submit: two gaps in the package
@@ -149,10 +149,10 @@ installer is public and the extension has been used for a while.
 3. In the dashboard's **Account** tab, set and verify the contact email. Publishing is blocked
    until it is verified.
 4. In the repo, add the icons to the manifest (see the top of this page) and bump `version` in
-   `apps/extension/src/manifest.ts` (today `0.0.0`; for example `0.1.0`). Every later upload needs
+   `bodies/browser/src/manifest.ts` (today `0.0.0`; for example `0.1.0`). Every later upload needs
    a higher version than the last one.
-5. Build: `pnpm --filter @tagalong/extension build`.
-6. Zip the **contents** of `apps/extension/dist`, so `manifest.json` sits at the root of the zip,
+5. Build: `pnpm --filter @tagalong/browser build`.
+6. Zip the **contents** of `bodies/browser/dist`, so `manifest.json` sits at the root of the zip,
    not inside a folder.
 7. In the dashboard, click **New item** and upload the zip.
 8. Fill in **Store listing**, **Privacy practices** and **Distribution** from this page. Set
