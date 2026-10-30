@@ -32,16 +32,7 @@ describe('createFakeHostBridge', () => {
 
   it('lists the pets it was seeded with and records interrupts', async () => {
     const bridge = createFakeHostBridge({
-      pets: [
-        {
-          id: 'scout',
-          name: 'Scout',
-          avatar: '🦊',
-          model: 'claude-opus-5',
-          providerId: 'anthropic',
-          roleId: 'generalist',
-        },
-      ],
+      pets: [{ id: 'scout', name: 'Scout', avatar: '🦊' }],
     });
 
     await expect(bridge.listPets()).resolves.toHaveLength(1);

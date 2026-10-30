@@ -1,7 +1,7 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening, setPanelMark, clearBrainMarks and markBrainLink.
+ * StatusMarks, markListening, setPanelMark and markBrainLink.
  */
 
 import { topStatus } from '@tagalong/protocol';
@@ -96,13 +96,6 @@ export function setPanelMark(marks: StatusMarks, id: unknown, on: unknown): void
   const mark = id as 'mic-busy' | 'mic-failed' | 'say-name';
   if (!on) marks.clear(mark);
   else marks.set({ id: mark }, mark === 'say-name' ? SAY_NAME_MARK_MS : undefined);
-}
-
-/** Scout can think again: a turn answered, or the sign-in check came back signed in. */
-export function clearBrainMarks(marks: StatusMarks): void {
-  marks.clear('brain-signed-out');
-  marks.clear('brain-no-sign-in');
-  marks.clear('brain-no-key');
 }
 
 /** Whether the brain can be reached: Offline while it is down, Update when it is too new. */

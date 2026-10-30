@@ -16,7 +16,6 @@ export default defineConfig({
       // The pure packages carry the 70% bar. The desktop host (main process and
       // preload, not the renderer) and the shared UI carry a no-regression floor.
       include: [
-        'packages/core/src/**/*.{ts,tsx}',
         'packages/protocol/src/**/*.{ts,tsx}',
         'protocol/ts/src/**/*.ts',
         'bodies/ui/src/**/*.{ts,tsx}',
@@ -25,7 +24,6 @@ export default defineConfig({
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/test-setup.ts'],
       thresholds: {
-        'packages/core/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'packages/protocol/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'protocol/ts/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'bodies/ui/src/**': uiFloor,

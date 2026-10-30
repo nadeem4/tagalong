@@ -26,25 +26,20 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, models and downloads, the voice process           |
 | [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                    |
 
-### The engine
+### Perception, memory and apps
 
-| Doc                                    | Covers                                                                                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight, the sight log, rolling memory                                |
-| [mind.md](mind.md)                     | Prompt assembly, constitution and soul, roles, Now, the turn lifecycle, brain providers, check-ins, watches, the Self, sleep, usage and budget |
-| [memory.md](memory.md)                 | The memory store, recall, the digest, summaries, forgetting, retention                                                                         |
-| [experts.md](experts.md)               | Experts and connectors, hand-offs, Scout's own jobs and the task board, pick up where you left off                                             |
-| [asks.md](asks.md)                     | Saved asks (Waiting on you): risk classes, expiry, outcomes                                                                                    |
-| [routines.md](routines.md)             | Routines: triggers, schedule, delivery, results                                                                                                |
-| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                                                                              |
+| Doc                                    | Covers                                                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight, the sight log, rolling memory |
+| [memory.md](memory.md)                 | The memory store, recall, the digest, summaries, forgetting, retention                                          |
+| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                                               |
 
 ### Foundations
 
-| Doc                                                | Covers                                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, changing settings by talking, the secret store, secrets on the way out |
-| [storage.md](storage.md)                           | SQLite: every table, the numbered migrations, retention jobs                               |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                                   |
+| Doc                                                | Covers                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, the secret store, secrets on the way out |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                     |
 
 ### Working on the code
 
@@ -61,15 +56,13 @@ For an engineer new to the repo:
 
 1. [architecture.md](architecture.md): the processes, the packages and one turn end to end.
 2. [development.md](development.md): get it running locally.
-3. [protocol.md](protocol.md): the contract every host and the engine share.
-4. [mind.md](mind.md), then [memory.md](memory.md): what happens inside a turn and what is kept.
+3. [protocol.md](protocol.md): the contract every host and the brain share.
+4. [memory.md](memory.md): what happens inside a turn and what is kept.
 5. [sight.md](sight.md) and [privacy.md](privacy.md): what is read from the screen and the rules
    around it.
 6. [desktop.md](desktop.md), [bubble.md](bubble.md) and [voice.md](voice.md): the desktop host.
-7. The rest as needed: [experts.md](experts.md), [asks.md](asks.md),
-   [connected-apps.md](connected-apps.md), [routines.md](routines.md),
-   [browser-body.md](browser-body.md), [settings-and-secrets.md](settings-and-secrets.md),
-   [storage.md](storage.md).
+7. The rest as needed: [brain.md](brain.md), [connected-apps.md](connected-apps.md),
+   [browser-body.md](browser-body.md), [settings-and-secrets.md](settings-and-secrets.md).
 
 Before changing a feature, read its subsystem doc and run its section of
 [testing/feature-test-guide.md](testing/feature-test-guide.md).

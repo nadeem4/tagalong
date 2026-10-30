@@ -1,6 +1,6 @@
 /**
- * A pet: the on-screen companion, Scout, as data (role, model, provider). Contains Pet and
- * SCOUT_ID.
+ * A pet: the on-screen companion, Scout, as the body draws it (id, name, avatar). Which
+ * brain answers is the brain's business, not the pet's. Contains Pet and SCOUT_ID.
  */
 import { z } from 'zod';
 
@@ -16,17 +16,5 @@ export const Pet = z.object({
   name: z.string().min(1),
   /** Emoji or an asset key the host knows how to render. */
   avatar: z.string().min(1),
-  /** The role this pet does: a role library id, `companion` for Scout. */
-  roleId: z.string().min(1),
-  /** The model that answers text turns. */
-  model: z.string().min(1),
-  /**
-   * The small, cheap model that answers a watch's frequent yes-or-no check, on the pet's
-   * own provider. Absent means that provider's default: Claude Haiku on OpenRouter and
-   * Anthropic.
-   */
-  watchModel: z.string().min(1).optional(),
-  /** BrainProvider id: 'claude-code', 'openrouter', 'anthropic' or 'fake'. */
-  providerId: z.string().min(1),
 });
 export type Pet = z.infer<typeof Pet>;

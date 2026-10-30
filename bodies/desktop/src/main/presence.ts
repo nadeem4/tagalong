@@ -2,10 +2,8 @@
  * Whether the person is at the computer, for Scout's dozing face. It reads one number, the
  * system's idle time, every 15 s, and hears the screen lock and unlock. Nothing on screen
  * is read, and nothing leaves this computer.
- * Also the wellbeing tick. Contains watchPresence, startPresence and startWellbeingTick.
+ * Contains watchPresence and startPresence.
  */
-
-import type { WindowEntry } from '@tagalong/protocol';
 
 /** No input for this long and Scout dozes. A constant, not a setting. */
 export const AWAY_AFTER_MS = 5 * 60_000;
@@ -47,40 +45,6 @@ export function startPresence(options: {
     },
     stop: () => clearInterval(timer),
   };
-}
-
-/** How often gentle nudges get the idle time and the titles. */
-export const WELLBEING_TICK_MS = 60_000;
-
-/**
- * Gentle nudges' feed: once a minute, the idle time and the window titles (no text, no
- * picture) go to the engine, which decides everything else. While the setting is off or
- * sight is paused, nothing is listed or sent. Returns the stop for quit.
- */
-export function startWellbeingTick(options: {
-  /** Read every tick: the setting and the sight pause change while the app runs. */
-  enabled: () => boolean;
-  /** The system's idle time, in ms. */
-  idleMs: () => number;
-  /** Titles only, with the blind spots already marked. */
-  list: () => Promise<WindowEntry[]>;
-  send: (params: { idleMs: number; windows: WindowEntry[] }) => Promise<unknown>;
-}): () => void {
-  let running = false;
-  const timer = setInterval(() => {
-    if (running || !options.enabled()) return;
-    running = true;
-    const idleMs = options.idleMs();
-    options
-      .list()
-      .then((windows) => options.send({ idleMs, windows }))
-      // A failed listing or an engine that is restarting: try next minute.
-      .catch(() => undefined)
-      .finally(() => {
-        running = false;
-      });
-  }, WELLBEING_TICK_MS);
-  return () => clearInterval(timer);
 }
 
 /** The slice of Electron's `powerMonitor` presence reads. */

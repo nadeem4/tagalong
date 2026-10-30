@@ -13,7 +13,6 @@ describe('ui package surface', () => {
         'DockPet',
         'HostBridgeProvider',
         'HomeView',
-        'brainLabel',
         'BeanClip',
         'SETTINGS_CSS',
         'createFakeHostBridge',

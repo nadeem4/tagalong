@@ -14,7 +14,6 @@ export type { FixTarget };
  * call failed. Never a key or a secret: only whether one is stored.
  */
 export interface HealthFacts {
-  brain: 'ready' | 'signed-out' | 'no-sign-in' | 'no-key' | 'unknown';
   connections: readonly { name: string; status: ConnectionStatus }[] | 'unknown';
   voice:
     | {
@@ -32,7 +31,7 @@ export interface HealthFacts {
   microphone: { count: number; pickedMissing: boolean } | 'unknown';
 }
 
-export type HealthCheckId = 'brain' | 'connections' | 'voice' | 'microphone';
+export type HealthCheckId = 'connections' | 'voice' | 'microphone';
 
 /** `info` and `unknown` rows are never counted as needing the person. */
 export interface HealthRow {
@@ -46,7 +45,6 @@ export interface HealthRow {
 const UNKNOWN = 'Not checked.';
 
 const LABELS: Record<HealthCheckId, string> = {
-  brain: 'Brain',
   connections: 'Connections',
   voice: 'Voice',
   microphone: 'Microphone',
@@ -64,21 +62,6 @@ const make = (
   line,
   ...(fix !== undefined && (state === 'broken' || state === 'info') ? { fix } : {}),
 });
-
-function brainRow(brain: HealthFacts['brain']): HealthRow {
-  switch (brain) {
-    case 'ready':
-      return make('brain', 'ok', 'Ready.');
-    case 'signed-out':
-      return make('brain', 'broken', 'Signed out of Claude.', 'brain');
-    case 'no-sign-in':
-      return make('brain', 'broken', 'Claude Code isn’t on this computer.', 'brain');
-    case 'no-key':
-      return make('brain', 'broken', 'No API key.', 'brain');
-    default:
-      return make('brain', 'unknown', UNKNOWN);
-  }
-}
 
 function connectionsRow(connections: HealthFacts['connections']): HealthRow {
   if (connections === 'unknown') return make('connections', 'unknown', UNKNOWN);
@@ -124,7 +107,6 @@ function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
 /** One row per check, in the card's order. Pure: no call, no model. */
 export function healthRows(facts: HealthFacts): HealthRow[] {
   return [
-    brainRow(facts.brain),
     connectionsRow(facts.connections),
     voiceRow(facts.voice),
     microphoneRow(facts.microphone),

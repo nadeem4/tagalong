@@ -4,7 +4,7 @@
  * FRAME_LONG_SIDE.
  */
 
-import { findCaptureBlock } from '@tagalong/core';
+import { findCaptureBlock } from '../platform/exclusions';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import type { Platform } from '../platform/index';
 import { isSightPaused } from '../platform/sight-gate';

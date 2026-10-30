@@ -7,7 +7,7 @@
  * saveListening.
  */
 
-import { callOrFullScreenInFront } from '@tagalong/core';
+import { callOrFullScreenInFront } from './front-window';
 import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
 import type { ListeningState } from '../shared/ipc';
 

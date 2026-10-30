@@ -6,7 +6,7 @@ import { HealthCard } from './health-card';
 import type { HealthRow } from './health';
 
 const ROWS: HealthRow[] = [
-  { id: 'brain', label: 'Brain', state: 'ok', line: 'Ready.' },
+  { id: 'connections', label: 'Connections', state: 'ok', line: 'Ready.' },
   {
     id: 'voice',
     label: 'Voice',
@@ -30,7 +30,7 @@ describe('HealthCard', () => {
     expect(card).toHaveTextContent('One thing needs you.');
     const items = within(card).getAllByRole('listitem');
     expect(items).toHaveLength(3);
-    expect(items[0]).toHaveTextContent('Brain');
+    expect(items[0]).toHaveTextContent('Connections');
     expect(items[0]).toHaveTextContent('Ready.');
     expect(items[1]).toHaveTextContent('The ElevenLabs voice has no key.');
   });

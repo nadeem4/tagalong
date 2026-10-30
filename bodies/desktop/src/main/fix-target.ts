@@ -10,11 +10,7 @@ import type { FixTarget } from '@tagalong/ui';
  * allowlist: a window names a target, never a page, so it cannot open anything else.
  */
 const PAGES: Record<FixTarget, string> = {
-  brain: 'settings#brain',
   voice: 'settings#voice',
-  browser: 'settings#browser',
-  privacy: 'settings#privacy',
-  experts: 'jobs',
   connections: 'connections',
 };
 

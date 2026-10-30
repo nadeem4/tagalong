@@ -1,7 +1,7 @@
 /**
  * Home: the one window for the companion and the app. Scout in the corner and six pages
  * (overview, jobs, connections, approvals, what Scout remembers, settings), each fed by the
- * Python brain. Contains HomeView, HomeHost, HomeProvider and HomePage. Rendered by the
+ * Python brain. Contains HomeView, HomeHost and HomePage. Rendered by the
  * desktop `home` page.
  */
 
@@ -13,7 +13,6 @@ import { BeanClip } from '../theme/bean-clip';
 import type { BeanClipData } from '../theme/bean-clip';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ApprovalsView } from './approvals-view';
-import { brainLabel } from './brain-label';
 import { ConnectionsPanel } from './connections-panel';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
@@ -33,21 +32,11 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'settings', label: () => 'Settings' },
 ];
 
-export interface HomeProvider {
-  id: string;
-  label: string;
-  needsKey?: boolean;
-}
-
-/** What Home needs from its host beyond the bridge: how the companion can think. */
+/** What Home needs from its host beyond the bridge. */
 export interface HomeHost {
-  setup(): Promise<{
-    /** `needsKey` marks a service that thinks on an API key, so the picker can say so. */
-    providers: readonly HomeProvider[];
-  }>;
   /**
    * Whether the companion can work right now, in a few words: "Ready", or what stops it
-   * (signed out, no key, sight paused). Without it the overview says Ready.
+   * (sight paused). Without it the overview says Ready.
    */
   status?(): Promise<{ text: string; ok: boolean }>;
 }
@@ -72,7 +61,6 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
   const bridge = useHostBridge();
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
-  const [setup, setSetup] = useState<Awaited<ReturnType<HomeHost['setup']>> | null>(null);
 
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -81,11 +69,8 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
   }
 
   useEffect(() => {
-    void Promise.all([bridge.listPets(), host.setup()]).then(([listed, loaded]) => {
-      setPets(listed);
-      setSetup(loaded);
-    });
-  }, [bridge, host]);
+    void bridge.listPets().then(setPets);
+  }, [bridge]);
 
   const companion = pets[0] as Pet | undefined;
   const name = companion?.name ?? 'Scout';
@@ -122,7 +107,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
         ))}
       </nav>
       <main className="home-main">
-        {page === 'overview' && <Overview companion={companion} setup={setup} host={host} />}
+        {page === 'overview' && <Overview companion={companion} host={host} />}
         {page === 'jobs' && <JobsPanel />}
         {page === 'connections' && <ConnectionsPanel />}
         {page === 'approvals' && <ApprovalsView />}
@@ -138,27 +123,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
   );
 }
 
-function providerLabel(
-  setup: Awaited<ReturnType<HomeHost['setup']>> | null,
-  providerId: string,
-): string {
-  return setup?.providers.find((p) => p.id === providerId)?.label ?? providerId;
-}
-
-/** "Your Claude sign-in" reads "your Claude sign-in" mid-sentence. */
-function lowerYour(label: string): string {
-  return label.startsWith('Your ') ? `y${label.slice(1)}` : label;
-}
-
-function Overview({
-  companion,
-  setup,
-  host,
-}: {
-  companion: Pet | undefined;
-  setup: Awaited<ReturnType<HomeHost['setup']>> | null;
-  host: HomeHost;
-}) {
+function Overview({ companion, host }: { companion: Pet | undefined; host: HomeHost }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
 
   useEffect(() => {
@@ -182,16 +147,6 @@ function Overview({
             />{' '}
             {status.text}
           </p>
-          {companion !== undefined && (
-            <p>
-              Thinks with{' '}
-              {brainLabel(
-                lowerYour(providerLabel(setup, companion.providerId)),
-                companion.providerId,
-                companion.model,
-              )}
-            </p>
-          )}
           <p>Looks at your screen when you ask it something. Never at its blind spots.</p>
         </section>
       </div>

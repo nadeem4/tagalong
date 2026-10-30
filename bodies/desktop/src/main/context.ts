@@ -6,8 +6,8 @@
 
 import { randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
-import { findCaptureBlock, normalizeProcessName } from '@tagalong/core';
-import type { CaptureBlock } from '@tagalong/core';
+import { findCaptureBlock, normalizeProcessName } from './platform/exclusions';
+import type { CaptureBlock } from '@tagalong/protocol';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';

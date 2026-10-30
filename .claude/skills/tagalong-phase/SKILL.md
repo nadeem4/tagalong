@@ -55,14 +55,14 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 
 ## Invariants that outrank convenience
 
-- **Core is pure.** `packages/core` and `packages/protocol` must never import `electron`,
+- **The protocol packages are pure.** `packages/protocol` and `protocol/ts` must never import `electron`,
   `react`, or DOM globals. An ESLint `no-restricted-imports` rule enforces it — if that rule
   fires, fix the import, never the rule.
 - **No computer control, ever.** No mouse or keyboard automation anywhere in the repo. The one
   exception already in the plan is the Ctrl+C selection trick in the desktop host, which is
   scoped to reading the selection and restoring the clipboard.
 - **Test with the fake provider. Always.** Every test, every manual check, every launch you
-  do yourself runs on a fake brain (the e2e fake brain in `bodies/desktop/e2e/fixtures`, or `FakeBrainProvider` in packages/core tests). **Never** run a real Anthropic, OpenAI or ElevenLabs call to verify your own work.
+  do yourself runs on a fake brain (the e2e fake brain in `bodies/desktop/e2e/fixtures`). **Never** run a real Anthropic, OpenAI or ElevenLabs call to verify your own work.
   The user pays per token for API calls; burning their budget to satisfy your curiosity is not
   yours to spend. Acceptance steps that genuinely need a real provider — "the answer references
   the selected text" — are handed to the user to run, listed under "Needs a human run", and left
@@ -81,25 +81,6 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
   is different and fine — the `AnthropicProvider`, the Claude API, the model ids, and the
   Claude sign-in all stay. The test is authorship,
   not the word: say who built it, never that an AI did.
-
-## Where code goes in packages/core
-
-| Folder          | Holds                                                                    |
-| --------------- | ------------------------------------------------------------------------ |
-| `conversation/` | `ConversationRunner` and the prompt assembler: one turn, start to finish |
-| `tools/`        | the `Tool` shape, `ToolRegistry`, and every built-in tool in `builtin/`  |
-| `perception/`   | capture policy: exclusions, retention, inventory, text layer, routing    |
-| `watch/`        | `WatchManager`, the poll behind `watch_for`                              |
-| `memory/`       | the database, conversation store, memories, recall, summaries            |
-| `providers/`    | `BrainProvider` and its implementations                                  |
-| `server/`       | the WebSocket server and pairing                                         |
-| `pets/`         | `PetRegistry` and the default pet, Scout                                 |
-| `settings/`     | `SettingsStore` and the secret store                                     |
-| `engine.ts`     | boots and wires the parts                                                |
-
-**The import rule:** `conversation/` and `engine.ts` import tools only from `tools/registry` or the
-`tools` index, never from `tools/builtin/*`. ESLint enforces it. Adding a tool: use the
-`tagalong-add-tool` skill.
 
 ## Commit sizing
 

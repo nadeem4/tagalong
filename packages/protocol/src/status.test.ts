@@ -19,14 +19,8 @@ describe('STATUS_WORDS', () => {
     }
   });
 
-  it('sends the brain marks to the brain fix, and Listening to none', () => {
-    expect(STATUS_WORDS['brain-signed-out']).toEqual({
-      tag: 'Signed out',
-      detail: 'Can’t think: signed out of Claude.',
-      fix: 'brain',
-    });
-    expect(STATUS_WORDS['brain-no-sign-in'].fix).toBe('brain');
-    expect(STATUS_WORDS['brain-no-key'].fix).toBe('brain');
+  it('has no sign-in or key marks: the brain owns its own login', () => {
+    expect(StatusId.options.filter((id) => /sign|key/.test(id))).toEqual([]);
     expect(STATUS_WORDS['listening-on'].fix).toBeUndefined();
   });
 
@@ -59,11 +53,11 @@ describe('statusTag', () => {
 describe('topStatus', () => {
   it('picks the first mark in the order, or null', () => {
     expect(topStatus([])).toBeNull();
-    expect(topStatus([{ id: 'listening-on' }, { id: 'brain-no-key' }])).toEqual({
-      id: 'brain-no-key',
+    expect(topStatus([{ id: 'listening-on' }, { id: 'mic-busy' }])).toEqual({
+      id: 'mic-busy',
     });
-    expect(topStatus([{ id: 'brain-no-key' }, { id: 'brain-signed-out' }])).toEqual({
-      id: 'brain-signed-out',
+    expect(topStatus([{ id: 'mic-busy' }, { id: 'brain-offline' }])).toEqual({
+      id: 'brain-offline',
     });
   });
 
@@ -71,9 +65,6 @@ describe('topStatus', () => {
     expect(StatusId.options).toEqual([
       'brain-offline',
       'brain-outdated',
-      'brain-signed-out',
-      'brain-no-sign-in',
-      'brain-no-key',
       'ears-failed',
       'mic-busy',
       'mic-failed',

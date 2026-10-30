@@ -16,7 +16,6 @@ import '@fontsource/pixelify-sans/latin-700.css';
 import './home.css';
 import '../../shared/ipc';
 import { FIGURE } from './bean-assets';
-import { overviewStatus, scoutBrain } from './settings/brain';
 import { SettingsPage } from './settings/settings-page';
 import { homeTarget, scrollToSection } from './home-target';
 
@@ -25,25 +24,11 @@ const SCROLL_TRIES = 30;
 
 /** How Home reads and changes the companion through the desktop's host calls. */
 const homeHost: HomeHost = {
-  setup: async () => {
-    const view = await window.tagalongHost.getHostView();
-    return {
-      // The fake provider is for tests and demos, never offered.
-      providers: view.providers
-        .filter((choice) => choice.id !== 'fake')
-        .map(({ id, label, needsKey }) => ({ id, label, needsKey })),
-    };
-  },
-  // The overview's line: Ready only when Scout can think (signed in, or a key) and see.
+  // The overview's line: Ready, unless sight is paused. Whether the brain can think is the
+  // brain's to say (the bubble's offline mark), not a check the body makes.
   status: async () => {
-    const view = await window.tagalongHost.getHostView();
-    const scout = view.pets[0];
-    const signIn =
-      scout?.providerId === 'claude-code'
-        ? await window.tagalongHost.checkClaudeSignIn().catch(() => 'unknown' as const)
-        : null;
     const paused = await window.tagalongHost.getSightPaused().catch(() => false);
-    return overviewStatus(scoutBrain(scout, view.providers, signIn), paused);
+    return paused ? { text: 'Ready, sight paused', ok: false } : { text: 'Ready', ok: true };
   },
 };
 

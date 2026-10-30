@@ -5,7 +5,7 @@
 `bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
 (contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
 global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
-brain directly. The desktop no longer boots the TypeScript engine (`packages/core`); start the brain
+brain directly. The desktop does not run a brain of its own; start the brain
 yourself with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
@@ -28,11 +28,16 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
-| `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
-| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`)                                                                                                              |
+| `src/main/settings-store.ts`               | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
+| `src/main/hide-secrets.ts`                 | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
+| `src/main/front-window.ts`                 | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
+| `src/main/test-support/`                   | `InMemorySecretStore`, a volatile `SecretStore` for tests                                                                                                                   |
 | `src/main/fix-target.ts`                   | `fixPage` (the Fix it allowlist)                                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
+| `src/main/platform/exclusions.ts`          | `findCaptureBlock`, `secretFileRule`, `normalizeProcessName`: which window may not be read                                                                                  |
+| `src/main/platform/inventory.ts`           | `buildInventory`: applies the exclusions to the host's window list                                                                                                          |
+| `src/main/platform/text-layer-notes.ts`    | What a window's text does not say (editors, terminals and canvas apps publish little)                                                                                       |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
 | `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
 | `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
@@ -62,8 +67,8 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 1. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
    is ever handed the ungated adapter (see [sight.md](sight.md)).
-2. Opens `SafeStorageSecretStore(userData)` (and `forgetRetiredKeys`), `SettingsStore(userData)`,
-   and calls `recordLaunch(settingsStore, app.getVersion())` before anything else reads settings.
+2. Opens `SafeStorageSecretStore(userData)`, `SettingsStore(userData)`,
+   so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
    mark on `IPC.statusMarkEvent`), `RollingMemory` and `PerceptionMemory`.
 4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
@@ -74,13 +79,13 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
-   `applyHotkeys(settings)`. There is no launch greeting, and the keep-an-eye
-   and wellbeing ticks are not started.
+   `applyHotkeys(settings)`. There is no launch greeting, launch record, keep-an-eye or
+   wellbeing tick.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
-  A["whenReady: start()"] --> B["gated platform, secrets, settings, recordLaunch"]
+  A["whenReady: start()"] --> B["gated platform, secrets, settings"]
   B --> C["startBrain (retries every 2 s)"]
   C --> E["panel window, avatar window"]
   E --> F["talk key hook, applyHotkeys"]
@@ -139,7 +144,7 @@ running.
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
 - **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye and wellbeing
-  come back as the brain's rows land; the old engine's IPC for them is deleted, not stubbed.
+  come back as the brain's rows land; the old TypeScript brain's IPC for them is deleted, not stubbed.
 
 `shutdown()` stops the client.
 
@@ -164,9 +169,8 @@ Rules each module enforces:
   vertically centred. A saved point is clamped into the work area, so an unplugged monitor never
   leaves the pet off screen. `moved` and `IPC.dropAvatar` save `settings.set { avatar }`. The pet
   is moved by `IPC.dragAvatar` steps from the page (a drag region would swallow its clicks);
-  `moveWindow` moves it, and the open panel follows through `placePanel`. `session-end` (Windows
-  ending the session) calls `recordCleanClose`. `show`/`hide` feed the Always listening pause
-  (`petsShown`).
+  `moveWindow` moves it, and the open panel follows through `placePanel`. `show`/`hide` feed the
+  Always listening pause (`petsShown`).
 - **Panel.** `placePanel` uses `panelPosition(pet, size, workArea)`: right against the pet with no
   gap, on the right when there is room, otherwise the left, its bottom level with the pet's,
   clamped to the work area. It then sends `IPC.panelSideEvent` (`'left' | 'right'`) so the bubble
@@ -288,8 +292,7 @@ the bubble's settings card. After `SettingsStore` saves, it:
 - broadcasts the saved settings on `IPC.settingsChangedEvent`, which open windows apply at once
   (the panel reads its talk key and microphone from it).
 
-The settings that are read when used rather than at boot (exclusions, the window text budget,
-sight detail) are covered in [sight.md](sight.md); the settings store itself, the chat allowlist
+The exclusions are read when used rather than at boot and are covered in [sight.md](sight.md); the settings store itself, the chat allowlist
 and the settings card's checks are in [settings-and-secrets.md](settings-and-secrets.md).
 
 ### The IPC modules
@@ -301,7 +304,7 @@ use the brain client directly; the rest call brain tools through `callJson`. A g
 (`ipc/ipc-channels.test.ts`) fails when a channel in `shared/ipc.ts` is not used by both main and
 the preload, so a dead channel cannot linger.
 
-| Module           | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                         | Engine calls / notes                                                                                                                                                                                                                                                                                                                                 |
+| Module           | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                         | Brain calls / notes                                                                                                                                                                                                                                                                                                                                  |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `turns.ts`       | `ask` (`ask`), `interrupt` (`interrupt`), `remarkNotNow` (`remark:not-now`)                                                                                                                                                  | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `interrupt`; `remarkNotNow` does nothing on the Python brain                                                                                                                                                                                             |
 | `scout.ts`       | `listPets` (`pets:list`)                                                                                                                                                                                                     | The one fixed local Scout, no brain call                                                                                                                                                                                                                                                                                                             |
@@ -310,14 +313,14 @@ the preload, so a dead channel cannot linger.
 | `memory.ts`      | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                             | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
 | `permissions.ts` | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                  | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
 | `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                            | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
-| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`), `saveApiKey` (`secret:api-key`)                                                                                                                                  | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
+| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`), `saveElevenLabsKey` (`secret:elevenlabs-key`; an empty key deletes it)                                                                                           | Works from `SettingsStore`, with no brain; the ElevenLabs key goes to the secret store (see [settings-and-secrets.md](settings-and-secrets.md))                                                                                                                                                                                                      |
 | `voice.ts`       | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent` | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
 | `clipboard.ts`   | `copyText` (`clipboard:copy-text`)                                                                                                                                                                                           | `clipboard.writeText` only, from the panel only, strings up to `MAX_COPY_CHARS` (20,000); also exports `fromWindow`                                                                                                                                                                                                                                  |
 | `browser.ts`     | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                            | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
 | `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`                                                                                                                                                                                                                                                                                                                  |
 | `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
-`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `providers` (`ProviderChoice[]`, with `hasKey` and never the key), `engineVersion`,
+`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `engineVersion`,
 `hotkeyError`, `platform` (`process.platform`) and
 `elevenLabsKeyStored`.
 
@@ -335,7 +338,6 @@ shell, the screen):
 | `dragAvatar`, `dropAvatar`                           | move the pet by a finite step; save its position                                                                                                  |
 | `openSettings`                                       | `openSettingsPage(fixPage(target))`; an unknown target throws                                                                                     |
 | `openHome`, `openLogsFolder`                         | open the window or the folder                                                                                                                     |
-| `checkClaudeSignIn`                                  | `signInFor(env)` (signed in clears the brain marks)                                                                                               |
 | `dropOnPet` (`drop.ts`, `registerDropIpc`)           | only from the avatar's window (`fromWindow`); names the item and opens the bubble on `IPC.dropEvent`                                              |
 
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
@@ -450,7 +452,7 @@ understands. It keeps each open turn's reply text, because `turn.completed` carr
 | `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                                                                                                                                                                                                                                   |
 | `ask` open with `confirm: true`                | `connector.confirm`: `approvalId` is the ask id, `turnId` its turn, `app` the tool's body label (text before `__`, capitalised) or `Scout` for a brain tool, `summary` the ask `text` (or, when empty, the tool name and its input, one `key: value` per line), `options` carried (no `always` on a locked tool)                             |
 | `ask` open without `confirm` (a job's ask)     | `connector.confirm` too, with `turnId` empty (the ask has no turn), `summary` the text plus its input as `key: value` lines, `app` `Claude Code` for a `claude_code:` tool or a question, else `Scout`; a question (no `tool`) has `tool: 'question'` and `question: true`; the card is removed only by the ask's `closed` frame or a resync |
-| `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old engine, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                                                      |
+| `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old TypeScript brain, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                                            |
 | `changed`                                      | no TurnEvent; its `what` goes to the windows on `IPC.brainChangedEvent` (`onBrainChanged`)                                                                                                                                                                                                                                                   |
 | resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `connector.dismiss` for each open ask; the state is cleared                                                                                                                                                                             |
 
@@ -488,7 +490,7 @@ Everything OS-specific sits behind `Platform` (`src/main/platform/index.ts`):
 Each method that reads the screen takes the exclusion list, so a refusal happens
 inside the read. `createPlatform(platform = process.platform)` returns `Win32Platform` on
 `win32` and throws "Tagalong has no platform adapter for '…'. It runs on Windows only." anywhere
-else, because a host that silently perceives nothing looks like a broken engine. `gateSight`
+else, because a host that silently perceives nothing looks like a broken brain. `gateSight`
 wraps it so every method checks the sight pause first (`SightPausedError`).
 
 Each capability is a free function taking its Electron dependencies (`desktopCapturer`, `screen`,
@@ -507,23 +509,16 @@ is tested in plain Node with no display. `nut-js` and `get-windows` are imported
   replacing the old one. Any failure, building the line or writing it, is swallowed.
 - `logLine(level, args, now)` is `<ISO time> WARN|ERROR <text>`: `keptText` (`log-text.ts`) keeps
   a text first argument and an `Error`'s name and message (never its stack); every other argument
-  becomes its type. The line goes through core's `hideSecrets`, is put on one line and cut at
+  becomes its type. The line goes through `hideSecrets` (`hide-secrets.ts`), is put on one line and cut at
   300 characters (`MAX_LINE`).
 - `rendererConsole(details)` takes a window's `console-message`: level `warning` becomes
   `console.warn('[renderer] …')`, `error` becomes `console.error`; others are dropped.
-- The engine runs in main's process, so core's warnings land in the same file. The voice process
+- The voice process
   posts its kept text as a `{ kind: 'log' }` message, logged in main as `[voice process] …`.
 - `openLogsFolder(dir, open)` makes the folder, then `shell.openPath` on it (`IPC.openLogsFolder`,
   the health card's Open logs folder). No log text crosses IPC.
 
 Review rule for call sites: never put speech, screen or file text in a warning's first argument.
-
-### Launch record
-
-The launch record (`launch.ts`): `recordLaunch`
-reads whether the last launch closed cleanly and stores `closedCleanly: false` and the running
-version; `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on `before-quit` and
-on the avatar's `session-end`.
 
 ### Bundling the workspace packages
 
@@ -532,7 +527,7 @@ on the avatar's `session-end`.
 - **main**: two entries, `main` (`src/main/index.ts`) and `voice-worker`
   (`src/main/voice/worker/main.ts`), to `dist/main.js` and `dist/voice-worker.js`, ES modules.
   `externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })` keeps the app's `dependencies`
-  external and bundles `@tagalong/core`, `@tagalong/protocol` and `@tagalong/ui`. They compile with
+  external and bundles `@tagalong/protocol` and `@tagalong/ui`. They compile with
   `moduleResolution: bundler`, so their emitted relative imports have no file extension and Node's
   ESM loader could not resolve them at runtime; Rollup resolves them at build time instead.
   `rollupOptions.external: NATIVE_DEPS` keeps the native modules out of the bundle even when a
@@ -597,7 +592,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 ## Interfaces
 
-- `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`, `previousLaunch`,
+- `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
   `settings`, `secrets`, `avatar`, `panel`, `tray`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `rolling`, `perceptionMemory`, `voice`, `voiceWorker`,
@@ -623,7 +618,6 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`                        |
 | `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`                        |
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `packages/protocol/src/settings.ts` |
-| `SIGN_IN_BUDGET_MS`                 | 1,000 ms                       | `launch.ts`                         |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`                       |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`                  |
 | Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`                     |
@@ -636,8 +630,8 @@ The desktop host writes:
 
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
 - Settings through `SettingsStore`
-  (`settings.json` in `userData`): the avatar position, `lastOpenedAt`, the launch record, the
-  Welcome record (`Settings.welcome`, now unused by the desktop). See [settings-and-secrets.md](settings-and-secrets.md).
+  (`settings.json` in `userData`): the avatar position, hotkeys, voice and the other settings
+  in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
 - Keys through `SafeStorageSecretStore`. See [settings-and-secrets.md](settings-and-secrets.md).
 - Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
   [voice.md](voice.md).
@@ -679,18 +673,18 @@ when a button on its card asks. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test                                                                                       | Pins                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/hotkeys.test.ts`                                                                 | registration outcomes, defaults that do not collide, rebind without restart, one refusal costs one action, retry, dispose, the talk key is never a global shortcut, the problem message                                                       |
-| `e2e/hotkey-recovery.spec.ts`                                                              | the app starts with an unregisterable accelerator, the message names it, the panel shows it, the rest still work                                                                                                                              |
-| `e2e/smoke.spec.ts`                                                                        | launch with avatar and panel, click opens and keeps the bubble, a rebound hotkey applies on save, sight pause refuses a real capture, a tool call over the real socket, Home is one window, setup opens                                       |
-| `src/main/windows/position.test.ts`                                                        | docking, a remembered position, clamping after a layout change, panel side and clamp, `crossesScale`                                                                                                                                          |
-| `src/main/windows/bubble-focus.test.ts`                                                    | `hidesOnBlur`: other app hides; streaming, the pet, or focus back keeps it                                                                                                                                                                    |
-| `src/main/windows/home.test.ts`                                                            | `HOME_MIN_WIDTH`                                                                                                                                                                                                                              |
-| `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
-| `src/main/ipc/*.test.ts`                                                                   | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
-| `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
-| `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                          |
-| `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                              |
-| `src/main/platform/index.test.ts`                                                          | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                            |
-| `src/main/packaging.test.ts`, `app-identity.test.ts`                                       | the installer config, unpack rules, runtime dependencies, `uiohook-napi` in `NATIVE_DEPS`, the one-command Windows build; `productName`                                                                                                       |
+| Test                                                 | Pins                                                                                                                                                                                                                                          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/hotkeys.test.ts`                           | registration outcomes, defaults that do not collide, rebind without restart, one refusal costs one action, retry, dispose, the talk key is never a global shortcut, the problem message                                                       |
+| `e2e/hotkey-recovery.spec.ts`                        | the app starts with an unregisterable accelerator, the message names it, the panel shows it, the rest still work                                                                                                                              |
+| `e2e/smoke.spec.ts`                                  | launch with avatar and panel, click opens and keeps the bubble, a rebound hotkey applies on save, sight pause refuses a real capture, a tool call over the real socket, Home is one window, setup opens                                       |
+| `src/main/windows/position.test.ts`                  | docking, a remembered position, clamping after a layout change, panel side and clamp, `crossesScale`                                                                                                                                          |
+| `src/main/windows/bubble-focus.test.ts`              | `hidesOnBlur`: other app hides; streaming, the pet, or focus back keeps it                                                                                                                                                                    |
+| `src/main/windows/home.test.ts`                      | `HOME_MIN_WIDTH`                                                                                                                                                                                                                              |
+| `src/main/tray-menu.test.ts`                         | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
+| `src/main/ipc/*.test.ts`                             | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
+| `src/main/log-file.test.ts`                          | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
+| `src/main/fix-target.test.ts`                        | Fix it targets                                                                                                                                                                                                                                |
+| `src/preload/held.test.ts`                           | `heldUntilHeard`                                                                                                                                                                                                                              |
+| `src/main/platform/index.test.ts`                    | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                            |
+| `src/main/packaging.test.ts`, `app-identity.test.ts` | the installer config, unpack rules, runtime dependencies, `uiohook-napi` in `NATIVE_DEPS`, the one-command Windows build; `productName`                                                                                                       |

@@ -28,7 +28,7 @@ import {
   TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
 import type { PerceptionTarget, Settings } from '@tagalong/protocol';
-import { SettingsStore } from '@tagalong/core';
+import { SettingsStore } from './settings-store';
 import {
   AlwaysListening,
   listeningPaused,
@@ -38,15 +38,7 @@ import {
 import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import {
-  StatusMarks,
-  clearBrainMarks,
-  markBrainLink,
-  markListening,
-  setPanelMark,
-} from './status-marks';
-import { recordCleanClose, recordLaunch } from './launch';
-import type { PreviousLaunch } from './launch';
+import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
@@ -55,7 +47,6 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { ELEVENLABS_SECRET_KEY, forgetRetiredKeys } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -63,7 +54,6 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
@@ -81,7 +71,7 @@ import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
-import { SafeStorageSecretStore } from './secret-store';
+import { ELEVENLABS_SECRET_KEY, SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
 import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
@@ -120,8 +110,6 @@ interface Desktop {
   brain: BrainClient;
   platform: Platform;
   settingsStore: SettingsStore;
-  /** What the last launch left behind: whether it crashed, and which version it ran. */
-  previousLaunch: PreviousLaunch;
   /** The settings the running app is using; refreshed whenever they are saved. */
   settings: Settings;
   secrets: SafeStorageSecretStore;
@@ -226,8 +214,6 @@ app.on('before-quit', () => {
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
-  // The next launch's greeting counts the time away from now, not from when this one opened.
-  recordCleanClose(desktop?.settingsStore, new Date());
   desktop?.brain.stop();
 });
 
@@ -239,11 +225,7 @@ async function start(): Promise<void> {
   const platform = gateSight(createPlatform(), () => sightPause.paused);
   const dataDir = app.getPath('userData');
   const secrets = new SafeStorageSecretStore(dataDir);
-  void forgetRetiredKeys(secrets).catch(() => {});
   const settingsStore = new SettingsStore(dataDir);
-
-  // Before anything else reads or writes settings: what the last launch left, then this one.
-  const previousLaunch = recordLaunch(settingsStore, app.getVersion());
   const settings = settingsStore.get();
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
@@ -340,7 +322,6 @@ async function start(): Promise<void> {
     brain,
     platform,
     settingsStore,
-    previousLaunch,
     settings,
     secrets,
     avatar: null,
@@ -468,9 +449,6 @@ async function start(): Promise<void> {
     position: settings.avatar,
     onMoved: (position) => rememberAvatarSpot(position),
   });
-  // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
-  // clean close too, not a crash.
-  desktop.avatar.on('session-end', () => recordCleanClose(desktop?.settingsStore, new Date()));
   // The pets hidden (the tray's Hide pets): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));
@@ -613,11 +591,6 @@ function stopVoice(): void {
   }
 }
 
-/** A finished turn that said something. */
-function hasText(params: { text?: unknown }): boolean {
-  return typeof params.text === 'string' && params.text !== '';
-}
-
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(incoming: { method: string; params: unknown }): void {
   // Read before showRemark below, which shows the hidden panel for the quiet line.
@@ -642,11 +615,6 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
   ) {
     desktop?.activeTurns.delete(params.turnId);
   }
-  // An answer with words means Scout can think: the brain mark goes.
-  if (notification.method === 'turn.completed' && desktop !== null && hasText(params)) {
-    clearBrainMarks(desktop.statusMarks);
-  }
-
   if (notification.method === 'pet.remark') showRemark(notification.params);
   // A change Scout wants to make in a connected app: the confirm card must be seen.
   if (notification.method === 'connector.confirm') bringUpBubble(true);
@@ -832,7 +800,7 @@ async function captureForPanel(
 }
 
 /**
- * Wires every IPC channel. The handlers that only need the engine, the settings or the
+ * Wires every IPC channel. The handlers that only need the settings or the
  * voice live in `ipc/`, which takes what it needs as arguments so it is tested without
  * Electron; the ones left here need Electron itself: they move windows, read the screen
  * or open things through the shell.
@@ -941,13 +909,6 @@ function registerIpc(): void {
     openLogsFolder(logsDir(), (path) => shell.openPath(path)),
   );
   ipcMain.handle(IPC.openHome, () => openHome());
-
-  // Check again in Settings: signed in now clears the brain mark on Scout.
-  ipcMain.handle(IPC.checkClaudeSignIn, async () => {
-    const state = await signInFor(process.env);
-    if (state === 'signed-in' && desktop !== null) clearBrainMarks(desktop.statusMarks);
-    return state;
-  });
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.

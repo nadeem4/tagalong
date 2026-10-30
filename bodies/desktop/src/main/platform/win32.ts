@@ -5,7 +5,7 @@
 
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
-import { buildInventory } from '@tagalong/core';
+import { buildInventory } from './inventory';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import { lookAtWindowWith } from './window-shot';

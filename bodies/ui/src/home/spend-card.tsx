@@ -24,8 +24,7 @@ function cap(usd: number): string {
 }
 
 /**
- * Home's Spend card. Read again whenever a turn starts or ends, the
- * same moments Activity refreshes.
+ * Home's Spend card. Read again whenever a turn starts or ends.
  */
 export function SpendCard() {
   const bridge = useHostBridge();

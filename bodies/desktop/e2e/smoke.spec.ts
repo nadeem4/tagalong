@@ -43,7 +43,6 @@ test.beforeAll(async () => {
       ...process.env,
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_SIGN_IN: 'signed-in',
       TAGALONG_FAKE_TTS: '1',
       // Talk to Scout hears a fixed question, through Chromium's fake microphone.
       TAGALONG_FAKE_STT: '1',
@@ -320,8 +319,7 @@ test('a tool call travels the real socket and the real host answers it', async (
   test.skip(true, 'returns with row 5d: window tools as body tools');
   const avatar = await windowFor('avatar');
 
-  // Every test in packages/core/src/perception hands the toolset a fake host, and every
-  // test in bodies/desktop/src/main/platform feeds a parser fixture output, so a tool and a
+  // Every test in bodies/desktop/src/main/platform feeds a parser fixture output, so a tool and a
   // host can each be right while the perception.* method between them is missing and the
   // whole suite stays green. This drives the real round trip.
   //
@@ -453,34 +451,25 @@ test('a rebound hotkey is applied on save, without a restart', async () => {
   expect(after.settings.hotkeys.ask).toBe(original.ask);
 });
 
-/** The two sight settings must survive the round trip through the real store. */
-test('sight detail and the window text budget save and read back', async () => {
+/** Rolling memory's minutes must survive the round trip through the real store. */
+test('rolling memory minutes save and read back', async () => {
   const settings = await windowFor('panel');
 
   const before = await settings.evaluate(() => window.tagalongHost.getHostView());
   const saved = await settings.evaluate(() =>
-    window.tagalongHost.saveSettings({ sightDetail: 'all', windowTextBudget: 12_000 }),
+    window.tagalongHost.saveSettings({ rollingMemory: { enabled: false, minutes: 7 } }),
   );
-  expect(saved.sightDetail).toBe('all');
-  expect(saved.windowTextBudget).toBe(12_000);
+  expect(saved.rollingMemory.minutes).toBe(7);
 
   try {
     const reread = await settings.evaluate(() => window.tagalongHost.getHostView());
-    expect(reread.settings.sightDetail).toBe('all');
-    expect(reread.settings.windowTextBudget).toBe(12_000);
+    expect(reread.settings.rollingMemory.minutes).toBe(7);
   } finally {
-    // Same reason as the hotkey test: these persist, and a suite that leaves the budget
-    // raised changes what every later run costs.
+    // Same reason as the hotkey test: this persists, and a suite that leaves it changed
+    // changes what every later run keeps in memory.
     await settings.evaluate(
-      (previous) =>
-        window.tagalongHost.saveSettings({
-          sightDetail: previous.sightDetail,
-          windowTextBudget: previous.windowTextBudget,
-        }),
-      {
-        sightDetail: before.settings.sightDetail,
-        windowTextBudget: before.settings.windowTextBudget,
-      },
+      (previous) => window.tagalongHost.saveSettings({ rollingMemory: previous }),
+      before.settings.rollingMemory,
     );
   }
 });
@@ -501,7 +490,9 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
   expect(pets.map((pet) => pet.id)).toEqual(['scout']);
-  await expect(home.getByRole('region', { name: 'Scout' })).toContainText('Thinks with');
+  await expect(home.getByRole('region', { name: 'Scout' })).toContainText(
+    'Never at its blind spots.',
+  );
 
   // Bean, still, in the nav tile: its strip loads past Home's CSP.
   const navBean = nav.locator('.home-nav__tile [data-testid=bean-clip]');
@@ -510,15 +501,18 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
 
   // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
-  for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
+  for (const section of ['Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
-  // Advanced is closed until asked for; it holds the ElevenLabs voice, sight detail and watches.
+  // Advanced is closed until asked for; it holds the ElevenLabs voice (the screen-memory
+  // minutes are in Privacy, so only the ElevenLabs heading proves the body opened).
   const advanced = home.getByRole('button', { name: /Advanced/ });
+  const elevenLabs = home.getByRole('heading', { name: 'ElevenLabs voice (optional)' });
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
+  await expect(elevenLabs).toBeHidden();
   await advanced.click();
   await expect(advanced).toHaveAttribute('aria-expanded', 'true');
-  await expect(home.getByText('With several monitors, a look sends')).toBeVisible();
+  await expect(elevenLabs).toBeVisible();
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();

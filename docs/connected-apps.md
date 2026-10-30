@@ -21,9 +21,6 @@ Status: the brain side (slice 9a), Home's Connections page on it (9b) and browse
 | `brain/src/brain/main.py`        | Builds `Apps`, starts it after the server is up, shuts it down before memory |
 | `brain/tests/fake_mcp_server.py` | A small stdio and http MCP server for tests                                  |
 
-The old TypeScript engine (`packages/core/src/connections/`) is no longer used by the desktop and
-will be deleted with `packages/core`.
-
 ## How it works
 
 ```mermaid

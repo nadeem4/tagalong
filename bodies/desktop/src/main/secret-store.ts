@@ -1,15 +1,27 @@
 /**
- * The engine's SecretStore on this host: API keys encrypted with the OS keychain (Electron
- * safeStorage) in secrets.json. Contains SafeStorageSecretStore.
+ * The desktop's secrets: keys encrypted with the OS keychain (Electron safeStorage) in
+ * secrets.json. Contains SecretStore, SafeStorageSecretStore and ELEVENLABS_SECRET_KEY.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
-import type { SecretStore } from '@tagalong/core';
+
+/**
+ * Secrets never live in the settings file. The desktop backs this with Electron safeStorage;
+ * tests use the in-memory fake in test-support.
+ */
+export interface SecretStore {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
+}
 
 /** Encrypted secrets sit next to the database and settings in the host's data dir. */
 export const SECRETS_FILENAME = 'secrets.json';
+
+/** Where the ElevenLabs key is kept: the one secret the desktop holds, for the voice. */
+export const ELEVENLABS_SECRET_KEY = 'elevenlabs.apiKey';
 
 /** The slice of Electron safeStorage this store uses, so tests can supply their own. */
 export interface SafeStorageLike {
@@ -19,7 +31,7 @@ export interface SafeStorageLike {
 }
 
 /**
- * The engine's SecretStore backed by the OS keychain through Electron safeStorage.
+ * The SecretStore backed by the OS keychain through Electron safeStorage.
  *
  * Only ciphertext is written, base64 wrapped so the file stays plain JSON. If the OS has
  * no encryption backend the store refuses to write at all: an API key sitting readable in

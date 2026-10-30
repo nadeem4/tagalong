@@ -9,8 +9,7 @@ import type { HostBridge } from './host-bridge';
 import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 const FACTS: HealthFacts = {
-  brain: 'signed-out',
-  connections: [],
+  connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
   voice: {
     enabled: true,
     mouth: 'kokoro',
@@ -53,7 +52,7 @@ describe('CompanionBubble, the health check', () => {
     expect(fake.asks).toEqual([]);
     const card = screen.getByRole('region', { name: 'Health check' });
     expect(card).toHaveTextContent('One thing needs you.');
-    expect(card).toHaveTextContent('Signed out of Claude.');
+    expect(card).toHaveTextContent('GitHub needs you to sign in again.');
     // Typed: nothing is said aloud.
     expect(onSay).not.toHaveBeenCalled();
   });
@@ -92,8 +91,8 @@ describe('CompanionBubble, the health check', () => {
     const { openFix } = setup();
     ask('are you ok?');
     await flush();
-    fireEvent.click(screen.getByRole('button', { name: 'Fix Brain' }));
-    expect(openFix).toHaveBeenCalledWith('brain');
+    fireEvent.click(screen.getByRole('button', { name: 'Fix Connections' }));
+    expect(openFix).toHaveBeenCalledWith('connections');
   });
 
   it('opens the logs folder through the host', async () => {

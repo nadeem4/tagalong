@@ -1,88 +1,36 @@
-/** Tests for the Pet schema, including the keys it drops, SCOUT_ID and watchModel. */
+/** Tests for the Pet schema: only what the body draws, and the keys it drops. */
 import { describe, expect, it } from 'vitest';
 import { Pet, SCOUT_ID } from './pet';
 
-const valid = {
-  id: 'scout',
-  name: 'Scout',
-  avatar: '🔎',
-  roleId: 'companion',
-  model: 'claude-sonnet-5',
-  providerId: 'anthropic',
-};
+const valid = { id: 'scout', name: 'Scout', avatar: '🔎' };
 
 describe('Pet', () => {
   it('parses a minimal pet as it is', () => {
     expect(Pet.parse(valid)).toEqual(valid);
   });
 
-  it('still parses a crew-era pet, dropping its grants, reply style, notes and colour', () => {
+  it('has exactly the keys the body draws: id, name, avatar', () => {
+    expect(Object.keys(Pet.shape).sort()).toEqual(['avatar', 'id', 'name']);
+  });
+
+  it('still parses an older saved pet, dropping the brain fields it carried', () => {
     const parsed = Pet.parse({
       ...valid,
+      roleId: 'companion',
+      model: 'claude-sonnet-5',
+      providerId: 'anthropic',
+      watchModel: 'nano',
       toolGrants: { remember: 'off' },
-      replyStyle: 'voice-full',
-      notes: 'x',
-      color: '#0ea5e9',
+      persona: 'You are Scout.',
     });
-    expect(parsed).not.toHaveProperty('toolGrants');
-    expect(parsed).not.toHaveProperty('replyStyle');
-    expect(parsed).not.toHaveProperty('notes');
-    expect(parsed).not.toHaveProperty('color');
+    expect(parsed).toEqual(valid);
   });
 
   it("names Scout's id", () => {
     expect(SCOUT_ID).toBe('scout');
   });
 
-  it('carries a role', () => {
-    const parsed = Pet.parse(valid);
-    expect(parsed.roleId).toBe('companion');
-    const { roleId: _roleId, ...withoutRole } = valid;
-    expect(Pet.safeParse(withoutRole).success).toBe(false);
-  });
-
-  it('still parses stored JSON carrying the legacy persona and allowlist keys', () => {
-    const parsed = Pet.parse({ ...valid, persona: 'You are Scout.', toolAllowlist: [] });
-    expect(parsed).not.toHaveProperty('persona');
-    expect(parsed).not.toHaveProperty('toolAllowlist');
-  });
-
-  it('still parses a crew-era pet, dropping its role version and voice id', () => {
-    const parsed = Pet.parse({ ...valid, roleVersion: 2, voiceId: 'fox' });
-    expect(parsed).not.toHaveProperty('roleVersion');
-    expect(parsed).not.toHaveProperty('voiceId');
-  });
-
   it('rejects an empty name', () => {
     expect(Pet.safeParse({ ...valid, name: '' }).success).toBe(false);
-  });
-
-  it('rejects a missing model', () => {
-    const { model: _model, ...withoutModel } = valid;
-    expect(Pet.safeParse(withoutModel).success).toBe(false);
-  });
-
-  it('drops the retired vision model an older pet still carries', () => {
-    expect(Pet.parse({ ...valid, visionModel: 'vl' })).not.toHaveProperty('visionModel');
-  });
-});
-
-describe('Pet.watchModel', () => {
-  const pet = {
-    id: 'scout',
-    name: 'Scout',
-    avatar: 'S',
-    roleId: 'generalist',
-    model: 'anthropic/claude-sonnet-5',
-    providerId: 'openrouter',
-  };
-
-  it('is optional: absent means the provider default check model', () => {
-    expect(Pet.parse(pet).watchModel).toBeUndefined();
-  });
-
-  it('keeps a model the user picked and refuses an empty one', () => {
-    expect(Pet.parse({ ...pet, watchModel: 'nano' }).watchModel).toBe('nano');
-    expect(Pet.safeParse({ ...pet, watchModel: '' }).success).toBe(false);
   });
 });

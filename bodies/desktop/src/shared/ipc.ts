@@ -4,7 +4,7 @@
  * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
  */
 
-import type { CaptureBlock } from '@tagalong/core';
+import type { CaptureBlock } from '@tagalong/protocol';
 import type {
   ContextSnapshot,
   EarsEvent,
@@ -48,7 +48,7 @@ export const IPC = {
   contextEvent: 'tagalong:context-event',
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
-  saveApiKey: 'tagalong:secret:api-key',
+  saveElevenLabsKey: 'tagalong:secret:elevenlabs-key',
   openSettings: 'tagalong:settings:open',
   openLogsFolder: 'tagalong:logs:open',
   hidePanel: 'tagalong:panel:hide',
@@ -70,7 +70,6 @@ export const IPC = {
   getRecording: 'tagalong:get-recording',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
-  checkClaudeSignIn: 'tagalong:claude:sign-in',
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
@@ -175,23 +174,6 @@ export interface CaptureNotice {
   paused?: boolean;
 }
 
-/** One brain Scout can run on, as Settings lists it. */
-export interface ProviderChoice {
-  id: string;
-  label: string;
-  /** Present for OpenAI-compatible presets: the URL used when settings name none. */
-  defaultBaseUrl?: string;
-  needsKey: boolean;
-  /** Whether a key is stored. The key itself never comes back out. */
-  hasKey: boolean;
-}
-
-/**
- * Whether Claude Code is signed in on this computer, from `claude auth status`.
- * `unknown` when claude ran but the answer could not be read (a timeout, odd output).
- */
-export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
-
 /** Whether the voice models are on disk, for the health check: a look, never a download. */
 export interface VoiceModels {
   /** The local voice (Kokoro). */
@@ -206,9 +188,8 @@ export interface VoiceModels {
  */
 export interface HostView {
   settings: Settings;
-  /** Empty while the engine is down: pets live in its database. */
+  /** Always the local Scout. */
   pets: Pet[];
-  providers: ProviderChoice[];
   engineVersion: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
@@ -262,8 +243,8 @@ export interface TagalongHostApi {
   onRecording(handler: (recording: boolean) => void): () => void;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
-  /** An empty key deletes the stored one. */
-  saveApiKey(providerId: string, apiKey: string): Promise<void>;
+  /** Saves the ElevenLabs key for the voice. An empty key deletes the stored one. */
+  saveElevenLabsKey(apiKey: string): Promise<void>;
   /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
   openBubble(): Promise<void>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
@@ -274,8 +255,6 @@ export interface TagalongHostApi {
   openHome(): Promise<void>;
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
-  /** Asks Claude Code, locally and with no model call, whether it is signed in. */
-  checkClaudeSignIn(): Promise<ClaudeSignIn>;
   /** The browser add-on's folder, for Settings' Load unpacked steps. */
   browserFolder(): Promise<BrowserFolder>;
   /** Reveals that folder in the file manager; rejects when it is not built yet. */

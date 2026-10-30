@@ -1,13 +1,11 @@
 /**
  * Turns the Settings form into a settings patch, kept apart from React so it is tested in plain
  * Node. Contains SettingsFormValues, buildSettingsPatch and its field checks, SettingsFieldError,
- * and helpers the sections share (key caps, voice facts, cleanUserName).
+ * and helpers the sections share (key caps, voice facts).
  */
 import {
   MAX_ROLLING_MEMORY_MINUTES,
-  MAX_USER_NAME_CHARS,
   MAX_VOICE_SPEED,
-  MAX_WINDOW_TEXT_CHARS,
   MIN_VOICE_SPEED,
   SettingsPatch,
 } from '@tagalong/protocol';
@@ -19,22 +17,9 @@ export interface SettingsFormValues {
   pauseSightHotkey: string;
   stopVoiceHotkey: string;
   talkHotkey: string;
-  sightDetail: string;
-  windowTextBudget: string;
-  /** Whether Scout greets you on a later launch. Absent leaves the setting alone. */
-  greeting?: boolean;
-  /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
-  keepAnEye?: boolean;
-  /** Whether Scout gives gentle nudges. Absent leaves the setting alone. */
-  wellbeing?: boolean;
-  /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
-  userName?: string;
-  /** Present together when the form shows rolling memory and the watches. */
+  /** Present together when the form shows rolling memory. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
-  watchMaxChecks?: string;
-  watchMaxConcurrent?: string;
-  watchTimeoutMinutes?: string;
   /** Voice. Present together when the form shows the Voice section. */
   voiceEnabled?: boolean;
   voice?: string;
@@ -61,15 +46,7 @@ export class SettingsFieldError extends Error {
 }
 
 /** The fields that live under Advanced: a refusal on one of them opens it. */
-const ADVANCED_FIELDS = new Set([
-  'sightDetail',
-  'windowTextBudget',
-  'rollingMemoryMinutes',
-  'watchMaxChecks',
-  'watchMaxConcurrent',
-  'watchTimeoutMinutes',
-  'elevenLabsVoiceId',
-]);
+const ADVANCED_FIELDS = new Set(['elevenLabsVoiceId']);
 
 export function isAdvancedField(field: string): boolean {
   return ADVANCED_FIELDS.has(field) || field.startsWith('key:');
@@ -84,8 +61,7 @@ export function isAdvancedField(field: string): boolean {
  * one the user typed.
  *
  * Nothing the form does not show is included, so saving cannot reset the exclusion list
- * or the retention mode as a side effect of changing a base URL. Models are not here at
- * all: each pet carries its own and is saved through `pets.upsert`.
+ * as a side effect of changing a hotkey.
  */
 export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchType {
   refuseSharedHotkeys(values);
@@ -111,12 +87,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
           },
         }
       : {}),
-    sightDetail: values.sightDetail,
-    windowTextBudget: parseBudget(values.windowTextBudget),
-    ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
-    ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
-    ...(values.wellbeing !== undefined ? { wellbeing: { enabled: values.wellbeing } } : {}),
-    ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
@@ -127,33 +97,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
               1,
               MAX_ROLLING_MEMORY_MINUTES,
               `Rolling memory must keep between 1 and ${MAX_ROLLING_MEMORY_MINUTES} minutes.`,
-            ),
-          },
-        }
-      : {}),
-    ...(values.watchMaxChecks !== undefined
-      ? {
-          watch: {
-            maxChecks: wholeNumber(
-              'watchMaxChecks',
-              values.watchMaxChecks,
-              1,
-              500,
-              'Checks per watch must be a whole number between 1 and 500.',
-            ),
-            maxConcurrent: wholeNumber(
-              'watchMaxConcurrent',
-              values.watchMaxConcurrent ?? '',
-              1,
-              10,
-              'Watches at once must be a whole number between 1 and 10.',
-            ),
-            defaultTimeoutMinutes: wholeNumber(
-              'watchTimeoutMinutes',
-              values.watchTimeoutMinutes ?? '',
-              1,
-              24 * 60,
-              'The watch timeout must be a whole number of minutes, at least 1.',
             ),
           },
         }
@@ -198,11 +141,6 @@ function refuseSharedHotkeys(values: SettingsFormValues): void {
   }
 }
 
-/** A name as typed, trimmed and cut to the cap: a long name is shortened, never refused. */
-export function cleanUserName(raw: string): string {
-  return raw.trim().slice(0, MAX_USER_NAME_CHARS).trim();
-}
-
 /** The speaking speed, within what still sounds like speech. */
 function parseSpeed(raw: string): number {
   const speed = Number(raw.trim());
@@ -239,32 +177,6 @@ function wholeNumber(
 export function keyCaps(accelerator: string, platform: string): string[] {
   const command = platform === 'darwin' ? 'Cmd' : 'Ctrl';
   return accelerator.split('+').map((part) => (part === 'CommandOrControl' ? command : part));
-}
-
-/**
- * Reads the budget field, refusing anything that is not a usable whole number.
- *
- * Throwing beats omitting: an omitted field leaves the box showing what the user typed
- * while the saved value stays what it was, which is a settings screen that lies. The
- * message names the bounds because the only way to fix this is to type a different
- * number.
- */
-function parseBudget(raw: string): number {
-  const budget = Number(raw.trim());
-  if (!Number.isInteger(budget) || budget < 1 || raw.trim().length === 0) {
-    throw new SettingsFieldError(
-      'windowTextBudget',
-      `Window text budget must be a whole number between 1 and ${MAX_WINDOW_TEXT_CHARS}.`,
-    );
-  }
-  if (budget > MAX_WINDOW_TEXT_CHARS) {
-    throw new SettingsFieldError(
-      'windowTextBudget',
-      `Window text budget cannot be more than ${MAX_WINDOW_TEXT_CHARS} characters — past that ` +
-        'one window outweighs everything else in the prompt.',
-    );
-  }
-  return budget;
 }
 
 /** An adapter's facts as one plain line under the picker. */

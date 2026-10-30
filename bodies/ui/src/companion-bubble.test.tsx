@@ -760,12 +760,12 @@ describe('CompanionBubble status marks', () => {
   it('shows the top status mark as a row, with Fix it opening the fix', () => {
     const openFix = vi.fn(() => Promise.resolve());
     const bridge = Object.assign(createFakeHostBridge(), { openFix });
-    renderBubble(bridge, { status: { id: 'brain-signed-out' } });
+    renderBubble(bridge, { status: { id: 'mic-busy' } });
     expect(screen.getByTestId('status-row')).toHaveTextContent(
-      'Can’t think: signed out of Claude.',
+      'Another app is using the microphone.',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
-    expect(openFix).toHaveBeenCalledWith('brain');
+    expect(openFix).toHaveBeenCalledWith('voice');
   });
 });
 
@@ -775,14 +775,16 @@ describe('GreetingLine with a status mark', () => {
     render(
       <GreetingLine
         petName="Scout"
-        status={{ id: 'brain-no-key' }}
+        status={{ id: 'mic-failed' }}
         onFix={onFix}
         onDone={() => undefined}
       />,
     );
-    expect(screen.getByTestId('status-row')).toHaveTextContent('Can’t think: no API key.');
+    expect(screen.getByTestId('status-row')).toHaveTextContent(
+      'The microphone could not be opened.',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
-    expect(onFix).toHaveBeenCalledWith('brain');
+    expect(onFix).toHaveBeenCalledWith('voice');
   });
 });
 

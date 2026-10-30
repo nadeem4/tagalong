@@ -3,7 +3,7 @@
  * layer is thin. Checked against the classified inventory first. Contains readWindowTextWith.
  */
 
-import { THIN_TEXT_CHARS, textLayerNotes } from '@tagalong/core';
+import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer-notes';
 import type { WindowEntry } from '@tagalong/protocol';
 
 import type { TextLayerProvider } from './text-layer';

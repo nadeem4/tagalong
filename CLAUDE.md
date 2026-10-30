@@ -7,11 +7,10 @@ Product intent: PRODUCT.md. Visual design: DESIGN.md. Engineering reference: doc
 
 The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 
-- Today: everything in this repo is TypeScript. packages/core is the current brain.
-- Target: a Python brain (runs on any machine) talks to TypeScript bodies (bodies/desktop, bodies/browser) over the contract in protocol/README.md.
+- Today: a Python brain (brain/) talks to TypeScript bodies (bodies/desktop, bodies/browser) over the contract in protocol/README.md.
 - Bodies talk only to the brain. Single user: no TLS, pairing or multi-user work yet.
 - The plan, decisions and build order live in Notion (links in CLAUDE.local.md). Read it before working on the brain.
-- Don't add new features to packages/core unless the task asks for it; new brain work goes into the Python brain.
+- New brain work goes into the Python brain.
 - When the rewrite changes commands or layout, update this file in the same PR.
 
 ## Commands
@@ -31,18 +30,16 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - protocol/ts: `@tagalong/contract`, zod schemas for contract v1
 - brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types; `server.py` is the websocket server, `sessions.py` the one conversation, `memory.py` the memory store, `tools.py` the brain's own tools, `toolbox.py` the tool gate, `apps.py`, `app_oauth.py` and `app_tools.py` connected apps (MCP), their browser sign-in and their tools, `asks.py` permission asks, `side_check.py` Scout approving an ask under a preference, `offers.py` Scout offering a preference, `guardrails.py` the budget, `guards.py` the guard runner, `masking.py` the Masker, save guard and log filter (secrets become `[secret]` before they are saved), `builtin_guards.py` the built-in guards, `events.py` and `scheduler.py` the event kinds and the wakes (Scout speaks first), `timers.py` Scout's timers, `questions.py` an expert's question to Scout first, `mind/` Scout's soul, `events.md` (per-kind notes), `approvals.md` (side-check and offer wording), prompt, thinking loop and `resume.py` (rebuilds history from the saved chat); see docs/brain.md)
 - packages/protocol: wire types and the JSON-RPC method catalog shared by brain and bodies
-- packages/core: the old brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server); the desktop no longer boots it, and it will be deleted
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
-- bodies/desktop: Electron body (dials the Python brain; no longer boots packages/core)
+- bodies/desktop: Electron body (dials the Python brain)
 - bodies/browser: browser body (Chromium)
 - docs/: one doc per subsystem; docs/development.md has the full layout and how-tos
 
 ## Conventions
 
-- Core stays pure: packages/core and packages/protocol never import electron, react or browser globals (ESLint enforces).
-- Tools go through tools/registry, never imported from tools/builtin/* directly (ESLint enforces). Use the tagalong-add-tool skill.
+- Protocol packages stay pure: packages/protocol and protocol/ts never import electron, react or browser globals (ESLint enforces).
 - Use the tagalong-phase skill when building a phase or task.
 - Every file opens with a 2-6 line header; comments explain why, not history.
-- Conventional Commits, e.g. feat(core): ...
+- Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md.
 - CI: branch protection on main requires build (Linux) and e2e (Windows); docs-only PRs skip both.

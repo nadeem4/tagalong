@@ -2,34 +2,27 @@
  * Settings: the form, one section per file in this folder, saved as one patch through
  * settings-form.ts. It is the Settings page of Home; there is no standalone window.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { SETTINGS_CSS } from '@tagalong/ui';
 import { SettingsFieldError, buildSettingsPatch, isAdvancedField } from '../settings-form';
 import { AdvancedSection } from './advanced-section';
-import { scoutBrain } from './brain';
-import { BrainSection } from './brain-section';
 import { BrowserSection } from './browser-section';
 import { ElevenLabsSection } from './elevenlabs-section';
 import { PrivacySection } from './privacy-section';
 import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
-import { SightSection } from './sight-section';
 import { VoiceSection } from './voice-section';
-import { WatchesSection } from './watches-section';
-import { YouSection } from './you-section';
-import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc';
+import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: how Scout thinks, You, Privacy, Voice, Shortcuts, the browser, then
- * Advanced (the ElevenLabs voice, sight detail, screen memory and watches), closed by default.
- * Main re-registers hotkeys on save, and the sight settings are read per capture.
+ * Sections in page order: Privacy, Voice, Shortcuts, the browser, then
+ * Advanced (the ElevenLabs voice), closed by default. Main re-registers hotkeys on save.
  */
 export function SettingsPage() {
   const [view, setView] = useState<HostView | null>(null);
-  const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
-  const [keys, setKeys] = useState<Record<string, string>>({});
+  const [elevenLabsKey, setElevenLabsKey] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
@@ -55,15 +48,6 @@ export function SettingsPage() {
       .then(setBrowserFolder)
       .catch(() => setBrowserFolder(null));
   }, []);
-
-  const checkSignIn = useCallback(() => {
-    setSignIn(null);
-    window.tagalongHost
-      .checkClaudeSignIn()
-      .then(setSignIn)
-      .catch(() => setSignIn('unknown'));
-  }, []);
-  useEffect(checkSignIn, [checkSignIn]);
 
   // Saving a fixed accelerator re-registers it in main, which is where the outcome is
   // known. Without this the window would keep showing the old failure next to the very
@@ -106,13 +90,11 @@ export function SettingsPage() {
   }
 
   const { settings } = view;
-  const scout = view.pets[0];
-  const brain = scoutBrain(scout, view.providers, signIn);
 
   const removeElevenLabsKey = async (): Promise<void> => {
     try {
       // An empty key deletes the stored one.
-      await window.tagalongHost.saveApiKey('elevenlabs', '');
+      await window.tagalongHost.saveElevenLabsKey('');
       setView((current) =>
         current === null ? current : { ...current, elevenLabsKeyStored: false },
       );
@@ -144,36 +126,21 @@ export function SettingsPage() {
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
         elevenLabsVoiceId: field('elevenLabsVoiceId'),
-        sightDetail: field('sightDetail'),
-        windowTextBudget: field('windowTextBudget'),
-        greeting: form.get('greeting') !== null,
-        keepAnEye: form.get('keepAnEye') !== null,
-        wellbeing: form.get('wellbeing') !== null,
-        userName: field('userName'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
-        watchMaxChecks: field('watchMaxChecks'),
-        watchMaxConcurrent: field('watchMaxConcurrent'),
-        watchTimeoutMinutes: field('watchTimeoutMinutes'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
-      // Empty boxes are left alone: removing a key is the Remove key button's job.
-      const typed = Object.entries(keys).filter(([, value]) => value.trim().length > 0);
-      for (const [providerId, value] of typed) {
-        await window.tagalongHost.saveApiKey(providerId, value.trim());
-      }
-      setKeys({});
-      const newlyStored = new Set(typed.map(([providerId]) => providerId));
+      // An empty box is left alone: removing the key is the Remove key button's job.
+      const typed = elevenLabsKey.trim();
+      if (typed.length > 0) await window.tagalongHost.saveElevenLabsKey(typed);
+      setElevenLabsKey('');
       setView((current) =>
         current === null
           ? current
           : {
               ...current,
               settings: saved,
-              providers: current.providers.map((choice) =>
-                newlyStored.has(choice.id) ? { ...choice, hasKey: true } : choice,
-              ),
-              elevenLabsKeyStored: current.elevenLabsKeyStored || newlyStored.has('elevenlabs'),
+              elevenLabsKeyStored: current.elevenLabsKeyStored || typed.length > 0,
             },
       );
       setInvalid(null);
@@ -212,8 +179,6 @@ export function SettingsPage() {
               Save
             </button>
           </div>
-          <BrainSection brain={brain} onCheckAgain={checkSignIn} />
-          <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
@@ -222,12 +187,10 @@ export function SettingsPage() {
             <ElevenLabsSection
               settings={settings}
               keyStored={view.elevenLabsKeyStored}
-              typed={keys.elevenlabs ?? ''}
-              onType={(value) => setKeys({ ...keys, elevenlabs: value })}
+              typed={elevenLabsKey}
+              onType={setElevenLabsKey}
               onRemove={() => void removeElevenLabsKey()}
             />
-            <SightSection settings={settings} />
-            <WatchesSection settings={settings} />
           </AdvancedSection>
           <div className="tg-footer">
             <button type="submit" className="tg-btn">

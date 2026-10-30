@@ -1,7 +1,7 @@
 /**
  * The log file: the app's warnings and errors, kept on disk so a person can send them when
  * something goes wrong. Contains logLine, installLogFile, rendererConsole and openLogsFolder.
- * The engine runs in main's process, so core's warnings land here too; the windows' come in
+ * The windows' warnings come in
  * through rendererConsole and the voice process's through forwardConsole (log-text.ts).
  *
  * Privacy: a line keeps only a text first argument and, for an Error, its name and
@@ -13,7 +13,7 @@
 
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { hideSecrets } from '@tagalong/core';
+import { hideSecrets } from './hide-secrets';
 import { keptText } from './log-text';
 import type { Level } from './log-text';
 

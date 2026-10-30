@@ -3,8 +3,8 @@
  * Contains parseWindowList, placeOnDisplays, attachTextCounts and handleOf.
  */
 
-import { findCaptureBlock } from '@tagalong/core';
-import type { ObservedWindow } from '@tagalong/core';
+import { findCaptureBlock } from './exclusions';
+import type { ObservedWindow } from './inventory';
 import type { CaptureExclusions, ScreenInfo } from '@tagalong/protocol';
 
 import type { WindowBounds } from './index';

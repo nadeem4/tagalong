@@ -10,8 +10,7 @@ There are three ways in:
 
 1. [Download and run it](#download-and-run-it): install the Windows app and use it.
 2. [Run it from source](#run-it-from-source): clone the repo and start the desktop app.
-3. [Use the engine in your own app](#use-the-engine-in-your-own-app): boot the engine and talk to
-   it over its local protocol.
+3. [Build your own body](#build-your-own-body): talk to the Python brain over its local protocol.
 
 The [user guide](#using-tagalong) follows. Plan, task board and decisions live in
 [Notion](https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc).
@@ -76,7 +75,7 @@ preferences, starting with "Always ask me before risky actions". After you have 
 kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
 preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
 under that preference, then tells you which one. Anything unclear still comes to you. Home's
-**Approvals** page shows all of it. See [docs/asks.md](docs/asks.md).
+**Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
 
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
@@ -90,97 +89,14 @@ gets it first and answers from what it knows, or passes it to you. See [docs/bra
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the browser
 body.
 
-## Use the engine in your own app
+## Build your own body
 
-`packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and the
-old desktop app ran on it. It holds:
-
-- the companion, Scout, and the role it works as;
-- the conversation runner, which assembles each prompt, calls the model and runs tools;
-- memory: conversations, long-term memories and summaries, in SQLite;
-- providers: Claude Code sign-in, Anthropic, OpenRouter and any OpenAI-compatible service;
-- experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
-  confirm;
-- connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
-  change waits for Allow once;
-- routines, and a local WebSocket server that speaks the JSON-RPC protocol defined in
-  `packages/protocol` (zod schemas).
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  desktop["Desktop app (Electron)"] -->|"JSON-RPC over ws://127.0.0.1"| engine["Engine (packages/core)"]
-  yours["Your app"] -->|"JSON-RPC over ws://127.0.0.1"| engine
-  engine --> models["Model providers"]
-  engine --> experts["Experts (Claude Code)"]
-  engine --> apps["Your apps (MCP)"]
-```
-
-`@tagalong/core` and `@tagalong/protocol` are **not published to npm yet**. Both are marked
-`"private": true`. Today you use them from this repo: add your app as a package in the pnpm
-workspace, depend on them with `"workspace:*"`, and run `pnpm build` so their `dist/` exists.
-
-This boots an engine, connects to it as a host, and asks Scout one question.
-`TAGALONG_FAKE_PROVIDERS=1` gives scripted answers, so it runs without a key or the network; leave
-it out to use Scout's real provider.
-
-```ts
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Engine, InMemorySecretStore, SCOUT } from '@tagalong/core';
-import { engineUrl } from '@tagalong/protocol';
-
-const engine = await Engine.boot({
-  dataDir: mkdtempSync(join(tmpdir(), 'tagalong-')), // database, settings and pairing token
-  secretStore: new InMemorySecretStore(), // the desktop app uses the OS keychain instead
-  engineVersion: '0.0.0',
-  port: 0, // let the OS pick; the default is 47321
-  env: { TAGALONG_FAKE_PROVIDERS: '1' },
-});
-
-const socket = new WebSocket(engineUrl(engine.port));
-await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }));
-
-let nextId = 1;
-const pending = new Map<string, (result: unknown) => void>();
-const call = (method: string, params: unknown) =>
-  new Promise((resolve) => {
-    const id = String(nextId++);
-    pending.set(id, resolve);
-    socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
-  });
-
-const answered = new Promise<void>((resolve) => {
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(String(event.data));
-    if (message.id !== undefined && message.method === undefined) {
-      pending.get(message.id)?.(message.result);
-    }
-    if (message.method === 'turn.delta') process.stdout.write(message.params.text);
-    if (message.method === 'turn.completed') resolve();
-  });
-});
-
-await call('hello', {
-  host: 'desktop',
-  version: '0.0.0',
-  capabilities: [], // what your host can read for Scout, such as 'selection' or 'screenshot'
-  token: engine.pairingToken,
-});
-await call('ask', { petId: SCOUT.id, input: { text: 'Hello, Scout' } });
-await answered;
-
-socket.close();
-await engine.shutdown();
-```
-
-A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
-The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's client for the Python brain is `BrainClient` in `protocol/ts/src/brain-client.ts` (shared by the bodies); the
-desktop no longer boots the engine. Read
-[Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
-[How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
+A body is anything that shows Scout and can read what you are looking at. The Python brain listens
+on a local WebSocket and speaks contract v1, written down in [protocol/README.md](protocol/README.md),
+with sample frames in `protocol/examples`. `@tagalong/contract` (`protocol/ts`) holds the zod schemas
+and `BrainClient`, the client both shipped bodies use. It is **not published to npm**: depend on it
+from this repo with `"workspace:*"`. Read [Architecture](docs/architecture.md) for how the brain and
+its bodies fit together.
 
 ## What is in this build
 
@@ -240,12 +156,7 @@ _delivered_, and the expert carries on in the same session with your note (or th
 finished first). The expert's key moments, such as "Found the bug in `date.ts`", show on the
 card and are not said aloud.
 
-**Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
-without taking the keyboard: a build that failed and why, say. It follows window titles only, reads
-one window when you settle on it or its title reads like trouble, and most of the time says
-nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
-the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
-**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, its hello, a
+**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, a
 line it says on its own, a routine's result and its line about an expert that finished. Scout
 decides what to say: everything it writes is spoken, typed question or spoken, except what it
 puts in a block (a draft, code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
@@ -358,22 +269,19 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
-- **Settings**, in seven sections. Press ⓘ beside a setting for the longer story. Below the form,
+- **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
   and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
-  - **How Scout thinks**: whether Scout's brain can think, and whether your Claude Code sign-in
-    works (checked locally with `claude auth status`). The brain reads its own key from its `.env`.
-  - **You**: what Scout calls you. Empty means no name.
-  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, wellbeing, screen memory
-    and what Scout never looks at.
+  - **Privacy**: screen memory (on or off, and how many minutes it keeps) and what Scout never
+    looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.
   - **Advanced**, closed by default: the ElevenLabs voice (your key and a voice ID from your
-    ElevenLabs library), sight detail and watches.
+    ElevenLabs library).
 
 ## Providers and keys
 
@@ -411,11 +319,6 @@ small picture of each screen every five seconds, in memory only, for the last te
 on Scout shows while it records. Ask "what was on screen a few minutes ago?" or "what changed?" and
 Scout looks back through it.
 
-**Watches.** Ask "tell me when the build finishes" and Scout watches for it, says in one line what it
-is watching, and tells you when it happens. A watch stops on its own when it fires or gives up (30
-minutes by default). A routine **When a watch fires** runs then too. Scout can also zoom in on small
-text and look at your other monitor ("what's on my other screen?"). Blind spots still apply.
-
 **Point, don't click.** Ask "where's the export button?" and Scout tells you, and a soft ring with a
 short label shows around it for a few seconds (`Esc` puts it away). Scout never moves the mouse,
 clicks or types.
@@ -438,13 +341,13 @@ screenshot is attached.
 
 ## Privacy
 
-- Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
-  you turn on, and keeping an eye on things (below). Every look badges Scout and the tray says what
+- Nothing on screen is read until you press a hotkey or ask, except screen memory, which
+  you turn on. Every look badges Scout and the tray says what
   was read and when.
 - **Check-ins.** Now and then, when nobody asked, Scout asks its own model once whether
   anything is worth saying, and most of the time says nothing. Each such call carries what the
   moment is about plus what Scout recalls for it (your preferences, its newest and matching
-  memories, up to two matching jobs of its own), your name, the time, what experts are doing and
+  memories, up to two matching jobs of its own), the time, what experts are doing and
   your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
   unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
   once the daily budget is spent.
@@ -453,25 +356,14 @@ screenshot is attached.
   tools, and is deleted 14 days after it finishes. At most 3 run at once (fewer on a busy
   machine), 20 a day, none once the daily budget is spent. When jobs and hand-offs finish, one
   check-in covers them all, with a note of at most 300 characters for each.
-- **Keeping an eye on things** is on by default: Scout follows window titles only (no picture, no
-  model call). Rarely, when you settle on a new window or a title reads like an error or a failed
-  build, it reads that one window and checks in, never twice about one window. A line may offer to
-  hand the work to an expert: only **Hand it over** reads that window again (secrets hidden) into
-  the hand-off card, with the project picked; nothing runs until **Send**. Turn it off under
-  **Settings → Privacy → Keep an eye on things**.
-- **Scout's face** comes from the mind in a check-in (a wince, a cheer, tired), never from a title
-  alone; it dozes after five minutes with no input or when the screen locks (one idle time number
-  from the OS, kept on this computer).
-- **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, after an hour
-  and a half with no break, or late at night, Scout checks in once with how long you have been at
-  it and the window in front: it may say a line, offer a write-up by your expert, look tired, or
-  say nothing. Idle time and titles only, no window text; quiet during calls and full screen.
+- **Scout's face** dozes after five minutes with no input or when the screen locks (one idle time
+  number from the OS, kept on this computer).
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.
 - Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
   leaves your computer, and Claude Code is told not to open secret files.
-- Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
+- Screenshots are not written to disk. Screen memory lives in memory only and are thrown
   away when you pause sight or quit.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
@@ -483,7 +375,7 @@ screenshot is attached.
   says are sent to ElevenLabs, never your screen or your questions.
 - When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
   it and is never stored; only the text goes to Scout's provider, like a typed question.
-- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs. (The old TypeScript core kept API keys in the OS keychain.)
+- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
@@ -492,7 +384,6 @@ screenshot is attached.
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
   the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and
   progress and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
-  The OS keychain applies only to the old TypeScript core.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 
@@ -521,7 +412,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 - [Engineering docs](docs/README.md): the index of every subsystem doc, with a reading order.
 - [Developer guide](docs/development.md): build, run, test and package from source.
-- [Architecture](docs/architecture.md): how the engine and its hosts fit together.
+- [Architecture](docs/architecture.md): how the brain and its bodies fit together.
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
 - [Product](PRODUCT.md) and [design system](DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.

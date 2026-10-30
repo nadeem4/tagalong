@@ -1,7 +1,7 @@
 # The Python brain
 
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
-being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
+was built row by row and replaced the old TypeScript brain. Today bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
 back. Scout can use the tools bodies declare, and asks the user first before a tool that changes
 something (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
@@ -65,7 +65,7 @@ the total can run a little low.
 | `brain/src/brain/toolbox.py`        | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                               |
 | `brain/src/brain/asks.py`           | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                                                                                                                                                        |
 | `brain/src/brain/approvals.py`      | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `scout_approved` (logs a Scout approval and reports it) |
-| `brain/src/brain/side_check.py`     | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes (the order is in [asks.md](asks.md#scout-approves-under-your-preferences))                                                                                                                |
+| `brain/src/brain/side_check.py`     | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                           |
 | `brain/src/brain/offers.py`         | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                |
 | `brain/src/brain/mind/approvals.md` | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                               |
 | `brain/src/brain/experts.py`        | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                                                                                                                                           |
@@ -287,11 +287,10 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
   A locked tool gets this look only under a preference you made that names the tool; the
   built-in default and general preferences never approve it. A tool stays in `ask` mode.
-  Details: [asks.md](asks.md#scout-approves-under-your-preferences).
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
   `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
-  `TAGALONG_KEEP_ASKING_DAYS`. Rules: [asks.md](asks.md#scout-offers-a-preference).
+  `TAGALONG_KEEP_ASKING_DAYS`.
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
 - **No answer.** After 5 minutes the ask closes with `reason: "timeout"` and the call fails with a
   timeout error.
@@ -347,7 +346,7 @@ so there is one gate and no second path.
 The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
 plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
 every recorded ask and every preference the offer saves. In `list_approvals`, `preference` is the
-sentence as it was when Scout approved, so later edits or removals do not change old rows. The history is described in [asks.md](asks.md#approvals-history-and-preferences); Home's Approvals page that shows it is in [bubble.md](bubble.md#home).
+sentence as it was when Scout approved, so later edits or removals do not change old rows. Home's Approvals page that shows the history is in [bubble.md](bubble.md#home).
 
 | Tool                | Input                                                    | Result text (JSON)                                                                                                                                                                                                                                              |
 | ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

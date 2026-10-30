@@ -7,7 +7,6 @@ import {
   LISTENING_MARK_MS,
   SAY_NAME_MARK_MS,
   StatusMarks,
-  clearBrainMarks,
   markBrainLink,
   markListening,
   setPanelMark,
@@ -25,9 +24,9 @@ describe('StatusMarks', () => {
     const marks = new StatusMarks();
     expect(marks.top()).toBeNull();
     marks.set({ id: 'listening-on' });
-    marks.set({ id: 'brain-no-key' });
-    expect(marks.top()).toEqual({ id: 'brain-no-key' });
-    marks.clear('brain-no-key');
+    marks.set({ id: 'mic-busy' });
+    expect(marks.top()).toEqual({ id: 'mic-busy' });
+    marks.clear('mic-busy');
     expect(marks.top()).toEqual({ id: 'listening-on' });
   });
 
@@ -53,12 +52,12 @@ describe('StatusMarks', () => {
   it('tells its listener the new top mark only when it changes', () => {
     const seen: (StatusMark | null)[] = [];
     const marks = new StatusMarks((top) => seen.push(top));
-    marks.set({ id: 'brain-signed-out' });
+    marks.set({ id: 'brain-offline' });
     marks.set({ id: 'listening-on' });
-    marks.clear('brain-no-key');
-    marks.clear('brain-signed-out');
+    marks.clear('mic-busy');
+    marks.clear('brain-offline');
     marks.clear('listening-on');
-    expect(seen).toEqual([{ id: 'brain-signed-out' }, { id: 'listening-on' }, null]);
+    expect(seen).toEqual([{ id: 'brain-offline' }, { id: 'listening-on' }, null]);
   });
 });
 
@@ -132,23 +131,11 @@ describe('setPanelMark', () => {
 
   it('refuses any other mark, so a window cannot claim Scout can think', () => {
     const marks = new StatusMarks();
-    marks.set({ id: 'brain-signed-out' });
-    expect(() => setPanelMark(marks, 'brain-signed-out', false)).toThrow();
+    marks.set({ id: 'brain-offline' });
+    expect(() => setPanelMark(marks, 'brain-offline', false)).toThrow();
     expect(() => setPanelMark(marks, 'nope', true)).toThrow();
     expect(() => setPanelMark(marks, 'mic-busy', 'yes')).toThrow();
-    expect(marks.top()).toEqual({ id: 'brain-signed-out' });
-  });
-});
-
-describe('clearBrainMarks', () => {
-  it('clears every brain mark and nothing else', () => {
-    const marks = new StatusMarks();
-    marks.set({ id: 'brain-signed-out' });
-    marks.set({ id: 'brain-no-sign-in' });
-    marks.set({ id: 'brain-no-key' });
-    marks.set({ id: 'listening-on' });
-    clearBrainMarks(marks);
-    expect(marks.top()).toEqual({ id: 'listening-on' });
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
   });
 });
 

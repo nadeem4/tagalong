@@ -5,7 +5,6 @@ import { healthHeadline, healthRows } from './health';
 import type { HealthFacts, HealthRow } from './health';
 
 const ALL_GOOD: HealthFacts = {
-  brain: 'ready',
   connections: [{ name: 'GitHub', status: 'connected' }],
   voice: {
     enabled: true,
@@ -27,12 +26,11 @@ const row = (rows: HealthRow[], id: HealthRow['id']): HealthRow => {
 describe('healthRows', () => {
   it('gives one row per check, in order, all ok, and says everything works', () => {
     const rows = healthRows(ALL_GOOD);
-    expect(rows.map((each) => each.id)).toEqual(['brain', 'connections', 'voice', 'microphone']);
+    expect(rows.map((each) => each.id)).toEqual(['connections', 'voice', 'microphone']);
     expect(rows.every((each) => each.state === 'ok')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
     expect(healthHeadline(rows)).toBe('Everything’s working.');
     expect(rows.map((each) => each.line)).toEqual([
-      'Ready.',
       'All apps connected.',
       'Ready.',
       'A microphone is ready.',
@@ -43,25 +41,10 @@ describe('healthRows', () => {
     const voice = ALL_GOOD.voice as Exclude<HealthFacts['voice'], 'unknown'>;
     const lines = [
       ...healthRows(ALL_GOOD),
-      ...healthRows({ ...ALL_GOOD, brain: 'signed-out' }),
-      ...healthRows({ ...ALL_GOOD, brain: 'no-sign-in' }),
-      ...healthRows({ ...ALL_GOOD, brain: 'no-key' }),
       ...healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }),
       ...healthRows({ ...ALL_GOOD, voice: { ...voice, mouth: 'kokoro', mouthReady: false } }),
     ].map((each) => each.line);
     for (const line of lines) expect(line).not.toMatch(/^I\s|\bI’|\bmy\b/i);
-  });
-
-  it.each([
-    ['signed-out', 'Signed out of Claude.'],
-    ['no-sign-in', 'Claude Code isn’t on this computer.'],
-    ['no-key', 'No API key.'],
-  ] as const)('a %s brain is broken and fixed under How Scout thinks', (brain, line) => {
-    expect(row(healthRows({ ...ALL_GOOD, brain }), 'brain')).toMatchObject({
-      state: 'broken',
-      line,
-      fix: 'brain',
-    });
   });
 
   it('says which connection needs a sign-in or failed', () => {
@@ -120,25 +103,25 @@ describe('healthRows', () => {
 
   it('turns a fact it could not read into an unknown row, not a problem', () => {
     const rows = healthRows({
-      brain: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
     });
     expect(rows.every((each) => each.state === 'unknown')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
-    expect(row(rows, 'brain').line).toBe('Not checked.');
+    expect(row(rows, 'connections').line).toBe('Not checked.');
   });
 
   it('counts what needs the person in the headline', () => {
+    const voice = ALL_GOOD.voice as Exclude<HealthFacts['voice'], 'unknown'>;
     const rows = healthRows({
       ...ALL_GOOD,
-      brain: 'signed-out',
+      voice: { ...voice, earsReady: false },
       connections: [{ name: 'GitHub', status: 'error' }],
     });
     expect(healthHeadline(rows)).toBe('Two things need you.');
-    expect(healthHeadline(healthRows({ ...ALL_GOOD, brain: 'no-key' }))).toBe(
-      'One thing needs you.',
-    );
+    expect(
+      healthHeadline(healthRows({ ...ALL_GOOD, microphone: { count: 0, pickedMissing: false } })),
+    ).toBe('One thing needs you.');
   });
 });

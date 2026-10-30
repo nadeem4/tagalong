@@ -3,7 +3,6 @@
   "references": [
     { "path": "./packages/protocol" },
     { "path": "./protocol/ts" },
-    { "path": "./packages/core" },
     { "path": "./bodies/ui" },
     { "path": "./bodies/desktop" },
     { "path": "./bodies/browser" }

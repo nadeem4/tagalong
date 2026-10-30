@@ -4,7 +4,7 @@ How to build, run, test and package Tagalong from source, and the conventions th
 
 ## Repository layout
 
-A pnpm workspace monorepo. One core engine, many thin hosts.
+A pnpm workspace monorepo. One Python brain, many thin TypeScript bodies.
 
 ```text
 tagalong/
@@ -18,9 +18,8 @@ tagalong/
     README.md                       # the index and reading order
     architecture.md, protocol.md    # the whole system; the wire protocol
     desktop.md, bubble.md, voice.md, browser-body.md   # the hosts
-    sight.md, mind.md, memory.md, experts.md, asks.md, routines.md,
-    connected-apps.md               # the engine's subsystems
-    settings-and-secrets.md, storage.md, privacy.md, development.md
+    sight.md, memory.md, connected-apps.md, brain.md   # the subsystems
+    settings-and-secrets.md, privacy.md, development.md
     testing/feature-test-guide.md   # manual tests
     chrome-web-store/               # store listing kit and the extension's privacy policy
   protocol/                         # contract v1 for the Python brain (README.md is the spec)
@@ -31,7 +30,7 @@ tagalong/
                                     # main.py (see docs/brain.md)
   packages/
     protocol/src/
-      index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
+      index.ts                      # the contract's public exports
       context.ts                    # ContextSnapshot, CapturedImage, DisplaySnapshot, WindowEntry,
                                     # ContextSnapshotPatch, PerceptionTarget
       pet.ts                        # Pet, SCOUT_ID
@@ -43,37 +42,6 @@ tagalong/
                                     # plus activity, addressing, asks, awareness, blind-spots,
                                     # connections, experience, experts, limits, memory, pick-up,
                                     # routines, self, sight-log, status, usage and voice schemas
-    core/roles/                     # companion.md, the one role: YAML header plus mechanics
-    core/constitution.md            # values, their order, the Never list
-    core/soul/                      # scout.md, Scout's soul: Character
-    core/scripts/gen-roles.mjs      # compiles roles/*.md, soul/*.md and constitution.md into src/roles/library.generated.ts
-    core/src/
-      index.ts                      # the public facade hosts import
-      engine.ts                     # Engine.boot: wires the parts together and listens
-      conversation/                 # ConversationRunner, prompt-assembler, now.ts (the Now block)
-      perception/                   # exclusions, retention, inventory, text layer, browser routing
-      tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the built-ins and connected-app tools)
-      connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
-      memory/                       # db.ts (numbered migrations), store.ts (ConversationStore), recall.ts, digest.ts,
-                                    # activity, experience log, sight log, history search, summarizer
-      asks/                         # saved asks (Waiting on you)
-      experts/                      # hand-offs, the catalog, the Claude Code connector, the fake connector
-      routines/                     # the scheduler, schedules and triggers, the routine store
-      jobs/                         # Scout's own background jobs (Jobs, JobStore), the task board
-      meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
-      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing; Arrivals
-      keep-an-eye/                  # the lookout over window titles
-      pick-up/                      # pick up where you left off
-      self/                         # the Self (notes, proposals) and sleep
-      usage/                        # the meter, prices and the daily budget
-      watch/, projects/, privacy/   # watches, the project finder, the blind spots
-      pets/registry.ts              # PetRegistry, the default pet Scout
-      roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
-      providers/                    # brain.ts, claude-code-brain.ts, anthropic.ts, openai-compatible.ts,
-                                    # presets.ts, watch-models.ts, guard.ts, key-resolver.ts, fake.ts,
-                                    # registry.ts, errors.ts
-      server/                       # ws-server.ts (EngineServer), pairing.ts
-      settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
@@ -100,8 +68,8 @@ tagalong/
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
-                                    # tray-icon.ts, tray-menu.ts, launch.ts,
-                                    # claude-sign-in.ts, sight-pause.ts, drop.ts,
+                                    # tray-icon.ts, tray-menu.ts,
+                                    # sight-pause.ts, drop.ts, settings-store.ts, hide-secrets.ts,
                                     # log-file.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
@@ -127,13 +95,12 @@ tagalong/
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
-| Package             | Responsibility                                                                                                                                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
-| `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
-| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context.                                                                              |
-| `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.                                   |
-| `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                                                  |
+| Package             | Responsibility                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                  |
+| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context.                                            |
+| `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears. |
+| `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                |
 
 ## How to run
 
@@ -201,7 +168,6 @@ the root `vitest.config.ts`.
 
 | Area                                                       | Floor (statements / branches / functions / lines) |
 | ---------------------------------------------------------- | ------------------------------------------------- |
-| `packages/core/src`                                        | 70 / 70 / 70 / 70                                 |
 | `packages/protocol/src`                                    | 70 / 70 / 70 / 70                                 |
 | `bodies/ui/src`                                            | 91 / 83 / 90 / 93                                 |
 | `bodies/desktop/src/main` and `bodies/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
@@ -209,17 +175,6 @@ the root `vitest.config.ts`.
 The `bodies/ui` and desktop host floors sit just below what they measured when they were added.
 Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and
 the browser body are not measured: the Playwright suites cover them.
-
-Inside `packages/core`:
-
-```bash
-pnpm gen:roles        # compile roles/*.md, soul/*.md and constitution.md into src/roles/library.generated.ts (commit the result)
-```
-
-Run `pnpm --filter @tagalong/core gen:roles` from the root (or `node scripts/gen-roles.mjs` from
-`packages/core`, which also works in a git worktree) after editing any file in
-`packages/core/roles/` or `packages/core/soul/`, or `packages/core/constitution.md`. It needs `packages/protocol` built first, because it validates each role
-against the protocol's `Role` schema. A test fails while the generated file is stale.
 
 ### Packaging
 
@@ -253,16 +208,14 @@ against the protocol's `Role` schema. A test fails while the generated file is s
 jobs:
 
 - **`changes`** (Linux, seconds). Asks `dorny/paths-filter` whether anything outside `docs/` that is
-  not Markdown changed. The role files in `packages/core/roles/*.md` count as code, because they
-  compile into core. When nothing counts, the other two jobs are skipped. If `changes` itself
+  not Markdown changed. When nothing counts, the other two jobs are skipped. If `changes` itself
   fails, `build` runs anyway rather than skipping.
 - **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
   the unit tests with coverage and the floors above.
 - **`e2e`** (Windows). Starts only after `build` passes. Runs `pnpm build` first, because the tests
   import the workspace packages from their compiled `dist` (on Linux the typecheck's `tsc -b` does
   this). Then the unit tests that skip themselves off Windows (`*.integration.test.ts` against a
-  real PowerShell, and the npm `.cmd` shim cases in `claude-sign-in.test.ts` and
-  `claude-code.test.ts`), and the Electron end-to-end suites.
+  real PowerShell), and the Electron end-to-end suites.
 
 Branch protection on `main` requires `build` and `e2e`. A docs-only pull request skips both, and a
 skipped required check counts as passed, so it can merge. A `paths-ignore` trigger would not work
@@ -332,7 +285,7 @@ you normally never call it yourself.
 
 ### Choosing Scout's brain
 
-The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker and no API key rows. Settings' **How Scout thinks** card shows whether the Claude Code sign-in works (`claude auth status --json`, run locally with no model call).
+The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker, no API key rows (apart from the optional ElevenLabs voice key) and no sign-in check.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -351,8 +304,6 @@ before the bubble takes the focus. A click on Scout captures nothing, because it
 Scout's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
 seconds to enumerate) and other monitors are Scout's own tools, taken only when a question needs
 them. The pause key takes sight away entirely — see [Pausing sight](privacy.md#pausing-sight).
-**With several monitors, a look sends** (Settings → Advanced → Sight detail) decides whether a capture of every
-display attaches only the composite and the focused display, or every display.
 
 Every accelerator is editable in Home → Settings → Shortcuts and rebinds while the app runs — no
 restart — and an accelerator another application already owns is reported rather than silently
@@ -367,49 +318,16 @@ immediately, with no restart.
 
 ### Scout
 
-A fresh install starts with one companion, **Scout**, on the Claude Code sign-in. Scout hands work
-to experts (see [experts.md](experts.md)).
+A fresh install starts with one companion, **Scout**, which lives in the Python brain. Memories and
+conversations are the brain's, saved in its own store (see [memory.md](memory.md) and
+[brain.md](brain.md)).
 
-Scout remembers. Tell it "I prefer short answers" and it keeps that across restarts; it can also
-save facts on its own. Memories live in the same
-SQLite file as conversations (`tagalong.db` in the data dir).
+### Rolling memory
 
-### Awareness: rolling memory and watches
-
-Rolling memory's switch is in Settings → **Privacy** (**Remember the last few minutes of the
-screen**); its minutes and the watch limits are under **Advanced → Screen memory and watches**. Both
-take effect on save.
-
-- **Rolling memory** (off by default). Turn it on and the desktop keeps the last few minutes — ten by
-  default, at most thirty — of every screen in memory, never on disk. A small red dot on Scout shows
-  while it records.
-- **The engine's time tools.** `recall_screen`, `what_changed` and `watch_for` (a watch compares the
-  screen every five seconds and asks one small model yes or no only once the region has changed and
-  held still) are on the Companion role, with `look_closer`, `list_displays` and
-  `look_at_display`. A routine's own turn never gets `watch_for`, so a watch routine cannot set off
-  itself. The watch limits below bound every watch.
-
-| Watch limit (Settings)         | Default | What it bounds                                    |
-| ------------------------------ | ------- | ------------------------------------------------- |
-| Checks per watch               | 60      | Model calls one watch may make before it gives up |
-| Watches at once                | 3       | A fourth is refused                               |
-| Watch gives up after (minutes) | 30      | How long a watch runs before it ends on its own   |
-
-A watch's check model is `Pet.watchModel`, else the provider's default (`watchModelsFor` in
-`packages/core/src/providers/watch-models.ts`); Home has no field for it.
-
-### The two cost controls
-
-Both live in Settings under **Advanced → Sight detail** and both take effect on save, with no restart: they are read at the
-moment of each capture rather than at boot.
-
-| Setting                               | Default                            | What raising it costs                                                                                                                                                                 |
-| ------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                           |
-| **Window text budget**                | 8,000 characters                   | How much of a window a read returns when Scout does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
-
-The budget is a ceiling, not a target — Scout asks for less when it only needs the top of a
-terminal, and the number it does not ask for is the one set here.
+Rolling memory's switch and its minutes are in Settings → **Privacy** (**Remember the last few
+minutes of the screen**, **Minutes of screen to remember**) and take effect on save. It is off by
+default. Turn it on and the desktop keeps the last few minutes of every screen in memory, never on
+disk (ten by default, at most thirty). A small red dot on Scout shows while it records.
 
 Capture is never silent. Every capture, including one Scout's own tool asked for, shows on Scout
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the
@@ -421,8 +339,8 @@ that capture is blocked here, naming only the exclusion entry that matched.
 
 The Python brain has no pairing token: it is single user and listens on `127.0.0.1`, and a body's
 `hello` carries only the protocol version, its kind and its tools (see
-[protocol/README.md](../protocol/README.md)). The desktop shows no pairing step. The old engine's
-token (`readOrCreatePairingToken`, `packages/core`) goes when `packages/core` is deleted.
+`hello` carries only the protocol version, its kind and its tools (see
+[protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
 
 The data directory is still `%APPDATA%\Tagalong` on Windows, which is `productName` in
 `bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
@@ -476,65 +394,17 @@ opens a `.env` file. Copying it therefore changes nothing at runtime.
 Three environment variables are read by the desktop, all straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
-| Variable                | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_SIGN_IN` | **Read** (`bodies/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. The Electron suites set `signed-in`.                                                                                                                                                |
-| `TAGALONG_FAKE_TTS=1`   | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
-| `TAGALONG_FAKE_STT=1`   | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
-| `ANTHROPIC_API_KEY`     | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
-| `OPENROUTER_API_KEY`    | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
-| `ELEVENLABS_API_KEY`    | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
+| Variable              | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_TTS=1` | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
+| `TAGALONG_FAKE_STT=1` | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
+| `ANTHROPIC_API_KEY`   | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
+| `OPENROUTER_API_KEY`  | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
+| `ELEVENLABS_API_KEY`  | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
 rather than leaving a key readable on disk.
-
-## How to add a host
-
-A host is anything that can show Scout and capture what the user is looking at: the Electron app, the
-the browser body, or something new. Adding one never touches the core.
-
-1. Implement the **Perception** contract: answer `perception.capture` for selection, active window,
-   clipboard, page text and screenshot, returning a `ContextSnapshotPatch` from
-   `packages/protocol`. Advertise only what you can actually read, in the `capabilities` array of
-   `hello`.
-2. Implement the **Presentation** contract: render Scout, stream reply deltas, and show the cards.
-   The shared React components in `bodies/ui` do this already — hand them a `HostBridge` and nothing
-   else.
-3. Speak the JSON-RPC protocol over the localhost WebSocket the engine exposes
-   (`ws://127.0.0.1:47321` by default), sending `hello` first. The method catalog and
-   every payload schema live in `packages/protocol`.
-4. Never import core internals. A host uses the protocol, and the engine's public API only where it
-   embeds the engine in process. `bodies/browser` imports nothing from core at all.
-
-## How to add a provider
-
-Providers are the swappable edges of the engine. Each one is an interface in `packages/core` with more
-than one planned implementation.
-
-- **BrainProvider** for the AI engine. Existing: `claude-code` (the Claude sign-in, through the
-  `claude` CLI), `openrouter` (a preset of the OpenAI-compatible `OpenAiCompatibleProvider`),
-  `anthropic`, and `fake` (tests and demos). Another OpenAI-format
-  service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain) (old brain only); a new named preset
-  is one entry in `packages/core/src/providers/presets.ts`.
-- **Text to speech** lives in the desktop host, not in core: `Tts` in
-  `bodies/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
-  with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
-  `createVoiceService` picks one; see [The mouth](voice.md#the-mouth).
-- **Speech to text** also lives in the desktop host: the `Ears` in the voice process, `LocalEars`
-  (Silero VAD, Moonshine tiny and Smart Turn, `voice/ears/`) on this computer, or `FakeEars` under
-  `TAGALONG_FAKE_STT=1`; see [The ears](voice.md#the-ears).
-
-Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
-`SECRET_KEYS` entry if it takes a key, and pick it for Scout in Home. Do not widen the interface for a provider that is not being built.
-
-## How to add a tool
-
-Every built-in tool lives in `packages/core/src/tools/builtin/`, in one `Tool` shape (id, definition,
-`read` or `write`, run), and reaches a turn through `ToolRegistry` in `tools/registry.ts`. The repo
-skill [`.claude/skills/tagalong-add-tool/SKILL.md`](../.claude/skills/tagalong-add-tool/SKILL.md)
-walks through it: which file, read versus write, testing with `fakeTurnTools`, registering, and the
-docs to update. The design is in [Roles and tools](mind.md#roles-and-tools) in mind.md.
 
 ## Conventions
 
@@ -542,17 +412,15 @@ docs to update. The design is in [Roles and tools](mind.md#roles-and-tools) in m
   motivated it.
 - **Never overengineer.** Build what the current task needs. Interfaces exist only where a second
   implementation is already planned.
-- **Core stays pure.** `packages/core` and `packages/protocol` must not import `electron`, `react`, or
+- **Protocol stays pure.** `packages/protocol` and `protocol/ts` must not import `electron`, `react`, or
   browser globals. An ESLint `no-restricted-imports` rule enforces it.
-- **Tools go through the registry.** `conversation/` and `engine.ts` import tools only from
-  `tools/registry` or the `tools` index, never from `tools/builtin/*`. ESLint enforces it too.
 - **Docs are part of done.** Update `README.md`, the subsystem doc in `docs/` that describes the
   code you changed (the [index](README.md) lists them), and `docs/testing/feature-test-guide.md`
   with every change.
 - **Comments.** Every file opens with a 2-6 line header: what it is for, what it contains, who uses
   it. Comments explain why, limits, units and parse-compat rules; phase numbers, PR references and
   history belong in git. Test files get a one-line header.
-- **Commits** use Conventional Commits, for example `feat(core): add PromptAssembler`.
+- **Commits** use Conventional Commits, for example `feat(desktop): add the capture notice`.
 - **Diagrams** are Mermaid only, and every block starts with the monochrome init line the docs
   share (copy it from any doc in `docs/`): grey lines and titles, so diagrams read on GitHub's light
   and dark themes.

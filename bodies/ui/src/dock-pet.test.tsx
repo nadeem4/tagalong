@@ -2,6 +2,7 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { STATUS_WORDS } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
 import {
   DockPet as RealDockPet,
@@ -14,9 +15,6 @@ const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🦊',
-  roleId: 'companion',
-  model: 'haiku',
-  providerId: 'claude-code',
 };
 
 const MOODS: readonly DockMood[] = [
@@ -165,17 +163,15 @@ describe('DockPet', () => {
     rerender(<DockPet pet={SCOUT} mood="idle" listening="paused" />);
     expect(screen.getByTestId('listening-mark')).toHaveAttribute(
       'title',
-      'Always listening is paused for a call, a full-screen window or Welcome.',
+      'Always listening is paused for a call or a full-screen window.',
     );
   });
 
   it('shows the top status mark as a tag, named in its label', () => {
-    const { rerender } = render(
-      <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-signed-out' }} />,
-    );
-    expect(screen.getByTestId('status-mark')).toHaveTextContent('Signed out');
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" status={{ id: 'mic-busy' }} />);
+    expect(screen.getByTestId('status-mark')).toHaveTextContent('Mic busy');
     expect(screen.getByRole('img')).toHaveAccessibleName(
-      'Scout is idle, Can’t think: signed out of Claude.',
+      `Scout is idle, ${STATUS_WORDS['mic-busy'].detail}`,
     );
     rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
     expect(screen.queryByTestId('status-mark')).toBeNull();
@@ -297,13 +293,7 @@ describe('moods', () => {
 
   it('keeps every mark over Bean: tag, paused, listening and status', () => {
     render(
-      <DockPet
-        pet={SCOUT}
-        mood="working"
-        recording
-        listening="on"
-        status={{ id: 'brain-signed-out' }}
-      />,
+      <DockPet pet={SCOUT} mood="working" recording listening="on" status={{ id: 'mic-busy' }} />,
     );
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
     expect(screen.getByTestId('recording-dot')).toBeInTheDocument();

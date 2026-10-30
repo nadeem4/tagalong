@@ -18,10 +18,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Scout's timers (real brain)](#scouts-timers-real-brain)
 - [Scout notices you (real brain, desktop)](#scout-notices-you-real-brain-desktop)
 - [Connected apps on the Python brain (real brain, a real stdio app)](#connected-apps-on-the-python-brain-real-brain-a-real-stdio-app)
-- [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
-- [Greeting](#greeting)
-- [Keeping an eye on things](#keeping-an-eye-on-things)
 - [Check-ins](#c-check-ins-the-mind-decides)
 - [Voice: Scout talks](#voice-scout-talks)
 - [Talk to Scout](#talk-to-scout)
@@ -38,10 +35,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [File this as a bug](#file-this-as-a-bug)
 - [The browser body](#the-browser-body)
 - [Installer](#installer)
-- [Scout's mind](#scouts-mind-real-brain-balanced-tier)
 - [Log file](#log-file)
-- [Background jobs and the task board](#j-background-jobs-and-the-task-board-real-brain-balanced-tier)
-- [Arrivals: finished work together](#arrivals-finished-work-together-real-brain-balanced-tier)
 - [Not supported](#not-supported)
 
 ## Configuration
@@ -51,8 +45,8 @@ source (start the brain with `cd brain; uv run brain`, then `pnpm dev:desktop`),
 Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A saved key or brain is
 used from the next question, with no restart.
 
-**The default for this guide: the Claude sign-in.** Install Claude Code, run `claude` once and sign
-in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Sonnet.
+**The default for this guide: the Python brain.** Start it with `cd brain && uv run brain`; it holds the
+model and its keys (see [brain.md](../brain.md)). The desktop has no provider, model or sign-in settings.
 
 **Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
 (`bodies/desktop/e2e/fixtures/fake-brain.ts`) and point the desktop at it. Scout streams a
@@ -85,32 +79,19 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 4. **Action:** ask "can you read the task in Chrome?".
 5. **Expected:** Scout reads that one window's text and answers from it.
 
-### H5. An install that used the removed Nebius provider
-
-_Only on a data folder from a build before Nebius was removed._
-
-1. **Setup:** a `tagalong.db`, `settings.json` and `secrets.json` from a build where Scout thought
-   on Token Factory (`providerId: 'nebius'`), and some spend recorded.
-2. **Action:** launch the app, open Home, then ask Scout a question.
-3. **Expected:** Scout thinks with **Your Claude sign-in** on Haiku and answers. The Spend card still lists the old rows, as "Scout · nebius".
-   `secrets.json` has no `nebius.apiKey` entry after the launch.
-
 ### H.7. "Scout, what's wrong?"
 
-1. **Setup:** run `claude auth logout`; in Settings → Voice pick ElevenLabs with no key stored.
-2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Brain
-   row; (c) ask again and press **Fix it** on the Voice row; (d) say "are you OK?" with the talk
-   key; (e) type "what's wrong with this code?", then "what's broken?"; (f) press **Open logs
-   folder** on the card.
+1. **Setup:** in Settings → Voice pick ElevenLabs with no key stored; stop the brain.
+2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Voice row;
+   (c) say "are you OK?" with the talk key; (d) type "what's wrong with this code?", then
+   "what's broken?"; (e) press **Open logs folder** on the card.
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
-   row each for Brain ("Signed out of Claude."), Connections, Voice ("The ElevenLabs
-   voice has no key.") and Microphone; nothing is spoken; no key appears anywhere on the
-   card. No row says "I" or "my". (b) Home opens
-   on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card, and nothing is spoken: health is shown, never said.
-   (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
-   working.". With the engine stopped, the rows it cannot read say "Not checked." and the
-   card still shows. If the check itself fails, the bubble says "Health check failed.". (f)
-   Explorer opens `%APPDATA%\Tagalong\logs` (even on a fresh install with nothing logged yet);
+   row each for Connections, Voice ("The ElevenLabs voice has no key.") and Microphone; nothing is
+   spoken; no key appears anywhere on the card. No row says "I" or "my". (b) Home opens at
+   Settings › Voice. (c) the same card, and nothing is spoken: health is shown, never said.
+   (d) Scout answers both as normal questions; no card. With everything fixed, the card says
+   "Everything's working.". If the check itself fails, the bubble says "Health check failed.".
+   (e) Explorer opens `%APPDATA%\Tagalong\logs` (even on a fresh install with nothing logged yet);
    nothing is put on the clipboard.
 
 ## Python brain: talk to Scout
@@ -511,97 +492,14 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
     **Expected:** the brain is listening at once and Scout answers; the app shows `error` after about
     30 seconds. Stopping the brain leaves no stray process.
 
-## Hand-offs to Claude Code (old engine)
-
-Home no longer has the Experts, Routines, Activity, Waiting on you, How Scout decided, What Scout saw
-or What Scout learned pages, nor a Scout page or Browser extension settings. Steps below that open
-them, or use the hand-off, routine, settings or pick-up cards, cannot be run.
-
-These sections cover the old packages/core engine, which the desktop no longer boots. For the
-Python brain see "Hand off to Claude Code (real brain, real Claude Code)" above.
-
-### E.1. Scout briefs, you press Send
-
-1. **Setup:** Claude Code installed; it is listed and **On** in Home → Experts. A code file open in
-   an editor whose title names a project folder.
-2. **Action:** ask Scout "can you find why this test fails and fix it?".
-3. **Expected:** a hand-off card in the bubble: **Agent** Claude Code, **Project** (guessed from the
-   window, or **Choose the project to work in**), **Access** (**Reads only** until you press
-   **Allow edits**), and the **Brief**, which you can edit. Nothing runs until **Send**.
-4. **Action:** press **Cancel**. **Expected:** nothing runs.
-5. **Action:** ask again and press **Send**. **Expected:** the card shows Claude Code's steps; when
-   it finishes, the answer shows on the card, and Scout may add one short line about the outcome
-   (the mind's, or nothing). Home →
-   Activity lists the hand-off with its thread.
-
-_Fake provider:_ the same flow runs with a scripted expert that "read the brief and has nothing to
-change".
-
-### E.2. Add a Debugger from its template
-
-1. **Setup:** Claude Code installed and signed in.
-2. **Action:** Home → Experts → **Add expert**. **Expected:** a picker with **Coder**, **Debugger**,
-   **Designer**, **Reviewer** and **Blank**, each with one line saying what it does, and below them
-   **From the catalog**.
-3. **Action:** pick **Debugger**. **Expected:** the form is filled in: Name **Debugger**, Good at
-   "Finding why something breaks, reading logs and stack traces", **Standing instructions** shown in
-   full (find the cause before suggesting anything, do not change files), **Let it edit files by
-   default** Off and **Let it search the web** Off. Every field can be changed.
-4. **Action:** **Save and test**. **Expected:** "Saved. Debugger is ready." and the list shows
-   Debugger, **Reads only**, **On**. Opening it again shows the form with its instructions and no
-   picker.
-5. **Action:** ask Scout why a failing test breaks and **Send** the hand-off to Debugger.
-   **Expected:** the answer names the cause and the evidence (file and line) and no file changes.
-
-### E.3. Change then review (two steps, one Send)
-
-1. **Setup:** Claude Code installed and signed in; add a **Coder** and a **Reviewer** from their
-   templates. A project with a small bug you know of.
-2. **Action:** ask Scout "Fix the date bug and have someone check it". **Expected:** one card,
-   "Hand to Coder, then Reviewer": one Project row, **1. Coder** (Can change files) and
-   **2. Reviewer** (Reads only), each with **Edit brief**, and **Remove step 2**.
-3. **Action:** **Send**. **Expected:** "Coder is on it (1 of 2)" with its steps, then "Reviewer is
-   checking (2 of 2)". Scout says nothing in between and one line at the end. The finished card
-   shows "Coder changed …" with Coder's answer, then "Reviewer says" with Reviewer's answer.
-4. **Action:** Home → Activity. **Expected:** two expert rows; Reviewer's "What Reviewer was told"
-   holds Coder's answer and changed files. What Scout saw has two "Sent to expert" rows.
-5. **Action:** repeat, and press **Stop** while Coder works. **Expected:** "Coder was stopped" and
-   "Reviewer did not start."; Activity has only Coder's row.
-6. **Action:** repeat, press **Remove step 2**, then **Send**. **Expected:** only Coder runs.
-
-_Fake brain:_ both steps are scripted experts.
-
 ## Settings
 
-### S.1. How Scout thinks shows the real brain and sign-in
+### S.5. A refused value is named where it is
 
-1. **Setup:** Claude Code installed and signed in (`claude auth status` says `"loggedIn": true`);
-   Scout on the Claude sign-in with Haiku.
-2. **Action:** open Home → Settings.
-3. **Expected:** the first card reads **Your Claude sign-in** with a **Signed in** chip (a tick and
-   the words). It has no model picker: the brain's model and key are set in its `.env`.
-
-### S.2. Signed out, and Check again
-
-1. **Setup:** run `claude auth logout` in a terminal. Scout on the Claude sign-in.
-2. **Action:** open Settings. Then run `claude auth login`, and click **Check again**.
-3. **Expected:** first a **Signed out** chip with "Run claude in a terminal and sign in", and a
-   **Check again** button. After signing in, **Check again** turns it
-   into **Signed in**. No model call is made (Activity stays empty).
-
-### S.3. No Claude Code
-
-1. **Setup:** a machine (or PATH) without `claude`.
-2. **Action:** open Settings.
-3. **Expected:** the brain card says Claude Code is not installed, with a **Check again** button.
-   There is no service picker: the brain's model and key are set in the brain's `.env`.
-
-### S.5. A refused value inside Advanced opens Advanced
-
-1. **Setup:** Settings, Advanced closed.
-2. **Action:** open Advanced, type `40` in **Watches at once**, close Advanced, Save.
-3. **Expected:** "Not saved. Watches at once must be a whole number between 1 and 10." Advanced opens
-   by itself, the field is outlined, focused and has the same sentence under it.
+1. **Setup:** Settings → Privacy, screen memory switched on.
+2. **Action:** type `40` in the memory minutes, Save.
+3. **Expected:** "Not saved. Rolling memory must keep between 1 and 30 minutes." The field is
+   outlined, focused and has the same sentence under it.
 
 ### S.6. A shortcut another app uses
 
@@ -630,14 +528,6 @@ _Fake brain:_ both steps are scripted experts.
 2. **Expected:** each opens its note inline below, the button shows pressed (`aria-expanded`), and
    opening another closes the first. The blind spot chips match the list in [privacy](../privacy.md).
 
-### S.8. Experts have no default folder
-
-1. **Setup:** an expert saved by an older build with a default folder.
-2. **Action:** open it in Home → Experts and Save; then ask Scout for a coding task from a window
-   with no project in its title.
-3. **Expected:** the form has no folder box, and **Let it edit files by default** and **On** are
-   switches. The hand-off card offers no remembered default and opens the folder picker.
-
 ### S.9. A broken settings file does not stop the app
 
 1. **Setup:** quit Tagalong. In `%APPDATA%\Tagalong`, replace the contents of `settings.json` with
@@ -647,161 +537,9 @@ _Fake brain:_ both steps are scripted experts.
    first save), and after the save the broken text is in `settings.json.corrupt` and
    `settings.json` is valid again.
 
-### S.10. Nothing spins forever after a crash
-
-1. **Setup:** start a hand-off to Claude Code, then end Tagalong from Task Manager while it runs.
-2. **Action:** start Tagalong and open Home → Activity.
-3. **Expected:** the hand-off reads "Interrupted: Tagalong closed before this finished." and is not
-   running. A routine that was running shows its last run as failed.
-
-### S.11. Claude Code installed with npm
-
-1. **Setup:** Claude Code installed with `npm install -g @anthropic-ai/claude-code` (so `claude` is
-   `claude.cmd`).
-2. **Action:** confirm a hand-off to Claude Code.
-3. **Expected:** it runs. With `claude` not installed at all the hand-off ends with a plain error
-   and the app keeps running. A hand-off still running after 30 minutes stops with "Claude Code
-   took longer than 30 minutes, so it was stopped."
-
-## Greeting
-
-The hello is the launch check-in: the mind gets the facts and may say one short line, or nothing.
-No line is written in code, and the wording varies; run each check about three times.
-
-### G.1. The first hello
-
-1. **Setup:** a fresh install (empty `%APPDATA%\Tagalong`).
-2. **Action:** start Tagalong.
-3. **Expected:** Scout's bubble opens beside it without taking the keyboard with **Try it now**
-   (focused) and **Got it**, and within about 15 s usually one short line from Scout above them,
-   typed in and said once (it may greet you by name). Never "Here I am. Ask me one real thing…".
-   With no brain answering, or when the mind passes, there is no line, only the buttons. There is
-   no **Next**. Tab reaches both buttons.
-4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
-   off, the line appears whole, with no typing.
-
-### G.2. A later launch: a line or nothing
-
-1. **Setup:** an install that has run before. Quit Tagalong.
-2. **Action:** start Tagalong again, and keep typing in another window.
-3. **Expected:** within about 15 s of Scout appearing, either one short line beside Scout (in the
-   mind's own words; never "Morning. I'm here when you need me." boilerplate) or nothing at all;
-   your typing is not interrupted. A line fades after about seven seconds; pointing at it keeps
-   it, clicking it opens the bubble, × closes it. With a brain that fails or times out, nothing is
-   said: there is no handwritten line. Nothing is captured (no capture dot); What Scout saw shows
-   one "Sent to AI" row for the check-in.
-4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line, if any, may
-   mention it; it never invents a task, file or result.
-5. **Always listening:** with Always listening on, the launch is the usual one (nothing is said
-   about listening); Scout shows a **Listening** tag at its bottom for about 8 s, with the tooltip
-   "Always listening is on. Say “Scout, stop” to switch it off.". Switching it on from the bubble
-   shows the same tag again; switching it off removes it.
-
-### G.3. The hello can be switched off
-
-1. **Action:** Settings → Privacy → **Say hello when Tagalong opens** → Off, Save. Restart.
-2. **Expected:** Scout docks and says nothing, and no "Sent to AI" row appears for a launch. The ⓘ
-   note says the hello reads no screen and is often nothing.
-
-### G.4. Scout knows your name
-
-1. **Action:** on a fresh install, open Home → Settings → **You**, type `Nadeem` and Save.
-2. **Expected:** the first hello may use the name; answers rarely do.
-3. **Action:** Settings → **You** → clear the box, Save. Restart.
-4. **Expected:** no line uses the name.
-
-### G.5. After a crash
-
-1. **Action:** end Tagalong in Task Manager, then start it.
-2. **Expected:** a line that may mention, calmly and in Scout's own words, that Tagalong closed
-   unexpectedly (and that runs it cut short are in Activity), or nothing. Never an invented task.
-   After an update over a running app (G.6), the crash is not mentioned: the update is.
-
-### G.6. After an update
-
-1. **Action:** install a newer build over the old one and start it.
-2. **Expected:** a line that may mention the update and what is new (from the release notes, in
-   Scout's words), or nothing. Never the old fixed line "I can write short drafts, translate…".
-3. **Action:** quit and start again.
-4. **Expected:** the update is not mentioned a second time.
-
-### G.7. Days away with routines
-
-1. **Action:** let a routine run, quit, then change the clock forward a day or wait a day, and start.
-2. **Expected:** a line that may mention the time away or the routine by name, or nothing.
-
-### G.8. Signed out
-
-1. **Action:** run `claude auth logout`, then restart Tagalong.
-2. **Expected:** within about a second, a quiet line "Can’t think: signed out of Claude." with
-   **Fix it**, which opens Settings. Nothing is said aloud, and no line says "I". Scout shows a
-   **Signed out** tag at its bottom (tooltip: the same sentence); the bubble shows the same row
-   with **Fix it** until a question gets an answer, or Settings' Check again finds Claude
-   signed in, which removes the tag. No check-in runs ("Sent to AI" has no launch row).
-
-## Keeping an eye on things
-
-On by default.
-Every line here is a check-in (see C below): the mind's own words, and usually nothing. Never pin
-the wording; check that a line is short, about the facts, and that silence is common.
-
-### K.1. A failed build may get one line
-
-1. **Setup:** a real brain set up; the bubble closed; nothing said in the last ten minutes.
-2. **Action:** in a terminal, run a command that fails, and give the window a title with "failed"
-   in it (PowerShell: `$host.UI.RawUI.WindowTitle = 'npm test failed'`). Keep typing elsewhere.
-3. **Expected:** within about twenty seconds either nothing, or one short line beside Scout about
-   what the failure means (not the error read back), and your typing is not interrupted. It has
-   **Not now** and fades after about twelve seconds. No screenshot is taken.
-
-### K.2. Settling on a new window
-
-1. **Action:** open a document or page you have not opened this session and stay on it for 30 s.
-2. **Expected:** almost always nothing. At most one line, and never a second one about the same
-   window.
-
-### K.3. The limits
-
-1. **Action:** after a check-in (spoken or not), cause another failure within ten minutes.
-2. **Expected:** nothing until ten minutes have passed (What Scout saw shows no new "Sent to AI").
-3. **Action:** press **Not now** on a line, then cause failures.
-4. **Expected:** nothing for an hour.
-5. **Action:** put a video full screen, or join a Teams, Zoom or Google Meet call, then cause a
-   failure in a window behind it.
-6. **Expected:** nothing while the full-screen window or the call is in front.
-
-### K.4. Blind spots and the switch
-
-1. **Action:** add `*failed*` to your exclusion list, then cause a failure whose title matches it.
-2. **Expected:** nothing; that window is never read and no call is made.
-3. **Action:** Settings → Privacy → **Keep an eye on things** → Off, Save.
-4. **Expected:** no further lines; the window list is no longer taken. The ⓘ note explains what is
-   followed, when a window is read, and what goes with the call.
-
-### K.4b. Paused sight is said plainly
-
-1. **Action:** pause sight (`Ctrl+Shift+Alt+P`) and ask "look at my screen".
-2. **Expected:** Scout says sight is paused, not that the screen was empty.
-
-### K.5. Hand it over reads the window only on the click
-
-1. **Setup:** one expert switched on (Claude Code), or several with clear "good at" lines; a
-   project open in the editor (for example `ai_pet` in VS Code).
-2. **Action:** click the editor, then bring a terminal to the front titled like trouble (for
-   example `title npm start - failed` in `cmd`) with `Error: listen EADDRINUSE :::3000` in it.
-3. **Expected:** a line may come with **Hand it over**. **What Scout saw** shows one read of the
-   terminal (the check-in's) and nothing more before the click.
-4. **Action:** press **Hand it over**.
-5. **Expected:** the hand-off card opens with the mind's task, the editor's project already picked
-   and "Includes the end of the error window" under the brief; **What Scout saw** now shows one
-   more read of the terminal. Nothing runs until **Send**; any key in the window's end is hidden.
-6. **Action:** with two experts on, repeat until a line offers help without naming a clear expert.
-7. **Expected:** the line shows without **Hand it over**: Scout never guesses an expert.
-
 ## Scout's moods
 
-Faces other than dozing come only from the mind, in a check-in (with or without words). A title
-alone never makes Scout wince or cheer.
+Scout's only faces are the dock moods (idle, listening, reading, thinking, working, dozing).
 
 ### M.1. Scout dozes while you are away
 
@@ -812,41 +550,22 @@ alone never makes Scout wince or cheer.
 3. **Action:** with Always listening on, repeat.
 4. **Expected:** the green listening dot stays on Scout the whole time it dozes.
 
-### M.2. A face from a check-in
-
-1. **Action:** in a terminal in front, set the title to a failure
-   (`$host.UI.RawUI.WindowTitle = 'npm test - 2 failed'`), with real failing output in it.
-2. **Expected:** Scout may wince (eyes squeezed shut, one shake, a sweat drop, then it holds the
-   pose) for about four seconds, with or without a line. Setting the title to `npm test - 12 passed` alone does nothing.
-3. **Action:** put a video full screen or join a call, then cause a failure title behind it.
-4. **Expected:** no reaction.
-
-### M.3. A finished hand-off
-
-1. **Setup:** Claude Code switched on as an expert.
-2. **Action:** hand off a task that fails (for example, a folder Claude Code cannot open), then one
-   that succeeds.
-3. **Expected:** each may bring a face (a wince, a cheer) and one short line on its card, both from
-   the mind; or neither. The **Done** face follows as usual.
-
 ### M.4. Reduced motion
 
 1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, restart
-   Tagalong (the setting is read when the window opens), then repeat M.1 and M.2.
+   Tagalong (the setting is read when the window opens), then repeat M.1.
 2. **Expected:** Bean's pose changes per mood but each is a still frame, nothing moves and Bean never
    blinks.
 
 ### M.5. Bean on the dock
 
-1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), hand
-   off a task to an expert (Working), and wait for it to finish (Done). Do it on a light wallpaper
-   and on a dark one.
+1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), and ask a
+   question while a screen tool reads. Do it on a light wallpaper and on a dark one.
 2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
-   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a walkie-talkie and a
-   badge at the top left while an expert works, a hop and a check mark for Done). The small tag at
-   the top right sits beside the check mark and clear of the badge, and reads clearly on both
-   wallpapers. Turn sight off while an expert works: the Paused chip shows at the top left over the
-   badge and the Working tag goes, so the two never overlap; the walkie-talkie still shows the work.
+   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, glasses while reading,
+   a thought cloud while thinking, a laptop for a job of Scout's own). The small tag at the top right
+   reads clearly on both wallpapers. Turn sight off: the Paused chip shows at the top left and the
+   Working tag goes, so the two never overlap.
 
 ### M.6. What Scout is busy with
 
@@ -875,56 +594,13 @@ alone never makes Scout wince or cheer.
    the small entry tile without its ears or feet cut off. None of the three ever moves, with or
    without reduced motion. No pixel-art Scout appears anywhere.
 
-## Gentle nudges
-
-The thresholds (90 minutes, a 5-minute break, 23:00 to 05:00) are constants; the unit tests
-(`packages/core/src/check-in/active-time.test.ts`, `check-in.test.ts`) shorten them through a fake
-clock and a fixed hour. By hand, check the switch, the hold during calls and that the words are the
-mind's.
-
-### N.1. Off by default
-
-1. **Action:** on a fresh profile, open Settings → Privacy.
-2. **Expected:** **Gentle nudges** sits directly below **Keep an eye on things**, switched Off. The ⓘ
-   note says what is read (idle time and titles), what goes with the one call, the limits, and that
-   it is off by default. With it off, no nudge check-in ever happens.
-
-### N.2. A long stretch
-
-1. **Action:** switch **Gentle nudges** on, Save, then keep working for an hour and a half without a
-   five-minute break.
-2. **Expected:** within a minute of the 90 minutes, one check-in ("Sent to AI" in What Scout saw).
-   Scout may look tired (slow breathing, a drooping head, no blink; "Scout looks tired"), say one
-   line in its own words, or do nothing. Never a fixed "Stretch?" line. No second check-in in the
-   same stretch.
-3. **Action:** step away for five minutes, then come back.
-4. **Expected:** a tired face clears.
-5. **Action:** an hour into a new stretch, put the computer to sleep for ten minutes, then wake it.
-6. **Expected:** nothing on waking; the stretch starts over.
-
-### N.3. Calls and full screen
-
-1. **Action:** with nudges on and a stretch nearly due, keep a Teams window (or a full-screen video)
-   in front past the 90 minutes.
-2. **Expected:** no check-in while it is in front. Switch to another window: the check-in comes
-   within a minute.
-
-### N.4. Late at night
-
-1. **Setup:** Claude Code switched on as an expert.
-2. **Action:** after 23:00, with nudges on, work for half an hour.
-3. **Expected:** one check-in. Any line is the mind's; if it offers a write-up, **Hand it over**
-   opens the hand-off card with the task and the window title, and nothing runs until **Send**.
-4. **Action:** press **Not now** on a line.
-5. **Expected:** no unprompted check-in for an hour.
-
 ## C. Check-ins (the mind decides)
 
 Run each three times with a real brain (a fast summaries model is fine). Pass: lines are short, true to the facts, never boilerplate, often absent.
 
 ### C.1. Silence is common
 
-1. **Action:** with Keep an eye on things on, settle on ten ordinary windows over an hour.
+1. **Action:** with check-ins on, settle on ten ordinary windows over an hour.
 2. **Expected:** almost always silent; at most six "Sent to AI" check-ins (the ten-minute
    cooldown).
 
@@ -957,14 +633,6 @@ Run each three times with a real brain (a fast summaries model is fine). Pass: l
    tell Scout "remember I prefer short answers" and then cause an error.
 2. **Expected:** no check-in about the blind-spot window (no "Sent to AI"); the error's line, if
    any, is short.
-
-### C.6. Launch after a night, a crash and an update
-
-1. **Action:** open Tagalong after a night away (G.2), then after ending it in Task Manager
-   (G.5), then after a version bump (G.6).
-2. **Expected:** each time a line or nothing; never "Morning." boilerplate. A finished hand-off
-   or the crash may be mentioned calmly; the new features may be mentioned in Scout's words; no
-   invented task. Pressing **Not now** before quitting does not stop the next launch's hello.
 
 ## Voice: Scout talks
 
@@ -1228,9 +896,9 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 2. **Expected:** the new key works at once and Right Ctrl no longer talks; the bubble's reply hint
    says "Hold Right Shift to reply". A settings file whose talk key is a combo (such as
    `Ctrl+Shift+Alt+Space`) opens on Right Ctrl.
-3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
+3. **Action:** with the bubble open, pick another microphone in Settings;
    Save, then talk to Scout without restarting.
-4. **Expected:** the new microphone is used and Scout uses the new name.
+4. **Expected:** the new microphone is used.
 
 ### T.9. Always listening and Seeing switches
 
@@ -1658,10 +1326,9 @@ monitor.
 
 ### SM.1. The settings and their defaults
 
-1. **Action:** Home → Settings → Privacy, then Advanced → **Screen memory and watches**.
+1. **Action:** Home → Settings → Privacy, then Advanced → **Screen memory**.
 2. **Expected:** **Remember the last few minutes of the screen** is **Off**. Under Advanced:
-   **Minutes of screen to remember** 10, **Checks per watch** 60, **Watches at once** 3, **Watch
-   gives up after (minutes)** 30.
+   **Minutes of screen to remember** 10.
 
 ### SM.2. Turning it on shows the red dot, without a restart
 
@@ -1746,7 +1413,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 
 ### DC.2. Silence is a decision too _(real brain)_
 
-1. **Setup:** Keep an eye on things on.
+1. **Setup:** check-ins on.
 2. **Action:** open a terminal whose title says `failed`, wait for the check-in, then open the page.
 3. **Expected:** a row for the check-in: **Scout stayed quiet** or **Scout spoke up**, with **An
    error on screen**. Opened, **What it was shown** is the message the check-in sent, keys and
@@ -1795,7 +1462,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
    opens what the page held then.
 5. **Action:** paste more than 6,000 characters into you.md and **Save**. **Expected:** "Saved the
    first 6000 characters: the page holds no more."
-6. **Action:** quit the engine (or unplug it in a dev build) and press **Save**. **Expected:** "Not
+6. **Action:** stop the brain (or make the settings file read-only) and press **Save**. **Expected:** "Not
    saved: …" beside Save, never a silent failure.
 
 ### SL.2. Scout writes a note in a conversation _(real brain)_
@@ -2309,24 +1976,17 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Change settings by talking _(real brain)_
 
-1. Say or type "talk a bit slower and call me Sam". The bubble shows a card: **Voice speed**
-   0.95 → 0.85 and **Your name** (none) → Sam, with **Apply** and **Cancel**. Settings has not
-   changed yet.
+1. Say or type "talk a bit slower". The bubble shows a card: **Voice speed** 0.95 -> 0.85, with **Apply**
+   and **Cancel**. Settings has not changed yet.
 2. Say "yes" (Always listening on or the talk key): nothing is applied. Click **Apply**: Scout's next
-   line is slower and it calls you Sam, with no restart. Home → What Scout saw has a **Changed by
-   talk** row naming `userName, voice`.
-3. Ask "keep my screenshots for 2 hours": the row is marked "Lets Scout see or keep more of your
-   screen" and the button reads **Turn on**. **Cancel** changes nothing.
-4. Ask for an API key, a base URL, the model or the calendar link to change: Scout says, in its own
+   line is slower, with no restart. Home -> What Scout saw has a **Changed by talk** row naming `voice`.
+3. Ask for an API key, a base URL, the model or the calendar link to change: Scout says, in its own
    words, those are changed only in Settings, shows no card and repeats nothing.
-5. With Always listening on, ask Scout to switch it off: a card; **Apply** closes the microphone and
+4. With Always listening on, ask Scout to switch it off: a card; **Apply** closes the microphone and
    the green mark goes. Ask it to switch it on: Scout says only you can, and where; no card.
-6. Ask "keep the log of what Scout saw for 30 days" (from 7): no card; Scout says only lowering
-   works by talk.
-   Ask for 3 days: a card.
-7. Ask "use ElevenLabs to speak" with no ElevenLabs key: the row says it needs a key in Settings.
-8. Ask "what's my voice speed?": Scout answers without a card.
-9. With the browser body connected, ask for a change from the desktop bubble: the card shows
+5. Ask "use ElevenLabs to speak" with no ElevenLabs key: the row says it needs a key in Settings.
+6. Ask "what's my voice speed?": Scout answers without a card.
+7. With the browser body connected, ask for a change from the desktop bubble: the card shows
    only in the desktop bubble.
 
 ## Expert catalog _(real Claude Code)_
@@ -2356,42 +2016,6 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 8. **Action:** add **Trip planner** and ask it to plan a weekend. **Expected:** it reads the calendar
    when Google Calendar is connected in Claude Code, writes its plan in its own folder, and never
    books anything. The tool names in `catalog.json` need this real-run check.
-
-## Scout's mind _(real brain, balanced tier)_
-
-Scout's values are `packages/core/constitution.md` and its character is
-`packages/core/soul/scout.md`; the prompt has no recipes. Run each check
-three times: the wording should vary, the behaviour should not.
-
-1. **Short answers stick.** Say "I prefer short answers." Restart. Ask "Explain how DNS works."
-   **Expected:** a short answer; Home → What Scout remembers has a **Preference** row.
-2. **Seeing is understanding.** With three apps open, ask "What do you see?". **Expected:** what
-   you seem to be doing, in a sentence or two, not a list of every window title per screen.
-3. **Meaning, not recital.** A terminal showing `EADDRINUSE :3000`, ask "what's this?".
-   **Expected:** Scout says the port is taken and what to do; it does not read the stack trace back.
-4. **Long text.** Give Scout a long passage or a research paper and ask it to read it.
-   **Expected:** it does not recite it; it offers a summary first and asks what to dig into.
-5. **Drafts.** An email open, "draft a reply". **Expected:** one `draft` block with **Copy**; the
-   line around it varies; Scout never says it was sent.
-6. **Translate.** German text selected, "translate this". **Expected:** plain English, no fixed
-   opener. "Now into French": a `> ` quoted block, and nothing French is spoken.
-7. **Now, not chatter.** Hand a task to an expert and let it finish. Then say "Scout, anything
-   new?" out loud. **Expected:** Scout mentions the finished work naturally, with no markdown read
-   aloud and no time-of-day greeting filler.
-8. **A routine asks nothing.** Run a routine with **Run now**. **Expected:** its answer asks you no
-   question.
-9. **Your name.** Set Settings → You to a name. **Expected:** Scout knows it, and does not use it
-   in every reply.
-10. **Two experts, no route memory.** Switch on Claude Code (code) and a Researcher (web). Ask "fix
-    the failing login test", then "find recent papers on agent memory". **Expected:** the first
-    card is for Claude Code, the second for the Researcher. Nothing names a task kind.
-11. **Silence with a reason.** Force a refusal, or the Claude Code sign-in's step cap (a question
-    that keeps it calling tools). **Expected:** no "I'd rather not…" or "went round in circles"
-    line; the bubble shows a muted **Declined** or **Stopped: too many steps** under Scout, the
-    chat panel shows it as a note, and nothing is spoken.
-12. **Facts, not orders.** Ask "what do you see?" with a blind spot in front, then with no host
-    connected. **Expected:** Scout explains in its own words; it never reads a tool's line back
-    ("Tell the user…").
 
 ## What Scout remembers _(real brain)_
 
@@ -2451,89 +2075,6 @@ three times: the wording should vary, the behaviour should not.
 5. **Expected:** (a) and (b) one line each, with the same time, level and 300-character rules;
    (c) one `[listening] paused: a full-screen window in front (<app>)` line and one
    `[listening] resumed` line, with the app's process name and never a window title.
-
-## J. Background jobs and the task board _(real brain, balanced tier)_
-
-Scout's own jobs are background Scout turns (`packages/core/src/jobs/`). Run each check three
-times: the wording should vary, the behaviour should not.
-
-1. **Work while talking.** Open a long article and say "read this and give me the gist, I'll keep
-   working". **Expected:** Scout says it is on it in its own words and you can keep chatting; the
-   chat panel and the bubble keep showing your own turn, never the job's text. When it finishes,
-   Scout may bring the gist up on its own (see Arrivals below) or on your next question (it rides
-   in Now); "go on" makes it use `open_result`.
-2. **Five at once.** Ask for five separate pieces of background work in a row. **Expected:** at most
-   3 run and the rest wait (fewer run on a machine short of memory); Scout says so in its own
-   words, never a fixed queue line. A sixth waiting is refused and Scout explains.
-3. **What are you working on?** **Expected:** Scout names the jobs, experts and watches from Now or
-   `board`, with how long each has run.
-4. **Stop by talk.** "Scout, stop the pricing one". **Expected:** `stop_work`; the job is gone from
-   the board and its row in the database is `stopped`.
-5. **A routine meanwhile.** Press **Run now** on a routine while you ask Scout something.
-   **Expected:** your answer streams in the chat panel; the routine's words never appear there.
-6. **Restart mid-job.** Quit Tagalong while a job runs and start it again. **Expected:** the job
-   shows as failed on the board ("Tagalong closed before this finished").
-7. **Ten minutes.** A job still running after 10 minutes stops and shows as failed with that
-   reason.
-8. **Forget a job.** "Scout, forget the pricing job." **Expected:** `forget` deletes the finished
-   job and its conversation, with no card; it is gone from the board.
-
-## Arrivals: finished work together _(real brain, balanced tier)_
-
-Finished jobs and hand-offs are gathered (`packages/core/src/check-in/arrivals.ts`): one check-in
-20 s after the latest finishes (60 s at most), held during a call, a full-screen app or while you
-are talking with Scout. The unit tests (`arrivals.test.ts`) cover the timings with a fake clock;
-by hand, check that it is one line and that the order is the mind's. Run each three times.
-
-1. **Three at once.** Ask for three pieces of background work in a row (for example: the gist of
-   an open article, a comparison of two pages you name, and a summary of a thread), then stop
-   talking. **Expected:** when all three finish, about 20 to 50 seconds later, **one** check-in
-   ("Sent to AI" in What Scout saw) and at most one short line: a round-up that asks which to
-   open first, or the most urgent one first (a failure, say), in Scout's own words. Never three
-   lines, never a fixed "N things are done" sentence. The order and the wording vary between runs.
-2. **Silence keeps it.** If Scout says nothing, ask "anything finished?". **Expected:** Scout
-   knows all three (Now lists them as "not mentioned yet"); `board` says the same.
-3. **Told once.** After a line about them, ask a new question. **Expected:** the jobs are no longer
-   "not mentioned yet" on the board; Scout does not announce them again unprompted.
-4. **During a call.** Start a job, then join a Teams call (or put a video full screen) before it
-   finishes. **Expected:** nothing while the call is in front; the line (or silence) comes within
-   about 15 seconds of leaving it.
-5. **While talking.** Keep asking Scout things while a job finishes. **Expected:** no check-in
-   until about 30 seconds after your last answer ends.
-6. **A job and a hand-off.** Start a job and hand something to Claude Code so both finish within
-   a minute. **Expected:** one check-in covering both; the line shows beside Scout, not on the
-   hand-off card. A hand-off finishing alone still puts its line on its card (C.3).
-7. **Not batched.** A watch firing or a routine result during the wait. **Expected:** each comes
-   at once through its own channel, as before.
-
-## D. Memory digest, recall and retention _(real brain, balanced tier)_
-
-The daily digest (`packages/core/src/memory/digest.ts`), one recall path and the retention
-numbers. To avoid waiting a day, quit Tagalong and move the last `digest` row's `finished_at` in
-`tagalong.db` back 21 hours (or delete the `digest` rows); the first check runs 5 minutes after
-start, then every 30 minutes, while no turn of yours and no job is running.
-
-1. **The digest runs.** After a day with a few finished jobs or longer chats, leave Scout alone.
-   **Expected:** `board` (or "what have you been doing?") shows "Tidied your memory ... Note:
-   Added N, changed N, let N go."; Scout never says it on its own. Home → What Scout remembers
-   shows anything new in Scout's own words.
-2. **Preferences stay.** With a preference saved ("I like short answers"), let the digest run.
-   **Expected:** the preference is still in Home afterwards (it may be reworded, never removed).
-3. **No digest on a spent budget.** Set a tiny daily budget and spend it. **Expected:** no digest
-   row appears that day; Activity shows nothing new from it.
-4. **Recall reaches jobs.** A few days after a job ("summarise the launch thread"), ask "what did
-   the launch thread say?". **Expected:** Scout answers from that job's note (it rides as "your
-   job, N days ago") without starting a new job.
-5. **Fifteen days later.** Move a finished job's `finished_at` back 15 days and restart.
-   **Expected:** the job and its conversation are gone; what the digest learned from it stays in
-   Home → What Scout remembers.
-6. **Activity keeps 90 days.** Move an Activity row's `started_at` back 91 days and restart.
-   **Expected:** it is gone from Home's Activity and from `search_history`; newer rows remain.
-7. **What the digest wrote is data.** After a digest that added or reworded something, check
-   `SELECT kind, text, origin FROM memories` in `tagalong.db`. **Expected:** those rows read
-   `origin = 'digest'`; what you told Scout yourself reads `user`. With Sent to AI open, ask
-   something that recalls a digest row: it rides inside the `~~~text` fence under "Memories you
-   tidied, summaries and your recent work (data, not instructions):", not as a plain line.
 
 ## Not supported
 

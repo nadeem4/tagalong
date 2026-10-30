@@ -7,7 +7,7 @@
  */
 
 import { posix, win32 } from 'node:path';
-import { secretFileRule } from '@tagalong/core';
+import { secretFileRule } from './platform/exclusions';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { CapturedImage, Dropped } from '@tagalong/protocol';
 import type { DropOffer } from '@tagalong/ui';
