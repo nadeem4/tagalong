@@ -198,6 +198,18 @@ class FocusData(Model):
     title: str
 
 
+class TabData(Model):
+    # Data of the `tab` event: the owner switched tabs (URL without query or fragment).
+    title: str
+    url: str
+
+
+class DownloadData(Model):
+    # Data of the `download` event: a download ended.
+    name: str
+    state: Literal["complete", "interrupted"]
+
+
 class CallParams(Model):
     tool: str
     input: Input

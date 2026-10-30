@@ -7,18 +7,28 @@ brain, which runs on your computer or on another one you set up.
 
 ## What it reads
 
-The extension reads a page only when Scout, the Tagalong companion, asks for it while you are
-talking to Scout, and only after you allow it:
+The extension reads a page, takes a picture or searches your browser only when Scout, the Tagalong
+companion, asks for it while you are talking to Scout, and only after you allow it:
 
 - Listing your tabs (title, address, whether each is active or asleep) needs your yes to
   "see open tabs".
-- Reading a tab needs that, and your yes for the site: **Allow on this site**, **Allow on all
-  sites** or **Not now**, in a small window the extension opens.
+- Reading a tab, or taking a picture of it, needs that, and your yes for the site: **Allow on this
+  site**, **Allow on all sites** or **Not now**, in a small window the extension opens. A picture
+  is of the visible part of the tab in front only.
+- Searching your history, bookmarks, downloads, recently closed tabs or reading list needs your yes
+  for that one source. It returns the matching entries (title, address and date, or the file name
+  for a download), up to a small limit.
 
 When it reads one tab, it takes the text you selected there, the page's URL and title, and the
 page's main text with menus and footers removed, up to 40,000 characters. It does not wake a
 sleeping tab, and it does not read Chrome's own pages, the Web Store or other extensions' pages.
 No script runs in your pages until Scout asks and you have allowed it.
+
+Two small facts are sent without Scout asking, and only while the extension is connected to your
+brain and you have allowed them: the title and address of the tab in front when it changes (needs
+the "see open tabs" yes), and the name and outcome of a download that finishes or fails (needs the
+downloads yes). The address is sent without its query string or fragment, and a private (incognito)
+window is never reported. They are context for Scout, not a reason for it to speak.
 
 The toolbar button opens a popup that lists what you have allowed. You can also remove any of it
 there, or on Chrome's extensions page.
@@ -46,7 +56,8 @@ brain.
 
 - It does not sell or share your data.
 - It shows no ads.
-- It does not track you or build a browsing history.
+- It does not track you or build a browsing history. The extension keeps no record of the tabs or
+  downloads it reports.
 - It has no analytics and no crash reporting.
 - It does not use your data for anything other than answering your own questions.
 

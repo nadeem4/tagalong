@@ -1303,3 +1303,25 @@ async def test_news_is_told_once_not_twice():
     join(again, "desktop")
     await idle(again)
     assert again._model.seen == []
+
+
+async def test_tab_event_starts_no_turn():
+    session, sent = make(Gate([]), kinds=None)
+    join(session, "chrome-7k2f")
+    session.body_event("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example"})
+    session.body_event("chrome-7k2f", "download", {"name": "a.pdf", "state": "complete"})
+    await settle()
+    assert states(sent) == []
+
+
+async def test_tab_event_reaches_the_next_turns_system_prompt():
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None)
+    join(session, "chrome-7k2f")
+    session.body_event("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example"})
+    session.body_event("chrome-7k2f", "download", {"name": "a.pdf", "state": "complete"})
+    session.say("chrome-7k2f", say("hi"))
+    await finish(session)
+    system = model.systems[0]
+    assert '; tab: "Docs" https://a.example' in system
+    assert 'last download: "a.pdf" (complete)' in system

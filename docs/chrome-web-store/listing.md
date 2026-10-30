@@ -54,21 +54,24 @@ Privacy:
 
 ### Single purpose
 
-> Lets Scout, the Tagalong companion, list the user's open tabs and read the text of a tab the user
-> allows, when the user asks. It connects only to the user's Tagalong brain.
+> Lets Scout, the Tagalong companion, list the user's open tabs, read or picture a tab the user
+> allows, and search the user's browser history and bookmarks, when the user asks. It also tells
+> Scout which tab is in front and when a download ends. It connects only to the user's Tagalong
+> brain.
 
 ### Permission justifications
 
 One entry per permission in the manifest.
 
-| Permission                                                                                             | Justification                                                                                                                                                                         |
-| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alarms`                                                                                               | A 30-second alarm wakes the service worker after Chrome stops it, so the extension notices when the Tagalong brain starts again and reconnects.                                       |
-| `scripting`                                                                                            | Injects the bundled page reader into one tab only when Scout asks and the user allowed that site, to read its selection and main text. There is no standing content script.           |
-| `storage`                                                                                              | Keeps the brain's address, the browser's name and its random body id, in `chrome.storage.local`, and the last message number in `chrome.storage.session`. Never synced.               |
-| `tabs` (optional)                                                                                      | Asked on first use, from a click in a small window. Lets Scout see the title and address of open tabs.                                                                                |
-| `history`, `bookmarks`, `downloads`, `sessions`, `readingList`, `tabGroups`, `contextMenus` (optional) | Declared so later tools can ask for them. Nothing uses them yet; each is asked, from a click, the first time a tool needs it.                                                         |
-| `<all_urls>` host (optional)                                                                           | Off until the user picks Allow on this site or Allow on all sites in the permission window. Lets the extension read a tab of that site when Scout asks. It reads nothing until asked. |
+| Permission                                                                | Justification                                                                                                                                                                                         |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alarms`                                                                  | A 30-second alarm wakes the service worker after Chrome stops it, so the extension notices when the Tagalong brain starts again and reconnects.                                                       |
+| `scripting`                                                               | Injects the bundled page reader into one tab only when Scout asks and the user allowed that site, to read its selection and main text. There is no standing content script.                           |
+| `storage`                                                                 | Keeps the brain's address, the browser's name and its random body id, in `chrome.storage.local`, and the last message number in `chrome.storage.session`. Never synced.                               |
+| `tabs` (optional)                                                         | Asked on first use, from a click in a small window. Lets Scout see the title and address of open tabs, and sends the tab in front to Scout while connected. Never from a private window.              |
+| `history`, `bookmarks`, `downloads`, `sessions`, `readingList` (optional) | Each is asked, from a click, the first time Scout searches that source (history, bookmarks, downloads, recently closed tabs, reading list). `downloads` also reports a finished download's file name. |
+| `tabGroups`, `contextMenus` (optional)                                    | Declared so later tools can ask for them. Nothing uses them yet; each is asked, from a click, the first time a tool needs it.                                                                         |
+| `<all_urls>` host (optional)                                              | Off until the user picks Allow on this site or Allow on all sites in the permission window. Lets the extension read a tab of that site when Scout asks. It reads nothing until asked.                 |
 
 ### Remote code
 
@@ -82,9 +85,15 @@ only from the extension itself (`script-src 'self'`) and network connections onl
 
 What the extension handles, from the code:
 
-- tab titles and addresses, when Scout lists tabs and the user allowed it.
+- tab titles and addresses, when Scout lists tabs and the user allowed it; and the tab in front
+  (title, address without query or fragment) while connected, if the user allowed `tabs`.
 - text you select, the page's main text (capped at 40,000 characters), page URL and title. Read
   only when Scout asks and the user allowed that site.
+- a picture of the visible part of the tab in front, only when Scout asks and the user allowed
+  that site.
+- entries from history, bookmarks, downloads, recently closed tabs or the reading list, only when
+  Scout searches that source and the user allowed it; and the name and outcome of a finished
+  download, if the user allowed `downloads`.
 - the brain's address, a name for the browser and a random body id, stored locally.
 
 All of it goes to the Tagalong brain the user set up, over a websocket (`ws://127.0.0.1:47321` by
@@ -93,14 +102,14 @@ Tagalong. The developer runs no server and receives nothing.
 
 Tick these categories:
 
-| Category                                                         | Tick | Why                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Website content                                                  | Yes  | Selected text and page text.                                                                                                                                                                                                                   |
-| Web history                                                      | Yes  | The URL and title of the tab you ask about are sent with the page, and tab titles and addresses when Scout lists tabs. It is the tabs you ask about, on request, not your browsing history. Ticking it is the cautious choice; owner decision. |
-| Personal communications                                          | No   | The extension does not read email or messages as such. If you select text in a web mail page, that is website content.                                                                                                                         |
-| Authentication information                                       | No   | No pairing token or key is stored. No user passwords or site credentials are read.                                                                                                                                                             |
-| Personally identifiable information, health, financial, location | No   | Not read.                                                                                                                                                                                                                                      |
-| User activity                                                    | No   | No click, keystroke, scroll or mouse monitoring.                                                                                                                                                                                               |
+| Category                                                         | Tick | Why                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Website content                                                  | Yes  | Selected text and page text.                                                                                                                                                                                                                                                                                    |
+| Web history                                                      | Yes  | The URL and title of the tab you ask about are sent with the page, tab titles and addresses when Scout lists tabs, the tab in front while connected, and history, closed-tab and download entries when Scout searches them (each source allowed by you). The extension keeps no record of them. Owner decision. |
+| Personal communications                                          | No   | The extension does not read email or messages as such. If you select text in a web mail page, that is website content.                                                                                                                                                                                          |
+| Authentication information                                       | No   | No pairing token or key is stored. No user passwords or site credentials are read.                                                                                                                                                                                                                              |
+| Personally identifiable information, health, financial, location | No   | Not read.                                                                                                                                                                                                                                                                                                       |
+| User activity                                                    | No   | No click, keystroke, scroll or mouse monitoring.                                                                                                                                                                                                                                                                |
 
 Tick all three certifications:
 

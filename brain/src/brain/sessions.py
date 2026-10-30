@@ -243,7 +243,12 @@ class Session:
                 body_id=body_id,
                 model=self._model,
                 system=lambda: system_prompt(
-                    self._now(), self._bodies.online(), know, self._focus()
+                    self._now(),
+                    self._bodies.online(),
+                    know,
+                    self._latest("focus"),
+                    self._latest("tab"),
+                    self._latest("download"),
                 ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
@@ -278,8 +283,8 @@ class Session:
         out = await self.toolbox.run(Call(uuid.uuid4().hex, tool, tool_input, "", ""), "home")
         return out if isinstance(out, str) else json.dumps(out)
 
-    def _focus(self) -> dict:
-        return {key: ev.facts for key, ev in self.scheduler.latest("focus").items()}
+    def _latest(self, kind: str) -> dict:
+        return {key: ev.facts for key, ev in self.scheduler.latest(kind).items()}
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is

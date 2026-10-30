@@ -36,7 +36,14 @@ const reading = (over: Partial<PageReading> = {}): PageReading => ({
 });
 
 function setup(
-  opts: { tabs?: TabInfo[]; reading?: PageReading; denyWith?: RpcError; denySite?: RpcError } = {},
+  opts: {
+    tabs?: TabInfo[];
+    reading?: PageReading;
+    denyWith?: RpcError;
+    denySite?: RpcError;
+    /** Runs once the site is allowed, to model the person switching tabs meanwhile. */
+    afterSite?: (all: TabInfo[]) => void;
+  } = {},
 ) {
   const all = opts.tabs ?? [tab()];
   const calls: Need[] = [];
@@ -46,21 +53,28 @@ function setup(
     activeInFocusedWindow: async () => all.find((t) => t.active) ?? null,
   };
   const read = vi.fn(async (_id: number) => opts.reading ?? reading());
-  const page: PageApi = { read };
+  const page: PageApi = { read, parts: async () => '' };
   const needs: Needs = {
     ensure: async (need) => {
       calls.push(need);
       if (opts.denyWith) throw opts.denyWith;
       if (opts.denySite && need.kind === 'site') throw opts.denySite;
+      if (need.kind === 'site') opts.afterSite?.(all);
     },
   };
-  const t = tabsTool({ tabs, page, needs, bodyName: 'Chrome' });
+  const capture = vi.fn(
+    async (_windowId: number): Promise<{ mime: 'image/jpeg'; base64: string }> => ({
+      mime: 'image/jpeg',
+      base64: 'AAAA',
+    }),
+  );
+  const t = tabsTool({ tabs, page, picture: { capture }, needs, bodyName: 'Chrome' });
   const text = async (input: Record<string, unknown>) => {
     const parts = await t.run(input);
     expect(parts).toHaveLength(1);
     return (parts[0] as { text: string }).text;
   };
-  return { t, calls, read, text };
+  return { t, calls, read, capture, text };
 }
 
 const rejection = (p: Promise<unknown>): Promise<RpcError> =>
@@ -203,6 +217,102 @@ describe('tabs read', () => {
   });
 });
 
+describe('tabs picture', () => {
+  it('picture_returns_one_image_part', async () => {
+    const { t, capture } = setup({ tabs: [tab({ id: 5, windowId: 3 })] });
+    expect(await t.run({ action: 'picture' })).toEqual([
+      { type: 'image', mime: 'image/jpeg', data: 'AAAA' },
+    ]);
+    expect(capture).toHaveBeenCalledWith(3);
+  });
+
+  it('picture_of_a_background_tab_fails_and_never_switches_tabs', async () => {
+    const { t, capture } = setup({
+      tabs: [tab({ id: 5 }), tab({ id: 6, active: false })],
+    });
+    const e = await rejection(t.run({ action: 'picture', tab_id: 6 }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/only the tab in front/i);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_asks_tabs_then_the_site', async () => {
+    const { t, calls } = setup();
+    await t.run({ action: 'picture' });
+    expect(calls).toEqual([
+      { kind: 'permission', name: 'tabs' },
+      { kind: 'site', origin: 'https://example.com' },
+    ]);
+  });
+
+  it('picture_of_a_sleeping_or_locked_tab_fails_like_read', async () => {
+    const asleep = setup({ tabs: [tab({ discarded: true })] });
+    const a = await rejection(asleep.t.run({ action: 'picture' }));
+    expect(a.code).toBe(ErrorCode.tool_failed);
+    expect(a.message).toMatch(/asleep/);
+    const locked = setup({ tabs: [tab({ url: 'chrome://settings' })] });
+    const l = await rejection(locked.t.run({ action: 'picture' }));
+    expect(l.code).toBe(ErrorCode.tool_failed);
+    expect(l.message).toMatch(/browser/i);
+    expect(asleep.capture).not.toHaveBeenCalled();
+    expect(locked.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_after_a_denied_site_or_tabs_never_captures', async () => {
+    const site = new RpcError(ErrorCode.denied, 'You did not allow Scout on this site.');
+    const a = setup({ denySite: site });
+    expect(await rejection(a.t.run({ action: 'picture' }))).toBe(site);
+    const tabsDenied = new RpcError(ErrorCode.denied, 'You did not allow Scout to see your tabs.');
+    const b = setup({ denyWith: tabsDenied });
+    expect(await rejection(b.t.run({ action: 'picture' }))).toBe(tabsDenied);
+    expect(a.capture).not.toHaveBeenCalled();
+    expect(b.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_fails_if_the_tab_in_front_changed_while_asking', async () => {
+    const other = setup({
+      tabs: [tab({ id: 1 }), tab({ id: 2, active: false })],
+      afterSite: (all) => {
+        all[0] = tab({ id: 1, active: false });
+        all[1] = tab({ id: 2, active: true });
+      },
+    });
+    const e = await rejection(other.t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/changed while I was asking/);
+    const moved = setup({
+      afterSite: (all) => {
+        all[0] = tab({ url: 'https://evil.test/x' });
+      },
+    });
+    const m = await rejection(moved.t.run({ action: 'picture' }));
+    expect(m.code).toBe(ErrorCode.tool_failed);
+    expect(other.capture).not.toHaveBeenCalled();
+    expect(moved.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_fails_plainly_if_the_tab_address_became_unreadable_while_asking', async () => {
+    const s = setup({
+      afterSite: (all) => {
+        all[0] = tab({ url: '' });
+      },
+    });
+    const e = await rejection(s.t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/changed while I was asking/);
+    expect(s.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_failure_from_the_browser_is_tool_failed_with_a_plain_reason', async () => {
+    const { t, capture } = setup();
+    capture.mockRejectedValueOnce(new Error('Cannot capture this window'));
+    const e = await rejection(t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/could not take a picture/i);
+    expect(e.message).toContain('Cannot capture this window');
+  });
+});
+
 describe('tabs input and permissions', () => {
   it('unknown_action_is_invalid_params', async () => {
     const { t } = setup();
@@ -274,7 +384,11 @@ describe('tabs read deadline', () => {
         get: async () => tab(),
         activeInFocusedWindow: async () => tab(),
       },
-      page: { read: async () => reading() },
+      page: {
+        read: async () => reading(),
+        parts: () => Promise.reject(new Error('unused')),
+      },
+      picture: { capture: () => Promise.reject(new Error('unused')) },
       needs: broker,
       bodyName: 'Chrome',
     });
@@ -300,7 +414,11 @@ describe('tabs read deadline', () => {
         get: async () => tab(),
         activeInFocusedWindow: async () => tab(),
       },
-      page: { read: async () => reading() },
+      page: {
+        read: async () => reading(),
+        parts: () => Promise.reject(new Error('unused')),
+      },
+      picture: { capture: () => Promise.reject(new Error('unused')) },
       needs,
       bodyName: 'Chrome',
     });

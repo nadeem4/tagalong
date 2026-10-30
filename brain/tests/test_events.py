@@ -133,3 +133,40 @@ def test_job_question_defaults_never_merge_and_ignore_caps():
     assert kind.wakes is True
     assert kind.batch_seconds is None
     assert kind.max_per_hour is None
+
+
+def test_tab_event_is_kept_not_woken():
+    assert EVENT_KINDS["tab"].wakes is False
+    assert EVENT_KINDS["download"].wakes is False
+    ev = from_body("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example/x"})
+    assert ev == Event(
+        "tab",
+        {"body": "chrome-7k2f", "title": "Docs", "url": "https://a.example/x"},
+        key="chrome-7k2f",
+    )
+
+
+def test_tab_event_replaces_the_older_one_for_the_same_body():
+    # Same key as the body id: the scheduler keeps only the latest per key.
+    first = from_body("b", "tab", {"title": "one", "url": "https://a.example"})
+    second = from_body("b", "tab", {"title": "two", "url": "https://b.example"})
+    assert first.key == second.key == "b"
+
+
+def test_download_event_validates_state():
+    ok = from_body("b", "download", {"name": "a.pdf", "state": "complete"})
+    assert ok == Event("download", {"body": "b", "name": "a.pdf", "state": "complete"}, key="b")
+    assert from_body("b", "download", {"name": "a.pdf", "state": "started"}) is None
+
+
+def test_tab_with_missing_url_is_dropped_without_raising():
+    assert from_body("b", "tab", {"title": "x"}) is None
+    assert from_body("b", "tab", None) is None
+    assert from_body("b", "download", {"state": "complete"}) is None
+
+
+def test_long_title_is_capped_at_200():
+    ev = from_body("b", "tab", {"title": "t" * 300, "url": "u" * 400})
+    assert len(ev.facts["title"]) == 200 and len(ev.facts["url"]) == 300
+    dl = from_body("b", "download", {"name": "n" * 300, "state": "interrupted"})
+    assert len(dl.facts["name"]) == 200

@@ -2,6 +2,7 @@
  * The real Chrome behind the layer's interfaces: storage, tabs, page reading, permissions and
  * the brain websocket. The logic modules only ever see the interfaces in api.ts.
  */
+import type { PartKind } from '../content/page-parts';
 import type { PageReading } from '../content/read-page';
 import { requestQuery } from '../permission/model';
 import {
@@ -12,7 +13,15 @@ import {
   type PermissionsApi,
 } from '../permissions';
 import type { BrainSocket } from '@tagalong/contract';
-import type { PageApi, StorageArea, TabInfo, TabsApi } from './api';
+import type {
+  PageApi,
+  PictureApi,
+  SearchApi,
+  SearchHit,
+  StorageArea,
+  TabInfo,
+  TabsApi,
+} from './api';
 
 function area(store: chrome.storage.StorageArea): StorageArea {
   return {
@@ -88,6 +97,99 @@ export const chromePage: PageApi = {
       throw new Error('the page reader did not run in this tab');
     }
     return reading;
+  },
+  async parts(tabId, part) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['page-reader.js'] });
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (kind: PartKind) => globalThis.__tagalongReadParts?.(kind) ?? null,
+      args: [part],
+    });
+    const text = result?.result as string | null | undefined;
+    if (text === null || text === undefined) {
+      throw new Error('the page reader did not run in this tab');
+    }
+    return text;
+  },
+};
+
+export const chromePicture: PictureApi = {
+  async capture(windowId) {
+    const url = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 70 });
+    return { mime: 'image/jpeg', base64: url.slice(url.indexOf(',') + 1) };
+  },
+};
+
+const iso = (ms: number | undefined): string | undefined =>
+  ms === undefined ? undefined : new Date(ms).toISOString();
+
+function flattenBookmarks(nodes: chrome.bookmarks.BookmarkTreeNode[]): SearchHit[] {
+  return nodes.flatMap((n) =>
+    n.url === undefined
+      ? []
+      : [{ title: n.title, url: n.url, when: iso(n.dateAdded) } satisfies SearchHit],
+  );
+}
+
+export const chromeSearch: SearchApi = {
+  async history(text, sinceMs, untilMs, limit) {
+    const items = await chrome.history.search({
+      text,
+      startTime: sinceMs ?? 0,
+      ...(untilMs === undefined ? {} : { endTime: untilMs }),
+      maxResults: limit,
+    });
+    return items.map((i) => ({
+      title: i.title ?? '',
+      url: i.url ?? '',
+      when: iso(i.lastVisitTime),
+    }));
+  },
+  async bookmarks(text, limit) {
+    // An empty query is rejected by chrome.bookmarks.search; the newest bookmarks stand in.
+    const nodes =
+      text === '' ? await chrome.bookmarks.getRecent(limit) : await chrome.bookmarks.search(text);
+    return flattenBookmarks(nodes).slice(0, limit);
+  },
+  async readingList(text, limit) {
+    if (chrome.readingList?.query === undefined) {
+      throw new Error('not supported in this browser');
+    }
+    const items = await chrome.readingList.query({});
+    const needle = text.toLowerCase();
+    return items
+      .filter((i) => needle === '' || `${i.title} ${i.url}`.toLowerCase().includes(needle))
+      .slice(0, limit)
+      .map((i) => ({ title: i.title, url: i.url, when: iso(i.creationTime) }));
+  },
+  async downloads(text, sinceMs, untilMs, limit) {
+    const items = await chrome.downloads.search({
+      query: text === '' ? [] : [text],
+      ...(sinceMs === undefined ? {} : { startedAfter: new Date(sinceMs).toISOString() }),
+      ...(untilMs === undefined ? {} : { startedBefore: new Date(untilMs).toISOString() }),
+      orderBy: ['-startTime'],
+      limit,
+    });
+    return items.map((d) => ({
+      title: d.filename.split(/[\\/]/).pop() ?? d.filename,
+      url: d.state,
+      when: d.startTime,
+    }));
+  },
+  async closedTabs(limit) {
+    // Chrome refuses more than 25 here; a closed window counts as its tabs.
+    const sessions = await chrome.sessions.getRecentlyClosed({
+      maxResults: Math.min(limit, 25),
+    });
+    return sessions
+      .flatMap((s) =>
+        (s.tab ? [s.tab] : (s.window?.tabs ?? [])).map((tab) => ({
+          title: tab.title ?? '',
+          url: tab.url ?? '',
+          when: iso(s.lastModified * 1000),
+        })),
+      )
+      .slice(0, limit);
   },
 };
 

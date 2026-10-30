@@ -185,22 +185,22 @@ desktop no longer boots the engine. Read
 
 ## What is in this build
 
-| In this build                                                                                                                          | Not in this build                                                   |
-| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a Welcome window and an NSIS installer                                                                        | macOS and Linux (the installer configs exist but are unverified)    |
-| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Speech to text through ElevenLabs                                   |
-| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
-| Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
-| Scout thinks through your Claude Code sign-in, or OpenRouter, Anthropic or an OpenAI-compatible service                                | An "always allow" for changes in connected apps                     |
-| Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                   |                                                                     |
-| Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
-| Background work: Scout reads, compares and summarises on its own while you keep talking; what finishes comes back together, once       |                                                                     |
-| Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
-| Change settings by talking: "talk a bit slower" shows a card, and nothing changes until you click Apply                                |                                                                     |
-| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
-|                                                                                                                                        | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |
-| The browser body: Scout lists and reads your open tabs in Chrome, Edge and other Chromium browsers, after you allow each step          |                                                                     |
+| In this build                                                                                                                                                                                                                           | Not in this build                                                   |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Windows desktop app with a Welcome window and an NSIS installer                                                                                                                                                                         | macOS and Linux (the installer configs exist but are unverified)    |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                                                                                                                               | Speech to text through ElevenLabs                                   |
+| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                                                                                                                 |                                                                     |
+| Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                                                                                                                        |                                                                     |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Anthropic or an OpenAI-compatible service                                                                                                                                 | An "always allow" for changes in connected apps                     |
+| Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                    |                                                                     |
+| Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification                                                                                                  |                                                                     |
+| Background work: Scout reads, compares and summarises on its own while you keep talking; what finishes comes back together, once                                                                                                        |                                                                     |
+| Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                                                                                                                  |                                                                     |
+| Change settings by talking: "talk a bit slower" shows a card, and nothing changes until you click Apply                                                                                                                                 |                                                                     |
+| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                       | ElevenLabs voice cost on the Spend card                             |
+|                                                                                                                                                                                                                                         | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                                                                                                                     | Code signing (the installer is unsigned) and an app icon of its own |
+| The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, and searches history, bookmarks and downloads in Chrome, Edge and other Chromium browsers, after you allow each step |                                                                     |
 
 # Using Tagalong
 
@@ -491,8 +491,11 @@ URL in the base URL box, store its key there, and pick its model on the Scout pa
 
 ## The browser body
 
-The browser body lets Scout list your open tabs and read one. It is a second body for the Python
-brain, so the brain (`cd brain && uv run brain`) must be running.
+The browser body lets Scout list your open tabs, read one, take a picture of the tab in front, pull
+out its links, tables, headings or the shape of its forms, and search your history, bookmarks,
+reading list, downloads and recently closed tabs. It also tells Scout which tab you are on and which
+download just finished, without waking it. It is a second body for the Python brain, so the brain
+(`cd brain && uv run brain`) must be running.
 
 1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
 2. Click **Load unpacked** and choose the folder shown in **Home → Settings → Add Scout to your
@@ -502,7 +505,8 @@ brain, so the brain (`cd brain && uv run brain`) must be running.
 3. Nothing to paste: it dials `127.0.0.1:47321`. Click the toolbar button to see the link, change
    the brain's address or name the browser.
 
-Ask Scout about your tabs. The first time it needs something, a small window asks you. More in
+Ask Scout about your tabs. The first time it needs something (your tabs, a site, your history and
+so on), a small window asks you. More in
 [The browser body](docs/browser-body.md).
 
 ## Screen memory

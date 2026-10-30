@@ -2268,6 +2268,91 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 2. **Expected:** it connects too. Asked "which browsers do you see?", Scout names both (for
    example `chrome-7k2f` and `chrome-q9x1`). Restarting a browser keeps its own id.
 
+### X.11. A picture of the tab in front
+
+1. **Setup:** the article in front; the `tabs` permission and the article's site not yet allowed
+   (remove them in the popup's **Allowed** list).
+2. **Action:** ask "Take a picture of the page I have open and tell me what the layout looks like."
+3. **Expected:** the two windows ask as in X.2 (tabs, then the site). After **Allow on this site**
+   Scout describes the page's layout from a picture and the front tab does not change.
+4. **Real-Chrome check (manual only):** Chrome documents `captureVisibleTab` as needing `<all_urls>`
+   or `activeTab`. This step is the only check that a grant for the one site is enough. If the answer
+   is "I could not take a picture of that tab" with a permission message, allow **Allow on all
+   sites** instead, ask again, and note which grant worked in the PR.
+
+### X.12. No picture of a background tab
+
+1. **Setup:** the article in the background, another allowed page in front.
+2. **Action:** ask "Take a picture of the article tab."
+3. **Expected:** Scout says only the tab in front can be pictured and asks you to open the article
+   first. The tab in front stays in front. Then switch to the article and ask again: it works.
+4. **Action:** ask for a picture of an unallowed site, and while its window is open click another tab
+   in the browser, then **Allow on this site**.
+5. **Expected:** Scout says the tab in front changed and took no picture.
+
+### X.13. Links, tables and headings
+
+1. **Setup:** the article in front and allowed.
+2. **Action:** ask "List the headings on this page", then "What links are on this page?", then "Show
+   me the tables".
+3. **Expected:** the headings come with their levels; the links come as text and full address (no
+   `javascript:` ones); each table comes under its own number with the rows in order. A page with no
+   tables gets "There are no tables on this page."
+
+### X.14. A form's shape, never its contents
+
+1. **Setup:** a page with a login form (any site's sign-in page, allowed). Type `hunter2` in the
+   password field and `me@example.com` in the email field. Do not submit. Leave a text area with
+   some typed words if the page has one.
+2. **Action:** ask "What fields does the form on this page have?"
+3. **Expected:** Scout names the fields by label and type only (for example Email, Password) and the
+   form's action. Neither `hunter2`, the email you typed nor the text area words appear in the
+   answer, and no `select` options are listed.
+
+### X.15. Search history, bookmarks and closed tabs
+
+1. **Setup:** remove `history`, `bookmarks` and `sessions` from the popup's **Allowed** list (the
+   popup lists the optional permissions you granted). Close a tab you visited today.
+2. **Action:** ask "Which pages did I visit on <today's date> about <a word from one of them>?"
+3. **Expected:** a window asks to search your browsing history with **Allow** and **Not now**.
+   After **Allow** Scout lists matching pages; a search for today's date includes today's pages.
+4. **Action:** ask "Search my bookmarks for <a word>", then "What tab did I just close?"
+5. **Expected:** each asks its own window (bookmarks, recently closed tabs) once; after that the
+   same question asks nothing. The closed-tab answer shows at most the 25 most recent tabs.
+6. **Action:** click **Not now** on a window.
+7. **Expected:** Scout says you did not allow it, for example "the person has not allowed Scout to
+   search browsing history". Nothing was granted.
+
+### X.16. Search downloads and the reading list
+
+1. **Setup:** download a small file (for example a PDF), then ask Scout to search downloads.
+2. **Action:** ask "What have I downloaded today?"
+3. **Expected:** after the downloads window, Scout lists the file by name and state, with no folder.
+4. **Action:** ask "Search my reading list for <a word>" in a browser without a reading list.
+5. **Expected:** Scout says the reading list is not supported in this browser. In Chrome with a
+   reading list it asks its own window and lists matches.
+6. **Action:** ask with a date that cannot exist, "downloads since 2026-02-30".
+7. **Expected:** Scout reports that the date is not valid and asks for another; nothing is searched.
+
+### X.17. Scout knows which tab you are on
+
+1. **Setup:** `tabs` allowed (X.2), the brain running, a few tabs open. Wait 3 seconds.
+2. **Action:** switch to a tab, then ask "What tab am I on, by title?" without it reading anything.
+3. **Expected:** Scout names that tab's title from what the browser told it, with no permission
+   window. Switch to another tab, wait 3 seconds, and ask again: it names the new one.
+4. **Action:** remove `tabs` in the popup and switch tabs.
+5. **Expected:** nothing new is reported, even on a site you allowed earlier; no window opens and
+   Scout does not speak by itself. A tab in a private window is never reported either.
+6. **Action:** open a tab on a page whose address has a query, like `?token=abc#frag`.
+7. **Expected:** if you ask Scout for the address, it has no `?token=abc` and no `#frag`.
+
+### X.18. A finished download
+
+1. **Setup:** the `downloads` permission granted (X.16).
+2. **Action:** download a file, wait for it to finish, then ask "What did I just download?"
+3. **Expected:** Scout names the file and says it completed, without the folder. Scout does not
+   speak up on its own when the download ends. A cancelled or failed download shows as interrupted.
+
 ## Installer
 
 ### I.1. Build the Windows installer
