@@ -79,6 +79,18 @@ describe('PermissionBroker', () => {
     expect(err.message).toBe(denial(site('https://example.com')));
   });
 
+  it('closed_after_a_real_grant_still_resolves', async () => {
+    const { broker } = setup({ answer: 'closed', heldAfter: true });
+    await broker.ensure(tabsNeed, 'see tabs');
+  });
+
+  it('the_shared_window_is_forgotten_once_the_ask_settles', async () => {
+    const { broker, ask } = setup({ answer: 'declined' });
+    await rejection(broker.ensure(tabsNeed, 'one'));
+    await rejection(broker.ensure(tabsNeed, 'two'));
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
   it('silence_fails_after_25s', async () => {
     const { broker } = setup({ answer: 'never' });
     let settled = false;

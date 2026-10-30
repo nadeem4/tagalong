@@ -84,7 +84,10 @@ export class PermissionBroker {
       this.open.set(key, asking);
     }
     const answer = await this.withinWait(asking);
-    if (answer !== 'granted' || !(await this.api.contains(need))) {
+    // "closed" is rechecked too: the window closes itself right after a real grant, so the close
+    // can be seen before the answer. Only a plain "no" or silence skips the check.
+    const maybeHeld = answer === 'granted' || answer === 'closed';
+    if (!maybeHeld || !(await this.api.contains(need))) {
       throw new RpcError(ErrorCode.tool_failed, denial(need));
     }
   }

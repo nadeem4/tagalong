@@ -11,8 +11,11 @@ const reason = document.getElementById('reason') as HTMLElement;
 const buttons = document.getElementById('buttons') as HTMLElement;
 
 function answer(id: string, granted: boolean): void {
-  void chrome.runtime.sendMessage({ type: 'permission-answer', id, granted });
-  window.close();
+  // Close only after the message is delivered, so the worker never sees "closed" first.
+  void chrome.runtime
+    .sendMessage({ type: 'permission-answer', id, granted })
+    .catch(() => undefined)
+    .then(() => window.close());
 }
 
 if (req === null) {

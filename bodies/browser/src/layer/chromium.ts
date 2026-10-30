@@ -97,8 +97,11 @@ export const chromePrompt: PermissionPrompt = {
           finish(m.granted === true ? 'granted' : 'declined');
         }
       };
+      // Windows removed before create() reports our id are remembered and checked afterwards.
+      const removedEarly = new Set<number>();
       const onRemoved = (removed: number): void => {
-        if (removed === windowId) finish('closed');
+        if (windowId === undefined) removedEarly.add(removed);
+        else if (removed === windowId) finish('closed');
       };
       chrome.runtime.onMessage.addListener(onMessage);
       chrome.windows.onRemoved.addListener(onRemoved);
@@ -108,6 +111,7 @@ export const chromePrompt: PermissionPrompt = {
       void chrome.windows.create({ url, type: 'popup', width: 420, height: 280 }).then(
         (w) => {
           windowId = w?.id;
+          if (windowId !== undefined && removedEarly.has(windowId)) finish('closed');
         },
         () => finish('closed'),
       );
