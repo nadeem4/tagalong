@@ -142,11 +142,11 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 
 ## The TypeScript client
 
-@tagalong/contract (protocol/ts) exports BrainClient, the body's end of this contract, shared by the desktop and the browser body. Besides ddr, ody, ools, openSocket and the callbacks (onNotification, onUse, onStatus, onResync), it takes:
+`@tagalong/contract` (`protocol/ts`) exports `BrainClient`, the body's end of this contract, shared by the desktop and the browser body. Besides `addr`, `body`, `tools`, `openSocket` and the callbacks (`onNotification`, `onUse`, `onStatus`, `onResync`), it takes:
 
-- **ody** ({ id, kind, name }): sent in hello as given; its id prefixes the client's request ids.
-- **seqStore** ({ load(): Promise<number | null>, save(seq) }): where the body keeps the last seq it saw, so a restart sends last_seq. Without it the client keeps last_seq in memory only. The browser keeps it in chrome.storage.session, which survives a worker restart but not a browser restart.
-- **keepalive** ({ everyMs, tool }): while online, the client calls one of the brain's own tools every everyMs so a sleepy host (a Chrome service worker) stays awake. The browser uses { everyMs: 20_000, tool: 'spend_today' }.
+- **`body`** (`{ id, kind, name }`): sent in hello as given; its id prefixes the client's request ids.
+- **`seqStore`** (`{ load(): Promise<number | null>, save(seq) }`): where the body keeps the last seq it saw, so a restart sends `last_seq`. Without it the client keeps `last_seq` in memory only. The browser keeps it in `chrome.storage.session`, which survives a worker restart but not a browser restart.
+- **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
 
 ## Examples
 

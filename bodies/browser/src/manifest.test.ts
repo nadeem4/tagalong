@@ -1,4 +1,7 @@
-/** Tests for the manifest's permissions, popup, description and socket policy. */
+/**
+ * Tests for the manifest's permissions, popup, description and socket policy. They pin what the
+ * browser store and the person see at install: only three permissions up front, the rest optional.
+ */
 import { describe, expect, it } from 'vitest';
 import { manifest } from './manifest';
 

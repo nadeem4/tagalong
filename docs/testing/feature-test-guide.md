@@ -2233,7 +2233,7 @@ esources\extension`.)
 
 1. **Setup:** an allowed `tabs` permission and a new site that is not allowed.
 2. **Action:** ask Scout to read that site's tab and leave the window alone for 30 seconds.
-3. **Expected:** after about 25 seconds Scout says you did not answer in time. Nothing was granted.
+3. **Expected:** after about 25 seconds the read fails with "the person has not allowed reading <that site>", the same sentence as a decline, and Scout says so. Nothing was granted.
 
 ### X.6. A sleeping tab
 

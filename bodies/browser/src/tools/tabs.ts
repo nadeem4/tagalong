@@ -1,17 +1,18 @@
 /**
  * The `tabs` tool: list the open tabs, or read the page in one. Reading asks for the tabs
- * permission and then the site, in that order, and never wakes a sleeping tab or touches a
+ * permission and then the site, in that order (sharing one wait), and never wakes a sleeping tab or touches a
  * page Chrome keeps locked.
  */
 import type { Part } from '@tagalong/contract';
 import { MAX_PAGE_TEXT_CHARS } from '../content/limits';
 import type { PageApi, TabInfo, TabsApi } from '../layer/api';
-import { FILE_ORIGIN, type Need } from '../permissions';
+import { FILE_ORIGIN, PERMISSION_WAIT_MS, type Need } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 
 /** Satisfied by the permission broker; a seam so this tool is testable alone. */
 export interface Needs {
-  ensure(need: Need, reason: string): Promise<void>;
+  /** `waitMs` caps how long to wait for the person; default is one full wait. */
+  ensure(need: Need, reason: string, waitMs?: number): Promise<void>;
 }
 
 export interface TabsDeps {
@@ -34,6 +35,9 @@ function lockedReason(url: string): string | null {
   if (u.hostname === 'chromewebstore.google.com') return 'it is the Chrome Web Store';
   if (u.hostname === 'chrome.google.com' && u.pathname.startsWith('/webstore')) {
     return 'it is the Chrome Web Store';
+  }
+  if (u.hostname === 'microsoftedge.microsoft.com' && u.pathname.startsWith('/addons')) {
+    return 'it is the Edge add-ons store';
   }
   if (u.protocol === 'chrome-extension:') return 'it is a page of a browser extension';
   if (!OPEN_SCHEMES.includes(u.protocol)) return 'it is a page of the browser itself';
@@ -75,7 +79,9 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
   }
 
   async function read(tabId: unknown): Promise<Part[]> {
-    await needs.ensure({ kind: 'permission', name: 'tabs' }, 'read a tab');
+    // One deadline for the whole read, so two questions never outlast the brain's own timeout.
+    const deadline = Date.now() + PERMISSION_WAIT_MS;
+    await needs.ensure({ kind: 'permission', name: 'tabs' }, 'read a tab', PERMISSION_WAIT_MS);
     const tab = await pick(tabId);
     if (tab.discarded) {
       throw failed(
@@ -87,6 +93,7 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     await needs.ensure(
       { kind: 'site', origin: siteOrigin(tab.url) },
       `read ${tab.title || tab.url}`,
+      Math.max(0, deadline - Date.now()),
     );
     let reading;
     try {

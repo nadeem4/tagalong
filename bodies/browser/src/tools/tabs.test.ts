@@ -3,10 +3,16 @@
  * Covers list, read, the sleeping and locked-page refusals, and permission denials.
  */
 import { ErrorCode, RpcError } from '@tagalong/contract';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PageApi, TabInfo, TabsApi } from '../layer/api';
 import type { PageReading } from '../content/read-page';
-import type { Need } from '../permissions';
+import {
+  PERMISSION_WAIT_MS,
+  PermissionBroker,
+  type Need,
+  type PermissionPrompt,
+  type PermissionsApi,
+} from '../permissions';
 import { tabsTool, type Needs } from './tabs';
 
 const tab = (over: Partial<TabInfo> = {}): TabInfo => ({
@@ -163,6 +169,7 @@ describe('tabs read', () => {
     ['chrome-extension://x/a.html', /extension/i],
     ['https://chromewebstore.google.com/detail/x', /web store/i],
     ['https://chrome.google.com/webstore/detail/x', /web store/i],
+    ['https://microsoftedge.microsoft.com/addons/detail/x', /add-ons store/i],
     ['view-source:https://example.com', /browser/i],
   ])('read_of_a_locked_page_fails_plainly: %s', async (url, what) => {
     const { t, read } = setup({ tabs: [tab({ url })] });
@@ -234,5 +241,72 @@ describe('tabs input and permissions', () => {
     const { t, calls } = setup({ tabs: [tab({ discarded: true })] });
     await rejection(t.run({ action: 'read' }));
     expect(calls.some((n) => n.kind === 'site')).toBe(false);
+  });
+});
+
+describe('tabs read deadline', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('one_read_gives_up_after_one_wait_even_when_it_needs_two_permissions', async () => {
+    vi.useFakeTimers();
+    let tabsHeld = false;
+    const api: PermissionsApi = {
+      contains: async (need) => need.kind === 'permission' && tabsHeld,
+      getAll: async () => ({ permissions: [], origins: [] }),
+      remove: async () => true,
+    };
+    // The tabs question is answered after 10 s; the site question is never answered.
+    const prompt: PermissionPrompt = {
+      ask: (need) =>
+        need.kind === 'site'
+          ? new Promise(() => undefined)
+          : new Promise((resolve) =>
+              setTimeout(() => {
+                tabsHeld = true;
+                resolve('granted');
+              }, 10_000),
+            ),
+    };
+    const broker = new PermissionBroker(api, prompt);
+    const t = tabsTool({
+      tabs: {
+        list: async () => [tab()],
+        get: async () => tab(),
+        activeInFocusedWindow: async () => tab(),
+      },
+      page: { read: async () => reading() },
+      needs: broker,
+      bodyName: 'Chrome',
+    });
+    const outcome = rejection(t.run({ action: 'read' }));
+    await vi.advanceTimersByTimeAsync(PERMISSION_WAIT_MS);
+    const e = await outcome;
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toBe('the person has not allowed reading example.com');
+  });
+
+  it('the_site_wait_gets_only_the_time_the_tabs_wait_left', async () => {
+    vi.useFakeTimers();
+    const asked: number[] = [];
+    const needs: Needs = {
+      ensure: async (_need, _reason, ms) => {
+        asked.push(ms ?? PERMISSION_WAIT_MS);
+        if (asked.length === 1) await new Promise((r) => setTimeout(r, 10_000));
+      },
+    };
+    const t = tabsTool({
+      tabs: {
+        list: async () => [tab()],
+        get: async () => tab(),
+        activeInFocusedWindow: async () => tab(),
+      },
+      page: { read: async () => reading() },
+      needs,
+      bodyName: 'Chrome',
+    });
+    const done = t.run({ action: 'read' });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await done;
+    expect(asked).toEqual([PERMISSION_WAIT_MS, PERMISSION_WAIT_MS - 10_000]);
   });
 });

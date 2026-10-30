@@ -15,6 +15,7 @@ import {
 } from './layer/chromium';
 import { PermissionBroker } from './permissions';
 import type { WorkerQuery } from './popup/model';
+import { shouldRedial } from './reconnect';
 import { ADDR_KEY, NAME_KEY } from './settings';
 
 /** Wakes a stopped worker so it notices the brain coming back. */
@@ -40,7 +41,7 @@ chrome.runtime.onInstalled.addListener(() => void body.start().catch(() => undef
 chrome.runtime.onStartup.addListener(() => void body.start().catch(() => undefined));
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === RECONNECT_ALARM && body.info().status !== 'online')
+  if (alarm.name === RECONNECT_ALARM && shouldRedial(body.info().status))
     void body.start().catch(() => undefined);
 });
 void chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });

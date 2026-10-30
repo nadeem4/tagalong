@@ -23,7 +23,8 @@ if (req === null) {
 } else {
   const { id, need } = req;
   title.textContent = need.kind === 'site' ? 'Scout wants to read a page' : 'Scout wants to help';
-  // The reason is text from the brain; only ever set as text, never as markup.
+  // The reason is the tool's own text plus the page title, so a page can shape it; only ever set
+  // as text, never as markup.
   reason.textContent = `Scout wants to ${req.reason}. If you say no, ${denial(need)}.`;
   for (const { label, scope } of buttonsFor(need)) {
     const button = document.createElement('button');

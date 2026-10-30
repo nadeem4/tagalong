@@ -75,7 +75,7 @@ export class PermissionBroker {
     private readonly waitMs: number = PERMISSION_WAIT_MS,
   ) {}
 
-  async ensure(need: Need, reason: string): Promise<void> {
+  async ensure(need: Need, reason: string, waitMs: number = this.waitMs): Promise<void> {
     if (await this.api.contains(need)) return;
     const key = JSON.stringify(need);
     let asking = this.open.get(key);
@@ -83,7 +83,7 @@ export class PermissionBroker {
       asking = this.prompt.ask(need, reason).finally(() => this.open.delete(key));
       this.open.set(key, asking);
     }
-    const answer = await this.withinWait(asking);
+    const answer = await this.withinWait(asking, waitMs);
     // "closed" is rechecked too: the window closes itself right after a real grant, so the close
     // can be seen before the answer. Only a plain "no" or silence skips the check.
     const maybeHeld = answer === 'granted' || answer === 'closed';
@@ -93,10 +93,10 @@ export class PermissionBroker {
   }
 
   /** The race is per call, not per window: a late caller still gets its own full wait. */
-  private withinWait(asking: Promise<Answer>): Promise<Answer | 'silent'> {
+  private withinWait(asking: Promise<Answer>, waitMs: number): Promise<Answer | 'silent'> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const silence = new Promise<'silent'>((resolve) => {
-      timer = setTimeout(() => resolve('silent'), this.waitMs);
+      timer = setTimeout(() => resolve('silent'), waitMs);
     });
     return Promise.race([asking, silence]).finally(() => clearTimeout(timer));
   }

@@ -1,4 +1,7 @@
-/* Toolbar popup look: DESIGN.md's light panel and navy shell, 320 px wide. */
+/*
+ * Toolbar popup look: DESIGN.md's light panel and navy shell, 320 px wide. Plain CSS because
+ * the popup is a static extension page with no build step for styles.
+ */
 :root {
   --bg: #f6f7fb;
   --card: #ffffff;

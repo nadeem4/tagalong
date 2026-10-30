@@ -1,4 +1,7 @@
-/** Tests for the permission broker, driven by a fake Chrome permissions API and a fake window. */
+/**
+ * Tests for the permission broker, driven by a fake Chrome permissions API and a fake window.
+ * They pin the plain denial sentence and the one-window-per-need and wait rules tools rely on.
+ */
 import { ErrorCode, RpcError } from '@tagalong/contract';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

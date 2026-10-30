@@ -1,4 +1,7 @@
-/** Tests for the permission window's pure model: its query string, buttons and Chrome request. */
+/**
+ * Tests for the permission window's pure model: its query string, buttons and Chrome request.
+ * The window is a page, so the logic worth testing lives here, away from the DOM.
+ */
 import { describe, expect, it } from 'vitest';
 import type { Need } from '../permissions';
 import { buttonsFor, chromeRequestFor, parseRequest, requestQuery } from './model';

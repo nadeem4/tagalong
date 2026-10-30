@@ -1,4 +1,7 @@
-/** Tests for the browser add-on's folder lookup and Show folder. */
+/**
+ * Tests for the browser add-on's folder lookup and Show folder. Settings shows this folder so a
+ * person can Load unpacked, so a wrong or missing path must be reported, not guessed.
+ */
 import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { browserFolder, registerBrowserIpc } from './browser';

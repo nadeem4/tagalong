@@ -15,7 +15,7 @@ export function BrowserSection({ folder }: { folder: BrowserFolder | null }) {
   return (
     <Section id="browser">
       <p className="tg-help">
-        Gives Scout the exact text you highlight in Chrome or Edge and the whole page you are on.
+        Lets Scout read a tab in Chrome or Edge, only when it needs to and only after you allow it.
       </p>
       <ol className="tg-help">
         <li>

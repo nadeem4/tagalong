@@ -18,6 +18,7 @@ The store listing, permission justifications and the public privacy policy are i
 | ------------------------------------ | ------------------------------------------------------------------- |
 | `src/service-worker.ts`              | Entry: wires the body to Chrome's APIs and the reconnect alarm      |
 | `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop |
+| `src/reconnect.ts`                   | The alarm's redial rule                                             |
 | `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                             |
 | `src/tools/tabs.ts`                  | The `tabs` tool (list and read)                                     |
 | `src/permissions.ts`                 | The permission broker and its 25 s wait                             |
@@ -49,8 +50,9 @@ flowchart LR
   E --> B
 ```
 
-1. The service worker starts and builds one `BrainClient`. It sends a hello with the body kind
-   `browser`, the body id, the name and the `tabs` tool, then dials the brain at the saved address.
+1. The service worker starts and builds one `BrainClient`. It dials the brain at the saved
+   address, then sends a hello with the body kind `browser`, the body id, the name and the `tabs`
+   tool.
 2. The brain calls `tabs`. The tool asks the broker for what it needs. If a permission is missing,
    the broker opens a small window and waits up to 25 seconds for an answer.
 3. With the permissions in place the tool returns the tab list as JSON, or injects the page reader
@@ -115,7 +117,7 @@ One tool: `tabs`. Its effect is `read`: it never changes a page.
 given by `tab_id`, or by default the active tab in the focused window. It refuses:
 
 - a sleeping tab: "That tab is asleep, and Scout will not wake it. Ask the user to open it first."
-- a locked page (the Chrome Web Store, `chrome-extension:` pages and any scheme other than http,
+- a locked page (the Chrome Web Store, the Edge add-ons store, `chrome-extension:` pages and any scheme other than http,
   https or file): "I cannot read that tab: ..." with the reason.
 
 It returns text of this shape, with the page text after the header lines:
@@ -146,7 +148,7 @@ A `file:` page uses the origin `file://`. **Allow on all sites** grants `<all_ur
 
 The window: one is open at a time for each need, and it waits 25 seconds. A click on **Not now**, or
 no answer, fails the tool with `tool_failed` and a plain sentence the brain can pass on, for example
-"the person has not allowed Scout to see open tabs" or "the person has not allowed Scout to read
+"the person has not allowed Scout to see open tabs" or "the person has not allowed reading
 example.com". The title reads "Scout wants to read a page" for a site, otherwise "Scout wants to
 help". The window sends its answer back with the runtime message `permission-answer`.
 
@@ -177,13 +179,13 @@ unpacked**.
 
 ## Failure handling
 
-| Situation                        | What happens                                                 |
-| -------------------------------- | ------------------------------------------------------------ |
-| Brain not running                | The client retries; the popup says it is not reachable       |
-| Add-on older than the brain      | The popup says it needs an update                            |
-| Worker stopped by Chrome         | The reconnect alarm (30 s) or the keepalive restarts it      |
-| Permission declined or no answer | `tool_failed` with a plain reason; nothing is granted        |
-| Sleeping or locked tab           | The tool refuses with a plain reason; the tab is not touched |
+| Situation                        | What happens                                                              |
+| -------------------------------- | ------------------------------------------------------------------------- |
+| Brain not running                | The client retries; the popup says it is not reachable                    |
+| Add-on older than the brain      | The popup says it needs an update                                         |
+| Worker stopped by Chrome         | The reconnect alarm (30 s) wakes it; the keepalive keeps it from stopping |
+| Permission declined or no answer | `tool_failed` with a plain reason; nothing is granted                     |
+| Sleeping or locked tab           | The tool refuses with a plain reason; the tab is not touched              |
 
 ## Privacy notes
 
@@ -201,20 +203,21 @@ None yet. Pushing browser events to Scout is added in slice 12b.
 
 ## Tests that pin it
 
-| Test file (under `bodies/browser/src/`) | What it pins                                                                     |
-| --------------------------------------- | -------------------------------------------------------------------------------- |
-| `body.test.ts`                          | Hello, tool dispatch, restart, stop, keepalive                                   |
-| `identity.test.ts`                      | The id shape and the browser kind                                                |
-| `settings.test.ts`                      | Address and name validation                                                      |
-| `manifest.test.ts`                      | Permissions, optional permissions, CSP, popup path                               |
-| `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                          |
-| `permission/model.test.ts`              | The window's wording and buttons                                                 |
-| `popup/model.test.ts`                   | The popup's status lines and allowed list                                        |
-| `tools/tabs.test.ts`                    | List, read, asleep, locked, truncation                                           |
-| `tools/registry.test.ts`                | The tool catalog the hello sends                                                 |
-| `content/read-page.test.ts`             | The page text, selection and the cut at 40,000 characters                        |
-| `content/injected-weight.test.ts`       | The injected reader stays small                                                  |
-| `source-guard.test.ts`                  | Only the permission page and popup request permissions; no protocol or ui import |
+| Test file (under `bodies/browser/src/`) | What it pins                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `body.test.ts`                          | Hello, tool dispatch, restart, stop, keepalive                                                          |
+| `reconnect.test.ts`                     | The alarm redials unless the body is online or outdated                                                 |
+| `identity.test.ts`                      | The id shape and the browser kind                                                                       |
+| `settings.test.ts`                      | Address and name validation                                                                             |
+| `manifest.test.ts`                      | Permissions, optional permissions, CSP, popup path                                                      |
+| `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                 |
+| `permission/model.test.ts`              | The window's wording and buttons                                                                        |
+| `popup/model.test.ts`                   | The popup's status lines and allowed list                                                               |
+| `tools/tabs.test.ts`                    | List, read, asleep, locked, truncation                                                                  |
+| `tools/registry.test.ts`                | The tool catalog the hello sends                                                                        |
+| `content/read-page.test.ts`             | The page text, selection and the cut at 40,000 characters                                               |
+| `content/injected-weight.test.ts`       | The injected reader stays small                                                                         |
+| `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them); no protocol or ui import |
 
 Run them with `pnpm --filter @tagalong/browser test`. Manual steps are in
 [testing/feature-test-guide.md](testing/feature-test-guide.md#the-browser-body).
