@@ -5,7 +5,7 @@
  */
 
 import { IPC } from '../../shared/ipc';
-import type { BrainStatus } from '../brain/brain-client';
+import type { BrainStatus } from '@tagalong/contract';
 import type { IpcHandle } from './handle';
 
 export function registerBrainLinkIpc(

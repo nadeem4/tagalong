@@ -17,7 +17,8 @@ A host is a thin shell around the engine. It perceives (selection, windows, scre
 text) and presents (the figure, the bubble, the voice). A host reaches the engine only through the
 JSON-RPC protocol in `packages/protocol`, over a loopback WebSocket. The desktop app no longer
 runs the engine: its main process dials the Python brain instead (`bodies/desktop/src/main/brain/start.ts`, `startBrain`; start it with
-`cd brain && uv run brain`). The Chrome extension still uses the engine for now.
+`cd brain && uv run brain`). So does the browser body (`bodies/browser`), which lists and reads open
+tabs for Scout; see [browser-body.md](browser-body.md). Nothing dials the TypeScript engine any more.
 
 Speech is the one capability that lives in a host rather than the core: the speech-to-text and
 text-to-speech models are native ONNX runtimes, which the pure core must not load. The core only
@@ -33,33 +34,31 @@ flowchart LR
     M["Electron main<br>BrainClient, platform,<br>tray, hotkeys, talk key"]
     V["Voice utility process<br>Kokoro, local ears"]
   end
-  subgraph Chrome["Chrome"]
-    SW["Extension service worker<br>EngineConnection"]
-    SP["Side panel"]
-    CS["Content script<br>page reader"]
+  subgraph Chrome["Chrome or Edge"]
+    SW["Browser body service worker<br>BrainClient"]
+    PU["Popup and permission window"]
+    CS["Page reader<br>injected on demand"]
   end
   P["Python brain<br>brain/, started by hand"]
-  E["Engine (extension only)<br>packages/core"]
   X["Model providers,<br>Claude Code, MCP servers,<br>ElevenLabs"]
   R -- "IPC via preload" --> M
   M -- "ws://127.0.0.1:47321" --> P
   M -- "parentPort messages" --> V
-  SW -- "ws://127.0.0.1:47321" --> E
-  SP -- "runtime port" --> SW
+  SW -- "ws://127.0.0.1:47321" --> P
+  PU -- "runtime messages" --> SW
   CS -- "page text" --> SW
-  E --> X
   P --> X
   M -- "ElevenLabs TTS" --> X
 ```
 
-| Process                  | Entry point                                    | What runs there                                                                                                                                                                        |
-| ------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main            | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
-| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `welcome` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                |
-| Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)           |
-| Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                         |
-| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                      |
-| Extension content script | `apps/extension/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                |
+| Process                | Entry point                                    | What runs there                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron main          | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
+| Renderer windows       | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `welcome` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                |
+| Voice utility process  | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)           |
+| Browser service worker | `bodies/browser/src/service-worker.ts`         | The browser body's one `BrainClient` socket to the brain; runs the `tabs` tool and asks for permissions                                                                                |
+| Browser popup          | `bodies/browser/src/popup/popup.html`          | Link status, brain address, browser name, what has been allowed (talks to the worker by runtime message)                                                                               |
+| Browser page reader    | `bodies/browser/src/content/page-reader.ts`    | Injected on demand to read a page's readable text (Readability)                                                                                                                        |
 
 How they connect:
 
@@ -74,9 +73,9 @@ How they connect:
   process's `parentPort` (`voice/worker/messages.ts`). The process starts on first need; if it
   dies, waiting calls fail at once and the next call starts a fresh one. Details in
   [voice.md](voice.md).
-- **Extension to engine.** The service worker owns the socket, with a 20 s heartbeat and
-  reconnect backoff from 1 s up to 30 s (`engine-connection.ts`). See
-  [browser-extension.md](browser-extension.md).
+- **Browser to brain.** The service worker owns a `BrainClient` socket (default
+  `127.0.0.1:47321`, the same address as the desktop), with a keepalive call every 20 s so the
+  worker stays awake. See [browser-body.md](browser-body.md).
 
 There is one desktop instance per user: `app.requestSingleInstanceLock()` runs before anything
 else, because two engines would fight over the port and the SQLite file.
@@ -90,14 +89,14 @@ flowchart BT
   C["packages/core"]
   U["bodies/ui"]
   D["bodies/desktop"]
-  X["apps/extension"]
+  X["bodies/browser"]
   C --> P
   U --> P
   D --> P
   D --> C
   D --> U
-  X --> P
-  X --> U
+  K["protocol/ts<br>@tagalong/contract"]
+  X --> K
 ```
 
 Arrows point at what a package depends on. The edges are the TypeScript project references
@@ -111,7 +110,7 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 | `packages/core` (runner, engine) | `conversation/**` and `engine.ts` reach tools through the registry                                                                                      | `tools/builtin/**`                                                                                                              | `eslint.config.js` (block for `conversation/**` and `engine.ts`)                                                     |
 | `bodies/ui`                      | React components shared by both hosts: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge   | `electron`, `ws`, `node:*`, `@tagalong/core`                                                                                    | Dependencies and references only (`protocol`, `react`); browser globals in ESLint. No lint rule names these imports. |
 | `bodies/desktop`                 | Electron host: windows, tray, hotkeys, talk key, platform adapter, perception, voice, `SafeStorageSecretStore`                                          | core internals                                                                                                                  | `@tagalong/core` exports only `.` (`packages/core/package.json`), so deep imports do not resolve                     |
-| `apps/extension`                 | Chrome MV3 host: selection and page text, side panel, pairing                                                                                           | `@tagalong/core`                                                                                                                | Not a dependency and not a project reference                                                                         |
+| `bodies/browser`                 | Browser body (Chromium MV3): the `tabs` tool, permission window, popup; speaks the brain contract through `@tagalong/contract`                          | `@tagalong/core`                                                                                                                | Not a dependency and not a project reference                                                                         |
 
 The protocol's ESLint block replaces the shared purity options for its own files rather than
 adding to them, so for `packages/protocol` the lint list is exactly `electron`, `react`, `node:*`
@@ -133,10 +132,9 @@ A host implements two things.
 says what it can do in `hello`'s `capabilities`; the engine only asks a host for what it
 advertised.
 
-| Host      | Capabilities (`hello`)                                                                               | Source                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts`   |
-| Extension | `selection`, `pageText`, `activeWindow`                                                              | `EXTENSION_CAPABILITIES`, `apps/extension/src/capabilities.ts` |
+| Host    | Capabilities (`hello`)                                                                               | Source                                                       |
+| ------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Desktop | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts` |
 
 Exclusions and the built-in blind spots are checked before anything is read; the details are in
 [sight.md](sight.md).
@@ -144,13 +142,17 @@ Exclusions and the built-in blind spots are checked before anything is read; the
 **Presentation.** The host renders Scout and its bubble, streams `turn.*` notifications, shows the
 cards (hand-off, connector confirm, routine, settings) and speaks. The UI package draws all of it
 against `HostBridge` (`bodies/ui/src/host-bridge.ts`), which each host implements: the desktop
-over IPC, the extension over its runtime port. See [bubble.md](bubble.md).
+over IPC. The browser body has no presentation: it only offers tools. See [bubble.md](bubble.md).
 
-### Routing between the desktop and the browser
+### Routing between the desktop and the browser (old engine)
 
-The engine tells the two hosts apart by `pageText`, which only the extension advertises
-(`isBrowserHost` in `packages/core/src/perception/browser-route.ts`). Connection order never
-decides who answers.
+This section describes `packages/core`, which the bodies no longer dial. In the Python brain the
+browser is just another body with its own tools, and the brain picks the body by tool name; see
+[browser-body.md](browser-body.md).
+
+The old engine told the two hosts apart by `pageText`, which only the old Chrome extension
+advertised (`isBrowserHost` in `packages/core/src/perception/browser-route.ts`). Connection order
+never decided who answered.
 
 - Window identity always comes from the desktop host when one is connected, and exclusions are
   checked against it first.
@@ -160,8 +162,6 @@ decides who answers.
   page text and tab, and drops them if that tab is excluded.
 - The extension gets `BROWSER_HOST_TIMEOUT_MS` (500 ms). A refusal falls back at once, a silence
   after 500 ms.
-
-Details in [browser-extension.md](browser-extension.md).
 
 ## Host transport
 
@@ -183,8 +183,7 @@ The full method catalog is in [protocol.md](protocol.md). The rules of the socke
 unauthenticated until `hello` presents that token; `tokensMatch` compares in constant time. A
 mismatch answers `-32000` and closes the socket; any other method before `hello` answers `-32000`.
 Loopback is not a permission boundary, which is why the token exists. The desktop reads the token
-from the engine in-process; the extension stores it in `chrome.storage.local` after the person
-pastes it into the options page (`apps/extension/src/pairing.ts`).
+from the engine in-process. The Python brain has no token: single user, no pairing yet.
 
 **Scoping.** A session that said `host: 'extension'` may call only `EXTENSION_METHODS`: `ask`,
 `interrupt` and `pets.list`. Everything else answers `-32000` before any handler runs. The
@@ -326,7 +325,7 @@ flowchart LR
     DK["desktop.md"]
     BU["bubble.md"]
     VO["voice.md"]
-    BX["browser-extension.md"]
+    BX["browser-body.md"]
   end
   subgraph Engine
     SI["sight.md"]
@@ -345,7 +344,6 @@ flowchart LR
   DK --> BU
   DK --> VO
   DK --> SI
-  BX --> SI
   MI --> ME
   MI --> EX
   MI --> AS
@@ -370,7 +368,7 @@ flowchart LR
 | [asks.md](asks.md)                                 | Saved asks (Waiting on you), risk, expiry, outcomes                                    | `packages/core/src/asks`                                                                                          |
 | [routines.md](routines.md)                         | Triggers, schedule, delivery, results, the calendar feed                               | `packages/core/src/routines`, `meetings`                                                                          |
 | [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `packages/core/src/connections`                                                                                   |
-| [browser-extension.md](browser-extension.md)       | The Chrome host, pairing, routing, what it reads                                       | `apps/extension/src`, `packages/core/src/perception/browser-route.ts`                                             |
+| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                              |
 | [settings-and-secrets.md](settings-and-secrets.md) | Settings store, change by talking, the secret store, secrets on the way out            | `packages/core/src/settings`, `privacy`, `providers/guard.ts`, `bodies/desktop/src/main/secret-store.ts`          |
 | [storage.md](storage.md)                           | SQLite tables, migrations, retention jobs                                              | `packages/core/src/memory/db.ts`                                                                                  |
 | [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                  |

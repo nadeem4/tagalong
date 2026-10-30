@@ -17,7 +17,6 @@ const ALL_GOOD: HealthFacts = {
     earsReady: true,
   },
   microphone: { count: 1, pickedMissing: false },
-  extension: true,
 };
 
 const row = (rows: HealthRow[], id: HealthRow['id']): HealthRow => {
@@ -35,7 +34,6 @@ describe('healthRows', () => {
       'connections',
       'voice',
       'microphone',
-      'extension',
     ]);
     expect(rows.every((each) => each.state === 'ok')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
@@ -46,7 +44,6 @@ describe('healthRows', () => {
       'All apps connected.',
       'Ready.',
       'A microphone is ready.',
-      'Connected.',
     ]);
   });
 
@@ -152,14 +149,9 @@ describe('healthRows', () => {
     ).toMatchObject({ state: 'broken', line: 'The one you picked is unplugged.', fix: 'voice' });
   });
 
-  it('shows a missing extension as info, never counted', () => {
-    const rows = healthRows({ ...ALL_GOOD, extension: false });
-    expect(row(rows, 'extension')).toMatchObject({
-      state: 'info',
-      line: 'Not connected (optional)',
-      fix: 'browser',
-    });
-    expect(healthHeadline(rows)).toBe('Everything’s working.');
+  it('has_no_browser_extension_row', () => {
+    const ids: string[] = healthRows(ALL_GOOD).map((each) => each.id);
+    expect(ids).not.toContain('extension');
   });
 
   it('turns a fact it could not read into an unknown row, not a problem', () => {
@@ -169,7 +161,6 @@ describe('healthRows', () => {
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
-      extension: 'unknown',
     });
     expect(rows.every((each) => each.state === 'unknown')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);

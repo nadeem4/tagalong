@@ -6,6 +6,6 @@
     { "path": "./packages/core" },
     { "path": "./bodies/ui" },
     { "path": "./bodies/desktop" },
-    { "path": "./apps/extension" }
+    { "path": "./bodies/browser" }
   ]
 }

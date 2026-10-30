@@ -101,6 +101,19 @@ def test_from_body_rejects_bad_input(name, data):
     assert from_body("desktop", name, data) is None
 
 
+def test_browser_connect_never_wakes():
+    assert from_connect("chrome-7k2f", 3600, "browser") is None
+
+
+def test_desktop_connect_still_wakes_after_ten_minutes():
+    ev = from_connect("desktop", 600, "desktop")
+    assert ev is not None and ev.kind == "body_online"
+
+
+def test_kind_unknown_keeps_old_behaviour():
+    assert from_connect("desktop", 600, None) is not None
+
+
 def test_from_connect_needs_ten_minutes_away():
     assert from_connect("desktop", 599.9) is None
     assert from_connect("desktop", None) is None

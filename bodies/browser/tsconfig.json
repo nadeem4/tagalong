@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Vite owns dist/ (it is the unpacked extension Chrome loads), so tsc is a typecheck
+    // that emits only declarations, and it emits them somewhere else.
+    "outDir": "./out",
+    "rootDir": "./src",
+    "emitDeclarationOnly": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["chrome"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../../protocol/ts" }]
+}

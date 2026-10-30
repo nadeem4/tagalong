@@ -8,8 +8,8 @@ import type { Part, SayParams } from '@tagalong/contract';
 import { STATUS_WORDS } from '@tagalong/protocol';
 import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import { BrainOffline } from '../brain/brain-client';
-import type { BrainClient, BrainStatus } from '../brain/brain-client';
+import { BrainOffline } from '@tagalong/contract';
+import type { BrainClient, BrainStatus } from '@tagalong/contract';
 import type { IpcHandle } from './handle';
 
 export interface TurnIpcDeps {

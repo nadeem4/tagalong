@@ -65,9 +65,12 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
     return None
 
 
-def from_connect(body_id: str, away_seconds: float | None) -> Event | None:
-    """Wake only when a body that was seen earlier comes back after a real absence."""
-    if away_seconds is None or away_seconds < BODY_ONLINE_MIN_AWAY_S:
+def from_connect(body_id: str, away_seconds: float | None, kind: str | None = None) -> Event | None:
+    """Wake only when a body that was seen earlier comes back after a real absence.
+
+    A browser opens and closes all day and is not the owner arriving, so it never wakes.
+    """
+    if kind == "browser" or away_seconds is None or away_seconds < BODY_ONLINE_MIN_AWAY_S:
         return None
     return Event(
         "body_online",

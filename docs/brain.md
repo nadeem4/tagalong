@@ -497,7 +497,8 @@ paused): the body's line then shows no "in front" part.
 
 **Body online.** `Bodies` remembers when each body went offline. When a body connects again after
 600 s or more away, the session emits `body_online` (at most twice an hour). A body's first connect
-since the brain started never wakes, and a quick reconnect does not either.
+since the brain started never wakes, a quick reconnect does not either, and a browser body (kind
+`browser`) never wakes Scout.
 
 **Who started a turn.** The `turn` notification carries `started_by`: `user` for a `say`, `brain`
 for a wake. A body that predates the field reads it as `user`. Bodies use it to show nothing while a

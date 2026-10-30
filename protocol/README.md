@@ -37,7 +37,7 @@ Body  { id, kind, name }
 - **Tool.** `name` is unique within the body that declares it: lowercase letters, digits, `_` and `-`, never `__`, at most 48 characters. `input_schema` is a JSON Schema object. `confirm: true` means the brain asks the user before running it, until the person unlocks the tool on Home or a preference names it (see Asks). `effect` is `"read"` or `"change"` and is omitted when the body does not say (never null): `read` means the tool only looks and changes nothing, `change` means it alters something. The brain uses it to decide how to ask.
 - **Tool names across bodies.** Bodies declare plain names (`see_screen`). The brain exposes them to the model as `<body id>__<name>` (`desktop__see_screen`) so two bodies never collide and the name stays within the model API's allowed characters. The brain calls the body with the plain name. Brain tools have no prefix and never contain `__`.
 - **Part.** `data` is base64. A future source, `ref` (an uploaded file id instead of `data`), is reserved: v1 senders always send `data`, and v1 receivers reject a part with `ref` and no `data` with `invalid_params`. Adding `ref` later needs no message change.
-- **Body.** `id` is stable for that install (for example `desktop`): lowercase letters, digits and `-`, at most 32 characters; `kind` is the body type (`desktop`, `extension`), `name` is for people (`Desktop`).
+- **Body.** `id` is stable for that install (for example `desktop`): lowercase letters, digits and `-`, at most 32 characters; `kind` is the body type (`desktop`, `browser`), `name` is for people (`Desktop`, `Chrome`). A browser body makes its id `<browser>-<4 random chars>` (`chrome-7k2f`) once per install, so two browsers or profiles are two bodies.
 
 ## Limits
 
@@ -140,6 +140,14 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 | `tool_failed`      | -32007 | The tool ran and failed; `data` may carry details                     |
 | `over_limit`       | -32008 | A part or message is over the size limits                             |
 
+## The TypeScript client
+
+`@tagalong/contract` (`protocol/ts`) exports `BrainClient`, the body's end of this contract, shared by the desktop and the browser body. Besides `addr`, `body`, `tools`, `openSocket` and the callbacks (`onNotification`, `onUse`, `onStatus`, `onResync`), it takes:
+
+- **`body`** (`{ id, kind, name }`): sent in hello as given; its id prefixes the client's request ids.
+- **`seqStore`** (`{ load(): Promise<number | null>, save(seq) }`): where the body keeps the last seq it saw, so a restart sends `last_seq`. Without it the client keeps `last_seq` in memory only. The browser keeps it in `chrome.storage.session`, which survives a worker restart but not a browser restart.
+- **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
+
 ## Examples
 
 A desktop connects, the user asks for something on screen, Scout looks and answers.
@@ -177,7 +185,7 @@ With `always` on offer, answering it allows the call and saves `auto` for that t
 A body that is too far behind.
 
 ```json
-→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"extension","kind":"extension","name":"Chrome"},"tools":[],"last_seq":12}}
+→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"chrome-7k2f","kind":"browser","name":"Chrome"},"tools":[],"last_seq":12}}
 ← {"jsonrpc":"2.0","id":1,"result":{"protocol":1,"session":"s1","tools":[],"seq":740,"resync":true}}
 ```
 

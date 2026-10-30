@@ -2,47 +2,45 @@
 
 Effective date: [EFFECTIVE DATE]
 
-This policy covers the Tagalong Chrome extension. The extension works only with the Tagalong
-desktop app running on the same computer.
+This policy covers the Tagalong browser extension. The extension works only with the Tagalong
+brain, which runs on your computer or on another one you set up.
 
 ## What it reads
 
-The extension reads a page only when you use it on that tab:
+The extension reads a page only when Scout, the Tagalong companion, asks for it while you are
+talking to Scout, and only after you allow it:
 
-- you click its toolbar button or open its side panel beside the page,
-- you press its shortcut (`Alt+Shift+Space`),
-- you click **Read this page**, or
-- you ask Tagalong something from the desktop app while Chrome is in front.
+- Listing your tabs (title, address, whether each is active or asleep) needs your yes to
+  "see open tabs".
+- Reading a tab needs that, and your yes for the site: **Allow on this site**, **Allow on all
+  sites** or **Not now**, in a small window the extension opens.
 
-When it reads, it takes from the tab in front: the text you selected, the page's URL and title,
-and the page's main text with menus and footers removed, up to 40,000 characters. It does not read
-other tabs. No script runs in your pages until you ask.
+When it reads one tab, it takes the text you selected there, the page's URL and title, and the
+page's main text with menus and footers removed, up to 40,000 characters. It does not wake a
+sleeping tab, and it does not read Chrome's own pages, the Web Store or other extensions' pages.
+No script runs in your pages until Scout asks and you have allowed it.
 
-While the side panel is open, it shows what it would attach. Nothing is sent until you send a
-question. **Clear** removes what is attached.
-
-By default Chrome lets the extension read only a tab you used it on. If you turn on **Allow reading
-any tab when I ask** on the options page, it can read the tab in front when you ask from elsewhere.
-It still reads nothing until you ask. You can turn it off on the same page.
+The toolbar button opens a popup that lists what you have allowed. You can also remove any of it
+there, or on Chrome's extensions page.
 
 ## Where it goes
 
-The extension sends what it read, with your question, to the Tagalong desktop app on this computer,
-over `127.0.0.1`. Its security policy blocks every other network connection.
+The extension sends what it read to the Tagalong brain, over one websocket, to the address you set
+in the popup (`127.0.0.1:47321` by default). Its security policy lets it open websockets and
+nothing else.
 
-The Tagalong app then sends your question and what you attached to the AI service you chose in
-Tagalong, to get an answer. Before anything leaves your computer, the app replaces keys, tokens,
-passwords and card numbers it finds with a marker. There is no Tagalong server. We do not receive
-your data.
+The brain then sends your question and what was attached to the AI service you chose in Tagalong,
+to get an answer. There is no Tagalong server. We do not receive your data.
 
 ## What it stores
 
-Only the pairing token and port you paste on the options page. They are kept in this browser's
-local extension storage and are never synced to other devices. **Forget pairing** on the options
-page deletes them, and so does removing the extension.
+Only the brain's address, a name for this browser and a random id, in this browser's local
+extension storage, and the number of the last message it received, in session storage that Chrome
+clears when the browser closes. None of it is synced to other devices. Removing the extension
+deletes it.
 
 The extension keeps no pages and no conversations. Your conversations are stored by the Tagalong
-desktop app, on your computer.
+brain.
 
 ## What it does not do
 

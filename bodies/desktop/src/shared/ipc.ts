@@ -45,6 +45,8 @@ export const IPC = {
   deleteExpert: 'tagalong:experts:delete',
   testExpert: 'tagalong:experts:test',
   pickFolder: 'tagalong:dialog:pick-folder',
+  browserFolder: 'tagalong:browser:folder',
+  showBrowserFolder: 'tagalong:browser:show-folder',
   confirmHandoff: 'tagalong:handoffs:confirm',
   dismissHandoff: 'tagalong:handoffs:dismiss',
   cancelHandoff: 'tagalong:handoffs:cancel',
@@ -151,9 +153,8 @@ export const IPC = {
   // ends a move of the pet), and the card main hands the bubble for it.
   dropOnPet: 'tagalong:avatar:drop-on-pet',
   dropEvent: 'tagalong:panel:drop',
-  // The health check: whether the voice models are on disk, and whether the extension is in.
+  // The health check: whether the voice models are on disk.
   voiceModels: 'tagalong:voice:models',
-  hostsStatus: 'tagalong:hosts:status',
   // Change settings by talking: Apply on Scout's settings card, a click only.
   applySettings: 'tagalong:settings:apply',
   expertCatalog: 'tagalong:experts:catalog',
@@ -300,18 +301,18 @@ export interface HostView {
   pets: Pet[];
   providers: ProviderChoice[];
   engineVersion: string;
-  /**
-   * The token the Chrome extension pastes once to pair. Absent while the engine is down:
-   * the engine owns the token file, and pairing against an engine that is not running
-   * would only fail later, on the socket.
-   */
-  pairingToken?: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
   /** `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
   platform: string;
   /** Whether an ElevenLabs key is stored. The key itself never comes back out. */
   elevenLabsKeyStored: boolean;
+}
+
+/** Where the browser add-on's folder is, and whether it has been built. */
+export interface BrowserFolder {
+  path: string;
+  exists: boolean;
 }
 
 /**
@@ -389,6 +390,10 @@ export interface TagalongHostApi {
    * refuses any other URL.
    */
   openLink(url: string): Promise<void>;
+  /** The browser add-on's folder, for Settings' Load unpacked steps. */
+  browserFolder(): Promise<BrowserFolder>;
+  /** Reveals that folder in the file manager; rejects when it is not built yet. */
+  showBrowserFolder(): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;
@@ -459,8 +464,6 @@ export interface TagalongHostApi {
   onDrop(handler: (offer: DropOffer) => void): () => void;
   /** The health check: whether the voice models are on disk. Never downloads. */
   voiceModels(): Promise<VoiceModels>;
-  /** The health check: whether the browser extension is connected to the engine. */
-  hostsStatus(): Promise<{ extension: boolean }>;
   /** The top status mark now, for a window that just opened. */
   getStatusMark(): Promise<StatusMark | null>;
   /** Fires with the new top status mark, or null when none is left. */

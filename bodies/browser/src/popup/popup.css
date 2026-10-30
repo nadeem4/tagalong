@@ -1,0 +1,98 @@
+/*
+ * Toolbar popup look: DESIGN.md's light panel and navy shell, 320 px wide. Plain CSS because
+ * the popup is a static extension page with no build step for styles.
+ */
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --text: #12162b;
+  --muted: #5a6178;
+  --line: #e0e3ec;
+  --link: #3d4a8a;
+  --err: #8a1c12;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12162b;
+    --card: #1a1f3a;
+    --text: #e9ecf5;
+    --muted: #a3aac4;
+    --line: #2e3558;
+    --link: #7cb8f2;
+    --err: #ffb4c0;
+  }
+}
+body {
+  width: 320px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px;
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+h1 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+}
+h2 {
+  margin: 16px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+p {
+  margin: 0 0 12px;
+}
+.status {
+  color: var(--muted);
+}
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.error {
+  color: var(--err);
+  font-size: 13px;
+  margin-top: -8px;
+}
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.grants {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grants li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.grants button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--link);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}

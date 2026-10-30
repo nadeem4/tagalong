@@ -5,7 +5,7 @@ How each part is built is in the subsystem docs: [sight.md](sight.md) (captures,
 sight log, rolling memory), [voice.md](voice.md) (microphone and speech),
 [mind.md](mind.md) (prompts, check-ins, the Self and sleep), [memory.md](memory.md),
 [experts.md](experts.md), [asks.md](asks.md), [connected-apps.md](connected-apps.md),
-[routines.md](routines.md), [browser-extension.md](browser-extension.md),
+[routines.md](routines.md), [browser-body.md](browser-body.md),
 [settings-and-secrets.md](settings-and-secrets.md) and [storage.md](storage.md) (every table and
 its retention).
 
@@ -64,17 +64,20 @@ read inside it".
 And a browser publishes only the tab you are on: the other tabs are not readable this way, and the
 pet is told that too, as a fact.
 
-## What the Chrome extension reads
+## What the browser body reads
 
-Only when you ask — the toolbar button, its shortcut, **Read this page**, or an ask while Chrome is
-in front — the extension reads the tab in front: your selection, the URL and title, and the page's
-main text with menus and footers stripped, capped at 40,000 characters. The sight bar names what is
-attached before you send. Nothing is read from tabs you are not on, the extension never runs in a
-page you did not ask about, and the capture exclusion list applies to tab titles too. It talks only to
-`127.0.0.1`, and the engine lets it do only what its side panel needs (ask, stop, and read the pet
-and role lists): it cannot change settings, approve a tool, add a connection, an expert or a
-routine, or start a hand-off.
-The extension's public privacy policy, for the Chrome Web Store, is
+Only when Scout asks through its `tabs` tool, and only after you say yes. Listing your tabs (title,
+address, whether each is active or asleep) needs your yes to "see open tabs". Reading one needs
+that and a yes for the site: **Allow on this site**, **Allow on all sites** or **Not now**, in a small
+window that waits 25 seconds. A read gives one tab's selection, URL, title and main text, capped at
+40,000 characters. A sleeping tab is never woken, and Chrome's own pages, the Web Store and other
+extensions' pages are never read. Nothing is read in the background.
+
+The body can only open websockets, to the brain (`127.0.0.1:47321` unless you change it in the
+popup). It keeps three small settings on this browser and nothing else: the brain's address, a name
+for the browser, and its body id. The toolbar popup lists what you have allowed, and Chrome's
+extension page can remove any of it. What the brain does with a page it was given follows the brain's
+own rules. The extension's public privacy policy, for the Chrome Web Store, is
 [chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
 
 ## What is never read
@@ -232,8 +235,7 @@ it.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
   computer and the engine: whether you are signed in to Claude Code, whether a key is stored (never
   the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
-  the microphones' ids against the one you picked, whether the voice models' files are on disk, and
-  whether the browser extension is connected. Nothing it reads is stored or sent anywhere, and the
+  the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the
   card never shows a key, token or secret.
 - The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and

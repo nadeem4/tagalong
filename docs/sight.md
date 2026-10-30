@@ -70,8 +70,8 @@ Every method beyond `capture` is optional, and a tool requires both the capabili
 
 The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`,
 `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer`. It never advertises
-`pageText`; page text comes only from the Chrome extension (see
-[browser-extension.md](browser-extension.md)).
+`pageText`; page text used to come only from the old Chrome extension. The browser body now
+offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
 ### The platform adapter
 
@@ -280,7 +280,7 @@ Never rejects.
 empty clipboard means nothing was selected (`null`). The result is cut to `MAX_SELECTION_CHARS` =
 20,000. In a browser, `get_selection` and a hotkey ask prefer the extension's DOM selection
 (`browser-route.ts`, `BROWSER_HOST_TIMEOUT_MS` = 500); see
-[browser-extension.md](browser-extension.md).
+[browser-body.md](browser-body.md).
 
 ### Exclusions
 
@@ -629,7 +629,7 @@ are; `all` carries the composite plus one per display.
 
 `estimateImageTokens` (`bodies/ui/src/sight-bar.tsx`) sums width × height ÷ 750 over the
 screenshot, the composite and each display image and shows `~N image tokens` in the `SightBar`.
-`SightBar` is part of `ChatPanel`, which the Chrome extension's side panel renders; the desktop
+`SightBar` is part of `ChatPanel`, which no body renders now (the Chrome side panel is gone); the desktop
 bubble shows chips for the window, the selection and a screenshot, with no estimate. What a turn
 actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 

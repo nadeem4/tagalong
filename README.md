@@ -88,13 +88,13 @@ which app is in front (never one you excluded, and none while sight is paused); 
 stay silent, at most twice an hour per kind. When Claude Code asks a question during a job, Scout
 gets it first and answers from what it knows, or passes it to you. See [docs/brain.md](docs/brain.md).
 
-The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
-extension.
+The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the browser
+body.
 
 ## Use the engine in your own app
 
-`packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and both the
-desktop app and the Chrome extension run on it. It holds:
+`packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and the
+old desktop app ran on it. It holds:
 
 - the companion, Scout, and the role it works as;
 - the conversation runner, which assembles each prompt, calls the model and runs tools;
@@ -111,7 +111,6 @@ desktop app and the Chrome extension run on it. It holds:
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   desktop["Desktop app (Electron)"] -->|"JSON-RPC over ws://127.0.0.1"| engine["Engine (packages/core)"]
-  extension["Chrome extension"] -->|"JSON-RPC over ws://127.0.0.1"| engine
   yours["Your app"] -->|"JSON-RPC over ws://127.0.0.1"| engine
   engine --> models["Model providers"]
   engine --> experts["Experts (Claude Code)"]
@@ -179,7 +178,7 @@ await engine.shutdown();
 
 A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
 The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's own client for the Python brain is `bodies/desktop/src/main/brain/brain-client.ts`; the
+app's client for the Python brain is `BrainClient` in `protocol/ts/src/brain-client.ts` (shared by the bodies); the
 desktop no longer boots the engine. Read
 [Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
 [How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
@@ -201,7 +200,7 @@ desktop no longer boots the engine. Read
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
 |                                                                                                                                        | Data export and delete-all in Settings                              |
 | Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |
-| The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
+| The browser body: Scout lists and reads your open tabs in Chrome, Edge and other Chromium browsers, after you allow each step          |                                                                     |
 
 # Using Tagalong
 
@@ -335,7 +334,7 @@ preferences.
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
-microphone and the browser extension, each with a plain line, starting "Two things need you." or
+and microphone, each with a plain line, starting "Two things need you." or
 "Everything's working." (shown, never said aloud). **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
 
@@ -350,7 +349,6 @@ removed.
 | `Ctrl+Shift+Alt+P`         | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
 | `Ctrl+Shift+Alt+M`         | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
 | `Right Ctrl` (hold, alone) | **Talk to Scout.** Listens while held; let go and Scout answers out loud               |
-| `Alt+Shift+Space`          | In Chrome, with the extension: opens the side panel with your selection                |
 
 Every key can be changed in **Home → Settings → Shortcuts** (the talk key, one key held alone, under **Voice**), and the
 change works at once.
@@ -469,7 +467,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
-  - **Browser extension (optional)**: the pairing token for the Chrome extension.
+  - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
     the ElevenLabs voice (your key and a voice ID from your ElevenLabs library), sight detail,
     screen memory and watches, and **Open Welcome again**.
@@ -491,20 +489,21 @@ model box: it is the authority.
 Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
 URL in the base URL box, store its key there, and pick its model on the Scout page.
 
-## The Chrome extension
+## The browser body
 
-The extension puts Scout in Chrome's side panel and lets it read the exact page you are on. It
-needs the desktop app running.
+The browser body lets Scout list your open tabs and read one. It is a second body for the Python
+brain, so the brain (`cd brain && uv run brain`) must be running.
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and choose the extension folder. The installer ships it in
-   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with
-   `pnpm --filter @tagalong/extension build` and choose `apps/extension/dist`.
-3. Copy the pairing token from **Home → Settings → Browser extension**, paste it into the
-   extension's options page, and click **Save and connect**.
+1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
+2. Click **Load unpacked** and choose the folder shown in **Home → Settings → Add Scout to your
+   browser**. The installer ships it in `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`.
+   From source, build it with `pnpm --filter @tagalong/browser build` and choose
+   `bodies/browser/dist`.
+3. Nothing to paste: it dials `127.0.0.1:47321`. Click the toolbar button to see the link, change
+   the brain's address or name the browser.
 
-Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
-[The Chrome extension in detail](docs/development.md#the-chrome-extension-in-detail).
+Ask Scout about your tabs. The first time it needs something, a small window asks you. More in
+[The browser body](docs/browser-body.md).
 
 ## Screen memory
 
@@ -621,7 +620,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | With Always listening on, Scout doesn't react                  | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.  |
 | The first spoken question takes a while                        | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                         |
 | Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
-| The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
+| The browser popup says Scout's brain is not reachable          | Start the brain (`cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself.                   |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
 | Sending logs with a problem report                             | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
 | You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |
