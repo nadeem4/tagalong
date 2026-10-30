@@ -13,7 +13,7 @@
 
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { hideSecrets } from '@tagalong/core';
+import { hideSecrets } from './hide-secrets';
 import { keptText } from './log-text';
 import type { Level } from './log-text';
 

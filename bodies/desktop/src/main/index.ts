@@ -28,7 +28,7 @@ import {
   TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
 import type { PerceptionTarget, Settings } from '@tagalong/protocol';
-import { SettingsStore } from '@tagalong/core';
+import { SettingsStore } from './settings-store';
 import {
   AlwaysListening,
   listeningPaused,

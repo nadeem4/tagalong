@@ -7,9 +7,9 @@
  * few hundred characters that look like a complete answer, and a pet that treats them as
  * one will tell the user their file is empty.
  *
- * These notes live here rather than in the host because they are about meaning, not about
- * the operating system — the same split that puts window classification in this package
- * and enumeration in `bodies/desktop`. Contains textLayerNotes and THIN_TEXT_CHARS.
+ * These notes are about meaning, not about the operating system, so they sit apart from the
+ * UI Automation reader in text-layer.ts. Contains textLayerNotes, THIN_TEXT_CHARS and
+ * TextLayerReading.
  */
 
 /** The reading a set of notes is derived from. */

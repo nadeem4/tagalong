@@ -1,10 +1,8 @@
 /**
- * Hides keys, tokens, passwords and card numbers in text before it leaves the machine.
- * Contains `hideSecrets`, used by the brain guard and by every path that sends text to a
- * model, an expert or an app. It catches what slips past the window blind spots; each
- * secret becomes a `[hidden: kind]` marker, so the model knows something was there. It
- * errs towards hiding, but leaves unquoted code identifiers alone so an expert can still
- * read code.
+ * Hides keys, tokens, passwords and card numbers in text before it is written down.
+ * Contains `hideSecrets`, used by the log file. Each secret becomes a `[hidden: kind]`
+ * marker, so a reader knows something was there. It errs towards hiding, but leaves unquoted
+ * code identifiers alone so a log line still reads as code.
  */
 
 const hidden = (kind: string) => `[hidden: ${kind}]`;

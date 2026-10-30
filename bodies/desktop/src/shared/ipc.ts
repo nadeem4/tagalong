@@ -4,7 +4,7 @@
  * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
  */
 
-import type { CaptureBlock } from '@tagalong/core';
+import type { CaptureBlock } from '@tagalong/protocol';
 import type {
   ContextSnapshot,
   EarsEvent,

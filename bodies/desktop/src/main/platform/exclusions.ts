@@ -1,7 +1,7 @@
 /**
  * Capture exclusions: which window may not be read, by the built-in blind spots, secret file
- * names and the person's own list. Contains findCaptureBlock, appCaptureBlock,
- * secretFileRule and normalizeProcessName. Shared by core and the desktop host.
+ * names and the person's own list. Contains findCaptureBlock, secretFileRule and
+ * normalizeProcessName. CaptureBlock itself lives in @tagalong/protocol, where it crosses the wire.
  */
 import { BUILT_IN_EXCLUSIONS, SECRET_FILES } from '@tagalong/protocol';
 import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
@@ -14,15 +14,6 @@ export interface ActiveWindow {
   readonly processName?: string;
   readonly title?: string;
 }
-
-/**
- * Which configured entry refused the capture, re-exported from the protocol.
- *
- * It lives there rather than here because it now crosses the socket: a full-view capture
- * refuses one display or one window while returning the rest, so the reason has to travel
- * with the snapshot. Two structurally identical definitions would drift.
- */
-export type { CaptureBlock };
 
 /**
  * Windows process names are not case-stable — the same binary is reported as `Chrome.exe`,
@@ -118,22 +109,4 @@ function matchSecretFile(title: string | undefined): CaptureBlock | null {
  */
 export function secretFileRule(fileName: string): string | null {
   return SECRET_FILES.find((file) => globToRegExp(file).test(fileName)) ?? null;
-}
-
-/**
- * The block on a snapshot's `app`: the host's own mark when it set one (it leaves a blocked
- * window's title out, so the title rules cannot match again here), else the rules.
- */
-export function appCaptureBlock(
-  app:
-    | { name: string; windowTitle?: string | undefined; blocked?: CaptureBlock | undefined }
-    | undefined,
-  exclusions: CaptureExclusions,
-): CaptureBlock | null {
-  if (app === undefined) return null;
-  if (app.blocked !== undefined) return app.blocked;
-  return findCaptureBlock(
-    { processName: app.name, ...(app.windowTitle === undefined ? {} : { title: app.windowTitle }) },
-    exclusions,
-  );
 }

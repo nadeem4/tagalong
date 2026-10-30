@@ -1,6 +1,6 @@
 /** Tests for hideSecrets: each secret shape is hidden, ordinary text and code are left alone. */
 import { describe, expect, it } from 'vitest';
-import { hideSecrets } from './secrets';
+import { hideSecrets } from './hide-secrets';
 
 describe('hideSecrets', () => {
   it('hides API keys and tokens, saying what was there', () => {

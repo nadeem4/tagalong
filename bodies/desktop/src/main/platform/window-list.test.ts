@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { ObservedWindow } from '@tagalong/core';
+import type { ObservedWindow } from './inventory';
 
 import {
   attachTextCounts,

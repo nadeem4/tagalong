@@ -1,7 +1,7 @@
 /** Tests for the host view, saving settings and keys. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { InMemorySecretStore } from '@tagalong/core';
+import { InMemorySecretStore } from '../test-support/in-memory-secret-store';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';

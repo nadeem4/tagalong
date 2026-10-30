@@ -3,7 +3,7 @@
  * in this process. Contains PerceptionMemory and ImageCodec.
  */
 
-import { findCaptureBlock } from '@tagalong/core';
+import { findCaptureBlock } from '../platform/exclusions';
 import type {
   CaptureExclusions,
   CapturedImage,

@@ -3,8 +3,8 @@
  * composite. Contains captureDisplaysWith and displayRefusals.
  */
 
-import { findCaptureBlock } from '@tagalong/core';
-import type { CaptureBlock } from '@tagalong/core';
+import { findCaptureBlock } from './exclusions';
+import type { CaptureBlock } from '@tagalong/protocol';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 import { blit, createCanvas } from './canvas';

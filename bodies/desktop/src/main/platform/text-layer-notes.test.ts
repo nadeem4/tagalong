@@ -1,7 +1,7 @@
 /** Tests for textLayerNotes. */
 import { describe, expect, it } from 'vitest';
 
-import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer';
+import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer-notes';
 
 const reading = {
   processName: 'Code.exe',

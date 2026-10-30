@@ -4,7 +4,7 @@
  * registerSettingsIpc.
  */
 
-import type { SecretStore } from '@tagalong/core';
+import type { SecretStore } from '../secret-store';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { HostView } from '../../shared/ipc';

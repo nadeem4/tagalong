@@ -1,7 +1,6 @@
 /**
- * Settings on disk and the secret-store contract. Contains `SettingsStore` (settings.json
- * with atomic saves, a .bak and a .corrupt copy), `SecretStore` (implemented by the host,
- * Electron safeStorage on desktop) and `InMemorySecretStore` for tests.
+ * Settings on disk. Contains `SettingsStore` (settings.json with atomic saves, a .bak and a
+ * .corrupt copy) and SETTINGS_FILENAME. The brain keeps no settings; this file is the desktop's.
  */
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,34 +8,6 @@ import { Settings, SettingsPatch } from '@tagalong/protocol';
 
 /** The settings file a host finds next to the database in its data dir. */
 export const SETTINGS_FILENAME = 'settings.json';
-
-/**
- * Secrets never live in the settings file, so the engine never learns how they are
- * protected. The desktop host backs this with Electron safeStorage; tests use the
- * in-memory implementation below.
- */
-export interface SecretStore {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<void>;
-}
-
-/** Volatile SecretStore for tests. */
-export class InMemorySecretStore implements SecretStore {
-  readonly #secrets = new Map<string, string>();
-
-  async get(key: string): Promise<string | null> {
-    return this.#secrets.get(key) ?? null;
-  }
-
-  async set(key: string, value: string): Promise<void> {
-    this.#secrets.set(key, value);
-  }
-
-  async delete(key: string): Promise<void> {
-    this.#secrets.delete(key);
-  }
-}
 
 /** Renders zod issues as "field: problem" lines so an error points at what to fix. */
 function describeIssues(issues: readonly { path: PropertyKey[]; message: string }[]): string {
