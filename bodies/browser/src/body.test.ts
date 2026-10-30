@@ -4,6 +4,7 @@
  * or brain is needed and every case is fast and repeatable.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HelloParams } from '@tagalong/contract';
 import type { PermissionBroker } from './permissions';
 import { createBody, type BodyDeps } from './body';
 import { FakeBrainSocket, memoryStorage, settle } from './test-support/fake-brain-socket';
@@ -87,6 +88,37 @@ describe('the browser body', () => {
     expect(params.body.kind).toBe('browser');
     expect(params.body.name).toBe('Chrome');
     expect(params.tools.map((t) => t.name)).toContain('tabs');
+  });
+
+  it('hello_says_display_false', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    sockets[0]!.open();
+    await settle();
+    const params = sockets[0]!.request('hello')?.['params'];
+    expect(HelloParams.safeParse(params).success).toBe(true);
+    expect((params as { body: { display?: boolean } }).body.display).toBe(false);
+  });
+
+  it('say_sends_text_and_context_as_a_say_request', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    const context = { url: 'https://a.test/docs', title: 'Docs' };
+    void body.say('what is this?', context);
+    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'what is this?', context });
+  });
+
+  it('say_while_offline_is_swallowed', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await expect(body.say('hi', { url: '', title: '' })).resolves.toBeUndefined();
+    expect(sockets[0]!.request('say')).toBeUndefined();
+  });
+
+  it('say_before_start_is_swallowed', async () => {
+    const { body } = setup();
+    await expect(body.say('hi', { url: '', title: '' })).resolves.toBeUndefined();
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {

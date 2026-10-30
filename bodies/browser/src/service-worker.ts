@@ -3,6 +3,7 @@
  * registered synchronously at the top level, because Chrome only delivers events to listeners
  * that exist when a stopped worker is woken.
  */
+import { fromMenuClick, fromOmnibox, MENU_ID, MENU_TITLE, type Ask } from './ask-scout';
 import { createBody } from './body';
 import {
   chromeActions,
@@ -91,6 +92,38 @@ function watchDownloads(): void {
 }
 watchDownloads();
 chrome.permissions.onAdded.addListener(watchDownloads);
+
+// Asking Scout from the page. Both listeners are top level so a stopped worker wakes for them.
+// The menu item only exists once `contextMenus` is granted, from the popup's click.
+function send(ask: Ask | null): void {
+  if (ask) body.say(ask.text, ask.context).catch(() => undefined);
+}
+
+chrome.omnibox.onInputEntered.addListener((text) => {
+  chrome.tabs
+    .query({ active: true, lastFocusedWindow: true })
+    .then(([tab]) => send(fromOmnibox(text, tab)))
+    .catch(() => undefined);
+});
+
+let menuWatched = false;
+function addMenuItem(): void {
+  if (!chrome.contextMenus) return;
+  if (!menuWatched) {
+    menuWatched = true;
+    chrome.contextMenus.onClicked.addListener((info, tab) => {
+      if (info.menuItemId === MENU_ID) send(fromMenuClick(info, tab));
+    });
+  }
+  // Replacing keeps one item whether the worker or the permission came first.
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({ id: MENU_ID, title: MENU_TITLE, contexts: ['selection'] }, () => {
+      void chrome.runtime.lastError;
+    });
+  });
+}
+addMenuItem();
+chrome.permissions.onAdded.addListener(addMenuItem);
 
 chrome.runtime.onMessage.addListener((message: Partial<WorkerQuery> | null, _sender, respond) => {
   if (message?.type !== 'status') return false;

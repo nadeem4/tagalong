@@ -33,6 +33,8 @@ export const manifest = {
     'search',
   ],
   optional_host_permissions: ['<all_urls>'],
+  // Typing `scout` then a question in the address bar; the keyword needs no permission.
+  omnibox: { keyword: 'scout' },
   /**
    * Extension pages and the worker may open websockets only: the brain can run on another
    * machine, so any host, but never a plain fetch of page text to somewhere else.

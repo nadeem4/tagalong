@@ -3,7 +3,7 @@
  * touches (storage, tabs, sockets) is passed in, so a test can run it without a real Chrome.
  * The service worker only wires the real pieces in and forwards events.
  */
-import { BrainClient, type BrainSocket, type BrainStatus } from '@tagalong/contract';
+import { BrainClient, BrainOffline, type BrainSocket, type BrainStatus } from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
 import type { ActionsApi, PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
 import { createTabReporter, downloadEvent } from './events';
@@ -51,6 +51,12 @@ export interface BrowserBody {
   tabChanged(tab: { title: string; url: string }): void;
   /** A download changed state; only finished or failed ones are sent, as a `download` fact. */
   downloadChanged(item: { filename: string; state: string }): void;
+  /**
+   * The person asked Scout something from the right-click menu or the address bar. The answer
+   * shows on a displaying body; while the brain is down nothing is shown anywhere, and the
+   * popup's status line is where the person sees that.
+   */
+  say(text: string, context: { url: string; title: string }): Promise<void>;
 }
 
 export function createBody(deps: BodyDeps): BrowserBody {
@@ -89,7 +95,8 @@ export function createBody(deps: BodyDeps): BrowserBody {
     ]);
     client = new BrainClient({
       addr: settings.addr,
-      body: { id, kind: 'browser', name },
+      // display: false because the browser shows no answers; the brain routes them elsewhere.
+      body: { id, kind: 'browser', name, display: false },
       seqStore: {
         load: async () => {
           const seq = await deps.session.get(SEQ_KEY);
@@ -139,6 +146,13 @@ export function createBody(deps: BodyDeps): BrowserBody {
     downloadChanged(item) {
       const fact = downloadEvent(item);
       if (fact) client?.event('download', fact);
+    },
+    async say(text, context) {
+      try {
+        await client?.say({ text, context });
+      } catch (error) {
+        if (!(error instanceof BrainOffline)) throw error;
+      }
     },
   };
 }

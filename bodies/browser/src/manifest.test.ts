@@ -36,6 +36,10 @@ describe('manifest', () => {
     expect('host_permissions' in manifest).toBe(false);
   });
 
+  it('declares_the_scout_omnibox_keyword', () => {
+    expect(manifest.omnibox).toEqual({ keyword: 'scout' });
+  });
+
   it('has_a_popup_and_no_side_panel_options_or_commands', () => {
     expect(manifest.action.default_popup).toBe('popup/popup.html');
     expect('side_panel' in manifest).toBe(false);

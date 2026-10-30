@@ -27,6 +27,11 @@ export function statusLine(status: BrainStatus): string {
   return STATUS_LINES[status];
 }
 
+/** The "Turn on right-click" button is offered until `contextMenus` is granted. */
+export function showContextMenusOffer(granted: string[]): boolean {
+  return !granted.includes('contextMenus');
+}
+
 function siteRow(pattern: string): GrantRow | null {
   if (pattern === 'file:///*') {
     return { label: 'Local files', need: { kind: 'site', origin: FILE_ORIGIN } };
