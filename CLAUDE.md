@@ -37,7 +37,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 ## Conventions
 
 - The contract package stays pure: protocol/ts depends on zod only and never imports electron, react or browser globals (ESLint enforces). Shared React-free shapes live in bodies/ui/src/shapes (`@tagalong/ui/shapes`).
-- Use the tagalong-phase skill when building a phase or task.
+- Use the tagalong-phase skill when building a slice or task.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md.
