@@ -29,7 +29,7 @@ import { SummariesSection } from './summaries-section';
 import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
 import { YouSection } from './you-section';
-import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
+import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
  * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
@@ -48,6 +48,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [summarizer, setSummarizer] = useState('');
   const [advanced, setAdvanced] = useState(false);
+  const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
   const [invalid, setInvalid] = useState<SettingsUi['invalid']>(null);
   const [status, setStatus] = useState('');
@@ -67,6 +68,13 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         setStatus(String(error));
         setStatusIsError(true);
       });
+  }, []);
+
+  useEffect(() => {
+    window.tagalongHost
+      .browserFolder()
+      .then(setBrowserFolder)
+      .catch(() => setBrowserFolder(null));
   }, []);
 
   const checkSignIn = useCallback(() => {
@@ -134,7 +142,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
     return (
       <main className="tg-settings">
         <style>{SETTINGS_CSS}</style>
-        <p style={{ padding: 20 }}>{status === '' ? 'Loading…' : status}</p>
+        <p style={{ padding: 20 }}>{status === '' ? 'Loadingâ€¦' : status}</p>
       </main>
     );
   }
@@ -253,7 +261,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
-      // "Watches at once must be…" beside that very field, Advanced opened if it is there.
+      // "Watches at once must beâ€¦" beside that very field, Advanced opened if it is there.
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof SettingsFieldError) {
         if (isAdvancedField(error.field)) setAdvanced(true);
@@ -302,7 +310,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
                 <h1 className="tg-intro__title">Settings</h1>
                 <p className="tg-help">
                   Everything works out of the box. Change only what you need. Press{' '}
-                  <span aria-hidden="true">ⓘ</span>
+                  <span aria-hidden="true">â“˜</span>
                   <span className="tg-sr">the information button</span> for more on any setting.
                 </p>
               </div>
@@ -322,6 +330,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
           <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
+          <BrowserSection folder={browserFolder} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
             <SummariesSection
               groups={summarizerGroups({

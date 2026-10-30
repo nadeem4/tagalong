@@ -3,7 +3,7 @@
 ## Purpose
 
 `bodies/ui` (`@tagalong/ui`) holds the React components both hosts render: Scout's bubble and
-the cards it hosts, the dock pet, the status marks, Home and the extension's chat panel. It never
+the cards it hosts, the dock pet, the status marks, Home and the chat panel. It never
 imports Electron, opens a socket or calls a Node API. Each host hands it a `HostBridge`, and that
 is all it knows about the outside world.
 
@@ -34,7 +34,7 @@ decides to hand to it.
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home),
-`apps/extension/src/sidepanel/app.tsx` (the chat panel).
+(`ChatPanel` has no host today: the browser body has no chat).
 
 ## How it works
 
@@ -70,7 +70,7 @@ the avatar.
 be used inside a HostBridgeProvider" when none is there, so a wiring mistake fails loudly.
 
 **The fake bridge.** `createFakeHostBridge(options)` (`test-support/fake-host-bridge.ts`) is an
-in-memory `HostBridge` shipped from the package, so the extension's tests use it too. `emit(event)`
+in-memory `HostBridge` shipped from the package, so a body's tests can use it too. `emit(event)`
 delivers an event to every subscriber synchronously, so tests need no timers. `ask` resolves
 `{ turnId: 'turn-<n>' }`, and the fake records what components asked for: `asks`, `interrupts`,
 `captures`, `approvals`, `copied` and the rest. Options seed its data (`pets`, `capture`, `jobs`,
@@ -234,8 +234,8 @@ bubble's own window). Its `pre` renderer turns a code element with class `langua
 given. Copy shows "Copied" or "Couldn't copy" for 2 s (`COPIED_MS`). Any other fenced block stays a
 code block with no Copy.
 
-The bubble passes `bridge.copyText` as `onCopy` when the host has it; the extension has none, so
-its drafts have no button. On desktop `copyText` goes to main (`IPC.copyText`), which writes the
+The bubble passes `bridge.copyText` as `onCopy` when the host has it; a host without it gets no
+copy button. On desktop `copyText` goes to main (`IPC.copyText`), which writes the
 clipboard itself because `navigator.clipboard` fails while the panel is unfocused. Main takes only a
 string of at most 20,000 characters, only from the panel window, and never reads the clipboard or
 pastes (see [desktop.md](desktop.md#the-ipc-modules)). The fence also keeps the draft out of
@@ -393,9 +393,9 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
 - **Jobs.** `JobsPanel` (`home/jobs-panel.tsx`) lists the jobs Scout handed to Claude Code, each with
   Stop while it runs; see [experts.md](experts.md).
 
-### ChatPanel (the extension's chat)
+### ChatPanel (the chat without a host)
 
-`ChatPanel` (`chat-panel.tsx`) is the Chrome side panel's chat; the desktop never renders it. Props:
+`ChatPanel` (`chat-panel.tsx`) was the Chrome side panel's chat and now has no host; the desktop never renders it. Props:
 `pet` (who answers and whose name labels each answer), `snapshot` (the host's capture),
 `lookTargets` (default `['screenshot', 'activeWindow']`) and `lookLabel`.
 

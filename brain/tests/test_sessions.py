@@ -686,7 +686,7 @@ async def test_body_tools_offered_then_gone_after_disconnect():
 
 async def test_session_answer_passes_text_to_the_ask():
     session, _ = make(Gate([]))
-    session._bodies.online_ids = lambda: ["desktop"]
+    session._bodies.display_ids = lambda: ["desktop"]
     task = asyncio.create_task(session._asks.open(text="Which?", options=["a"], free_text=True))
     await asyncio.sleep(0)
     ask_id = session.open_asks()[0]["id"]
@@ -754,6 +754,87 @@ async def test_wake_goes_to_the_body_the_user_last_talked_to():
     session.jobs._on_finished(end_job(memory))
     await finish_quietly(session)
     assert wake_started(sent) == ["extension", "extension"]
+
+
+# --- a body with display=false shows nothing: its says are answered elsewhere (12c) ---
+
+
+def join_headless(session, body_id="browser"):
+    body = Body(id=body_id, kind="browser", name=body_id, display=False)
+    session._bodies.connect(body, [], QuietPeer(), None)
+
+
+def turn_body(sent):
+    return next(p["body"] for m, p in sent if m == "turn" and p["state"] == "started")
+
+
+async def test_say_from_a_display_less_body_routes_the_turn_to_the_last_displaying_body():
+    session, sent = make(Gate(["a", "b"]))
+    join(session, "desktop")
+    join_headless(session)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    sent.clear()
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "desktop"
+
+
+async def test_say_from_a_display_less_body_falls_back_to_any_displaying_body():
+    session, sent = make(Gate(["a"]))
+    join_headless(session)
+    join(session, "desktop")
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "desktop"
+
+
+async def test_say_from_a_display_less_body_is_null_when_no_displaying_body_is_online():
+    session, sent = make(Gate(["a"]))
+    join_headless(session)
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) is None
+    assert ("reply", None) in [(m, p["body"]) for m, p in sent if m == "reply"]
+
+
+async def test_say_from_a_display_less_body_does_not_move_last_body():
+    session, sent = make(Gate(["a", "b", "c"]))
+    memory = session._memory
+    join(session, "desktop")
+    join(session, "extension")
+    join_headless(session)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert session._last_body == "desktop"
+    sent.clear()
+    session.jobs._on_finished(end_job(memory))
+    await finish_quietly(session)
+    assert wake_started(sent) == ["desktop"]
+
+
+async def test_say_from_a_displaying_body_is_unchanged():
+    session, sent = make(Gate(["a"]))
+    join(session, "desktop")
+    join(session, "extension")
+    session.say("extension", say("hi"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "extension"
+    assert session._last_body == "extension"
+
+
+async def test_display_less_say_joins_a_running_turn_like_any_say():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    join(session, "desktop")
+    join_headless(session)
+    first = session.say("desktop", say("a"))
+    joined = session.say("browser", say("b"))
+    assert joined.joined is True and joined.turn == first.turn
+    gate.set()
+    await finish_quietly(session)
 
 
 async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
@@ -944,6 +1025,31 @@ async def test_body_online_after_ten_minutes_wakes_scout():
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: body_online" in text and "offline_seconds: 700" in text
+
+
+async def _returns_after_an_hour(body_id, kind):
+    clock = Tick()
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None, bodies=Bodies(clock=clock))
+    peer = QuietPeer()
+    body = Body(id=body_id, kind=kind, name=body_id)
+    session._bodies.connect(body, [], peer, None)
+    session._bodies.disconnect(body_id, peer)
+    clock.now = 3600.0
+    session._bodies.connect(body, [], QuietPeer(), None)
+    await idle(session)
+    return model, session
+
+
+async def test_a_browser_body_returning_after_an_hour_starts_no_wake():
+    model, session = await _returns_after_an_hour("chrome-7k2f", "browser")
+    assert model.seen == []
+    assert not session.scheduler._groups
+
+
+async def test_a_desktop_body_returning_after_an_hour_wakes():
+    model, _ = await _returns_after_an_hour("desktop", "desktop")
+    assert len(model.seen) == 1
 
 
 async def test_body_online_after_a_short_gap_does_not():
@@ -1278,3 +1384,25 @@ async def test_news_is_told_once_not_twice():
     join(again, "desktop")
     await idle(again)
     assert again._model.seen == []
+
+
+async def test_tab_event_starts_no_turn():
+    session, sent = make(Gate([]), kinds=None)
+    join(session, "chrome-7k2f")
+    session.body_event("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example"})
+    session.body_event("chrome-7k2f", "download", {"name": "a.pdf", "state": "complete"})
+    await settle()
+    assert states(sent) == []
+
+
+async def test_tab_event_reaches_the_next_turns_system_prompt():
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None)
+    join(session, "chrome-7k2f")
+    session.body_event("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example"})
+    session.body_event("chrome-7k2f", "download", {"name": "a.pdf", "state": "complete"})
+    session.say("chrome-7k2f", say("hi"))
+    await finish(session)
+    system = model.systems[0]
+    assert '; tab: "Docs" https://a.example' in system
+    assert 'last download: "a.pdf" (complete)' in system

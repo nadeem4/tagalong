@@ -113,6 +113,11 @@ describe('healthRows', () => {
     ).toMatchObject({ state: 'broken', line: 'The one you picked is unplugged.', fix: 'voice' });
   });
 
+  it('has_no_browser_extension_row', () => {
+    const ids: string[] = healthRows(ALL_GOOD).map((each) => each.id);
+    expect(ids).not.toContain('extension');
+  });
+
   it('turns a fact it could not read into an unknown row, not a problem', () => {
     const rows = healthRows({
       brain: 'unknown',

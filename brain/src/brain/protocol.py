@@ -135,6 +135,7 @@ class Body(Model):
     id: Annotated[str, Field(pattern=r"^[a-z0-9-]{1,32}$")]
     kind: str
     name: str
+    display: bool | None = None  # false: shows nothing; omitted or true: shows turns and asks
 
 
 class EmptyResult(Model):
@@ -196,6 +197,18 @@ class FocusData(Model):
     # Data of the `focus` event: the front window changed.
     app: str
     title: str
+
+
+class TabData(Model):
+    # Data of the `tab` event: the owner switched tabs (URL without query or fragment).
+    title: str
+    url: str
+
+
+class DownloadData(Model):
+    # Data of the `download` event: a download ended.
+    name: str
+    state: Literal["complete", "interrupted"]
 
 
 class CallParams(Model):

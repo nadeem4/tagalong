@@ -10,7 +10,9 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   ApprovedParams,
   BackEventData,
+  DownloadEventData,
   FocusEventData,
+  TabEventData,
   TurnParams,
   type BodyToBrainMethod,
   type BrainToBodyMethod,
@@ -43,6 +45,23 @@ describe('back and focus event data', () => {
   });
   it('rejects negative idle seconds', () => {
     expect(BackEventData.safeParse({ idle_seconds: -1 }).success).toBe(false);
+  });
+});
+
+describe('tab and download event data', () => {
+  it('parses the examples', () => {
+    expect(TabEventData.parse(eventData('tab'))).toEqual({
+      title: 'Release notes',
+      url: 'https://example.com/releases',
+    });
+    expect(DownloadEventData.parse(eventData('download'))).toEqual({
+      name: 'report.pdf',
+      state: 'complete',
+    });
+  });
+  it('rejects a bad download state and a tab without a url', () => {
+    expect(DownloadEventData.safeParse({ name: 'a', state: 'started' }).success).toBe(false);
+    expect(TabEventData.safeParse({ title: 'x' }).success).toBe(false);
   });
 });
 

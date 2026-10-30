@@ -5,7 +5,7 @@
 
 import type { MemoryEntry } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import { RpcError } from '../brain/brain-client';
+import { RpcError } from '@tagalong/contract';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';

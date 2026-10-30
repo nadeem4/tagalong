@@ -1,6 +1,6 @@
 # Protocol
 
-> This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands. Its TypeScript schemas are the `@tagalong/contract` package in `protocol/ts`, its Python types are `brain.protocol` in `brain/src/brain/protocol.py`, and the shared samples are in `protocol/examples`. `packages/protocol` goes away when the bodies switch to the new contract. Contract v1 adds an `approved` notification (sent when Scout approves an ask under a preference) and `changed {what: "approvals"}`; they are not in this page's catalog.
+> This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands. Its TypeScript schemas are the `@tagalong/contract` package in `protocol/ts`, its Python types are `brain.protocol` in `brain/src/brain/protocol.py`, and the shared samples are in `protocol/examples`. `packages/protocol` goes away when the bodies switch to the new contract. Contract v1 adds an `approved` notification (sent when Scout approves an ask under a preference) and `changed {what: "approvals"}`; they are not in this page's catalog. The browser body (`bodies/browser`) no longer dials this protocol: it speaks contract v1 to the Python brain ([browser-body.md](browser-body.md)).
 
 ## Purpose
 
@@ -392,4 +392,3 @@ host's `SecretStore`. Both are described in [settings-and-secrets.md](settings-a
 | `packages/protocol/src/context.test.ts`, `pet.test.ts`, `message.test.ts`, `settings.test.ts` | The main schemas and their caps and defaults                                                              |
 | `packages/protocol/src/index.test.ts`                                                         | `PROTOCOL_VERSION` is semver; the loopback URL                                                            |
 | `packages/core/src/server/ws-server.test.ts`                                                  | Pairing, hello deadline and size cap, extension scoping, every error code, core-to-host result validation |
-| `apps/extension/src/engine-connection.test.ts`                                                | The extension's hello, calls and answers                                                                  |

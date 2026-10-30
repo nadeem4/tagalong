@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -60,7 +61,6 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY, forgetRetiredKeys } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
@@ -69,12 +69,12 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { openClaudeSignIn, signInFor } from './claude-sign-in';
+import { signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
-import type { BrainStatus } from './brain/brain-client';
-import type { BrainClient } from './brain/brain-client';
+import type { BrainStatus } from '@tagalong/contract';
+import type { BrainClient } from '@tagalong/contract';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
@@ -120,7 +120,7 @@ import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
-import { registerHealthIpc } from './ipc/health';
+import { registerBrowserIpc } from './ipc/browser';
 import { fixPage } from './fix-target';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice } from '../shared/ipc';
@@ -1075,7 +1075,13 @@ function registerIpc(): void {
     writeText: (text) => clipboard.writeText(text),
     fromPanel: fromWindow(() => required().panel),
   });
-  registerHealthIpc(handle, { engine });
+  registerBrowserIpc(handle, {
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+    exists: existsSync,
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+  });
 
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);
@@ -1130,7 +1136,6 @@ function registerIpc(): void {
     if (state === 'signed-in' && desktop !== null) clearBrainMarks(desktop.statusMarks);
     return state;
   });
-  ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.
@@ -1163,11 +1168,6 @@ function registerIpc(): void {
     const { panel, avatar } = required();
     if (panel === null || avatar === null || !Number.isFinite(height)) return;
     fitPanel(panel, avatar, height);
-  });
-
-  ipcMain.handle(IPC.openLink, async (_event, url: string) => {
-    if (!isAllowedLink(url)) throw new Error(`Tagalong only opens provider key pages, not ${url}`);
-    await shell.openExternal(url);
   });
 
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());

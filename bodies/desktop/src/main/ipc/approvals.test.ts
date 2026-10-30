@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { IPC } from '../../shared/ipc';
-import { BrainOffline } from '../brain/brain-client';
+import { BrainOffline } from '@tagalong/contract';
 import { registerApprovalsIpc } from './approvals';
 import { fakeIpc } from './fake-ipc';
 

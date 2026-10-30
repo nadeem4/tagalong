@@ -4,7 +4,7 @@ import { ErrorCode, Tool } from '@tagalong/contract';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
-import { RpcError } from './brain-client';
+import { RpcError } from '@tagalong/contract';
 import { SightPausedError } from '../platform/sight-gate';
 
 const exclusions = { processNames: [], titlePatterns: [] } as unknown as CaptureExclusions;

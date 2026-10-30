@@ -7,7 +7,7 @@
 import { topStatus } from '@tagalong/protocol';
 import type { StatusId, StatusMark } from '@tagalong/protocol';
 import type { AlwaysListening } from './always-listening';
-import type { BrainStatus } from './brain/brain-client';
+import type { BrainStatus } from '@tagalong/contract';
 
 export class StatusMarks {
   readonly #marks = new Map<StatusId, StatusMark>();

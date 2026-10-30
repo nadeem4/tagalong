@@ -17,10 +17,11 @@ from brain.protocol import AskParams, ErrorCode, RpcError
 class FakeBodies:
     def __init__(self, online: list[str] | None = None) -> None:
         self.online = ["desktop"] if online is None else online
+        self.headless: set[str] = set()
         self.sent: list[tuple[str, dict]] = []
 
-    def online_ids(self) -> list[str]:
-        return self.online
+    def display_ids(self) -> list[str]:
+        return [i for i in self.online if i not in self.headless]
 
     def notify(self, method: str, params: dict) -> None:
         AskParams.model_validate({**params, "seq": 1})
@@ -113,6 +114,26 @@ async def test_no_body_online_denies_without_opening():
 
 def test_anyone_online_follows_bodies():
     assert Asks(FakeBodies(["desktop"])).anyone_online() is True
+
+
+async def test_ask_with_only_a_display_less_body_online_is_refused_like_nobody_online():
+    bodies = FakeBodies(online=["browser"])
+    bodies.headless = {"browser"}
+    asks = Asks(bodies)
+    assert asks.anyone_online() is False
+    assert await asks.permission(call(), "desktop__x", False) == "deny"
+    assert bodies.sent == []
+    assert asks.open_asks() == []
+
+
+async def test_ask_opens_when_a_displaying_body_is_online():
+    bodies = FakeBodies(online=["browser", "desktop"])
+    bodies.headless = {"browser"}
+    asks = Asks(bodies)
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    asks.answer(params["id"], "allow", "desktop")
+    assert await task == "allow"
 
 
 async def test_timeout_closes_ask_and_raises_timeout():

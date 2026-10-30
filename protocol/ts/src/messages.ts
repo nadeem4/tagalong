@@ -66,6 +66,16 @@ export type BackEventData = z.infer<typeof BackEventData>;
 export const FocusEventData = z.object({ app: z.string(), title: z.string() });
 export type FocusEventData = z.infer<typeof FocusEventData>;
 
+// Data of the browser body's `tab` and `download` events.
+export const TabEventData = z.object({ title: z.string(), url: z.string() });
+export type TabEventData = z.infer<typeof TabEventData>;
+
+export const DownloadEventData = z.object({
+  name: z.string(),
+  state: z.enum(['complete', 'interrupted']),
+});
+export type DownloadEventData = z.infer<typeof DownloadEventData>;
+
 export const CallParams = z.object({ tool: z.string(), input: Input });
 export type CallParams = z.infer<typeof CallParams>;
 

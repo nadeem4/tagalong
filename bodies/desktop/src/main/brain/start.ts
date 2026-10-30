@@ -3,8 +3,8 @@
  * brain; it dials the address the brain listens on (TAGALONG_BRAIN_ADDR, the same variable)
  * and BrainClient keeps retrying while it is down. It declares the window body tools.
  */
-import { BrainClient } from './brain-client';
-import type { BrainClientOptions, BrainSocket } from './brain-client';
+import { BrainClient } from '@tagalong/contract';
+import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
@@ -55,6 +55,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   const brain = new BrainClient({
     ...handlers,
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,
+    body: { id: 'desktop', kind: 'desktop', name: 'Desktop' },
     tools: () => tools,
     openSocket,
     onUse: (tool, input) => run(tool, input),

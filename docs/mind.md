@@ -111,7 +111,7 @@ sequenceDiagram
 1. Looks the pet up (an unknown `petId` throws), awaits `KeyedProviderResolver.refresh()` so a key
    saved a moment ago is used, writes the hotkey's own read to the sight log (`recordSnapshot`),
    and fills in the browser's exact selection and page text when the extension answers in time
-   (`browserContextFor`, see [browser-extension.md](browser-extension.md)).
+   (`browserContextFor`, see [browser-body.md](browser-body.md)).
 2. `ConversationRunner.run` (`src/conversation/runner.ts`):
    - **One turn per pet.** A non-background ask interrupts every foreground turn of that pet
      (`#interruptPet`). A second ask is an interruption, not a queue. Background turns (routines,

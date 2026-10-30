@@ -72,7 +72,7 @@ function brainRow(brain: HealthFacts['brain']): HealthRow {
     case 'signed-out':
       return make('brain', 'broken', 'Signed out of Claude.', 'brain');
     case 'no-sign-in':
-      return make('brain', 'broken', 'Claude Code isn’t on this computer.', 'brain');
+      return make('brain', 'broken', 'Claude Code isnâ€™t on this computer.', 'brain');
     case 'no-key':
       return make('brain', 'broken', 'No API key.', 'brain');
     default:
@@ -86,7 +86,7 @@ function connectionsRow(connections: HealthFacts['connections']): HealthRow {
     connection.status === 'needs-sign-in'
       ? [`${connection.name} needs you to sign in again.`]
       : connection.status === 'error'
-        ? [`${connection.name} isn’t working.`]
+        ? [`${connection.name} isnâ€™t working.`]
         : [],
   );
   if (problems.length > 0) return make('connections', 'broken', problems.join(' '), 'connections');
@@ -136,7 +136,7 @@ const COUNT = ['One', 'Two', 'Three', 'Four'];
 /** The card's first line, and the only one said aloud (only when the question was spoken). */
 export function healthHeadline(rows: readonly HealthRow[]): string {
   const broken = rows.filter((row) => row.state === 'broken').length;
-  if (broken === 0) return 'Everything’s working.';
+  if (broken === 0) return 'Everythingâ€™s working.';
   const count = COUNT[broken - 1] ?? String(broken);
   return broken === 1 ? `${count} thing needs you.` : `${count} things need you.`;
 }

@@ -355,7 +355,7 @@ class AskBodies:
         self.online = list(online)
         self.sent = []
 
-    def online_ids(self):
+    def display_ids(self):
         return self.online
 
     def notify(self, method, params):

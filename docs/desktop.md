@@ -29,8 +29,8 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
 | `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
-| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                          |
-| `src/main/links.ts`, `fix-target.ts`       | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                           |
+| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`)                                                                                                              |
+| `src/main/links.ts`, `fix-target.ts`       | `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
@@ -325,7 +325,7 @@ only what the module reads, so every module is tested without Electron. `deps.en
 | `apply-settings.ts` | none (the logic behind `applySettings`)                                                                                                                                                                                                                                                                                              | Re-checks the card's patch with `talkPatchProblem`, refuses `listening.always: true`, switches listening off through `AlwaysListening.set(false)`, saves the rest `byTalk`                                                                                                                                                                           |
 | `voice.ts`          | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent`                                                                                                         | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
 | `clipboard.ts`      | `copyText` (`clipboard:copy-text`)                                                                                                                                                                                                                                                                                                   | `clipboard.writeText` only, from the panel only, strings up to `MAX_COPY_CHARS` (20,000); also exports `fromWindow`                                                                                                                                                                                                                                  |
-| `health.ts`         | `hostsStatus` (`hosts:status`)                                                                                                                                                                                                                                                                                                       | `hosts.status`                                                                                                                                                                                                                                                                                                                                       |
+| `browser.ts`        | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                                                                                                                                    | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
 | `handle.ts`         | none                                                                                                                                                                                                                                                                                                                                 | `IpcHandle`, `IpcOn`, `IpcListener`, `EngineCall`                                                                                                                                                                                                                                                                                                    |
 | `fake-ipc.ts`       | none                                                                                                                                                                                                                                                                                                                                 | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
@@ -348,8 +348,7 @@ shell, the screen):
 | `dragAvatar`, `dropAvatar`                           | move the pet by a finite step; save its position                                                                                                  |
 | `openSettings`                                       | `openSettingsPage(fixPage(target))`; an unknown target throws                                                                                     |
 | `openHome`, `openLogsFolder`                         | open the window or the folder                                                                                                                     |
-| `checkClaudeSignIn`, `openClaudeSignIn`              | `signInFor(env)` (signed in clears the brain marks); a terminal that signs in                                                                     |
-| `openLink`                                           | `shell.openExternal` only when `isAllowedLink(url)`                                                                                               |
+| `checkClaudeSignIn`                                  | `signInFor(env)` (signed in clears the brain marks)                                                                                               |
 | `dropOnPet` (`drop.ts`, `registerDropIpc`)           | only from the avatar's window (`fromWindow`); names the item and opens the bubble on `IPC.dropEvent`                                              |
 
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
@@ -365,7 +364,7 @@ Electron in main, so a page cannot forge it) with that window's `webContents`: `
 
 ### Talking to the brain
 
-`src/main/brain/brain-client.ts` is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
+`BrainClient` (`protocol/ts/src/brain-client.ts`, exported by `@tagalong/contract` and shared with the browser body) is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
 The app uses it for turns and for Home: `onNotification` feeds the mapper's `map`, `onResync` its
 `resync`, and `call(tool, input)` runs a brain tool for Home (see below).
 
@@ -374,6 +373,10 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 - **Status** (`onStatus`): `connecting`, `online`, `offline`, `outdated`. `outdated` means the brain
   refused the protocol version; the client stops retrying. A closed socket is `offline` and is
   redialled every `retryMs` (2 s).
+- **Options the desktop leaves at their defaults:** `body` (who the body is; the desktop sends its
+  own), `seqStore` (where `last_seq` is kept; the desktop keeps it in memory) and `keepalive`
+  (`{ everyMs, tool }`, a timed call to a brain tool; only the browser body uses it). See
+  [protocol/README.md](../protocol/README.md#the-typescript-client).
 - **say / cancel:** `say(params)` is a request and resolves with the brain's `SayResult`. `cancel(turn)`
   is a notification. Both need `online`; `say` otherwise rejects with `BrainOffline`, as does a
   `say` still waiting when the socket drops. Requests time out after 30 s.
@@ -585,7 +588,7 @@ by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate 
 | `asarUnpack`           | `**/*.node`, `**/node_modules/onnxruntime-node/bin/**`, `**/node_modules/@img/**`                                                                                                      |
 | `npmRebuild`           | `false`: every native module ships an N-API binary, which Electron loads as is                                                                                                         |
 | `publish`              | `null`: no update channel                                                                                                                                                              |
-| `extraResources`       | `../../apps/extension/dist` to `resources/extension` (the built Chrome extension, for Load unpacked)                                                                                   |
+| `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked)                                                                                                 |
 | `artifactName`         | `${productName}-Setup-${version}-${arch}.${ext}`                                                                                                                                       |
 | `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                  |
 | `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false` |
@@ -679,7 +682,7 @@ the clean close and stops the brain client.
 - **Logging fails.** Swallowed; the console still has the line.
 - **Unsupported OS.** `createPlatform` throws, `start` rejects, and the app shows the error and
   quits.
-- **Refused inputs.** `openLink` throws for a URL off the allowlist; `openSettings` throws for an
+- **Refused inputs.** `openSettings` throws for an
   unknown Fix it target; `openPickUp` throws for an item the current pick-up did not name;
   `copyText`, `applySettings` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
   `fitPanel` ignore non-finite numbers.

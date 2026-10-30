@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { startBrain } from './start';
-import type { BrainSocket } from './brain-client';
+import type { BrainSocket } from '@tagalong/contract';
 import type { Platform } from '../platform/index';
 
 const noop = () => undefined;
