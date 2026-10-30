@@ -8,18 +8,8 @@ import type { Pet } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 
-/**
- * The one pet there is. The role, model and provider fields are still required by the Pet
- * shape; the brain, not this record, decides who answers.
- */
-const SCOUT: Pet = {
-  id: SCOUT_ID,
-  name: 'Scout',
-  avatar: '🦊',
-  roleId: 'companion',
-  model: 'sonnet',
-  providerId: 'claude-code',
-};
+/** The one pet there is; the brain, not this record, decides who answers. */
+const SCOUT: Pet = { id: SCOUT_ID, name: 'Scout', avatar: '🦊' };
 
 /** A copy of Scout, so no caller can change the one record. */
 export function localScout(): Pet {

@@ -48,7 +48,6 @@ function bubbleBridge(): HostBridge {
     checkHealth: () =>
       gatherHealth({
         getHostView: () => host.getHostView(),
-        checkClaudeSignIn: () => host.checkClaudeSignIn(),
         listConnections: () => bridge.listConnections?.() ?? unavailable(),
         listMicrophones: () => listMicrophones(),
         voiceModels: () => host.voiceModels(),

@@ -11,6 +11,9 @@ import type { SecretStore } from '@tagalong/core';
 /** Encrypted secrets sit next to the database and settings in the host's data dir. */
 export const SECRETS_FILENAME = 'secrets.json';
 
+/** Where the ElevenLabs key is kept: the one secret the desktop holds, for the voice. */
+export const ELEVENLABS_SECRET_KEY = 'elevenlabs.apiKey';
+
 /** The slice of Electron safeStorage this store uses, so tests can supply their own. */
 export interface SafeStorageLike {
   isEncryptionAvailable(): boolean;

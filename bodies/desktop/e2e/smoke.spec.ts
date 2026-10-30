@@ -43,7 +43,6 @@ test.beforeAll(async () => {
       ...process.env,
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_SIGN_IN: 'signed-in',
       TAGALONG_FAKE_TTS: '1',
       // Talk to Scout hears a fixed question, through Chromium's fake microphone.
       TAGALONG_FAKE_STT: '1',
@@ -501,7 +500,7 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
 
   // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
-  for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
+  for (const section of ['Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
   // Advanced is closed until asked for; it holds the ElevenLabs voice and the screen-memory minutes.

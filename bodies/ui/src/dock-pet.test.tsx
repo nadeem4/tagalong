@@ -2,6 +2,7 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { STATUS_WORDS } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
 import {
   DockPet as RealDockPet,
@@ -14,9 +15,6 @@ const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🦊',
-  roleId: 'companion',
-  model: 'haiku',
-  providerId: 'claude-code',
 };
 
 const MOODS: readonly DockMood[] = [
@@ -171,11 +169,11 @@ describe('DockPet', () => {
 
   it('shows the top status mark as a tag, named in its label', () => {
     const { rerender } = render(
-      <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-signed-out' }} />,
+      <DockPet pet={SCOUT} mood="idle" status={{ id: 'mic-busy' }} />,
     );
-    expect(screen.getByTestId('status-mark')).toHaveTextContent('Signed out');
+    expect(screen.getByTestId('status-mark')).toHaveTextContent('Mic busy');
     expect(screen.getByRole('img')).toHaveAccessibleName(
-      'Scout is idle, Can’t think: signed out of Claude.',
+      `Scout is idle, ${STATUS_WORDS['mic-busy'].detail}`,
     );
     rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
     expect(screen.queryByTestId('status-mark')).toBeNull();
@@ -302,7 +300,7 @@ describe('moods', () => {
         mood="working"
         recording
         listening="on"
-        status={{ id: 'brain-signed-out' }}
+        status={{ id: 'mic-busy' }}
       />,
     );
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');

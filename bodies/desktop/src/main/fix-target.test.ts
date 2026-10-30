@@ -9,11 +9,7 @@ describe('fixPage', () => {
   });
 
   it.each([
-    ['brain', 'settings#brain'],
     ['voice', 'settings#voice'],
-    ['browser', 'settings#browser'],
-    ['privacy', 'settings#privacy'],
-    ['experts', 'jobs'],
     ['connections', 'connections'],
   ])('sends %s to %s', (target, page) => {
     expect(fixPage(target)).toBe(page);
@@ -21,6 +17,10 @@ describe('fixPage', () => {
 
   it('refuses anything not on the list, rather than open a page a window named', () => {
     const odd = [
+      'brain',
+      'browser',
+      'privacy',
+      'experts',
       'advanced',
       'settings#brain',
       'experts#x',

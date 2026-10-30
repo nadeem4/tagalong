@@ -1,18 +1,14 @@
 /** Tests for gatherHealth: each row, budgets and calls that fail or hang. */
 import { describe, expect, it, vi } from 'vitest';
 import { Settings } from '@tagalong/protocol';
-import type { Pet } from '@tagalong/protocol';
 import type { HostView } from '../../shared/ipc';
 import { gatherHealth } from './health-facts';
 import type { HealthDeps } from './health-facts';
 
-const scout = { id: 'scout', name: 'Scout', providerId: 'claude-code', model: 'sonnet' } as Pet;
-
 function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> = {}): HostView {
   return {
     settings: Settings.parse(settings),
-    pets: [scout],
-    providers: [],
+    pets: [{ id: 'scout', name: 'Scout', avatar: '🦊' }],
     engineVersion: '0.0.0',
     platform: 'win32',
     elevenLabsKeyStored: false,
@@ -23,7 +19,6 @@ function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> =
 function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
   return {
     getHostView: () => Promise.resolve(view()),
-    checkClaudeSignIn: () => Promise.resolve('signed-in'),
     listConnections: () =>
       Promise.resolve({
         apps: [
@@ -50,7 +45,6 @@ describe('gatherHealth', () => {
   it('reads every check from the host’s own calls', async () => {
     const facts = await gatherHealth(deps());
     expect(facts).toEqual({
-      brain: 'ready',
       connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
       voice: {
         enabled: true,
@@ -64,17 +58,15 @@ describe('gatherHealth', () => {
     });
   });
 
-  it('reads Scout signed out, and a picked microphone that is gone', async () => {
+  it('reads a picked microphone that is gone', async () => {
     const facts = await gatherHealth(
       deps({
-        checkClaudeSignIn: () => Promise.resolve('signed-out'),
         getHostView: () =>
           Promise.resolve(
             view({}, { voice: { ...Settings.parse({}).voice, microphoneId: 'usb' } }),
           ),
       }),
     );
-    expect(facts.brain).toBe('signed-out');
     expect(facts.microphone).toEqual({ count: 1, pickedMissing: true });
   });
 
@@ -89,14 +81,12 @@ describe('gatherHealth', () => {
     const fail = () => Promise.reject(new Error('down'));
     const facts = await gatherHealth({
       getHostView: fail,
-      checkClaudeSignIn: fail,
       listConnections: fail,
       listMicrophones: fail,
       voiceModels: fail,
       testBudgetMs: 5_000,
     });
     expect(facts).toEqual({
-      brain: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
@@ -117,7 +107,6 @@ describe('gatherHealth', () => {
       );
       await vi.advanceTimersByTimeAsync(5_000);
       expect(await pending).toEqual({
-        brain: 'ready',
         connections: 'unknown',
         voice: 'unknown',
         microphone: 'unknown',
@@ -127,7 +116,7 @@ describe('gatherHealth', () => {
     }
   });
 
-  it('gives up on a host view that hangs, and says the brain is unknown', async () => {
+  it('gives up on a host view that hangs, and says the voice is unknown', async () => {
     vi.useFakeTimers();
     try {
       let settled = false;
@@ -142,7 +131,7 @@ describe('gatherHealth', () => {
       });
       await vi.advanceTimersByTimeAsync(5_000);
       expect(settled).toBe(true);
-      expect((await pending).brain).toBe('unknown');
+      expect((await pending).voice).toBe('unknown');
     } finally {
       vi.useRealTimers();
     }

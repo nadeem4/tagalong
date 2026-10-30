@@ -38,7 +38,6 @@ import { heldUntilHeard } from './held';
 import type {
   BrowserFolder,
   CaptureNotice,
-  ClaudeSignIn,
   EarsStatus,
   HostView,
   ListeningState,
@@ -155,8 +154,8 @@ const host: TagalongHostApi = {
   },
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
-  saveApiKey: (providerId: string, apiKey: string) =>
-    ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
+  saveElevenLabsKey: (apiKey: string) =>
+    ipcRenderer.invoke(IPC.saveElevenLabsKey, apiKey) as Promise<void>,
   openBubble: () => ipcRenderer.invoke(IPC.openBubble) as Promise<void>,
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
   onPanelSide: (handler) => {
@@ -177,7 +176,6 @@ const host: TagalongHostApi = {
   openLogsFolder: () => ipcRenderer.invoke(IPC.openLogsFolder) as Promise<void>,
   openHome: () => ipcRenderer.invoke(IPC.openHome) as Promise<void>,
   onHomePage: (handler) => homePage.listen(handler),
-  checkClaudeSignIn: () => ipcRenderer.invoke(IPC.checkClaudeSignIn) as Promise<ClaudeSignIn>,
   browserFolder: () => ipcRenderer.invoke(IPC.browserFolder) as Promise<BrowserFolder>,
   showBrowserFolder: () => ipcRenderer.invoke(IPC.showBrowserFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,

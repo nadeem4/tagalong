@@ -10,9 +10,6 @@ import { z } from 'zod';
 export const StatusId = z.enum([
   'brain-offline',
   'brain-outdated',
-  'brain-signed-out',
-  'brain-no-sign-in',
-  'brain-no-key',
   'ears-failed',
   'mic-busy',
   'mic-failed',
@@ -30,7 +27,7 @@ export interface StatusMark {
 }
 
 /** Where a Fix it button lands: a Settings section, or a Home page. */
-export type FixTarget = 'brain' | 'voice' | 'browser' | 'privacy' | 'experts' | 'connections';
+export type FixTarget = 'voice' | 'connections';
 
 /**
  * tag: the 1-2 words on Scout. detail: the tooltip, the aria label and the bubble row. A mark
@@ -44,17 +41,6 @@ export const STATUS_WORDS: Readonly<
     tag: 'Update',
     detail: 'Update Tagalong to talk to this brain.',
   },
-  'brain-signed-out': {
-    tag: 'Signed out',
-    detail: 'Can’t think: signed out of Claude.',
-    fix: 'brain',
-  },
-  'brain-no-sign-in': {
-    tag: 'No brain',
-    detail: 'Can’t think: Claude Code isn’t on this computer.',
-    fix: 'brain',
-  },
-  'brain-no-key': { tag: 'No key', detail: 'Can’t think: no API key.', fix: 'brain' },
   'ears-failed': {
     tag: 'Can’t listen',
     detail: 'Can’t listen: the speech models didn’t load. It retries on its own.',

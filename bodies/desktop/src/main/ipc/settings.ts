@@ -1,5 +1,5 @@
 /**
- * IPC for Settings: the host view every window reads, saving settings and the keys. Reads and
+ * IPC for Settings: the host view every window reads, saving settings and the voice key. Reads and
  * writes the desktop's own settings file; the brain has no settings. Contains
  * registerSettingsIpc.
  */
@@ -8,12 +8,7 @@ import type { SecretStore } from '@tagalong/core';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { HostView } from '../../shared/ipc';
-import {
-  ELEVENLABS_SECRET_KEY,
-  providerChoices,
-  secretKeyFor,
-  storedKeys,
-} from '../provider-choices';
+import { ELEVENLABS_SECRET_KEY } from '../secret-store';
 import type { IpcHandle } from './handle';
 import { localScout } from './scout';
 
@@ -31,21 +26,19 @@ export interface SettingsIpcDeps {
   broadcast: (settings: Settings) => void;
 }
 
-/** Settings and the keys. */
+/** Settings and the ElevenLabs key. */
 export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): void {
   const readSettings = (): Promise<Settings> => Promise.resolve(deps.settingsStore().get());
 
   handle(IPC.hostView, async (): Promise<HostView> => {
     const secrets = deps.secrets();
     const settings = await readSettings();
-    const stored = await storedKeys(secrets);
     const problem = deps.problem();
     const elevenLabsKey = await secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
     return {
       elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
       settings,
       pets: [localScout()],
-      providers: providerChoices(stored),
       engineVersion: deps.version(),
       platform: process.platform,
       ...(problem !== null ? { hotkeyError: problem } : {}),
@@ -68,11 +61,10 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
 
   handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch));
 
-  handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {
+  // An empty key deletes the stored one.
+  handle(IPC.saveElevenLabsKey, async (_event, apiKey: string) => {
     const secrets = deps.secrets();
-    const secretKey = secretKeyFor(providerId);
-    if (secretKey === undefined) throw new Error(`'${providerId}' does not take an API key`);
-    if (apiKey.length === 0) await secrets.delete(secretKey);
-    else await secrets.set(secretKey, apiKey);
+    if (apiKey.length === 0) await secrets.delete(ELEVENLABS_SECRET_KEY);
+    else await secrets.set(ELEVENLABS_SECRET_KEY, apiKey);
   });
 }

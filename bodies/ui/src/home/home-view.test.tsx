@@ -14,21 +14,10 @@ const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🦊',
-  roleId: 'companion',
-  model: 'haiku',
-  providerId: 'claude-code',
 };
 
 function host(): HomeHost {
-  return {
-    setup: () =>
-      Promise.resolve({
-        providers: [
-          { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false },
-          { id: 'anthropic', label: 'Anthropic', needsKey: true },
-        ],
-      }),
-  };
+  return {};
 }
 
 function renderHome(
@@ -105,11 +94,11 @@ describe('HomeView', () => {
     expect(bridge.memories).toEqual([]);
   });
 
-  it('opens on an overview: how Scout thinks and where things run', async () => {
+  it('opens on an overview that says nothing about which brain thinks', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const scout = await screen.findByRole('region', { name: 'Scout' });
-    await waitFor(() => expect(scout).toHaveTextContent('Thinks with your Claude sign-in · Haiku'));
     expect(scout).toHaveTextContent('Never at its blind spots.');
+    expect(scout).not.toHaveTextContent('Thinks with');
     expect(screen.queryByRole('region', { name: 'Experts' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Recent' })).toBeNull();
   });
@@ -120,15 +109,13 @@ describe('HomeView', () => {
     await waitFor(() => expect(where).toHaveTextContent('ws://127.0.0.1:47321'));
   });
 
-  it('says what is really wrong with Scout instead of Ready', async () => {
-    const signedOut: HomeHost = {
-      ...host(),
-      status: () => Promise.resolve({ text: 'Signed out of Claude Code', ok: false }),
+  it('says what is really wrong with Scout instead of plain Ready', async () => {
+    const paused: HomeHost = {
+      status: () => Promise.resolve({ text: 'Ready, sight paused', ok: false }),
     };
-    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: signedOut });
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: paused });
     const scout = await screen.findByRole('region', { name: 'Scout' });
-    await waitFor(() => expect(scout).toHaveTextContent('Signed out of Claude Code'));
-    expect(scout).not.toHaveTextContent('Ready');
+    await waitFor(() => expect(scout).toHaveTextContent('Ready, sight paused'));
   });
 
   it('moves between pages, and reports the page to the host', async () => {

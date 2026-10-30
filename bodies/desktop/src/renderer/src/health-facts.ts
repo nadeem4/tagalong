@@ -1,26 +1,24 @@
 /**
- * "Scout, what's wrong?": gatherHealth reads the health card's rows (brain and sign-in,
- * connections, voice, microphone) from host calls that already
- * exist, each within a time budget, with no model call. Used by the bubble (panel.tsx).
+ * "Scout, what's wrong?": gatherHealth reads the health card's rows (connections, voice,
+ * microphone) from host calls that already exist, each within a time budget, with no model
+ * call. Used by the bubble (panel.tsx).
  */
 import { chosenMouth } from '@tagalong/protocol';
 import type { AppsList } from '@tagalong/protocol';
 import type { HealthFacts } from '@tagalong/ui';
-import type { ClaudeSignIn, HostView, VoiceModels } from '../../shared/ipc';
-import { scoutBrain } from './settings/brain';
+import type { HostView, VoiceModels } from '../../shared/ipc';
 
 /** The calls the health check reads from: all of them exist for Home and Settings already. */
 export interface HealthDeps {
   getHostView(): Promise<HostView>;
-  checkClaudeSignIn(): Promise<ClaudeSignIn>;
   listConnections(): Promise<AppsList>;
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
-  /** How long each call (the sign-in, every read) may take before it fails. */
+  /** How long each read may take before it fails. */
   testBudgetMs: number;
 }
 
-/** Each check gets this long by default: `claude --version` and the sign-in are quick. */
+/** Each check gets this long by default: every read is a quick local or brain call. */
 export const HEALTH_TEST_BUDGET_MS = 5_000;
 
 const LATE = Symbol('late');
@@ -41,22 +39,6 @@ async function within<T, F>(work: () => Promise<T>, ms: number, fallback: F): Pr
   }
 }
 
-async function brainOf(
-  view: HostView | 'unknown',
-  deps: HealthDeps,
-): Promise<HealthFacts['brain']> {
-  if (view === 'unknown') return 'unknown';
-  const scout = view.pets[0];
-  const signIn =
-    scout?.providerId === 'claude-code'
-      ? await within(() => deps.checkClaudeSignIn(), deps.testBudgetMs, 'unknown' as const)
-      : null;
-  const { state } = scoutBrain(scout, view.providers, signIn);
-  return state === 'ready' || state === 'signed-out' || state === 'no-sign-in' || state === 'no-key'
-    ? state
-    : 'unknown';
-}
-
 /** Reads every row at once. Never throws. Never reads a key: only whether one is stored. */
 export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
@@ -68,11 +50,9 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
     attempt(() => deps.listMicrophones()),
     attempt(() => deps.voiceModels()),
   ]);
-  const brain = await brainOf(view, deps);
   const settings = view === 'unknown' ? null : view.settings;
   const picked = settings?.voice.microphoneId;
   return {
-    brain,
     connections:
       connections === 'unknown'
         ? 'unknown'
