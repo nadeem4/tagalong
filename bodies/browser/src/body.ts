@@ -5,13 +5,14 @@
  */
 import { BrainClient, type BrainSocket, type BrainStatus } from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
-import type { PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
+import type { ActionsApi, PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
 import { createTabReporter, downloadEvent } from './events';
 import { readSettings } from './settings';
 import { toolset } from './tools/registry';
 import type { PermissionBroker } from './permissions';
 import { browserSearchTool } from './tools/browser-search';
 import { pagePartsTool } from './tools/page-parts';
+import { tabActionsTool } from './tools/tab-actions';
 import { tabsTool } from './tools/tabs';
 
 const SEQ_KEY = 'lastSeq';
@@ -31,6 +32,7 @@ export interface BodyDeps {
   page: PageApi;
   picture: PictureApi;
   search: SearchApi;
+  actions: ActionsApi;
   broker: PermissionBroker;
   /** Makes the id's 4 random chars; tests pin it. */
   random?: () => string;
@@ -78,6 +80,12 @@ export function createBody(deps: BodyDeps): BrowserBody {
       }),
       pagePartsTool({ tabs: deps.tabs, page: deps.page, needs: deps.broker, bodyName: name }),
       browserSearchTool({ search: deps.search, needs: deps.broker, bodyName: name }),
+      tabActionsTool({
+        actions: deps.actions,
+        tabs: deps.tabs,
+        needs: deps.broker,
+        bodyName: name,
+      }),
     ]);
     client = new BrainClient({
       addr: settings.addr,

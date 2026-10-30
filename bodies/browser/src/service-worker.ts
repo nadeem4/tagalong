@@ -5,6 +5,7 @@
  */
 import { createBody } from './body';
 import {
+  chromeActions,
   chromePage,
   chromePermissions,
   chromePicture,
@@ -38,6 +39,7 @@ const body = createBody({
   page: chromePage,
   picture: chromePicture,
   search: chromeSearch,
+  actions: chromeActions,
   broker: new PermissionBroker(chromePermissions, chromePrompt),
   openSocket: webSocket,
 });

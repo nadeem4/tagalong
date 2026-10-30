@@ -30,6 +30,7 @@ export const manifest = {
     'readingList',
     'tabGroups',
     'contextMenus',
+    'search',
   ],
   optional_host_permissions: ['<all_urls>'],
   /**

@@ -23,6 +23,7 @@ describe('manifest', () => {
         'downloads',
         'history',
         'readingList',
+        'search',
         'sessions',
         'tabGroups',
         'tabs',

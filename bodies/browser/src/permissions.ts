@@ -14,6 +14,7 @@ export const OPTIONAL_PERMISSIONS = [
   'readingList',
   'tabGroups',
   'contextMenus',
+  'search',
 ] as const;
 
 export type OptionalPermission = (typeof OPTIONAL_PERMISSIONS)[number];
@@ -54,6 +55,7 @@ const ABILITIES: Record<OptionalPermission, string> = {
   readingList: 'use the reading list',
   tabGroups: 'use tab groups',
   contextMenus: 'add right-click menu items',
+  search: 'search the web for you',
 };
 
 /** The plain sentence a tool fails with when the person did not allow it. */
