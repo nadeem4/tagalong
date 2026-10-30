@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Pure part of the toolbar popup: the one-line brain status and the list of what the person
  * has allowed Scout to do, as plain rows. No chrome.* here, so it is testable.
  */

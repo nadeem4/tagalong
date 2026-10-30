@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for the popup's pure part: the status sentence and the list of what Scout has
  * been allowed, turned into plain rows.
  */

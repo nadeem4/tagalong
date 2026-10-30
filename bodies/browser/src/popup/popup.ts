@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The toolbar popup's glue: asks the worker for the brain status, saves the address and name
  * into storage (the worker restarts on the change), and lists what Scout may do with a Remove
  * button each. The logic worth testing lives in model.ts.
@@ -55,7 +55,12 @@ async function showGrants(): Promise<void> {
       const button = document.createElement('button');
       button.textContent = 'Remove';
       button.setAttribute('aria-label', `Remove ${row.label}`);
-      button.addEventListener('click', () => void remove(row).then(showGrants));
+      button.addEventListener('click', () => {
+        // A refused remove must not leave the list stale, so refresh either way.
+        remove(row)
+          .catch(() => false)
+          .finally(() => void showGrants());
+      });
       item.append(label, button);
       return item;
     }),
@@ -84,4 +89,6 @@ async function init(): Promise<void> {
   await Promise.all([showStatus(), showGrants()]);
 }
 
-void init();
+init().catch(() => {
+  statusEl.textContent = statusLine('offline');
+});

@@ -1,4 +1,4 @@
-﻿/** Vite build for the extension pages and service worker. */
+/** Vite build for the extension pages and service worker. */
 import { defineConfig } from 'vite';
 import type { Plugin } from 'vite';
 import { manifest } from './src/manifest';
