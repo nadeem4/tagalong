@@ -12,5 +12,9 @@
   },
   "include": ["src/**/*"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "references": [{ "path": "../../packages/protocol" }, { "path": "../../bodies/ui" }]
+  "references": [
+    { "path": "../../protocol/ts" },
+    { "path": "../../packages/protocol" },
+    { "path": "../../bodies/ui" }
+  ]
 }

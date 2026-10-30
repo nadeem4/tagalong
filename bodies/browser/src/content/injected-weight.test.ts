@@ -6,17 +6,15 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 describe('the injected page reader', () => {
-  it('takes its budgets from the protocol limits module, which imports nothing', () => {
-    const limits = readFileSync(
-      new URL('../../../../packages/protocol/src/limits.ts', import.meta.url),
-      'utf8',
-    );
+  it('takes its budgets from a local limits module, which imports nothing', () => {
+    const limits = readFileSync(new URL('./limits.ts', import.meta.url), 'utf8');
     expect(limits).not.toMatch(/^\s*import\s/m);
   });
 
-  it('imports the limits subpath, never the protocol barrel', () => {
+  it('imports ./limits, never the protocol or zod', () => {
     const reader = readFileSync(new URL('./read-page.ts', import.meta.url), 'utf8');
-    expect(reader).toContain("from '@tagalong/protocol/limits'");
-    expect(reader).not.toMatch(/from '@tagalong\/protocol'/);
+    expect(reader).toContain("from './limits'");
+    expect(reader).not.toMatch(/from '@tagalong\/protocol/);
+    expect(reader).not.toMatch(/from 'zod'/);
   });
 });

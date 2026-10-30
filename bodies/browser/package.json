@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@mozilla/readability": "0.6.0",
+    "@tagalong/contract": "workspace:*",
     "@tagalong/protocol": "workspace:*",
     "@tagalong/ui": "workspace:*",
     "react": "19.3.0",

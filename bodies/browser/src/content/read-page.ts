@@ -3,9 +3,9 @@
  * on a clone. Injected into the user's tab on demand only.
  */
 import { Readability } from '@mozilla/readability';
-// The zod-free subpath: this file is injected into the user's page, and the schemas would
-// more than double what every read ships into the tab.
-import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from '@tagalong/protocol/limits';
+// Local on purpose: this file is injected into the user's page, so it must not pull in
+// the protocol package or its schemas.
+import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
 
 /** What the page reader hands back to the service worker. Plain data: it crosses a boundary. */
 export interface PageReading {
