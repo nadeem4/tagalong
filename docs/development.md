@@ -372,42 +372,15 @@ Scout remembers. Tell it "I prefer short answers" and it keeps that across resta
 save facts on its own. Memories live in the same
 SQLite file as conversations (`tagalong.db` in the data dir).
 
-### Awareness: rolling memory and watches
+### Awareness: rolling memory
 
-Rolling memory's switch is in Settings → **Privacy** (**Remember the last few minutes of the
-screen**); its minutes and the watch limits are under **Advanced → Screen memory and watches**. Both
-take effect on save.
+Rolling memory's switch and its minutes are in Settings → **Privacy** (**Remember the last few
+minutes of the screen**, **Minutes of screen to remember**). They take effect on save.
 
 - **Rolling memory** (off by default). Turn it on and the desktop keeps the last few minutes — ten by
   default, at most thirty — of every screen in memory, never on disk. A small red dot on Scout shows
   while it records.
-- **The engine's time tools.** `recall_screen`, `what_changed` and `watch_for` (a watch compares the
-  screen every five seconds and asks one small model yes or no only once the region has changed and
-  held still) are on the Companion role, with `look_closer`, `list_displays` and
-  `look_at_display`. A routine's own turn never gets `watch_for`, so a watch routine cannot set off
-  itself. The watch limits below bound every watch.
-
-| Watch limit (Settings)         | Default | What it bounds                                    |
-| ------------------------------ | ------- | ------------------------------------------------- |
-| Checks per watch               | 60      | Model calls one watch may make before it gives up |
-| Watches at once                | 3       | A fourth is refused                               |
-| Watch gives up after (minutes) | 30      | How long a watch runs before it ends on its own   |
-
-A watch's check model is `Pet.watchModel`, else the provider's default (`watchModelsFor` in
-`packages/core/src/providers/watch-models.ts`); Home has no field for it.
-
-### The two cost controls
-
-Both live in Settings under **Advanced → Sight detail** and both take effect on save, with no restart: they are read at the
-moment of each capture rather than at boot.
-
-| Setting                               | Default                            | What raising it costs                                                                                                                                                                 |
-| ------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                           |
-| **Window text budget**                | 8,000 characters                   | How much of a window a read returns when Scout does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
-
-The budget is a ceiling, not a target — Scout asks for less when it only needs the top of a
-terminal, and the number it does not ask for is the one set here.
+- Watches, sight detail and the window text budget are no longer settings.
 
 Capture is never silent. Every capture, including one Scout's own tool asked for, shows on Scout
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the

@@ -758,14 +758,6 @@ Run each three times with a real brain (a fast summaries model is fine). Pass: l
 2. **Expected:** no check-in about the blind-spot window (no "Sent to AI"); the error's line, if
    any, is short.
 
-### C.6. Launch after a night, a crash and an update
-
-1. **Action:** open Tagalong after a night away (G.2), then after ending it in Task Manager
-   (G.5), then after a version bump (G.6).
-2. **Expected:** each time a line or nothing; never "Morning." boilerplate. A finished hand-off
-   or the crash may be mentioned calmly; the new features may be mentioned in Scout's words; no
-   invented task. Pressing **Not now** before quitting does not stop the next launch's hello.
-
 ## Voice: Scout talks
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
@@ -1028,9 +1020,9 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 2. **Expected:** the new key works at once and Right Ctrl no longer talks; the bubble's reply hint
    says "Hold Right Shift to reply". A settings file whose talk key is a combo (such as
    `Ctrl+Shift+Alt+Space`) opens on Right Ctrl.
-3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
+3. **Action:** with the bubble open, pick another microphone in Settings;
    Save, then talk to Scout without restarting.
-4. **Expected:** the new microphone is used and Scout uses the new name.
+4. **Expected:** the new microphone is used.
 
 ### T.9. Always listening and Seeing switches
 

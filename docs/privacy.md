@@ -231,8 +231,7 @@ it.
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
-- Tagalong no longer says hello when it opens, and no longer records in its settings file whether
-  the last launch closed cleanly or which version it ran. A pasted key is saved to the OS keychain
+- A pasted key is saved to the OS keychain
   before its one test (one tiny request to that service); a key that fails the test stays there
   until you replace it or remove it in Settings. It is never spoken, shown or logged. Checking your
   Claude sign-in only reads the local sign-in and sends nothing.
@@ -589,7 +588,7 @@ moment is about:
 
 - **what Scout recalls for that moment (your preferences, its newest memories, those matching the
   window title or the finished ask, and up to two matching jobs of its own, at most 2,000
-  characters), your name, the time, and what experts are doing right now;**
+  characters), the time, and what experts are doing right now;**
 - **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
   characters of each;
 - the last three lines Scout said on its own (so it does not repeat itself), and the names and ids
@@ -768,10 +767,10 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Listed windows**     | the window list is read (a tool or a routine)                                                                | how many windows                                                 |
 | **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
 | **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
-| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in (the launch hello included)       | the provider and model, how many characters and pictures         |
+| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in                                   | the provider and model, how many characters and pictures         |
 | **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
-| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `userName, voice`); never values |
+| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `voice, hotkeys`); never values |
 
 - **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
   a test checks that it never gains one. A window title passes through the same secret scrubber as
