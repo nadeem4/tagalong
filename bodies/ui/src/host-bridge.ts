@@ -10,13 +10,15 @@ import type {
   AppAddParams,
   AppsList,
   ContextSnapshot,
-  CoreToHostNotification,
-  NotificationParamsOf,
+  FixTarget,
+  MemoryEntry,
   PerceptionTarget,
   Pet,
-  MemoryEntry,
-} from '@tagalong/protocol';
-import type { FixTarget, HealthFacts } from './health';
+  TurnEvent,
+} from './shapes';
+import type { HealthFacts } from './health';
+
+export type { TurnEvent };
 
 /** What the brain knows of spend: today's dollars and the daily limit (null when it has none). */
 export interface SpendToday {
@@ -89,28 +91,6 @@ export interface BrainLink {
   addr: string;
   status: 'connecting' | 'online' | 'offline' | 'outdated';
 }
-
-/**
- * The notifications a panel renders: everything about a turn in flight, the brain's asks
- * (shown as confirm cards) and Scout's own words from a wake.
- */
-type TurnNotification =
-  | Extract<CoreToHostNotification, `turn.${string}`>
-  | 'connector.confirm'
-  | 'connector.dismiss'
-  | 'pet.remark';
-
-/**
- * Derived from the protocol catalog rather than restated, so a new turn.* notification
- * lands in the UI as a compile error instead of a silently ignored event.
- */
-export type TurnEvent =
-  | {
-      [N in TurnNotification]: { type: N } & NotificationParamsOf<N>;
-    }[TurnNotification]
-  // The brain only says the apps changed; the page reads the list again. The old engine's
-  // payload is not part of the bodies' contract.
-  | { type: 'connections.changed' };
 
 export interface AskInput {
   petId: string;

@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot } from './shapes';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';

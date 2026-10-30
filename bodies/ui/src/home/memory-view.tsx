@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { MemoryEntry } from '@tagalong/protocol';
+import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { themeTokens as t } from '../theme/tokens';
 

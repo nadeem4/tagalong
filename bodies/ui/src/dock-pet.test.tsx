@@ -2,8 +2,8 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { STATUS_WORDS } from '@tagalong/protocol';
-import type { Pet } from '@tagalong/protocol';
+import { STATUS_WORDS } from './shapes';
+import type { Pet } from './shapes';
 import {
   DockPet as RealDockPet,
   type BeanFigure,

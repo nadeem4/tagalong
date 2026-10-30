@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { MemoryEntry } from '@tagalong/protocol';
+import type { MemoryEntry } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { MemoryView } from './memory-view';

@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { STATUS_WORDS } from '@tagalong/protocol';
+import { STATUS_WORDS } from './shapes';
 import { StatusMark } from './status-mark';
 
 describe('StatusMark, the tag on Scout', () => {

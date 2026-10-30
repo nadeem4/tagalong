@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { Pet } from '@tagalong/protocol';
+import type { Pet } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { HomeView, type HomeHost, type HomePage } from './home-view';

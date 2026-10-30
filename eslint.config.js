@@ -135,6 +135,27 @@ export default tseslint.config(
     },
   },
   {
+    // Desktop main and the voice process import these, so no React may sneak in.
+    files: ['bodies/ui/src/shapes/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react', message: '@tagalong/ui/shapes must stay React-free.' },
+            { name: 'react-dom', message: '@tagalong/ui/shapes must stay React-free.' },
+          ],
+          patterns: [
+            {
+              group: ['react/*', 'react-dom/*'],
+              message: '@tagalong/ui/shapes must stay React-free.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['bodies/browser/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     languageOptions: {

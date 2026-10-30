@@ -10,7 +10,7 @@ import type {
   PerceptionTarget,
   Pet,
   MemoryEntry,
-} from '@tagalong/protocol';
+} from '../shapes';
 import type {
   ApprovalCounts,
   ApprovalRow,

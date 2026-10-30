@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   ContextSnapshot,
   DisplaySnapshot,
-  MAX_PAGE_TEXT_CHARS,
   MAX_SELECTION_CHARS,
   PerceptionTarget,
   WindowEntry,
@@ -24,16 +23,8 @@ describe('ContextSnapshot', () => {
     expect(parsed.app?.name).toBe('Code.exe');
   });
 
-  it('parses an extension snapshot carrying page text', () => {
-    const parsed = ContextSnapshot.parse({
-      ...valid,
-      host: 'extension',
-      page: { url: 'https://example.com/a', title: 'A', text: 'body text' },
-    });
-    expect(parsed.page?.url).toBe('https://example.com/a');
-  });
-
-  it('rejects an unknown host kind', () => {
+  it('rejects any host but the desktop', () => {
+    expect(ContextSnapshot.safeParse({ ...valid, host: 'extension' }).success).toBe(false);
     expect(ContextSnapshot.safeParse({ ...valid, host: 'toaster' }).success).toBe(false);
   });
 
@@ -53,15 +44,6 @@ describe('ContextSnapshot', () => {
       ContextSnapshot.safeParse({ ...valid, selection: 'x'.repeat(MAX_SELECTION_CHARS + 1) })
         .success,
     ).toBe(false);
-  });
-
-  it('caps page text at the documented budget', () => {
-    const page = {
-      url: 'https://example.com',
-      title: 'T',
-      text: 'x'.repeat(MAX_PAGE_TEXT_CHARS + 1),
-    };
-    expect(ContextSnapshot.safeParse({ ...valid, page }).success).toBe(false);
   });
 
   it('accepts a png screenshot block', () => {

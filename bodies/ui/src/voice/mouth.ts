@@ -4,7 +4,7 @@
  * still streaming. Which engine says each line is main's choice (`mouthOrder`).
  * Contains QueueMouth.
  */
-import type { Mouth } from '@tagalong/protocol';
+import type { Mouth } from '../shapes';
 import type { SpeechQueue } from './speech-queue';
 
 export class QueueMouth implements Mouth {

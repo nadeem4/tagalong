@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import type { Dropped } from '@tagalong/protocol';
+import type { Dropped } from './shapes';
 
 /**
  * Something dropped on Scout's figure, as the card shows it: the item, named but not yet

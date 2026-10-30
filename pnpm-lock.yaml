@@ -148,9 +148,6 @@ importers:
 
   bodies/ui:
     dependencies:
-      '@tagalong/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -163,6 +160,9 @@ importers:
       remark-gfm:
         specifier: 4.0.1
         version: 4.0.1
+      zod:
+        specifier: 4.6.2
+        version: 4.6.2
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 7.0.1

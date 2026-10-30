@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useId, useState } from 'react';
-import type { AppAddParams, AppInfo } from '@tagalong/protocol';
+import type { AppAddParams, AppInfo } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 
 type Status = { text: string; error: boolean } | null;

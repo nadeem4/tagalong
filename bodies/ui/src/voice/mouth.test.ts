@@ -1,7 +1,7 @@
 /** Tests for QueueMouth. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { Pushable } from '@tagalong/protocol';
+import { Pushable } from '../shapes';
 import { QueueMouth } from './mouth';
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));

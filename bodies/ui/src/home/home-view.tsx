@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Pet } from '@tagalong/protocol';
+import type { Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { BeanClip } from '../theme/bean-clip';
 import type { BeanClipData } from '../theme/bean-clip';

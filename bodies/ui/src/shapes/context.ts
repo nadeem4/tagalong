@@ -1,18 +1,28 @@
 /**
- * What a host saw when the person asked: the context snapshot and its parts (images,
+ * What the desktop saw when the person asked: the context snapshot and its parts (images,
  * displays, the window inventory, something dropped on Scout). Contains ContextSnapshot,
- * ContextSnapshotPatch, PerceptionTarget and the shapes they are built from.
+ * PerceptionTarget, CaptureBlock and the shapes they are built from. Imports only zod, so
+ * desktop main and the renderer share it.
  */
 import { z } from 'zod';
 
-import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
-import { CaptureBlock } from './settings';
+/** A selection is always kept whole up to this length; beyond it the desktop truncates. */
+export const MAX_SELECTION_CHARS = 20_000;
 
-/** Which host produced a snapshot. Hosts differ in what they can perceive. */
-export const HostKind = z.enum(['desktop', 'extension']);
-export type HostKind = z.infer<typeof HostKind>;
-
-export { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
+/**
+ * Which configured entry refused a capture.
+ *
+ * Carries the matching rule rather than a bare boolean so the UI can say "1Password.exe is
+ * on your exclusion list" instead of "blocked", and so a user who did not expect a refusal
+ * can find the line that caused it. The reason travels with the snapshot because a
+ * full-view capture refuses one display or one window while returning the rest.
+ */
+export const CaptureBlock = z.object({
+  rule: z.enum(['processName', 'titlePattern']),
+  /** The exclusion entry exactly as the user wrote it, for display. */
+  entry: z.string().min(1),
+});
+export type CaptureBlock = z.infer<typeof CaptureBlock>;
 
 /**
  * A picture a host captured. PNG only, so providers get one predictable image format.
@@ -119,34 +129,26 @@ export const Dropped = z.object({
 export type Dropped = z.infer<typeof Dropped>;
 
 /**
- * What a host saw at the moment the user asked. Every field beyond the identity
- * triple is optional, because hosts advertise different capabilities.
+ * What the desktop saw at the moment the user asked. Every field beyond the identity
+ * triple is optional: a capture holds only what was asked for and allowed.
  */
 export const ContextSnapshot = z.object({
   id: z.uuid(),
   capturedAt: z.iso.datetime(),
-  host: HostKind,
+  host: z.literal('desktop'),
   app: z
     .object({
       name: z.string().min(1),
       windowTitle: z.string().optional(),
       /**
        * Set by the desktop when the window is a blind spot or excluded. Its title is then
-       * left out, so this is how the engine still knows to refuse.
+       * left out, so this is how the brain still knows to refuse.
        */
       blocked: CaptureBlock.optional(),
     })
     .optional(),
   selection: z.string().max(MAX_SELECTION_CHARS).optional(),
   clipboard: z.string().optional(),
-  /** Supplied by the extension host only; the desktop host cannot read page text. */
-  page: z
-    .object({
-      url: z.url(),
-      title: z.string(),
-      text: z.string().max(MAX_PAGE_TEXT_CHARS),
-    })
-    .optional(),
   /** A single screenshot. `displays` and `composite` carry the full view. */
   screenshot: CapturedImage.optional(),
   /**
@@ -168,11 +170,7 @@ export const ContextSnapshot = z.object({
 });
 export type ContextSnapshot = z.infer<typeof ContextSnapshot>;
 
-/** What a host returns from perception.capture: whichever fields it managed to read. */
-export const ContextSnapshotPatch = ContextSnapshot.partial();
-export type ContextSnapshotPatch = z.infer<typeof ContextSnapshotPatch>;
-
-/** The things a host can be asked to perceive. */
+/** The things the desktop can be asked to perceive. */
 export const PerceptionTarget = z.enum([
   'selection',
   'screenshot',

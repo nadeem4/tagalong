@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import type { ConnectorConfirmParams } from '@tagalong/protocol';
+import type { ConnectorConfirmParams } from './shapes';
 
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string };

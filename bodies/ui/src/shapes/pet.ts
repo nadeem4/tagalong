@@ -1,11 +1,8 @@
 /**
  * A pet: the on-screen companion, Scout, as the body draws it (id, name, avatar). Which
- * brain answers is the brain's business, not the pet's. Contains Pet and SCOUT_ID.
+ * brain answers is the brain's business, not the pet's. Contains Pet.
  */
 import { z } from 'zod';
-
-/** Scout's id: the one pet there is. */
-export const SCOUT_ID = 'scout';
 
 /**
  * One pet. Parsing drops unknown keys, so a pet saved by an older version, with fields

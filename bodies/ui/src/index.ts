@@ -27,7 +27,7 @@ export { BeanClip } from './theme/bean-clip';
 export type { BeanClipData } from './theme/bean-clip';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 
-/** Exported so hosts can test their renderer wiring without booting an engine. */
+/** Exported so hosts can test their renderer wiring without booting a brain. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 /** Home: the one window for jobs, permissions, approvals, connections, memory and settings. */

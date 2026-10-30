@@ -4,9 +4,9 @@
  * FixTarget, healthRows and healthHeadline.
  */
 
-import type { ConnectionStatus, FixTarget, MouthId } from '@tagalong/protocol';
+import type { ConnectionStatus, FixTarget, MouthId } from './shapes';
 
-/** Where a Fix it button lands; the type lives in protocol, beside the status marks. */
+/** Where a Fix it button lands; the type lives in shapes, beside the status marks. */
 export type { FixTarget };
 
 /**
