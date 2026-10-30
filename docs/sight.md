@@ -36,7 +36,7 @@ The desktop host does the reading. Windows is the only platform.
 
 The Python brain does not ask for reads yet. On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the bubble's capture path call it from `context.ts`.
 
-The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`. It never advertises `pageText`; the browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
+The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
 ### The platform adapter
 

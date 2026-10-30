@@ -225,9 +225,6 @@ it.
   Set `screenshotRetention` to `{ "mode": "hours", "hours": 1-24 }` to keep them for debugging;
   expired images — and every stored image, the moment you switch retention back off — are swept on
   the next turn.
-- A pet whose provider cannot see images never receives the screenshot: it is dropped before the
-  request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
-  turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - A pasted key is saved to the OS keychain
   before its one test (one tiny request to that service); a key that fails the test stays there

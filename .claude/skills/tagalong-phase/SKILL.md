@@ -1,6 +1,6 @@
 ---
 name: tagalong-phase
-description: Use when building any phase or task of the Tagalong project in this repo - before scaffolding packages, writing core/protocol/ui/desktop/extension code, committing, or marking a Notion task Done.
+description: Use when building any phase or task of the Tagalong project in this repo - before scaffolding packages, writing protocol/ts, ui, desktop or browser body code, committing, or marking a Notion task Done.
 ---
 
 # Tagalong Phase Execution
@@ -35,7 +35,7 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
    for a new contract message, and any doc the change invalidates. Docs are part of
    done, not a follow-up.
 5. Commit with a Conventional Commit message scoped to the package
-   (`feat(core): add PromptAssembler`, `chore(repo): add eslint flat config`).
+   (`feat(desktop): add the talk key`, `chore(repo): add eslint flat config`).
 6. Set the task `Status` to `Done` only when its `Acceptance` text is literally satisfied.
 
 ## The loop, per phase
@@ -118,7 +118,7 @@ a decision the next agent will have to re-think unless it is written down.
 
 ## Red flags — stop and re-read the phase page
 
-- About to import `electron` or `react` into `core` or `protocol`
+- About to import `electron` or `react` into `protocol/ts` or `@tagalong/ui/shapes`
 - About to write production code with no failing test behind it
 - About to mark a task `Done` without running its `Acceptance` text
 - About to start phase N+1 while a phase N task is still `Not started`
