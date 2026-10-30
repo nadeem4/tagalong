@@ -56,5 +56,8 @@ describe('manifest', () => {
   it('describes_scout_within_the_store_summary_limit', () => {
     expect(manifest.description).toContain('Scout');
     expect(manifest.description.length).toBeLessThanOrEqual(132);
+    // It must say what the extension can now do: manage tabs, and ask Scout from a page.
+    expect(manifest.description).toContain('manages tabs');
+    expect(manifest.description).toContain('ask it from a page');
   });
 });

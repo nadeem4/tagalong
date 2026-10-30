@@ -165,6 +165,15 @@ describe('tab_actions tool', () => {
     expect(actions.addToReadingList).toHaveBeenCalledWith('Active page', 'https://a.test/x');
   });
 
+  it('a_url_without_a_title_is_saved_under_the_url_and_skips_the_tabs_ask', async () => {
+    const { t, actions, asked } = setup();
+    await t.run({ action: 'bookmark', url: 'https://c.test/p' });
+    expect(actions.bookmark).toHaveBeenCalledWith('https://c.test/p', 'https://c.test/p');
+    await t.run({ action: 'reading_list', url: 'https://c.test/q' });
+    expect(actions.addToReadingList).toHaveBeenCalledWith('https://c.test/q', 'https://c.test/q');
+    expect(asked.map((n) => (n as { name: string }).name)).toEqual(['bookmarks', 'readingList']);
+  });
+
   it('bookmark_with_no_active_tab_fails_plainly', async () => {
     const { t, actions } = setup(null);
     const e = await rejection(t.run({ action: 'bookmark' }));

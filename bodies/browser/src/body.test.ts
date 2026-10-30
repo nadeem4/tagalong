@@ -106,19 +106,52 @@ describe('the browser body', () => {
     await online(sockets[0]!);
     const context = { url: 'https://a.test/docs', title: 'Docs' };
     void body.say('what is this?', context);
+    await settle();
     expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'what is this?', context });
   });
 
-  it('say_while_offline_is_swallowed', async () => {
+  it('say_while_connecting_is_sent_once_online', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    // A cold wake: nothing started yet, and the link is still connecting when the ask arrives.
+    void body.say('what is this?', { url: 'https://a.test/', title: 'A' });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sockets[0]!.request('say')).toBeUndefined();
+    await online(sockets[0]!);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sockets[0]!.sent.filter((m) => m['method'] === 'say')).toHaveLength(1);
+    expect(sockets[0]!.request('say')?.['params']).toEqual({
+      text: 'what is this?',
+      context: { url: 'https://a.test/', title: 'A' },
+    });
+  });
+
+  it('say_sends_no_context_when_none_is_given', async () => {
     const { body, sockets } = setup();
     await body.start();
-    await expect(body.say('hi', { url: '', title: '' })).resolves.toBeUndefined();
+    await online(sockets[0]!);
+    void body.say('hi');
+    await settle();
+    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'hi' });
+  });
+
+  it('say_while_the_brain_never_comes_up_is_dropped_without_throwing', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    await body.start();
+    const done = body.say('hi', { url: '', title: '' });
+    await vi.advanceTimersByTimeAsync(6_000);
+    await expect(done).resolves.toBeUndefined();
     expect(sockets[0]!.request('say')).toBeUndefined();
   });
 
-  it('say_before_start_is_swallowed', async () => {
-    const { body } = setup();
-    await expect(body.say('hi', { url: '', title: '' })).resolves.toBeUndefined();
+  it('say_before_start_dials_then_drops_when_the_brain_is_down', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    const done = body.say('hi', { url: '', title: '' });
+    await vi.advanceTimersByTimeAsync(6_000);
+    await expect(done).resolves.toBeUndefined();
+    expect(sockets).toHaveLength(1);
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {

@@ -1,7 +1,8 @@
 /**
  * The `tab_actions` tool: open, close, switch, group, reopen, bookmark or save a page for later.
- * It changes the browser but only in ways the person can see and undo, so it carries no confirm;
- * each action asks only for the permission it needs, and an address to open must be http or https.
+ * It changes the browser but only in ways the person can see and undo, so it declares no confirm
+ * of its own (the brain still asks first, as for any `change` tool, until set to auto); each
+ * action asks only for the permission it needs, and an address to open must be http or https.
  */
 import type { Part } from '@tagalong/contract';
 import type { ActionsApi, TabsApi } from '../layer/api';
@@ -91,7 +92,8 @@ export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
     waitMs: () => number,
   ): Promise<{ title: string; url: string }> {
     const { title, url } = input;
-    if (typeof title === 'string' && typeof url === 'string') return { title, url };
+    // A named page needs no look at the tab in front, so no `tabs` ask either.
+    if (typeof url === 'string') return { title: typeof title === 'string' ? title : url, url };
     await need('tabs', 'see which tab is in front', waitMs());
     const active = await tabs.activeInFocusedWindow();
     if (active === null) throw failed('There is no active tab to save.');

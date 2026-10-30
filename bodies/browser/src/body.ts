@@ -16,6 +16,9 @@ import { tabActionsTool } from './tools/tab-actions';
 import { tabsTool } from './tools/tabs';
 
 const SEQ_KEY = 'lastSeq';
+/** How long an ask waits for the link before it is dropped, and how often it looks. */
+const SAY_WAIT_MS = 5_000;
+const SAY_POLL_MS = 100;
 const KEEPALIVE = { everyMs: 20_000, tool: 'spend_today' };
 
 /** What the popup shows: the link and who this body is. */
@@ -53,10 +56,11 @@ export interface BrowserBody {
   downloadChanged(item: { filename: string; state: string }): void;
   /**
    * The person asked Scout something from the right-click menu or the address bar. The answer
-   * shows on a displaying body; while the brain is down nothing is shown anywhere, and the
-   * popup's status line is where the person sees that.
+   * shows on a displaying body. It starts the body if a woken worker has none yet and waits up to
+   * 5 s for the link; if the brain is still down the ask is dropped, and the popup's status line
+   * is where the person sees that.
    */
-  say(text: string, context: { url: string; title: string }): Promise<void>;
+  say(text: string, context?: { url: string; title: string }): Promise<void>;
 }
 
 export function createBody(deps: BodyDeps): BrowserBody {
@@ -148,8 +152,14 @@ export function createBody(deps: BodyDeps): BrowserBody {
       if (fact) client?.event('download', fact);
     },
     async say(text, context) {
+      // A woken worker has no client yet and a fresh one is still connecting, so wait for it.
+      await start();
+      const deadline = Date.now() + SAY_WAIT_MS;
+      while (client?.link !== 'online' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, SAY_POLL_MS));
+      }
       try {
-        await client?.say({ text, context });
+        await client?.say(context === undefined ? { text } : { text, context });
       } catch (error) {
         if (!(error instanceof BrainOffline)) throw error;
       }

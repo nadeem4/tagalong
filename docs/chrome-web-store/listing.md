@@ -17,9 +17,9 @@ the steps to submit it. Each claim here matches the code in `bodies/browser/src`
 
 **Name:** Tagalong
 
-**Short description** (120 of 132 characters; the manifest `description` is the same text):
+**Short description** (131 of 132 characters; the manifest `description` is the same text):
 
-> Lets Scout, your Tagalong companion, read pages in your browser only when it needs to. Needs the Tagalong brain running.
+> Scout, your Tagalong companion, reads pages and manages tabs when needed, and you can ask it from a page. Needs the Tagalong brain.
 
 **Detailed description** (paste as is; each paragraph is one line):
 
@@ -43,6 +43,8 @@ Setup: load the extension, then start the Tagalong brain. There is nothing to pa
 
 Privacy:
 - Reads a page only when Scout asks and you allowed it. Nothing runs in pages in the background.
+- Opens, closes, switches and groups tabs, and adds bookmarks or reading list entries, only when Scout does it for you. Each action asks you first in Tagalong until you set it to auto.
+- Sends text you select, or type after "scout" in the address bar, to Scout when you make that ask. With the tabs permission it also sends the page title and address, without query or fragment. Nothing from a private window.
 - Talks only to the Tagalong brain at the address you set (127.0.0.1 unless you change it). There is no Tagalong server.
 - The brain sends your question and what you attached to the AI service you chose in Tagalong.
 - No ads, no analytics, no tracking. Nothing sold.
@@ -104,8 +106,10 @@ What the extension handles, from the code:
   Scout searches that source and the user allowed it; and the name and outcome of a finished
   download, if the user allowed `downloads`.
 - when the user selects text and chooses "Ask Scout about this", or types `scout` and a question in
-  the address bar: the selected or typed text, the page's title and the page's origin and path
-  (no query string or fragment). Sent because the user made the ask.
+  the address bar: the typed text, or the selected text (up to 2,000 characters, marked to Scout as
+  page text and not instructions), and the page's origin and path (no query string or fragment).
+  The page's title and, for the address bar, its address come only if the user allowed `tabs`.
+  Sent because the user made the ask; never from a private window.
 - the brain's address, a name for the browser and a random body id, stored locally.
 
 All of it goes to the Tagalong brain the user set up, over a websocket (`ws://127.0.0.1:47321` by
