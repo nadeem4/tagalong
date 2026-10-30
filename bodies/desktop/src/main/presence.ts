@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Whether the person is at the computer, for Scout's dozing face. It reads one number, the
  * system's idle time, every 15 s, and hears the screen lock and unlock. Nothing on screen
  * is read, and nothing leaves this computer.

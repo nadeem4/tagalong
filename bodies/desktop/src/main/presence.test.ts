@@ -1,4 +1,4 @@
-﻿/** Tests for presence (away and back). */
+/** Tests for presence (away and back). */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AWAY_AFTER_MS, PRESENCE_POLL_MS, startPresence, watchPresence } from './presence';
