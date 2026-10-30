@@ -7,7 +7,6 @@ describe('panelSettings', () => {
   it('reads the talk key and the microphone the panel uses', () => {
     const settings = Settings.parse({
       ...SETTINGS_DEFAULTS,
-      userName: 'Nadeem',
       hotkeys: { ...SETTINGS_DEFAULTS.hotkeys, ask: 'CommandOrControl+J', talk: 'RightShift' },
       voice: { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic' },
     });

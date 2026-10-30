@@ -453,34 +453,25 @@ test('a rebound hotkey is applied on save, without a restart', async () => {
   expect(after.settings.hotkeys.ask).toBe(original.ask);
 });
 
-/** The two sight settings must survive the round trip through the real store. */
-test('sight detail and the window text budget save and read back', async () => {
+/** Rolling memory's minutes must survive the round trip through the real store. */
+test('rolling memory minutes save and read back', async () => {
   const settings = await windowFor('panel');
 
   const before = await settings.evaluate(() => window.tagalongHost.getHostView());
   const saved = await settings.evaluate(() =>
-    window.tagalongHost.saveSettings({ sightDetail: 'all', windowTextBudget: 12_000 }),
+    window.tagalongHost.saveSettings({ rollingMemory: { enabled: false, minutes: 7 } }),
   );
-  expect(saved.sightDetail).toBe('all');
-  expect(saved.windowTextBudget).toBe(12_000);
+  expect(saved.rollingMemory.minutes).toBe(7);
 
   try {
     const reread = await settings.evaluate(() => window.tagalongHost.getHostView());
-    expect(reread.settings.sightDetail).toBe('all');
-    expect(reread.settings.windowTextBudget).toBe(12_000);
+    expect(reread.settings.rollingMemory.minutes).toBe(7);
   } finally {
-    // Same reason as the hotkey test: these persist, and a suite that leaves the budget
-    // raised changes what every later run costs.
+    // Same reason as the hotkey test: this persists, and a suite that leaves it changed
+    // changes what every later run keeps in memory.
     await settings.evaluate(
-      (previous) =>
-        window.tagalongHost.saveSettings({
-          sightDetail: previous.sightDetail,
-          windowTextBudget: previous.windowTextBudget,
-        }),
-      {
-        sightDetail: before.settings.sightDetail,
-        windowTextBudget: before.settings.windowTextBudget,
-      },
+      (previous) => window.tagalongHost.saveSettings({ rollingMemory: previous }),
+      before.settings.rollingMemory,
     );
   }
 });

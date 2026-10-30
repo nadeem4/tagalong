@@ -61,10 +61,10 @@ describe('registerSettingsIpc: hostView', () => {
 describe('registerSettingsIpc: saveSettings', () => {
   it('settings set persists through the local store and returns the new settings', async () => {
     const { invoke, deps, settingsStore } = setup();
-    const patch: SettingsPatch = { userName: 'Ada' };
+    const patch: SettingsPatch = { listening: { always: true } };
     const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
     expect(settingsStore.set).toHaveBeenCalledWith(patch);
-    expect(saved.userName).toBe('Ada');
+    expect(saved.listening.always).toBe(true);
     expect(deps.setSettings).toHaveBeenCalledWith(saved);
     expect(deps.broadcast).toHaveBeenCalledWith(saved);
     expect(deps.applyHotkeys).not.toHaveBeenCalled();

@@ -8,7 +8,6 @@ import type { ReactNode } from 'react';
 /** The sections in the order the page shows them; the standalone window's nav links to each. */
 export const SECTIONS = [
   { id: 'brain', title: 'How Scout thinks' },
-  { id: 'you', title: 'You' },
   { id: 'privacy', title: 'Privacy' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },

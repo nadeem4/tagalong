@@ -45,8 +45,6 @@ import {
   markListening,
   setPanelMark,
 } from './status-marks';
-import { recordCleanClose, recordLaunch } from './launch';
-import type { PreviousLaunch } from './launch';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
@@ -120,8 +118,6 @@ interface Desktop {
   brain: BrainClient;
   platform: Platform;
   settingsStore: SettingsStore;
-  /** What the last launch left behind: whether it crashed, and which version it ran. */
-  previousLaunch: PreviousLaunch;
   /** The settings the running app is using; refreshed whenever they are saved. */
   settings: Settings;
   secrets: SafeStorageSecretStore;
@@ -226,8 +222,6 @@ app.on('before-quit', () => {
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
-  // The next launch's greeting counts the time away from now, not from when this one opened.
-  recordCleanClose(desktop?.settingsStore, new Date());
   desktop?.brain.stop();
 });
 
@@ -241,9 +235,6 @@ async function start(): Promise<void> {
   const secrets = new SafeStorageSecretStore(dataDir);
   void forgetRetiredKeys(secrets).catch(() => {});
   const settingsStore = new SettingsStore(dataDir);
-
-  // Before anything else reads or writes settings: what the last launch left, then this one.
-  const previousLaunch = recordLaunch(settingsStore, app.getVersion());
   const settings = settingsStore.get();
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
@@ -340,7 +331,6 @@ async function start(): Promise<void> {
     brain,
     platform,
     settingsStore,
-    previousLaunch,
     settings,
     secrets,
     avatar: null,
@@ -468,9 +458,6 @@ async function start(): Promise<void> {
     position: settings.avatar,
     onMoved: (position) => rememberAvatarSpot(position),
   });
-  // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
-  // clean close too, not a crash.
-  desktop.avatar.on('session-end', () => recordCleanClose(desktop?.settingsStore, new Date()));
   // The pets hidden (the tray's Hide pets): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));

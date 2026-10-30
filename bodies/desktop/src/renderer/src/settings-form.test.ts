@@ -1,6 +1,5 @@
 /** Tests for buildSettingsPatch and the Settings form helpers. */
 import { describe, expect, it } from 'vitest';
-import { MAX_USER_NAME_CHARS, MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 
 import {
   SettingsFieldError,
@@ -16,15 +15,23 @@ const values: SettingsFormValues = {
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
   talkHotkey: 'RightControl',
-  sightDetail: 'focused',
-  windowTextBudget: '8000',
 };
 
-describe('buildSettingsPatch retired fields', () => {
-  it('never sends the retired provider fields', () => {
-    const patch = buildSettingsPatch(values);
-    expect(patch).not.toHaveProperty('providerId');
-    expect(patch).not.toHaveProperty('defaultModel');
+describe('buildSettingsPatch removed fields', () => {
+  it('never emits a key the Settings schema no longer has', () => {
+    const patch = buildSettingsPatch({
+      ...values,
+      rollingMemoryEnabled: true,
+      rollingMemoryMinutes: '5',
+      voiceEnabled: true,
+      voice: 'bm_george',
+      voiceSpeed: '1',
+    });
+    const live = ['avatar', 'captureExclusions', 'hotkeys', 'listening', 'rollingMemory', 'voice'];
+    expect(Object.keys(patch).filter((key) => !live.includes(key))).toEqual([]);
+    for (const removed of ['sightDetail', 'windowTextBudget', 'greeting', 'userName', 'watch']) {
+      expect(patch).not.toHaveProperty(removed);
+    }
   });
 });
 
@@ -73,104 +80,24 @@ describe('buildSettingsPatch', () => {
     expect(patch.hotkeys?.ask).toBe('CommandOrControl+Shift+Space');
   });
 
-  it('carries the sight detail choice', () => {
-    expect(buildSettingsPatch({ ...values, sightDetail: 'all' }).sightDetail).toBe('all');
-    expect(buildSettingsPatch(values).sightDetail).toBe('focused');
-  });
-
-  it('refuses a sight detail it does not know instead of sending it on', () => {
-    expect(() => buildSettingsPatch({ ...values, sightDetail: 'everything' })).toThrow();
-  });
-
-  it('carries the window text budget as a number, not the string the form holds', () => {
-    const patch = buildSettingsPatch({ ...values, windowTextBudget: '12000' });
-    expect(patch.windowTextBudget).toBe(12_000);
-  });
-
-  it('explains a budget that is not a whole number rather than silently dropping it', () => {
-    // Silently omitting it would leave the field showing the number the user typed while
-    // the saved value stayed what it was — the settings equivalent of a lie.
-    for (const bad of ['', 'lots', '1.5', '-200', '0']) {
-      expect(() => buildSettingsPatch({ ...values, windowTextBudget: bad }), bad).toThrow(
-        /whole number/i,
-      );
-    }
-  });
-
-  it('refuses a budget above the ceiling, naming the ceiling', () => {
-    expect(() =>
-      buildSettingsPatch({ ...values, windowTextBudget: String(MAX_WINDOW_TEXT_CHARS + 1) }),
-    ).toThrow(new RegExp(String(MAX_WINDOW_TEXT_CHARS)));
-  });
-
-  it('accepts the shipped default and the ceiling exactly', () => {
-    expect(
-      buildSettingsPatch({
-        ...values,
-        windowTextBudget: String(SETTINGS_DEFAULTS.windowTextBudget),
-      }).windowTextBudget,
-    ).toBe(SETTINGS_DEFAULTS.windowTextBudget);
-    expect(
-      buildSettingsPatch({ ...values, windowTextBudget: String(MAX_WINDOW_TEXT_CHARS) })
-        .windowTextBudget,
-    ).toBe(MAX_WINDOW_TEXT_CHARS);
-  });
-
   it('sends nothing the user did not set, so a save cannot reset a neighbouring setting', () => {
     const patch = buildSettingsPatch(values);
-    expect(patch.captureExclusions).toBeUndefined();
-    expect(patch.screenshotRetention).toBeUndefined();
-    expect(patch.enginePort).toBeUndefined();
-    expect(patch.avatar).toBeUndefined();
+    expect(Object.keys(patch)).toEqual(['hotkeys']);
   });
 });
 
-describe('what a rejected save tells the user', () => {
-  it('names the field, not just that something was wrong', () => {
-    // A save that refuses with "invalid input" is the same lie as one that silently keeps
-    // a different value: the user cannot tell which of eight fields to change.
-    for (const bad of ['', 'lots', '-200', String(MAX_WINDOW_TEXT_CHARS + 1)]) {
-      let message = '';
-      try {
-        buildSettingsPatch({ ...values, windowTextBudget: bad });
-      } catch (error) {
-        message = error instanceof Error ? error.message : String(error);
-      }
-      expect(message.toLowerCase(), bad).toContain('window text budget');
-    }
-  });
-
-  it('says what would make it acceptable', () => {
-    let message = '';
-    try {
-      buildSettingsPatch({ ...values, windowTextBudget: 'lots' });
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error);
-    }
-    expect(message).toContain('1');
-    expect(message).toContain(String(MAX_WINDOW_TEXT_CHARS));
-  });
-});
-
-describe('advanced field errors', () => {
-  it('names the field a refused value belongs to, so Settings can open Advanced on it', () => {
+describe('field errors', () => {
+  it('names the field a refused value belongs to, so Settings can mark it', () => {
     let caught: unknown;
     try {
-      buildSettingsPatch({
-        ...values,
-        rollingMemoryEnabled: false,
-        rollingMemoryMinutes: '10',
-        watchMaxChecks: '60',
-        watchMaxConcurrent: '40',
-        watchTimeoutMinutes: '30',
-      });
+      buildSettingsPatch({ ...values, rollingMemoryEnabled: true, rollingMemoryMinutes: '45' });
     } catch (error) {
       caught = error;
     }
     expect(caught).toBeInstanceOf(SettingsFieldError);
-    expect(caught).toMatchObject({ field: 'watchMaxConcurrent' });
-    expect(isAdvancedField('watchMaxConcurrent')).toBe(true);
+    expect(caught).toMatchObject({ field: 'rollingMemoryMinutes' });
     expect(isAdvancedField('askHotkey')).toBe(false);
+    expect(isAdvancedField('rollingMemoryMinutes')).toBe(false);
   });
 });
 
@@ -181,94 +108,24 @@ describe('keyCaps', () => {
   });
 });
 
-describe('buildSettingsPatch greeting', () => {
-  it('carries the greeting switch when the form shows it', () => {
-    expect(buildSettingsPatch({ ...values, greeting: false }).greeting).toBe(false);
-    expect(buildSettingsPatch({ ...values, greeting: true }).greeting).toBe(true);
-  });
+describe('buildSettingsPatch rolling memory', () => {
+  const memory = { rollingMemoryEnabled: true, rollingMemoryMinutes: '5' };
 
-  it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).greeting).toBeUndefined();
-  });
-});
-
-describe('buildSettingsPatch userName', () => {
-  it('carries the name, trimmed, and an emptied box clears it', () => {
-    expect(buildSettingsPatch({ ...values, userName: '  Nadeem ' }).userName).toBe('Nadeem');
-    expect(buildSettingsPatch({ ...values, userName: '   ' }).userName).toBe('');
-  });
-
-  it('cuts a long name to the cap rather than refusing the save', () => {
-    expect(buildSettingsPatch({ ...values, userName: 'a'.repeat(60) }).userName).toBe(
-      'a'.repeat(MAX_USER_NAME_CHARS),
-    );
-  });
-
-  it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).userName).toBeUndefined();
-  });
-});
-
-describe('buildSettingsPatch keepAnEye', () => {
-  it('carries the keep-an-eye switch when the form shows it', () => {
-    expect(buildSettingsPatch({ ...values, keepAnEye: false }).keepAnEye).toBe(false);
-    expect(buildSettingsPatch({ ...values, keepAnEye: true }).keepAnEye).toBe(true);
-  });
-
-  it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).keepAnEye).toBeUndefined();
-  });
-});
-
-describe('buildSettingsPatch wellbeing', () => {
-  it('carries the Gentle nudges switch when the form shows it', () => {
-    expect(buildSettingsPatch({ ...values, wellbeing: true }).wellbeing).toEqual({
+  it('carries the switch and the minutes when the form shows them', () => {
+    expect(buildSettingsPatch({ ...values, ...memory }).rollingMemory).toEqual({
       enabled: true,
-    });
-    expect(buildSettingsPatch({ ...values, wellbeing: false }).wellbeing).toEqual({
-      enabled: false,
+      minutes: 5,
     });
   });
 
   it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).wellbeing).toBeUndefined();
-  });
-});
-
-describe('buildSettingsPatch awareness', () => {
-  const awareness = {
-    rollingMemoryEnabled: true,
-    rollingMemoryMinutes: '5',
-    watchMaxChecks: '40',
-    watchMaxConcurrent: '2',
-    watchTimeoutMinutes: '15',
-  };
-
-  it('carries rolling memory and the watch limits when the form shows them', () => {
-    const patch = buildSettingsPatch({ ...values, ...awareness });
-    expect(patch.rollingMemory).toEqual({ enabled: true, minutes: 5 });
-    expect(patch.watch).toEqual({ maxChecks: 40, maxConcurrent: 2, defaultTimeoutMinutes: 15 });
-  });
-
-  it('leaves both alone when the form does not show them', () => {
-    const patch = buildSettingsPatch(values);
-    expect(patch.rollingMemory).toBeUndefined();
-    expect(patch.watch).toBeUndefined();
+    expect(buildSettingsPatch(values).rollingMemory).toBeUndefined();
   });
 
   it('refuses minutes outside one to thirty, saying the bounds', () => {
-    expect(() =>
-      buildSettingsPatch({ ...values, ...awareness, rollingMemoryMinutes: '45' }),
-    ).toThrow(/1 and 30/);
-  });
-
-  it('refuses a watch limit that is not a positive whole number', () => {
-    expect(() => buildSettingsPatch({ ...values, ...awareness, watchMaxChecks: '0' })).toThrow(
-      /checks/i,
+    expect(() => buildSettingsPatch({ ...values, ...memory, rollingMemoryMinutes: '45' })).toThrow(
+      /1 and 30/,
     );
-    expect(() =>
-      buildSettingsPatch({ ...values, ...awareness, watchMaxConcurrent: 'two' }),
-    ).toThrow(/at once/i);
   });
 });
 
