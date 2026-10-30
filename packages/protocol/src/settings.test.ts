@@ -1,59 +1,31 @@
-/** Tests for the Settings schema, its defaults, SettingsPatch and the change-by-talk card. */
+/** Tests for the Settings schema, its defaults and SettingsPatch. */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './methods';
 import {
   MAX_ROLLING_MEMORY_MINUTES,
-  MAX_SCREENSHOT_RETENTION_HOURS,
-  MAX_USER_NAME_CHARS,
   SETTINGS_DEFAULTS,
   Settings,
   TALK_KEY_LABELS,
   TALK_KEY_RIGHT_CTRL,
   TALK_KEYS,
   SettingsPatch,
-  SettingsProposedParams,
-  WELCOME_STEPS,
 } from './settings';
 import { SettingsSetParams } from './methods';
 import { chosenMouth } from './voice';
 
-describe('Settings providerBaseUrls', () => {
-  it('starts empty, so every preset uses its built-in base URL', () => {
-    expect(Settings.parse({}).providerBaseUrls).toEqual({});
-  });
-
-  it('keeps a base URL override per provider', () => {
-    const s = Settings.parse({ providerBaseUrls: { openrouter: 'http://127.0.0.1:8080/v1' } });
-    expect(s.providerBaseUrls).toEqual({ openrouter: 'http://127.0.0.1:8080/v1' });
-  });
-
-  it('rejects a base URL that is not a URL', () => {
-    expect(Settings.safeParse({ providerBaseUrls: { openrouter: 'not a url' } }).success).toBe(
-      false,
-    );
-  });
-
-  it('can be patched on its own', () => {
-    const patch = SettingsPatch.parse({
-      providerBaseUrls: { openrouter: 'https://example.com/v1/' },
-    });
-    expect(patch).toEqual({ providerBaseUrls: { openrouter: 'https://example.com/v1/' } });
-  });
-
-  it('drops the base URL of the retired nebius provider from an older settings file', () => {
-    const s = Settings.parse({
-      providerBaseUrls: { nebius: 'https://a.example/v1/', openrouter: 'https://b.example/v1/' },
-    });
-    expect(s.providerBaseUrls).toEqual({ openrouter: 'https://b.example/v1/' });
-  });
-});
-
 describe('Settings', () => {
+  it('has exactly the live keys', () => {
+    expect(Object.keys(Settings.parse({})).sort()).toEqual([
+      'avatar',
+      'captureExclusions',
+      'hotkeys',
+      'listening',
+      'rollingMemory',
+      'voice',
+    ]);
+  });
+
   it('fills every default from an empty object', () => {
     const s = Settings.parse({});
-    expect(s.enginePort).toBe(47321);
-    expect(s.pageTextBudget).toBe(40_000);
-    expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
     expect(s.hotkeys).toEqual({
       ask: 'CommandOrControl+Shift+Space',
@@ -73,48 +45,31 @@ describe('Settings', () => {
     expect(s.hotkeys).toEqual({ ask: 'Alt+Space' });
   });
 
-  it('drops the crew-era providerId and defaultModel from an older settings file', () => {
-    const s = Settings.parse({ providerId: 'anthropic', defaultModel: 'claude-opus-5' });
-    expect(s).not.toHaveProperty('providerId');
-    expect(s).not.toHaveProperty('defaultModel');
-  });
-
-  it('drops the crew-era defaultPetId and hiddenPets from an older settings file', () => {
-    const s = Settings.parse({ defaultPetId: 'ink', hiddenPets: ['bolt'] });
-    expect(s).not.toHaveProperty('defaultPetId');
-    expect(s).not.toHaveProperty('hiddenPets');
-    const patch = SettingsPatch.parse({ defaultPetId: 'ink', hiddenPets: ['bolt'] });
-    expect(patch).toEqual({});
+  it('drops every retired field of an older settings file, and a patch ignores them too', () => {
+    const old = {
+      providerId: 'anthropic',
+      defaultModel: 'claude-opus-5',
+      defaultPetId: 'ink',
+      hiddenPets: ['bolt'],
+      onboarding: { done: true },
+      enginePort: 47321,
+      userName: 'Ada',
+      keepAnEye: true,
+      sightDetail: 'all',
+      budget: { dailyUsd: 1 },
+    };
+    expect(Object.keys(Settings.parse(old))).not.toContain('userName');
+    expect(Settings.parse(old)).toEqual(Settings.parse({}));
+    expect(SettingsPatch.parse(old)).toEqual({});
   });
 
   it('keeps explicit values', () => {
     const s = Settings.parse({
-      enginePort: 50000,
-      userName: 'Ada',
       hotkeys: { ask: 'Alt+Space' },
       avatar: { x: 12, y: 34 },
     });
-    expect(s.enginePort).toBe(50000);
-    expect(s.userName).toBe('Ada');
     expect(s.hotkeys.ask).toBe('Alt+Space');
     expect(s.avatar).toEqual({ x: 12, y: 34 });
-  });
-
-  it('rejects a privileged port', () => {
-    expect(Settings.safeParse({ enginePort: 80 }).success).toBe(false);
-  });
-
-  it('rejects a port above the valid range', () => {
-    expect(Settings.safeParse({ enginePort: 70000 }).success).toBe(false);
-  });
-
-  it('rejects a non-integer port', () => {
-    expect(Settings.safeParse({ enginePort: 47321.5 }).success).toBe(false);
-  });
-
-  it('rejects a zero or negative page text budget', () => {
-    expect(Settings.safeParse({ pageTextBudget: 0 }).success).toBe(false);
-    expect(Settings.safeParse({ historyMessages: -1 }).success).toBe(false);
   });
 
   it('carries no secret fields', () => {
@@ -146,34 +101,11 @@ describe('Settings.captureExclusions', () => {
   });
 });
 
-describe('Settings.screenshotRetention', () => {
-  it('is off by default, so screenshots never reach the database unasked', () => {
-    expect(Settings.parse({}).screenshotRetention).toEqual({ mode: 'off' });
-    expect(SETTINGS_DEFAULTS.screenshotRetention.mode).toBe('off');
-  });
-
-  it('accepts the 24 hour debugging window', () => {
-    const s = Settings.parse({ screenshotRetention: { mode: 'hours', hours: 24 } });
-    expect(s.screenshotRetention).toEqual({ mode: 'hours', hours: 24 });
-  });
-
-  it('rejects retention beyond the documented maximum', () => {
-    expect(
-      Settings.safeParse({
-        screenshotRetention: { mode: 'hours', hours: MAX_SCREENSHOT_RETENTION_HOURS + 1 },
-      }).success,
-    ).toBe(false);
-  });
-
-  it('rejects an unknown mode and a mode without its hours', () => {
-    expect(Settings.safeParse({ screenshotRetention: { mode: 'forever' } }).success).toBe(false);
-    expect(Settings.safeParse({ screenshotRetention: { mode: 'hours' } }).success).toBe(false);
-  });
-});
-
 describe('SettingsPatch', () => {
   it('accepts a single field', () => {
-    expect(SettingsPatch.parse({ userName: 'Ada' })).toEqual({ userName: 'Ada' });
+    expect(SettingsPatch.parse({ listening: { always: true } })).toEqual({
+      listening: { always: true },
+    });
   });
 
   it('accepts an empty patch', () => {
@@ -181,43 +113,15 @@ describe('SettingsPatch', () => {
   });
 
   it('still validates the fields it is given', () => {
-    expect(SettingsPatch.safeParse({ enginePort: 80 }).success).toBe(false);
+    expect(SettingsPatch.safeParse({ captureExclusions: { processNames: [''] } }).success).toBe(
+      false,
+    );
   });
 
-  it('never invents the new privacy fields when they are omitted', () => {
-    const patch = SettingsPatch.parse({ userName: 'Ada' });
+  it('never invents fields that are omitted', () => {
+    const patch = SettingsPatch.parse({ listening: { always: true } });
     expect(patch).not.toHaveProperty('captureExclusions');
-    expect(patch).not.toHaveProperty('screenshotRetention');
-  });
-
-  it('validates the privacy fields it is given', () => {
-    expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'off' } }).success).toBe(true);
-    expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'weeks' } }).success).toBe(false);
-  });
-});
-
-describe('Settings.sightDetail', () => {
-  it('defaults to focused, so a full-view capture stays one image plus one screen', () => {
-    // `all` multiplies the bill by the monitor count on every ask that carries a look.
-    // The default has to be the cheap one; the expensive one is a choice the user makes.
-    expect(Settings.parse({}).sightDetail).toBe('focused');
-    expect(SETTINGS_DEFAULTS.sightDetail).toBe('focused');
-  });
-
-  it('accepts all, which attaches every display', () => {
-    expect(Settings.parse({ sightDetail: 'all' }).sightDetail).toBe('all');
-  });
-
-  it('rejects a detail level it does not know', () => {
-    expect(Settings.safeParse({ sightDetail: 'everything' }).success).toBe(false);
-    expect(Settings.safeParse({ sightDetail: 2 }).success).toBe(false);
-  });
-
-  it('is patchable on its own without resetting anything else', () => {
-    const patch = SettingsPatch.parse({ sightDetail: 'all' });
-    expect(patch.sightDetail).toBe('all');
-    expect(patch).not.toHaveProperty('hotkeys');
-    expect(patch).not.toHaveProperty('captureExclusions');
+    expect(patch).not.toHaveProperty('rollingMemory');
   });
 });
 
@@ -254,63 +158,6 @@ describe('the pause hotkey setting', () => {
   });
 });
 
-describe('Settings.windowTextBudget', () => {
-  it('defaults to the documented per-window budget', () => {
-    expect(Settings.parse({}).windowTextBudget).toBe(DEFAULT_WINDOW_TEXT_CHARS);
-    expect(SETTINGS_DEFAULTS.windowTextBudget).toBe(DEFAULT_WINDOW_TEXT_CHARS);
-  });
-
-  it('accepts a raised budget up to the hard ceiling', () => {
-    expect(Settings.parse({ windowTextBudget: 20_000 }).windowTextBudget).toBe(20_000);
-    expect(Settings.parse({ windowTextBudget: MAX_WINDOW_TEXT_CHARS }).windowTextBudget).toBe(
-      MAX_WINDOW_TEXT_CHARS,
-    );
-  });
-
-  it('refuses a budget above the ceiling', () => {
-    // The ceiling is the page-text cap. Past it one window can outweigh everything else
-    // in the prompt, and the user raising a slider has no way to see that coming.
-    expect(Settings.safeParse({ windowTextBudget: MAX_WINDOW_TEXT_CHARS + 1 }).success).toBe(false);
-  });
-
-  it('refuses a budget that would read nothing', () => {
-    expect(Settings.safeParse({ windowTextBudget: 0 }).success).toBe(false);
-    expect(Settings.safeParse({ windowTextBudget: -1 }).success).toBe(false);
-    expect(Settings.safeParse({ windowTextBudget: 1.5 }).success).toBe(false);
-  });
-
-  it('rides in a patch without dragging the other settings with it', () => {
-    const patch = SettingsPatch.parse({ windowTextBudget: 12_000 });
-    expect(patch.windowTextBudget).toBe(12_000);
-    expect(patch.sightDetail).toBeUndefined();
-    expect(patch.captureExclusions).toBeUndefined();
-  });
-});
-
-describe('Settings.summarizer', () => {
-  it('defaults to none, meaning each pet summarises with its own brain', () => {
-    expect(Settings.parse({}).summarizer).toBeNull();
-  });
-
-  it('keeps an explicit provider and model', () => {
-    const summarizer = { providerId: 'openrouter', model: 'anthropic/claude-haiku-4.5' };
-    expect(Settings.parse({ summarizer }).summarizer).toEqual(summarizer);
-    expect(SettingsPatch.parse({ summarizer: null }).summarizer).toBeNull();
-  });
-
-  it('rejects a summarizer with no model', () => {
-    expect(
-      Settings.safeParse({ summarizer: { providerId: 'openrouter', model: '' } }).success,
-    ).toBe(false);
-  });
-
-  it('drops a summarizer on the retired nebius provider, so each pet summarises itself', () => {
-    expect(
-      Settings.parse({ summarizer: { providerId: 'nebius', model: 'x' } }).summarizer,
-    ).toBeNull();
-  });
-});
-
 describe('Settings.rollingMemory', () => {
   it('is off by default and holds ten minutes when turned on', () => {
     expect(Settings.parse({}).rollingMemory).toEqual({ enabled: false, minutes: 10 });
@@ -332,94 +179,7 @@ describe('Settings.rollingMemory', () => {
 
   it('rides in a patch alone', () => {
     const patch = SettingsPatch.parse({ rollingMemory: { enabled: true, minutes: 5 } });
-    expect(patch.rollingMemory).toEqual({ enabled: true, minutes: 5 });
-    expect(patch.watch).toBeUndefined();
-  });
-});
-
-describe('Settings.watch', () => {
-  it('defaults to 60 checks a watch, 3 watches at once and a 30 minute timeout', () => {
-    expect(Settings.parse({}).watch).toEqual({
-      maxChecks: 60,
-      maxConcurrent: 3,
-      defaultTimeoutMinutes: 30,
-    });
-  });
-
-  it('refuses limits of zero', () => {
-    const watch = { maxChecks: 0, maxConcurrent: 3, defaultTimeoutMinutes: 30 };
-    expect(Settings.safeParse({ watch }).success).toBe(false);
-    expect(
-      Settings.safeParse({ watch: { ...watch, maxChecks: 5, maxConcurrent: 0 } }).success,
-    ).toBe(false);
-  });
-});
-
-describe('an old onboarding key', () => {
-  it('still parses, and is dropped', () => {
-    const parsed = Settings.parse({ onboarding: { done: true } });
-    expect(parsed).not.toHaveProperty('onboarding');
-    expect(SettingsPatch.parse({ onboarding: { done: true } })).toEqual({});
-  });
-});
-
-describe('Settings.welcome', () => {
-  it('starts not done, so a fresh install opens the Welcome window', () => {
-    expect(Settings.parse({}).welcome).toEqual({ done: false });
-  });
-
-  it('reads as not done on an install that finished the old wizard, so it sees Welcome once', () => {
-    expect(Settings.parse({ onboarding: { done: true } }).welcome.done).toBe(false);
-  });
-
-  it('rides in a patch alone', () => {
-    expect(SettingsPatch.parse({ welcome: { done: true } })).toEqual({ welcome: { done: true } });
-  });
-});
-
-describe('Settings.greeting', () => {
-  it('is on by default, so Scout says hello on a later launch', () => {
-    expect(Settings.parse({}).greeting).toBe(true);
-  });
-
-  it('reads as on from a settings file written before it existed', () => {
-    expect(Settings.parse({ welcome: { done: true } }).greeting).toBe(true);
-  });
-
-  it('can be switched off in a patch alone', () => {
-    expect(SettingsPatch.parse({ greeting: false })).toEqual({ greeting: false });
-  });
-});
-
-describe('Settings.lastOpenedAt', () => {
-  it('starts unknown', () => {
-    expect(Settings.parse({}).lastOpenedAt).toBeNull();
-  });
-
-  it('keeps an ISO time and rides in a patch alone', () => {
-    const at = '2026-10-12T08:00:00.000Z';
-    expect(Settings.parse({ lastOpenedAt: at }).lastOpenedAt).toBe(at);
-    expect(SettingsPatch.parse({ lastOpenedAt: at })).toEqual({ lastOpenedAt: at });
-  });
-
-  it('refuses something that is not a time', () => {
-    expect(Settings.safeParse({ lastOpenedAt: 'yesterday' }).success).toBe(false);
-  });
-
-  it('has a sibling, lastClosedAt, that starts unknown and rides in a patch alone', () => {
-    const at = '2026-10-12T18:00:00.000Z';
-    expect(Settings.parse({}).lastClosedAt).toBeNull();
-    expect(SettingsPatch.parse({ lastClosedAt: at })).toEqual({ lastClosedAt: at });
-  });
-});
-
-describe('Settings.keepAnEye', () => {
-  it('is on by default: Scout follows window titles and speaks up rarely', () => {
-    expect(Settings.parse({}).keepAnEye).toBe(true);
-  });
-
-  it('can be switched off in a patch alone', () => {
-    expect(SettingsPatch.parse({ keepAnEye: false })).toEqual({ keepAnEye: false });
+    expect(patch).toEqual({ rollingMemory: { enabled: true, minutes: 5 } });
   });
 });
 
@@ -447,10 +207,6 @@ describe('Settings.voice', () => {
       speed: 0.95,
       elevenLabsVoiceId: '',
     });
-  });
-
-  it('parses a settings file written before Scout could talk', () => {
-    expect(Settings.parse({ welcome: { done: true } }).voice.enabled).toBe(true);
   });
 
   it('offers the two British male voices only', () => {
@@ -533,28 +289,9 @@ describe('Settings.voice.microphoneId', () => {
   });
 });
 
-describe('Settings.userName', () => {
-  it('is empty by default, and a settings file from before it still parses', () => {
-    expect(Settings.parse({}).userName).toBe('');
-    expect(Settings.parse({ welcome: { done: true } }).userName).toBe('');
-  });
-
-  it('is trimmed, rides in a patch alone, and can be cleared', () => {
-    expect(SettingsPatch.parse({ userName: '  Nadeem ' })).toEqual({ userName: 'Nadeem' });
-    expect(SettingsPatch.parse({ userName: '' })).toEqual({ userName: '' });
-  });
-
-  it(`is at most ${MAX_USER_NAME_CHARS} characters`, () => {
-    expect(Settings.safeParse({ userName: 'a'.repeat(MAX_USER_NAME_CHARS) }).success).toBe(true);
-    expect(Settings.safeParse({ userName: 'a'.repeat(MAX_USER_NAME_CHARS + 1) }).success).toBe(
-      false,
-    );
-  });
-});
-
 describe('Settings.listening', () => {
   it('reads an old file without it as off', () => {
-    expect(Settings.parse({ welcome: { done: true } }).listening).toEqual({ always: false });
+    expect(Settings.parse({ avatar: { x: 1, y: 2 } }).listening).toEqual({ always: false });
   });
 
   it('keeps Always listening on across a round trip', () => {
@@ -569,144 +306,11 @@ describe('Settings.listening', () => {
   });
 });
 
-describe('Settings.closedCleanly and lastVersion', () => {
-  it('reads a settings file from before them as a clean close on no known version', () => {
-    const settings = Settings.parse({ welcome: { done: true } });
-    expect(settings.closedCleanly).toBe(true);
-    expect(settings.lastVersion).toBeNull();
-  });
-
-  it('ride in a patch alone', () => {
-    expect(SettingsPatch.parse({ closedCleanly: false })).toEqual({ closedCleanly: false });
-    expect(SettingsPatch.parse({ lastVersion: '0.4.0' })).toEqual({ lastVersion: '0.4.0' });
-  });
-
-  it('refuse an empty version', () => {
-    expect(SettingsPatch.safeParse({ lastVersion: '' }).success).toBe(false);
-  });
-});
-
-describe('Settings.welcome steps', () => {
-  it('reads a record from before the steps as not started', () => {
-    expect(Settings.parse({ welcome: { done: false } }).welcome).toEqual({ done: false });
-    expect(Settings.parse({}).userNameDeclined).toBe(false);
-  });
-
-  it('keeps the step reached, how you answer and the brain picked', () => {
-    const welcome = { done: false, step: 'voice', answerBy: 'type', brain: 'openrouter' } as const;
-    expect(SettingsPatch.parse({ welcome })).toEqual({ welcome });
-    expect(WELCOME_STEPS).toEqual(['answer', 'name', 'think', 'voice', 'keys', 'try']);
-  });
-
-  it('refuses a step that does not exist', () => {
-    expect(SettingsPatch.safeParse({ welcome: { done: false, step: 'colour' } }).success).toBe(
-      false,
-    );
-  });
-
-  it('remembers a declined name in a patch alone', () => {
-    expect(SettingsPatch.parse({ userNameDeclined: true })).toEqual({ userNameDeclined: true });
-  });
-});
-
-describe('Settings.pickUp', () => {
-  it('is on by default, and on for a settings file from before it', () => {
-    expect(Settings.parse({}).pickUp).toBe(true);
-    expect(Settings.parse({ keepAnEye: false }).pickUp).toBe(true);
-  });
-
-  it('can be switched off in a patch alone, and refuses a non-boolean', () => {
-    expect(SettingsPatch.parse({ pickUp: false })).toEqual({ pickUp: false });
-    expect(SettingsPatch.safeParse({ pickUp: 'off' }).success).toBe(false);
-  });
-});
-
-describe('Settings.sightLog', () => {
-  it('keeps the log of what Scout saw for 7 days by default', () => {
-    expect(Settings.parse({}).sightLog).toEqual({ days: 7 });
-  });
-
-  it('accepts 1 to 30 days and refuses anything outside', () => {
-    expect(Settings.parse({ sightLog: { days: 1 } }).sightLog.days).toBe(1);
-    expect(Settings.parse({ sightLog: { days: 30 } }).sightLog.days).toBe(30);
-    expect(Settings.safeParse({ sightLog: { days: 0 } }).success).toBe(false);
-    expect(Settings.safeParse({ sightLog: { days: 31 } }).success).toBe(false);
-    expect(Settings.safeParse({ sightLog: { days: 2.5 } }).success).toBe(false);
-  });
-
-  it('rides in a patch alone', () => {
-    expect(SettingsPatch.parse({ sightLog: { days: 3 } })).toEqual({ sightLog: { days: 3 } });
-  });
-});
-
-describe('Settings.budget', () => {
-  it('is off by default, and a settings file from before it still parses', () => {
-    expect(Settings.parse({}).budget).toEqual({ dailyUsd: null });
-    expect(Settings.parse({ welcome: { done: true } }).budget).toEqual({ dailyUsd: null });
-  });
-
-  it('takes a cap in dollars in a patch alone, and can be cleared', () => {
-    expect(SettingsPatch.parse({ budget: { dailyUsd: 1 } })).toEqual({ budget: { dailyUsd: 1 } });
-    expect(SettingsPatch.parse({ budget: { dailyUsd: 0.5 } }).budget?.dailyUsd).toBe(0.5);
-    expect(SettingsPatch.parse({ budget: { dailyUsd: null } }).budget?.dailyUsd).toBeNull();
-  });
-
-  it('refuses a negative or zero cap', () => {
-    expect(SettingsPatch.safeParse({ budget: { dailyUsd: -1 } }).success).toBe(false);
-    expect(SettingsPatch.safeParse({ budget: { dailyUsd: 0 } }).success).toBe(false);
-  });
-});
-
-describe('Settings.wellbeing', () => {
-  it('is off by default, and a settings file from before it parses as off', () => {
-    expect(Settings.parse({}).wellbeing).toEqual({ enabled: false });
-    expect(Settings.parse({ keepAnEye: true, welcome: { done: true } }).wellbeing).toEqual({
-      enabled: false,
-    });
-  });
-
-  it('rides in a patch alone, and refuses a non-boolean', () => {
-    expect(SettingsPatch.parse({ wellbeing: { enabled: true } })).toEqual({
-      wellbeing: { enabled: true },
-    });
-    expect(SettingsPatch.safeParse({ wellbeing: { enabled: 'yes' } }).success).toBe(false);
-  });
-});
-
-describe('SettingsProposedParams', () => {
-  const proposal = {
-    proposalId: '50000000-0000-4000-8000-000000000001',
-    petId: 'scout',
-    patch: { voice: { ...SETTINGS_DEFAULTS.voice, speed: 0.85 }, userName: 'Sam' },
-    rows: [
-      { setting: 'voice.speed', label: 'Voice speed', from: '0.95', to: '0.85', loosens: false },
-      { setting: 'userName', label: 'Your name', from: '(none)', to: 'Sam', loosens: false },
-      {
-        setting: 'pickUp',
-        label: 'Pick up where you left off',
-        from: 'Off',
-        to: 'On',
-        loosens: true,
-        note: 'Keeps window titles',
-      },
-    ],
-  };
-
-  it('round-trips a patch and its now-and-after rows', () => {
-    expect(SettingsProposedParams.parse(JSON.parse(JSON.stringify(proposal)))).toEqual(proposal);
-  });
-
-  it('refuses a patch that is not a valid settings patch, and a card with no rows', () => {
-    expect(
-      SettingsProposedParams.safeParse({ ...proposal, patch: { voice: { speed: 9 } } }).success,
-    ).toBe(false);
-    expect(SettingsProposedParams.safeParse({ ...proposal, rows: [] }).success).toBe(false);
-  });
-});
-
 describe('SettingsSetParams', () => {
   it('may say the patch came from a card Scout showed, for the privacy log', () => {
-    expect(SettingsSetParams.parse({ patch: { userName: 'Sam' }, byTalk: true }).byTalk).toBe(true);
+    expect(
+      SettingsSetParams.parse({ patch: { listening: { always: true } }, byTalk: true }).byTalk,
+    ).toBe(true);
     expect(SettingsSetParams.parse({ patch: {} }).byTalk).toBeUndefined();
   });
 });

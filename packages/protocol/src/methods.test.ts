@@ -113,7 +113,6 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'routines.changed',
   'pet.mood',
   'pickUp.ready',
-  'settings.proposed',
   'board.changed',
 ] as const;
 

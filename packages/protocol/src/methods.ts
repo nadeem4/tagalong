@@ -132,7 +132,7 @@ import {
   PickUpRebriefResult,
 } from './pick-up';
 import { Pet } from './pet';
-import { CaptureBlock, Settings, SettingsPatch, SettingsProposedParams } from './settings';
+import { CaptureBlock, Settings, SettingsPatch } from './settings';
 import {
   SightLogClearParams,
   SightLogClearResult,
@@ -641,7 +641,6 @@ export const coreToHostNotifications = {
   'routines.changed': { params: RoutinesChangedParams },
   'pet.mood': { params: PetMoodParams },
   'pickUp.ready': { params: PickUpReadyParams },
-  'settings.proposed': { params: SettingsProposedParams },
   'board.changed': { params: BoardChangedParams },
 } as const satisfies Record<string, NotificationSpec>;
 
