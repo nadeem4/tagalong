@@ -1,7 +1,6 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/protocol" },
     { "path": "./protocol/ts" },
     { "path": "./bodies/ui" },
     { "path": "./bodies/desktop" },

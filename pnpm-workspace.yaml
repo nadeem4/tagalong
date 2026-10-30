@@ -1,4 +1,3 @@
 packages:
-  - 'packages/*'
   - 'bodies/*'
   - 'protocol/ts'

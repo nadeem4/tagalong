@@ -9,14 +9,13 @@ const uiFloor = { statements: 91, branches: 83, functions: 90, lines: 93 };
 
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'bodies/*', 'protocol/ts'],
+    projects: ['bodies/*', 'protocol/ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
-      // The pure packages carry the 70% bar. The desktop host (main process and
+      // The pure contract package carries the 70% bar. The desktop host (main process and
       // preload, not the renderer) and the shared UI carry a no-regression floor.
       include: [
-        'packages/protocol/src/**/*.{ts,tsx}',
         'protocol/ts/src/**/*.ts',
         'bodies/ui/src/**/*.{ts,tsx}',
         'bodies/desktop/src/main/**/*.ts',
@@ -24,7 +23,6 @@ export default defineConfig({
       ],
       exclude: ['**/*.test.ts', '**/*.test.tsx', '**/test-setup.ts'],
       thresholds: {
-        'packages/protocol/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'protocol/ts/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'bodies/ui/src/**': uiFloor,
         'bodies/desktop/src/{main,preload}/**': desktopHostFloor,

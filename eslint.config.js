@@ -5,11 +5,11 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 /**
- * Flat config. The rule that matters most here is the purity guard on the protocol
- * packages (packages/protocol and protocol/ts): neither may reach for electron, react,
- * or the DOM. If that rule fires, fix the import, never the rule.
+ * Flat config. The rule that matters most here is the purity guard on the contract
+ * package (protocol/ts): it may not reach for electron, react, or the DOM. If that rule
+ * fires, fix the import, never the rule.
  */
-const PURE_PACKAGES = ['packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'];
+const PURE_PACKAGES = ['protocol/ts/**/*.ts'];
 
 const PURITY_PATHS = [
   {
@@ -82,20 +82,20 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'],
+    files: ['protocol/ts/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           paths: [
-            { name: 'electron', message: 'packages/protocol depends on zod and nothing else.' },
-            { name: 'react', message: 'packages/protocol depends on zod and nothing else.' },
+            { name: 'electron', message: 'protocol/ts depends on zod and nothing else.' },
+            { name: 'react', message: 'protocol/ts depends on zod and nothing else.' },
           ],
           patterns: [
-            { group: ['node:*'], message: 'packages/protocol depends on zod and nothing else.' },
+            { group: ['node:*'], message: 'protocol/ts depends on zod and nothing else.' },
             {
               group: ['@tagalong/*'],
-              message: 'packages/protocol sits at the bottom of the dependency graph.',
+              message: 'protocol/ts sits at the bottom of the dependency graph.',
             },
           ],
         },
