@@ -4,3 +4,4 @@
  */
 export const MAX_PAGE_TEXT_CHARS = 40_000;
 export const MAX_SELECTION_CHARS = 20_000;
+export const TRUNCATED_NOTE = '\n[truncated at 40,000 characters]';

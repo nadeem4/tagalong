@@ -3,7 +3,7 @@
  * Injected into the user's tab, so it imports only limits. Forms report field names and
  * types, never what the person typed or chose.
  */
-import { MAX_PAGE_TEXT_CHARS } from './limits';
+import { MAX_PAGE_TEXT_CHARS, TRUNCATED_NOTE } from './limits';
 
 export type PartKind = 'links' | 'tables' | 'forms' | 'headings';
 
@@ -38,10 +38,20 @@ function headings(doc: Document): string[] {
 
 const SKIPPED_INPUTS = ['hidden', 'submit', 'button', 'reset', 'image'];
 
+/** A label's own words; a label that wraps a field must not carry the field's contents. */
+function labelText(label: Element | null | undefined): string {
+  if (!label) return '';
+  const copy = label.cloneNode(true) as Element;
+  copy
+    .querySelectorAll('select, textarea, input, option, script, style')
+    .forEach((n) => n.remove());
+  return clean(copy.textContent);
+}
+
 function fieldLabel(doc: Document, el: Element): string {
   const id = el.getAttribute('id');
   const byFor = id === null ? null : doc.querySelector(`label[for="${CSS.escape(id)}"]`);
-  const text = clean(byFor?.textContent ?? el.closest('label')?.textContent);
+  const text = labelText(byFor ?? el.closest('label'));
   return (
     text ||
     clean(el.getAttribute('aria-label')) ||
@@ -77,5 +87,5 @@ export function readParts(doc: Document, kind: PartKind): string {
   if (items.length === 0) return `There are no ${kind} on this page.`;
   const text = items.join(kind === 'forms' || kind === 'tables' ? '\n\n' : '\n');
   if (text.length <= MAX_PAGE_TEXT_CHARS) return text;
-  return `${text.slice(0, MAX_PAGE_TEXT_CHARS)}\n[truncated at 40,000 characters]`;
+  return `${text.slice(0, MAX_PAGE_TEXT_CHARS)}${TRUNCATED_NOTE}`;
 }

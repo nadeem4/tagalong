@@ -4,7 +4,7 @@
  * never wakes a sleeping tab or touches a page Chrome keeps locked.
  */
 import type { Part } from '@tagalong/contract';
-import { MAX_PAGE_TEXT_CHARS } from '../content/limits';
+import { MAX_PAGE_TEXT_CHARS, TRUNCATED_NOTE } from '../content/limits';
 import type { PageApi, PictureApi, TabInfo, TabsApi } from '../layer/api';
 import { FILE_ORIGIN, PERMISSION_WAIT_MS, type Need } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
@@ -122,12 +122,18 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     });
     // The person may have switched tabs while the site question was open; picture only what was allowed.
     const now = await tabs.get(allowed.id);
-    if (now === null || !now.active || siteOrigin(now.url) !== siteOrigin(allowed.url)) {
+    const same = (): boolean => {
+      try {
+        return now !== null && siteOrigin(now.url) === siteOrigin(allowed.url);
+      } catch {
+        return false;
+      }
+    };
+    if (now === null || !now.active || !same()) {
       throw failed('The tab in front changed while I was asking, so I did not take a picture.');
     }
-    const tab = now;
     try {
-      const shot = await pictureApi.capture(tab.windowId);
+      const shot = await pictureApi.capture(now.windowId);
       return [{ type: 'image', mime: shot.mime, data: shot.base64 }];
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e);
@@ -147,8 +153,7 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     const lines = [`url: ${reading.url}`, `title: ${reading.title}`];
     if (reading.selection !== '') lines.push(`selection: ${reading.selection}`);
     let text = `${lines.join('\n')}\n\n${reading.text.slice(0, MAX_PAGE_TEXT_CHARS)}`;
-    if (reading.truncated || reading.text.length > MAX_PAGE_TEXT_CHARS)
-      text += '\n[truncated at 40,000 characters]';
+    if (reading.truncated || reading.text.length > MAX_PAGE_TEXT_CHARS) text += TRUNCATED_NOTE;
     return [{ type: 'text', text }];
   }
 

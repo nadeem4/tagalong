@@ -69,6 +69,23 @@ describe('readParts forms', () => {
     expect(out).not.toContain('Narnia');
   });
 
+  it('wrapped_and_for_labels_never_carry_select_options_or_textarea_text', () => {
+    body(`<form>
+      <label>Country <select name="c"><option>Narnia</option></select></label>
+      <label for="n">Notes <textarea>private words</textarea></label><textarea id="n">more words</textarea>
+      <label>Memo <textarea name="m">secret memo</textarea></label>
+      <label for="wrap">Pick <select id="wrap"><option>Gondor</option></select></label>
+    </form>`);
+    const out = readParts(document, 'forms');
+    for (const leak of ['Narnia', 'private words', 'more words', 'secret memo', 'Gondor']) {
+      expect(out).not.toContain(leak);
+    }
+    expect(out).toContain('Country (select)');
+    expect(out).toContain('Notes (textarea)');
+    expect(out).toContain('Memo (textarea)');
+    expect(out).toContain('Pick (select)');
+  });
+
   it('forms_never_read_password_hidden_or_textarea_contents', () => {
     body(`<form>
       <input type="password" name="pw" value="s3cret">

@@ -291,6 +291,18 @@ describe('tabs picture', () => {
     expect(moved.capture).not.toHaveBeenCalled();
   });
 
+  it('picture_fails_plainly_if_the_tab_address_became_unreadable_while_asking', async () => {
+    const s = setup({
+      afterSite: (all) => {
+        all[0] = tab({ url: '' });
+      },
+    });
+    const e = await rejection(s.t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/changed while I was asking/);
+    expect(s.capture).not.toHaveBeenCalled();
+  });
+
   it('picture_failure_from_the_browser_is_tool_failed_with_a_plain_reason', async () => {
     const { t, capture } = setup();
     capture.mockRejectedValueOnce(new Error('Cannot capture this window'));
