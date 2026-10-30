@@ -60,7 +60,6 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY, forgetRetiredKeys } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
@@ -69,7 +68,7 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { openClaudeSignIn, signInFor } from './claude-sign-in';
+import { signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
@@ -1130,7 +1129,6 @@ function registerIpc(): void {
     if (state === 'signed-in' && desktop !== null) clearBrainMarks(desktop.statusMarks);
     return state;
   });
-  ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.
@@ -1163,11 +1161,6 @@ function registerIpc(): void {
     const { panel, avatar } = required();
     if (panel === null || avatar === null || !Number.isFinite(height)) return;
     fitPanel(panel, avatar, height);
-  });
-
-  ipcMain.handle(IPC.openLink, async (_event, url: string) => {
-    if (!isAllowedLink(url)) throw new Error(`Tagalong only opens provider key pages, not ${url}`);
-    await shell.openExternal(url);
   });
 
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());

@@ -322,7 +322,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Neutral
 
-- **Ink Navy** (shell-navy, `color.page`): the bubble, the speech tail, the standalone Settings bar.
+- **Ink Navy** (shell-navy, `color.page`): the bubble, the speech tail.
 - **Sidebar Navy** (sidebar-navy): Home's nav, the full chat's header.
 - **Active Row Navy** (row-active): the current page in Home's nav (hard-coded there as `#1E2442`).
 - **Avatar Tile** (avatar-tile): the tile behind Scout in Home, bubble chips, your own messages in the chat, inline code, hover on bubble icon buttons (hard-coded as `#222845`).
@@ -351,7 +351,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 **Body Font:** Onest (with system-ui, sans-serif)
 **Mono:** ui-monospace, Cascadia Mono, Consolas
 
-Every window bundles its faces from `@fontsource` (Latin subset), nothing fetched: Home and the standalone Settings window Onest 400/600 and Pixelify Sans 400/600/700; the bubble Onest 400/600 and Pixelify Sans 700; the dock Onest 600 for its tags.
+Every window bundles its faces from `@fontsource` (Latin subset), nothing fetched: Home Onest 400/600 and Pixelify Sans 400/600/700; the bubble Onest 400/600 and Pixelify Sans 700; the dock Onest 600 for its tags.
 
 **Character:** A chunky pixel face gives Scout a name and a voice; a clean geometric sans keeps every sentence and control modern.
 
@@ -381,7 +381,6 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the recording and listening dots 8px up and 16px in from the bottom corners, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
-- **Standalone Settings:** 1080x760, opened only when Tagalong starts without its engine; a 64px bar over a 280px nav (`size.headerHeight`, `size.navWidth`).
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
 

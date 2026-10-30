@@ -262,7 +262,6 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
   checkKey: (providerId: string) =>
     ipcRenderer.invoke(IPC.checkKey, providerId) as Promise<ProvidersCheckResult>,
-  openClaudeSignIn: () => ipcRenderer.invoke(IPC.openClaudeSignIn) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
   openBubble: () => ipcRenderer.invoke(IPC.openBubble) as Promise<void>,
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
@@ -308,7 +307,6 @@ const host: TagalongHostApi = {
   checkClaudeSignIn: () => ipcRenderer.invoke(IPC.checkClaudeSignIn) as Promise<ClaudeSignIn>,
   switchScout: (providerId: string) =>
     ipcRenderer.invoke(IPC.switchScout, providerId) as Promise<Pet>,
-  openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
   speak: (text: string, preview?: SpeakPreview) =>

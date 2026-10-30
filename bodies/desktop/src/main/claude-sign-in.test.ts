@@ -4,14 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  checkClaudeSignIn,
-  claudeSignInCommand,
-  fakeSignIn,
-  openClaudeSignIn,
-  parseAuthStatus,
-  signInFor,
-} from './claude-sign-in';
+import { checkClaudeSignIn, fakeSignIn, parseAuthStatus, signInFor } from './claude-sign-in';
 
 const SIGNED_IN = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'a@b.c' });
 const SIGNED_OUT = JSON.stringify({ loggedIn: false });
@@ -111,26 +104,5 @@ describe('fakeSignIn', () => {
     );
     expect(check).not.toHaveBeenCalled();
     expect(await signInFor({}, check)).toBe('signed-in');
-  });
-});
-
-describe('openClaudeSignIn', () => {
-  it('opens a terminal that signs in to Claude Code, on Windows', () => {
-    expect(claudeSignInCommand('win32')).toEqual({
-      command: 'cmd.exe',
-      args: ['/c', 'start', 'Claude sign-in', 'cmd', '/k', 'claude auth login'],
-    });
-  });
-
-  it('starts it detached, so it outlives nothing and blocks nothing', () => {
-    const calls: unknown[][] = [];
-    const unref = vi.fn();
-    openClaudeSignIn((...args: unknown[]) => {
-      calls.push(args);
-      return { unref, on: () => undefined };
-    }, 'win32');
-    expect(calls[0]?.[0]).toBe('cmd.exe');
-    expect(calls[0]?.[2]).toMatchObject({ detached: true, stdio: 'ignore' });
-    expect(unref).toHaveBeenCalledOnce();
   });
 });

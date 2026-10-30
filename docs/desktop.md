@@ -29,8 +29,8 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
 | `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
-| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                          |
-| `src/main/links.ts`, `fix-target.ts`       | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                           |
+| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`)                                                                                                              |
+| `src/main/links.ts`, `fix-target.ts`       | `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
@@ -348,8 +348,7 @@ shell, the screen):
 | `dragAvatar`, `dropAvatar`                           | move the pet by a finite step; save its position                                                                                                  |
 | `openSettings`                                       | `openSettingsPage(fixPage(target))`; an unknown target throws                                                                                     |
 | `openHome`, `openLogsFolder`                         | open the window or the folder                                                                                                                     |
-| `checkClaudeSignIn`, `openClaudeSignIn`              | `signInFor(env)` (signed in clears the brain marks); a terminal that signs in                                                                     |
-| `openLink`                                           | `shell.openExternal` only when `isAllowedLink(url)`                                                                                               |
+| `checkClaudeSignIn`                                  | `signInFor(env)` (signed in clears the brain marks)                                                                                               |
 | `dropOnPet` (`drop.ts`, `registerDropIpc`)           | only from the avatar's window (`fromWindow`); names the item and opens the bubble on `IPC.dropEvent`                                              |
 
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
@@ -680,7 +679,7 @@ the clean close and stops the brain client.
 - **Logging fails.** Swallowed; the console still has the line.
 - **Unsupported OS.** `createPlatform` throws, `start` rejects, and the app shows the error and
   quits.
-- **Refused inputs.** `openLink` throws for a URL off the allowlist; `openSettings` throws for an
+- **Refused inputs.** `openSettings` throws for an
   unknown Fix it target; `openPickUp` throws for an item the current pick-up did not name;
   `copyText`, `applySettings` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
   `fitPanel` ignore non-finite numbers.

@@ -511,7 +511,7 @@ After a rebuild, click the reload arrow on the Tagalong card in `chrome://extens
 
 ### Pair it, once
 
-1. In the desktop app, open the Settings window (tray → **Open Tagalong** → **Settings**). In its
+1. In the desktop app, open Home (tray → **Open Tagalong**), then **Settings**. In its
    **Browser extension (optional)** section, click **Copy** beside the pairing token. How pairing
    works is in [browser-extension.md](browser-extension.md#pairing).
 2. Chrome opens the extension's options page on first use (or right-click the toolbar button →

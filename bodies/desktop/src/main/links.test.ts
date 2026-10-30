@@ -1,33 +1,7 @@
 /** Tests for the link allowlists. */
 
 import { describe, expect, it } from 'vitest';
-import { isAllowedLink, isSignInPage } from './links';
-
-describe('isAllowedLink', () => {
-  it('opens the pages where provider keys are made', () => {
-    expect(isAllowedLink('https://openrouter.ai/keys')).toBe(true);
-    expect(isAllowedLink('https://console.anthropic.com/settings/keys')).toBe(true);
-  });
-
-  it('no longer opens the key page of the retired nebius provider', () => {
-    expect(isAllowedLink('https://tokenfactory.nebius.com/')).toBe(false);
-  });
-
-  it('opens the exact pages that link to installing a coding agent, and no others there', () => {
-    expect(isAllowedLink('https://claude.com/claude-code')).toBe(true);
-    expect(isAllowedLink('https://github.com/google-gemini/gemini-cli')).toBe(true);
-    expect(isAllowedLink('https://github.com/openai/codex')).toBe(true);
-    expect(isAllowedLink('https://github.com/evil/repo')).toBe(false);
-  });
-
-  it('refuses anything else, so a renderer cannot make main open arbitrary URLs', () => {
-    expect(isAllowedLink('https://evil.example.com/keys')).toBe(false);
-    expect(isAllowedLink('http://openrouter.ai/keys')).toBe(false);
-    expect(isAllowedLink('file:///C:/Windows/System32/calc.exe')).toBe(false);
-    expect(isAllowedLink('https://openrouter.ai.evil.example.com/')).toBe(false);
-    expect(isAllowedLink('not a url')).toBe(false);
-  });
-});
+import { isSignInPage } from './links';
 
 describe('isSignInPage', () => {
   it('opens a connected app’s sign-in page only over https', () => {

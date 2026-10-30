@@ -117,9 +117,7 @@ export const IPC = {
   stopWatch: 'tagalong:watch:stop',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
-  openLink: 'tagalong:link:open',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
-  openClaudeSignIn: 'tagalong:claude:open-sign-in',
   switchScout: 'tagalong:pets:switch-scout',
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
@@ -337,8 +335,6 @@ export interface TagalongHostApi {
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
   /** One test of the key just saved for `providerId`. */
   checkKey(providerId: string): Promise<ProvidersCheckResult>;
-  /** Opens a terminal that signs in to Claude Code. */
-  openClaudeSignIn(): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
   /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
   openBubble(): Promise<void>;
@@ -358,11 +354,6 @@ export interface TagalongHostApi {
    * model. Settings calls it after storing a key when no Claude sign-in was found.
    */
   switchScout(providerId: string): Promise<Pet>;
-  /**
-   * Opens a provider's key page, or a coding agent's install page, in the browser. Main
-   * refuses any other URL.
-   */
-  openLink(url: string): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;

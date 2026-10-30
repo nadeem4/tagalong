@@ -1,6 +1,6 @@
 /**
- * Why the microphone failed to open, read from the browser's error name. Shared by the talk
- * rules and the mic.
+ * Why the microphone failed to open, read from the browser's error name. Used by the talk
+ * rules and the mic tests.
  */
 
 /**
