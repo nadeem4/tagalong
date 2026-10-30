@@ -35,6 +35,8 @@ Thumbs.db
 
 # local agent history
 .remember/
+.superpowers/
+docs/superpowers/
 
 # design tool scratch (local only)
 .impeccable/
