@@ -2,6 +2,7 @@
  * The real Chrome behind the layer's interfaces: storage, tabs, page reading, permissions and
  * the brain websocket. The logic modules only ever see the interfaces in api.ts.
  */
+import type { PartKind } from '../content/page-parts';
 import type { PageReading } from '../content/read-page';
 import { requestQuery } from '../permission/model';
 import {
@@ -88,6 +89,19 @@ export const chromePage: PageApi = {
       throw new Error('the page reader did not run in this tab');
     }
     return reading;
+  },
+  async parts(tabId, part) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['page-reader.js'] });
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (kind: PartKind) => globalThis.__tagalongReadParts?.(kind) ?? null,
+      args: [part],
+    });
+    const text = result?.result as string | null | undefined;
+    if (text === null || text === undefined) {
+      throw new Error('the page reader did not run in this tab');
+    }
+    return text;
   },
 };
 

@@ -46,7 +46,7 @@ function setup(
     activeInFocusedWindow: async () => all.find((t) => t.active) ?? null,
   };
   const read = vi.fn(async (_id: number) => opts.reading ?? reading());
-  const page: PageApi = { read };
+  const page: PageApi = { read, parts: async () => '' };
   const needs: Needs = {
     ensure: async (need) => {
       calls.push(need);

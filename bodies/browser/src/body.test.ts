@@ -31,7 +31,10 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       get: () => Promise.resolve(null),
       activeInFocusedWindow: () => Promise.resolve(null),
     },
-    page: { read: () => Promise.reject(new Error('unused')) },
+    page: {
+      read: () => Promise.reject(new Error('unused')),
+      parts: () => Promise.reject(new Error('unused')),
+    },
     picture: { capture: () => Promise.reject(new Error('unused')) },
     broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
     random: () => 'ab12',

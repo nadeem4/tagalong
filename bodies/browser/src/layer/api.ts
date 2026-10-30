@@ -2,6 +2,7 @@
  * The thin edges the browser body talks through, so logic modules stay free of chrome.*.
  * Storage for identity and settings; tabs and page reading for the tabs tool.
  */
+import type { PartKind } from '../content/page-parts';
 import type { PageReading } from '../content/read-page';
 
 export interface StorageArea {
@@ -33,4 +34,6 @@ export interface PictureApi {
 export interface PageApi {
   /** Injects the page reader into the tab and returns what it read. */
   read(tabId: number): Promise<PageReading>;
+  /** Injects the page reader and returns one kind of page structure as plain text. */
+  parts(tabId: number, part: PartKind): Promise<string>;
 }

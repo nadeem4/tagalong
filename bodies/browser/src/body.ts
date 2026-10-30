@@ -9,6 +9,7 @@ import type { PageApi, PictureApi, StorageArea, TabsApi } from './layer/api';
 import { readSettings } from './settings';
 import { toolset } from './tools/registry';
 import type { PermissionBroker } from './permissions';
+import { pagePartsTool } from './tools/page-parts';
 import { tabsTool } from './tools/tabs';
 
 const SEQ_KEY = 'lastSeq';
@@ -63,6 +64,7 @@ export function createBody(deps: BodyDeps): BrowserBody {
         needs: deps.broker,
         bodyName: name,
       }),
+      pagePartsTool({ tabs: deps.tabs, page: deps.page, needs: deps.broker, bodyName: name }),
     ]);
     client = new BrainClient({
       addr: settings.addr,

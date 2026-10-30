@@ -52,6 +52,51 @@ function siteOrigin(url: string): string {
   return u.protocol === 'file:' ? FILE_ORIGIN : u.origin;
 }
 
+async function pick(tabs: TabsApi, tabId: unknown): Promise<TabInfo> {
+  if (tabId === undefined) {
+    const active = await tabs.activeInFocusedWindow();
+    if (active === null) throw failed('There is no active tab to read.');
+    return active;
+  }
+  if (typeof tabId !== 'number') throw invalid('tab_id must be a number');
+  const found = await tabs.get(tabId);
+  if (found === null) throw failed(`There is no tab with id ${tabId}.`);
+  return found;
+}
+
+/** Refuses a sleeping or locked tab. */
+function refuseUnreadable(tab: TabInfo): void {
+  if (tab.discarded) {
+    throw failed('That tab is asleep, and Scout will not wake it. Ask the user to open it first.');
+  }
+  const locked = lockedReason(tab.url);
+  if (locked !== null) throw failed(`I cannot read that tab: ${locked}.`);
+}
+
+/**
+ * Shared by every tool that reads a tab: asks for tabs, finds the tab, refuses a sleeping or
+ * locked one, runs the tool's own check, then asks for the tab's site.
+ */
+export async function resolveReadableTab(
+  deps: { tabs: TabsApi; needs: Needs },
+  tabId: unknown,
+  tabsReason: string,
+  check?: (tab: TabInfo) => void,
+): Promise<TabInfo> {
+  // One deadline for both questions, so they never outlast the brain's own timeout.
+  const deadline = Date.now() + PERMISSION_WAIT_MS;
+  await deps.needs.ensure({ kind: 'permission', name: 'tabs' }, tabsReason, PERMISSION_WAIT_MS);
+  const tab = await pick(deps.tabs, tabId);
+  refuseUnreadable(tab);
+  check?.(tab);
+  await deps.needs.ensure(
+    { kind: 'site', origin: siteOrigin(tab.url) },
+    `read ${tab.title || tab.url}`,
+    Math.max(0, deadline - Date.now()),
+  );
+  return tab;
+}
+
 export function tabsTool(deps: TabsDeps): BrowserTool {
   const { tabs, page, picture: pictureApi, needs, bodyName } = deps;
 
@@ -68,52 +113,15 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     return [{ type: 'text', text: JSON.stringify({ tabs: out }) }];
   }
 
-  async function pick(tabId: unknown): Promise<TabInfo> {
-    if (tabId === undefined) {
-      const active = await tabs.activeInFocusedWindow();
-      if (active === null) throw failed('There is no active tab to read.');
-      return active;
-    }
-    if (typeof tabId !== 'number') throw invalid('tab_id must be a number');
-    const found = await tabs.get(tabId);
-    if (found === null) throw failed(`There is no tab with id ${tabId}.`);
-    return found;
-  }
-
-  /** Refuses a sleeping or locked tab; shared by read and picture. */
-  function refuseUnreadable(tab: TabInfo): void {
-    if (tab.discarded) {
-      throw failed(
-        'That tab is asleep, and Scout will not wake it. Ask the user to open it first.',
-      );
-    }
-    const locked = lockedReason(tab.url);
-    if (locked !== null) throw failed(`I cannot read that tab: ${locked}.`);
-  }
-
-  function askSite(tab: TabInfo, deadline: number): Promise<void> {
-    return needs.ensure(
-      { kind: 'site', origin: siteOrigin(tab.url) },
-      `read ${tab.title || tab.url}`,
-      Math.max(0, deadline - Date.now()),
-    );
-  }
-
   async function picture(tabId: unknown): Promise<Part[]> {
-    const deadline = Date.now() + PERMISSION_WAIT_MS;
-    await needs.ensure(
-      { kind: 'permission', name: 'tabs' },
-      'take a picture of a tab',
-      PERMISSION_WAIT_MS,
-    );
-    const tab = await pick(tabId);
-    refuseUnreadable(tab);
-    if (!tab.active) {
-      throw failed(
-        'Only the tab in front can be pictured, and Scout will not switch tabs. Ask the user to open it first.',
-      );
-    }
-    await askSite(tab, deadline);
+    const allowed = await resolveReadableTab(deps, tabId, 'take a picture of a tab', (t) => {
+      if (!t.active) {
+        throw failed(
+          'Only the tab in front can be pictured, and Scout will not switch tabs. Ask the user to open it first.',
+        );
+      }
+    });
+    const tab = allowed;
     try {
       const shot = await pictureApi.capture(tab.windowId);
       return [{ type: 'image', mime: shot.mime, data: shot.base64 }];
@@ -124,12 +132,7 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
   }
 
   async function read(tabId: unknown): Promise<Part[]> {
-    // One deadline for the whole read, so two questions never outlast the brain's own timeout.
-    const deadline = Date.now() + PERMISSION_WAIT_MS;
-    await needs.ensure({ kind: 'permission', name: 'tabs' }, 'read a tab', PERMISSION_WAIT_MS);
-    const tab = await pick(tabId);
-    refuseUnreadable(tab);
-    await askSite(tab, deadline);
+    const tab = await resolveReadableTab(deps, tabId, 'read a tab');
     let reading;
     try {
       reading = await page.read(tab.id);
