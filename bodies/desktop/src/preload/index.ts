@@ -59,7 +59,6 @@ import type {
   HostView,
   ListeningState,
   ModelList,
-  PointerRing,
   SpeakPreview,
   SpeakResult,
   TagalongHostApi,
@@ -371,11 +370,6 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, state: ListeningState): void => handler(state);
     ipcRenderer.on(IPC.listeningEvent, listener);
     return () => void ipcRenderer.off(IPC.listeningEvent, listener);
-  },
-  onPointer: (handler) => {
-    const listener = (_event: IpcRendererEvent, ring: PointerRing): void => handler(ring);
-    ipcRenderer.on(IPC.pointerShow, listener);
-    return () => void ipcRenderer.off(IPC.pointerShow, listener);
   },
   // File.path is gone in Electron 44: webUtils, which a sandboxed preload may use, gives
   // the path. A File made in script, with no file behind it, gives '' and is left out.

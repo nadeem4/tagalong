@@ -15,31 +15,31 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 ## Where it lives
 
-| Path (under `bodies/desktop/`)                         | What it holds                                                                                                                                                               |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
-| `src/main/brain/start.ts`                              | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
-| `src/main/brain/body-tools.ts`                         | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
-| `src/main/brain/body-events.ts`                        | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
-| `src/main/hotkeys.ts`                                  | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
-| `src/main/talk-key.ts`                                 | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
-| `src/main/tray-menu.ts`, `tray-icon.ts`                | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
-| `src/main/windows/`                                    | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `welcome.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)               |
-| `src/main/ipc/`                                        | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
-| `src/main/drop.ts`, `drop-io.ts`                       | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
-| `src/main/status-marks.ts`                             | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
-| `src/main/launch.ts`, `welcome.ts`, `release-notes.ts` | The launch record, brain readiness, Welcome's main-process half, `RELEASE_NOTES`                                                                                            |
-| `src/main/claude-sign-in.ts`                           | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                          |
-| `src/main/links.ts`, `fix-target.ts`                   | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                           |
-| `src/main/log-file.ts`, `log-text.ts`                  | The log file                                                                                                                                                                |
-| `src/main/platform/`                                   | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
-| `src/preload/index.ts`, `held.ts`                      | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
-| `src/shared/ipc.ts`                                    | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                   |
-| `src/renderer/*.html`, `src/renderer/src/`             | One page per window: `avatar`, `panel`, `home`, `welcome`                                                                                                                   |
-| `electron.vite.config.ts`                              | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
-| `electron-builder.json`                                | The installer                                                                                                                                                               |
-| `scripts/`                                             | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                      |
-| `e2e/`                                                 | Playwright suites run against the built app                                                                                                                                 |
+| Path (under `bodies/desktop/`)             | What it holds                                                                                                                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/index.ts`                        | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
+| `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
+| `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
+| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
+| `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
+| `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
+| `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
+| `src/main/windows/`                        | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `welcome.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)               |
+| `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
+| `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
+| `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
+| `src/main/launch.ts`, `welcome.ts`         | The launch record, brain readiness, Welcome's main-process half                                                                                                             |
+| `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                          |
+| `src/main/links.ts`, `fix-target.ts`       | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                           |
+| `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
+| `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
+| `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
+| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                   |
+| `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`, `welcome`                                                                                                                   |
+| `electron.vite.config.ts`                  | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
+| `electron-builder.json`                    | The installer                                                                                                                                                               |
+| `scripts/`                                 | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                      |
+| `e2e/`                                     | Playwright suites run against the built app                                                                                                                                 |
 
 ## How it works
 
@@ -138,8 +138,7 @@ running.
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
-- **Not wired yet.** Pets are a fixed local Scout. Welcome never opens. The pointer overlay, the
-  separate Settings window, the launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
+- **Not wired yet.** Pets are a fixed local Scout. Welcome never opens. The launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
   and routines come back as the brain's rows land. Any IPC that needs them throws "Scout cannot do
   that yet on the new brain."
 
@@ -362,7 +361,7 @@ Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captur
 `statusMarkEvent`, `listeningEvent`, `homePageEvent`, `routineEvent`, `routineDraftEvent`,
 `greetEvent`, `greetLineEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
 `talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`,
-`earsProgressEvent` and `pointerShow` (no longer sent).
+`earsProgressEvent`.
 
 Three handlers check the sender with `fromWindow(window)`, which compares `event.sender` (set by
 Electron in main, so a page cannot forge it) with that window's `webContents`: `copyText` and
@@ -484,7 +483,7 @@ data over the channels in `shared/ipc.ts`:
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
   the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys, Welcome,
   Home, the panel's placement and fit, the avatar's drag, the greeting, remark and routine lines,
-  voice and ears, Always listening, the pointer ring, drops, the health facts and status marks.
+  voice and ears, Always listening, drops, the health facts and status marks.
 
 Each `on…` returns an unsubscribe function. `heldUntilHeard` (`preload/held.ts`) keeps the last
 value that arrived with no listener and hands it to the first one, for three events main may send
@@ -501,8 +500,8 @@ on `tagalongHost`. See [voice.md](voice.md).
 
 Everything OS-specific sits behind `Platform` (`src/main/platform/index.ts`):
 `getActiveWindow`, `captureSelection`, `readClipboard`, `captureActiveWindowImage`,
-`captureDisplays`, `listWindows`, `captureRegion`, `readWindowText`, `lookAtWindow` and
-`findElement`. Each method that reads the screen takes the exclusion list, so a refusal happens
+`captureDisplays`, `listWindows`, `captureRegion`, `readWindowText` and `lookAtWindow`.
+Each method that reads the screen takes the exclusion list, so a refusal happens
 inside the read. `createPlatform(platform = process.platform)` returns `Win32Platform` on
 `win32` and throws "Tagalong has no platform adapter for '…'. It runs on Windows only." anywhere
 else, because a host that silently perceives nothing looks like a broken engine. `gateSight`
@@ -604,8 +603,7 @@ releaseNotes: '', welcomed: true }`. The bubble's Try it invite is in
 `SIGN_IN_BUDGET_MS` (1,000 ms; a slow or failed check reads `unknown`, never a problem). When Scout
 cannot think, `brainStatus` sets a brain mark in `StatusMarks` and `brainLine` sends
 `IPC.greetLineEvent { status }`; the panel shows the mark's row with Fix it, never spoken. When it
-can, main calls `checkIn.launch { launch: { ...previousLaunch, version, releaseNotes:
-RELEASE_NOTES } }`, which answers at once; any line arrives later as `pet.remark` or
+can, main calls `checkIn.launch { launch: { ...previousLaunch, version } }`, which answers at once; any line arrives later as `pet.remark` or
 `pickUp.ready`. Then main saves `lastOpenedAt`. The launch record (`launch.ts`): `recordLaunch`
 reads whether the last launch closed cleanly and stores `closedCleanly: false` and the running
 version; `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on `before-quit` and
@@ -630,8 +628,8 @@ on the avatar's `session-end`. The check-in itself is in [mind.md](mind.md).
   die with "bufferUtil.unmask is not a function" on the first masked frame.
 - **preload**: `src/preload/index.ts` to `dist/preload/index.cjs`, CommonJS, because a sandboxed
   preload cannot be an ES module while the package is.
-- **renderer**: root `src/renderer`, six HTML inputs (`avatar`, `panel`, `settings`, `welcome`,
-  `home`, `pointer`) to `dist/renderer`. React and React DOM are aliased to the copies
+- **renderer**: root `src/renderer`, four HTML inputs (`avatar`, `panel`, `welcome`,
+  `home`) to `dist/renderer`. React and React DOM are aliased to the copies
   `@tagalong/ui` resolves, so there is one React instance. JSX uses Vite's esbuild transform
   (`jsx: 'automatic'`), not `@vitejs/plugin-react` (it needs Vite 8; the app is on Vite 7), so
   there is no Fast Refresh in development.

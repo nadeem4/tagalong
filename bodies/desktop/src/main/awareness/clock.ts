@@ -1,5 +1,5 @@
 /**
- * Time as an injectable Clock, so rolling memory and the pointer run under a fake clock in tests.
+ * Time as an injectable Clock, so rolling memory and the timers run under a fake clock in tests.
  * Contains Clock and systemClock.
  */
 

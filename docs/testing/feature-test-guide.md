@@ -61,8 +61,7 @@ and **Model** to a Claude id (for example `anthropic/claude-sonnet-5`). Save.
 
 **Fake provider (no key).** Steps marked _fake provider_ need no key: launch from source with
 `TAGALONG_FAKE_PROVIDERS=1` (PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Scout streams a
-scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine. Keeping an eye
-on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is also set.
+scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine.
 
 **A fresh profile.** Run `pnpm --filter @tagalong/desktop start:fresh` (a new temp data folder each
 time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwards).
@@ -935,7 +934,7 @@ No line is written in code, and the wording varies; run each check about three t
 
 ## Keeping an eye on things
 
-On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1` is set.
+On by default.
 Every line here is a check-in (see C below): the mind's own words, and usually nothing. Never pin
 the wording; check that a line is short, about the facts, and that silence is common.
 
@@ -2299,8 +2298,8 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 1. **Setup:** Windows with Node.js 22 and pnpm 10; a clean checkout; `pnpm install`.
 2. **Action:** `pnpm package:win` from the repository root.
-3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.1.0-x64.exe`
-   exists. In `apps\desktop\release\win-unpacked\resources` there are `app.asar`,
+3. **Expected:** it ends without errors and `bodies\desktop\release\Tagalong-Setup-0.1.0-x64.exe`
+   exists. In `bodies\desktop\release\win-unpacked\resources` there are `app.asar`,
    `app.asar.unpacked` (holding `better-sqlite3`'s and `get-windows`' Windows binaries) and
    `extension`.
 

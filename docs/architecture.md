@@ -133,10 +133,10 @@ A host implements two things.
 says what it can do in `hello`'s `capabilities`; the engine only asks a host for what it
 advertised.
 
-| Host      | Capabilities (`hello`)                                                                               | Source                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts`   |
-| Extension | `selection`, `pageText`, `activeWindow`                                                              | `EXTENSION_CAPABILITIES`, `apps/extension/src/capabilities.ts` |
+| Host      | Capabilities (`hello`)                                                                    | Source                                                         |
+| --------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts`   |
+| Extension | `selection`, `pageText`, `activeWindow`                                                   | `EXTENSION_CAPABILITIES`, `apps/extension/src/capabilities.ts` |
 
 Exclusions and the built-in blind spots are checked before anything is read; the details are in
 [sight.md](sight.md).
@@ -314,7 +314,7 @@ then awaited `handoffs.stopAll()`, `jobs.stopAll()`, `connections.closeAll()`,
 and last `db.close()`.
 
 On the desktop, `before-quit` disposes the hotkeys, the talk key hook, the voice process, keep an
-eye, the listening guard, the pointer overlay, presence, rolling memory and the perception memory,
+eye, the listening guard, presence, rolling memory and the perception memory,
 records a clean close, and calls `host.shutdown()` (client first, then engine) without awaiting it.
 
 ## Subsystem map

@@ -103,19 +103,19 @@ tagalong/
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, welcome.ts, launch.ts,
-                                    # claude-sign-in.ts, keep-an-eye.ts, sight-pause.ts, drop.ts,
+                                    # claude-sign-in.ts, sight-pause.ts, drop.ts,
                                     # routine-delivery.ts, log-file.ts, links.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
                                     # handler.ts, ears-host.ts, worker-local-voice.ts, main.ts (its bootstrap)
       src/main/platform/            # capture, downscale, composite, canvas, label, displays, ocr,
-                                    # read-text, text-layer, find-element, sight-gate,
+                                    # read-text, text-layer, sight-gate,
                                     # window-helper, window-list, window-shot, selection, win32
-      src/main/windows/             # one module per window: avatar, panel, home, settings, welcome, pointer
+      src/main/windows/             # one module per window: avatar, panel, home, welcome
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar (Scout), panel (the bubble), welcome (Welcome),
-                                    # home (Home), settings (Settings) and pointer HTML, src/*.tsx
+                                    # and home (Home) HTML, src/*.tsx
       src/renderer/src/settings/    # the Settings page, one file per section
       src/renderer/src/bean/        # Bean's WebP strips and manifest.json
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
@@ -345,9 +345,7 @@ you normally never call it yourself.
 **`TAGALONG_FAKE_PROVIDERS=1`.** With this set, `createProvider` returns the scripted
 `FakeBrainProvider` whatever settings say: no API key, no network, and a deterministic word-by-word
 stream. Hand-offs go to a scripted expert, so no Claude Code usage is spent. It is how the
-Playwright suites run, and the easiest way to see the app work before you have a key. Keeping an eye
-on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is set too, and no window the engine lists
-counts as full screen, so the CI desktop never holds a check-in (the launch one included). Without
+Playwright suites run, and the easiest way to see the app work before you have a key. Without
 it, Scout asks the provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
 with the Claude sign-in (`claude-code`, Sonnet), which needs Claude Code installed and signed in;
 Welcome offers a keyed provider instead. The engine itself boots without any key.
@@ -560,7 +558,6 @@ shell you launch from**, as shown above.
 | `TAGALONG_FAKE_PROVIDERS=1` | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                                                                                                                                                    |
 | `TAGALONG_FAKE_TOOL`        | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                                                                                                                                                                                                                     |
 | `TAGALONG_FAKE_TOOL_INPUT`  | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                                                                                                                                                                                                            |
-| `TAGALONG_KEEP_AN_EYE=1`    | **Read** (`bodies/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                                                                                                                                                                                                               |
 | `TAGALONG_SKIP_WELCOME=1`   | **Read** (`bodies/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                                                                                                                                                                                                      |
 | `TAGALONG_FAKE_TTS=1`       | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
 | `TAGALONG_FAKE_STT=1`       | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |

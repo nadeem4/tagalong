@@ -38,7 +38,6 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // to fails on a missing inventory rather than on invented windows.
     listWindows: async () => ({ windows: [] }),
     lookAtWindow: async () => ({ windowId: '' }),
-    findElement: async () => ({ found: false, notes: [] }),
     ...overrides,
   };
 }
@@ -352,8 +351,8 @@ describe('DESKTOP_CAPABILITIES', () => {
     expect(DESKTOP_CAPABILITIES).toContain('recall');
   });
 
-  it('advertises the pointer, now that screen.pointAt is answered', () => {
-    expect(DESKTOP_CAPABILITIES).toContain('pointer');
+  it('no longer advertises the pointer: the overlay that drew it is gone', () => {
+    expect(DESKTOP_CAPABILITIES).not.toContain('pointer');
   });
 });
 

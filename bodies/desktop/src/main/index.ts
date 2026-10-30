@@ -1,6 +1,6 @@
 /**
  * The desktop app's main process: dials the brain, makes the windows (Scout, its bubble,
- * Home, Welcome, the pointer overlay), the tray and the hotkeys, and wires every IPC channel.
+ * Home, Welcome), the tray and the hotkeys, and wires every IPC channel.
  * Handlers that need only the brain, settings or voice live in `ipc/`; the ones here need
  * Electron itself: they move windows, read the screen or open things through the shell.
  */
