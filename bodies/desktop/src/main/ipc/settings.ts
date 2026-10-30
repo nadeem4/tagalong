@@ -1,13 +1,13 @@
 /**
- * IPC for Settings: the host view every window reads, saving settings, the keys and the model
- * lists. Reads and writes the desktop's own settings file; the brain has no settings or model
- * calls yet. Contains registerSettingsIpc.
+ * IPC for Settings: the host view every window reads, saving settings and the keys. Reads and
+ * writes the desktop's own settings file; the brain has no settings. Contains
+ * registerSettingsIpc.
  */
 
 import type { SecretStore } from '@tagalong/core';
-import type { ProvidersCheckResult, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import type { HostView, ModelList } from '../../shared/ipc';
+import type { HostView } from '../../shared/ipc';
 import {
   ELEVENLABS_SECRET_KEY,
   providerChoices,
@@ -15,7 +15,6 @@ import {
   storedKeys,
 } from '../provider-choices';
 import type { IpcHandle } from './handle';
-import { applySettings } from './apply-settings';
 import { localScout } from './scout';
 
 export interface SettingsIpcDeps {
@@ -30,13 +29,9 @@ export interface SettingsIpcDeps {
   configureRolling: (rollingMemory: Settings['rollingMemory']) => void;
   /** Sends the saved settings to every open window. */
   broadcast: (settings: Settings) => void;
-  /** Always listening's off path, the same as the bubble's switch (`IPC.setListening`). */
-  listeningOff: () => void;
-  /** Whether the call came from the bubble's window: the only one with a settings card. */
-  fromPanel: (event: unknown) => boolean;
 }
 
-/** Settings, the keys, and the model lists. */
+/** Settings and the keys. */
 export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): void {
   const readSettings = (): Promise<Settings> => Promise.resolve(deps.settingsStore().get());
 
@@ -73,19 +68,6 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
 
   handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch));
 
-  // Apply on Scout's settings card: a click only. Always listening goes its own off path.
-  // The patch is the renderer's, so it is checked again against the settings now.
-  handle(IPC.applySettings, (event, patch: unknown) => {
-    if (!deps.fromPanel(event)) {
-      return Promise.reject(new Error('A settings card is applied only from the bubble.'));
-    }
-    return applySettings(patch, {
-      current: readSettings,
-      listeningOff: () => deps.listeningOff(),
-      save,
-    });
-  });
-
   handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {
     const secrets = deps.secrets();
     const secretKey = secretKeyFor(providerId);
@@ -93,12 +75,4 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     if (apiKey.length === 0) await secrets.delete(secretKey);
     else await secrets.set(secretKey, apiKey);
   });
-
-  handle(IPC.checkKey, (): ProvidersCheckResult => ({
-    ok: false,
-    message: 'Keys are checked by the brain now; Tagalong can’t test one here yet.',
-  }));
-
-  // The brain has no model lists yet: the form still takes a typed model id.
-  handle(IPC.listModels, (): ModelList => ({ models: [], source: 'fallback' }));
 }

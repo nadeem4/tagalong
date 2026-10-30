@@ -140,8 +140,6 @@ matching ask reaches you.
 | `packages/core/src/engine.ts`                    | Builds `Asks`, calls `boot` and `prune`, the `asks.*` and `tool.approve` handlers, `closeHeld` on shutdown                            |
 | `packages/core/src/tools/builtin/connections.ts` | Holds an app change through `deps.confirm` (`Asks.hold`); see [connected-apps.md](connected-apps.md)                                  |
 | `packages/core/src/experts/handoffs.ts`          | Adds a hand-off card (`Asks.add`), settles it on Send, Dismiss or a gone expert; see [experts.md](experts.md)                         |
-| `bodies/desktop/src/main/ipc/asks.ts`            | `registerAskIpc`: `tagalong:asks:list`, `tagalong:asks:answer`, `tagalong:asks:open`                                                  |
-| `bodies/desktop/src/preload/index.ts`            | `listAsks`, `answerAsk`, `openAsk` on the bridge                                                                                      |
 | `bodies/ui/src/home/home-view.tsx`               | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
 | `bodies/ui/src/connector-confirm.tsx`            | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
 
@@ -365,4 +363,3 @@ rows keep one short line for 30 days. See [privacy.md](privacy.md).
   second answer loses; a write waiting at quit is `expired/closed` after relaunch and nothing ran; a
   hand-off card survives a relaunch and Send starts it; Delete all keeps the waiting.
 - `packages/core/src/tools/registry.test.ts`: no role's tool can answer an ask.
-- `bodies/desktop/src/main/ipc/asks.test.ts`.

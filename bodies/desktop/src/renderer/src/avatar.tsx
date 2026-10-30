@@ -154,7 +154,6 @@ function Avatar() {
         onClick={() => {
           // The click that ends a drag is not a click on the pet.
           if (!input.takeClick()) return;
-          send({ type: 'looked' });
           void window.tagalongHost.openBubble();
         }}
       >

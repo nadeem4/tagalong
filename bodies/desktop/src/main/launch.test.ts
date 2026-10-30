@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Pet, Settings, type SettingsPatch } from '@tagalong/protocol';
-import { brainLine, brainReadiness, brainStatus, recordCleanClose, recordLaunch } from './launch';
+import { brainReadiness, brainStatus, recordCleanClose, recordLaunch } from './launch';
 import { providerChoices } from './provider-choices';
 
 afterEach(() => vi.useRealTimers());
@@ -110,19 +110,6 @@ describe('brainReadiness', () => {
     const pending = ask('claude-code', () => new Promise(() => undefined));
     await vi.advanceTimersByTimeAsync(1_000);
     expect(await pending).toBe('unknown');
-  });
-});
-
-describe('brainLine', () => {
-  it('is nothing when Scout can think, or could not be checked: the check-in has the line', () => {
-    expect(brainLine('ready')).toBeNull();
-    expect(brainLine('unknown')).toBeNull();
-  });
-
-  it('gives a status mark, never words in Scout’s voice, when Scout cannot think', () => {
-    expect(brainLine('signed-out')).toEqual({ status: 'brain-signed-out' });
-    expect(brainLine('no-sign-in')).toEqual({ status: 'brain-no-sign-in' });
-    expect(brainLine('no-key')).toEqual({ status: 'brain-no-key' });
   });
 });
 

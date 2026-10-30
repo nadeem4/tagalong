@@ -1,7 +1,6 @@
 /**
- * IPC for asking and interrupting: both go to the brain over contract v1. Stopping a watch
- * and a remark's two buttons are kept as no-ops until the brain has them. Contains
- * registerTurnIpc.
+ * IPC for asking and interrupting: both go to the brain over contract v1. A remark's Not now
+ * is kept as a no-op, since the brain has nothing to tell. Contains registerTurnIpc.
  */
 
 import type { Part, SayParams } from '@tagalong/contract';
@@ -86,12 +85,9 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
     },
   );
 
-  handle(IPC.stopWatch, () => undefined);
-
   handle(IPC.interrupt, (_event, turnId: string) => {
     deps.brain.cancel(turnId);
   });
 
   handle(IPC.remarkNotNow, () => undefined);
-  handle(IPC.remarkAccept, () => undefined);
 }

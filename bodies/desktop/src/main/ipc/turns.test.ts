@@ -109,11 +109,9 @@ describe('registerTurnIpc', () => {
     expect(cancelled).toEqual(['t1']);
   });
 
-  it('watch stop and the remark buttons do nothing', async () => {
+  it("a remark's Not now does nothing", async () => {
     const { invoke, said, cancelled } = setup();
-    await invoke(IPC.stopWatch, 'w1');
     await invoke(IPC.remarkNotNow);
-    await invoke(IPC.remarkAccept, 'r1');
     expect([said, cancelled]).toEqual([[], []]);
   });
 });

@@ -21,7 +21,6 @@ import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
-import type { GreetLine } from '../../shared/ipc';
 import { prepareLine } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
@@ -72,8 +71,6 @@ function Panel() {
   const [petName, setPetName] = useState('Scout');
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
-  const [greeting, setGreeting] = useState(false);
-  const [line, setLine] = useState<GreetLine | null>(null);
   // A line Scout says on its own, from keeping an eye on things, with Not now on it.
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
   // Something dropped on Scout: its card, until a button on it is pressed.
@@ -115,8 +112,6 @@ function Panel() {
     answering,
     onBegin: () => {
       mouth.stop();
-      setGreeting(false);
-      setLine(null);
       setRemark(null);
     },
   });
@@ -142,17 +137,6 @@ function Panel() {
 
   useEffect(() => window.tagalongHost.onPanelSide(setSide), []);
 
-  useEffect(
-    () =>
-      window.tagalongHost.onGreet(() => {
-        setMode('bubble');
-        setLine(null);
-        // The hello's line, if any, is the mind's: it comes to the bubble as a check-in remark.
-        setGreeting(true);
-      }),
-    [],
-  );
-
   useEffect(() => {
     void window.tagalongHost
       .getStatusMark()
@@ -161,23 +145,10 @@ function Panel() {
     return window.tagalongHost.onStatusMark(setStatus);
   }, []);
 
-  // A later launch: one quiet line, which fades and hides the window unless touched. A brain
-  // that cannot think comes as a status mark: shown with Fix it, never said aloud.
-  useEffect(
-    () =>
-      window.tagalongHost.onGreetLine((next) => {
-        setMode('bubble');
-        setLine(next);
-        if ('text' in next) mouth.say(next.text);
-      }),
-    [mouth],
-  );
-
   useEffect(
     () =>
       window.tagalongHost.onRemark((next) => {
         setMode('bubble');
-        setLine(null);
         setRemark(next);
         mouth.say(next.text);
       }),
@@ -199,19 +170,11 @@ function Panel() {
     return () => observer.disconnect();
   }, [mode, petId]);
 
-  function dismissGreeting(): void {
-    setGreeting(false);
-    mouth.stop();
-    void window.tagalongHost.hidePanel();
-  }
-
   useEffect(() => {
     void window.tagalongHost.getContext().then(setSnapshot);
-    // A hotkey press means a question: it ends the hello and brings back the bubble.
+    // A hotkey press means a question: it ends a quiet line and brings back the bubble.
     return window.tagalongHost.onContext((next) => {
       setSnapshot(next);
-      setGreeting(false);
-      setLine(null);
       setRemark(null);
       setDrop(null);
     });
@@ -222,8 +185,6 @@ function Panel() {
     () =>
       window.tagalongHost.onDrop((offer) => {
         setMode('bubble');
-        setGreeting(false);
-        setLine(null);
         setRemark(null);
         setDrop(offer);
       }),
@@ -294,40 +255,11 @@ function Panel() {
               onOpen={() => setRemark(null)}
               onNotNow={() => void window.tagalongHost.remarkNotNow()}
             />
-          ) : line !== null && 'status' in line ? (
-            <GreetingLine
-              petName={petName}
-              status={{ id: line.status }}
-              tail={side === 'left' ? 'right' : 'left'}
-              onDone={() => {
-                setLine(null);
-                void window.tagalongHost.hidePanel();
-              }}
-              onFix={(target) => {
-                setLine(null);
-                void window.tagalongHost.openSettings(target);
-                void window.tagalongHost.hidePanel();
-              }}
-            />
-          ) : line !== null ? (
-            <GreetingLine
-              petName={petName}
-              text={line.text}
-              tail={side === 'left' ? 'right' : 'left'}
-              onDone={() => {
-                setLine(null);
-                mouth.stop();
-                void window.tagalongHost.hidePanel();
-              }}
-              onOpen={() => setLine(null)}
-            />
           ) : (
             <CompanionBubble
               petId={petId}
               petName={petName}
-              greeting={greeting}
               expanded={mode === 'chat'}
-              onDismiss={dismissGreeting}
               onOpenChat={() => setMode('chat')}
               onCollapse={() => setMode('bubble')}
               onClose={() => {

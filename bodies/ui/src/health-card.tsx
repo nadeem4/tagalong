@@ -35,7 +35,7 @@ export function HealthCard({
       <style>{HEALTH_CSS}</style>
       {rows === null ? (
         <p className="bubble-text" role="status">
-          Checkingâ€¦
+          Checking…
         </p>
       ) : (
         <>

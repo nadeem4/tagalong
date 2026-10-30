@@ -1,11 +1,11 @@
 /**
  * What a launch remembers and says: the clean-close marker, whether Scout can think right now, and
  * the launch line's brain mark. Contains recordLaunch, recordCleanClose, brainReadiness,
- * brainStatus and brainLine.
+ * and brainStatus.
  */
 
 import type { Pet, Settings, SettingsPatch, StatusId } from '@tagalong/protocol';
-import type { ClaudeSignIn, GreetLine, ProviderChoice } from '../shared/ipc';
+import type { ClaudeSignIn, ProviderChoice } from '../shared/ipc';
 
 /** The slice of the settings store the launch record needs. */
 export interface LaunchStore {
@@ -87,13 +87,4 @@ export function brainStatus(brain: BrainReadiness): StatusId | null {
     default:
       return null;
   }
-}
-
-/**
- * When Scout cannot think, a status mark (shown as a row with Fix it, never spoken): the body
- * never talks in Scout's voice. Null when it can: the launch check-in has the line, if any.
- */
-export function brainLine(brain: BrainReadiness): GreetLine | null {
-  const status = brainStatus(brain);
-  return status === null ? null : { status };
 }

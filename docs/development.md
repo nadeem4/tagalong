@@ -104,7 +104,7 @@ tagalong/
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, launch.ts,
                                     # claude-sign-in.ts, sight-pause.ts, drop.ts,
-                                    # routine-delivery.ts, log-file.ts, links.ts, awareness/, ipc/,
+                                    # log-file.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
@@ -463,24 +463,16 @@ focused window against the capture exclusions in settings (password managers and
 credential prompts by default); when one matches, no picture is taken at all and the bubble is told
 that capture is blocked here, naming only the exclusion entry that matched.
 
-### The pairing token
+### No pairing token
 
-On boot the engine writes a 32-byte hex token to `pairing.token` in its data dir, alongside
-`tagalong.db`, `settings.json`, and `secrets.json`. On Windows that directory is
-`%APPDATA%\Tagalong`, which is `productName` in `bodies/desktop/package.json` — Electron derives the
-data directory from it, and changing it moves everyone's settings, database and saved keys with no
-migration. The token is stable across restarts, so a host that has already paired does not have to
-pair again.
+The Python brain has no pairing token: it is single user and listens on `127.0.0.1`, and a body's
+`hello` carries only the protocol version, its kind and its tools (see
+[protocol/README.md](../protocol/README.md)). The desktop shows no pairing step. The old engine's
+token (`readOrCreatePairingToken`, `packages/core`) goes when `packages/core` is deleted.
 
-Every host must present that token in its `hello` call. A connection that sends anything else gets
-RPC error `-32000` and the socket is closed; a connection that calls any other method before `hello`
-gets the same error.
-
-The token exists because **loopback is not a permission boundary**. Any process running as the user
-can open a socket to `127.0.0.1:47321` — binding to loopback only keeps other machines out, not other
-programs on this one. Without the token, any local program could drive Scout, read the user's
-conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
-the length of the shared prefix through timing.
+The data directory is still `%APPDATA%\Tagalong` on Windows, which is `productName` in
+`bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
+settings and saved keys with no migration.
 
 ## The browser body in detail
 
@@ -559,7 +551,7 @@ the browser body, or something new. Adding one never touches the core.
    The shared React components in `bodies/ui` do this already — hand them a `HostBridge` and nothing
    else.
 3. Speak the JSON-RPC protocol over the localhost WebSocket the engine exposes
-   (`ws://127.0.0.1:47321` by default), presenting the pairing token in `hello`. The method catalog and
+   (`ws://127.0.0.1:47321` by default), sending `hello` first. The method catalog and
    every payload schema live in `packages/protocol`.
 4. Never import core internals. A host uses the protocol, and the engine's public API only where it
    embeds the engine in process. `bodies/browser` imports nothing from core at all.

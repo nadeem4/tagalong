@@ -5,7 +5,6 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Pet } from '@tagalong/protocol';
 import { SETTINGS_CSS } from '@tagalong/ui';
 import {
   SettingsFieldError,
@@ -45,7 +44,6 @@ import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc'
 export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<HostView | null>(null);
   const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
-  const [models, setModels] = useState<Record<string, string[]>>({});
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [summarizer, setSummarizer] = useState('');
   const [advanced, setAdvanced] = useState(false);
@@ -87,27 +85,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   }, []);
   useEffect(checkSignIn, [checkSignIn]);
 
-  // The summarizer list offers each keyed service's models once it has a key.
-  const keyedWithKey = (view?.providers ?? [])
-    .filter((choice) => choice.needsKey && choice.hasKey)
-    .map((choice) => choice.id)
-    .join(',');
-  useEffect(() => {
-    if (keyedWithKey === '') return;
-    let current = true;
-    for (const providerId of keyedWithKey.split(',')) {
-      window.tagalongHost
-        .listModels(providerId)
-        .then((list) => {
-          if (current) setModels((known) => ({ ...known, [providerId]: list.models }));
-        })
-        .catch(() => undefined);
-    }
-    return () => {
-      current = false;
-    };
-  }, [keyedWithKey]);
-
   // Saving a fixed accelerator re-registers it in main, which is where the outcome is
   // known. Without this the window would keep showing the old failure next to the very
   // field that just corrected it.
@@ -143,7 +120,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
     return (
       <main className="tg-settings">
         <style>{SETTINGS_CSS}</style>
-        <p style={{ padding: 20 }}>{status === '' ? 'Loadingâ€¦' : status}</p>
+        <p style={{ padding: 20 }}>{status === '' ? 'Loading…' : status}</p>
       </main>
     );
   }
@@ -164,15 +141,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
             ),
           },
     );
-
-  const switched = (pet: Pet, providerId: string): void => {
-    markProviders(providerId, true);
-    setView((current) =>
-      current === null
-        ? current
-        : { ...current, pets: current.pets.map((known) => (known.id === pet.id ? pet : known)) },
-    );
-  };
 
   const removeKey = async (providerId: string): Promise<void> => {
     const label =
@@ -262,7 +230,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
-      // "Watches at once must beâ€¦" beside that very field, Advanced opened if it is there.
+      // "Watches at once must be…" beside that very field, Advanced opened if it is there.
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof SettingsFieldError) {
         if (isAdvancedField(error.field)) setAdvanced(true);
@@ -320,12 +288,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
               </button>
             </div>
           )}
-          <BrainSection
-            brain={brain}
-            providers={view.providers}
-            onCheckAgain={checkSignIn}
-            onSwitched={switched}
-          />
+          <BrainSection brain={brain} onCheckAgain={checkSignIn} />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
           <BudgetSection settings={settings} />
@@ -337,7 +300,8 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
               groups={summarizerGroups({
                 providers: view.providers,
                 signIn,
-                models,
+                // The brain serves no model lists, so each service offers only the typed id.
+                models: {},
                 current: settings.summarizer,
               })}
               value={summarizer}

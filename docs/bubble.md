@@ -165,7 +165,7 @@ The bubble keeps each one's state from its notification:
 
 Asks are in [asks.md](asks.md).
 
-**The hello.** With `greeting` set (main's `IPC.greetEvent`, which nothing sends on the Python brain yet),
+**The hello.** With `greeting` set (nothing sets it on the Python brain yet; main's greeting channel was deleted),
 `TryItInvite` shows **Try it now** (focused) and **Got it**, and writes no line of its own. The
 line above them is the mind's: the first `pet.remark` without a `handoffId` that arrives while the
 hello is up, typed in at 22 ms a character (`TYPE_MS`; whole under `prefers-reduced-motion`), read

@@ -608,17 +608,16 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 
 1. **Setup:** run `claude auth logout` in a terminal. Scout on the Claude sign-in.
 2. **Action:** open Settings. Then run `claude auth login`, and click **Check again**.
-3. **Expected:** first a **Signed out** chip with "Run claude in a terminal and sign in", and the
-   buttons **Check again** and **Use an API key instead**. After signing in, **Check again** turns it
+3. **Expected:** first a **Signed out** chip with "Run claude in a terminal and sign in", and a
+   **Check again** button. After signing in, **Check again** turns it
    into **Signed in**. No model call is made (Activity stays empty).
 
-### S.3. No Claude Code: pick a service and paste a key
+### S.3. No Claude Code
 
-1. **Setup:** a machine (or PATH) without `claude`. Scout on the Claude sign-in.
-2. **Action:** open Settings, pick **OpenRouter**, paste a key, click **Save**.
-3. **Expected:** before saving, "Scout needs a brain to think with" and two services. After Save
-   the card reads **OpenRouter · anthropic/claude-haiku-4.5** (the recommended model) with **Key
-   stored**, and Scout answers the next question on OpenRouter.
+1. **Setup:** a machine (or PATH) without `claude`.
+2. **Action:** open Settings.
+3. **Expected:** the brain card says Claude Code is not installed, with a **Check again** button.
+   There is no service picker: the brain's model and key are set in the brain's `.env`.
 
 ### S.4. API keys: add, replace, remove
 

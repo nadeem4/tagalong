@@ -1,11 +1,9 @@
 /**
  * What the companion on the dock is doing, kept apart from its rendering so it is tested
  * in plain Node. Seeing wins while a capture is fresh; then reading, while a screen tool is
- * in flight; then thinking, while the companion answers the person; then expert, while an
- * expert has a task; then working, while one of Scout's own background turns (a job, a
- * routine) runs; then Seeing again while something is held over the pet to drop on it; then
- * a wince or a cheer, for a few seconds; then tired, from a gentle nudge until `rested`;
- * then done, until the person clicks to look; then dozing, while the person is away.
+ * in flight; then thinking, while the companion answers the person; then working, while one
+ * of Scout's own background turns (a job, a wake) runs; then Seeing again while something is
+ * held over the pet to drop on it; then dozing, while the person is away.
  * Contains nextDock and dockMood (the mood reducer) and startDrag/moveDrag (when a press
  * becomes a drag).
  */
@@ -15,48 +13,33 @@ export interface DockState {
   seeing: boolean;
   /** The person's own turns: Scout thinking. */
   turns: ReadonlySet<string>;
-  /** Background turns, a job's or a routine's: Scout working on its own. */
+  /** Background turns, a job's or a wake's: Scout working on its own. */
   jobs: ReadonlySet<string>;
-  handoffs: ReadonlySet<string>;
   /** Turns with a screen tool in flight. */
   reading: ReadonlySet<string>;
-  done: boolean;
   /** No input for a while, or the screen is locked. */
   away: boolean;
-  /** A short reaction from `pet.mood`, until `reacted` clears it. */
-  reaction: 'wince' | 'cheer' | null;
   /** A file, a link or text is held over the pet, not yet dropped. */
   dropHover: boolean;
-  /** A gentle nudge's `tired`, until `rested` clears it. */
-  tired: boolean;
 }
 
 export const IDLE_DOCK: DockState = {
   seeing: false,
   turns: new Set(),
   jobs: new Set(),
-  handoffs: new Set(),
   reading: new Set(),
-  done: false,
   away: false,
-  reaction: null,
   dropHover: false,
-  tired: false,
 };
 
-/** How long a wince or a cheer stays on the face. */
-export const REACTION_MS = 4_000;
-
 /**
- * The slice of an event the dock reads: engine notifications, plus its own (seeing, seen,
- * looked, reacted, dropHover, dropLeave) and main's presence.away and presence.back.
+ * The slice of an event the dock reads: turn events, plus its own (seeing, seen, dropHover,
+ * dropLeave) and main's presence.away and presence.back.
  */
 export interface DockEvent {
   type: string;
   turnId?: string | undefined;
   petId?: string | undefined;
-  handoffId?: string | undefined;
-  mood?: string | undefined;
   /** On turn.started: a turn nobody is watching (a job's or a routine's). */
   background?: true | undefined;
   /** On turn.toolRequest and turn.toolResult: the tool's name. */
@@ -93,8 +76,6 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
       return { ...state, seeing: true };
     case 'seen':
       return { ...state, seeing: false };
-    case 'looked':
-      return { ...state, done: false };
     // Something held over the pet; the drop itself ends it with dropLeave too.
     case 'dropHover':
       return state.dropHover ? state : { ...state, dropHover: true };
@@ -104,14 +85,6 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
       return state.away ? state : { ...state, away: true };
     case 'presence.back':
       return state.away ? { ...state, away: false } : state;
-    case 'pet.mood':
-      if (event.mood === 'tired') return state.tired ? state : { ...state, tired: true };
-      if (event.mood === 'rested') return state.tired ? { ...state, tired: false } : state;
-      return event.mood === 'wince' || event.mood === 'cheer'
-        ? { ...state, reaction: event.mood }
-        : state;
-    case 'reacted':
-      return state.reaction === null ? state : { ...state, reaction: null };
     case 'turn.started':
       if (event.turnId === undefined) return state;
       return event.background === true
@@ -143,14 +116,6 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
         reading: without(state.reading, id),
       };
     }
-    case 'handoff.progress':
-      return event.handoffId === undefined || state.handoffs.has(event.handoffId)
-        ? state
-        : { ...state, handoffs: new Set([...state.handoffs, event.handoffId]) };
-    case 'handoff.finished':
-      return event.handoffId === undefined
-        ? state
-        : { ...state, handoffs: without(state.handoffs, event.handoffId), done: true };
     default:
       return state;
   }
@@ -160,12 +125,8 @@ export function dockMood(state: DockState): DockMood {
   if (state.seeing) return 'listening';
   if (state.reading.size > 0) return 'reading';
   if (state.turns.size > 0) return 'thinking';
-  if (state.handoffs.size > 0) return 'expert';
   if (state.jobs.size > 0) return 'working';
   if (state.dropHover) return 'listening';
-  if (state.reaction !== null) return state.reaction;
-  if (state.tired) return 'tired';
-  if (state.done) return 'done';
   return state.away ? 'dozing' : 'idle';
 }
 

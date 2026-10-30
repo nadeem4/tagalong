@@ -1,13 +1,12 @@
 /**
- * The three cards Scout shows before anything happens: the hand-off card, the connector
- * confirm card and the routine card. Each needs the fake pet to reach for a different tool
- * (TAGALONG_FAKE_TOOL is read once, at launch), so each block starts its own app on its own
- * fresh profile, which also gives it its own single-instance lock.
+ * The card Scout shows before it changes something in a connected app. It needs the fake pet to
+ * reach for a scripted tool (TAGALONG_FAKE_TOOL is read once, at launch), so the block starts
+ * its own app on its own fresh profile, which also gives it its own single-instance lock.
  */
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { basename, dirname, join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries, which types `window.tagalong` and
@@ -71,84 +70,6 @@ async function activity(app: ElectronApplication): Promise<Page> {
   await nav.getByRole('button', { name: 'Activity' }).click({ timeout: 15_000 });
   return home;
 }
-
-test.describe('the hand-off card', () => {
-  test.skip(true, 'returns with row 8: the hand-off card');
-  let app: ElectronApplication;
-  let dataDir: string;
-  const project = mkdtempSync(join(tmpdir(), 'tagalong-project-'));
-
-  test.beforeAll(async () => {
-    ({ app, dataDir } = await launch('hand_to_expert', {
-      ask: 'Fix the failing login test',
-      expert_id: 'claude-code',
-    }));
-    // A Claude Code expert. Fake mode answers it with a scripted connector: no
-    // claude process starts.
-    const avatar = await windowFor(app, 'avatar');
-    await avatar.evaluate(() =>
-      window.tagalong.saveExpert!({
-        id: 'claude-code',
-        name: 'Claude Code',
-        goodAt: 'Code',
-        enabled: true,
-        instructions: '',
-        connection: {
-          type: 'claude-code',
-          canEdit: false,
-          canSearchWeb: false,
-          plugins: [],
-          mcpTools: [],
-          workspace: 'project' as const,
-        },
-      }),
-    );
-    // The folder picker is a native dialog Playwright cannot click; it answers with a
-    // temporary project instead.
-    await app.evaluate(({ dialog }, folder) => {
-      dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] });
-    }, project);
-  });
-
-  test.afterAll(async () => {
-    await app.close();
-    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
-    rmSync(project, { recursive: true, force: true });
-  });
-
-  test('shows the brief, Send starts the hand-off, and Activity shows it', async () => {
-    const panel = await ask(app, 'can you fix the login test?');
-    const card = panel.getByRole('region', { name: 'Hand to Claude Code' });
-    await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card).toContainText('Fix the failing login test');
-    await expect(card).toContainText('Reads only');
-
-    // Nothing has run yet: the card is only a proposal.
-    const before = await panel.evaluate(() => window.tagalong.listActivity!({}));
-    expect(before.entries.some((entry) => entry.kind === 'expert')).toBe(false);
-
-    // Settle the project on the temporary folder, whatever the runner has lying around.
-    if (!(await card.getByRole('button', { name: 'Browse…' }).isVisible())) {
-      await card.getByRole('button', { name: 'Change project' }).click();
-    }
-    await card.getByRole('button', { name: 'Browse…' }).click();
-    await expect(card).toContainText(basename(project));
-    await card.getByRole('button', { name: 'Send' }).click();
-
-    await expect(panel.getByRole('region', { name: 'Claude Code finished' })).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(panel.getByText(/Claude Code \(fake\) read the brief/)).toBeVisible();
-
-    const home = await activity(app);
-    await expect(
-      home
-        .getByRole('list', { name: 'Activity' })
-        .getByRole('button', { name: /Scout handed off to Claude Code/ }),
-    ).toBeVisible({ timeout: 30_000 });
-    await home.close();
-  });
-});
 
 test.describe('the connector confirm card', () => {
   test.skip(true, 'returns with row 9: the connector confirm card');
@@ -253,63 +174,6 @@ test.describe('the connector confirm card', () => {
     await expect(card).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(written, { timeout: 30_000 }).toBe('Buy milk\nBuy milk\n');
     await expect(home.getByRole('region', { name: 'Answered' })).toContainText('Approved by you');
-    await home.close();
-  });
-});
-
-test.describe('the routine card', () => {
-  test.skip(true, 'returns with row 10: the routine card');
-  let app: ElectronApplication;
-  let dataDir: string;
-
-  test.beforeAll(async () => {
-    ({ app, dataDir } = await launch('create_routine', {
-      name: 'Morning papers',
-      when: { type: 'weekdays', time: '08:00' },
-      what: 'Find new papers on AI agents.',
-    }));
-  });
-
-  test.afterAll(async () => {
-    await app.close();
-    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
-  });
-
-  const routines = (page: Page) =>
-    page.evaluate(async () => (await window.tagalong.listRoutines!()).map((r) => r.name));
-
-  test('nothing is saved without Save', async () => {
-    const panel = await ask(app, 'every weekday at 8, find me new papers on AI agents');
-    const card = panel.getByRole('region', { name: 'Set up Morning papers?' });
-    await expect(card).toBeVisible({ timeout: 30_000 });
-    await expect(card).toContainText('Weekdays at 08:00');
-    expect(await routines(panel)).toEqual([]);
-
-    await card.getByRole('button', { name: 'Cancel' }).click();
-    await expect(card).toHaveCount(0);
-    expect(await routines(panel)).toEqual([]);
-  });
-
-  test('Save creates the routine in Home → Routines', async () => {
-    const panel = await ask(app, 'every weekday at 8, find me new papers on AI agents');
-    const card = panel.getByRole('region', { name: 'Set up Morning papers?' });
-    await expect(card).toBeVisible({ timeout: 30_000 });
-    await card.getByRole('button', { name: 'Save' }).click();
-    const saved = panel.getByRole('region', { name: 'Morning papers is saved' });
-    await expect(saved).toContainText('Saved. Run it now to test?');
-    await saved.getByRole('button', { name: 'Not now' }).click();
-    expect(await routines(panel)).toEqual(['Morning papers']);
-
-    const avatar = await windowFor(app, 'avatar');
-    await avatar.evaluate(() => window.tagalongHost.openHome());
-    const home = await windowFor(app, 'home');
-    await home
-      .getByRole('navigation', { name: 'Tagalong' })
-      .getByRole('button', { name: 'Routines' })
-      .click({ timeout: 15_000 });
-    await expect(home.getByRole('list', { name: 'Routines' })).toContainText('Morning papers', {
-      timeout: 15_000,
-    });
     await home.close();
   });
 });
