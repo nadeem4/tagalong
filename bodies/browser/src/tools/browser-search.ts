@@ -38,11 +38,18 @@ function dateOf(name: string, raw: unknown, endOfDay = false): number | undefine
   if (raw === undefined) return undefined;
   const day = typeof raw === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw) : null;
   // A date with no time is the person's local day; Date.parse would read it as UTC.
-  const ms = day
-    ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]) + (endOfDay ? 1 : 0)).getTime()
-    : typeof raw === 'string'
-      ? Date.parse(raw)
-      : Number.NaN;
+  let ms: number;
+  if (day) {
+    const [y, m, d] = [Number(day[1]), Number(day[2]) - 1, Number(day[3])];
+    const start = new Date(y, m, d);
+    // new Date rolls 2026-02-30 over to March; a real day keeps its month and date.
+    ms =
+      start.getMonth() === m && start.getDate() === d
+        ? new Date(y, m, d + (endOfDay ? 1 : 0)).getTime()
+        : Number.NaN;
+  } else {
+    ms = typeof raw === 'string' ? Date.parse(raw) : Number.NaN;
+  }
   if (Number.isNaN(ms)) throw invalid(`${name} must be a date like 2026-10-29`);
   return ms;
 }

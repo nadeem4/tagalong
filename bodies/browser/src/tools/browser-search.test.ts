@@ -126,6 +126,13 @@ describe('browser_search tool', () => {
     expect(search.history).not.toHaveBeenCalled();
   });
 
+  it.each(['2026-02-30', '2026-13-45'])('an impossible date %s is invalid_params', async (day) => {
+    const { t, search } = setup();
+    const e = await rejection(t.run({ source: 'history', since: day }));
+    expect(e.code).toBe(ErrorCode.invalid_params);
+    expect(search.history).not.toHaveBeenCalled();
+  });
+
   it('unknown_source_is_invalid_params', async () => {
     const { t } = setup();
     const e = await rejection(t.run({ source: 'cookies' }));

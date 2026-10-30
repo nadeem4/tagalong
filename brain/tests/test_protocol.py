@@ -18,9 +18,11 @@ from brain.protocol import (
     AskOpen,
     BackData,
     Body,
+    DownloadData,
     ErrorCode,
     ErrorObject,
     FocusData,
+    TabData,
     Tool,
 )
 
@@ -238,6 +240,15 @@ def test_back_and_focus_data_parse_the_examples():
     assert BackData.model_validate(event_data("back")).idle_seconds == 420
     focus = FocusData.model_validate(event_data("focus"))
     assert (focus.app, focus.title) == ("Code.exe", "protocol.py - tagalong")
+
+
+def test_tab_and_download_data_parse_the_examples():
+    tab = TabData.model_validate(event_data("tab"))
+    assert (tab.title, tab.url) == ("Release notes", "https://example.com/releases")
+    download = DownloadData.model_validate(event_data("download"))
+    assert (download.name, download.state) == ("report.pdf", "complete")
+    with pytest.raises(ValidationError):
+        DownloadData.model_validate({**event_data("download"), "state": "started"})
 
 
 def test_negative_idle_seconds_is_rejected():

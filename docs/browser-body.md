@@ -5,8 +5,10 @@
 `bodies/browser` is a Chromium Manifest V3 extension that makes your browser a body for the Python
 brain. Scout can list your open tabs and read a page when you ask, after you say yes. It holds no
 brain of its own: it dials the brain over the websocket contract in
-[protocol/README.md](../protocol/README.md) and offers one tool, `tabs`. It works in Chrome, Edge,
-Brave, Opera, Vivaldi, Arc and any other Chromium browser from version 116.
+[protocol/README.md](../protocol/README.md) and offers three tools: `tabs`, `page_parts` and
+`browser_search`. It also tells Scout, as plain facts, which tab you are on and which download
+just finished. It works in Chrome, Edge, Brave, Opera, Vivaldi, Arc and any other Chromium browser
+from version 116.
 
 The store listing, permission justifications and the public privacy policy are in
 [chrome-web-store/listing.md](chrome-web-store/listing.md) and
@@ -20,11 +22,14 @@ The store listing, permission justifications and the public privacy policy are i
 | `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop |
 | `src/reconnect.ts`                   | The alarm's redial rule                                             |
 | `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                             |
-| `src/tools/tabs.ts`                  | The `tabs` tool (list and read)                                     |
+| `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`      |
+| `src/tools/page-parts.ts`            | The `page_parts` tool                                               |
+| `src/tools/browser-search.ts`        | The `browser_search` tool                                           |
+| `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle             |
 | `src/permissions.ts`                 | The permission broker and its 25 s wait                             |
 | `src/permission/`                    | The permission window page                                          |
 | `src/popup/`                         | The toolbar popup page                                              |
-| `src/content/`                       | The page reader injected into a tab on demand                       |
+| `src/content/`                       | The page reader and the parts reader, injected into a tab on demand |
 | `src/layer/`                         | Thin wrappers over `chrome.*`, so tests can fake them               |
 | `src/manifest.ts`                    | Builds `manifest.json`                                              |
 
@@ -38,8 +43,8 @@ The build (`pnpm --filter @tagalong/browser build`) writes `bodies/browser/dist`
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart LR
-  B["Python brain"] -->|"tool call: tabs"| W["Service worker<br>BrainClient"]
-  W --> T["tabs tool"]
+  B["Python brain"] -->|"tool call"| W["Service worker<br>BrainClient"]
+  W --> T["tools: tabs,<br>page_parts, browser_search"]
   T --> P{"Permission<br>granted?"}
   P -->|"no"| X["Permission window<br>25 s wait"]
   X -->|"Allow"| P
@@ -51,12 +56,13 @@ flowchart LR
 ```
 
 1. The service worker starts and builds one `BrainClient`. It dials the brain at the saved
-   address, then sends a hello with the body kind `browser`, the body id, the name and the `tabs`
-   tool.
-2. The brain calls `tabs`. The tool asks the broker for what it needs. If a permission is missing,
+   address, then sends a hello with the body kind `browser`, the body id, the name and its three
+   tools.
+2. The brain calls a tool. The tool asks the broker for what it needs. If a permission is missing,
    the broker opens a small window and waits up to 25 seconds for an answer.
-3. With the permissions in place the tool returns the tab list as JSON, or injects the page reader
-   into one tab and returns its text.
+3. With the permissions in place the tool returns the tab list as JSON, injects the page reader
+   into one tab and returns its text, takes a picture of the tab in front, injects the parts reader,
+   or asks the browser's own records.
 4. If the connection drops, the client retries. A 30-second alarm named `tagalong-reconnect` wakes a
    stopped worker and restarts the body, because Chrome stops idle workers.
 
@@ -81,7 +87,10 @@ its own, which makes it a second body. The name can be changed in the popup (32 
 
 ## Tools
 
-One tool: `tabs`. Its effect is `read`: it never changes a page.
+Three tools, all with effect `read`: none of them changes a page or switches a tab. The brain shows
+them as `<body id>__<tool>`.
+
+### `tabs`
 
 ```json
 {
@@ -89,7 +98,7 @@ One tool: `tabs`. Its effect is `read`: it never changes a page.
   "input_schema": {
     "type": "object",
     "properties": {
-      "action": { "type": "string", "enum": ["list", "read"] },
+      "action": { "type": "string", "enum": ["list", "read", "picture"] },
       "tab_id": { "type": "number" }
     },
     "required": ["action"]
@@ -133,28 +142,132 @@ The page's readable text...
 The page text has menus and footers removed. It is cut at 40,000 characters with the note
 "[truncated at 40,000 characters]".
 
+**`picture`** needs the `tabs` permission and then the permission for the tab's site, like `read`,
+and refuses a sleeping or locked tab the same way. It returns one `image` part: a JPEG (quality 70)
+of the visible area of the window, taken with `chrome.tabs.captureVisibleTab`. Scout is told to
+prefer `read` and use `picture` only when the layout matters. Two more rules:
+
+- Only the tab in front can be pictured. For any other tab it fails with "Only the tab in front can
+  be pictured, and Scout will not switch tabs. Ask the user to open it first." and takes nothing.
+- The person may switch tabs, or navigate, while the permission window is open. After the allow the
+  tool looks the tab up again; if it is no longer in front or is on another site it fails with
+  "The tab in front changed while I was asking, so I did not take a picture."
+
+Chrome documents `captureVisibleTab` as needing `<all_urls>` or `activeTab`. Whether a grant for one
+site is enough is not covered by a test; it is a manual check in the
+[feature test guide](testing/feature-test-guide.md#the-browser-body).
+
+### `page_parts`
+
+One kind of structure from a page, for when the plain text of `tabs` `read` is not enough.
+
+```json
+{
+  "name": "page_parts",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "part": { "type": "string", "enum": ["links", "tables", "forms", "headings"] },
+      "tab_id": { "type": "number" }
+    },
+    "required": ["part"]
+  }
+}
+```
+
+It uses the same tab choice (`tab_id`, else the active tab), the same sleeping and locked refusals
+and the same two needs, `tabs` and then the site, as `tabs` `read` (they share
+`resolveReadableTab`). It injects `page-reader.js` and returns plain text, cut at 40,000 characters
+with the same truncated note. A page with none of the kind answers "There are no links on this
+page." (or tables, forms, headings).
+
+| `part`     | Output                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `links`    | One line each: `text -> absolute URL`. Empty hrefs and `javascript:` links are skipped.          |
+| `tables`   | Each table as `Table N`, then one line per row with the cells separated by tabs.                 |
+| `headings` | `h1` to `h6`, one per line, indented with `#` marks to the level.                                |
+| `forms`    | `Form N: <action>`, then one line per field: its label and its type, for example `Email (text)`. |
+
+`forms` reports the shape of a form and never what is in it. It lists labels and types only: no
+value the person typed or picked, no checked state, no option text and no textarea text. A label that
+wraps a field is cut down to its own words, so the field's contents cannot ride along. A field with
+no label falls back to its `aria-label`, placeholder, name or id, then to "(unnamed)". Hidden
+fields and buttons are left out.
+
+### `browser_search`
+
+Looks through the browser's own records.
+
+```json
+{
+  "name": "browser_search",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "enum": ["history", "bookmarks", "reading_list", "downloads", "closed"]
+      },
+      "text": { "type": "string" },
+      "since": { "type": "string" },
+      "until": { "type": "string" },
+      "limit": { "type": "number" }
+    },
+    "required": ["source"]
+  }
+}
+```
+
+- `text` is words to match; empty means everything (for `bookmarks`, the newest ones).
+- `since` and `until` are dates. They apply to `history` and `downloads` only. A date alone, like
+  `2026-10-29`, means that day in the person's own time zone, and `until` includes that day (the
+  search runs to the end of it). A full timestamp, like `2026-10-29T10:00:00Z`, is used as given.
+  Anything else, and an impossible date such as `2026-02-30` or `2026-13-45`, fails with
+  `invalid_params`.
+- `limit` defaults to 20 and is capped at 50. `closed` is capped at 25 (the most Chrome returns),
+  and a closed window counts as its tabs.
+- An unknown `source` fails with `invalid_params`.
+- The answer is one text part with one line per hit, `<when> | <title> | <url>`, each line cut at
+  300 characters. A download shows its file name and its state in place of the title and URL. No
+  hit gives "Nothing matched."
+- `reading_list` needs `chrome.readingList`. Where the browser has none it fails with `tool_failed`
+  "I could not search that: not supported in this browser".
+
+Each source asks for its own optional permission first, in one window (see below).
+
 ## Permissions
 
 The manifest asks only for `alarms`, `scripting` and `storage` at install. Everything else is
 optional and asked for when a tool needs it. The window is the only place a grant is made, because
 `chrome.permissions.request` needs a click.
 
-| Tool call     | Needs                                | Asked as                                                                |
-| ------------- | ------------------------------------ | ----------------------------------------------------------------------- |
-| `tabs` `list` | the `tabs` permission                | "see open tabs": **Allow** or **Not now**                               |
-| `tabs` `read` | the `tabs` permission, then the site | the site: **Allow on this site**, **Allow on all sites** or **Not now** |
+| Tool call                       | Needs                                | Asked as                                                                |
+| ------------------------------- | ------------------------------------ | ----------------------------------------------------------------------- |
+| `tabs` `list`                   | the `tabs` permission                | "see open tabs": **Allow** or **Not now**                               |
+| `tabs` `read`, `picture`        | the `tabs` permission, then the site | the site: **Allow on this site**, **Allow on all sites** or **Not now** |
+| `page_parts`                    | the `tabs` permission, then the site | as `tabs` `read`                                                        |
+| `browser_search` `history`      | the `history` permission             | **Allow** or **Not now**                                                |
+| `browser_search` `bookmarks`    | the `bookmarks` permission           | **Allow** or **Not now**                                                |
+| `browser_search` `reading_list` | the `readingList` permission         | **Allow** or **Not now**                                                |
+| `browser_search` `downloads`    | the `downloads` permission           | **Allow** or **Not now**                                                |
+| `browser_search` `closed`       | the `sessions` permission            | **Allow** or **Not now**                                                |
 
 A `file:` page uses the origin `file://`. **Allow on all sites** grants `<all_urls>`.
 
 The window: one is open at a time for each need, and it waits 25 seconds. A click on **Not now**, or
 no answer, fails the tool with `tool_failed` and a plain sentence the brain can pass on, for example
-"the person has not allowed Scout to see open tabs" or "the person has not allowed reading
-example.com". The title reads "Scout wants to read a page" for a site, otherwise "Scout wants to
-help". The window sends its answer back with the runtime message `permission-answer`.
+"the person has not allowed Scout to see open tabs", "the person has not allowed Scout to search
+browsing history" or "the person has not allowed reading example.com". The title reads "Scout wants
+to read a page" for a site, otherwise "Scout wants to help". The window sends its answer back with
+the runtime message `permission-answer`.
 
-The manifest also lists `history`, `bookmarks`, `downloads`, `sessions`, `readingList`, `tabGroups`
-and `contextMenus` as optional, for later tools. Nothing asks for them yet. There is no side panel
-and no keyboard command.
+One call has one 25-second deadline, however many questions it asks. `tabs` `read` and `picture` and
+`page_parts` ask for `tabs` and then for the site; the site question gets only what is left of the
+25 seconds, so the pair never outlasts the brain's 30-second tool timeout. A grant is made once and
+kept, so the next call asks nothing.
+
+The manifest also lists `tabGroups` and `contextMenus` as optional, for later tools. Nothing asks for
+them yet. There is no side panel and no keyboard command.
 
 ## Popup
 
@@ -186,11 +299,18 @@ unpacked**.
 | Worker stopped by Chrome         | The reconnect alarm (30 s) wakes it; the keepalive keeps it from stopping |
 | Permission declined or no answer | `tool_failed` with a plain reason; nothing is granted                     |
 | Sleeping or locked tab           | The tool refuses with a plain reason; the tab is not touched              |
+| `picture` of a background tab    | `tool_failed`: only the tab in front can be pictured; nothing is switched |
+| `picture`, tab changed on allow  | `tool_failed`: the tab in front changed; no picture is taken              |
+| Search source not supported      | `tool_failed` with the browser's reason ("not supported in this browser") |
 
 ## Privacy notes
 
 - Nothing is read until Scout asks and you have allowed it. No script runs in a page before that.
-- A read takes the selection, the URL, the title and the main text, and nothing else.
+  The two facts under Events are the only thing sent on the body's own.
+- A read takes the selection, the URL, the title and the main text, and nothing else. A
+  `page_parts` read of forms takes labels and types, never what you typed. A `picture` is taken only
+  when Scout asks, and only of the tab in front.
+- A `browser_search` looks only at the source you allowed, and only when Scout asks.
 - The body keeps no pages and no chats. It stores the brain address, the name and the id in local
   extension storage, and the last sequence number in session storage.
 - It sends what it read only to the brain at the address you set. The brain sends it on to the AI
@@ -199,7 +319,26 @@ unpacked**.
 
 ## Events
 
-None yet. Pushing browser events to Scout is added in slice 12b.
+The body tells the brain two things without being asked, as `event` notifications. Both are
+context, not a reason to speak: the brain keeps the latest of each per body and never starts a turn
+for them (see "Body events" in [brain.md](brain.md)). They flow only while the body is online;
+offline, a fact is dropped, not queued.
+
+| Name       | Data                                        | When                                                      |
+| ---------- | ------------------------------------------- | --------------------------------------------------------- |
+| `tab`      | `{title, url}`                              | The tab in front changes, or its title or address changes |
+| `download` | `{name, state}` (`complete`, `interrupted`) | A download finishes or fails; other states send nothing   |
+
+- **URLs are stripped.** The `url` is the origin plus the path, with no query string and no
+  fragment, because tokens live there. An address that is not http or https gives nothing.
+- **Throttled.** At most one `tab` every 2 seconds. A burst sends the first at once and the last
+  value when the 2 seconds end. The same title and URL twice in a row is sent once. If the send
+  fails (offline), the next change tries again.
+- **Downloads keep the file name only.** The folder is dropped.
+- **Never prompts.** The events do not ask for permissions. Without the `tabs` permission a tab
+  arrives with no address and nothing is sent. `chrome.downloads` exists only once the `downloads`
+  permission is granted; the worker watches it from the start and again when a permission is added.
+- **Listeners are top level.** They are registered when the worker starts, as Chrome requires.
 
 ## Tests that pin it
 
@@ -213,9 +352,13 @@ None yet. Pushing browser events to Scout is added in slice 12b.
 | `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                 |
 | `permission/model.test.ts`              | The window's wording and buttons                                                                        |
 | `popup/model.test.ts`                   | The popup's status lines and allowed list                                                               |
-| `tools/tabs.test.ts`                    | List, read, asleep, locked, truncation                                                                  |
+| `events.test.ts`                        | Stripped URLs, the 2 s throttle, no repeats, download names and states                                  |
+| `tools/tabs.test.ts`                    | List, read, picture (front tab only, same tab after the allow), asleep, locked, truncation              |
+| `tools/page-parts.test.ts`              | Same needs as read, asleep and locked tabs, unknown part                                                |
+| `tools/browser-search.test.ts`          | Each source and its permission, limits, local-day dates, impossible dates, unsupported reading list     |
 | `tools/registry.test.ts`                | The tool catalog the hello sends                                                                        |
 | `content/read-page.test.ts`             | The page text, selection and the cut at 40,000 characters                                               |
+| `content/page-parts.test.ts`            | Links, tables, headings, forms by label and type only, the cut at 40,000 characters                     |
 | `content/injected-weight.test.ts`       | The injected reader stays small                                                                         |
 | `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them); no protocol or ui import |
 
