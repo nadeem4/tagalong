@@ -2197,8 +2197,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
    Settings → **Add Scout to your browser** and read the folder it shows (**Show folder** opens it).
    In Chrome open `chrome://extensions`, switch on **Developer mode**, click **Load unpacked** and
    choose that folder. Do the same in Edge at `edge://extensions`. Pin Tagalong in both.
-   (Installed app: the folder is `%LOCALAPPDATA%\Programs\Tagalong
-esources\extension`.)
+   (Installed app: the folder is `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`.)
 3. **Expected:** `bodies/browser/dist` holds `manifest.json`, `service-worker.js`, `page-reader.js`,
    `popup/popup.html` and `permission/permission.html`. Each Tagalong card shows no errors and no
    page opens. Click the toolbar button in each browser: the popup says "Connected to Scout's brain",
