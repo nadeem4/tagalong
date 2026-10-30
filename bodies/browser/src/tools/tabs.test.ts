@@ -115,6 +115,12 @@ describe('tabs read', () => {
     ]);
   });
 
+  it('read_of_a_local_file_asks_for_the_file_origin', async () => {
+    const { text, calls } = setup({ tabs: [tab({ url: 'file:///C:/notes/a.txt' })] });
+    await text({ action: 'read' });
+    expect(calls[1]).toEqual({ kind: 'site', origin: 'file://' });
+  });
+
   it('read_formats_url_title_selection_and_text', async () => {
     const { text } = setup({ reading: reading({ selection: 'picked', text: 'Body text' }) });
     expect(await text({ action: 'read' })).toBe(

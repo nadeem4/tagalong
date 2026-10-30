@@ -39,6 +39,7 @@ export default defineConfig({
       input: {
         sidepanel: 'src/sidepanel.html',
         options: 'src/options.html',
+        permission: 'src/permission/permission.html',
         'service-worker': 'src/service-worker.ts',
       },
       output: {

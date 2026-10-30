@@ -6,7 +6,7 @@
 import type { Part } from '@tagalong/contract';
 import { MAX_PAGE_TEXT_CHARS } from '../content/limits';
 import type { PageApi, TabInfo, TabsApi } from '../layer/api';
-import type { Need } from '../permissions';
+import { FILE_ORIGIN, type Need } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 
 /** Satisfied by the permission broker; a seam so this tool is testable alone. */
@@ -38,6 +38,12 @@ function lockedReason(url: string): string | null {
   if (u.protocol === 'chrome-extension:') return 'it is a page of a browser extension';
   if (!OPEN_SCHEMES.includes(u.protocol)) return 'it is a page of the browser itself';
   return null;
+}
+
+/** The origin to ask about; a file: URL's own origin is the useless string "null". */
+function siteOrigin(url: string): string {
+  const u = new URL(url);
+  return u.protocol === 'file:' ? FILE_ORIGIN : u.origin;
 }
 
 export function tabsTool(deps: TabsDeps): BrowserTool {
@@ -79,7 +85,7 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     const locked = lockedReason(tab.url);
     if (locked !== null) throw failed(`I cannot read that tab: ${locked}.`);
     await needs.ensure(
-      { kind: 'site', origin: new URL(tab.url).origin },
+      { kind: 'site', origin: siteOrigin(tab.url) },
       `read ${tab.title || tab.url}`,
     );
     let reading;
