@@ -52,6 +52,7 @@ import type {
 import { IPC } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
+  BrowserFolder,
   CaptureNotice,
   ClaudeSignIn,
   EarsStatus,
@@ -313,6 +314,8 @@ const host: TagalongHostApi = {
   switchScout: (providerId: string) =>
     ipcRenderer.invoke(IPC.switchScout, providerId) as Promise<Pet>,
   openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
+  browserFolder: () => ipcRenderer.invoke(IPC.browserFolder) as Promise<BrowserFolder>,
+  showBrowserFolder: () => ipcRenderer.invoke(IPC.showBrowserFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
   speak: (text: string, preview?: SpeakPreview) =>

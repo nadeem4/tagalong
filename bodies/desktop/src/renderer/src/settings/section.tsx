@@ -13,7 +13,7 @@ export const SECTIONS = [
   { id: 'budget', title: 'Daily budget' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
-  { id: 'browser', title: 'Browser extension (optional)' },
+  { id: 'browser', title: 'Add Scout to your browser' },
   { id: 'advanced', title: 'Advanced' },
 ] as const;
 

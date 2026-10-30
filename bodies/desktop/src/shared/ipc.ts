@@ -45,6 +45,8 @@ export const IPC = {
   deleteExpert: 'tagalong:experts:delete',
   testExpert: 'tagalong:experts:test',
   pickFolder: 'tagalong:dialog:pick-folder',
+  browserFolder: 'tagalong:browser:folder',
+  showBrowserFolder: 'tagalong:browser:show-folder',
   confirmHandoff: 'tagalong:handoffs:confirm',
   dismissHandoff: 'tagalong:handoffs:dismiss',
   cancelHandoff: 'tagalong:handoffs:cancel',
@@ -321,6 +323,12 @@ export interface HostView {
  * anything specific to this host lives here instead, so a component can never grow a
  * dependency on something the Chrome host will not have.
  */
+/** Where the browser add-on's folder is, and whether it has been built. */
+export interface BrowserFolder {
+  path: string;
+  exists: boolean;
+}
+
 export interface TagalongHostApi {
   getContext(): Promise<ContextSnapshot | null>;
   onContext(handler: (snapshot: ContextSnapshot | null) => void): () => void;
@@ -389,6 +397,10 @@ export interface TagalongHostApi {
    * refuses any other URL.
    */
   openLink(url: string): Promise<void>;
+  /** The browser add-on's folder, for Settings' Load unpacked steps. */
+  browserFolder(): Promise<BrowserFolder>;
+  /** Reveals that folder in the file manager; rejects when it is not built yet. */
+  showBrowserFolder(): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;

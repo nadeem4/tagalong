@@ -124,3 +124,12 @@ describe('desktop runtime dependencies', () => {
     expect(manifest.scripts['package:win']).toContain('fetch-native.mjs win32 x64');
   });
 });
+
+describe('root dev script', () => {
+  it('dev_desktop_builds_the_browser_body_first', () => {
+    const root = read('../../../../package.json') as { scripts: Record<string, string> };
+    expect(root.scripts['dev:desktop']?.startsWith('pnpm --filter @tagalong/browser build')).toBe(
+      true,
+    );
+  });
+});
