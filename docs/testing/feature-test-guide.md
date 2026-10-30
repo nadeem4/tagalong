@@ -11,6 +11,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
+- [Claude Code asks Scout first (real brain, real Claude Code)](#claude-code-asks-scout-first-real-brain-real-claude-code)
 - [Approvals history (real brain)](#approvals-history-real-brain)
 - [Learned approvals (real brain, real Claude Code)](#learned-approvals-real-brain-real-claude-code)
 - [Approvals page (real brain)](#approvals-page-real-brain)
@@ -1482,9 +1483,9 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
 Needs Claude Code installed and signed in, and an expert that may edit a small test project.
 
-1. Ask Scout to fix something in the project and press **Send**. While "Coder is on it", the card
-   shows a line now and then from what Claude Code writes ("Found the bug in `date.ts`"); none of it
-   is said aloud. Tool steps ("Reading ...") show too and stay silent.
+1. Ask Scout to fix something in the project and pick a mode on the card. Open Home → **Jobs**: the
+   running row shows its latest progress line, which changes as Claude Code works. None of it is
+   said aloud.
 2. Tell Scout "tell Coder to use dayjs, not moment". Scout says in its own words that Coder will
    get it (the wording varies; there is no fixed line). The
    final answer reflects the note.
