@@ -78,7 +78,7 @@ function Home() {
       <HomeView
         host={homeHost}
         scout={FIGURE.idle}
-        settings={<SettingsPage embedded />}
+        settings={<SettingsPage />}
         {...(page === undefined ? {} : { page })}
         onPage={setPage}
       />

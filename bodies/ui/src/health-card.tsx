@@ -31,7 +31,7 @@ export function HealthCard({
   onOpenLogs?: () => void;
 }) {
   return (
-    <section className="handoff health" aria-label="Health check">
+    <section className="card health" aria-label="Health check">
       <style>{HEALTH_CSS}</style>
       {rows === null ? (
         <p className="bubble-text" role="status">

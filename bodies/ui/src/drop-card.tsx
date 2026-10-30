@@ -38,7 +38,7 @@ export function DropCard({
 
   if ('refusal' in offer) {
     return (
-      <section className="handoff" aria-label="Dropped on Scout">
+      <section className="card" aria-label="Dropped on Scout">
         <p className="bubble-text" role="status">
           {offer.refusal}
         </p>
@@ -57,7 +57,7 @@ export function DropCard({
     );
 
   return (
-    <section className="handoff" aria-label="Dropped on Scout">
+    <section className="card" aria-label="Dropped on Scout">
       <p className="bubble-text">
         {label}:{' '}
         {explain

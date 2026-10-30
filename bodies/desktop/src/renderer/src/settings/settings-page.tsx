@@ -1,7 +1,6 @@
 /**
  * Settings: the form, one section per file in this folder, saved as one patch through
- * settings-form.ts. Home embeds it as its Settings page; the standalone window shows it only
- * when the engine failed to start.
+ * settings-form.ts. It is the Settings page of Home; there is no standalone window.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -13,7 +12,7 @@ import { BrainSection } from './brain-section';
 import { BrowserSection } from './browser-section';
 import { ElevenLabsSection } from './elevenlabs-section';
 import { PrivacySection } from './privacy-section';
-import { SECTIONS, SettingsUiContext } from './section';
+import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
 import { SightSection } from './sight-section';
@@ -25,10 +24,9 @@ import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc'
 /**
  * Sections in page order: how Scout thinks, You, Privacy, Voice, Shortcuts, the browser, then
  * Advanced (the ElevenLabs voice, sight detail, screen memory and watches), closed by default.
- * Embedded in Home it has no header or side menu of its own. Main re-registers hotkeys on save,
- * and the sight settings are read per capture.
+ * Main re-registers hotkeys on save, and the sight settings are read per capture.
  */
-export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
+export function SettingsPage() {
   const [view, setView] = useState<HostView | null>(null);
   const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
@@ -150,7 +148,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         windowTextBudget: field('windowTextBudget'),
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
-        pickUp: form.get('pickUp') !== null,
         wellbeing: form.get('wellbeing') !== null,
         userName: field('userName'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
@@ -158,7 +155,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         watchMaxChecks: field('watchMaxChecks'),
         watchMaxConcurrent: field('watchMaxConcurrent'),
         watchTimeoutMinutes: field('watchTimeoutMinutes'),
-        sightLogDays: field('sightLogDays'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
       // Empty boxes are left alone: removing a key is the Remove key button's job.
@@ -200,49 +196,22 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <SettingsUiContext.Provider value={ui}>
-      <form
-        className={embedded ? 'tg-settings tg-settings--embedded' : 'tg-settings'}
-        onSubmit={(event) => void save(event)}
-      >
+      <form className="tg-settings tg-settings--embedded" onSubmit={(event) => void save(event)}>
         <style>{SETTINGS_CSS}</style>
-        {!embedded && (
-          <>
-            <header className="tg-bar">
-              <h1 className="tg-px tg-bar__title">Settings</h1>
-              <span className="tg-bar__meta">
-                Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}
-              </span>
-              <button type="submit" className="tg-btn">
-                Save
-              </button>
-            </header>
-            <nav className="tg-nav" aria-label="Settings">
-              <ul>
-                {SECTIONS.map((section) => (
-                  <li key={section.id}>
-                    <a href={`#${section.id}`}>{section.title}</a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </>
-        )}
         <main className="tg-main">
-          {embedded && (
-            <div className="tg-intro">
-              <div className="tg-intro__text">
-                <h1 className="tg-intro__title">Settings</h1>
-                <p className="tg-help">
-                  Everything works out of the box. Change only what you need. Press{' '}
-                  <span aria-hidden="true">â“˜</span>
-                  <span className="tg-sr">the information button</span> for more on any setting.
-                </p>
-              </div>
-              <button type="submit" className="tg-btn">
-                Save
-              </button>
+          <div className="tg-intro">
+            <div className="tg-intro__text">
+              <h1 className="tg-intro__title">Settings</h1>
+              <p className="tg-help">
+                Everything works out of the box. Change only what you need. Press{' '}
+                <span aria-hidden="true">ⓘ</span>
+                <span className="tg-sr">the information button</span> for more on any setting.
+              </p>
             </div>
-          )}
+            <button type="submit" className="tg-btn">
+              Save
+            </button>
+          </div>
           <BrainSection brain={brain} onCheckAgain={checkSignIn} />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />

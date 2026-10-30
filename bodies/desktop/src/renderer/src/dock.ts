@@ -40,7 +40,7 @@ export interface DockEvent {
   type: string;
   turnId?: string | undefined;
   petId?: string | undefined;
-  /** On turn.started: a turn nobody is watching (a job's or a routine's). */
+  /** On turn.started: a turn nobody is watching (a job's or a wake's). */
   background?: true | undefined;
   /** On turn.toolRequest and turn.toolResult: the tool's name. */
   tool?: string | undefined;

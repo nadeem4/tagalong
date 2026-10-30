@@ -17,10 +17,7 @@ export function BrainSection({
       <Section id="brain">
         <div className="tg-alert tg-alert--err" role="status">
           <p className="tg-alert__title">Scout&apos;s engine didn&apos;t start</p>
-          <p>
-            Settings can still be changed. Sign-in status and model lists come back once it&apos;s
-            running.
-          </p>
+          <p>Settings can still be changed. Sign-in status comes back once it&apos;s running.</p>
         </div>
       </Section>
     );

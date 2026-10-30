@@ -209,14 +209,6 @@ describe('buildSettingsPatch userName', () => {
   });
 });
 
-describe('buildSettingsPatch pickUp', () => {
-  it('carries the pick-up switch when the form shows it, and leaves it alone otherwise', () => {
-    expect(buildSettingsPatch({ ...values, pickUp: false }).pickUp).toBe(false);
-    expect(buildSettingsPatch({ ...values, pickUp: true }).pickUp).toBe(true);
-    expect(buildSettingsPatch(values).pickUp).toBeUndefined();
-  });
-});
-
 describe('buildSettingsPatch keepAnEye', () => {
   it('carries the keep-an-eye switch when the form shows it', () => {
     expect(buildSettingsPatch({ ...values, keepAnEye: false }).keepAnEye).toBe(false);
@@ -225,24 +217,6 @@ describe('buildSettingsPatch keepAnEye', () => {
 
   it('leaves it alone when the form does not show it', () => {
     expect(buildSettingsPatch(values).keepAnEye).toBeUndefined();
-  });
-});
-
-describe('buildSettingsPatch sightLogDays', () => {
-  it('carries how many days What Scout saw keeps', () => {
-    expect(buildSettingsPatch({ ...values, sightLogDays: ' 3 ' }).sightLog).toEqual({ days: 3 });
-  });
-
-  it('refuses a number of days outside 1 to 30, naming the field', () => {
-    for (const bad of ['0', '31', '2.5', '', 'week']) {
-      expect(() => buildSettingsPatch({ ...values, sightLogDays: bad })).toThrow(
-        expect.objectContaining({ field: 'sightLogDays' }),
-      );
-    }
-  });
-
-  it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).sightLog).toBeUndefined();
   });
 });
 

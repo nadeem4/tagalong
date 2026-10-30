@@ -24,7 +24,7 @@ function cap(usd: number): string {
 }
 
 /**
- * Home's Spend card. Read again whenever a turn, a hand-off or a routine run finishes, the
+ * Home's Spend card. Read again whenever a turn starts or ends, the
  * same moments Activity refreshes.
  */
 export function SpendCard() {

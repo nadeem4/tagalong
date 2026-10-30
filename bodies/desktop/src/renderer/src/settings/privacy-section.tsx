@@ -1,19 +1,13 @@
 /**
  * Settings' Privacy section: Seeing and Always listening (live switches), the launch hello,
- * keeping an eye on things, gentle nudges, pick up where you left off, rolling memory on or off,
- * how long What Scout saw keeps, and the built-in blind spots, listed from BLIND_SPOTS and never
- * switchable. Rolling memory's minutes are under Advanced.
+ * keeping an eye on things, gentle nudges, rolling memory on or off, and the built-in blind
+ * spots, listed from BLIND_SPOTS and never switchable. Rolling memory's minutes are under Advanced.
  */
 import { useEffect, useState } from 'react';
-import {
-  BLIND_SPOTS,
-  MAX_SIGHT_LOG_DAYS,
-  MIN_SIGHT_LOG_DAYS,
-  SETTINGS_DEFAULTS,
-} from '@tagalong/protocol';
+import { BLIND_SPOTS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { keyCaps } from '../settings-form';
-import { Info, Section, Tip, useInvalid } from './section';
+import { Info, Section, Tip } from './section';
 
 /**
  * Seeing and Always listening act at once, through main, so they are no form fields: each
@@ -95,50 +89,10 @@ function LiveSwitches() {
   );
 }
 
-/**
- * How long Home's What Scout saw keeps its rows. Always on, so there is no switch: the log
- * holds no pixels and no text, only what was looked at and where it went.
- */
-function SightLogDays({ days }: { days: number }) {
-  const invalid = useInvalid('sightLogDays');
-  return (
-    <>
-      <div className="tg-setting">
-        <div className="tg-setting__text">
-          <div className="tg-titlerow">
-            <h3 className="tg-sub">Keep the record of what Scout saw</h3>
-            <Info tip="sightLog" label="About the record of what Scout saw" />
-          </div>
-          <p className="tg-help">Days, from 1 to 30. Home shows it under What Scout saw.</p>
-          {invalid.message}
-        </div>
-        <input
-          name="sightLogDays"
-          type="number"
-          min={MIN_SIGHT_LOG_DAYS}
-          max={MAX_SIGHT_LOG_DAYS}
-          defaultValue={days}
-          aria-label="Days to keep the record of what Scout saw"
-          style={{ width: 72 }}
-          {...invalid.props}
-        />
-      </div>
-      <Tip tip="sightLog">
-        Each time Scout lists your windows, reads text, takes a screenshot, or sends something to an
-        AI or an expert, Home notes the kind, the app and window, where it went and how much. Never
-        the picture, the text or the brief. Blind spots and your exclusions are noted by app only.
-        Older entries are deleted, and deleting one does not take back what was already sent. Always
-        on. Kept 7 days by default.
-      </Tip>
-    </>
-  );
-}
-
 export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
   const [remember, setRemember] = useState(settings.rollingMemory.enabled);
   const [greet, setGreet] = useState(settings.greeting);
   const [watching, setWatching] = useState(settings.keepAnEye);
-  const [picking, setPicking] = useState(settings.pickUp);
   const [nudging, setNudging] = useState(settings.wellbeing.enabled);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
@@ -248,37 +202,6 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
       <div className="tg-setting">
         <div className="tg-setting__text">
           <div className="tg-titlerow">
-            <h3 className="tg-sub" id="pick-up-label">
-              Pick up where you left off
-            </h3>
-            <Info tip="pickUp" label="About picking up where you left off" />
-          </div>
-          <p className="tg-help">Back after a long break, maybe a line on what you were in.</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          className="tg-switch"
-          aria-checked={picking}
-          aria-labelledby="pick-up-label"
-          onClick={() => setPicking((on) => !on)}
-        >
-          {picking ? 'On' : 'Off'}
-        </button>
-        {picking && <input type="hidden" name="pickUp" value="on" />}
-      </div>
-      <Tip tip="pickUp">
-        Every ten minutes Scout notes, from window titles only, which projects you have open in your
-        editor (folder, branch and file name) and which hand-offs are unsent or stopped. One such
-        note is kept, on this computer. When you are back after six hours or more, the note goes to
-        the summaries model once, and Scout may say one line about it with a Pick up card, or
-        nothing; each item on the card opens only when you click it, and Brief again only fills in
-        the hand-off card. Blind spots are never noted. Off deletes the note. On by default.
-      </Tip>
-      <hr className="tg-divider" />
-      <div className="tg-setting">
-        <div className="tg-setting__text">
-          <div className="tg-titlerow">
             <h3 className="tg-sub" id="memory-label">
               Remember the last few minutes of the screen
             </h3>
@@ -306,8 +229,6 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         away, blind spots are never recorded, and a red dot shows on Scout while it records. Off by
         default.
       </Tip>
-      <hr className="tg-divider" />
-      <SightLogDays days={settings.sightLog.days} />
       <hr className="tg-divider" />
       <div className="tg-titlerow">
         <h3 className="tg-sub">Scout never looks at</h3>

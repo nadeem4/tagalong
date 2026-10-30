@@ -14,7 +14,7 @@ const PAGES: Record<FixTarget, string> = {
   voice: 'settings#voice',
   browser: 'settings#browser',
   privacy: 'settings#privacy',
-  experts: 'experts',
+  experts: 'jobs',
   connections: 'connections',
 };
 

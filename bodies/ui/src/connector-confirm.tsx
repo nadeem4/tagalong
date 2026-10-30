@@ -42,7 +42,7 @@ export function ConnectorConfirmCard({
   if (isJob) {
     const text = typed.trim();
     return (
-      <section className="handoff" aria-label={`${confirm.app} asks`}>
+      <section className="card" aria-label={`${confirm.app} asks`}>
         <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
           {confirm.summary}
         </p>
@@ -88,14 +88,14 @@ export function ConnectorConfirmCard({
 
   return (
     <section
-      className="handoff"
+      className="card"
       aria-label={isAsk ? `Allow ${confirm.tool}?` : `Change something in ${confirm.app}?`}
     >
       <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
         {isAsk ? what : `Change in ${confirm.app} — allow?`}
       </p>
-      {confirm.risk === 'high' && <p className="handoff-brief">Can’t be undone</p>}
-      <dl className="handoff-rows">
+      {confirm.risk === 'high' && <p className="card-brief">Can’t be undone</p>}
+      <dl className="card-rows">
         <div>
           <dt>App</dt>
           <dd>{confirm.app}</dd>
@@ -118,7 +118,7 @@ export function ConnectorConfirmCard({
             <dt>Details</dt>
             <dd>
               {/* Every argument in full; long ones scroll. Focusable so the keyboard can too. */}
-              <span className="handoff-brief connector-details" tabIndex={0}>
+              <span className="card-brief connector-details" tabIndex={0}>
                 {filled.join('\n')}
               </span>
             </dd>

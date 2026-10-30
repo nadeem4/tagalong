@@ -65,7 +65,7 @@ export function scoutBrain(
       : {
           state: 'no-key',
           title,
-          help: `Scout has no ${provider.label} key, so it can't think. Add one under Advanced, API keys.`,
+          help: `Scout has no ${provider.label} key, so it can't think. Put ANTHROPIC_API_KEY in the brain's .env file.`,
           chip: { text: 'No key', tone: 'warn' },
         };
   }

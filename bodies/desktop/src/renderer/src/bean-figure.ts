@@ -17,13 +17,8 @@ const CLIPS: readonly (keyof BeanFigure)[] = [
   'listening',
   'reading',
   'thinking',
-  'expert',
   'working',
-  'done',
   'dozing',
-  'wince',
-  'cheer',
-  'tired',
   'idle-blink',
   'listening-blink',
 ];

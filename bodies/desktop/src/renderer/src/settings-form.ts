@@ -5,8 +5,6 @@
  */
 import {
   MAX_ROLLING_MEMORY_MINUTES,
-  MAX_SIGHT_LOG_DAYS,
-  MIN_SIGHT_LOG_DAYS,
   MAX_USER_NAME_CHARS,
   MAX_VOICE_SPEED,
   MAX_WINDOW_TEXT_CHARS,
@@ -27,8 +25,6 @@ export interface SettingsFormValues {
   greeting?: boolean;
   /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
   keepAnEye?: boolean;
-  /** Whether Scout keeps a pick-up snapshot. Absent leaves the setting alone. */
-  pickUp?: boolean;
   /** Whether Scout gives gentle nudges. Absent leaves the setting alone. */
   wellbeing?: boolean;
   /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
@@ -48,8 +44,6 @@ export interface SettingsFormValues {
   microphoneId?: string;
   mouth?: string;
   ears?: string;
-  /** How many days What Scout saw keeps. Absent leaves the setting alone. */
-  sightLogDays?: string;
 }
 
 /**
@@ -121,22 +115,8 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     windowTextBudget: parseBudget(values.windowTextBudget),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
-    ...(values.pickUp !== undefined ? { pickUp: values.pickUp } : {}),
     ...(values.wellbeing !== undefined ? { wellbeing: { enabled: values.wellbeing } } : {}),
     ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
-    ...(values.sightLogDays !== undefined
-      ? {
-          sightLog: {
-            days: wholeNumber(
-              'sightLogDays',
-              values.sightLogDays,
-              MIN_SIGHT_LOG_DAYS,
-              MAX_SIGHT_LOG_DAYS,
-              `What Scout saw keeps between ${MIN_SIGHT_LOG_DAYS} and ${MAX_SIGHT_LOG_DAYS} days.`,
-            ),
-          },
-        }
-      : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
