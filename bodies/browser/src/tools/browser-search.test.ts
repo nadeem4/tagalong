@@ -54,8 +54,8 @@ describe('browser_search tool', () => {
     const { t, search } = setup();
     const since = '2026-10-01';
     const until = '2026-10-29';
-    const s = Date.parse(since);
-    const u = Date.parse(until);
+    const s = new Date(2026, 9, 1).getTime();
+    const u = new Date(2026, 9, 30).getTime();
     await t.run({ source: 'history', text: 'cats', since, until, limit: 5 });
     expect(search.history).toHaveBeenCalledWith('cats', s, u, 5);
     await t.run({ source: 'bookmarks', text: 'cats', limit: 5 });
@@ -104,6 +104,17 @@ describe('browser_search tool', () => {
       '',
       Date.UTC(2026, 9, 29, 10),
       Date.UTC(2026, 9, 29, 11),
+      20,
+    );
+  });
+
+  it('a_date_without_a_time_is_the_local_day_and_until_includes_it', async () => {
+    const { t, search } = setup();
+    await t.run({ source: 'history', since: '2026-10-29', until: '2026-10-29' });
+    expect(search.history).toHaveBeenCalledWith(
+      '',
+      new Date(2026, 9, 29).getTime(),
+      new Date(2026, 9, 30).getTime(),
       20,
     );
   });

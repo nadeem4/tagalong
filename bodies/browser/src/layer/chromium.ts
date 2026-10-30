@@ -177,18 +177,19 @@ export const chromeSearch: SearchApi = {
     }));
   },
   async closedTabs(limit) {
-    const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: limit });
-    return sessions.flatMap((s) => {
-      const tab = s.tab;
-      if (tab === undefined) return [];
-      return [
-        {
+    // Chrome refuses more than 25 here; a closed window counts as its tabs.
+    const sessions = await chrome.sessions.getRecentlyClosed({
+      maxResults: Math.min(limit, 25),
+    });
+    return sessions
+      .flatMap((s) =>
+        (s.tab ? [s.tab] : (s.window?.tabs ?? [])).map((tab) => ({
           title: tab.title ?? '',
           url: tab.url ?? '',
           when: iso(s.lastModified * 1000),
-        },
-      ];
-    });
+        })),
+      )
+      .slice(0, limit);
   },
 };
 

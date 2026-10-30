@@ -34,9 +34,15 @@ function limitOf(raw: unknown): number {
 }
 
 /** An ISO date or timestamp as milliseconds; absent stays undefined, junk is invalid. */
-function dateOf(name: string, raw: unknown): number | undefined {
+function dateOf(name: string, raw: unknown, endOfDay = false): number | undefined {
   if (raw === undefined) return undefined;
-  const ms = typeof raw === 'string' ? Date.parse(raw) : Number.NaN;
+  const day = typeof raw === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw) : null;
+  // A date with no time is the person's local day; Date.parse would read it as UTC.
+  const ms = day
+    ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]) + (endOfDay ? 1 : 0)).getTime()
+    : typeof raw === 'string'
+      ? Date.parse(raw)
+      : Number.NaN;
   if (Number.isNaN(ms)) throw invalid(`${name} must be a date like 2026-10-29`);
   return ms;
 }
@@ -56,7 +62,7 @@ export function browserSearchTool(deps: BrowserSearchDeps): BrowserTool {
       description:
         'Search the browser\'s own records: "history", "bookmarks", "reading_list", ' +
         '"downloads" or "closed" (recently closed tabs). Optional text to match, and since / ' +
-        'until dates (like 2026-10-29) for history and downloads. Returns one line per hit. ' +
+        'until dates (like 2026-10-29; until includes that day) for history and downloads. Returns one line per hit. ' +
         `This is the ${deps.bodyName} browser.`,
       input_schema: {
         type: 'object',
@@ -83,7 +89,7 @@ export function browserSearchTool(deps: BrowserSearchDeps): BrowserTool {
       }
       const text = typeof input['text'] === 'string' ? input['text'] : '';
       const since = dateOf('since', input['since']);
-      const until = dateOf('until', input['until']);
+      const until = dateOf('until', input['until'], true);
       const limit = limitOf(input['limit']);
 
       const { permission, reason } = SOURCES[source as Source];
