@@ -1,4 +1,8 @@
-// Pins how a browser install names itself to the brain: kind from brands/UA, id made once.
+/**
+ * Pins how a browser install names itself to the brain.
+ * The kind comes from brands or the user agent; the id is random, made once and kept,
+ * so two browsers or profiles never collide and a restart reconnects as the same body.
+ */
 import { describe, expect, it } from 'vitest';
 import type { StorageArea } from './layer/api';
 import { detectBrowser, loadBodyId, makeBodyId, browserName } from './identity';
@@ -59,6 +63,14 @@ describe('body id', () => {
     const second = await loadBodyId(storage, 'chrome', () => 'bbbb');
     expect(first).toBe('chrome-aaaa');
     expect(second).toBe('chrome-aaaa');
+  });
+
+  it('an_invalid_stored_id_is_replaced_with_a_fresh_saved_one', async () => {
+    const storage = memory();
+    await storage.set('bodyId', 'BAD ID!');
+    const id = await loadBodyId(storage, 'edge', () => 'zzzz');
+    expect(id).toBe('edge-zzzz');
+    expect(await storage.get('bodyId')).toBe('edge-zzzz');
   });
 
   it('two_installs_get_different_ids', async () => {

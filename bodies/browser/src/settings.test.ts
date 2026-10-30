@@ -1,4 +1,8 @@
-// Pins the brain address and optional name the popup saves, and that bad input never lands.
+/**
+ * Pins the brain address and optional name the popup saves.
+ * Bad input must never land in storage, and bad stored values must fall back to the
+ * defaults instead of breaking the connection.
+ */
 import { describe, expect, it } from 'vitest';
 import type { StorageArea } from './layer/api';
 import { DEFAULT_ADDR, parseAddr, readSettings, saveAddr, saveName } from './settings';
