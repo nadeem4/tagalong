@@ -176,7 +176,6 @@ export const PerceptionTarget = z.enum([
   'screenshot',
   'activeWindow',
   'clipboard',
-  'pageText',
   /** Every display plus the composite. */
   'displays',
   /** The window inventory, with no window text in it. */

@@ -203,9 +203,13 @@ describe('PerceptionTarget', () => {
   });
 
   it('still knows the original perception targets', () => {
-    for (const target of ['selection', 'screenshot', 'activeWindow', 'clipboard', 'pageText']) {
+    for (const target of ['selection', 'screenshot', 'activeWindow', 'clipboard']) {
       expect(PerceptionTarget.safeParse(target).success, target).toBe(true);
     }
+  });
+
+  it('no longer knows pageText, which no body produces', () => {
+    expect(PerceptionTarget.safeParse('pageText').success).toBe(false);
   });
 });
 

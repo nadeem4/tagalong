@@ -6,9 +6,6 @@
 
 import type { ConnectionStatus, FixTarget, MouthId } from './shapes';
 
-/** Where a Fix it button lands; the type lives in shapes, beside the status marks. */
-export type { FixTarget };
-
 /**
  * What the health check read, from calls the host already makes. Each is `unknown` when its
  * call failed. Never a key or a secret: only whether one is stored.

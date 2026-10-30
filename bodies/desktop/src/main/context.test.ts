@@ -176,8 +176,8 @@ describe('capturePatch', () => {
     expect(patch).toEqual({ clipboard: 'clipboard contents' });
   });
 
-  it('leaves out targets this host cannot perceive', async () => {
-    const { patch } = await capturePatch(fakePlatform(), ['pageText'], {
+  it('reads nothing when nothing is asked for', async () => {
+    const { patch } = await capturePatch(fakePlatform(), [], {
       exclusions: NOTHING_EXCLUDED,
     });
 

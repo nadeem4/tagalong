@@ -5,7 +5,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
-import type { SpendToday, TurnEvent } from '../host-bridge';
+import type { SpendToday } from '../host-bridge';
+import type { TurnEvent } from '../shapes';
 
 /** The events after which the day's spend is read again: a turn started or ended. */
 function changesSpend(event: TurnEvent): boolean {

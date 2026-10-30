@@ -4,7 +4,8 @@
  */
 
 import { healthHeadline } from './health';
-import type { FixTarget, HealthRow } from './health';
+import type { HealthRow } from './health';
+import type { FixTarget } from './shapes';
 import { themeTokens as t } from './theme/tokens';
 
 /** The words beside each dot, so a state never rests on colour alone. */

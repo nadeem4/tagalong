@@ -10,6 +10,7 @@ import type {
   PerceptionTarget,
   Pet,
   MemoryEntry,
+  TurnEvent,
 } from '../shapes';
 import type {
   ApprovalCounts,
@@ -20,7 +21,6 @@ import type {
   JobRow,
   PermissionRow,
   PreferenceRow,
-  TurnEvent,
 } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {

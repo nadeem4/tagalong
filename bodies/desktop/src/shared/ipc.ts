@@ -15,7 +15,8 @@ import type {
   MouthId,
 } from '@tagalong/ui/shapes';
 import type { Settings, SettingsPatch, VoiceId } from './settings';
-import type { DropOffer, FixTarget, HostBridge } from '@tagalong/ui';
+import type { DropOffer, HostBridge } from '@tagalong/ui';
+import type { FixTarget } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {

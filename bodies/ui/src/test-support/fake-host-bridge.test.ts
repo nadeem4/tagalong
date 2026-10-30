@@ -1,7 +1,7 @@
 /** Tests for createFakeHostBridge's recorded calls and seeded data. */
 
 import { describe, expect, it } from 'vitest';
-import type { TurnEvent } from '../host-bridge';
+import type { TurnEvent } from '../shapes';
 import { createFakeHostBridge } from './fake-host-bridge';
 
 describe('createFakeHostBridge', () => {

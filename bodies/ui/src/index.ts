@@ -15,7 +15,6 @@ export type {
   PreferenceRow,
   PermissionRow,
   SpendToday,
-  TurnEvent,
 } from './host-bridge';
 
 export { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -46,4 +45,4 @@ export { ListenController } from './voice/listen-controller';
 export type { ListenMic } from './voice/listen-controller';
 
 /** "Scout, what's wrong?": what a host reads for the health card, and where Fix it lands. */
-export type { FixTarget, HealthFacts } from './health';
+export type { HealthFacts } from './health';

@@ -26,7 +26,8 @@ import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
-import type { FixTarget, HostBridge } from '@tagalong/ui';
+import type { HostBridge } from '@tagalong/ui';
+import type { FixTarget } from '@tagalong/ui/shapes';
 import { gatherHealth, HEALTH_TEST_BUDGET_MS } from './health-facts';
 import { listMicrophones } from './mic';
 

@@ -11,8 +11,10 @@ import { Pushable } from './shapes';
 import type {
   ConnectorConfirmParams,
   ContextSnapshot,
+  FixTarget,
   Mouth,
   StatusMark as StatusMarkValue,
+  TurnEvent,
 } from './shapes';
 import { ANSWER_CSS, Answer } from './answer';
 import { StatusMark } from './status-mark';
@@ -22,9 +24,8 @@ import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { wantsHealthCheck } from './health-ask';
 import { healthHeadline, healthRows } from './health';
-import type { FixTarget, HealthRow } from './health';
+import type { HealthRow } from './health';
 import { HealthCard } from './health-card';
-import type { TurnEvent } from './host-bridge';
 import { themeTokens as t } from './theme/tokens';
 import { stopStatus } from './stop-status';
 import { SpokenStream } from './voice/spoken-stream';

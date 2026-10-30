@@ -41,7 +41,7 @@ import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
-import type { TurnEvent } from '@tagalong/ui';
+import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { elevenLabsTts } from './voice/elevenlabs';

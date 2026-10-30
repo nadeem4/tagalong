@@ -17,6 +17,7 @@ import type {
   PetRemarkParams,
   StatusMark,
   MemoryEntry,
+  TurnEvent,
 } from '@tagalong/ui/shapes';
 import type { Settings, SettingsPatch } from '../shared/settings';
 import type {
@@ -30,7 +31,6 @@ import type {
   PreferenceRow,
   PermissionRow,
   SpendToday,
-  TurnEvent,
 } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import { heldUntilHeard } from './held';

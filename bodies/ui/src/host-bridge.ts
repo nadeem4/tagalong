@@ -18,8 +18,6 @@ import type {
 } from './shapes';
 import type { HealthFacts } from './health';
 
-export type { TurnEvent };
-
 /** What the brain knows of spend: today's dollars and the daily limit (null when it has none). */
 export interface SpendToday {
   spentUsd: number;
