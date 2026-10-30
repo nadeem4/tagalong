@@ -1,4 +1,4 @@
-# dependencies
+﻿# dependencies
 node_modules/
 .pnpm-store/
 
@@ -37,8 +37,7 @@ Thumbs.db
 .remember/
 
 # design tool scratch (local only)
-.impeccable/questions/
-.impeccable/review/
+.impeccable/
 .claude/worktrees/
 
 # python (brain)
