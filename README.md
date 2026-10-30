@@ -358,22 +358,21 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
-- **Settings**, in seven sections. Press ⓘ beside a setting for the longer story. Below the form,
+- **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
   and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
   - **How Scout thinks**: whether Scout's brain can think, and whether your Claude Code sign-in
     works (checked locally with `claude auth status`). The brain reads its own key from its `.env`.
-  - **You**: what Scout calls you. Empty means no name.
-  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, wellbeing, screen memory
-    and what Scout never looks at.
+  - **Privacy**: screen memory (on or off, and how many minutes it keeps) and what Scout never
+    looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.
   - **Advanced**, closed by default: the ElevenLabs voice (your key and a voice ID from your
-    ElevenLabs library), sight detail and watches.
+    ElevenLabs library).
 
 ## Providers and keys
 
@@ -453,19 +452,8 @@ screenshot is attached.
   tools, and is deleted 14 days after it finishes. At most 3 run at once (fewer on a busy
   machine), 20 a day, none once the daily budget is spent. When jobs and hand-offs finish, one
   check-in covers them all, with a note of at most 300 characters for each.
-- **Keeping an eye on things** is on by default: Scout follows window titles only (no picture, no
-  model call). Rarely, when you settle on a new window or a title reads like an error or a failed
-  build, it reads that one window and checks in, never twice about one window. A line may offer to
-  hand the work to an expert: only **Hand it over** reads that window again (secrets hidden) into
-  the hand-off card, with the project picked; nothing runs until **Send**. Turn it off under
-  **Settings → Privacy → Keep an eye on things**.
-- **Scout's face** comes from the mind in a check-in (a wince, a cheer, tired), never from a title
-  alone; it dozes after five minutes with no input or when the screen locks (one idle time number
-  from the OS, kept on this computer).
-- **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, after an hour
-  and a half with no break, or late at night, Scout checks in once with how long you have been at
-  it and the window in front: it may say a line, offer a write-up by your expert, look tired, or
-  say nothing. Idle time and titles only, no window text; quiet during calls and full screen.
+- **Scout's face** dozes after five minutes with no input or when the screen locks (one idle time
+  number from the OS, kept on this computer).
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

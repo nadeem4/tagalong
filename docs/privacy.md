@@ -197,24 +197,18 @@ you click Apply**. A spoken "yes" never applies it, because a voice from a video
 it.
 
 - **What chat can change.** Scout's voice (on or off, which voice, speed, the ElevenLabs voice,
-  who speaks and who listens), your name, the hello, the hotkeys, keeping an eye on things, sight
-  detail, the window text size, screen memory, screenshot retention, adding a capture exclusion,
-  gentle nudges, pick-up, the daily spending cap, and lowering how long the log of what Scout saw
-  is kept.
+  who speaks and who listens), the hotkeys, screen memory and adding a capture exclusion.
 - **What chat can never change.** API keys, logins, provider URLs, the model, the calendar link
-  (it lives in the keychain), removing a capture exclusion, raising the log's days, and the app's
-  own bookkeeping. The tool answers that these are changed only in Settings, never shows a card for
+  (it lives in the keychain), removing a capture exclusion, and the app's own bookkeeping. The tool answers that these are changed only in Settings, never shows a card for
   them and never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
   the card's changes again against this list, so a tampered card cannot reach anything else, and
   only the bubble can apply one. The card goes to the desktop only, never the browser extension.
 - **Always listening.** Scout can switch it off through the card, never on: only you switch it on,
   in the bubble's header or Settings › Privacy. The Seeing switch and the pause key are not
   settings.
-- **Loosening always shows a marked card.** A change that lets Scout see, keep or spend more (keep
-  an eye on things on, screen memory on or longer, screenshots kept, sight detail on every display,
-  pick-up on, a higher or no spending cap) is marked "Lets Scout see or keep more of your screen" (or
-  "spend more"), and the button reads **Turn on**. A routine running on its own can never propose
-  one.
+- **Loosening always shows a marked card.** A change that lets Scout see or keep more (screen
+  memory on or longer) is marked "Lets Scout see or keep more of your screen", and the button reads
+  **Turn on**. A routine running on its own can never propose one.
 - **The record.** Each applied card writes a **Changed by talk** row in What Scout saw, naming the
   settings, not their values.
 
@@ -237,31 +231,16 @@ it.
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
-- The hello as Tagalong opens is a check-in (below) and reads nothing on screen. Besides what
-  every check-in carries, the summaries model is sent how long you were away, the names of routines
-  that ran since the last open, whether Tagalong closed unexpectedly last time and how many runs
-  that cut short, after an update the old and new version and the release notes (plain facts about
-  what is new), and, when you are back after a long break, where you left off (below). It may say
-  one short line, or nothing; if the call fails, nothing is said. The hello just after setup is the
-  same kind of call, with none of the launch facts. Turn it off under Settings → Privacy → **Say
-  hello when Tagalong opens**. While Scout talks is on, a line is also spoken (below).
-- Tagalong records, in its local settings file, whether the last launch closed cleanly and which
-  app version it ran, so the launch check-in knows of a crash or an update. The markers themselves
-  stay in that file on this computer; only the facts listed above reach the brain you chose, inside
-  the launch check-in.
-- Setup stores each answer in local settings as it is given: the step reached, how you answer, your
-  name or that you declined it (`userNameDeclined`), how Scout thinks and whether it talks. A pasted
-  key is saved to the OS keychain before its one test (one tiny request to that service); a key that
-  fails the test stays there until you replace it or remove it in Settings. It is never
-  spoken, shown or logged. Checking your Claude sign-in only reads the local sign-in and sends nothing.
+- Tagalong no longer says hello when it opens, and no longer records in its settings file whether
+  the last launch closed cleanly or which version it ran. A pasted key is saved to the OS keychain
+  before its one test (one tiny request to that service); a key that fails the test stays there
+  until you replace it or remove it in Settings. It is never spoken, shown or logged. Checking your
+  Claude sign-in only reads the local sign-in and sends nothing.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
   computer and the engine: whether you are signed in to Claude Code, whether a key is stored (never
   the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
   the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the
   card never shows a key, token or secret.
-- The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
-  It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
-  in the facts of every check-in. Clear the box and it is gone from both.
 - With every question, Scout's AI provider also gets a short **Now** block of facts about the
   moment: your local time, day and time zone (for example `Europe/London`); how long since you
   last talked to Scout; whether you asked out loud, or which routine is running; and, for each
@@ -603,9 +582,8 @@ microphone; **I'll type** (or a fresh setup that has not been answered yet) leav
 ## Check-ins: what goes with an unprompted call
 
 Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: as
-Tagalong opens (and just after setup), when you are back after a long break with something to
-pick up, after you settle on a new window, when a title reads like an error, after a long stretch
-(with Gentle nudges on), and when work finishes (an expert you handed work to, or a job of Scout's own). Most of the time the answer is nothing, and
+you are back after a long break with something to pick up, and when work finishes (an expert you
+handed work to, or a job of Scout's own). Most of the time the answer is nothing, and
 nothing is shown. Each of these calls goes to Scout's own model and carries, besides what that
 moment is about:
 
@@ -614,39 +592,14 @@ moment is about:
   characters), your name, the time, and what experts are doing right now;**
 - **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
   characters of each;
-- the last three lines Scout said on its own (so it does not repeat itself), how long you have been
-  active (only with Gentle nudges on), and the names and ids of your experts.
+- the last three lines Scout said on its own (so it does not repeat itself), and the names and ids
+  of your experts.
 
 Keys, tokens and passwords are hidden in all of it before it leaves the computer, and a blind
 spot's app and title are never in it. The limits: at most 24 check-ins a day, at most one
-unprompted one every ten minutes, none for an hour after **Not now** (the hello as Tagalong opens
-and finished work still get theirs), none during a call or over a full-screen app, and none at all once the daily budget
+unprompted one every ten minutes, none for an hour after **Not now** (finished work still gets
+its own), none during a call or over a full-screen app, and none at all once the daily budget
 is reached. Each call is a "Sent to AI" row in **What Scout saw**.
-
-## Keeping an eye on things
-
-On by default; switch it off under Settings → Privacy → **Keep an eye on things**. Off means no
-tracking at all: the window list is not even taken.
-
-- **Always, for free:** every five seconds the desktop lists the open windows — application, title,
-  which one is in front, whether one fills its whole screen — and sends that list to the engine on
-  this computer. No picture is taken, no window text is read, and no model is called. The list is
-  kept in memory only, for the session.
-- **Rarely, one check-in:** when you have stayed on a window new to this session for about thirty
-  seconds, or a title reads like trouble (`error`, `failed`, `failing`, `failure`, `exception`,
-  `traceback`, `crashed`), Scout reads **that one window's text** (the last 4,000 characters) and
-  sends it, with its app and title and the facts every check-in carries (above), in one short call
-  that asks whether anything is worth saying. Most of the time the answer is nothing and nothing is
-  shown. The same reply may set Scout's face (a wince or a cheer); titles alone never do.
-- **Limits:** as for every check-in, above; never two looks at the same window (same window and
-  same title). Pausing sight stops it too.
-- **Blind spots apply everywhere:** a window on the built-in list or your exclusion list is never
-  considered, its title included, and its text is never read.
-- **An offer reads the window again only when you click.** A line may offer to hand the work to an
-  expert. Only if you press **Hand it over** does Scout read that window's text again (the last
-  4,000 characters), hide any key, token or password in it, and put it in the brief on the
-  hand-off card, which says "Includes the end of the error window". The read is logged in **What
-  Scout saw** like every other read, and nothing goes to the expert until you press **Send**.
 
 ### Dozing: your idle time
 
@@ -654,22 +607,6 @@ Scout dozes when you have been away for five minutes or the screen is locked. Fo
 reads one number from the operating system every fifteen seconds, how long since the last key or
 mouse input, and hears the lock and unlock events. Nothing on screen is read, the number is never
 stored, and it never leaves this computer.
-
-### Gentle nudges: idle time and titles
-
-Off by default; switch it on under Settings → Privacy → **Gentle nudges**. While it is on, and sight
-is not paused, the desktop sends the engine on this computer two things once a minute: the idle time
-(how long since the last key or mouse input) and the window titles keeping an eye already lists (no
-picture, no window text). Neither is stored.
-
-- After an hour and a half with no five-minute break (once a stretch), or after 23:00 once you have
-  been active for half an hour (once a night), Scout makes one check-in. It carries how long you
-  have been at it, the app and title of the window in front (never a blind spot's), and the facts
-  every check-in carries (above). No window text is read.
-- Scout may say a line, offer to have an expert do something (nothing goes to the expert until you
-  press Send on the card), look tired, or say nothing. A tired face clears after a five-minute
-  break or when you switch nudges off.
-- Nothing appears during a call or over a full-screen app, and **Not now** quiets it for an hour.
 
 ## Finished work: hand-offs and jobs
 

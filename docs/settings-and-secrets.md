@@ -10,21 +10,21 @@ that leaves the machine.
 
 ## Where it lives
 
-| File                                          | What it holds                                                                                                                           |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.ts`           | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `SettingsChangeRow`, `SettingsProposedParams`, the retired-value cleaners |
-| `packages/protocol/src/methods.ts`            | `settings.get`, `settings.set` (`byTalk`), `settings.proposed`                                                                          |
-| `packages/core/src/settings/settings.ts`      | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                                                   |
-| `packages/core/src/engine.ts`                 | The `settings.get` and `settings.set` handlers; settings passed into stores as functions                                                |
-| `packages/core/src/tools/builtin/settings.ts` | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                                                        |
-| `packages/core/src/providers/presets.ts`      | `SECRET_KEYS`: where each brain's key is filed                                                                                          |
-| `packages/core/src/providers/key-resolver.ts` | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes                                    |
-| `packages/core/src/privacy/secrets.ts`        | `hideSecrets`                                                                                                                           |
-| `packages/core/src/providers/guard.ts`        | `guardBrain`: hides secrets in every request to a model                                                                                 |
-| `bodies/desktop/src/main/secret-store.ts`     | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                                                       |
-| `bodies/desktop/src/main/provider-choices.ts` | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`                                           |
-| `bodies/desktop/src/main/ipc/settings.ts`     | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
-| `bodies/desktop/src/main/index.ts`            | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
+| File                                          | What it holds                                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.ts`           | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey`                |
+| `packages/protocol/src/methods.ts`            | `settings.get`, `settings.set` (`byTalk`)                                                            |
+| `packages/core/src/settings/settings.ts`      | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                |
+| `packages/core/src/engine.ts`                 | The `settings.get` and `settings.set` handlers; settings passed into stores as functions             |
+| `packages/core/src/tools/builtin/settings.ts` | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                     |
+| `packages/core/src/providers/presets.ts`      | `SECRET_KEYS`: where each brain's key is filed                                                       |
+| `packages/core/src/providers/key-resolver.ts` | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes |
+| `packages/core/src/privacy/secrets.ts`        | `hideSecrets`                                                                                        |
+| `packages/core/src/providers/guard.ts`        | `guardBrain`: hides secrets in every request to a model                                              |
+| `bodies/desktop/src/main/secret-store.ts`     | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                    |
+| `bodies/desktop/src/main/provider-choices.ts` | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`        |
+| `bodies/desktop/src/main/ipc/settings.ts`     | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                       |
+| `bodies/desktop/src/main/index.ts`            | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                |
 
 ## How it works
 
@@ -35,49 +35,30 @@ that leaves the machine.
 and `SettingsPatch` is `z.object(settingsFields).partial()`, so parsing a patch never invents a
 value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripped on parse.
 
-| Setting                        | Default                                                                                                                                              | Bounds and notes                                                                                                                        |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `enginePort`                   | 47321                                                                                                                                                | Integer, 1024 to 65535. Read once at boot                                                                                               |
-| `providerBaseUrls`             | `{}`                                                                                                                                                 | Provider id to URL; absent means the preset's own URL                                                                                   |
-| `pageTextBudget`               | 40,000                                                                                                                                               | Positive integer, characters of page text in a prompt                                                                                   |
-| `historyMessages`              | 20                                                                                                                                                   | Positive integer, messages replayed to the model                                                                                        |
-| `hotkeys`                      | `ask` `CommandOrControl+Shift+Space`, `pauseSight` `CommandOrControl+Shift+Alt+P`, `stopVoice` `CommandOrControl+Shift+Alt+M`, `talk` `RightControl` | `pauseSight`, `stopVoice`, `talk` optional; `talk` is one of `TALK_KEYS` (`RightControl`, `RightAlt`, `RightShift`, `ScrollLock`)       |
-| `avatar`                       | `{ x: null, y: null }`                                                                                                                               | null docks to the default edge                                                                                                          |
-| `captureExclusions`            | `{ processNames: [], titlePatterns: [] }`                                                                                                            | Trimmed, non-blank entries; built-in blind spots are separate (`BLIND_SPOTS`)                                                           |
-| `screenshotRetention`          | `{ mode: 'off' }`                                                                                                                                    | Or `{ mode: 'hours', hours: 1..24 }` (`MAX_SCREENSHOT_RETENTION_HOURS`)                                                                 |
-| `sightDetail`                  | `focused`                                                                                                                                            | `focused` or `all`                                                                                                                      |
-| `windowTextBudget`             | 8,000 (`DEFAULT_WINDOW_TEXT_CHARS`)                                                                                                                  | Positive, at most `MAX_WINDOW_TEXT_CHARS`                                                                                               |
-| `summarizer`                   | null                                                                                                                                                 | `{ providerId, model }` or null (the pet's own brain)                                                                                   |
-| `rollingMemory`                | `{ enabled: false, minutes: 10 }`                                                                                                                    | Minutes 1 to 30 (`MAX_ROLLING_MEMORY_MINUTES`)                                                                                          |
-| `watch`                        | `{ maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 }`                                                                                     | 1 to 500, 1 to 10, 1 to 1,440                                                                                                           |
-| `welcome`                      | `{ done: false }`                                                                                                                                    | Plus optional `step` (`WELCOME_STEPS`), `answerBy`, `brain`; the desktop no longer reads or writes it                                   |
-| `greeting`                     | true                                                                                                                                                 | The launch check-in                                                                                                                     |
-| `lastOpenedAt`, `lastClosedAt` | null                                                                                                                                                 | ISO datetimes, written by the desktop                                                                                                   |
-| `closedCleanly`                | true                                                                                                                                                 | Set false at launch, true on a clean quit                                                                                               |
-| `lastVersion`                  | null                                                                                                                                                 | The version the last launch ran                                                                                                         |
-| `keepAnEye`                    | true                                                                                                                                                 |                                                                                                                                         |
-| `voice`                        | `{ enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' }`                                                                          | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
-| `userName`                     | `''`                                                                                                                                                 | Trimmed, at most 40 characters (`MAX_USER_NAME_CHARS`)                                                                                  |
-| `userNameDeclined`             | false                                                                                                                                                |                                                                                                                                         |
-| `listening`                    | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
-| `pickUp`                       | true                                                                                                                                                 | Off deletes the kept snapshot                                                                                                           |
-| `sightLog`                     | `{ days: 7 }`                                                                                                                                        | 1 to 30 (`MIN_SIGHT_LOG_DAYS`, `MAX_SIGHT_LOG_DAYS`)                                                                                    |
-| `budget`                       | `{ dailyUsd: null }`                                                                                                                                 | Positive, at most 1,000 (`MAX_DAILY_BUDGET_USD`), or null                                                                               |
-| `wellbeing`                    | `{ enabled: false }`                                                                                                                                 |                                                                                                                                         |
+| Setting | Default | Bounds and notes |
 
-The schema has no secret fields (pinned by `settings.test.ts`, "carries no secret fields").
+| Setting             | Default                                                                                                                                              | Bounds and notes                                                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `hotkeys`           | `ask` `CommandOrControl+Shift+Space`, `pauseSight` `CommandOrControl+Shift+Alt+P`, `stopVoice` `CommandOrControl+Shift+Alt+M`, `talk` `RightControl` | `pauseSight`, `stopVoice`, `talk` optional; `talk` is one of `TALK_KEYS` (`RightControl`, `RightAlt`, `RightShift`, `ScrollLock`)       |
+| `avatar`            | `{ x: null, y: null }`                                                                                                                               | null docks to the default edge                                                                                                          |
+| `captureExclusions` | `{ processNames: [], titlePatterns: [] }`                                                                                                            | Trimmed, non-blank entries; built-in blind spots are separate (`BLIND_SPOTS`)                                                           |
+| `rollingMemory`     | `{ enabled: false, minutes: 10 }`                                                                                                                    | Minutes 1 to 30 (`MAX_ROLLING_MEMORY_MINUTES`)                                                                                          |
+| `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' }`                                                                          | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
+| `listening`         | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
+
+Those six are the whole schema; everything the old brain read (the name, the greeting, keeping an
+eye, nudges, the budget, sight detail, watches and the rest) is gone. The schema has no secret
+fields (pinned by `settings.test.ts`, "carries no secret fields").
 
 ### Migrations of saved values
 
 There is no version number in `settings.json`. Older files are cleaned on read, and the next save
 writes the cleaned form:
 
-| Cleaner                    | What it does                                                                                                                   |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Unknown keys stripped      | Drops removed fields such as `providerId`, `defaultModel`, `defaultPetId`, `hiddenPets`, the onboarding key and `hotkeys.look` |
-| `withoutRetiredBaseUrls`   | Drops a `providerBaseUrls` entry for a provider in `RETIRED_PROVIDERS` (`nebius`)                                              |
-| `withoutRetiredSummarizer` | A `summarizer` on a retired provider becomes null                                                                              |
-| `withoutRetiredTalkKey`    | A `hotkeys.talk` that is not one of `TALK_KEYS` (an old accelerator combo) becomes `RightControl`                              |
+| Cleaner                 | What it does                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unknown keys stripped   | Drops every removed field (`greeting`, `keepAnEye`, `wellbeing`, `userName`, `sightDetail`, `windowTextBudget`, `watch`, `welcome`, the launch record, `providerBaseUrls` and so on) |
+| `withoutRetiredTalkKey` | A `hotkeys.talk` that is not one of `TALK_KEYS` (an old accelerator combo) becomes `RightControl`                                                                                    |
 
 ### How settings are stored
 
@@ -90,15 +71,14 @@ writes the cleaned form:
 - `set(patch)` validates the patch (`SettingsPatch.safeParse`; a bad patch throws
   `Invalid settings patch:` with one line per field and writes nothing), merges it **shallowly**
   over `get()` and re-parses. A patch therefore replaces a whole top-level object: every writer of
-  `voice`, `hotkeys` or `welcome` spreads the current object first. It then writes
+  `voice` or `hotkeys` spreads the current object first. It then writes
   `settings.json.tmp`, copies the current valid file to `.bak` (or moves an invalid one to
   `.corrupt`, so a hand edit with a typo is never lost), and renames the temp file over
   `settings.json`.
 
 The engine and the desktop main process each hold a `SettingsStore` over the same file. While the
 engine runs, main saves through `settings.set`; with no engine (it refused to boot), main reads and
-writes the file directly, so Settings still works. Main also writes launch facts (`lastOpenedAt`,
-`closedCleanly`, `lastVersion`) through `recordLaunch` before the engine boots.
+writes the file directly, so Settings still works.
 
 ### How settings are broadcast
 
@@ -111,30 +91,22 @@ The engine sends no notification when settings change. The desktop's save path
 3. `configureRolling(saved.rollingMemory)` when the patch has `rollingMemory`: starts, stops or
    trims screen memory.
 4. `broadcast(saved)`: `IPC.settingsChangedEvent` to every open window. The bubble's panel listens
-   (`onSettingsChanged`) for its keys, microphone and the person's name.
+   (`onSettingsChanged`) for its keys and microphone.
 
 The `settings.set` handler in the engine also acts on what changed: with `byTalk` it records a
-`changed_by_talk` row in `sight_log` (the sorted top-level setting names, never values); `pickUp`
-false clears the pick-up snapshot; `wellbeing.enabled` false settles the check-in so a tired face
-clears now.
+`changed_by_talk` row in `sight_log` (the sorted top-level setting names, never values).
 
 ### Settings that take effect without a restart
 
 Because `SettingsStore.get()` reads the file each time, every engine-side read through
 `settings.get()` is live. The engine passes settings into its parts as functions, read at use:
-`sightLog.days` and `captureExclusions` (`SightLog`, history search), `budget.dailyUsd`
-(`budgetSpent`), `watch` (read when a watch starts), `summarizer` (read per summary and digest),
-`windowTextBudget`, `pickUp` and `providerBaseUrls` (read whenever a provider is resolved). The
-runner reads the whole settings object at the start of each turn (`historyMessages`,
-`screenshotRetention`, `sightDetail`, `pageTextBudget`, `userName`).
-
-Only `enginePort` is read once, when the engine server starts. On the desktop, hotkeys and screen
-memory are applied on save (above), and Always listening has its own on and off path
-(`AlwaysListening`). Keys are covered in [Secrets](#secrets).
+`captureExclusions` (`SightLog`, history search). On the desktop, hotkeys and screen memory are
+applied on save (above), and Always listening has its own on and off path (`AlwaysListening`).
+Keys are covered in [Secrets](#secrets).
 
 ### Changed by talking
 
-"Talk a bit slower and call me Sam" goes through `change_settings`
+"Talk a bit slower" goes through `change_settings`
 (`core/src/tools/builtin/settings.ts`, kind `write`). It builds a patch and shows a card. It saves
 nothing.
 
@@ -144,22 +116,12 @@ nothing.
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------- |
 | `voice.enabled`, `voice.voice`, `voice.speed`, `voice.elevenLabsVoiceId`, `voice.mouth`, `voice.ears` | One field at a time, the rest kept; `mouth` `elevenlabs` notes "Needs an ElevenLabs key in Settings" | Never                     |
 | `listening.always`                                                                                    | Only `false`; `true` is refused                                                                      | Never                     |
-| `userName`, `greeting`                                                                                |                                                                                                      | Never                     |
 | `hotkeys.ask`, `hotkeys.pauseSight`, `hotkeys.stopVoice`                                              | Text                                                                                                 | Never                     |
 | `hotkeys.talk`                                                                                        | One of `TALK_KEYS`, never a combo                                                                    | Never                     |
-| `keepAnEye`                                                                                           |                                                                                                      | Turned on                 |
-| `sightDetail`                                                                                         | `focused` or `all`                                                                                   | Changed to `all`          |
-| `windowTextBudget`                                                                                    | Number                                                                                               | Never                     |
 | `rollingMemory.enabled`, `rollingMemory.minutes`                                                      |                                                                                                      | Turned on; minutes raised |
-| `screenshotRetention`                                                                                 | `"off"`, `0`, `false`, or a number of hours                                                          | Hours raised              |
 | `captureExclusions.add`                                                                               | Adds an app (`*.exe`) or a title pattern; never removes                                              | Never                     |
-| `wellbeing.enabled`                                                                                   |                                                                                                      | Never                     |
-| `sightLog.days`                                                                                       | Only lower than now                                                                                  | Never                     |
-| `pickUp`                                                                                              | Off notes "Deletes the snapshot kept now"                                                            | Turned on                 |
-| `budget.dailyUsd`                                                                                     | Dollars, or `null` / `"none"` / `"off"` for no cap                                                   | Raised or removed         |
 
-Anything else (`providerBaseUrls`, keys, logins, the model, the calendar link, `enginePort`,
-removing an exclusion) is refused with one fact: the setting name (through `hideSecrets`, at most
+Anything else (keys, logins, the model, the calendar link, removing an exclusion) is refused with one fact: the setting name (through `hideSecrets`, at most
 60 characters) cannot be changed by talk, the list of what can, and where the rest is changed. The
 value asked for is never echoed. The tool's deps are `{ get, emit }` only, so it has no path to the
 `SecretStore`. Its description lists the current value of every allowlisted setting (through
@@ -168,8 +130,7 @@ value asked for is never echoed. The tool's deps are `{ get, emit }` only, so it
 **Building the card.** For each `{ setting, value }` the tool parses the value, lays it over the
 current object (`field`) or replaces the top-level value (`whole`), and makes a row
 `{ setting, label, from, to, loosens, note? }`. A change that shows the same before and after is
-dropped. A loosening change gets the note "Lets Scout see or keep more of your screen" (or "Lets
-Scout spend more each day" for the budget). The patch is checked with `SettingsPatch.safeParse`.
+dropped. A loosening change gets the note "Lets Scout see or keep more of your screen". The patch is checked with `SettingsPatch.safeParse`.
 No rows answers "Those settings are already that way". On a routine's own turn, any loosening row
 refuses the whole call (`A routine's turn cannot loosen a setting.`). Otherwise it emits
 `settings.proposed { proposalId, petId, patch, rows }` and tells the model that nothing changes
@@ -305,13 +266,9 @@ neither read nor change settings.
 
 | Constant                              | Value           | File                                      |
 | ------------------------------------- | --------------- | ----------------------------------------- |
-| `MAX_SCREENSHOT_RETENTION_HOURS`      | 24              | `packages/protocol/src/settings.ts`       |
 | `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `packages/protocol/src/settings.ts`       |
-| `MAX_USER_NAME_CHARS`                 | 40              | `packages/protocol/src/settings.ts`       |
-| `MAX_DAILY_BUDGET_USD`                | 1,000           | `packages/protocol/src/settings.ts`       |
 | `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `packages/protocol/src/settings.ts`       |
 | `SIGHT_LOG_DEFAULT_DAYS`, min, max    | 7, 1, 30        | `packages/protocol/src/sight-log.ts`      |
-| `DEFAULT_WINDOW_TEXT_CHARS`           | 8,000           | `packages/protocol/src/limits.ts`         |
 | Refused setting name shown            | 60 characters   | `tools/builtin/settings.ts`               |
 | `SETTINGS_FILENAME`                   | `settings.json` | `core/src/settings/settings.ts`           |
 | `SECRETS_FILENAME`                    | `secrets.json`  | `bodies/desktop/src/main/secret-store.ts` |
@@ -354,20 +311,20 @@ backend, so Tagalong will not store the key.` and nothing is written.
 
 ## Privacy notes
 
-The settings file holds no secrets. `userName` reaches the provider only inside Scout's prompt.
+The settings file holds no secrets.
 What was changed by talk is logged by name in What Scout saw, never by value. Keys never reach a
 renderer, a log line or a model. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test file                                          | Pins                                                                                                                                                                                            |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.test.ts`           | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                                          |
-| `packages/core/src/settings/settings.test.ts`      | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                                                  |
-| `packages/core/src/tools/builtin/settings.test.ts` | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, days lower only, budget, no secret store, `talkPatchProblem` |
-| `bodies/desktop/src/main/ipc/settings.test.ts`     | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                                                  |
-| `bodies/desktop/src/main/secret-store.test.ts`     | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                                                 |
-| `bodies/desktop/src/main/provider-choices.test.ts` | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                                                   |
-| `packages/core/src/providers/key-resolver.test.ts` | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                                              |
-| `packages/core/src/privacy/secrets.test.ts`        | Each `hideSecrets` rule, ordinary text untouched                                                                                                                                                |
-| `packages/core/src/providers/guard.test.ts`        | Messages and tool results hidden, images and ids kept                                                                                                                                           |
+| Test file                                          | Pins                                                                                                                                                                   |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.test.ts`           | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                 |
+| `packages/core/src/settings/settings.test.ts`      | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                         |
+| `packages/core/src/tools/builtin/settings.test.ts` | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, no secret store, `talkPatchProblem` |
+| `bodies/desktop/src/main/ipc/settings.test.ts`     | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                         |
+| `bodies/desktop/src/main/secret-store.test.ts`     | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                        |
+| `bodies/desktop/src/main/provider-choices.test.ts` | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                          |
+| `packages/core/src/providers/key-resolver.test.ts` | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                     |
+| `packages/core/src/privacy/secrets.test.ts`        | Each `hideSecrets` rule, ordinary text untouched                                                                                                                       |
+| `packages/core/src/providers/guard.test.ts`        | Messages and tool results hidden, images and ids kept                                                                                                                  |

@@ -11,7 +11,7 @@ export interface BeanClipData {
   src: string;
   frames: number;
   fps: number;
-  /** A loop runs forever; a one-shot (cheer, wince, a blink) plays once and holds its last frame. */
+  /** A loop runs forever; a one-shot (a blink) plays once and holds its last frame. */
   loop: boolean;
 }
 

@@ -1,6 +1,6 @@
 /** Tests for the Bean strips the avatar window ships, and the figure built from them. */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -32,6 +32,12 @@ describe('the Bean strips', () => {
     expect(clip!.file).toMatch(/\.webp$/);
     expect(clip!.frames).toBeGreaterThan(0);
     expect(existsSync(join(BEAN, clip!.file))).toBe(true);
+  });
+
+  it('ships only the strips the dock can draw', () => {
+    expect(Object.keys(manifest.clips).sort()).toEqual([...NEEDED].sort());
+    const onDisk = readdirSync(BEAN).filter((file) => file.endsWith('.webp'));
+    expect(onDisk.sort()).toEqual(NEEDED.map((name) => `${name}.webp`).sort());
   });
 
   it('plays the blinks once, and loops the moods', () => {

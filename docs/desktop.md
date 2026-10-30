@@ -28,7 +28,6 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
-| `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
 | `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`)                                                                                                              |
 | `src/main/fix-target.ts`                   | `fixPage` (the Fix it allowlist)                                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
@@ -63,7 +62,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 1. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
    is ever handed the ungated adapter (see [sight.md](sight.md)).
 2. Opens `SafeStorageSecretStore(userData)` (and `forgetRetiredKeys`), `SettingsStore(userData)`,
-   and calls `recordLaunch(settingsStore, app.getVersion())` before anything else reads settings.
+   so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
    mark on `IPC.statusMarkEvent`), `RollingMemory` and `PerceptionMemory`.
 4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
@@ -74,13 +73,13 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
-   `applyHotkeys(settings)`. There is no launch greeting, and the keep-an-eye
-   and wellbeing ticks are not started.
+   `applyHotkeys(settings)`. There is no launch greeting, launch record, keep-an-eye or
+   wellbeing tick.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
-  A["whenReady: start()"] --> B["gated platform, secrets, settings, recordLaunch"]
+  A["whenReady: start()"] --> B["gated platform, secrets, settings"]
   B --> C["startBrain (retries every 2 s)"]
   C --> E["panel window, avatar window"]
   E --> F["talk key hook, applyHotkeys"]
@@ -164,9 +163,8 @@ Rules each module enforces:
   vertically centred. A saved point is clamped into the work area, so an unplugged monitor never
   leaves the pet off screen. `moved` and `IPC.dropAvatar` save `settings.set { avatar }`. The pet
   is moved by `IPC.dragAvatar` steps from the page (a drag region would swallow its clicks);
-  `moveWindow` moves it, and the open panel follows through `placePanel`. `session-end` (Windows
-  ending the session) calls `recordCleanClose`. `show`/`hide` feed the Always listening pause
-  (`petsShown`).
+  `moveWindow` moves it, and the open panel follows through `placePanel`. `show`/`hide` feed the
+  Always listening pause (`petsShown`).
 - **Panel.** `placePanel` uses `panelPosition(pet, size, workArea)`: right against the pet with no
   gap, on the right when there is room, otherwise the left, its bottom level with the pet's,
   clamped to the work area. It then sends `IPC.panelSideEvent` (`'left' | 'right'`) so the bubble
@@ -518,13 +516,6 @@ is tested in plain Node with no display. `nut-js` and `get-windows` are imported
 
 Review rule for call sites: never put speech, screen or file text in a warning's first argument.
 
-### Launch record
-
-The launch record (`launch.ts`): `recordLaunch`
-reads whether the last launch closed cleanly and stores `closedCleanly: false` and the running
-version; `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on `before-quit` and
-on the avatar's `session-end`.
-
 ### Bundling the workspace packages
 
 `electron.vite.config.ts` builds three targets:
@@ -597,7 +588,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 ## Interfaces
 
-- `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`, `previousLaunch`,
+- `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
   `settings`, `secrets`, `avatar`, `panel`, `tray`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `rolling`, `perceptionMemory`, `voice`, `voiceWorker`,
@@ -623,7 +614,6 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`                        |
 | `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`                        |
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `packages/protocol/src/settings.ts` |
-| `SIGN_IN_BUDGET_MS`                 | 1,000 ms                       | `launch.ts`                         |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`                       |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`                  |
 | Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`                     |
@@ -636,8 +626,8 @@ The desktop host writes:
 
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
 - Settings through `SettingsStore`
-  (`settings.json` in `userData`): the avatar position, `lastOpenedAt`, the launch record, the
-  Welcome record (`Settings.welcome`, now unused by the desktop). See [settings-and-secrets.md](settings-and-secrets.md).
+  (`settings.json` in `userData`): the avatar position, hotkeys, voice and the other settings
+  in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
 - Keys through `SafeStorageSecretStore`. See [settings-and-secrets.md](settings-and-secrets.md).
 - Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
   [voice.md](voice.md).

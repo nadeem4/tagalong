@@ -647,10 +647,10 @@ estimate. What a turn actually costs is recorded by the usage meter (see [mind.m
 | `tagalong:get-recording`, `tagalong:recording-event`                                     | invoke / event | the recording dot                                            |
 | `tagalong:sight-log:list` / `:delete` / `:clear`                                         | invoke         | Home's What Scout saw                                        |
 
-**Settings** (`packages/protocol/src/settings.ts`): `captureExclusions`, `screenshotRetention`
-(`off` default, or `hours` 1 to `MAX_SCREENSHOT_RETENTION_HOURS` = 24), `sightDetail`,
-`windowTextBudget`, `rollingMemory`, `watch`, `keepAnEye` (default true), `sightLog.days`,
-`hotkeys.ask`, `hotkeys.pauseSight`.
+**Settings** (`packages/protocol/src/settings.ts`): `captureExclusions`, `rollingMemory`,
+`hotkeys.ask`, `hotkeys.pauseSight`. The old `screenshotRetention`, `sightDetail`, `windowTextBudget`,
+`watch`, `keepAnEye` and `sightLog` settings are gone from the schema; the text below about them
+describes `packages/core`, which is deleted in 13c.
 
 ## Constants and limits
 

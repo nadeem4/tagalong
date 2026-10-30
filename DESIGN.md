@@ -404,7 +404,7 @@ Gently rounded chrome. The bubble, Home cards use 12px; fields and primary butto
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), expert (a walkie-talkie, a badge at the top left), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (for expert and for working, Scout's own job), **Done** on Done Green; thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood; in the expert pose it covers the badge, and the walkie-talkie still shows); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), working (typing at a laptop, a gear turns) and dozing (rising z's). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (Scout's own job); thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 
@@ -434,10 +434,10 @@ Scoped under `.tg-settings`. **Primary** (`tg-btn`): Gold, 40px, 8px, Onest 600 
 
 ## Motion
 
-- **Dock:** the motion is in Bean's frames, 12 fps, stepped with CSS `steps()`: loops of 2 to 4 seconds, and cheer and wince play once (1s) and hold their last frame. Blinks are a 2-frame clip (about 170ms) every 3 to 6 seconds in idle and listening only, started when the loop comes back to frame 0, the pose the blink was rendered from.
+- **Dock:** the motion is in Bean's frames, 12 fps, stepped with CSS `steps()`: loops of 2 to 4 seconds. Blinks are a 2-frame clip (about 170ms) every 3 to 6 seconds in idle and listening only, started when the loop comes back to frame 0, the pose the blink was rendered from.
 - **Bubble:** the invitation and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). The invitation types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (frame 0 of a loop, the held last frame of cheer and wince) and does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
+Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (frame 0 of a loop) and does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
 
 ## Accessibility
 

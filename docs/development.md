@@ -100,7 +100,7 @@ tagalong/
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
-                                    # tray-icon.ts, tray-menu.ts, launch.ts,
+                                    # tray-icon.ts, tray-menu.ts,
                                     # claude-sign-in.ts, sight-pause.ts, drop.ts,
                                     # log-file.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
