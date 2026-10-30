@@ -5,7 +5,7 @@
  */
 import type { Part } from '@tagalong/contract';
 import type { ActionsApi, TabsApi } from '../layer/api';
-import type { OptionalPermission } from '../permissions';
+import { PERMISSION_WAIT_MS, type OptionalPermission } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 import type { Needs } from './tabs';
 
@@ -30,10 +30,10 @@ function webAddress(raw: unknown): string {
   try {
     u = new URL(raw);
   } catch {
-    throw invalid('url must be a full address; only http and https addresses are opened');
+    throw invalid('url must be a full address; only http and https addresses are allowed');
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-    throw invalid('only http and https addresses can be opened');
+    throw invalid('only http and https addresses are allowed');
   }
   return raw;
 }
@@ -49,8 +49,8 @@ async function attempt<T>(what: string, run: () => Promise<T>): Promise<T> {
 
 export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
   const { actions, tabs, needs, bodyName } = deps;
-  const need = (name: OptionalPermission, reason: string): Promise<void> =>
-    needs.ensure({ kind: 'permission', name }, reason);
+  const need = (name: OptionalPermission, reason: string, waitMs?: number): Promise<void> =>
+    needs.ensure({ kind: 'permission', name }, reason, waitMs);
 
   async function open(input: Record<string, unknown>): Promise<Part[]> {
     if (input['url'] !== undefined) {
@@ -88,10 +88,11 @@ export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
   /** The page to save: what the call names, else the tab the person is looking at. */
   async function pageToSave(
     input: Record<string, unknown>,
+    waitMs: () => number,
   ): Promise<{ title: string; url: string }> {
     const { title, url } = input;
     if (typeof title === 'string' && typeof url === 'string') return { title, url };
-    await need('tabs', 'see which tab is in front');
+    await need('tabs', 'see which tab is in front', waitMs());
     const active = await tabs.activeInFocusedWindow();
     if (active === null) throw failed('There is no active tab to save.');
     return {
@@ -107,8 +108,13 @@ export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
     where: string,
     run: (title: string, url: string) => Promise<void>,
   ): Promise<Part[]> {
-    await need(permission, reason);
-    const page = await pageToSave(input);
+    // A url the model supplies is checked before anything is asked; the active tab's is not.
+    if (input['url'] !== undefined) webAddress(input['url']);
+    // One deadline for both questions, so they never outlast the brain's own timeout.
+    const deadline = Date.now() + PERMISSION_WAIT_MS;
+    const remaining = (): number => Math.max(0, deadline - Date.now());
+    await need(permission, reason, remaining());
+    const page = await pageToSave(input, remaining);
     await attempt(`save that to ${where}`, () => run(page.title, page.url));
     return text(`Saved "${page.title}" to ${where}.`);
   }

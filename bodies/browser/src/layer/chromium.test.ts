@@ -35,7 +35,11 @@ const fake = {
     ]),
     restore: vi.fn(async (_id?: string) => undefined),
   },
-  tabs: { create: vi.fn(async (_p: unknown) => ({ id: 42 })), group: vi.fn(async () => 9) },
+  tabs: {
+    create: vi.fn(async (_p: unknown) => ({ id: 42 })),
+    remove: vi.fn(async (_id: number) => undefined),
+    group: vi.fn(async () => 9),
+  },
   search: { query: vi.fn(async (_q: unknown) => undefined) },
   tabGroups: { update: vi.fn(async (_id: number, _p: unknown) => undefined) },
 };
@@ -53,6 +57,12 @@ describe('chromeActions', () => {
     const out = await chromeActions.search('cats');
     expect(fake.search.query).toHaveBeenCalledWith({ text: 'cats', tabId: 42 });
     expect(out).toEqual({ id: 42 });
+  });
+
+  it('search closes the blank tab and rethrows when the query fails', async () => {
+    fake.search.query.mockRejectedValueOnce(new Error('no search engine'));
+    await expect(chromeActions.search('cats')).rejects.toThrow('no search engine');
+    expect(fake.tabs.remove).toHaveBeenCalledWith(42);
   });
 
   it('group names the group only when given a title', async () => {

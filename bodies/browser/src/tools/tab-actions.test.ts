@@ -183,15 +183,45 @@ describe('tab_actions tool', () => {
     expect(e.message).toContain('not supported in this browser');
   });
 
-  it('denied_permission_surfaces_its_sentence', async () => {
-    const sentence = 'the person has not allowed Scout to use tab groups';
+  it.each([
+    ['group', { action: 'group', tab_ids: [1] }, 'group'],
+    ['reopen', { action: 'reopen' }, 'reopen'],
+    ['open with search', { action: 'open', search: 'cats' }, 'search'],
+    ['bookmark', { action: 'bookmark' }, 'bookmark'],
+    ['reading_list', { action: 'reading_list' }, 'addToReadingList'],
+  ] as const)('denied_permission_surfaces_its_sentence: %s', async (_name, input, api) => {
+    const sentence = 'the person has not allowed Scout to do that';
     const { t, actions } = setup(ACTIVE, async () => {
       throw new RpcError(ErrorCode.tool_failed, sentence);
     });
-    const e = await rejection(t.run({ action: 'group', tab_ids: [1] }));
+    const e = await rejection(t.run({ ...input }));
     expect(e.code).toBe(ErrorCode.tool_failed);
     expect(e.message).toBe(sentence);
-    expect(actions.group).not.toHaveBeenCalled();
+    expect(actions[api]).not.toHaveBeenCalled();
+  });
+
+  it('bookmark_and_reading_list_share_one_permission_deadline', async () => {
+    const waits: (number | undefined)[] = [];
+    const { t } = setup(ACTIVE, async (_need, _reason, waitMs) => {
+      waits.push(waitMs);
+    });
+    await t.run({ action: 'bookmark' });
+    expect(waits).toHaveLength(2);
+    expect(waits[0]).toBeLessThanOrEqual(25_000);
+    expect(waits[1]).toBeLessThanOrEqual(waits[0]!);
+  });
+
+  it('bookmark_and_reading_list_accept_web_addresses_only', async () => {
+    const { t, actions, asked } = setup();
+    for (const action of ['bookmark', 'reading_list']) {
+      for (const url of ['javascript:alert(1)', 'file:///c:/a', 'chrome://settings']) {
+        const e = await rejection(t.run({ action, title: 'T', url }));
+        expect(e.code, `${action} ${url}`).toBe(ErrorCode.invalid_params);
+      }
+    }
+    expect(actions.bookmark).not.toHaveBeenCalled();
+    expect(actions.addToReadingList).not.toHaveBeenCalled();
+    expect(asked).toEqual([]);
   });
 
   it('unknown_action_is_invalid_params', async () => {

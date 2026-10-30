@@ -202,7 +202,13 @@ export const chromeActions: ActionsApi = {
   async search(text) {
     // A blank tab first, so the new tab's id is known; the search then loads into it.
     const tab = await chrome.tabs.create({});
-    await chrome.search.query({ text, tabId: tab.id as number });
+    try {
+      await chrome.search.query({ text, tabId: tab.id as number });
+    } catch (e) {
+      // Do not leave an empty tab behind.
+      if (tab.id !== undefined) await chrome.tabs.remove(tab.id).catch(() => undefined);
+      throw e;
+    }
     return { id: tab.id ?? -1 };
   },
   async close(tabId) {
