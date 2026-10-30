@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { manifest } from './manifest';
+import { OPTIONAL_PERMISSIONS } from './permissions';
 
 describe('manifest', () => {
   it('is_manifest_v3_with_a_module_service_worker', () => {
@@ -15,24 +16,17 @@ describe('manifest', () => {
     expect([...manifest.permissions].sort()).toEqual(['alarms', 'scripting', 'storage']);
   });
 
-  it('lists_the_optional_permissions_from_the_design', () => {
-    expect([...manifest.optional_permissions].sort()).toEqual(
-      [
-        'bookmarks',
-        'contextMenus',
-        'downloads',
-        'history',
-        'readingList',
-        'sessions',
-        'tabGroups',
-        'tabs',
-      ].sort(),
-    );
+  it('lists_exactly_the_optional_permissions_the_broker_can_ask_for', () => {
+    expect([...manifest.optional_permissions].sort()).toEqual([...OPTIONAL_PERMISSIONS].sort());
   });
 
   it('optional_host_permissions_is_all_urls_and_there_is_no_host_permissions', () => {
     expect(manifest.optional_host_permissions).toEqual(['<all_urls>']);
     expect('host_permissions' in manifest).toBe(false);
+  });
+
+  it('declares_the_scout_omnibox_keyword', () => {
+    expect(manifest.omnibox).toEqual({ keyword: 'scout' });
   });
 
   it('has_a_popup_and_no_side_panel_options_or_commands', () => {
@@ -51,5 +45,8 @@ describe('manifest', () => {
   it('describes_scout_within_the_store_summary_limit', () => {
     expect(manifest.description).toContain('Scout');
     expect(manifest.description.length).toBeLessThanOrEqual(132);
+    // It must say what the extension can now do: manage tabs, and ask Scout from a page.
+    expect(manifest.description).toContain('manages tabs');
+    expect(manifest.description).toContain('ask it from a page');
   });
 });

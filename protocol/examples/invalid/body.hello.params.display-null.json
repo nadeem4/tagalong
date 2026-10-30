@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol": 1,
+    "body": { "id": "chrome-ab12", "kind": "browser", "name": "Chrome", "display": null },
+    "tools": []
+  }
+}

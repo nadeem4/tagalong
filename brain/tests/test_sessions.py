@@ -686,7 +686,7 @@ async def test_body_tools_offered_then_gone_after_disconnect():
 
 async def test_session_answer_passes_text_to_the_ask():
     session, _ = make(Gate([]))
-    session._bodies.online_ids = lambda: ["desktop"]
+    session._bodies.display_ids = lambda: ["desktop"]
     task = asyncio.create_task(session._asks.open(text="Which?", options=["a"], free_text=True))
     await asyncio.sleep(0)
     ask_id = session.open_asks()[0]["id"]
@@ -754,6 +754,87 @@ async def test_wake_goes_to_the_body_the_user_last_talked_to():
     session.jobs._on_finished(end_job(memory))
     await finish_quietly(session)
     assert wake_started(sent) == ["extension", "extension"]
+
+
+# --- a body with display=false shows nothing: its says are answered elsewhere (12c) ---
+
+
+def join_headless(session, body_id="browser"):
+    body = Body(id=body_id, kind="browser", name=body_id, display=False)
+    session._bodies.connect(body, [], QuietPeer(), None)
+
+
+def turn_body(sent):
+    return next(p["body"] for m, p in sent if m == "turn" and p["state"] == "started")
+
+
+async def test_say_from_a_display_less_body_routes_the_turn_to_the_last_displaying_body():
+    session, sent = make(Gate(["a", "b"]))
+    join(session, "desktop")
+    join_headless(session)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    sent.clear()
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "desktop"
+
+
+async def test_say_from_a_display_less_body_falls_back_to_any_displaying_body():
+    session, sent = make(Gate(["a"]))
+    join_headless(session)
+    join(session, "desktop")
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "desktop"
+
+
+async def test_say_from_a_display_less_body_is_null_when_no_displaying_body_is_online():
+    session, sent = make(Gate(["a"]))
+    join_headless(session)
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) is None
+    assert ("reply", None) in [(m, p["body"]) for m, p in sent if m == "reply"]
+
+
+async def test_say_from_a_display_less_body_does_not_move_last_body():
+    session, sent = make(Gate(["a", "b", "c"]))
+    memory = session._memory
+    join(session, "desktop")
+    join(session, "extension")
+    join_headless(session)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert session._last_body == "desktop"
+    sent.clear()
+    session.jobs._on_finished(end_job(memory))
+    await finish_quietly(session)
+    assert wake_started(sent) == ["desktop"]
+
+
+async def test_say_from_a_displaying_body_is_unchanged():
+    session, sent = make(Gate(["a"]))
+    join(session, "desktop")
+    join(session, "extension")
+    session.say("extension", say("hi"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "extension"
+    assert session._last_body == "extension"
+
+
+async def test_display_less_say_joins_a_running_turn_like_any_say():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    join(session, "desktop")
+    join_headless(session)
+    first = session.say("desktop", say("a"))
+    joined = session.say("browser", say("b"))
+    assert joined.joined is True and joined.turn == first.turn
+    gate.set()
+    await finish_quietly(session)
 
 
 async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():

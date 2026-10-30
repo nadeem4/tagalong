@@ -39,9 +39,13 @@ class FakeBodies(Bodies):
     def __init__(self, online: list[str]) -> None:
         super().__init__()
         self.ids = online
+        self.headless: set[str] = set()
 
     def online_ids(self) -> list[str]:
         return list(self.ids)
+
+    def display_ids(self) -> list[str]:
+        return [i for i in self.ids if i not in self.headless]
 
     def is_online(self, body_id: str) -> bool:
         return body_id in self.ids
@@ -103,6 +107,23 @@ def test_falls_back_to_any_online_body_when_the_last_is_offline():
     rig = Rig(online=("extension",), last="desktop")
     rig.scheduler.emit(ev())
     assert [b for b, _ in rig.starts] == ["extension"]
+
+
+def test_wake_never_goes_to_a_display_less_body():
+    rig = Rig(online=("browser", "desktop"), last="browser")
+    rig.bodies.headless = {"browser"}
+    rig.scheduler.emit(ev())
+    assert [b for b, _ in rig.starts] == ["desktop"]
+
+
+def test_wake_waits_when_only_display_less_bodies_are_online():
+    rig = Rig(online=("browser",), last="browser")
+    rig.bodies.headless = {"browser"}
+    rig.scheduler.emit(ev())
+    assert rig.starts == []
+    rig.bodies.ids.append("desktop")
+    rig.scheduler.pump()
+    assert [b for b, _ in rig.starts] == ["desktop"]
 
 
 def test_no_body_online_waits_and_connect_runs_it():

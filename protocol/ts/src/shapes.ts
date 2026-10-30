@@ -70,5 +70,6 @@ export const Body = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,32}$/),
   kind: z.string(),
   name: z.string(),
+  display: z.boolean().optional(),
 });
 export type Body = z.infer<typeof Body>;

@@ -194,10 +194,10 @@ class Scheduler:
 
     def _choose_body(self) -> str | None:
         last = self._last_body()
-        if last is not None and self._bodies.is_online(last):
+        shown = self._bodies.display_ids()  # a wake is never labelled with a display-less body
+        if last is not None and last in shown:
             return last
-        online = self._bodies.online_ids()
-        return online[0] if online else None  # none: the next connect retries
+        return shown[0] if shown else None  # none: the next connect retries
 
     def _arm_timer(self) -> None:
         # Only a group still waiting on time (batch or cap) needs a timer; busy and no-body

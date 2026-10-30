@@ -8,7 +8,14 @@ import { browserName, detectBrowser } from '../identity';
 import { chromeStorage as storage } from '../layer/chromium';
 import { originPattern } from '../permissions';
 import { DEFAULT_ADDR, readSettings, saveAddr, saveName } from '../settings';
-import { ALL_SITES, grantRows, statusLine, type GrantRow, type WorkerQuery } from './model';
+import {
+  ALL_SITES,
+  grantRows,
+  showContextMenusOffer,
+  statusLine,
+  type GrantRow,
+  type WorkerQuery,
+} from './model';
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const addrEl = document.getElementById('addr') as HTMLInputElement;
@@ -16,6 +23,7 @@ const addrError = document.getElementById('addr-error') as HTMLElement;
 const nameEl = document.getElementById('name') as HTMLInputElement;
 const grantsEl = document.getElementById('grants') as HTMLElement;
 const grantsEmpty = document.getElementById('grants-empty') as HTMLElement;
+const rightClickEl = document.getElementById('right-click') as HTMLButtonElement;
 
 async function showStatus(): Promise<void> {
   const query: WorkerQuery = { type: 'status' };
@@ -56,6 +64,7 @@ async function showGrants(): Promise<void> {
     }),
   );
   grantsEmpty.hidden = rows.length > 0;
+  rightClickEl.hidden = !showContextMenusOffer(all.permissions ?? []);
 }
 
 async function init(): Promise<void> {
@@ -75,6 +84,13 @@ async function init(): Promise<void> {
     });
   });
   nameEl.addEventListener('change', () => void saveName(storage, nameEl.value));
+  // The request has to run inside this click; the worker adds the menu item when it is granted.
+  rightClickEl.addEventListener('click', () => {
+    chrome.permissions
+      .request({ permissions: ['contextMenus'] })
+      .catch(() => false)
+      .finally(() => void showGrants());
+  });
 
   await Promise.all([showStatus(), showGrants()]);
 }

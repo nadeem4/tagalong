@@ -6,7 +6,7 @@ export const manifest = {
   manifest_version: 3,
   name: 'Tagalong',
   description:
-    'Lets Scout, your Tagalong companion, read pages in your browser only when it needs to. Needs the Tagalong brain running.',
+    'Scout, your Tagalong companion, reads pages and manages tabs when needed, and you can ask it from a page. Needs the Tagalong brain.',
   version: '0.0.0',
   minimum_chrome_version: '116',
   background: { service_worker: 'service-worker.js', type: 'module' },
@@ -30,8 +30,11 @@ export const manifest = {
     'readingList',
     'tabGroups',
     'contextMenus',
+    'search',
   ],
   optional_host_permissions: ['<all_urls>'],
+  // Typing `scout` then a question in the address bar; the keyword needs no permission.
+  omnibox: { keyword: 'scout' },
   /**
    * Extension pages and the worker may open websockets only: the brain can run on another
    * machine, so any host, but never a plain fetch of page text to somewhere else.

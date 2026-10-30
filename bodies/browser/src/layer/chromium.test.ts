@@ -1,13 +1,14 @@
 /**
- * Tests chromeSearch against a fake chrome global: the argument shapes Chrome is picky about
- * (the 25 cap on closed tabs, no endTime when open-ended) and the empty-text bookmarks path.
+ * Tests chromeSearch and chromeActions against a fake chrome global: the argument shapes Chrome
+ * is picky about (the 25 cap on closed tabs, no endTime when open-ended), the empty-text
+ * bookmarks path, and how actions find the tab or session they act on.
  */
 // chromium.ts uses the chrome.* typings, which the shared test tsconfig does not load.
 /// <reference types="chrome" />
 // page-reader.ts declares the injected globals chromium.ts calls.
 import type {} from '../content/page-reader';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import type { SearchApi } from './api';
+import type { ActionsApi, SearchApi } from './api';
 
 const fake = {
   storage: { local: {}, session: {} },
@@ -21,7 +22,7 @@ const fake = {
   },
   sessions: {
     getRecentlyClosed: vi.fn(async (_q: unknown) => [
-      { lastModified: 1, tab: { title: 'One', url: 'https://one.test' } },
+      { lastModified: 1, tab: { title: 'One', url: 'https://one.test', sessionId: 's1' } },
       {
         lastModified: 2,
         window: {
@@ -32,14 +33,58 @@ const fake = {
         },
       },
     ]),
+    restore: vi.fn(async (_id?: string) => undefined),
   },
+  tabs: {
+    create: vi.fn(async (_p: unknown) => ({ id: 42 })),
+    remove: vi.fn(async (_id: number) => undefined),
+    group: vi.fn(async () => 9),
+  },
+  search: { query: vi.fn(async (_q: unknown) => undefined) },
+  tabGroups: { update: vi.fn(async (_id: number, _p: unknown) => undefined) },
 };
 
 let chromeSearch: SearchApi;
+let chromeActions: ActionsApi;
 
 beforeAll(async () => {
   vi.stubGlobal('chrome', fake);
-  ({ chromeSearch } = await import('./chromium'));
+  ({ chromeSearch, chromeActions } = await import('./chromium'));
+});
+
+describe('chromeActions', () => {
+  it('search loads the text into a fresh tab and returns that tab id', async () => {
+    const out = await chromeActions.search('cats');
+    expect(fake.search.query).toHaveBeenCalledWith({ text: 'cats', tabId: 42 });
+    expect(out).toEqual({ id: 42 });
+  });
+
+  it('search closes the blank tab and rethrows when the query fails', async () => {
+    fake.search.query.mockRejectedValueOnce(new Error('no search engine'));
+    await expect(chromeActions.search('cats')).rejects.toThrow('no search engine');
+    expect(fake.tabs.remove).toHaveBeenCalledWith(42);
+  });
+
+  it('group names the group only when given a title', async () => {
+    await chromeActions.group([1, 2]);
+    expect(fake.tabGroups.update).not.toHaveBeenCalled();
+    await chromeActions.group([1, 2], 'Trip');
+    expect(fake.tabGroups.update).toHaveBeenCalledWith(9, { title: 'Trip' });
+  });
+
+  it('reopen restores the newest closed tab and says which, or null when none', async () => {
+    const back = await chromeActions.reopen();
+    expect(fake.sessions.restore).toHaveBeenCalledWith('s1');
+    expect(back).toEqual({ title: 'One', url: 'https://one.test' });
+    fake.sessions.getRecentlyClosed.mockResolvedValueOnce([]);
+    expect(await chromeActions.reopen()).toBeNull();
+  });
+
+  it('the reading list is refused where the browser has none', async () => {
+    await expect(chromeActions.addToReadingList('T', 'https://a.test')).rejects.toThrow(
+      'not supported in this browser',
+    );
+  });
 });
 
 describe('chromeSearch', () => {

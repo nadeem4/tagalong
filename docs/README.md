@@ -24,7 +24,7 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | [desktop.md](desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file, Welcome |
 | [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, pointing, drafts, drops                                                            |
 | [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, models and downloads, the voice process                    |
-| [browser-body.md](browser-body.md) | The browser body: identity, the `tabs` tool, permissions, popup, install                                                              |
+| [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                             |
 
 ### The engine
 

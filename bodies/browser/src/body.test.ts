@@ -4,6 +4,7 @@
  * or brain is needed and every case is fast and repeatable.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HelloParams } from '@tagalong/contract';
 import type { PermissionBroker } from './permissions';
 import { createBody, type BodyDeps } from './body';
 import { FakeBrainSocket, memoryStorage, settle } from './test-support/fake-brain-socket';
@@ -43,6 +44,16 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       downloads: () => Promise.reject(new Error('unused')),
       closedTabs: () => Promise.reject(new Error('unused')),
     },
+    actions: {
+      open: () => Promise.reject(new Error('unused')),
+      search: () => Promise.reject(new Error('unused')),
+      close: () => Promise.reject(new Error('unused')),
+      switchTo: () => Promise.reject(new Error('unused')),
+      group: () => Promise.reject(new Error('unused')),
+      reopen: () => Promise.reject(new Error('unused')),
+      bookmark: () => Promise.reject(new Error('unused')),
+      addToReadingList: () => Promise.reject(new Error('unused')),
+    },
     broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
     random: () => 'ab12',
     openSocket: (url) => {
@@ -77,6 +88,70 @@ describe('the browser body', () => {
     expect(params.body.kind).toBe('browser');
     expect(params.body.name).toBe('Chrome');
     expect(params.tools.map((t) => t.name)).toContain('tabs');
+  });
+
+  it('hello_says_display_false', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    sockets[0]!.open();
+    await settle();
+    const params = sockets[0]!.request('hello')?.['params'];
+    expect(HelloParams.safeParse(params).success).toBe(true);
+    expect((params as { body: { display?: boolean } }).body.display).toBe(false);
+  });
+
+  it('say_sends_text_and_context_as_a_say_request', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    const context = { url: 'https://a.test/docs', title: 'Docs' };
+    void body.say('what is this?', context);
+    await settle();
+    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'what is this?', context });
+  });
+
+  it('say_while_connecting_is_sent_once_online', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    // A cold wake: nothing started yet, and the link is still connecting when the ask arrives.
+    void body.say('what is this?', { url: 'https://a.test/', title: 'A' });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sockets[0]!.request('say')).toBeUndefined();
+    await online(sockets[0]!);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sockets[0]!.sent.filter((m) => m['method'] === 'say')).toHaveLength(1);
+    expect(sockets[0]!.request('say')?.['params']).toEqual({
+      text: 'what is this?',
+      context: { url: 'https://a.test/', title: 'A' },
+    });
+  });
+
+  it('say_sends_no_context_when_none_is_given', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.say('hi');
+    await settle();
+    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'hi' });
+  });
+
+  it('say_while_the_brain_never_comes_up_is_dropped_without_throwing', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    await body.start();
+    const done = body.say('hi', { url: '', title: '' });
+    await vi.advanceTimersByTimeAsync(6_000);
+    await expect(done).resolves.toBeUndefined();
+    expect(sockets[0]!.request('say')).toBeUndefined();
+  });
+
+  it('say_before_start_dials_then_drops_when_the_brain_is_down', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    const done = body.say('hi', { url: '', title: '' });
+    await vi.advanceTimersByTimeAsync(6_000);
+    await expect(done).resolves.toBeUndefined();
+    expect(sockets).toHaveLength(1);
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {

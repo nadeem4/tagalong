@@ -3,18 +3,22 @@
  * touches (storage, tabs, sockets) is passed in, so a test can run it without a real Chrome.
  * The service worker only wires the real pieces in and forwards events.
  */
-import { BrainClient, type BrainSocket, type BrainStatus } from '@tagalong/contract';
+import { BrainClient, BrainOffline, type BrainSocket, type BrainStatus } from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
-import type { PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
+import type { ActionsApi, PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
 import { createTabReporter, downloadEvent } from './events';
 import { readSettings } from './settings';
 import { toolset } from './tools/registry';
 import type { PermissionBroker } from './permissions';
 import { browserSearchTool } from './tools/browser-search';
 import { pagePartsTool } from './tools/page-parts';
+import { tabActionsTool } from './tools/tab-actions';
 import { tabsTool } from './tools/tabs';
 
 const SEQ_KEY = 'lastSeq';
+/** How long an ask waits for the link before it is dropped, and how often it looks. */
+const SAY_WAIT_MS = 5_000;
+const SAY_POLL_MS = 100;
 const KEEPALIVE = { everyMs: 20_000, tool: 'spend_today' };
 
 /** What the popup shows: the link and who this body is. */
@@ -31,6 +35,7 @@ export interface BodyDeps {
   page: PageApi;
   picture: PictureApi;
   search: SearchApi;
+  actions: ActionsApi;
   broker: PermissionBroker;
   /** Makes the id's 4 random chars; tests pin it. */
   random?: () => string;
@@ -49,6 +54,13 @@ export interface BrowserBody {
   tabChanged(tab: { title: string; url: string }): void;
   /** A download changed state; only finished or failed ones are sent, as a `download` fact. */
   downloadChanged(item: { filename: string; state: string }): void;
+  /**
+   * The person asked Scout something from the right-click menu or the address bar. The answer
+   * shows on a displaying body. It starts the body if a woken worker has none yet and waits up to
+   * 5 s for the link; if the brain is still down the ask is dropped, and the popup's status line
+   * is where the person sees that.
+   */
+  say(text: string, context?: { url: string; title: string }): Promise<void>;
 }
 
 export function createBody(deps: BodyDeps): BrowserBody {
@@ -78,10 +90,17 @@ export function createBody(deps: BodyDeps): BrowserBody {
       }),
       pagePartsTool({ tabs: deps.tabs, page: deps.page, needs: deps.broker, bodyName: name }),
       browserSearchTool({ search: deps.search, needs: deps.broker, bodyName: name }),
+      tabActionsTool({
+        actions: deps.actions,
+        tabs: deps.tabs,
+        needs: deps.broker,
+        bodyName: name,
+      }),
     ]);
     client = new BrainClient({
       addr: settings.addr,
-      body: { id, kind: 'browser', name },
+      // display: false because the browser shows no answers; the brain routes them elsewhere.
+      body: { id, kind: 'browser', name, display: false },
       seqStore: {
         load: async () => {
           const seq = await deps.session.get(SEQ_KEY);
@@ -131,6 +150,19 @@ export function createBody(deps: BodyDeps): BrowserBody {
     downloadChanged(item) {
       const fact = downloadEvent(item);
       if (fact) client?.event('download', fact);
+    },
+    async say(text, context) {
+      // A woken worker has no client yet and a fresh one is still connecting, so wait for it.
+      await start();
+      const deadline = Date.now() + SAY_WAIT_MS;
+      while (client?.link !== 'online' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, SAY_POLL_MS));
+      }
+      try {
+        await client?.say(context === undefined ? { text } : { text, context });
+      } catch (error) {
+        if (!(error instanceof BrainOffline)) throw error;
+      }
     },
   };
 }

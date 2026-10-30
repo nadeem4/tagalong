@@ -411,6 +411,25 @@ def test_online_ids_lists_connected_bodies():
     assert bodies.online_ids() == ["a", "b"]
 
 
+def test_display_ids_skip_display_false_bodies():
+    bodies = Bodies()
+    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None)
+    bodies.connect(Body(id="c", kind="desktop", name="c", display=True), [], FakePeer(), None)
+    assert bodies.display_ids() == ["a", "c"]
+    assert bodies.online_ids() == ["a", "b", "c"]
+
+
+def test_body_lookup_is_online_only():
+    bodies = Bodies()
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    assert bodies.body("a") == body("a")
+    assert bodies.body("zzz") is None
+    bodies.disconnect("a", peer)
+    assert bodies.body("a") is None
+
+
 def test_known_tools_survive_disconnect():
     bodies = Bodies()
     peer = FakePeer()

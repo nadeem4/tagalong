@@ -14,6 +14,7 @@ import {
 } from '../permissions';
 import type { BrainSocket } from '@tagalong/contract';
 import type {
+  ActionsApi,
   PageApi,
   PictureApi,
   SearchApi,
@@ -190,6 +191,53 @@ export const chromeSearch: SearchApi = {
         })),
       )
       .slice(0, limit);
+  },
+};
+
+export const chromeActions: ActionsApi = {
+  async open(url) {
+    const tab = await chrome.tabs.create({ url });
+    return { id: tab.id ?? -1 };
+  },
+  async search(text) {
+    // A blank tab first, so the new tab's id is known; the search then loads into it.
+    const tab = await chrome.tabs.create({});
+    try {
+      await chrome.search.query({ text, tabId: tab.id as number });
+    } catch (e) {
+      // Do not leave an empty tab behind.
+      if (tab.id !== undefined) await chrome.tabs.remove(tab.id).catch(() => undefined);
+      throw e;
+    }
+    return { id: tab.id ?? -1 };
+  },
+  async close(tabId) {
+    await chrome.tabs.remove(tabId);
+  },
+  async switchTo(tabId) {
+    const tab = await chrome.tabs.update(tabId, { active: true });
+    if (tab?.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
+  },
+  async group(tabIds, title) {
+    const groupId = await chrome.tabs.group({ tabIds: tabIds as [number, ...number[]] });
+    if (title !== undefined) await chrome.tabGroups.update(groupId, { title });
+  },
+  async reopen() {
+    const [last] = await chrome.sessions.getRecentlyClosed({ maxResults: 1 });
+    if (last === undefined) return null;
+    const closed = last.tab ?? last.window?.tabs?.[0];
+    const id = last.tab?.sessionId ?? last.window?.sessionId;
+    await chrome.sessions.restore(id);
+    return { title: closed?.title ?? '', url: closed?.url ?? '' };
+  },
+  async bookmark(title, url) {
+    await chrome.bookmarks.create({ title, url });
+  },
+  async addToReadingList(title, url) {
+    if (chrome.readingList?.addEntry === undefined) {
+      throw new Error('not supported in this browser');
+    }
+    await chrome.readingList.addEntry({ title, url, hasBeenRead: false });
   },
 };
 

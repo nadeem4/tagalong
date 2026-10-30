@@ -57,6 +57,20 @@ export interface SearchApi {
   closedTabs(limit: number): Promise<SearchHit[]>;
 }
 
+export interface ActionsApi {
+  open(url: string): Promise<{ id: number }>;
+  /** A web search in a new tab, run by the browser's own default search engine. */
+  search(text: string): Promise<{ id: number }>;
+  close(tabId: number): Promise<void>;
+  switchTo(tabId: number): Promise<void>;
+  group(tabIds: number[], title?: string): Promise<void>;
+  /** The tab closed last, or null when there is none to bring back. */
+  reopen(): Promise<{ title: string; url: string } | null>;
+  bookmark(title: string, url: string): Promise<void>;
+  /** Rejects with "not supported in this browser" when there is no reading list. */
+  addToReadingList(title: string, url: string): Promise<void>;
+}
+
 export interface PageApi {
   /** Injects the page reader into the tab and returns what it read. */
   read(tabId: number): Promise<PageReading>;

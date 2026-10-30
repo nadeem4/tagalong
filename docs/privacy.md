@@ -66,17 +66,39 @@ pet is told that too, as a fact.
 
 ## What the browser body reads
 
-Only when Scout asks through its `tabs` tool, and only after you say yes. Listing your tabs (title,
-address, whether each is active or asleep) needs your yes to "see open tabs". Reading one needs
-that and a yes for the site: **Allow on this site**, **Allow on all sites** or **Not now**, in a small
-window that waits 25 seconds. A read gives one tab's selection, URL, title and main text, capped at
-40,000 characters. A sleeping tab is never woken, and Chrome's own pages, the Web Store and other
-extensions' pages are never read. Nothing is read in the background.
+The browser body has no screen of its own; it only offers Scout tools, and each one asks you first.
+Scout uses them while you talk to it, through four tools:
+
+- `tabs`: listing your tabs (title, address, whether each is active or asleep) needs your yes to
+  "see open tabs". Reading one, or a picture of the visible part of the tab in front, needs that and
+  a yes for the site: **Allow on this site**, **Allow on all sites** or **Not now**, in a small
+  window that waits 25 seconds. A read gives one tab's selection, URL, title and main text, capped at
+  40,000 characters. A sleeping tab is never woken, and Chrome's own pages, the Web Store and other
+  extensions' pages are never read.
+- `page_parts`: a page's links, tables, forms (field names and types only, never what was typed) or
+  headings, under the same two yeses as reading a tab.
+- `browser_search`: your history, bookmarks, downloads, recently closed tabs or reading list, each
+  needing its own yes. It returns matching entries up to a small limit.
+- `tab_actions`: open an address (http or https only) or a web search, close, switch to or group
+  tabs, reopen the one closed last, add a bookmark or a reading list entry. Tagalong asks you first in
+  its bubble until you set the tool to auto.
+
+Two facts are sent without Scout asking, while the body is connected and you have allowed them: the
+title and address of the tab in front when it changes (needs "see open tabs") and the name and
+outcome of a finished or failed download (needs downloads). Addresses lose their query string and
+fragment, and a private (incognito) window is never reported or asked from.
+
+You can also ask Scout from the page: right-click selected text (once turned on in the popup) or
+type `scout` and a question in the address bar. That sends your text, or the selection (at most 2,000
+characters, marked as page text, not instructions). A right-click also sends the page address; the
+page title, and the address for an address-bar ask, come only with "see open tabs". No script runs in
+a page until you have allowed it.
 
 The body can only open websockets, to the brain (`127.0.0.1:47321` unless you change it in the
-popup). It keeps three small settings on this browser and nothing else: the brain's address, a name
-for the browser, and its body id. The toolbar popup lists what you have allowed, and Chrome's
-extension page can remove any of it. What the brain does with a page it was given follows the brain's
+popup). It keeps on this browser the brain's address, a name for the browser and its body id (local
+storage), and the number of the last message it received (session storage, which Chrome clears when
+the browser closes). It keeps no pages, tabs or conversations. The toolbar popup lists what you have
+allowed, and Chrome's extension page can remove any of it. What the brain does with a page it was given follows the brain's
 own rules. The extension's public privacy policy, for the Chrome Web Store, is
 [chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
 

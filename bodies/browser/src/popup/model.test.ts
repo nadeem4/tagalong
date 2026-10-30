@@ -3,7 +3,14 @@
  * been allowed, turned into plain rows.
  */
 import { describe, expect, it } from 'vitest';
-import { grantRows, statusLine } from './model';
+import { grantRows, statusLine, showContextMenusOffer } from './model';
+
+describe('showContextMenusOffer', () => {
+  it('contextMenus_offer_is_shown_only_until_granted', () => {
+    expect(showContextMenusOffer(['storage'])).toBe(true);
+    expect(showContextMenusOffer(['storage', 'contextMenus'])).toBe(false);
+  });
+});
 
 describe('statusLine', () => {
   it('has_one_sentence_per_status', () => {

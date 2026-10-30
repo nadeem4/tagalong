@@ -105,6 +105,20 @@ describe('createTurnEvents', () => {
     expect(e).toMatchObject({ conversationId: 'brain' });
   });
 
+  it('shows_a_turn_whatever_body_it_names', () => {
+    // A page asked from the browser: the turn names another body or none, and still shows here.
+    for (const body of ['chrome-ab12', null]) {
+      const m = make('sess-1');
+      const named = (f: object) => ({ ...f, body });
+      expect(m.map('turn', named(turn('started')))).toEqual([
+        { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'sess-1' },
+      ]);
+      expect(m.map('reply', named(delta('Hi')))).toEqual([
+        { type: 'turn.delta', turnId: T, text: 'Hi' },
+      ]);
+    }
+  });
+
   it('maps a reply delta and drops reply done', () => {
     const m = make();
     expect(m.map('reply', delta('Hi'))).toEqual([{ type: 'turn.delta', turnId: T, text: 'Hi' }]);

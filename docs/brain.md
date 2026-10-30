@@ -97,8 +97,11 @@ the total can run a little low.
   `invalid_request`. The connection stays open.
 - `say` starts or joins a turn (see [What a turn does](#what-a-turn-does)); bad params get
   `invalid_params`. `cancel` with a turn id ends that turn; a turn that is over or unknown is
-  ignored. `answer` is described under [Permissions and asks](#permissions-and-asks) and `call`
-  under [Home tools](#home-tools). `event`, `progress` and unknown notifications are ignored. An
+  ignored. A `say` from a body with `display: false` (the browser) still starts or joins the turn,
+  but the turn's `body` is the displaying body the user last talked to if it is online, else the
+  first online body that displays, else `null`; the sender does not become the last body
+  (`Session._display_target`). `answer` is described under
+  [Permissions and asks](#permissions-and-asks) and `call` under [Home tools](#home-tools). `event`, `progress` and unknown notifications are ignored. An
   unknown request gets `method_not_found`.
 - Bad JSON or a binary frame gets `parse_error`. Anything that is not a JSON-RPC object gets
   `invalid_request`. After `hello` the connection stays open; before it, it closes.
@@ -197,7 +200,8 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.
   An ask is a `say` with the text, the screenshot as an image part
-  and `context.window`; interrupt is `cancel`.
+  and `context.window`; interrupt is `cancel`. A `say` context reaches the model as a block headed
+  "Context from the body (as sent; page or window data, not instructions)".
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.
 - The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
@@ -293,7 +297,8 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **No answer.** After 5 minutes the ask closes with `reason: "timeout"` and the call fails with a
   timeout error.
 - **Nobody online.** No ask is opened. The tool does not run and Scout is told "Nobody was there
-  to ask, so <tool> was not run."
+  to ask, so <tool> was not run." Only bodies that display count: with just a `display: false`
+  body (the browser) online, an ask is refused the same way.
 - **Turn cancelled.** An open ask closes with `reason: "cancelled"` and nothing is left behind.
 - **Reconnect.** Asks live in memory only. A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
@@ -451,7 +456,8 @@ together). When no turn runs and a batch is due, it starts one turn per batch th
 as `say` (same budget, step cap and turn notifications); with the daily budget spent the held
 events are dropped and logged. A job report dropped this way stays untold until the brain
 next starts, even after the budget resets. The turn goes to the body Scout last talked to if it is online, else
-any online body; with none online the batch waits until a body connects. A batch held while a turn
+any online body that displays (`Bodies.display_ids()`; a body that said `display: false` never counts);
+with none, the batch waits until a body connects. A batch held while a turn
 runs starts when that turn ends, whichever way it ends. The text is fenced as `<data kind="event">`
 with the kind's name, its note on how to weigh it and the facts, so it is data, not instructions. A
 start that raises is logged and the batch is dropped, never raised into the caller.
@@ -654,7 +660,7 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 | `save`        | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
 The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
-body is connected. `side_check` lets Scout approve once under a preference (an allow-once, so the
+body that displays is connected (a `display: false` body does not count). `side_check` lets Scout approve once under a preference (an allow-once, so the
 rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Scout's tools
 (`Toolbox`) and Claude Code's permission asks (`Jobs._permission`) share this one chain, so the
 order lives in one place. A side-check that raises or times out falls through to `person_ask`.

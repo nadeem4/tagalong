@@ -186,12 +186,23 @@ class Session:
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes
-        self._last_body = body_id
+        sender = self._bodies.body(body_id)
+        shown_on: str | None = body_id
+        if sender is not None and sender.display is False:
+            shown_on = self._display_target()  # its answer must appear where someone can see it
+        else:
+            self._last_body = body_id
         # A finished task whose callback has not run yet is a dead turn: start a new one.
         if self._busy():
             self._inbox.append(content)
             return SayResult(turn=self._turn_id, joined=True)
-        return SayResult(turn=self._start_turn(body_id, content), joined=False)
+        return SayResult(turn=self._start_turn(shown_on, content), joined=False)
+
+    def _display_target(self) -> str | None:
+        shown = self._bodies.display_ids()
+        if self._last_body in shown:
+            return self._last_body
+        return shown[0] if shown else None
 
     def body_event(self, body_id: str, name: str, data: object) -> None:
         event = from_body(body_id, name, data)
@@ -220,7 +231,7 @@ class Session:
         return self._task is not None and not self._task.done()
 
     def _start_turn(
-        self, body_id: str, content: list, started_by: Literal["user", "brain"] = "user"
+        self, body_id: str | None, content: list, started_by: Literal["user", "brain"] = "user"
     ) -> str:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
