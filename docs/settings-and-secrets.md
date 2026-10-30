@@ -38,8 +38,7 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 | `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' }`                                                                          | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
 | `listening`         | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
 
-Those six are the whole schema; everything the old brain read (the name, the greeting, keeping an
-eye, nudges, the budget, sight detail, watches and the rest) is gone. The schema has no secret
+Those six are the whole schema. The schema has no secret
 fields (pinned by `settings.test.ts`, "carries no secret fields").
 
 ### Migrations of saved values
@@ -47,10 +46,10 @@ fields (pinned by `settings.test.ts`, "carries no secret fields").
 There is no version number in `settings.json`. Older files are cleaned on read, and the next save
 writes the cleaned form:
 
-| Cleaner                 | What it does                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unknown keys stripped   | Drops every removed field (`greeting`, `keepAnEye`, `wellbeing`, `userName`, `sightDetail`, `windowTextBudget`, `watch`, `welcome`, the launch record, `providerBaseUrls` and so on) |
-| `withoutRetiredTalkKey` | A `hotkeys.talk` that is not one of `TALK_KEYS` (an old accelerator combo) becomes `RightControl`                                                                                    |
+| Cleaner                 | What it does                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| Unknown keys stripped   | Drops every key the schema does not know                                                          |
+| `withoutRetiredTalkKey` | A `hotkeys.talk` that is not one of `TALK_KEYS` (an old accelerator combo) becomes `RightControl` |
 
 ### How settings are stored
 

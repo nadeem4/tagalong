@@ -1,19 +1,18 @@
 # Privacy in detail
 
 What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
-How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions, the
-sight log, rolling memory), [voice.md](voice.md) (microphone and speech),
+How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions,
+rolling memory), [voice.md](voice.md) (microphone and speech),
 [memory.md](memory.md), [brain.md](brain.md) (the Python brain's prompts, asks and
 experts), [connected-apps.md](connected-apps.md), [browser-body.md](browser-body.md) and
 [settings-and-secrets.md](settings-and-secrets.md).
 
 ## What is captured, and when
 
-Nothing on screen is read until you press a key, with three exceptions: **keeping an eye on things**,
-which is on by default and follows window titles only (below), and **rolling memory** and a **watch** a
-pet started at your request, which you switch on yourself (both below). Otherwise there is no
-screenshot and no window text read between one question and the next — each hotkey reads once, sends
-that, and stops.
+Nothing on screen is read until you press a key, with two exceptions: the **front window's title**,
+which the desktop tells the brain when it changes (names only, never the window's text), and **rolling
+memory**, which you switch on yourself (below). Otherwise there is no screenshot and no window text
+read between one question and the next — each hotkey reads once, sends that, and stops.
 
 | You do                  | It reads                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------- |
@@ -27,11 +26,9 @@ window's text, take a screenshot of the window you were using or of one listed w
 others (never a minimized one, which has nothing drawn), fetch another monitor, zoom into part of one.
 Blind spots refuse every one. A screenshot, a window picture and a window read from a picture
 (OCR) are announced on Scout and in the tray tooltip like any capture; listing windows, reading a
-window's text layer, a close-up crop, a frame from screen memory and pointing are not announced,
-but each writes a row in [What Scout saw](#what-scout-saw-the-log-of-its-own-looking) when it read
-something (the full table is under "Capture announcements" in
-[sight.md](sight.md#capture-announcements)). Those run only inside a turn you started, are shown in
-the panel as they happen, and obey everything below.
+window's text layer, a close-up crop and a frame from screen memory are not announced (the full
+table is under "Capture announcements" in [sight.md](sight.md#capture-announcements)). Those run
+only inside a turn you started, are shown in the panel as they happen, and obey everything below.
 
 ## What the window list holds
 
@@ -122,9 +119,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   window or tab title, so the title stays out of the conversation and out of any expert's brief.
 
 - **Your own exclusions.** They work the same way. Settings has no editor for them: you add an app
-  or a window title by asking Scout ("never look at Signal"), which shows a settings card that
-  changes nothing until you click Apply. Chat can never remove one; removing an entry means
-  editing `captureExclusions` in `settings.json` by hand.
+  or a window title, or remove one, by editing `captureExclusions` in `settings.json` by hand.
 - **Secrets that slip past.** A title rule only works while the title names the file (an editor
   shows `.env` only while that tab is open). So everything sent to a model — your question,
   selections, window text, tool results, memories — and every brief to an expert passes through
@@ -132,49 +127,8 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   Stripe keys), login tokens (JWTs), private key blocks, the password in a connection string, the
   values of `PASSWORD=`, `SECRET=`, `TOKEN=` and `API_KEY=` settings, and card numbers become a
   marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
-- **Secret files, by your experts.** Claude Code reads files for itself, so it is started with deny
-  rules for every secret file name above (`Read(**/.env)`, `Edit(**/.env)` and so on).
-- **Experts run sealed.** An expert run of Claude Code gets only the tools its mode allows (read and
-  search; plus edit when you allowed edits; web search and fetch when you switched on **Let it
-  search the web**, or for a routine's research), none of
-  your MCP servers, none of the project folder's `.claude` settings (so a project cannot grant
-  itself permissions or run hooks), and no hooks from your own settings either. Its answer, its
-  error and its progress steps pass through `hideSecrets` before they are kept in Activity or shown,
-  so a key it read in a file is not repeated back. Its standing instructions pass through
-  `hideSecrets` too, into a temp file that is removed when the run ends.
-- **Catalog experts use your Claude Code apps.** An expert installed from the catalog (Researcher,
-  Trip planner, Social media manager) is the one exception to the seal: it may call exactly the app
-  tools its card lists (for example Notion search and fetch, or Google Calendar list and search
-  events), through the connectors you already set up and signed into in Claude Code. Tagalong
-  holds no token and does no sign-in for them; it reads which ones exist from `~/.claude.json` and
-  `~/.claude/plugins`, read-only. Every tool not on the list, including any that posts, sends,
-  books or changes something, is refused without asking, even one you allowed for your own Claude
-  Code sessions in `~/.claude/settings.json` (it is denied for these runs). The tools come from
-  Tagalong's built-in catalog every run, never from the saved expert. Only its pinned plugins load; if Claude
-  Code loads any other, the run stops before it starts. **Install** runs `claude plugin install`
-  only after you pressed it on a card that names each plugin. These experts work in their own
-  folder in your temp folder, never in your projects. Templates and experts you make stay sealed.
-- **Hand-off cards are saved, without the window.** A card waiting for Send is kept as an ask in
-  Waiting on you, so it survives a restart, for up to 24 hours. The saved card holds the brief Scout
-  wrote (keys hidden) and the files it names; the window title, your selection and any window text
-  that came with it stay in memory only, and are gone when Tagalong closes. After a restart the card
-  says so, and the expert gets only the brief it shows.
-- **Two-step hand-offs.** When one card names two steps (say a Coder, then a Reviewer), both are
-  confirmed by the one Send, with each step's access shown on the card; nothing starts later on its
-  own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`, and cut at 8,000
-  characters) and the names of the files it changed, works in the same project with its own access,
-  and never runs if step 1 failed, timed out or was stopped, or once Tagalong is closing.
-  Each step's brief is its own "Sent to expert" row in the log of what Scout saw.
-- **Notes to a working expert.** What you ask Scout to tell a working expert ("use dayjs, not
-  moment") leaves the machine to that expert like the brief did: your words, passed through
-  `hideSecrets`, written into the same live Claude Code session when its current step ends. It
-  cannot change what the expert may do: same folder, same tools, still sealed. Each note delivered
-  is its own "Sent to expert" row (its size, never its words), and it is added to the hand-off's
-  Activity row under "What Coder was told". A note still waiting when the run ends is never sent,
-  and the card says so; after Stop nothing more is passed on. At most 5 notes wait at a time, each
-  at most 2,000 characters. What the expert writes between its tools shows on the card (first
-  sentence, at most 120 characters, keys hidden) and is never said aloud. What its tools read or
-  return is never said aloud, and neither is its final answer.
+- **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](brain.md#experts)). A note you ask Scout to pass to a working expert
+  (`tell_expert`) leaves the machine to that expert like the brief did.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -187,44 +141,16 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   a picture is of, it takes none while anything at all is blocked.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 
-## Changing settings by talking
-
-You can ask Scout to change some settings ("talk a bit slower", "call me Sam", "stop keeping an
-eye on things"). Scout shows a card with each setting now and after, and **nothing changes until
-you click Apply**. A spoken "yes" never applies it, because a voice from a video or a call could say
-it.
-
-- **What chat can change.** Scout's voice (on or off, which voice, speed, the ElevenLabs voice,
-  who speaks and who listens), the hotkeys, screen memory and adding a capture exclusion.
-- **What chat can never change.** API keys, logins, provider URLs, the model, the calendar link
-  (it lives in the keychain), removing a capture exclusion, and the app's own bookkeeping. The tool answers that these are changed only in Settings, never shows a card for
-  them and never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
-  the card's changes again against this list, so a tampered card cannot reach anything else, and
-  only the bubble can apply one. The card goes to the desktop only, never the browser extension.
-- **Always listening.** Scout can switch it off through the card, never on: only you switch it on,
-  in the bubble's header or Settings › Privacy. The Seeing switch and the pause key are not
-  settings.
-- **Loosening always shows a marked card.** A change that lets Scout see or keep more (screen
-  memory on or longer) is marked "Lets Scout see or keep more of your screen", and the button reads
-  **Turn on**. A routine running on its own can never propose one.
-- **The record.** Each applied card writes a **Changed by talk** row in What Scout saw, naming the
-  settings, not their values.
-
 ## The rest
 
-- A visible indicator shows every screenshot, window picture, OCR read and hotkey read; the other
-  reads are logged in What Scout saw.
+- A visible indicator shows every screenshot, window picture, OCR read and hotkey read.
 - Built-in blind spots and your own exclusion list block capture in password managers, secret
   files and other listed apps.
 - When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
   desktop — capture falls back to the screen rather than refusing, which matches the exclusion
   rules: a window that cannot be named is allowed, because a pet that never sees reads as broken.
 - Everything is stored locally in SQLite.
-- Screenshots are not persisted by default. The image is stripped from the stored snapshot before
-  the row is written, so the database holds the question and the window title but never the pixels.
-  Set `screenshotRetention` to `{ "mode": "hours", "hours": 1-24 }` to keep them for debugging;
-  expired images — and every stored image, the moment you switch retention back off — are swept on
-  the next turn.
+- Screenshots are never saved: the saved chat keeps only the marker `[screenshot]` (see [memory.md](memory.md#saved-chat)).
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - A pasted key is saved to the OS keychain
   before its one test (one tiny request to that service); a key that fails the test stays there
@@ -234,14 +160,9 @@ it.
   the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
   the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the
   card never shows a key, token or secret.
-- With every question, Scout's AI provider also gets a short **Now** block of facts about the
-  moment: your local time, day and time zone (for example `Europe/London`); how long since you
-  last talked to Scout; whether you asked out loud, or which routine is running; and, for each
-  expert running, finished since you last talked (and whether it finished, stopped or failed) or
-  waiting for your Send, the expert's name and the first line of what it was asked, at most 100
-  characters, through `hideSecrets`. An expert's answer is never in it. What Scout remembers
-  rides in the same message: the same notes, to the same provider, nothing new. Nothing of this is stored by the block itself; it is rebuilt each turn
-  from what Tagalong already keeps on this computer.
+- With every question, Scout's AI provider also gets one **Now** line: your local date, time and UTC
+  offset. What Scout remembers rides in the same message: the same notes, to the same provider,
+  nothing new. Nothing of this is stored by the line itself.
 
 ## Connected apps: what goes to them
 
@@ -259,23 +180,19 @@ when Scout calls one of their tools in a turn you started.
   and nothing changes. A change still waiting when Tagalong closes is never run later. A change too
   long to show in full (over 4,000 characters) is not offered at all. A change that cannot be undone
   (the app says so, or its name says send, delete, merge and the like) is labelled "Can’t be undone".
-- **Waiting on you.** Each change waiting for you, and each hand-off card, is saved as an ask in
-  `tagalong.db` on this computer, listed in Home › **Waiting on you**, where you can answer it too. An
+- **Approvals.** Each change waiting for you, and each hand-off card, is saved as an ask in
+  `tagalong.db` on this computer, listed in Home › **Approvals**, where you can answer it too. An
   ask keeps Scout's summary of what will happen (the app, the tool and what Scout filled in, with
   keys and passwords hidden) and, for a hand-off card, the brief. Tagalong never puts a window
   title, your selection or window text into an ask by itself, though the summary keeps what Scout
-  wrote, which can quote the screen when you asked for that (a bug report, say). Once an ask is
-  answered, expired or closed, only the first line of its summary is kept (at most 120 characters),
-  the rest and the brief are deleted, and the row goes 30 days after it was answered. **Delete all**
-  in Home › **How Scout decided** deletes every answered ask too; what is still waiting stays.
+  wrote, which can quote the screen when you asked for that (a bug report, say).
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
   written in it, and the app cannot end that fence early. An app's error message is fenced the
   same way. It goes to Scout's brain provider like any window text, and is not stored.
 - **Tokens and keys.** The Python brain keeps sign-in tokens, a pasted key, a local tool's secret
   env values and secret url parts in its own files, `app-tokens.json` and `app-oauth/`, never in
   the apps table, the repository or logs; see [connected apps](connected-apps.md) and the next
-  section. **Disconnect** deletes them. (Legacy, the old TypeScript core: the same secrets sat in
-  the OS keychain through Electron safe storage, `connection.<id>.*`.)
+  section. **Disconnect** deletes them.
 
 ### What is masked on disk, what is not
 
@@ -303,86 +220,6 @@ The Python brain replaces secrets with `[secret]` before text is saved:
   own random state is accepted.
 - **Found on this PC** reads Claude Code's `~/.claude.json` read-only, and never copies a key out
   of it: a value written there in full is left behind, and you are asked for it if the app needs it.
-- **Activity** records each call as the app, the tool, read or write, and whether it worked. Not
-  what was sent or what came back, and not an app's error text either.
-- **"What needs me?"** (asked, or the **What needs me** routine) calls only the apps' read tools,
-  with no screen content in what it sends; what comes back goes to Scout's brain provider like any
-  other app answer.
-- **"File this as a bug"** sends screen text to an app, because you asked for exactly that. Scout
-  reads the window with the error and quotes it (at most 40 lines) in the issue, as data: it never
-  follows instructions written in it.
-  The text goes to GitHub or Linear only after you press **Allow once** on the card, which shows the
-  whole issue; Cancel sends nothing. Keys and passwords in it are hidden first, blind spots are
-  never read, and no screenshot is attached.
-
-## Routines: what runs on its own
-
-A routine is something Scout does for you at a time or when something happens, such as new papers
-every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout's card or in Home.
-
-- **What saving allows.** Saving is your consent for the routine's read-only work: each run is one
-  of Scout's turns, so it may read your connected apps' read-only tools, as Scout does when you ask.
-  A tool that changes something still shows **Allow once** every time, and does nothing if you are
-  not there to press it.
-- **Experts.** A routine hands work to an expert without asking only when its card said so ("May
-  hand to: Researcher, read-only, no project"). Exactly one such hand-off per run: that expert then
-  runs in an empty folder of its own, with web search and web fetch only, so it cannot read your
-  projects or edit any file, but it can search the web and open web pages. Its brief is only the
-  routine's saved instruction plus Scout's request for this run, never what is on your screen, a
-  selection or file names. A second hand-off in the same run, or to any other expert, shows the
-  usual card and waits for Send.
-- **What a run sees.** The routine's own words and the topics saved with it (Home's Morning papers
-  form; Scout writes topics into the routine's words), and, for a trigger, what triggered it: the
-  first 600 characters of an expert's answer, or a watch's message. A routine that waits for an app
-  or site reads window titles only, every 15 seconds, never a picture or window text, and never a
-  blind spot's title.
-- **Where results go.** Only where the routine says: a line in Scout's bubble, Scout's voice, a
-  Windows notification. Each run is also a row in Activity, and its answer is kept in Scout's
-  conversation on this computer so you can ask about it later. Results wait while a full-screen app
-  or a call is in front.
-- **Missed runs.** If the computer was asleep or Tagalong was closed, a routine runs once when it is
-  back, and says it ran late. Never more than once. A meeting prep never runs late: once a meeting
-  has started, its prep is skipped.
-- **Meeting prep's calendar link.** The secret .ics link you paste in the Meeting prep form is a key
-  to your calendar, so it is kept in the OS keychain through Electron safe storage
-  (`calendar.ics`), never in settings, the database, the repository, logs, an error message or
-  chat. Tagalong sends nothing with it: every 15 minutes at most it fetches that link from your
-  calendar host, over https only, and reads it on this computer. Only the meetings in the next 36
-  hours are kept, in memory. Ten (or thirty) minutes before a meeting, its title, time, attendees,
-  room or link and up to 600 characters of its description go to Scout's brain provider as part of
-  that routine's turn, fenced as invite text Scout must never follow, since anyone can send you an
-  invite. Scout may then use your connected apps' read tools to find the last thread and related
-  docs. A calendar fetch carries nothing from your screen, so it is not a row in Activity. Nothing
-  is fetched while no meeting routine is on, except one check when you open the Meeting prep form
-  with a link kept, and **Forget the link** in the form deletes it from
-  the keychain.
-- **During a call.** A prep that is still waiting when the meeting starts goes out as a Windows
-  notification only, never spoken aloud.
-- **The daily budget.** With a cap set, a routine that comes due after that day's priced spend
-  reached it does not run; Activity records it as skipped. **Run now** always runs.
-- Routines are kept in the database on this computer (`routines` table). Delete one in Home, or ask
-  Scout to, and it is gone.
-
-## Scout's own background jobs: what a job sends
-
-Scout can start longer work of its own (reading something long, comparing, summarising) and keep
-talking with you meanwhile. Each job is one of Scout's turns, run in the background in a
-conversation of its own.
-
-- **What a job sends.** To Scout's own provider and model, through the same guard as every turn
-  (secrets hidden, one "Sent to AI" row, metered): Scout's usual system prompt, the brief Scout
-  wrote (the task, and context it chose: text you gave it or that it already read, at most 8,000
-  characters, so it may repeat window text the turn that started it already sent once), what Scout
-  remembers, the Now facts, and whatever the job's tools fetch.
-- **What a job cannot do.** It never looks at your screen, reads a window, takes a picture or
-  points. Its only tools are searching your history and your connected apps' read-only tools; it
-  shows no card, files no memory and starts no other job.
-- **On this computer.** One row per job in the `jobs` table: the task (secrets hidden), a short
-  note, how it ended, and its times; and its conversation (the brief, secrets hidden, and the answer). Both are
-  deleted 14 days after the job finishes. A job writes no row to Activity.
-- **Limits.** At most 3 run at once (fewer when the computer is short of memory or busy), 5 wait,
-  each stops after 10 minutes, at most 20 start a day, and none starts once the daily budget is
-  spent. You can ask Scout to stop one; shutting Tagalong stops them all.
 
 ## Scout's voice: what is spoken, and where it goes
 
@@ -400,15 +237,6 @@ something long it may give the gist first and ask what you want read. So the tex
 chosen speech engine: it stays on this computer with Kokoro or the system voice, and is sent to
 ElevenLabs when ElevenLabs is the chosen voice. With **Scout talks** off, the reading is only shown
 in the bubble.
-
-**Translating.** Scout translates with its own model: there is no translation service, so the text
-it read goes only to Scout's model, like any question about your screen, and reads are logged as
-any other read is. A translation into English is spoken like any answer while **Scout talks** is on.
-That goes to the chosen speech engine: it stays on this computer with Kokoro or the system
-voice, and goes to ElevenLabs when ElevenLabs is the chosen voice. A translation into any other
-language is shown in the bubble as a quoted block and never spoken, with ElevenLabs too; only the
-English line before it ("It's in the bubble.") is. A target language you ask Scout to remember is kept as a remembered
-preference, like anything else you ask it to remember.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -532,7 +360,7 @@ Nothing is said aloud about it.
   checks the front window when listening comes on and every 2 seconds after: if it is a call app
   (for example Teams, Zoom or Google Meet) or fills the screen, the microphone closes and the mark
   turns to an outline until that window is no longer in front. It is the front window that
-  counts, as with keeping an eye on things: a Teams window in front pauses listening even with no
+  counts: a Teams window in front pauses listening even with no
   call, and a call behind another window does not.
 - **Deaf while the system voice speaks.** The system voice is not echo-cancelled, so Scout
   ignores what it hears while that voice is speaking. Kokoro and ElevenLabs are echo-cancelled,
@@ -572,151 +400,22 @@ microphone; **I'll type** (or a fresh setup that has not been answered yet) leav
 - **Always listening is separate.** Its switch on the keys step is off by default and only you
   switch it on; it starts once setup is closed.
 
-## Check-ins: what goes with an unprompted call
-
-Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: as
-you are back after a long break with something to pick up, and when work finishes (an expert you
-handed work to, or a job of Scout's own). Most of the time the answer is nothing, and
-nothing is shown. Each of these calls goes to Scout's own model and carries, besides what that
-moment is about:
-
-- **what Scout recalls for that moment (your preferences, its newest memories, those matching the
-  window title or the finished ask, and up to two matching jobs of its own, at most 2,000
-  characters), the time, and what experts are doing right now;**
-- **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
-  characters of each;
-- the last three lines Scout said on its own (so it does not repeat itself), and the names and ids
-  of your experts.
-
-Keys, tokens and passwords are hidden in all of it before it leaves the computer, and a blind
-spot's app and title are never in it. The limits: at most 24 check-ins a day, at most one
-unprompted one every ten minutes, none for an hour after **Not now** (finished work still gets
-its own), none during a call or over a full-screen app, and none at all once the daily budget
-is reached. Each call is a "Sent to AI" row in **What Scout saw**.
-
-### Dozing: your idle time
+## Dozing: your idle time
 
 Scout dozes when you have been away for five minutes or the screen is locked. For this the desktop
 reads one number from the operating system every fifteen seconds, how long since the last key or
 mouse input, and hears the lock and unlock events. Nothing on screen is read, the number is never
 stored, and it never leaves this computer.
 
-## Finished work: hand-offs and jobs
-
-When an expert you handed work to or one of Scout's own jobs finishes, Scout waits a little (20
-seconds after the latest, a minute at most, longer during a call, a full-screen app or a
-conversation with you) and makes **one** check-in about everything that finished in that time,
-so five finished things are one call, not five. Nothing extra is stored for this; a job only gets
-the time a line about it was shown.
-
-- **One hand-off alone:** the expert's name, the start of what it was asked (its first paragraph,
-  at most 100 characters), how it ended, and the last 1,500 characters of its answer (or the first
-  1,500 of its error).
-- **Several things:** for each of at most five, its short id, the job's task or the expert and the
-  start of its ask, how it ended, and a note of at most 300 characters (the job's gist, the first
-  line of the expert's answer, or the error); the rest are only counted. No expert answer beyond
-  its first line.
-
-These go to the summaries model with the facts every check-in carries, so Scout can say one short
-line, or nothing. Answers, notes and errors go fenced as data, never as instructions; the same
-fence is used for job and expert notes on the board and in Now, and for conversation summaries
-and recent work recalled under "What you remember". The card keeps the whole answer;
-the answer is never read out. With the bubble closed, the line comes beside Scout like any other
-line. A routine's own hand-off is delivered by the routine, and a watch firing comes at once: neither
-waits for the others.
-
-## Pick up where you left off
-
-Part of the old TypeScript brain, with no switch in Settings now (the desktop's Pick up control is
-gone, and the Python brain does not do this).
-
-- **What it holds:** one row in `tagalong.db` (table `pick_up`), on this computer, overwritten
-  every ten minutes while the app runs. From window titles only: up to three projects open in an
-  editor (the project's name and folder, the branch read from its `.git/HEAD`, and the file name
-  in the title, which is never opened or read), and up to three hand-offs left half done (the
-  expert's name and the ask; never the selected text or window a brief carried).
-- **Sent once, when you are back.** No picture and no window text, ever. When you are back after
-  six hours or more (at launch, or on the next ten-minute look), the note's items (project names,
-  branch, file name, and the experts and asks of hand-offs left half done) go to the summaries
-  model in one check-in (above), which may say one line about them, or nothing. No line is
-  written on this computer.
-- **Blind spots apply:** a window on the built-in list or your exclusion list is never noted, its
-  title included.
-- **When you are back** after six hours or more, the snapshot is used once (even when the
-  answer is nothing) and a new one starts; the line, if any, comes with a Pick up card. Nothing
-  opens until you press a button on the card. **Open** opens only a folder that
-  pick-up named, through VS Code's or Cursor's own link or Explorer; **Brief again** only fills in
-  the hand-off card, which waits for Send. No keys are typed and the mouse is never moved.
-
-## The experience log: what Scout decided
-
-Scout keeps a record of what it decided and what came of it, so you can see why it did something
-and so it can learn from it later. One episode per question, background job, routine run and
-check-in, silent ones included.
-
-- **What an episode keeps:** what Scout was asked (your question, or a check-in's message to the
-  AI, as listed under [Check-ins](#check-ins-what-goes-with-an-unprompted-call), without anything
-  from your screen), what it decided (answered, stayed quiet, spoke, offered work, or wrote a line
-  that was never shown because you pressed **Not now** meanwhile), what it said, the model and its
-  token counts (check-ins included; every call also counts toward Spend and the daily budget).
-- **No screen text, no window titles.** Window text, text read from a picture, your selection and
-  anything a screen tool read are never kept: the log keeps a marker such as `[screen text, 412
-characters, not kept]` instead. Window titles, and the branch and file names read from them, are
-  not kept either; the app's name and the reason Scout woke are.
-- **Its steps:** each tool Scout called, with what it was called with and the first line of what
-  came back, except a screen tool's or a search of your history's, which keeps only the marker; a
-  picture is never kept.
-- **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, and how
-  each ask from that turn ended (approved, declined, expired or cancelled), a change in an app and a
-  hand-off card alike.
-- **Secrets hidden, clipped, local.** Keys, tokens and passwords are hidden before anything is
-  written; what was asked is cut at 8,000 characters and everything else at 4,000. It stays in
-  `tagalong.db` on this computer. An episode is deleted 30 days after it started, at launch and
-  every 30 minutes while Tagalong runs.
-- **Delete all.** Home › **How Scout decided** › **Delete all** (one confirm) deletes every episode
-  and its steps at once, and every answered ask in Waiting on you. Deleting a memory does not go
-  back through old episodes: those go after 30 days, or with Delete all.
-
-## What Scout learned: its own notes, and sleep
-
-Scout keeps notes about you and about itself: who you are and how you like to be helped
-(`you.md`), what it does differently now (`lessons.md`), what it promised to follow up on
-(`commitments.md`) and procedures that worked (`skills`).
-
-- **Where they live.** Plain files in `%APPDATA%\Tagalong\self`, on this computer. Keys, tokens and
-  passwords are hidden before anything is written.
-- **You decide what lasts.** In a conversation Scout can update you.md and commitments.md at once
-  (you can undo it). A new lesson or skill, and every change sleep makes, is only a **proposal**:
-  it is not used until you **Accept** it in **Home → What Scout learned**, where its text is shown.
-  **Reject** keeps it on record, unused. A proposal made before the page last changed cannot be
-  accepted, so accepting never quietly undoes a later change. A routine's own turn cannot change the notes at all.
-- **Every change is kept.** Each version records who made it (you, Scout in a conversation, or Scout
-  while sleeping), when and why, and its text, so What Scout learned can open it and undo the
-  newest. Your own edits, including edits to the files by hand, have secrets hidden and are cut to
-  the page's limit. Deleting the folder removes the notes; the versions stay in `tagalong.db` until
-  you delete that too.
-- **What goes to the AI.** The notes go with every question and check-in, at most 9,000
-  characters.
-- **Sleep.** Once a day, while you are away (30 minutes with no input and no conversation; when
-  gentle nudges are off and Tagalong has no idle time, 30 minutes since you last talked and since
-  it started), Scout sends its AI one more message:
-  - its notes, each skill by its first line only;
-  - one line for each of its recent decisions (up to 80): what woke it, what it was asked and
-    said, the tools it used, and what you did about it.
-
-  It sends no screen text and no pictures. The reply can propose changes to at most four pages;
-  each waits in What Scout learned for you to accept or reject.
-
 ## Spend: what the cost meter keeps
 
-Every model call Scout makes and every expert run is counted in the local database, for Home's
-**Spend** card and the daily budget.
+Every model call Scout makes is priced from its token counts and added to one running total for the
+day, for Home's **Spend** card and the daily budget.
 
-- **Counts only:** when, Scout or an expert, the provider, the model, input and output tokens, and
-  the dollar cost when the model has a known price. Never what was asked, said, read or seen.
+- **One number:** the brain keeps a small ledger in its data folder with the date and the dollars
+  spent that day. Never what was asked, said, read or seen.
 - **Stays on this computer.** Nothing about it is sent anywhere; prices come from a table built into
-  the app, so working out a cost makes no network call.
-- **The Claude sign-in is shown as tokens only,** as your plan, never as money.
+  the brain, so working out a cost makes no network call.
 
 ## Rolling memory: what the buffer holds
 
@@ -740,47 +439,6 @@ it is on:
 
 Only the frame a pet asks for with `recall_screen` or `what_changed` is ever sent to a model.
 
-## Watches
-
-A watch photographs one screen every five seconds at 640 pixels and compares it with the last frame,
-**on this machine**. Even with rolling memory off, it keeps that screen's recent frames in memory for
-as long as the watch runs, and drops them 30 seconds after the watch ends; pausing sight drops them
-too. A model only sees something when the watched region changed: then the changed part is cropped
-and sent to the pet's small check model — or, for a text-only model, the last 4,000 characters of the
-window you were watching. Every watch shows a **Watching** chip with **Stop**, and ends on its own
-after its timeout or its check limit.
-
-## What Scout saw: the log of its own looking
-
-Home has a page, **What Scout saw**, that lists each time Scout looked at your screen or sent
-something off this computer, newest first, grouped Today, Yesterday and Earlier. It is always on;
-there is no switch, because it holds no content and an off switch would weaken the audit.
-
-| Row                    | Written when                                                                                                 | What the row keeps                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **Listed windows**     | the window list is read (a tool or a routine)                                                                | how many windows                                                 |
-| **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
-| **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
-| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in                                   | the provider and model, how many characters and pictures         |
-| **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
-| **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
-| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `voice, hotkeys`); never values  |
-
-- **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
-  a test checks that it never gains one. A window title passes through the same secret scrubber as
-  everything sent; the title of a blind spot or a window on your exclusion list is not kept at all,
-  only its app.
-- **What makes no row.** A read the blind spots or your exclusions refused, and anything while sight is
-  paused, because nothing was read. A watch comparing frames on this computer with no picture sent. The
-  window titles keeping an eye on things follows every five seconds. Voice: audio never leaves the computer and is never stored, so there is no "heard"
-  row; what you say to Scout becomes a question, and its text reaching the provider is a **Sent to
-  AI** row.
-- **Kept 7 days** (the old brain's `sightLog.days`, 1 to 30; Settings has no control for it now).
-  Older rows are deleted as new ones are written and when Tagalong starts.
-- **Deleting.** Each row has a delete button; **Delete all** asks first. Deleting removes the record,
-  not what was already sent, and does not touch your conversations.
-- The Chrome extension cannot read or delete the log.
-
 ## What Scout remembers: see it, delete it
 
 Scout keeps what it learns about you (facts, preferences, and short summaries of long
@@ -789,68 +447,18 @@ conversations) in the database on this computer, until you delete it.
 - **Home → What Scout remembers** shows every one of them, newest first, with its kind and the
   day it was saved. Each has a delete button; deleting is for good, and Scout no longer recalls it.
 - **Ask Scout to forget.** "Forget that I like tea": Scout finds the matching memories and deletes
-  the one you mean. "Forget the pricing job" deletes a finished background job and its
-  conversation the same way. Nothing is deleted on a routine's own run.
+  the one you mean.
 - Deleting a memory does not take back what was already sent to the AI in earlier questions.
 - The Chrome extension cannot read or delete them.
 
-### Tidying memory once a day
-
-Once a day, while no answer to you and no background job is running, Scout looks
-back over its memory and its recent work and decides what to keep. That is one call, at most two
-a day (a failed one is tried once more), and none once the daily budget is spent:
-
-- **What it sends**, to the summaries model (Settings → Summaries, else Scout's own), through the
-  same guard as every call (secrets hidden, one "Sent to AI" row, metered): up to 150 of Scout's
-  facts and preferences, up to 30 conversation summaries (20 older than 30 days, 10 since the last
-  tidy), and up to 10 finished background jobs not yet read (the task, its short note and the
-  first 1,500 characters of its result). Nothing from your screen, the log of what Scout saw or
-  Activity is sent.
-- **What it can change**: add memories, reword one, or let a fact or summary go. It never deletes a
-  preference: those are yours to delete. At most 10 of each kind of change a day; anything it
-  writes has secrets hidden. You see the result in **Home → What Scout remembers**, and the run on
-  Scout's task board ("Added 2, changed 1, let 3 go.").
-- **What it writes is data, not your word.** When Scout recalls a memory the tidy added or
-  reworded, it reads it as data, never as instructions; only what you told Scout yourself stands
-  as your word. Memories you already had count as yours.
-- **Afterwards** background jobs older than 14 days are deleted with their conversations, and
-  Scout keeps at most 200 conversation summaries, the oldest going first.
-
 ### How long things are kept
 
-| What                                             | Kept                                                    |
-| ------------------------------------------------ | ------------------------------------------------------- |
-| Facts and preferences                            | Until you delete them (the daily tidy may reword facts) |
-| Conversation summaries                           | Until deleted, at most 200                              |
-| Conversations with Scout                         | Until deleted                                           |
-| Background jobs and their conversations          | 14 days after the job finishes                          |
-| Activity (Home)                                  | 90 days, deleted when Tagalong starts                   |
-| The log of what Scout saw                        | 7 days by default (1 to 30)                             |
-| Rolling screen memory (RAM only, off by default) | 10 minutes by default (1 to 30)                         |
-
-## What did we do today?
-
-Ask Scout "What did we do today?" (or any other day or range) and it lists the records above
-through `search_history` with no search words: the apps and window titles in the log of what Scout
-saw (with the first and last time and how many looks), your questions (the first 120 characters),
-which experts got which ask and how they ended, and routines and app calls by name, at most 60
-rows. Those titles, questions and asks go to **Scout's own model** to be summed up, like any tool
-result, with any key, token or password in them hidden first. Answers from experts, turns and
-routines are not included, nor the selection or window a brief carried, nor anything older than the
-log keeps. Nothing new is recorded for it: Scout only knows what it looked at or was asked.
-
-## Searching your history
-
-Ask "what was that article about vector databases I read Tuesday?" and Scout searches a local
-full-text index in `tagalong.db` of the window titles and apps in the log of what Scout saw and of
-your questions, expert asks and routine names. It stores no new content: the index holds the same
-words as those rows and is kept in step with them, so deleting a row, **Delete all**, or the
-retention dropping old rows removes them from search too. Nothing older than the days the log
-keeps is found. A blind spot or excluded window was only ever kept as its app name, so its title
-cannot be found. Up to 20 matching lines (day, time, app and the title or ask, with any key, token
-or password hidden) go to **Scout's own model** as a tool result. No page text, answers or
-selections are searched or sent, nothing leaves the machine except that tool result, and the
-Chrome extension cannot query the index.
+| What                                             | Kept                            |
+| ------------------------------------------------ | ------------------------------- |
+| Facts and preferences                            | Until you delete them           |
+| Conversation summaries                           | Until deleted                   |
+| Conversations with Scout                         | Until deleted                   |
+| Rolling screen memory (RAM only, off by default) | 10 minutes by default (1 to 30) |
 
 ## Pausing sight
 
@@ -880,25 +488,6 @@ platform adapter, and the adapter handed to the rest of the app is already wrapp
 path added later is covered by construction rather than by remembering. Which reads pause covers is
 a mapped type over the adapter's own methods, so adding a method without deciding what pause does to
 it does not compile.
-
-## Pointing at things
-
-When you ask where something is ("where's the export button?"), Scout can show you with a ring
-around it (`point_at`).
-
-- **What is read.** Only the names of the elements inside the one window Scout names, through
-  Windows' accessibility tree, to find the one called, say, "Export", and its rectangle. The search
-  starts at that window and never walks the rest of the desktop. Nothing else in the window is read,
-  and no picture is taken.
-- **Blind spots and exclusions apply first.** A window on the built-in blind spots or your
-  exclusion list is refused before anything in it is read, and a minimized window is not searched:
-  Scout asks you to bring it forward. Pausing sight refuses pointing too.
-- **The ring is drawn, never clicked.** The overlay is a click-through window that only draws.
-  Tagalong never moves the mouse, clicks or types for this. `Esc` is listened for, never sent, and
-  only while a ring shows.
-- **The ring stays out of Scout's own pictures.** The overlay is excluded from screen capture, so a
-  screenshot Scout takes never shows it.
-- Nothing about a point is stored.
 
 ## Drafts and the clipboard
 
@@ -936,12 +525,9 @@ expert** and **Cancel**.
   is open is an ordinary question and does not carry the dropped item.
 - **Hand it to an expert** goes through Scout, which writes the brief. The usual hand-off card
   appears, and nothing reaches the expert until you press **Send**.
-- **Stored like a screenshot.** The conversation keeps the dropped item's name, path and text like
-  a selection. A dropped image is kept out of the database by the screenshot retention rule, and a
-  brain that cannot see images never gets it (Scout says so).
-- **It shows in What Scout saw.** The question that carries the item is a turn, so it is logged
-  as **Sent to AI** with its characters and pictures, like any other. The drop itself reads
-  nothing, so it adds no row.
+- **Stored like a selection.** The conversation keeps the dropped item's name, path and text like
+  a selection. A dropped image is kept as the marker `[screenshot]`, and a brain that cannot see
+  images never gets it (Scout says so).
 - **Pausing sight does not block a drop.** A drop is something you hand over on purpose, not Scout
   reading the screen.
 - **Nothing opens by accident.** The pet's and the bubble's windows refuse to navigate, so a file

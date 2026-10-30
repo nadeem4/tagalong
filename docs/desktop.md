@@ -380,8 +380,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
   rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/spend.ts`,
-  answering `{ spentUsd, limitUsd }`): the by-provider rows and the month are gone until the brain can
-  report them. Home's Permissions list (a card under the Settings form,
+  answering `{ spentUsd, limitUsd }`). Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
   pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
@@ -619,7 +618,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `src/shared/settings.ts` |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`            |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`       |
-| Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`          |
+| Memory list                         | `limit: 200`                   | `ipc/memory.ts`          |
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`           |
 | `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`   |
 

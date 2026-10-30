@@ -381,7 +381,7 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
   `setPaused` before `setAlways`, so switching on during a call never opens the mic for a moment.
 - **Deafness.** It passes `onSystemVoice` to `setDeaf`.
 - **Delivery.** A heard question goes through `HeardInbox`. If no bubble is mounted (a one-line
-  hello, remark or routine line is up, or Scout is still waking), the question is held, the line
+  hello or remark is up, or Scout is still waking), the question is held, the line
   gives way through `onBegin`, and the bubble asks it as it subscribes. Only the latest is held.
 - **Marks and notes.** `talk-rules.ts` holds the pure decisions: `settles`, `shownPartial` (always
   words shown without the leading name), `FailureStreak`, `EarsNotes`, `FollowUpCue`, `micMark` and
@@ -542,7 +542,7 @@ same addressing rule.
 
 - **Held.** `hold()` (the talk key or the mic button) cuts Scout off at once. So does the ears'
   `speechStart` in a held session. Both go through `onBegin`, which calls `mouth.stop()` and clears
-  any one-line hello, remark or routine line.
+  any one-line hello or remark.
 - **Always.** Only the first addressed partial, or the addressed `turnEnd`, of a turn barges in.
 - **The bubble.** It subscribes to `talk.onListen`. If an answer is still streaming, the bubble
   ends that answer's `SpokenStream` and calls `bridge.interrupt(turnId)`. It keeps the text shown

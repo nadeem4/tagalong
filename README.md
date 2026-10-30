@@ -138,24 +138,14 @@ needs it. It can photograph a window sitting behind others, though not a minimiz
 looks past its own bubble to the window you were using. A screenshot adds roughly 1,500 input
 tokens, which is why it is not taken on every question.
 
-**Hand-offs.** When Scout hands work to an expert, the bubble shows a card first: the agent, the
-project it guessed (from your window, or the projects you used before), whether it may change
-files, and the brief. **Change project** picks another guess, searches your code folders or browses
-for a folder; **Allow edits** lets this one task change files; **Send** (or **Cancel**) decides.
-While the expert works the bubble lists its steps with **Stop**, and its answer comes back to the
-bubble when it is done. Ask for a second opinion ("fix the date bug and have someone check it") and
-the one card lists two steps, such as **1. Coder** then **2. Reviewer**, each with its own access
-and brief, under one project and one **Send**; **Remove step 2** keeps it to one. The Reviewer
-starts once the Coder has finished, with the Coder's answer and changed files, and the bubble shows
-both answers. If the first step fails or is stopped, the second never runs. While an expert works
-you can tell Scout something for it ("tell Coder to use dayjs, not moment"): Scout says "I'll pass
-that to Coder", the card shows **Passed on:** with _waiting for Coder to finish this step_, then
-_delivered_, and the expert carries on in the same session with your note (or the card says it
-finished first). The expert's key moments, such as "Found the bug in `date.ts`", show on the
-card and are not said aloud.
+**Hand-offs.** Scout can hand a task to Claude Code, which works in a folder on this computer as a
+job. Watch it in **Home → Jobs**: **Stop** a running one, **Show result** for a finished one. When
+Claude Code asks for permission or has a question, Scout gets it first and answers from what it
+knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
+moment") and it passes the note on.
 
 **Scout talks.** Scout reads its answers aloud, so you can look away: the answer, a
-line it says on its own, a routine's result and its line about an expert that finished. Scout
+line it says on its own and its line about an expert that finished. Scout
 decides what to say: everything it writes is spoken, typed question or spoken, except what it
 puts in a block (a draft, code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
@@ -183,41 +173,14 @@ and the bars cut it off. Ask "what's in this chart?" (or about a photo, diagram 
 Scout gives the kind, the axes, the trend and the values that stand out, and says when it can't
 make one out. With ElevenLabs as the voice, the text read goes to ElevenLabs.
 
-**Translate this.** Ask "translate this" and Scout translates your selection, or the window in
-front, into the language you name, else one you asked it to remember ("always translate to
-Spanish"), else the language you asked in. It names the source language, keeps the layout, names,
-numbers and code, and warns when the words came from a picture. Scout's own model translates, with
-no translation service. "Translate it and read it to me" speaks an English translation in full; a
-translation into another language shows in the bubble only, because the voices speak English.
-
-**What needs me?** Ask it and Scout reads your connected apps (GitHub reviews and assigned issues,
-Linear issues, Notion mentions when its tools offer them) and answers with one list grouped by app,
-oldest first, one line each with how long it has waited. It only reads, and sends no screen
-content. An app that isn't connected is named once at the end; a signed-out one asks you to sign in
-again.
-
-**What did we do today?** Ask it (or "how much did I work yesterday?") and Scout sums up the day
-from what it looked at and was asked: the apps and windows, when, what you asked and what experts
-did. It only knows what it saw; nothing extra is tracked.
-
-**What was that article I read?** Ask "what was that article about vector databases I read
-Tuesday?" and Scout searches the window titles it looked at and what you asked it, and answers
-with the day, time and app. It only knows titles, never page text, and only as far back as the
-record of what Scout saw keeps.
-
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts. See and delete
-what it remembers in Home, or say "Scout, forget that". Once a day, when you are away, Scout tidies
-its memory on its own: it keeps the gist of its recent work and lets stale details go, never your
-preferences.
+what it remembers in Home, or say "Scout, forget that".
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
 and microphone, each with a plain line, starting "Two things need you." or
 "Everything's working." (shown, never said aloud). **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
-
-Upgrading from an earlier build keeps only Scout; any other companion, with its conversations, is
-removed.
 
 ## Hotkeys
 
@@ -248,7 +211,6 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
   Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
-  The Popular and "found in Claude Code" lists are not built.
   - **Sign in**: an app that signs in with its own page shows **Needs sign-in** and a **Sign in**
     button. It opens the app's page in your browser; the chip reads **Waiting for the browser**
     until you finish (or five minutes pass). The brain and the browser must be on the same computer.
@@ -317,10 +279,6 @@ small picture of each screen every five seconds, in memory only, for the last te
 on Scout shows while it records. Ask "what was on screen a few minutes ago?" or "what changed?" and
 Scout looks back through it.
 
-**Point, don't click.** Ask "where's the export button?" and Scout tells you, and a soft ring with a
-short label shows around it for a few seconds (`Esc` puts it away). Scout never moves the mouse,
-clicks or types.
-
 **Draft it for me.** Say "reply to this email, yes but Friday" or "write the PR description" and
 Scout reads what is in front of you and writes a short draft in the bubble with a **Copy** button.
 Copy puts the draft on your clipboard; you paste it. Scout never types or pastes into an app.
@@ -329,45 +287,22 @@ Copy puts the draft on your clipboard; you paste it. Scout never types or pastes
 to explain it or hand it to an expert. Nothing is read until you press a button, and secrets files
 such as `.env` are refused.
 
-**File this as a bug.** With an error on screen, say "file this as a bug" or "make a Linear ticket
-for this". Scout reads the window with the error and writes the issue: a short title, then what
-happened (the error, quoted), where (the app, the window title and the project), the steps it saw
-and what was expected. The connected app's confirm card shows the whole issue; **Allow once** files
-it ("Filed as #123"), **Cancel** files nothing. Scout never guesses a GitHub repo: it uses the one on
-screen or the one you name, or asks. With both GitHub and Linear connected, it asks which. No
-screenshot is attached.
-
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory, which
   you turn on. Every look badges Scout and the tray says what
   was read and when.
-- **Check-ins.** Now and then, when nobody asked, Scout asks its own model once whether
-  anything is worth saying, and most of the time says nothing. Each such call carries what the
-  moment is about plus what Scout recalls for it (your preferences, its newest and matching
-  memories, up to two matching jobs of its own), the time, what experts are doing and
-  your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
-  unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
-  once the daily budget is spent.
-- **Background jobs.** When Scout works on something in the background, the job sees only the
-  brief Scout wrote (no screen, no pictures), uses only your history and your apps' read-only
-  tools, and is deleted 14 days after it finishes. At most 3 run at once (fewer on a busy
-  machine), 20 a day, none once the daily budget is spent. When jobs and hand-offs finish, one
-  check-in covers them all, with a note of at most 300 characters for each.
 - **Scout's face** dozes after five minutes with no input or when the screen locks (one idle time
   number from the OS, kept on this computer).
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.
 - Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
-  leaves your computer, and Claude Code is told not to open secret files.
+  leaves your computer.
 - Screenshots are not written to disk. Screen memory lives in memory only and are thrown
   away when you pause sight or quit.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
-- Once a day Scout sends up to 150 of its memories, 30 conversation summaries and the notes of up
-  to 10 recent background jobs to its summaries model to tidy them. Background jobs are deleted
-  after 14 days.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.
@@ -377,7 +312,7 @@ screenshot is attached.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
-  **Allow once**; every call is logged in Activity (which app and tool, never the content).
+  **Allow once**.
 - Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
   the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and

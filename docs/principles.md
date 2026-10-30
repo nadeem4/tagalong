@@ -14,7 +14,7 @@ The rules the Python-brain rewrite follows: who does what, what code decides ver
 
 1. Bodies only talk to the brain, never to each other. The brain routes everything.
 2. The body you are talking to answers. Other bodies work behind the scenes as internal experts.
-3. A turn the brain starts itself (a routine, an expert finishing) is shown on the body you last talked to if it is online, otherwise any online body; every body still gets the notifications.
+3. A turn the brain starts itself (a timer, an expert finishing) is shown on the body you last talked to if it is online, otherwise any online body; every body still gets the notifications.
 4. One session across bodies. Start on the phone, carry on at the desk; a second body joins the same conversation.
 5. Scout's tool list is what is connected now: brain tools, tools of the bodies online, and MCP apps. The model sees body tools as `<body id>__<name>` (`desktop__see_screen`) so two bodies never collide.
 6. Model decides, code guards.
