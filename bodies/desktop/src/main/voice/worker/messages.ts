@@ -3,7 +3,8 @@
  * WorkerProcess.
  */
 
-import type { EarsEvent, ListenMode, VoiceId } from '@tagalong/protocol';
+import type { EarsEvent, ListenMode } from '@tagalong/ui/shapes';
+import type { VoiceId } from '../../../shared/settings';
 
 /** What main sends the voice process. */
 export type ToWorker =

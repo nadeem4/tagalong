@@ -22,9 +22,5 @@
   // Bean's manifest is imported by the avatar window; JSON is only included when listed.
   "include": ["src/**/*", "src/renderer/src/bean/manifest.json"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "references": [
-    { "path": "../../protocol/ts" },
-    { "path": "../../packages/protocol" },
-    { "path": "../ui" }
-  ]
+  "references": [{ "path": "../../protocol/ts" }, { "path": "../ui" }]
 }

@@ -2,8 +2,8 @@
  * The few settings the panel uses (the talk key as a person reads it, the microphone), read
  * at open and on every save. Used by panel.tsx.
  */
-import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '@tagalong/protocol';
-import type { Settings } from '@tagalong/protocol';
+import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../../shared/settings';
+import type { Settings } from '../../shared/settings';
 
 /** The talk key as read until settings say otherwise: Right Ctrl, held alone. */
 export const DEFAULT_TALK_KEY = TALK_KEY_LABELS[TALK_KEY_RIGHT_CTRL];

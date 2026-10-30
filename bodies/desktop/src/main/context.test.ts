@@ -2,8 +2,9 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { basename } from 'node:path';
-import { ContextSnapshot } from '@tagalong/protocol';
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import { ContextSnapshot } from '@tagalong/ui/shapes';
+import type { CaptureExclusions } from '../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { DESKTOP_CAPABILITIES, answerCapture, captureAskSnapshot, capturePatch } from './context';
 import type { DisplaysCapture, Platform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
@@ -167,7 +168,7 @@ describe('captureAskSnapshot', () => {
 });
 
 describe('capturePatch', () => {
-  it('reads only what the engine asked for', async () => {
+  it('reads only what the brain asked for', async () => {
     const { patch } = await capturePatch(fakePlatform(), ['clipboard'], {
       exclusions: NOTHING_EXCLUDED,
     });
@@ -288,7 +289,7 @@ describe('the windows perception target', () => {
     expect(patch.windows).toEqual(inventory);
   });
 
-  it('does not enumerate windows when the engine did not ask for them', async () => {
+  it('does not enumerate windows when the brain did not ask for them', async () => {
     // The enumeration spawns PowerShell. A text-only ask must not pay for it.
     const listWindows = vi.fn(async () => ({ windows: inventory }));
     const platform = fakePlatform({ listWindows });
@@ -341,7 +342,7 @@ describe('DESKTOP_CAPABILITIES', () => {
 
   it('advertises the text layer, now that perception.readText is answered', () => {
     // Task 3 asserted the opposite, deliberately: advertising a capability the host
-    // cannot honour makes the engine call a method that fails, which reads to the user as
+    // cannot honour makes the brain call a method that fails, which reads to the user as
     // a broken pet rather than a missing feature. The claim only became true here, when
     // the read landed, so the assertion flips here and nowhere earlier.
     expect(DESKTOP_CAPABILITIES).toContain('textLayer');
@@ -445,8 +446,8 @@ function displayCapture(overrides: Partial<DisplaysCapture> = {}): DisplaysCaptu
 
 describe('capturePatch, displays', () => {
   it('answers the displays target the host advertises a capability for', async () => {
-    // DESKTOP_CAPABILITIES names `displays`, so the engine is entitled to ask for it.
-    // A host that advertises a capability and then ignores the target makes the engine
+    // DESKTOP_CAPABILITIES names `displays`, so the brain is entitled to ask for it.
+    // A host that advertises a capability and then ignores the target makes the brain
     // call something that silently returns nothing, which reads as a broken pet.
     const platform = fakePlatform({
       captureDisplays: async () => displayCapture(),

@@ -1,6 +1,6 @@
 /** Tests for gatherHealth: each row, budgets and calls that fail or hang. */
 import { describe, expect, it, vi } from 'vitest';
-import { Settings } from '@tagalong/protocol';
+import { Settings } from '../../shared/settings';
 import type { HostView } from '../../shared/ipc';
 import { gatherHealth } from './health-facts';
 import type { HealthDeps } from './health-facts';
@@ -9,7 +9,7 @@ function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> =
   return {
     settings: Settings.parse(settings),
     pets: [{ id: 'scout', name: 'Scout', avatar: '🦊' }],
-    engineVersion: '0.0.0',
+    appVersion: '0.0.0',
     platform: 'win32',
     elevenLabsKeyStored: false,
     ...patch,

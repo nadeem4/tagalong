@@ -5,7 +5,8 @@
 
 import { findCaptureBlock } from './exclusions';
 import type { ObservedWindow } from './inventory';
-import type { CaptureExclusions, ScreenInfo } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { ScreenInfo } from '@tagalong/ui/shapes';
 
 import type { WindowBounds } from './index';
 

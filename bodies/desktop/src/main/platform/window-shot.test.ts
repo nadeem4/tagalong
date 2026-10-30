@@ -1,7 +1,7 @@
 /** Tests for the screenshot of one listed window. */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { lookAtWindowWith } from './window-shot';
 
 const IMAGE = { base64: 'cG5n', width: 800, height: 600 };

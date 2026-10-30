@@ -1,6 +1,6 @@
 /** Tests for the call and full-screen rule: when the front window means Scout stays quiet. */
 import { describe, expect, it } from 'vitest';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { callOrFullScreenInFront, isMeeting } from './front-window';
 
 function win(id: string, title: string, extra: Partial<WindowEntry> = {}): WindowEntry {

@@ -3,8 +3,9 @@
  * mic-worklet.js until closed, and listMicrophones lists the devices for Settings.
  * Nothing is recorded or kept. Used by the bubble and Settings.
  */
-import { EARS_SAMPLE_RATE, Pushable } from '@tagalong/protocol';
-import type { MicStream } from '@tagalong/protocol';
+import { EARS_SAMPLE_RATE } from '../../shared/voice';
+import { Pushable } from '@tagalong/ui/shapes';
+import type { MicStream } from '@tagalong/ui/shapes';
 // Its own file, not a data: URL: the panel's CSP (default-src 'self') blocks data: worklets.
 import workletUrl from './mic-worklet.js?url&no-inline';
 

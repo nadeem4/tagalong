@@ -4,8 +4,8 @@
  * Every hotkey is sent on every save (see buildSettingsPatch); main re-registers them and
  * reports one it could not take as `hotkeyError`, shown here on the field it names.
  */
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS } from '../../../shared/settings';
+import type { Settings } from '../../../shared/settings';
 import { Info, Section, Tip } from './section';
 
 export function ShortcutsSection({

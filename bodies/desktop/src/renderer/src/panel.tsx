@@ -13,7 +13,7 @@ import {
   QueueMouth,
   SpeechQueue,
 } from '@tagalong/ui';
-import type { ContextSnapshot, PetRemarkParams, StatusMark } from '@tagalong/protocol';
+import type { ContextSnapshot, PetRemarkParams, StatusMark } from '@tagalong/ui/shapes';
 import type { DropOffer } from '@tagalong/ui';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';

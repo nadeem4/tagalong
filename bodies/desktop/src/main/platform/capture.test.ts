@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import type { CaptureImagePort, CaptureSource, WindowCaptureDeps } from './capture';
 import type { ActiveWindowInfo } from './index';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 const BOUND = 1568;
 

@@ -1,7 +1,7 @@
 /** Tests for binding, rebinding and reporting the global shortcuts. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS } from '../shared/settings';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,

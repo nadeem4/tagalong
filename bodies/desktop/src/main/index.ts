@@ -21,13 +21,10 @@ import {
   shell,
   utilityProcess,
 } from 'electron';
-import {
-  ContextSnapshot,
-  SCOUT_ID,
-  TALK_KEY_LABELS,
-  TALK_KEY_RIGHT_CTRL,
-} from '@tagalong/protocol';
-import type { PerceptionTarget, Settings } from '@tagalong/protocol';
+import { ContextSnapshot } from '@tagalong/ui/shapes';
+import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
+import type { PerceptionTarget } from '@tagalong/ui/shapes';
+import type { Settings } from '../shared/settings';
 import { SettingsStore } from './settings-store';
 import {
   AlwaysListening,
@@ -86,7 +83,7 @@ import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { forwardAppsChanged, registerConnectionIpc } from './ipc/connections';
-import { registerScoutIpc } from './ipc/scout';
+import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import type { IpcHandle } from './ipc/handle';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';

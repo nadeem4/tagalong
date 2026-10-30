@@ -3,7 +3,7 @@
  * the same per-display refusal as a full capture. Contains captureRegionWith.
  */
 
-import type { DisplayBounds } from '@tagalong/protocol';
+import type { DisplayBounds } from '@tagalong/ui/shapes';
 
 import { displayRefusals } from './displays';
 import type { DisplayImagePort, DisplayInfo, DisplayRefusalDeps, DisplaySource } from './displays';

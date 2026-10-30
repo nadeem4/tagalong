@@ -4,7 +4,7 @@
  */
 
 import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer-notes';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 import type { TextLayerProvider } from './text-layer';
 import { handleOf } from './window-list';

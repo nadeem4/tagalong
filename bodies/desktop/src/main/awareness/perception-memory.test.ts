@@ -1,7 +1,7 @@
 /** Tests for perception.recall and perception.diff from rolling memory. */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import { createCanvas } from '../platform/canvas';
 import type { Bitmap } from '../platform/canvas';
 import type { DisplaysCapture } from '../platform/displays';

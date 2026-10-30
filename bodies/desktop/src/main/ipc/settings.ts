@@ -5,7 +5,7 @@
  */
 
 import type { SecretStore } from '../secret-store';
-import type { Settings, SettingsPatch } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '../../shared/settings';
 import { IPC } from '../../shared/ipc';
 import type { HostView } from '../../shared/ipc';
 import { ELEVENLABS_SECRET_KEY } from '../secret-store';
@@ -39,7 +39,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
       elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
       settings,
       pets: [localScout()],
-      engineVersion: deps.version(),
+      appVersion: deps.version(),
       platform: process.platform,
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };

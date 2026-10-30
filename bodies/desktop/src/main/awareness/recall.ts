@@ -1,116 +1,61 @@
 /**
- * Rolling memory and watches: what the desktop remembers and what changed on it.
- * Contains the `perception.recall` and `perception.diff` schemas and the `watch.*` messages.
- * Kept apart from methods.ts because only these shapes deal with time; every other
- * perception method answers about now.
+ * The shapes rolling memory answers with: a frame from a moment ago, and how a display
+ * differs from how it looked earlier. Plain types, since nothing crosses a wire any more.
+ * Contains RecalledFrame, PerceptionRecallParams/Result and PerceptionDiffParams/Result.
  */
-import { z } from 'zod';
-
-import { CapturedImage, DisplayBounds, WindowEntry } from './context';
+import type { CapturedImage, DisplayBounds, WindowEntry } from '@tagalong/ui/shapes';
 
 /** One display as it looked at a moment the host buffered. */
-export const RecalledFrame = z.object({
-  displayId: z.number().int(),
-  /** When this frame was taken, so the pet can say which moment it is describing. */
-  capturedAt: z.iso.datetime(),
-  image: CapturedImage,
-});
-export type RecalledFrame = z.infer<typeof RecalledFrame>;
+export interface RecalledFrame {
+  displayId: number;
+  /** When this frame was taken, so Scout can say which moment it is describing. */
+  capturedAt: string;
+  image: CapturedImage;
+}
 
 /**
- * The frame nearest `secondsAgo`, for one display or for every display.
- *
- * Whole seconds: the buffer holds a frame every five, so anything finer is a precision
- * the answer cannot have.
+ * The frame nearest `secondsAgo`, for one display or for every display. Whole seconds: the
+ * buffer holds a frame every five, so anything finer is a precision the answer cannot have.
  */
-export const PerceptionRecallParams = z.object({
-  secondsAgo: z.number().int().nonnegative(),
-  displayId: z.number().int().optional(),
-});
-export type PerceptionRecallParams = z.infer<typeof PerceptionRecallParams>;
+export interface PerceptionRecallParams {
+  secondsAgo: number;
+  displayId?: number | undefined;
+}
 
-export const PerceptionRecallResult = z.object({
-  /** Whether rolling memory is on right now. Off, `frames` is empty and the pet says why. */
-  recording: z.boolean(),
+export interface PerceptionRecallResult {
+  /** Whether rolling memory is on right now. Off, `frames` is empty. */
+  recording: boolean;
   /** The oldest moment the buffer reaches, so "ten minutes ago" after a restart is honest. */
-  oldestAt: z.iso.datetime().optional(),
+  oldestAt?: string;
   /** The moment the answer describes. Absent when the buffer is empty. */
-  capturedAt: z.iso.datetime().optional(),
-  frames: z.array(RecalledFrame),
+  capturedAt?: string;
+  frames: RecalledFrame[];
   /** The window inventory as it was at `capturedAt`. Never any window text. */
-  windows: z.array(WindowEntry),
-  focusedWindow: z.object({ processName: z.string().min(1), title: z.string() }).optional(),
-});
-export type PerceptionRecallResult = z.infer<typeof PerceptionRecallResult>;
+  windows: WindowEntry[];
+  focusedWindow?: { processName: string; title: string };
+}
 
 /**
  * How one display, or a region of it, differs from how it looked `sinceSeconds` ago.
- *
- * `rect` is in that display's own pixels, as `perception.captureRegion` takes it. A watch
- * polls with `includeImages: false` and only asks for the crops when it is about to show
- * them to a model: two PNGs every five seconds is the cost the threshold exists to avoid.
+ * `rect` is in that display's own pixels. `includeImages` defaults to true: a poll passes
+ * false and only asks for the crops when it is about to show them.
  */
-export const PerceptionDiffParams = z.object({
-  displayId: z.number().int(),
-  /** Positive: a frame compared with itself says nothing. */
-  sinceSeconds: z.number().int().positive(),
-  rect: DisplayBounds.optional(),
-  includeImages: z.boolean().default(true),
-});
-export type PerceptionDiffParams = z.input<typeof PerceptionDiffParams>;
+export interface PerceptionDiffParams {
+  displayId: number;
+  sinceSeconds: number;
+  rect?: DisplayBounds | undefined;
+  includeImages?: boolean | undefined;
+}
 
-export const PerceptionDiffResult = z.object({
+export interface PerceptionDiffResult {
   /** The share of the region's pixels that changed, from 0 (nothing) to 1 (everything). */
-  changeRatio: z.number().min(0).max(1),
+  changeRatio: number;
   /** When the earlier frame was taken. Absent when there was nothing to compare with. */
-  beforeAt: z.iso.datetime().optional(),
-  afterAt: z.iso.datetime(),
+  beforeAt?: string;
+  afterAt: string;
   /** The bounding box of what changed, in display pixels. Absent when nothing did. */
-  bounds: DisplayBounds.optional(),
+  bounds?: DisplayBounds;
   /** The changed box as it was, and as it is now. Only with `includeImages`. */
-  before: CapturedImage.optional(),
-  after: CapturedImage.optional(),
-});
-export type PerceptionDiffResult = z.infer<typeof PerceptionDiffResult>;
-
-/**
- * A watch saw its condition come true; the watch is over. `message` is the judge's own reason,
- * or empty when it gave none: an empty message is never spoken, and the card and the
- * notification show the `condition` instead.
- */
-export const WatchFiredParams = z.object({
-  watchId: z.uuid(),
-  petId: z.string().min(1),
-  condition: z.string().min(1),
-  message: z.string(),
-  displayId: z.number().int(),
-});
-export type WatchFiredParams = z.infer<typeof WatchFiredParams>;
-
-/**
- * Where a watch stands, so a host can show a Watching chip and take it down again.
- *
- * Every state but `watching` is final. `capped` means the per-watch check limit ran out.
- */
-export const WatchState = z.enum(['watching', 'fired', 'stopped', 'timeout', 'capped', 'error']);
-export type WatchState = z.infer<typeof WatchState>;
-
-export const WatchStatusParams = z.object({
-  watchId: z.uuid(),
-  petId: z.string().min(1),
-  condition: z.string().min(1),
-  displayId: z.number().int(),
-  state: WatchState,
-  /** Model checks spent so far, against `maxChecks`. */
-  checks: z.number().int().nonnegative(),
-  maxChecks: z.number().int().positive(),
-  /** The small model answering this watch's checks, so the chip can say which one. */
-  checkModel: z.string().min(1).optional(),
-  /** A sentence for the user when the watch ended for a reason worth saying. */
-  detail: z.string().optional(),
-});
-export type WatchStatusParams = z.infer<typeof WatchStatusParams>;
-
-/** The Watching chip's Stop button. */
-export const WatchStopParams = z.object({ watchId: z.uuid() });
-export const WatchStopResult = z.object({ stopped: z.boolean() });
+  before?: CapturedImage;
+  after?: CapturedImage;
+}

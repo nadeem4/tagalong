@@ -4,8 +4,9 @@
  * switchable.
  */
 import { useEffect, useState } from 'react';
-import { BLIND_SPOTS, MAX_ROLLING_MEMORY_MINUTES, SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings } from '@tagalong/protocol';
+import { BLIND_SPOTS } from '../../../shared/blind-spots';
+import { MAX_ROLLING_MEMORY_MINUTES, SETTINGS_DEFAULTS } from '../../../shared/settings';
+import type { Settings } from '../../../shared/settings';
 import { keyCaps } from '../settings-form';
 import { Info, Section, Tip, useInvalid } from './section';
 

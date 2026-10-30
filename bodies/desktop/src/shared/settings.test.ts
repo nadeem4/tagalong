@@ -9,7 +9,6 @@ import {
   TALK_KEYS,
   SettingsPatch,
 } from './settings';
-import { SettingsSetParams } from './methods';
 import { chosenMouth } from './voice';
 
 describe('Settings', () => {
@@ -303,14 +302,5 @@ describe('Settings.listening', () => {
     expect(SettingsPatch.parse({ listening: { always: true } })).toEqual({
       listening: { always: true },
     });
-  });
-});
-
-describe('SettingsSetParams', () => {
-  it('may say the patch came from a card Scout showed, for the privacy log', () => {
-    expect(
-      SettingsSetParams.parse({ patch: { listening: { always: true } }, byTalk: true }).byTalk,
-    ).toBe(true);
-    expect(SettingsSetParams.parse({ patch: {} }).byTalk).toBeUndefined();
   });
 });

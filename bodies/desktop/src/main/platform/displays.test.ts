@@ -7,7 +7,7 @@ import type { Bitmap, Colour } from './canvas';
 import { captureDisplaysWith } from './displays';
 import type { DisplayImagePort, DisplayInfo, DisplaysCaptureDeps } from './displays';
 import type { ActiveWindowInfo, WindowBounds } from './index';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 /** A window in the inventory captureDisplaysWith reads to decide what to blank. */
 function entry(overrides: Partial<WindowEntry> = {}): WindowEntry {

@@ -3,7 +3,7 @@
  * captureSelectionWith and COPY_SETTLE_MS.
  */
 
-import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
+import { MAX_SELECTION_CHARS } from '@tagalong/ui/shapes';
 
 /**
  * The two clipboard operations selection capture needs, so tests can supply their own.

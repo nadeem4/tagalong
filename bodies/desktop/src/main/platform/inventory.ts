@@ -2,7 +2,8 @@
  * The window inventory: applies exclusions to the host's window list. Contains
  * buildInventory and ObservedWindow.
  */
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 import { findCaptureBlock, normalizeProcessName } from './exclusions';
 

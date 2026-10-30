@@ -4,8 +4,8 @@
  * StatusMarks, markListening, setPanelMark and markBrainLink.
  */
 
-import { topStatus } from '@tagalong/protocol';
-import type { StatusId, StatusMark } from '@tagalong/protocol';
+import { topStatus } from '@tagalong/ui/shapes';
+import type { StatusId, StatusMark } from '@tagalong/ui/shapes';
 import type { AlwaysListening } from './always-listening';
 import type { BrainStatus } from '@tagalong/contract';
 

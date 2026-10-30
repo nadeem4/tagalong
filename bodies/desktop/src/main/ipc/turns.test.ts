@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { SayParams } from '@tagalong/contract';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import { BrainOffline } from '@tagalong/contract';
 import { fakeIpc } from './fake-ipc';

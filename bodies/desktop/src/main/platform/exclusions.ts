@@ -1,10 +1,11 @@
 /**
  * Capture exclusions: which window may not be read, by the built-in blind spots, secret file
  * names and the person's own list. Contains findCaptureBlock, secretFileRule and
- * normalizeProcessName. CaptureBlock itself lives in @tagalong/protocol, where it crosses the wire.
+ * normalizeProcessName. CaptureBlock itself lives in @tagalong/ui/shapes, where the panels share it.
  */
-import { BUILT_IN_EXCLUSIONS, SECRET_FILES } from '@tagalong/protocol';
-import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
+import { BUILT_IN_EXCLUSIONS, SECRET_FILES } from '../../shared/blind-spots';
+import type { CaptureBlock } from '@tagalong/ui/shapes';
+import type { CaptureExclusions } from '../../shared/settings';
 
 /**
  * The little a host knows about the focused window when it asks whether it may capture.

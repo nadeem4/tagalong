@@ -2,7 +2,7 @@
  * Puts `window.tagalongVoice` (ears, microphone, ears' models) on a window. The bubble
  * installs it before it renders.
  */
-import type { Ears } from '@tagalong/protocol';
+import type { Ears } from '@tagalong/ui/shapes';
 import '../../shared/ipc';
 import { openMic } from './mic';
 import type { OpenMic } from './mic';

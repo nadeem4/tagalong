@@ -4,8 +4,8 @@
  * frame thresholds.
  */
 
-import { EARS_SAMPLE_RATE } from '@tagalong/protocol';
-import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
+import { EARS_SAMPLE_RATE } from '../../../shared/voice';
+import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/ui/shapes';
 
 /** Speech or not, frame by frame (Silero). */
 export interface Vad {

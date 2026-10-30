@@ -1,7 +1,7 @@
 /** Tests for the clipboard trick. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
+import { MAX_SELECTION_CHARS } from '@tagalong/ui/shapes';
 import { COPY_SETTLE_MS, captureSelectionWith } from './selection';
 import type { ClipboardPort } from './selection';
 

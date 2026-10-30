@@ -3,8 +3,8 @@
  * microphone) from host calls that already exist, each within a time budget, with no model
  * call. Used by the bubble (panel.tsx).
  */
-import { chosenMouth } from '@tagalong/protocol';
-import type { AppsList } from '@tagalong/protocol';
+import { chosenMouth } from '../../shared/voice';
+import type { AppsList } from '@tagalong/ui/shapes';
 import type { HealthFacts } from '@tagalong/ui';
 import type { HostView, VoiceModels } from '../../shared/ipc';
 

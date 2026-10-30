@@ -27,7 +27,7 @@ const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
  * those are then resolved at runtime from this app, they are declared as its dependencies. Pure
  * JavaScript deps such as ws and the Anthropic SDK are inlined with everything else.
  */
-const WORKSPACE_PACKAGES = ['@tagalong/protocol', '@tagalong/ui'];
+const WORKSPACE_PACKAGES = ['@tagalong/ui'];
 const NATIVE_DEPS = ['better-sqlite3', 'get-windows', 'onnxruntime-node', 'uiohook-napi'];
 
 export default defineConfig({

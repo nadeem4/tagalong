@@ -15,11 +15,10 @@ import type {
   PerceptionTarget,
   Pet,
   PetRemarkParams,
-  Settings,
-  SettingsPatch,
   StatusMark,
   MemoryEntry,
-} from '@tagalong/protocol';
+} from '@tagalong/ui/shapes';
+import type { Settings, SettingsPatch } from '../shared/settings';
 import type {
   AskInput,
   BrainLink,

@@ -4,8 +4,8 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS } from '../../../shared/settings';
+import type { Settings } from '../../../shared/settings';
 
 import { VoiceSection } from './voice-section';
 

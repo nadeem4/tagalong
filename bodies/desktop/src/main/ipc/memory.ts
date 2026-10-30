@@ -3,7 +3,7 @@
  * tools (list_memories, forget). Contains registerMemoryIpc.
  */
 
-import type { MemoryEntry } from '@tagalong/protocol';
+import type { MemoryEntry } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import { RpcError } from '@tagalong/contract';
 import { callJson } from '../brain/call-json';

@@ -4,7 +4,7 @@
  */
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Settings, SettingsPatch } from '@tagalong/protocol';
+import { Settings, SettingsPatch } from '../shared/settings';
 
 /** The settings file a host finds next to the database in its data dir. */
 export const SETTINGS_FILENAME = 'settings.json';

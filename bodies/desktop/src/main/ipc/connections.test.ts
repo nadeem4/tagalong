@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { BrainOffline, RpcError } from '@tagalong/contract';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
-import { forwardAppsChanged, registerConnectionIpc } from './connections';
+import {
+  AppIdParams,
+  AppSetEnabledParams,
+  forwardAppsChanged,
+  registerConnectionIpc,
+} from './connections';
 
 const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
 
@@ -180,7 +185,7 @@ describe('registerConnectionIpc', () => {
     await expect(invoke(IPC.removeConnection, 'files')).rejects.toBeInstanceOf(BrainOffline);
   });
 
-  it('never calls the old engine: only brain tools and asks', async () => {
+  it('never calls anything but the brain: only brain tools and asks', async () => {
     const { invoke, calls } = setup(() => text({ apps: [] }));
     await invoke(IPC.listConnections);
     expect(calls.every(([tool]) => !tool.startsWith('connections.'))).toBe(true);
@@ -198,5 +203,15 @@ describe('forwardAppsChanged', () => {
     const sent: unknown[] = [];
     forwardAppsChanged('memory', (n) => sent.push(n));
     expect(sent).toEqual([]);
+  });
+});
+
+describe('the app id and enable shapes', () => {
+  it('need a non-empty id, and a boolean for enabled', () => {
+    expect(AppSetEnabledParams.safeParse({ id: 'a', enabled: false }).success).toBe(true);
+    expect(AppSetEnabledParams.safeParse({ id: 'a' }).success).toBe(false);
+    expect(AppIdParams.safeParse({ id: 'a' }).success).toBe(true);
+    expect(AppIdParams.safeParse({ id: '' }).success).toBe(false);
+    expect(AppIdParams.safeParse({}).success).toBe(false);
   });
 });

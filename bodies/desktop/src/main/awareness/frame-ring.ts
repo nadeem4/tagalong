@@ -3,7 +3,7 @@
  * first. Contains StoredFrame, Moment and FrameRing.
  */
 
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 /**
  * One display at one moment, as the ring keeps it.

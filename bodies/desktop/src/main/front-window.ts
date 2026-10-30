@@ -2,7 +2,7 @@
  * The one call and full-screen rule: when the front window is a call or full screen, Scout
  * keeps out of the way. Contains isMeeting and callOrFullScreenInFront.
  */
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { normalizeProcessName } from './platform/exclusions';
 
 /** Call and meeting apps, by process: the pet never speaks over a call. */

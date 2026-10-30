@@ -1,6 +1,6 @@
 /** Tests for capture exclusions: lists, title globs, secret files and built-in blind spots. */
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS, type CaptureExclusions } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS, type CaptureExclusions } from '../../shared/settings';
 import { findCaptureBlock, secretFileRule } from './exclusions';
 
 describe('secretFileRule', () => {

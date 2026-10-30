@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import type { DisplaysCapture } from '../platform/displays';
 import type { ActiveWindowInfo } from '../platform/index';
 import { SightPausedError } from '../platform/sight-gate';

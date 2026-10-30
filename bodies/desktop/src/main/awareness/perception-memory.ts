@@ -4,15 +4,15 @@
  */
 
 import { findCaptureBlock } from '../platform/exclusions';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { CapturedImage } from '@tagalong/ui/shapes';
 import type {
-  CaptureExclusions,
-  CapturedImage,
   PerceptionDiffParams,
   PerceptionDiffResult,
   PerceptionRecallParams,
   PerceptionRecallResult,
   RecalledFrame,
-} from '@tagalong/protocol';
+} from './recall';
 import type { Bitmap } from '../platform/canvas';
 import type { Platform } from '../platform/index';
 import type { Clock } from './clock';

@@ -4,8 +4,9 @@
  */
 
 import { findCaptureBlock } from './exclusions';
-import type { CaptureBlock } from '@tagalong/protocol';
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureBlock } from '@tagalong/ui/shapes';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 import { blit, createCanvas } from './canvas';
 import type { Bitmap, Colour } from './canvas';

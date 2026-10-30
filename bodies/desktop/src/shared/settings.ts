@@ -1,11 +1,10 @@
 /**
- * Settings as they cross the wire: the Settings schema, SETTINGS_DEFAULTS and SettingsPatch
- * for `settings.set`. Only fields something still reads live here. Secrets are never here:
- * they live in the host's SecretStore.
+ * The desktop's settings: the Settings schema, SETTINGS_DEFAULTS and SettingsPatch for the
+ * settings file and `settings.set`. Only fields something still reads live here. Secrets are
+ * never here: they live in the host's SecretStore.
  */
+import { EARS_IDS, MOUTH_IDS } from '@tagalong/ui/shapes';
 import { z } from 'zod';
-
-import { EARS_IDS, MOUTH_IDS } from './voice';
 
 /**
  * Ceiling on rolling memory. Thirty minutes of frames from two displays is already tens of
@@ -96,22 +95,6 @@ export const CaptureExclusions = z.object({
   titlePatterns: z.array(exclusionEntry),
 });
 export type CaptureExclusions = z.infer<typeof CaptureExclusions>;
-
-/**
- * Which configured entry refused a capture.
- *
- * Carries the matching rule rather than a bare boolean so the UI can say "1Password.exe is
- * on your exclusion list" instead of "blocked", and so a user who did not expect a refusal
- * can find the line that caused it. It lives in the protocol because it now crosses the
- * socket: a full-view capture refuses one display or one window while returning the rest,
- * so the reason has to travel with the snapshot.
- */
-export const CaptureBlock = z.object({
-  rule: z.enum(['processName', 'titlePattern']),
-  /** The exclusion entry exactly as the user wrote it, for display. */
-  entry: z.string().min(1),
-});
-export type CaptureBlock = z.infer<typeof CaptureBlock>;
 
 /**
  * Field validators without defaults attached.

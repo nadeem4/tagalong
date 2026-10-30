@@ -1,6 +1,6 @@
 // Collects the microphone into 512-sample frames (32 ms at 16 kHz) and posts each one.
 // Runs on the audio thread; nothing is kept once a frame is posted. 512 is EARS_FRAME in
-// @tagalong/protocol (voice.ts): a worklet cannot import it, so change both together.
+// src/shared/voice.ts: a worklet cannot import it, so change both together.
 class TagalongMic extends AudioWorkletProcessor {
   constructor() {
     super();

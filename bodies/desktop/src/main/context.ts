@@ -1,5 +1,5 @@
 /**
- * What the desktop can see, packaged for the engine: the ask's snapshot (selection and the window
+ * What the desktop can see, packaged for the brain: the ask's snapshot (selection and the window
  * in focus) and the answer to perception.capture. Contains DESKTOP_CAPABILITIES,
  * captureAskSnapshot, capturePatch and answerCapture.
  */
@@ -7,13 +7,16 @@
 import { randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
 import { findCaptureBlock, normalizeProcessName } from './platform/exclusions';
-import type { CaptureBlock } from '@tagalong/protocol';
-import { ContextSnapshot } from '@tagalong/protocol';
-import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
+import { ContextSnapshot } from '@tagalong/ui/shapes';
+import type { CaptureBlock, PerceptionTarget } from '@tagalong/ui/shapes';
+import type { CaptureExclusions } from '../shared/settings';
 import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';
 import { SightPausedError, isSightPaused } from './platform/sight-gate';
 
-/** What the desktop host tells the engine it can perceive. */
+/** What a capture returns: whichever fields it managed to read. */
+type ContextSnapshotPatch = Partial<ContextSnapshot>;
+
+/** What the desktop host tells the brain it can perceive. */
 export const DESKTOP_CAPABILITIES = [
   'selection',
   'activeWindow',
@@ -22,7 +25,7 @@ export const DESKTOP_CAPABILITIES = [
   'displays',
   // The text layer reads any window by id, including ones behind others and minimized
   // ones. Advertised only now that `perception.readText` is answered: a capability the
-  // host cannot honour makes the engine call a method that fails, which reads to the user
+  // host cannot honour makes the brain call a method that fails, which reads to the user
   // as a broken pet rather than a missing feature.
   'textLayer',
   // Advertised whether or not rolling memory is on: recall then answers that it
@@ -149,7 +152,7 @@ async function windowInFocus(
 /**
  * The snapshot's `app` field, or nothing when the host could not name the window. A blocked
  * window (a blind spot or an exclusion) keeps only its app name: its title never reaches the
- * prompt, the conversation or a brief. It carries `blocked` instead, so the engine still refuses
+ * prompt, the conversation or a brief. It carries `blocked` instead, so the brain still refuses
  * on a title rule it can no longer match.
  */
 function appOf(
@@ -242,7 +245,7 @@ function toSnapshotDisplays(capture: DisplaysCapture): ContextSnapshot['displays
  * Every display and the composite, for the displays target.
  *
  * Best effort, like every other perception: a capturer that throws must not cost the
- * engine the other targets it asked for.
+ * brain the other targets it asked for.
  */
 async function captureFullView(
   platform: Platform,
@@ -310,7 +313,7 @@ export async function captureAskSnapshot(
 }
 
 /**
- * Answers the engine's perception.capture with just the targets it named. Page text only
+ * Answers the brain's perception.capture with just the targets it named. Page text only
  * ever comes from the extension, so it is silently absent here.
  */
 export async function capturePatch(
@@ -362,7 +365,7 @@ export async function capturePatch(
       const full = await captureFullView(platform, options.exclusions);
       if (full.patch.displays === undefined) {
         // The host advertises the `displays` capability, so a silent nothing here is the
-        // engine calling a method it was told would work and getting an empty answer.
+        // brain calling a method it was told would work and getting an empty answer.
         warnings.push('the displays could not be captured');
       }
       Object.assign(patch, full.patch);
