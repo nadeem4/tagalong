@@ -1,9 +1,10 @@
-/**
+﻿/**
  * The toolbar popup's glue: asks the worker for the brain status, saves the address and name
  * into storage (the worker restarts on the change), and lists what Scout may do with a Remove
  * button each. The logic worth testing lives in model.ts.
  */
 import { browserName, detectBrowser } from '../identity';
+import { chromeStorage as storage } from '../layer/chromium';
 import { originPattern } from '../permissions';
 import { DEFAULT_ADDR, readSettings, saveAddr, saveName } from '../settings';
 import {
@@ -14,11 +15,6 @@ import {
   type WorkerQuery,
   type WorkerStatus,
 } from './model';
-
-const storage = {
-  get: async (key: string) => (await chrome.storage.local.get(key))[key],
-  set: (key: string, value: unknown) => chrome.storage.local.set({ [key]: value }),
-};
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const addrEl = document.getElementById('addr') as HTMLInputElement;

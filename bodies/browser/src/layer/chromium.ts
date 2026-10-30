@@ -1,6 +1,6 @@
-/**
- * The real Chrome behind the layer's interfaces. The first pieces: tabs and page reading,
- * moved here from chrome-adapters.ts, which stays until the old extension code is removed.
+﻿/**
+ * The real Chrome behind the layer's interfaces: storage, tabs, page reading, permissions and
+ * the brain websocket. The logic modules only ever see the interfaces in api.ts.
  */
 import type { PageReading } from '../content/read-page';
 import { requestQuery } from '../permission/model';
@@ -11,7 +11,37 @@ import {
   type PermissionPrompt,
   type PermissionsApi,
 } from '../permissions';
-import type { PageApi, TabInfo, TabsApi } from './api';
+import type { BrainSocket } from '@tagalong/contract';
+import type { PageApi, StorageArea, TabInfo, TabsApi } from './api';
+
+function area(store: chrome.storage.StorageArea): StorageArea {
+  return {
+    get: async (key) => (await store.get(key))[key],
+    set: (key, value) => store.set({ [key]: value }),
+  };
+}
+
+/** Settings and the body id; survives browser restarts. */
+export const chromeStorage: StorageArea = area(chrome.storage.local);
+
+/** last_seq; survives worker restarts but not browser restarts. */
+export const chromeSession: StorageArea = area(chrome.storage.session);
+
+/** A browser WebSocket as the BrainClient's socket, the way the desktop wraps its own. */
+export function webSocket(url: string): BrainSocket {
+  const ws = new WebSocket(url);
+  return {
+    send: (data) => ws.send(data),
+    close: () => ws.close(),
+    onOpen: (f) => ws.addEventListener('open', () => f()),
+    onMessage: (f) =>
+      ws.addEventListener('message', (event) => {
+        if (typeof event.data === 'string') f(event.data);
+      }),
+    // An error is always followed by close, which is where reconnecting starts.
+    onClose: (f) => ws.addEventListener('close', () => f()),
+  };
+}
 
 function toInfo(tab: chrome.tabs.Tab): TabInfo | null {
   if (tab.id === undefined) return null;

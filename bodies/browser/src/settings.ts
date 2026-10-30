@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The two things the popup lets the person change: where the brain is, and an
  * optional display name. Bad stored values fall back rather than break the connection.
  * No chrome.* here; storage is passed in.
@@ -7,8 +7,8 @@ import type { StorageArea } from './layer/api';
 
 export const DEFAULT_ADDR = '127.0.0.1:47321';
 
-const ADDR_KEY = 'brainAddr';
-const NAME_KEY = 'bodyName';
+export const ADDR_KEY = 'brainAddr';
+export const NAME_KEY = 'bodyName';
 const MAX_NAME = 32;
 const ADDR_PATTERN = /^([A-Za-z0-9.-]+):(\d{1,5})$/;
 

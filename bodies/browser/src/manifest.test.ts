@@ -1,46 +1,50 @@
-/** Tests for the manifest's permissions, pages, shortcut, description and socket policy. */
+/** Tests for the manifest's permissions, popup, description and socket policy. */
 import { describe, expect, it } from 'vitest';
-import { COMMAND_OPEN_PANEL, manifest } from './manifest';
+import { manifest } from './manifest';
 
 describe('manifest', () => {
-  it('is Manifest V3 with a module service worker', () => {
+  it('is_manifest_v3_with_a_module_service_worker', () => {
     expect(manifest.manifest_version).toBe(3);
     expect(manifest.background).toEqual({ service_worker: 'service-worker.js', type: 'module' });
   });
 
-  it('asks for exactly these permissions, with no optional ones', () => {
-    expect([...manifest.permissions].sort()).toEqual(
-      ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'].sort(),
-    );
-    expect('optional_permissions' in manifest).toBe(false);
+  it('requires_only_alarms_scripting_and_storage', () => {
+    expect([...manifest.permissions].sort()).toEqual(['alarms', 'scripting', 'storage']);
   });
 
-  it('carries no standing host permission: pages are reached through activeTab only', () => {
+  it('lists_the_optional_permissions_from_the_design', () => {
+    expect([...manifest.optional_permissions].sort()).toEqual(
+      [
+        'bookmarks',
+        'contextMenus',
+        'downloads',
+        'history',
+        'readingList',
+        'sessions',
+        'tabGroups',
+        'tabs',
+      ].sort(),
+    );
+  });
+
+  it('optional_host_permissions_is_all_urls_and_there_is_no_host_permissions', () => {
+    expect(manifest.optional_host_permissions).toEqual(['<all_urls>']);
     expect('host_permissions' in manifest).toBe(false);
   });
 
-  it('offers reading any tab only as an optional grant the user switches on', () => {
-    expect(manifest.optional_host_permissions).toEqual(['<all_urls>']);
+  it('has_a_popup_and_no_side_panel_options_or_commands', () => {
+    expect(manifest.action.default_popup).toBe('popup/popup.html');
+    expect('side_panel' in manifest).toBe(false);
+    expect('options_ui' in manifest).toBe(false);
+    expect('commands' in manifest).toBe(false);
   });
 
-  it('points the side panel and options page at the built html', () => {
-    expect(manifest.side_panel.default_path).toBe('sidepanel.html');
-    expect(manifest.options_ui).toEqual({ page: 'options.html', open_in_tab: true });
+  it('lets_extension_pages_open_websockets_to_any_host', () => {
+    expect(manifest.content_security_policy.extension_pages).toContain('connect-src ws:');
   });
 
-  it('declares the shortcut that opens the side panel', () => {
-    const command = manifest.commands[COMMAND_OPEN_PANEL];
-    expect(command?.suggested_key.default).toMatch(/Space$/);
-    expect(command?.description.length).toBeGreaterThan(0);
-  });
-
-  it('describes Scout, not a crew, within the store summary limit', () => {
+  it('describes_scout_within_the_store_summary_limit', () => {
     expect(manifest.description).toContain('Scout');
-    expect(manifest.description).not.toMatch(/crew/i);
     expect(manifest.description.length).toBeLessThanOrEqual(132);
-  });
-
-  it('lets extension pages open sockets to loopback and nowhere else', () => {
-    expect(manifest.content_security_policy.extension_pages).toContain('ws://127.0.0.1:*');
   });
 });

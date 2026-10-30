@@ -18,16 +18,12 @@ function emitManifest(): Plugin {
 }
 
 /**
- * The extension pages and the service worker, built as ES modules into `dist/`, which is
- * the folder Chrome loads unpacked. The content script is a second build
- * (`vite.content.config.ts`) because Chrome injects it as a classic script, which cannot
- * import the shared chunks this build produces.
+ * The extension pages and service worker, built as ES modules into `dist/`, the folder Chrome
+ * loads unpacked. The content script is a second build (`vite.content.config.ts`) because
+ * Chrome injects it as a classic script, which cannot import the shared chunks this build makes.
  */
 export default defineConfig({
   root: 'src',
-  // Vite's own esbuild transform covers the JSX, as in the desktop renderer; the React
-  // plugin pinned in this workspace needs a newer Vite than the one installed.
-  esbuild: { jsx: 'automatic' },
   plugins: [emitManifest()],
   build: {
     outDir: '../dist',
@@ -37,8 +33,6 @@ export default defineConfig({
     modulePreload: false,
     rollupOptions: {
       input: {
-        sidepanel: 'src/sidepanel.html',
-        options: 'src/options.html',
         permission: 'src/permission/permission.html',
         popup: 'src/popup/popup.html',
         'service-worker': 'src/service-worker.ts',
