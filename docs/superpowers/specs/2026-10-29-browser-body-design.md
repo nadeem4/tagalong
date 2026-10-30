@@ -117,16 +117,12 @@ My calls (the person can overturn any):
     - Once granted, never asked again. The popup lists what has been granted, with a Remove for each.
     - Right-click "Ask Scout" (12c) needs `contextMenus` before the menu item can exist, so the popup offers
       to turn it on; the `scout` address-bar keyword needs no permission.
-
-    `readingList` is Chrome-only; elsewhere that source answers `tool_failed` "not supported in this browser".
-
+      `readingList` is Chrome-only; elsewhere that source answers `tool_failed` "not supported in this browser".
 15. **Events** (12b). Two new body event names, documented in the browser body's doc:
     - `tab {title, url}`: the active tab changed (throttled like `focus`, at most one per 2 s, URL without query
       string or fragment). Brain kind `tab`, `wakes=False`: a fact Scout sees on its next turn, never a wake.
     - `download {name, state}`: a download finished or failed. Brain kind `download`, `wakes=False`.
-
-    Each gets a note in `brain/src/brain/mind/events.md`; wording stays the model's.
-
+      Each gets a note in `brain/src/brain/mind/events.md`; wording stays the model's.
 16. **Shared connection.** The desktop's `bodies/desktop/src/main/brain/brain-client.ts` moves into
     `@tagalong/contract` (`protocol/ts`) as `BrainClient`, used by both bodies. It already imports only the
     contract and the global `WebSocket`. Changes: the body is a constructor argument (not hardcoded `desktop`);

@@ -9,7 +9,7 @@ from importlib.resources import files
 
 from pydantic import ValidationError
 
-from brain.protocol import BackData, FocusData
+from brain.protocol import BackData, DownloadData, FocusData, TabData
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,8 @@ _KINDS = (
     EventKind("back", batch_seconds=0, max_per_hour=2),
     EventKind("job_question", batch_seconds=None, max_per_hour=None),
     EventKind("focus", wakes=False),
+    EventKind("tab", wakes=False),
+    EventKind("download", wakes=False),
 )
 EVENT_KINDS: dict[str, EventKind] = {k.name: k for k in _KINDS}
 
@@ -60,14 +62,25 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
             focus = FocusData.model_validate(data)
             facts = {"body": body_id, "app": focus.app, "title": focus.title[:200]}
             return Event("focus", facts, key=body_id)
+        if name == "tab":
+            tab = TabData.model_validate(data)
+            facts = {"body": body_id, "title": tab.title[:200], "url": tab.url[:300]}
+            return Event("tab", facts, key=body_id)
+        if name == "download":
+            dl = DownloadData.model_validate(data)
+            facts = {"body": body_id, "name": dl.name[:200], "state": dl.state}
+            return Event("download", facts, key=body_id)
     except ValidationError:
         return None
     return None
 
 
-def from_connect(body_id: str, away_seconds: float | None) -> Event | None:
-    """Wake only when a body that was seen earlier comes back after a real absence."""
-    if away_seconds is None or away_seconds < BODY_ONLINE_MIN_AWAY_S:
+def from_connect(body_id: str, away_seconds: float | None, kind: str | None = None) -> Event | None:
+    """Wake only when a body that was seen earlier comes back after a real absence.
+
+    A browser opens and closes all day and is not the owner arriving, so it never wakes.
+    """
+    if kind == "browser" or away_seconds is None or away_seconds < BODY_ONLINE_MIN_AWAY_S:
         return None
     return Event(
         "body_online",

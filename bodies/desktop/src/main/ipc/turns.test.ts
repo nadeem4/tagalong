@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { SayParams } from '@tagalong/contract';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import { BrainOffline } from '../brain/brain-client';
+import { BrainOffline } from '@tagalong/contract';
 import { fakeIpc } from './fake-ipc';
 import { registerTurnIpc } from './turns';
 

@@ -13,7 +13,7 @@
   "publish": null,
   "extraResources": [
     {
-      "from": "../../apps/extension/dist",
+      "from": "../browser/dist",
       "to": "extension"
     }
   ],

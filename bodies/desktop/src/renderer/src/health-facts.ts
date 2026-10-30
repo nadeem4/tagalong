@@ -1,6 +1,6 @@
 /**
  * "Scout, what's wrong?": gatherHealth reads the health card's rows (brain and sign-in,
- * experts, connections, voice, microphone, browser extension) from host calls that already
+ * experts, connections, voice, microphone) from host calls that already
  * exist, each within a time budget, with no model call. Used by the bubble (panel.tsx).
  */
 import { chosenMouth } from '@tagalong/protocol';
@@ -18,7 +18,6 @@ export interface HealthDeps {
   listConnections(): Promise<AppsList>;
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
-  hostsStatus(): Promise<{ extension: boolean }>;
   /** How long each call (one expert's test, the sign-in, every read) may take before it fails. */
   testBudgetMs: number;
 }
@@ -82,13 +81,12 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
   const attempt = <T>(work: () => Promise<T>) =>
     within(work, deps.testBudgetMs, 'unknown' as const);
-  const [view, experts, connections, microphones, models, hosts] = await Promise.all([
+  const [view, experts, connections, microphones, models] = await Promise.all([
     attempt(() => deps.getHostView()),
     expertsOf(deps),
     attempt(() => deps.listConnections()),
     attempt(() => deps.listMicrophones()),
     attempt(() => deps.voiceModels()),
-    attempt(() => deps.hostsStatus()),
   ]);
   const brain = await brainOf(view, deps);
   const settings = view === 'unknown' ? null : view.settings;
@@ -120,6 +118,5 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
             pickedMissing:
               picked !== undefined && !microphones.some((microphone) => microphone.id === picked),
           },
-    extension: hosts === 'unknown' ? 'unknown' : hosts.extension,
   };
 }

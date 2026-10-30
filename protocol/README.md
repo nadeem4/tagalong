@@ -31,13 +31,13 @@ Tool  { name, description, input_schema, confirm?, effect? }
 Part  { type: "text", text }
     | { type: "image", mime, data }
     | { type: "file",  mime, name?, data }
-Body  { id, kind, name }
+Body  { id, kind, name, display? }
 ```
 
 - **Tool.** `name` is unique within the body that declares it: lowercase letters, digits, `_` and `-`, never `__`, at most 48 characters. `input_schema` is a JSON Schema object. `confirm: true` means the brain asks the user before running it, until the person unlocks the tool on Home or a preference names it (see Asks). `effect` is `"read"` or `"change"` and is omitted when the body does not say (never null): `read` means the tool only looks and changes nothing, `change` means it alters something. The brain uses it to decide how to ask.
 - **Tool names across bodies.** Bodies declare plain names (`see_screen`). The brain exposes them to the model as `<body id>__<name>` (`desktop__see_screen`) so two bodies never collide and the name stays within the model API's allowed characters. The brain calls the body with the plain name. Brain tools have no prefix and never contain `__`.
 - **Part.** `data` is base64. A future source, `ref` (an uploaded file id instead of `data`), is reserved: v1 senders always send `data`, and v1 receivers reject a part with `ref` and no `data` with `invalid_params`. Adding `ref` later needs no message change.
-- **Body.** `id` is stable for that install (for example `desktop`): lowercase letters, digits and `-`, at most 32 characters; `kind` is the body type (`desktop`, `extension`), `name` is for people (`Desktop`).
+- **Body.** `id` is stable for that install (for example `desktop`): lowercase letters, digits and `-`, at most 32 characters; `kind` is the body type (`desktop`, `browser`), `name` is for people (`Desktop`, `Chrome`). A browser body makes its id `<browser>-<4 random chars>` (`chrome-7k2f`) once per install, so two browsers or profiles are two bodies. `display` is optional (omitted or `true` by default, never null): `display: false` says the body shows nothing. Replies, asks and broadcasts are still sent to it and it ignores them; the brain never counts it when it picks where to show a turn or whether anyone can be asked.
 
 ## Limits
 
@@ -68,8 +68,8 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; today the Home tools `list_memories`, `forget`, `spend_today`, `list_permissions`, `set_permission`, `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
-- **say.** The user said something. At least one of `text` or `parts` is present. `context` is free-form (active window, selection) and goes to the model as-is; each body documents its own context in its doc, never here. `spoken: true` means the user spoke, so the body will speak the reply itself (voice stays in the desktop body in v1; the brain only sees text). The result returns the `turn` id at once; the reply streams as notifications. If a turn is already running (from any body), the message joins it instead of starting a new one: the result carries that turn's id and `joined: true`, and the model sees the new message at its next step. If the daily budget is spent, the turn still starts and ends at once with `reason: "over_budget"`, so every body learns it the same way.
-- **event.** A fact the body noticed (window changed, user idle). Names are free-form and documented per body. The brain decides whether it matters; most events get no reaction. Two names are shared by every body: `back {idle_seconds}` (the user returned after at least 5 minutes idle) and `focus {app, title}` (the front window changed; throttled; an empty `app` clears it, sent when the body may not report the front window). A body coming online is not an event: the brain learns it from the connection itself.
+- **say.** The user said something. At least one of `text` or `parts` is present. `context` is free-form (active window, selection) and goes to the model as-is; each body documents its own context in its doc, never here. `spoken: true` means the user spoke, so the body will speak the reply itself (voice stays in the desktop body in v1; the brain only sees text). The result returns the `turn` id at once; the reply streams as notifications. If a turn is already running (from any body), the message joins it instead of starting a new one: the result carries that turn's id and `joined: true`, and the model sees the new message at its next step. If the daily budget is spent, the turn still starts and ends at once with `reason: "over_budget"`, so every body learns it the same way. A `say` from a body with `display: false` still starts or joins the turn, but the turn's `body` is the displaying body the user last talked to if it is online, otherwise the first online body that displays, otherwise `null`; the sender does not become the body the user last talked to.
+- **event.** A fact the body noticed (window changed, user idle). Names are free-form and documented per body. The brain decides whether it matters; most events get no reaction. Two names are shared by every body: `back {idle_seconds}` (the user returned after at least 5 minutes idle) and `focus {app, title}` (the front window changed; throttled; an empty `app` clears it, sent when the body may not report the front window). The browser body also sends `tab {title, url}` (the owner switched tabs; URL without query or fragment; throttled) and `download {name, state}` (state is `complete` or `interrupted`); the brain keeps the latest of each and never wakes for them. A body coming online is not an event: the brain learns it from the connection itself.
 - **call.** The body runs one of the brain's tools directly (Home reading settings, for example). Unknown tool gets `unknown_tool`.
 - **answer.** The user answered an ask. `option` is one of the ask's `options` strings; `text` is optional free text. An ask that is already closed or never existed gets `not_found`; an `option` not in the list gets `invalid_params`, unless the ask accepts typed answers (an expert's question) and `text` is non-empty: then any `option` is taken and the typed text is the answer.
 - **cancel.** Stop this turn. The brain ends it with `turn { state: "ended", reason: "cancelled" }`. A turn that has already ended or never existed is ignored.
@@ -91,7 +91,7 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.
 - **reply.** Scout's words for a turn, streamed. `body` follows the same rule as `turn.body`, so it is `null` for a brain-started turn with no body online. Zero or more `delta` chunks, then exactly one `done` if any delta was sent. A turn that ends with no `reply` at all is a silent turn, and that is allowed.
-- **turn.** A turn started or ended. `body` is the body the user was talking to: it shows and speaks the reply; other bodies may show it in history. For a turn the brain starts itself, `body` is the body the user last talked to if it is online, otherwise any online body, otherwise `null`. `reason` on `ended` is one of `done`, `cancelled`, `error`, `over_budget`, `step_cap`. `started_by` says who began the turn: `"user"` or `"brain"`. A body shows no thinking state or bubble for `"brain"` until a `reply` or an `ask` arrives; absent means `"user"`.
+- **turn.** A turn started or ended. `body` is the body the user was talking to: it shows and speaks the reply; other bodies may show it in history. For a turn the brain starts itself, `body` is the body the user last talked to if it is online, otherwise any online body that displays, otherwise `null`. A `say` from a body with `display: false` gets the same choice. With only display-less bodies online no ask opens: it is refused at once, as if nobody were online. `reason` on `ended` is one of `done`, `cancelled`, `error`, `over_budget`, `step_cap`. `started_by` says who began the turn: `"user"` or `"brain"`. A body shows no thinking state or bubble for `"brain"` until a `reply` or an `ask` arrives; absent means `"user"`.
 - **tool.** A tool call in a turn started or ended, so bodies can show what Scout is doing. `name` is the full name as the model sees it. `summary` is a short line for people; it comes from the tool's result, not a template.
 - **ask.** Scout needs the user. `state: "open"` carries the question; every connected body shows it. When the ask closes, the brain sends `state: "closed"` to every body so the prompt disappears everywhere. `reason` is `answered`, `timeout` or `cancelled`; with `answered`, `option` is the chosen option and `by` is the body id that answered. First answer wins. For a confirm (see Asks and confirm) the ask has `confirm: true`, `tool` and `input`, and its options are exactly `["allow", "deny"]` or exactly `["allow", "always", "deny"]`, in that order.
 - **changed.** Something the bodies display changed (`settings`, `memory`, `permissions`, `approvals`, an expert's name). `what` is free-form, never a fixed list. Bodies refetch through `call`.
@@ -140,6 +140,14 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 | `tool_failed`      | -32007 | The tool ran and failed; `data` may carry details                     |
 | `over_limit`       | -32008 | A part or message is over the size limits                             |
 
+## The TypeScript client
+
+`@tagalong/contract` (`protocol/ts`) exports `BrainClient`, the body's end of this contract, shared by the desktop and the browser body. Besides `addr`, `body`, `tools`, `openSocket` and the callbacks (`onNotification`, `onUse`, `onStatus`, `onResync`), it takes:
+
+- **`body`** (`{ id, kind, name }`): sent in hello as given; its id prefixes the client's request ids.
+- **`seqStore`** (`{ load(): Promise<number | null>, save(seq) }`): where the body keeps the last seq it saw, so a restart sends `last_seq`. Without it the client keeps `last_seq` in memory only. The browser keeps it in `chrome.storage.session`, which survives a worker restart but not a browser restart.
+- **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
+
 ## Examples
 
 A desktop connects, the user asks for something on screen, Scout looks and answers.
@@ -177,7 +185,7 @@ With `always` on offer, answering it allows the call and saves `auto` for that t
 A body that is too far behind.
 
 ```json
-→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"extension","kind":"extension","name":"Chrome"},"tools":[],"last_seq":12}}
+→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"chrome-7k2f","kind":"browser","name":"Chrome"},"tools":[],"last_seq":12}}
 ← {"jsonrpc":"2.0","id":1,"result":{"protocol":1,"session":"s1","tools":[],"seq":740,"resync":true}}
 ```
 

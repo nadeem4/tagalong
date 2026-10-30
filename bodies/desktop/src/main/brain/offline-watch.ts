@@ -2,7 +2,7 @@
  * Fails open turns when the brain stays down. A short blip is covered by the client's own
  * resync on reconnect; if the brain does not come back, the bubble must not stream forever.
  */
-import type { BrainStatus } from './brain-client';
+import type { BrainStatus } from '@tagalong/contract';
 
 export function offlineWatch(giveUp: () => void, ms = 10_000): (status: BrainStatus) => void {
   let timer: ReturnType<typeof setTimeout> | undefined;

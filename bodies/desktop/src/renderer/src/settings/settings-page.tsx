@@ -30,7 +30,7 @@ import { SummariesSection } from './summaries-section';
 import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
 import { YouSection } from './you-section';
-import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
+import type { BrowserFolder, ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
  * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
@@ -56,6 +56,7 @@ export function SettingsPage({
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [summarizer, setSummarizer] = useState('');
   const [advanced, setAdvanced] = useState(false);
+  const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
   const [invalid, setInvalid] = useState<SettingsUi['invalid']>(null);
   const [status, setStatus] = useState('');
@@ -75,6 +76,13 @@ export function SettingsPage({
         setStatus(String(error));
         setStatusIsError(true);
       });
+  }, []);
+
+  useEffect(() => {
+    window.tagalongHost
+      .browserFolder()
+      .then(setBrowserFolder)
+      .catch(() => setBrowserFolder(null));
   }, []);
 
   const checkSignIn = useCallback(() => {
@@ -331,7 +339,7 @@ export function SettingsPage({
           <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
-          <BrowserSection token={view.pairingToken} />
+          <BrowserSection folder={browserFolder} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
             <SummariesSection
               groups={summarizerGroups({

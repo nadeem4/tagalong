@@ -2,7 +2,7 @@
  * Reads a Home tool's answer: the brain's Home tools return one JSON string in a single text
  * part, so a handler asks for the tool and gets the parsed value, or an error naming the tool.
  */
-import type { BrainClient } from './brain-client';
+import type { BrainClient } from '@tagalong/contract';
 
 /** All the IPC handlers need of the brain: run one of its tools. */
 export type BrainCall = Pick<BrainClient, 'call'>;

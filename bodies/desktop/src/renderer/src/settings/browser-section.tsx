@@ -1,49 +1,58 @@
 /**
- * Settings' Browser extension section: the token the Chrome extension needs, once. Read-only
- * and selectable, with a copy button, because the alternative is asking someone to find a file
- * in their profile folder.
+ * Settings' "Add Scout to your browser" section: how to load the browser add-on with Load
+ * unpacked. The add-on dials Scout on its own, so there is nothing to paste; this only
+ * finds the folder, reveals it and copies the two addresses people cannot click.
  */
-import { useState } from 'react';
-import { Section, Tip } from './section';
+import type { BrowserFolder } from '../../../shared/ipc';
+import { Section } from './section';
 
-export function BrowserSection({ token }: { token: string | undefined }) {
-  const [copied, setCopied] = useState(false);
+// A blocked clipboard or a missing folder is not worth a message here, so rejections are dropped.
+const copy = (text: string): void => {
+  navigator.clipboard.writeText(text).catch(() => undefined);
+};
+
+export function BrowserSection({ folder }: { folder: BrowserFolder | null }) {
   return (
-    <Section id="browser" info={{ tip: 'browser', label: 'About the browser extension' }}>
+    <Section id="browser">
       <p className="tg-help">
-        Gives Scout the exact text you highlight in Chrome and the whole page you are on.
+        Lets Scout read a tab in Chrome or Edge, only when it needs to and only after you allow it.
       </p>
-      <Tip tip="browser">
-        Scout already sees Chrome without it, through screenshots and the window&apos;s text. The
-        extension adds exact selections, full page text and a Scout panel inside Chrome. It talks
-        only to Tagalong on this computer. Paste the token into the extension&apos;s options page
-        once. Anyone with the token can talk to Scout from this computer, so keep it to yourself.
-      </Tip>
-      {token === undefined ? (
-        <p className="tg-help">The pairing token appears once the engine is running.</p>
+      <ol className="tg-help">
+        <li>
+          Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) in your browser.
+        </li>
+        <li>Turn on Developer mode.</li>
+        <li>Choose Load unpacked, then pick the Scout folder.</li>
+      </ol>
+      {folder === null ? null : folder.exists ? (
+        <p className="tg-help">{folder.path}</p>
       ) : (
-        <div className="tg-inline">
-          <label>
-            <span>Pairing token</span>
-            <input
-              name="pairingToken"
-              readOnly
-              value={token}
-              onFocus={(event) => event.currentTarget.select()}
-              data-testid="pairing-token"
-            />
-          </label>
+        <p className="tg-help">Build it first: pnpm --filter @tagalong/browser build</p>
+      )}
+      <div className="tg-inline">
+        {folder?.exists === true && (
           <button
             type="button"
             className="tg-btn-quiet"
             onClick={() => {
-              void navigator.clipboard.writeText(token).then(() => setCopied(true));
+              window.tagalongHost.showBrowserFolder().catch(() => undefined);
             }}
           >
-            {copied ? 'Copied' : 'Copy'}
+            Show folder
           </button>
-        </div>
-      )}
+        )}
+        {folder !== null && (
+          <button type="button" className="tg-btn-quiet" onClick={() => copy(folder.path)}>
+            Copy folder path
+          </button>
+        )}
+        <button type="button" className="tg-btn-quiet" onClick={() => copy('chrome://extensions')}>
+          Copy chrome://extensions
+        </button>
+        <button type="button" className="tg-btn-quiet" onClick={() => copy('edge://extensions')}>
+          Copy edge://extensions
+        </button>
+      </div>
     </Section>
   );
 }

@@ -62,6 +62,18 @@ describe('shapes', () => {
     expect(Body.safeParse(body('my_body')).success).toBe(false);
   });
 
+  it('body_accepts_display_false_and_omitted', () => {
+    const body = { id: 'chrome-ab12', kind: 'browser', name: 'Chrome' };
+    expect(Body.safeParse(body).success).toBe(true);
+    expect(Body.safeParse({ ...body, display: false }).success).toBe(true);
+    expect(Body.safeParse({ ...body, display: true }).success).toBe(true);
+  });
+
+  it('body_rejects_display_null', () => {
+    const body = { id: 'chrome-ab12', kind: 'browser', name: 'Chrome', display: null };
+    expect(Body.safeParse(body).success).toBe(false);
+  });
+
   it('rejects a part with ref and no data', () => {
     expect(Part.safeParse({ type: 'file', mime: 'a/b', ref: 'f1' }).success).toBe(false);
     expect(Part.safeParse({ type: 'file', mime: 'a/b', data: 'AA==' }).success).toBe(true);

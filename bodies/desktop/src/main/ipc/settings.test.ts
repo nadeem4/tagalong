@@ -52,12 +52,11 @@ describe('registerSettingsIpc: hostView', () => {
     });
   });
 
-  it('carries the hotkey problem and no pairing token', async () => {
+  it('carries the hotkey problem', async () => {
     const { invoke } = setup({ problem: 'the hotkey is taken' });
     const view = (await invoke(IPC.hostView)) as HostView;
     expect(view.elevenLabsKeyStored).toBe(false);
     expect(view.hotkeyError).toBe('the hotkey is taken');
-    expect(view).not.toHaveProperty('pairingToken');
   });
 });
 

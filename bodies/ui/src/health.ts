@@ -32,11 +32,9 @@ export interface HealthFacts {
       }
     | 'unknown';
   microphone: { count: number; pickedMissing: boolean } | 'unknown';
-  extension: boolean | 'unknown';
 }
 
-export type HealthCheckId =
-  'brain' | 'experts' | 'connections' | 'voice' | 'microphone' | 'extension';
+export type HealthCheckId = 'brain' | 'experts' | 'connections' | 'voice' | 'microphone';
 
 /** `info` and `unknown` rows are never counted as needing the person. */
 export interface HealthRow {
@@ -55,7 +53,6 @@ const LABELS: Record<HealthCheckId, string> = {
   connections: 'Connections',
   voice: 'Voice',
   microphone: 'Microphone',
-  extension: 'Browser extension',
 };
 
 const make = (
@@ -142,13 +139,6 @@ function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
   return make('microphone', 'ok', 'A microphone is ready.');
 }
 
-function extensionRow(extension: HealthFacts['extension']): HealthRow {
-  if (extension === 'unknown') return make('extension', 'unknown', UNKNOWN);
-  return extension
-    ? make('extension', 'ok', 'Connected.')
-    : make('extension', 'info', 'Not connected (optional)', 'browser');
-}
-
 /** One row per check, in the card's order. Pure: no call, no model. */
 export function healthRows(facts: HealthFacts): HealthRow[] {
   return [
@@ -157,7 +147,6 @@ export function healthRows(facts: HealthFacts): HealthRow[] {
     connectionsRow(facts.connections),
     voiceRow(facts.voice),
     microphoneRow(facts.microphone),
-    extensionRow(facts.extension),
   ];
 }
 

@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -72,8 +73,8 @@ import { signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
-import type { BrainStatus } from './brain/brain-client';
-import type { BrainClient } from './brain/brain-client';
+import type { BrainStatus } from '@tagalong/contract';
+import type { BrainClient } from '@tagalong/contract';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
@@ -119,7 +120,7 @@ import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
-import { registerHealthIpc } from './ipc/health';
+import { registerBrowserIpc } from './ipc/browser';
 import { fixPage } from './fix-target';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice } from '../shared/ipc';
@@ -1074,7 +1075,13 @@ function registerIpc(): void {
     writeText: (text) => clipboard.writeText(text),
     fromPanel: fromWindow(() => required().panel),
   });
-  registerHealthIpc(handle, { engine });
+  registerBrowserIpc(handle, {
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+    exists: existsSync,
+    showItemInFolder: (path) => shell.showItemInFolder(path),
+  });
 
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);

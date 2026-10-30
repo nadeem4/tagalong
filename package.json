@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dev:desktop": "pnpm --filter @tagalong/desktop dev",
+    "dev:desktop": "pnpm --filter @tagalong/browser build && pnpm --filter @tagalong/desktop dev",
     "package:win": "pnpm build && pnpm --filter @tagalong/desktop package:win",
     "package:mac": "pnpm build && pnpm --filter @tagalong/desktop package:mac",
     "package:linux": "pnpm build && pnpm --filter @tagalong/desktop package:linux"

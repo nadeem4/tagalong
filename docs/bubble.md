@@ -3,7 +3,7 @@
 ## Purpose
 
 `bodies/ui` (`@tagalong/ui`) holds the React components both hosts render: Scout's bubble and
-the cards it hosts, the dock pet, the status marks, Home and the extension's chat panel. It never
+the cards it hosts, the dock pet, the status marks, Home and the chat panel. It never
 imports Electron, opens a socket or calls a Node API. Each host hands it a `HostBridge`, and that
 is all it knows about the outside world.
 
@@ -27,7 +27,7 @@ decides to hand to it.
 | `stop-status.ts`                                                                                      | `stopStatus`: the quiet line for a turn that ended with nothing said                           |
 | `status-mark.tsx`                                                                                     | `StatusMark` (`tag` and `row`)                                                                 |
 | `dock-pet.tsx`, `theme/bean-clip.tsx`                                                                 | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                |
-| `chat-panel.tsx`, `message-list.tsx`, `composer.tsx`, `sight-bar.tsx`                                 | The extension's chat panel                                                                     |
+| `chat-panel.tsx`, `message-list.tsx`, `composer.tsx`, `sight-bar.tsx`                                 | The chat panel (no body uses it now)                                                           |
 | `home/`                                                                                               | `HomeView` and its pages                                                                       |
 | `voice/speakable.ts`, `voice/spoken-stream.ts`                                                        | `toSpeakable`, `mergeShortLines`, `SpokenStream`: what of a line is said                       |
 | `voice/` (the rest)                                                                                   | `SpeechQueue`, `QueueMouth`, `PushToTalk`, `ListenController` (see [voice.md](voice.md))       |
@@ -35,7 +35,7 @@ decides to hand to it.
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home),
-`apps/extension/src/sidepanel/app.tsx` (the chat panel).
+(`ChatPanel` has no host today: the browser body has no chat).
 
 ## How it works
 
@@ -76,7 +76,7 @@ the avatar.
 be used inside a HostBridgeProvider" when none is there, so a wiring mistake fails loudly.
 
 **The fake bridge.** `createFakeHostBridge(options)` (`test-support/fake-host-bridge.ts`) is an
-in-memory `HostBridge` shipped from the package, so the extension's tests use it too. `emit(event)`
+in-memory `HostBridge` shipped from the package, so a body's tests can use it too. `emit(event)`
 delivers an event to every subscriber synchronously, so tests need no timers. `ask` resolves
 `{ turnId: 'turn-<n>' }`, and the fake records what components asked for: `asks`, `interrupts`,
 `captures`, `stoppedWatches`, `confirmedHandoffs`, `approvals`, `answeredAsks`, `copied`,
@@ -216,7 +216,7 @@ hear/see me". "What's wrong with this code" or "are you working?" stay with Scou
 
 On a match, when the bridge has `checkHealth`, the bubble interrupts any running turn and shows
 `HealthCard` instead of asking: no turn, no tool and no model call. `healthRows(facts)` turns
-`HealthFacts` (`brain`, `experts`, `connections`, `voice`, `microphone`, `extension`, each
+`HealthFacts` (`brain`, `experts`, `connections`, `voice`, `microphone`, each
 possibly `'unknown'`) into one row per check, `ok`, `broken`, `info` or `unknown` (`Not
 checked.`); `healthHeadline` counts the broken rows ("Everything’s working.", "Two things need
 you."). The headline is kept as the exchange's answer; nothing is said aloud. A check that fails
@@ -257,8 +257,8 @@ bubble's own window). Its `pre` renderer turns a code element with class `langua
 given. Copy shows "Copied" or "Couldn't copy" for 2 s (`COPIED_MS`). Any other fenced block stays a
 code block with no Copy.
 
-The bubble passes `bridge.copyText` as `onCopy` when the host has it; the extension has none, so
-its drafts have no button. On desktop `copyText` goes to main (`IPC.copyText`), which writes the
+The bubble passes `bridge.copyText` as `onCopy` when the host has it; a host without it gets no
+copy button. On desktop `copyText` goes to main (`IPC.copyText`), which writes the
 clipboard itself because `navigator.clipboard` fails while the panel is unfocused. Main takes only a
 string of at most 20,000 characters, only from the panel window, and never reads the clipboard or
 pastes (see [desktop.md](desktop.md#the-ipc-modules)). The fence also keeps the draft out of
@@ -445,9 +445,9 @@ The nav lists thirteen pages (`HomePage`), the companion's name filling in where
 - **Scout.** Saving a provider change drops `watchModel`, which named the old provider's model.
   "Saved. Scout thinks this way from the next question." or "Not saved. …".
 
-### ChatPanel (the extension's chat)
+### ChatPanel (the chat without a host)
 
-`ChatPanel` (`chat-panel.tsx`) is the Chrome side panel's chat; the desktop never renders it. Props:
+`ChatPanel` (`chat-panel.tsx`) was the Chrome side panel's chat and now has no host; the desktop never renders it. Props:
 `pet` (who answers and whose name labels each answer), `snapshot` (the host's capture),
 `lookTargets` (default `['screenshot', 'activeWindow']`) and `lookLabel`.
 
@@ -557,5 +557,5 @@ never spoken. See [privacy.md](privacy.md).
 | `bodies/desktop/src/renderer/src/dock.test.ts`                                                                                                          | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                                                                                                                                |
 | `home/home-view.test.tsx`                                                                                                                               | twelve pages, the waiting count, Bean in the nav, the overview, Routines kept mounted, the status line, page routing, saving how Scout thinks                                                                                                                                                                                                                                                                                                  |
 | `home/waiting-view.test.tsx`, `home/activity-view.test.tsx` and the other `home/*.test.tsx`                                                             | each page's list, actions, live re-reads, paging, empty and failure states                                                                                                                                                                                                                                                                                                                                                                     |
-| `chat-panel.test.tsx`, `chat-panel-watch.test.tsx`, `message-list.test.tsx`, `composer.test.tsx`, `sight-bar.test.tsx`                                  | the extension chat: sight bar states and Look, streaming and settling, speakers, background turns ignored, conversation continuation, errors, watch chips; the composer's Enter rules; the image token estimate                                                                                                                                                                                                                                |
+| `chat-panel.test.tsx`, `chat-panel-watch.test.tsx`, `message-list.test.tsx`, `composer.test.tsx`, `sight-bar.test.tsx`                                  | the chat panel: sight bar states and Look, streaming and settling, speakers, background turns ignored, conversation continuation, errors, watch chips; the composer's Enter rules; the image token estimate                                                                                                                                                                                                                                    |
 | `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts`                                                                        | the provider and its loud failure, the fake's capture recording, the public surface                                                                                                                                                                                                                                                                                                                                                            |

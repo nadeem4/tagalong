@@ -7,7 +7,7 @@
 web
 
 Rendered with web technology inside an Electron desktop app (Windows 11 today; macOS and Linux
-later) and a Chrome extension side panel. Desktop conventions apply: tray, global hotkeys,
+later) and a Chrome extension that works without a screen of its own. Desktop conventions apply: tray, global hotkeys,
 always-on-top windows, keyboard first.
 
 ## Users
@@ -85,7 +85,8 @@ its result.
   privacy, voice, shortcuts and the browser extension; the tuning knobs (summaries, API keys, the
   ElevenLabs voice, sight detail, watches) sit under Advanced, closed by default, with a short line
   visible and the longer story behind ⓘ.
-- The Chrome extension hands Scout the page and selection from Chrome's side panel.
+- The Chrome extension is a tools-only body, with no display: Scout can see and manage your tabs when
+  you allow it, and you can ask Scout from a right-click on selected text or the address bar.
 
 ## Capabilities and Constraints
 
