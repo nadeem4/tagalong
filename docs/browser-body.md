@@ -40,7 +40,7 @@ The store listing, permission justifications and the public privacy policy are i
 The build (`pnpm --filter @tagalong/browser build`) writes `bodies/browser/dist`: `manifest.json`,
 `service-worker.js`, `page-reader.js`, `popup/popup.html`, `permission/permission.html` and
 `assets/`. That folder is what you load unpacked. The package imports `@tagalong/contract` (the
-`BrainClient`), never `@tagalong/protocol` or `@tagalong/ui`.
+`BrainClient`), never `@tagalong/ui`.
 
 ## How it works
 

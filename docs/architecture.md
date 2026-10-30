@@ -87,12 +87,9 @@ else, because two desktops would fight over the global shortcuts and the setting
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart BT
-  P["packages/protocol<br>zod only"]
-  U["bodies/ui"]
+  U["bodies/ui<br>(incl. @tagalong/ui/shapes)"]
   D["bodies/desktop"]
   X["bodies/browser"]
-  U --> P
-  D --> P
   D --> U
   K["protocol/ts<br>@tagalong/contract"]
   X --> K
@@ -102,15 +99,20 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 (`tsconfig.json` at the root and in each package) and the workspace dependencies in each
 `package.json`.
 
-| Package             | Responsibility                                                                                                                                                                                                      | Must never import                                | Enforced by                                                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | Zod schemas for every message, the method catalog, settings schema and defaults, limits, blind spots, status marks, shared voice and addressing helpers                                                             | `node:*`, `electron`, `react`, any `@tagalong/*` | `eslint.config.js` (block for `packages/protocol/**`); its only dependency is `zod`                                  |
-| `bodies/ui`         | React components the desktop renders: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge                                                                | `electron`, `ws`, `node:*`                       | Dependencies and references only (`protocol`, `react`); browser globals in ESLint. No lint rule names these imports. |
-| `bodies/desktop`    | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings and secret stores (`SafeStorageSecretStore`)                                                                     |                                                  |                                                                                                                      |
-| `bodies/browser`    | Browser body (Chromium MV3): the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, right-click and address-bar asks, permission window, popup; speaks the brain contract through `@tagalong/contract` | `@tagalong/protocol`, `@tagalong/ui`             | Not a dependency and not a project reference                                                                         |
+| Package          | Responsibility                                                                                                                                                                                                      | Must never import                                | Enforced by                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `protocol/ts`    | `@tagalong/contract`: zod schemas for contract v1, the brain-body wire                                                                                                                                              | `node:*`, `electron`, `react`, any `@tagalong/*` | `eslint.config.js` (block for `protocol/ts/**`); its only dependency is `zod`                                       |
+| `bodies/ui`      | React components the desktop renders: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge. Its `shapes` export holds the React-free shared shapes        | `electron`, `ws`, `node:*`                       | `shapes/**` may not import React (ESLint block and `bodies/ui/src/source-guard.test.ts`); browser globals in ESLint |
+| `bodies/desktop` | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings and secret stores (`SafeStorageSecretStore`)                                                                     |                                                  |                                                                                                                     |
+| `bodies/browser` | Browser body (Chromium MV3): the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, right-click and address-bar asks, permission window, popup; speaks the brain contract through `@tagalong/contract` | `@tagalong/ui`                                   | Not a dependency and not a project reference                                                                        |
 
-The protocol's ESLint block replaces the shared purity options for its own files rather than
-adding to them, so for `packages/protocol` the lint list is exactly `electron`, `react`, `node:*`
+`@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process, the
+voice process and the UI share: addressing, apps, context, memory, pet, status marks, turn events
+and voice ids. It has no React, so main can import it. The desktop's own files are
+`bodies/desktop/src/shared/{settings,blind-spots,voice}.ts` and `main/awareness/recall.ts`.
+
+The contract package's ESLint block replaces the shared purity options for its own files rather
+than adding to them, so for `protocol/ts` the lint list is exactly `electron`, `react`, `node:*`
 and `@tagalong/*`.
 
 The desktop bundles the workspace packages into its main, preload and renderer builds with
@@ -188,7 +190,7 @@ flowchart LR
     CA["connected-apps.md"]
   end
   subgraph Foundations
-    PR["protocol.md"]
+    PR["protocol/README.md"]
     SS["settings-and-secrets.md"]
   end
   DK --> BU
@@ -200,16 +202,16 @@ flowchart LR
   DK --> SS
 ```
 
-| Doc                                                | Covers                                                                                 | Main code                                                                                                         |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| [protocol.md](protocol.md)                         | The old wire shapes in `packages/protocol`                                             | `packages/protocol/src`                                                                                           |
-| [brain.md](brain.md)                               | The Python brain: files, tools, asks, experts, memory, the mind                        | `brain/src/brain`                                                                                                 |
-| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file             | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                            |
-| [bubble.md](bubble.md)                             | The companion bubble, status marks, pointing, drafts, drops                            | `bodies/ui/src`                                                                                                   |
-| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `packages/protocol/src/voice.ts` |
-| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, rolling memory                  | `bodies/desktop/src/main/platform`, `main/awareness`                                                              |
-| [memory.md](memory.md)                             | The memory store and the rolling memory                                                | `brain/src/brain/memory.py`, `bodies/desktop/src/main/awareness`                                                  |
-| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `brain/src/brain/apps.py`, `app_tools.py`                                                                         |
-| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                              |
-| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, the secret store, hiding secrets in logs                               | `bodies/desktop/src/main/settings-store.ts`, `secret-store.ts`, `hide-secrets.ts`                                 |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                  |
+| Doc                                                | Covers                                                                                 | Main code                                                                                                        |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [protocol/README.md](../protocol/README.md)        | Contract v1 between the brain and the bodies                                           | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                 |
+| [brain.md](brain.md)                               | The Python brain: files, tools, asks, experts, memory, the mind                        | `brain/src/brain`                                                                                                |
+| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file             | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                           |
+| [bubble.md](bubble.md)                             | The companion bubble, status marks, pointing, drafts, drops                            | `bodies/ui/src`                                                                                                  |
+| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
+| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, rolling memory                  | `bodies/desktop/src/main/platform`, `main/awareness`                                                             |
+| [memory.md](memory.md)                             | The memory store and the rolling memory                                                | `brain/src/brain/memory.py`, `bodies/desktop/src/main/awareness`                                                 |
+| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `brain/src/brain/apps.py`, `app_tools.py`                                                                        |
+| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                             |
+| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, the secret store, hiding secrets in logs                               | `bodies/desktop/src/main/settings-store.ts`, `secret-store.ts`, `hide-secrets.ts`                                |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                 |

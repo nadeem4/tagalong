@@ -3,7 +3,7 @@
 ## Purpose
 
 Settings are the person's choices, kept as one JSON file and validated by one schema in
-`packages/protocol`. The desktop owns the file; the Python brain has no settings of its own. Secrets
+`bodies/desktop/src/shared/settings.ts`. The desktop owns the file; the Python brain has no settings of its own. Secrets
 (the ElevenLabs key) never sit in that file. They sit in the desktop's `SecretStore`, which is
 encrypted with the OS keychain. This doc also covers how secrets are hidden in what the desktop
 writes to disk.
@@ -12,7 +12,7 @@ writes to disk.
 
 | File                                                             | What it holds                                                                                                           |
 | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.ts`                              | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey`                                   |
+| `bodies/desktop/src/shared/settings.ts`                          | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey`                                   |
 | `bodies/desktop/src/main/settings-store.ts`                      | `SettingsStore` (`settings.json`), `SETTINGS_FILENAME`                                                                  |
 | `bodies/desktop/src/main/secret-store.ts`                        | The `SecretStore` interface, `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`), `ELEVENLABS_SECRET_KEY` |
 | `bodies/desktop/src/main/test-support/in-memory-secret-store.ts` | `InMemorySecretStore`, the test fake                                                                                    |
@@ -166,8 +166,8 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 | Constant                              | Value           | File                                        |
 | ------------------------------------- | --------------- | ------------------------------------------- |
-| `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `packages/protocol/src/settings.ts`         |
-| `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `packages/protocol/src/settings.ts`         |
+| `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `bodies/desktop/src/shared/settings.ts`     |
+| `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `bodies/desktop/src/shared/settings.ts`     |
 | `SETTINGS_FILENAME`                   | `settings.json` | `bodies/desktop/src/main/settings-store.ts` |
 | `SECRETS_FILENAME`                    | `secrets.json`  | `bodies/desktop/src/main/secret-store.ts`   |
 | `secrets.json` file mode              | `0o600`         | `bodies/desktop/src/main/secret-store.ts`   |
@@ -211,7 +211,7 @@ The settings file holds no secrets. The key never reaches a renderer, a log line
 
 | Test file                                        | Pins                                                                                    |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.test.ts`         | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values  |
+| `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values  |
 | `bodies/desktop/src/main/settings-store.test.ts` | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing |
 | `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, rolling memory, broadcast), key save and delete       |
 | `bodies/desktop/src/main/secret-store.test.ts`   | Round trip, survives restart, no plain text on disk, refuses with no encryption         |

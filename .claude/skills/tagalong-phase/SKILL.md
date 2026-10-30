@@ -31,8 +31,8 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 2. **Write the failing test first.** No production code without a test that motivated it.
 3. Make it pass. Refactor.
 4. Update `README.md`, the subsystem doc in `docs/` (the index is `docs/README.md`;
-   `docs/architecture.md` for the processes, packages and the life of a turn), `docs/protocol.md`
-   ("How to add a method") for a new method, and any doc the change invalidates. Docs are part of
+   `docs/architecture.md` for the processes, packages and the life of a turn), `protocol/README.md`
+   for a new contract message, and any doc the change invalidates. Docs are part of
    done, not a follow-up.
 5. Commit with a Conventional Commit message scoped to the package
    (`feat(core): add PromptAssembler`, `chore(repo): add eslint flat config`).
@@ -55,7 +55,7 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 
 ## Invariants that outrank convenience
 
-- **The protocol packages are pure.** `packages/protocol` and `protocol/ts` must never import `electron`,
+- **The contract package is pure.** `protocol/ts` depends on zod only and must never import `electron`,
   `react`, or DOM globals. An ESLint `no-restricted-imports` rule enforces it — if that rule
   fires, fix the import, never the rule.
 - **No computer control, ever.** No mouse or keyboard automation anywhere in the repo. The one

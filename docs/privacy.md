@@ -104,7 +104,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
 
 - **The built-in blind spots.** Always on, listed read-only in Settings → Privacy under **Scout never looks
   at**, as chips built from the `BLIND_SPOTS` labels, and kept apart from your own exclusion list so clearing that list never removes them
-  (`BLIND_SPOTS` in `packages/protocol/src/blind-spots.ts`):
+  (`BLIND_SPOTS` in `bodies/desktop/src/shared/blind-spots.ts`):
   - password managers: 1Password, Bitwarden, KeePass, KeePassXC, LastPass, Dashlane, Keeper, Proton
     Pass, Enpass;
   - the Windows sign-in screen, the UAC prompt, Windows Security and Credential Manager;

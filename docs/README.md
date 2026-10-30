@@ -12,7 +12,6 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | Doc                                            | Covers                                                                                                                               |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | [architecture.md](architecture.md)             | Processes, packages and import rules, host contracts, the host transport, the life of one turn, boot and shutdown, the subsystem map |
-| [protocol.md](protocol.md)                     | `packages/protocol`: the JSON-RPC envelope, every method and notification, the main schemas, versioning, adding a method             |
 | [../protocol/README.md](../protocol/README.md) | Contract v1 between the Python brain and the bodies: the rewrite's source of truth                                                   |
 | [brain.md](brain.md)                           | The Python brain: how to run it, its files, hello and tools, the outbox and replay, what is not built yet                            |
 | [principles.md](principles.md)                 | The rules the rewrite follows: one brain and many bodies, what code does versus what the model decides, no technical debt            |
@@ -56,7 +55,7 @@ For an engineer new to the repo:
 
 1. [architecture.md](architecture.md): the processes, the packages and one turn end to end.
 2. [development.md](development.md): get it running locally.
-3. [protocol.md](protocol.md): the contract every host and the brain share.
+3. [../protocol/README.md](../protocol/README.md): the contract every host and the brain share.
 4. [memory.md](memory.md): what happens inside a turn and what is kept.
 5. [sight.md](sight.md) and [privacy.md](privacy.md): what is read from the screen and the rules
    around it.
