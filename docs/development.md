@@ -99,7 +99,7 @@ tagalong/
                                     # (Home's Jobs panel and a job's asks)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
-      src/main/                     # index.ts, brain/ (brain-client.ts, turn-events.ts,
+      src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, welcome.ts, launch.ts,

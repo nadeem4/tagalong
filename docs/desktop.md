@@ -370,7 +370,7 @@ Electron in main, so a page cannot forge it) with that window's `webContents`: `
 
 ### Talking to the brain
 
-`src/main/brain/brain-client.ts` is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
+`BrainClient` (`protocol/ts/src/brain-client.ts`, exported by `@tagalong/contract` and shared with the browser body) is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
 The app uses it for turns and for Home: `onNotification` feeds the mapper's `map`, `onResync` its
 `resync`, and `call(tool, input)` runs a brain tool for Home (see below).
 

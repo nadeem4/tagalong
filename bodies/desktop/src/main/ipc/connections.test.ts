@@ -2,7 +2,7 @@
 
 import { ErrorCode } from '@tagalong/contract';
 import { describe, expect, it } from 'vitest';
-import { BrainOffline, RpcError } from '../brain/brain-client';
+import { BrainOffline, RpcError } from '@tagalong/contract';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
 import { forwardAppsChanged, registerConnectionIpc } from './connections';

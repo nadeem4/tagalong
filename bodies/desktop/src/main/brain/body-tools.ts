@@ -10,7 +10,7 @@ import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
 import { captureNotice } from '../capture-notice';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
-import { RpcError } from './brain-client';
+import { RpcError } from '@tagalong/contract';
 
 const RUN_TIMEOUT_MS = 15_000;
 const LONG_SIDE = 1568;

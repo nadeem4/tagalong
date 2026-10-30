@@ -73,9 +73,9 @@ import { openClaudeSignIn, signInFor } from './claude-sign-in';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
-import type { BrainStatus } from './brain/brain-client';
+import type { BrainStatus } from '@tagalong/contract';
 import { shouldOpenWelcome } from './welcome';
-import type { BrainClient } from './brain/brain-client';
+import type { BrainClient } from '@tagalong/contract';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,

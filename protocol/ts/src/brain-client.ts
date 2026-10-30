@@ -1,20 +1,18 @@
 /**
- * The desktop's end of contract v1: one websocket to the brain, hello first, then say,
- * cancel and the brain's notifications and `use` requests. It owns reconnecting and
- * replay (last_seq); what the notifications mean is the caller's job.
+ * A body's end of contract v1, shared by the desktop and the browser: one websocket to the
+ * brain, hello first, then say, cancel and the brain's notifications and `use` requests.
+ * It owns reconnecting, replay (last_seq) and an optional keepalive; what the notifications
+ * mean is the caller's job. Imports only sibling contract files, so it stays zod-only.
  */
+import { ErrorCode, PROTOCOL, type Body, type Part, type Tool } from './shapes.js';
 import {
   CallResult,
-  ErrorCode,
   HelloResult,
-  PROTOCOL,
   SayResult,
   UseParams,
   brainToBody,
-  type Part,
   type SayParams,
-  type Tool,
-} from '@tagalong/contract';
+} from './messages.js';
 
 export type BrainStatus = 'connecting' | 'online' | 'offline' | 'outdated';
 
@@ -26,9 +24,21 @@ export interface BrainSocket {
   onClose(f: () => void): void;
 }
 
+/** Where a body keeps the last notification seq it saw, so a restart can ask for a replay. */
+export interface SeqStore {
+  load(): Promise<number | null>;
+  save(seq: number): void;
+}
+
 export interface BrainClientOptions {
   /** "host:port" */
   addr: string;
+  /** Who this body is, sent in hello as given; its id prefixes request ids. */
+  body: Body;
+  /** Defaults to memory only, so a new client starts without a last_seq. */
+  seqStore?: SeqStore;
+  /** Calls one of the brain's tools on a timer while online, to keep a sleepy host awake. */
+  keepalive?: { everyMs: number; tool: string };
   /** Body tools, sent in hello. */
   tools: () => Tool[];
   openSocket: (url: string) => BrainSocket;
@@ -49,7 +59,6 @@ export class BrainOffline extends Error {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
-const BODY = { id: 'desktop', kind: 'desktop', name: 'Desktop' };
 
 interface Pending {
   resolve: (result: unknown) => void;
@@ -64,6 +73,8 @@ export class BrainClient {
   private stopped = true;
   private nextId = 1;
   private lastSeq: number | null = null;
+  private seqLoad: Promise<void> | undefined;
+  private keepaliveTimer: ReturnType<typeof setInterval> | undefined;
   private pending = new Map<string, Pending>();
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -153,6 +164,13 @@ export class BrainClient {
   private setStatus(status: BrainStatus): void {
     if (this.status === status) return;
     this.status = status;
+    clearInterval(this.keepaliveTimer);
+    const { keepalive } = this.options;
+    if (status === 'online' && keepalive) {
+      this.keepaliveTimer = setInterval(() => {
+        void this.call(keepalive.tool).catch(() => undefined);
+      }, keepalive.everyMs);
+    }
     this.options.onStatus(status);
   }
 
@@ -161,15 +179,27 @@ export class BrainClient {
     const socket = this.options.openSocket(`ws://${this.options.addr}`);
     this.socket = socket;
     // A superseded socket may still fire late events; they must not touch current state.
-    socket.onOpen(() => this.socket === socket && this.hello());
+    socket.onOpen(() => this.socket === socket && void this.hello(socket));
     socket.onMessage((data) => this.socket === socket && this.receive(data));
     socket.onClose(() => this.socket === socket && this.closed());
   }
 
-  private hello(): void {
+  private async hello(socket: BrainSocket): Promise<void> {
+    // Read the store once per client; without one, hello stays synchronous.
+    const store = this.options.seqStore;
+    if (store) {
+      this.seqLoad ??= store.load().then(
+        (seq) => {
+          this.lastSeq = seq;
+        },
+        () => undefined,
+      );
+      await this.seqLoad;
+      if (this.socket !== socket) return;
+    }
     const params = {
       protocol: PROTOCOL,
-      body: BODY,
+      body: this.options.body,
       tools: this.options.tools(),
       ...(this.lastSeq === null ? {} : { last_seq: this.lastSeq }),
     };
@@ -185,6 +215,7 @@ export class BrainClient {
         if (parsed.data.resync) {
           // The old numbering is gone; continue from the brain's latest.
           this.lastSeq = parsed.data.seq;
+          this.options.seqStore?.save(parsed.data.seq);
           this.options.onResync();
         }
         this.setStatus('online');
@@ -225,7 +256,7 @@ export class BrainClient {
     resolve: (result: unknown) => void,
     reject: (error: Error) => void,
   ): void {
-    const id = `desktop-${this.nextId++}`;
+    const id = `${this.options.body.id}-${this.nextId++}`;
     const timer = setTimeout(() => {
       this.pending.delete(id);
       reject(new Error(`${method} timed out`));
@@ -277,6 +308,7 @@ export class BrainClient {
     const { seq } = parsed.data as { seq: number };
     if (this.lastSeq !== null && seq <= this.lastSeq) return;
     this.lastSeq = seq;
+    this.options.seqStore?.save(seq);
     this.options.onNotification(method, parsed.data);
   }
 

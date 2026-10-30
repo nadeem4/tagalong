@@ -3,13 +3,15 @@
  * cancel and reconnect, all driven by hand so no network or real clock is involved.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Tool } from '@tagalong/contract';
+import type { Tool } from './shapes.js';
 import {
   BrainClient,
   BrainOffline,
   RpcError,
+  type BrainClientOptions,
   type BrainSocket,
   type BrainStatus,
+  type SeqStore,
 } from './brain-client.js';
 
 class FakeSocket implements BrainSocket {
@@ -54,7 +56,9 @@ const helloOk = (id: string, resync = false) => ({
   result: { protocol: 1, session: 's1', tools: [], seq: 0, resync },
 });
 
-function setup(retryMs?: number) {
+const desktop = { id: 'desktop', kind: 'desktop', name: 'Desktop' };
+
+function setup(retryMs?: number, extra: Partial<BrainClientOptions> = {}) {
   const sockets: FakeSocket[] = [];
   const urls: string[] = [];
   const statuses: BrainStatus[] = [];
@@ -63,6 +67,7 @@ function setup(retryMs?: number) {
   const onUse = vi.fn(async () => [{ type: 'text' as const, text: 'ok' }]);
   const client = new BrainClient({
     addr: '127.0.0.1:47321',
+    body: desktop,
     tools: () => tools,
     openSocket: (url) => {
       urls.push(url);
@@ -75,15 +80,17 @@ function setup(retryMs?: number) {
     onResync: () => resyncs.push(1),
     onStatus: (s) => statuses.push(s),
     ...(retryMs === undefined ? {} : { retryMs }),
+    ...extra,
   });
   return { client, sockets, urls, statuses, notes, onUse, resyncs };
 }
 
-async function online(retryMs?: number) {
-  const ctx = setup(retryMs);
+async function online(retryMs?: number, extra: Partial<BrainClientOptions> = {}) {
+  const ctx = setup(retryMs, extra);
   ctx.client.start();
   const s = ctx.sockets[0]!;
   s.opens();
+  await vi.advanceTimersByTimeAsync(0);
   s.receive(helloOk(s.sent[0]!.id));
   await vi.advanceTimersByTimeAsync(0);
   return { ...ctx, s };
@@ -478,6 +485,7 @@ describe('BrainClient', () => {
     const order: string[] = [];
     const c = new BrainClient({
       addr: 'x:1',
+      body: desktop,
       tools: () => tools,
       openSocket: () => {
         const sock = new FakeSocket();
@@ -552,5 +560,113 @@ describe('BrainClient', () => {
     settle([{ type: 'text', text: 'late' }]);
     await vi.advanceTimersByTimeAsync(0);
     expect(s2.sent.filter((m) => m.id === 'b1')).toEqual([]);
+  });
+});
+
+describe('BrainClient as a shared body client', () => {
+  const chrome = { id: 'chrome-7k2f', kind: 'browser', name: 'Chrome' };
+
+  it('hello_sends_the_body_it_was_given', () => {
+    const { client, sockets } = setup(undefined, { body: chrome });
+    client.start();
+    sockets[0]!.opens();
+    expect(sockets[0]!.sent[0]!.params.body).toEqual(chrome);
+  });
+
+  it('request_ids_start_with_the_body_id', () => {
+    const { client, sockets } = setup(undefined, { body: chrome });
+    client.start();
+    sockets[0]!.opens();
+    expect(sockets[0]!.sent[0]!.id).toBe('chrome-7k2f-1');
+  });
+
+  function memoryStore(initial: number | null) {
+    const saved: number[] = [];
+    const store: SeqStore = {
+      load: vi.fn(async () => initial),
+      save: (seq) => void saved.push(seq),
+    };
+    return { store, saved };
+  }
+
+  it('loads_last_seq_from_the_store_before_hello', async () => {
+    const { store } = memoryStore(5);
+    const { client, sockets } = setup(undefined, { seqStore: store });
+    client.start();
+    sockets[0]!.opens();
+    expect(sockets[0]!.sent).toEqual([]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sockets[0]!.sent[0]!.params.last_seq).toBe(5);
+  });
+
+  it('saves_each_new_seq_and_the_resync_seq', async () => {
+    const { store, saved } = memoryStore(null);
+    const { s, sockets } = await online(100, { seqStore: store });
+    s.receive(turn(7));
+    expect(saved).toEqual([7]);
+    s.drop();
+    await vi.advanceTimersByTimeAsync(100);
+    const s2 = sockets[1]!;
+    s2.opens();
+    await vi.advanceTimersByTimeAsync(0);
+    s2.receive({
+      jsonrpc: '2.0',
+      id: s2.sent[0]!.id,
+      result: { protocol: 1, session: 's1', tools: [], seq: 40, resync: true },
+    });
+    expect(saved).toEqual([7, 40]);
+  });
+
+  it('no_load_on_reconnect_keeps_memory_seq', async () => {
+    const { store } = memoryStore(5);
+    const { s, sockets } = await online(100, { seqStore: store });
+    s.receive(turn(9));
+    s.drop();
+    await vi.advanceTimersByTimeAsync(100);
+    const s2 = sockets[1]!;
+    s2.opens();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.load).toHaveBeenCalledTimes(1);
+    expect(s2.sent[0]!.params.last_seq).toBe(9);
+  });
+
+  const keepalive = { everyMs: 20_000, tool: 'spend_today' };
+  const calls = (s: FakeSocket) => s.sent.filter((m) => m.method === 'call');
+
+  it('keepalive_calls_the_tool_every_20s_while_online', async () => {
+    const { client, sockets, s } = await (async () => {
+      const ctx = setup(100, { keepalive });
+      ctx.client.start();
+      const sock = ctx.sockets[0]!;
+      sock.opens();
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(calls(sock)).toEqual([]);
+      sock.receive(helloOk(sock.sent[0]!.id));
+      return { ...ctx, s: sock };
+    })();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls(s)).toHaveLength(1);
+    expect(calls(s)[0]).toMatchObject({ params: { tool: 'spend_today', input: {} } });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls(s)).toHaveLength(2);
+    s.drop();
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(calls(s)).toHaveLength(2);
+    const s2 = sockets[1]!;
+    s2.opens();
+    s2.receive(helloOk(s2.sent[0]!.id));
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(calls(s2)).toHaveLength(1);
+    client.stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(calls(s2)).toHaveLength(1);
+  });
+
+  it('keepalive_failure_is_swallowed', async () => {
+    const { client, s } = await online(undefined, { keepalive });
+    await vi.advanceTimersByTimeAsync(20_000);
+    s.receive({ jsonrpc: '2.0', id: calls(s)[0]!.id, error: { code: -32007, message: 'no' } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.link).toBe('online');
   });
 });
