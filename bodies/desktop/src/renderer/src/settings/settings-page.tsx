@@ -17,6 +17,7 @@ import {
 import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
+import { BrowserSection } from './browser-section';
 import { BudgetSection } from './budget-section';
 import { ElevenLabsSection } from './elevenlabs-section';
 import { KeysSection } from './keys-section';
