@@ -2,6 +2,8 @@
 
 > This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands. Its TypeScript schemas are the `@tagalong/contract` package in `protocol/ts`, its Python types are `brain.protocol` in `brain/src/brain/protocol.py`, and the shared samples are in `protocol/examples`. `packages/protocol` goes away when the bodies switch to the new contract. Contract v1 adds an `approved` notification (sent when Scout approves an ask under a preference) and `changed {what: "approvals"}`; they are not in this page's catalog. The browser body (`bodies/browser`) no longer dials this protocol: it speaks contract v1 to the Python brain ([browser-body.md](browser-body.md)).
 
+In this page, "engine" and "core" mean the brain at the other end of the socket.
+
 ## Purpose
 
 `packages/protocol` is the wire contract between the engine and every host: the JSON-RPC
@@ -68,9 +70,7 @@ result schema:
 `paramsSchemaFor`, `resultSchemaFor` and `notificationParamsSchemaFor` accept only catalogued
 names, so an unknown name is a compile error; `ParamsOf<M>`, `ResultOf<M>` and
 `NotificationParamsOf<N>` give the inferred types. Unless a row says otherwise, a host-to-core
-method is desktop only; the extension may call `ask`, `interrupt` and `pets.list`
-(`EXTENSION_METHODS` in `packages/core/src/server/ws-server.ts`). The handlers are in
-`buildHandlers` in `packages/core/src/engine.ts`.
+method is desktop only; the extension may call `ask`, `interrupt` and `pets.list`.
 
 In the tables, `{}` is an empty object and `?` marks an optional field.
 
@@ -115,8 +115,6 @@ In the tables, `{}` is an empty object and `?` marks an optional field.
 | `asks.answer`  | `id`, `decision: 'approve' \| 'decline'`   | `{ accepted }`                      |
 | `asks.open`    | `id`                                       | `{ opened }`                        |
 
-See [asks.md](asks.md).
-
 ### Home's records
 
 | Method             | Params                                    | Result                                                                   |
@@ -133,7 +131,7 @@ See [asks.md](asks.md).
 | `usage.summary`    | `{}`                                      | `{ today, month: UsageRow[], todayUsd, budget: { dailyUsd, spentOut } }` |
 | `hosts.status`     | `{}`                                      | `{ extension }`: whether a browser extension session is connected        |
 
-See [memory.md](memory.md), [sight.md](sight.md) and [mind.md](mind.md).
+See [memory.md](memory.md) and [sight.md](sight.md).
 
 ### The Self
 
@@ -145,8 +143,6 @@ See [memory.md](memory.md), [sight.md](sight.md) and [mind.md](mind.md).
 | `self.undo`   | `versionId`    | `{ ok, reason? }`                                   |
 | `self.accept` | `versionId`    | `{ ok, reason? }`                                   |
 | `self.reject` | `versionId`    | `{ ok, reason? }`                                   |
-
-See [mind.md](mind.md).
 
 ### Experts and hand-offs
 
@@ -165,8 +161,6 @@ See [mind.md](mind.md).
 | `pickUp.rebrief`   | `itemId`                                                                                     | `{ proposed }`                          |
 | `pickUp.dismiss`   | `{}`                                                                                         | `{ dismissed }`                         |
 
-See [experts.md](experts.md).
-
 ### Check-ins
 
 | Method              | Params                                                                       | Result                                                            |
@@ -176,8 +170,6 @@ See [experts.md](experts.md).
 | `keepAnEye.notNow`  | `{}`                                                                         | `{ quietUntil }`                                                  |
 | `keepAnEye.accept`  | `remarkId`                                                                   | `{ proposed }`                                                    |
 | `wellbeing.observe` | `idleMs`, `windows: WindowEntry[]`                                           | `{}`                                                              |
-
-See [mind.md](mind.md).
 
 ### Connected apps
 
@@ -204,8 +196,6 @@ See [connected-apps.md](connected-apps.md).
 | `routines.dismiss`    | `proposalId`                                              | `{ dismissed }`                |
 | `calendar.setLink`    | `link`: an https URL (at most 2,000 characters) or `null` | `{ linked, meetings, error? }` |
 | `calendar.check`      | `{}`                                                      | `{ linked, meetings, error? }` |
-
-See [routines.md](routines.md).
 
 ### Core to host requests
 
@@ -313,8 +303,7 @@ one), snapshot?: ContextSnapshot, createdAt }`. `MessageContent` is a discrimina
 | `tool_result` | `toolUseId`, `content` (string), `isError?`    |
 
 `Conversation` is `{ id, petId, title (default null), createdAt }`. The block shape is
-provider-neutral: the store and every provider read and write the same thing. Storage is in
-[storage.md](storage.md).
+provider-neutral: the store and every provider read and write the same thing.
 
 ## Constants and limits
 
@@ -351,7 +340,7 @@ provider-neutral: the store and every provider read and write the same thing. St
 
 The `Settings` schema, `SETTINGS_DEFAULTS` and `SettingsPatch` are in `src/settings.ts`. A patch
 is built from the validators without defaults, so parsing one never invents values; everything
-omitted keeps its current value. The engine's `SettingsStore` (`packages/core/src/settings/settings.ts`)
+omitted keeps its current value. The desktop's `SettingsStore` (`bodies/desktop/src/main/settings-store.ts`)
 keeps them in `settings.json` in the data folder. Secrets are never in settings: they live in the
 host's `SecretStore`. Both are described in [settings-and-secrets.md](settings-and-secrets.md).
 
@@ -366,29 +355,19 @@ host's `SecretStore`. Both are described in [settings-and-secrets.md](settings-a
    `src/methods.test.ts`; the "covers the table exactly" test fails until both lists agree.
    (`CORE_TO_HOST` only checks that its names exist.) Add schema tests beside the others.
 4. **Version.** Bump `PROTOCOL_VERSION` in `src/index.ts`.
-5. **Engine.**
-   - Host-to-core: add the handler in `buildHandlers` (`packages/core/src/engine.ts`).
-     `MethodHandlers` makes every handler optional, so a missing one compiles and answers
-     `-32601` "not wired up". Throw `RpcFailure` for a refusal the host should show.
-   - Core-to-host: add a method to `HostSession` and `SessionImpl` in `server/ws-server.ts`
-     that sends the request and parses the result, and add a `HostCapability` if hosts must opt in.
-   - Notification: emit through `live.server?.broadcast(...)` or `session.notify(...)`.
-6. **Extension.** Only if the side panel needs it, add the name to `EXTENSION_METHODS` and update
-   the scoping tests in `packages/core/src/server/ws-server.test.ts`.
-7. **Hosts.** The desktop calls through `EngineClient.call` from an IPC handler in
-   `bodies/desktop/src/main/ipc/`, exposed by the preload; a core-to-host request is answered in
-   `EngineClient`'s `#answer` (and `service-worker.ts` for the extension). A notification the UI
+5. **Brain.** The Python brain answers the method or sends the notification (see [brain.md](brain.md)).
+6. **Hosts.** The desktop calls through `BrainClient.call` from an IPC handler in
+   `bodies/desktop/src/main/ipc/`, exposed by the preload. A notification the UI
    renders joins `TurnNotification` in `bodies/ui/src/host-bridge.ts` (every `turn.*` joins
    automatically).
-8. **Docs.** Add the row to the tables above and to the subsystem doc that owns it.
+7. **Docs.** Add the row to the tables above and to the subsystem doc that owns it.
 
 ## Tests that pin it
 
-| Test                                                                                          | Pins                                                                                                      |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/methods.test.ts`                                                       | The exact host-to-core and notification lists; each method's params and result shapes                     |
-| `packages/protocol/src/methods.types.test-d.ts`                                               | Unknown method names and notification-as-method lookups fail `pnpm typecheck`                             |
-| `packages/protocol/src/rpc.test.ts`                                                           | The envelopes, including "exactly one of result or error"                                                 |
-| `packages/protocol/src/context.test.ts`, `pet.test.ts`, `message.test.ts`, `settings.test.ts` | The main schemas and their caps and defaults                                                              |
-| `packages/protocol/src/index.test.ts`                                                         | `PROTOCOL_VERSION` is semver; the loopback URL                                                            |
-| `packages/core/src/server/ws-server.test.ts`                                                  | Pairing, hello deadline and size cap, extension scoping, every error code, core-to-host result validation |
+| Test                                                                                          | Pins                                                                                  |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `packages/protocol/src/methods.test.ts`                                                       | The exact host-to-core and notification lists; each method's params and result shapes |
+| `packages/protocol/src/methods.types.test-d.ts`                                               | Unknown method names and notification-as-method lookups fail `pnpm typecheck`         |
+| `packages/protocol/src/rpc.test.ts`                                                           | The envelopes, including "exactly one of result or error"                             |
+| `packages/protocol/src/context.test.ts`, `pet.test.ts`, `message.test.ts`, `settings.test.ts` | The main schemas and their caps and defaults                                          |
+| `packages/protocol/src/index.test.ts`                                                         | `PROTOCOL_VERSION` is semver; the loopback URL                                        |

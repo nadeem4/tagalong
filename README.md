@@ -76,7 +76,7 @@ preferences, starting with "Always ask me before risky actions". After you have 
 kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
 preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
 under that preference, then tells you which one. Anything unclear still comes to you. Home's
-**Approvals** page shows all of it. See [docs/asks.md](docs/asks.md).
+**Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
 
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
@@ -90,97 +90,14 @@ gets it first and answers from what it knows, or passes it to you. See [docs/bra
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the browser
 body.
 
-## Use the engine in your own app
+## Build your own body
 
-`packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and the
-old desktop app ran on it. It holds:
-
-- the companion, Scout, and the role it works as;
-- the conversation runner, which assembles each prompt, calls the model and runs tools;
-- memory: conversations, long-term memories and summaries, in SQLite;
-- providers: Claude Code sign-in, Anthropic, OpenRouter and any OpenAI-compatible service;
-- experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
-  confirm;
-- connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
-  change waits for Allow once;
-- routines, and a local WebSocket server that speaks the JSON-RPC protocol defined in
-  `packages/protocol` (zod schemas).
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  desktop["Desktop app (Electron)"] -->|"JSON-RPC over ws://127.0.0.1"| engine["Engine (packages/core)"]
-  yours["Your app"] -->|"JSON-RPC over ws://127.0.0.1"| engine
-  engine --> models["Model providers"]
-  engine --> experts["Experts (Claude Code)"]
-  engine --> apps["Your apps (MCP)"]
-```
-
-`@tagalong/core` and `@tagalong/protocol` are **not published to npm yet**. Both are marked
-`"private": true`. Today you use them from this repo: add your app as a package in the pnpm
-workspace, depend on them with `"workspace:*"`, and run `pnpm build` so their `dist/` exists.
-
-This boots an engine, connects to it as a host, and asks Scout one question.
-`TAGALONG_FAKE_PROVIDERS=1` gives scripted answers, so it runs without a key or the network; leave
-it out to use Scout's real provider.
-
-```ts
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Engine, InMemorySecretStore, SCOUT } from '@tagalong/core';
-import { engineUrl } from '@tagalong/protocol';
-
-const engine = await Engine.boot({
-  dataDir: mkdtempSync(join(tmpdir(), 'tagalong-')), // database, settings and pairing token
-  secretStore: new InMemorySecretStore(), // the desktop app uses the OS keychain instead
-  engineVersion: '0.0.0',
-  port: 0, // let the OS pick; the default is 47321
-  env: { TAGALONG_FAKE_PROVIDERS: '1' },
-});
-
-const socket = new WebSocket(engineUrl(engine.port));
-await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }));
-
-let nextId = 1;
-const pending = new Map<string, (result: unknown) => void>();
-const call = (method: string, params: unknown) =>
-  new Promise((resolve) => {
-    const id = String(nextId++);
-    pending.set(id, resolve);
-    socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
-  });
-
-const answered = new Promise<void>((resolve) => {
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(String(event.data));
-    if (message.id !== undefined && message.method === undefined) {
-      pending.get(message.id)?.(message.result);
-    }
-    if (message.method === 'turn.delta') process.stdout.write(message.params.text);
-    if (message.method === 'turn.completed') resolve();
-  });
-});
-
-await call('hello', {
-  host: 'desktop',
-  version: '0.0.0',
-  capabilities: [], // what your host can read for Scout, such as 'selection' or 'screenshot'
-  token: engine.pairingToken,
-});
-await call('ask', { petId: SCOUT.id, input: { text: 'Hello, Scout' } });
-await answered;
-
-socket.close();
-await engine.shutdown();
-```
-
-A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
-The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's client for the Python brain is `BrainClient` in `protocol/ts/src/brain-client.ts` (shared by the bodies); the
-desktop no longer boots the engine. Read
-[Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
-[How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
+A body is anything that shows Scout and can read what you are looking at. The Python brain listens
+on a local WebSocket and speaks contract v1, written down in [protocol/README.md](protocol/README.md),
+with sample frames in `protocol/examples`. `@tagalong/contract` (`protocol/ts`) holds the zod schemas
+and `BrainClient`, the client both shipped bodies use. It is **not published to npm**: depend on it
+from this repo with `"workspace:*"`. Read [Architecture](docs/architecture.md) for how the brain and
+its bodies fit together.
 
 ## What is in this build
 
@@ -471,7 +388,7 @@ screenshot is attached.
   says are sent to ElevenLabs, never your screen or your questions.
 - When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
   it and is never stored; only the text goes to Scout's provider, like a typed question.
-- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs. (The old TypeScript core kept API keys in the OS keychain.)
+- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
@@ -480,7 +397,6 @@ screenshot is attached.
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
   the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and
   progress and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
-  The OS keychain applies only to the old TypeScript core.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 

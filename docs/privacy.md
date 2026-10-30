@@ -3,11 +3,9 @@
 What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
 How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions, the
 sight log, rolling memory), [voice.md](voice.md) (microphone and speech),
-[mind.md](mind.md) (prompts, check-ins, the Self and sleep), [memory.md](memory.md),
-[experts.md](experts.md), [asks.md](asks.md), [connected-apps.md](connected-apps.md),
-[routines.md](routines.md), [browser-body.md](browser-body.md),
-[settings-and-secrets.md](settings-and-secrets.md) and [storage.md](storage.md) (every table and
-its retention).
+[memory.md](memory.md), [brain.md](brain.md) (the Python brain's prompts, asks and
+experts), [connected-apps.md](connected-apps.md), [browser-body.md](browser-body.md) and
+[settings-and-secrets.md](settings-and-secrets.md).
 
 ## What is captured, and when
 

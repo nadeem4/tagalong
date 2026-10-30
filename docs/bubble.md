@@ -160,7 +160,7 @@ The bubble keeps each one's state from its notification:
 | `DropCard`             | the `drop` prop     | Explain (asks "Explain this." or the person's words), Hand it to an expert (asks "Hand this to an expert: … (path)"), both with `drop: true`; Cancel                                                                                                                                                                                                                                                                                                                                                                                                                           | a button; a new drop reopens it                                                                              |
 | `ConnectorConfirmCard` | `connector.confirm` | Allow once / Always allow / Deny (`approveTool(approvalId, 'once' \| 'always' \| 'deny')`). Always allow shows only when the event's `options` include `always` (a locked tool has none); an event without `options` (the old brain) gets Allow once and Deny. A brain ask (it has `options`) leads with Scout's own words and shows the tool name, never "Change in <app>"; its text shows whole. Open asks queue oldest first and the card shows the head, so several asks at once each get their turn. A click that does not get through (brain offline) leaves the card up | an answer that got through; its turn ending; `connector.dismiss` for it; `asks.changed` no longer listing it |
 
-Asks are in [asks.md](asks.md).
+Asks are described in [brain.md](brain.md).
 
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
 a remark or a brain status mark (there is no launch line any more). It fades after `holdMs` (7,000 ms
@@ -371,7 +371,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   bridge without `listApprovals` (an old body) renders nothing. `e2e/approvals.spec.ts` covers it on
   the fake brain.
 - **Jobs.** `JobsPanel` (`home/jobs-panel.tsx`) lists the jobs Scout handed to Claude Code, each with
-  Stop while it runs; see [experts.md](experts.md).
+  Stop while it runs; see [brain.md](brain.md#experts).
 
 ## Interfaces
 

@@ -54,7 +54,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     if (patch.hotkeys !== undefined) deps.applyHotkeys(saved);
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
     if (patch.rollingMemory !== undefined) deps.configureRolling(saved.rollingMemory);
-    // An open panel reads its keys, microphone and the user's name from here, not a restart.
+    // An open panel reads its keys and microphone from here, not a restart.
     deps.broadcast(saved);
     return Promise.resolve(saved);
   };

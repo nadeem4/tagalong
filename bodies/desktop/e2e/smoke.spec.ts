@@ -490,7 +490,9 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
   expect(pets.map((pet) => pet.id)).toEqual(['scout']);
-  await expect(home.getByRole('region', { name: 'Scout' })).toContainText('Thinks with');
+  await expect(home.getByRole('region', { name: 'Scout' })).toContainText(
+    'Never at its blind spots.',
+  );
 
   // Bean, still, in the nav tile: its strip loads past Home's CSP.
   const navBean = nav.locator('.home-nav__tile [data-testid=bean-clip]');

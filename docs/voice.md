@@ -2,14 +2,11 @@
 
 ## Purpose
 
-The desktop no longer boots `packages/core`, so the engine-side parts of voice (pointing, keep-an-eye
-check-ins) are not wired to the Python brain yet.
-
 How Scout hears and speaks. This covers the talk key, the mic button, Always listening, the
 follow-up window, barge-in, and the speech models in the voice utility process. On the speaking
 side it covers Kokoro, ElevenLabs and the system voice. Speech to text runs on this computer. The
-configured brain still answers: a heard question goes to the engine as an ordinary ask with
-`spoken: true` (see `mind.md`).
+configured brain still answers: a heard question goes to the brain as an ordinary ask with
+`spoken: true`.
 
 ## Where it lives
 
@@ -501,7 +498,7 @@ transcript.
   while the pets are hidden and the mark on Scout is always in sight while the mic is open.
 - **The guard.** While listening is on, `startListeningGuard` lists the windows every
   `LISTENING_GUARD_MS` (2,000 ms). It also checks at once when listening comes on, at launch or
-  when switched on. `listeningBlocked` is `callOrFullScreenInFront` from `@tagalong/core`: it is the
+  when switched on. `listeningBlocked` is `callOrFullScreenInFront` in `main/front-window.ts`: it is the
   front window that counts, so a Teams window in front blocks even without a call. A failed listing
   keeps the last answer. When listening is switched off, the guard forgets its answer and unblocks.
   Each pause logs one line naming the kind of window and its process, never its title, for
@@ -700,16 +697,11 @@ process exits. In the voice process:
   default. Its `rate` is the preview speed, or 1. While it speaks, the level is held at 0.5 and
   `onSystemVoice(true)` fires. `getVoices()` is called once at load so the list is ready.
 
-### How core learns a turn was spoken
+### How the brain learns a turn was spoken
 
 `CompanionBubble.submit(text, context, asSpoken = true)` sends
-`ask { ..., spoken: true }` (`AskParams.spoken` in `packages/protocol/src/methods.ts`). In
-`packages/core/src/conversation/runner.ts` the turn's Now facts become
-`{ kind: 'asked', spoken: true }`, and `turn.started` carries `spoken: true`. `renderNow` adds
-`SPOKEN_LINE` to that turn's `## Now` block: "Spoken: they said this out loud. Speech
-recognition may have misheard a word." The system prompt does not change. The experience log
-records the trigger as `voice` (`memory/experience.ts`). A typed turn never gets the line. See
-`mind.md`.
+`ask { ..., spoken: true }` (`spoken` in the ask params of contract v1). A typed turn never carries it.
+The Python brain accepts the field and does not act on it yet.
 
 ## Interfaces
 

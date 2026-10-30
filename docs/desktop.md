@@ -5,7 +5,7 @@
 `bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
 (contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
 global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
-brain directly. The desktop no longer boots the TypeScript engine (`packages/core`); start the brain
+brain directly. The desktop does not run a brain of its own; start the brain
 yourself with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
@@ -523,7 +523,7 @@ Review rule for call sites: never put speech, screen or file text in a warning's
 - **main**: two entries, `main` (`src/main/index.ts`) and `voice-worker`
   (`src/main/voice/worker/main.ts`), to `dist/main.js` and `dist/voice-worker.js`, ES modules.
   `externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })` keeps the app's `dependencies`
-  external and bundles `@tagalong/core`, `@tagalong/protocol` and `@tagalong/ui`. They compile with
+  external and bundles `@tagalong/protocol` and `@tagalong/ui`. They compile with
   `moduleResolution: bundler`, so their emitted relative imports have no file extension and Node's
   ESM loader could not resolve them at runtime; Rollup resolves them at build time instead.
   `rollupOptions.external: NATIVE_DEPS` keeps the native modules out of the bundle even when a
