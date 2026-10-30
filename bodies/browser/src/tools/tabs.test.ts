@@ -54,13 +54,19 @@ function setup(
       if (opts.denySite && need.kind === 'site') throw opts.denySite;
     },
   };
-  const t = tabsTool({ tabs, page, needs, bodyName: 'Chrome' });
+  const capture = vi.fn(
+    async (_windowId: number): Promise<{ mime: 'image/jpeg'; base64: string }> => ({
+      mime: 'image/jpeg',
+      base64: 'AAAA',
+    }),
+  );
+  const t = tabsTool({ tabs, page, picture: { capture }, needs, bodyName: 'Chrome' });
   const text = async (input: Record<string, unknown>) => {
     const parts = await t.run(input);
     expect(parts).toHaveLength(1);
     return (parts[0] as { text: string }).text;
   };
-  return { t, calls, read, text };
+  return { t, calls, read, capture, text };
 }
 
 const rejection = (p: Promise<unknown>): Promise<RpcError> =>
@@ -200,6 +206,57 @@ describe('tabs read', () => {
     expect(e.code).toBe(ErrorCode.tool_failed);
     expect(e.message).toMatch(/could not read/i);
     expect(e.message).toContain('Cannot access contents of the page');
+  });
+});
+
+describe('tabs picture', () => {
+  it('picture_returns_one_image_part', async () => {
+    const { t, capture } = setup({ tabs: [tab({ id: 5, windowId: 3 })] });
+    expect(await t.run({ action: 'picture' })).toEqual([
+      { type: 'image', mime: 'image/jpeg', data: 'AAAA' },
+    ]);
+    expect(capture).toHaveBeenCalledWith(3);
+  });
+
+  it('picture_of_a_background_tab_fails_and_never_switches_tabs', async () => {
+    const { t, capture } = setup({
+      tabs: [tab({ id: 5 }), tab({ id: 6, active: false })],
+    });
+    const e = await rejection(t.run({ action: 'picture', tab_id: 6 }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/only the tab in front/i);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_asks_tabs_then_the_site', async () => {
+    const { t, calls } = setup();
+    await t.run({ action: 'picture' });
+    expect(calls).toEqual([
+      { kind: 'permission', name: 'tabs' },
+      { kind: 'site', origin: 'https://example.com' },
+    ]);
+  });
+
+  it('picture_of_a_sleeping_or_locked_tab_fails_like_read', async () => {
+    const asleep = setup({ tabs: [tab({ discarded: true })] });
+    const a = await rejection(asleep.t.run({ action: 'picture' }));
+    expect(a.code).toBe(ErrorCode.tool_failed);
+    expect(a.message).toMatch(/asleep/);
+    const locked = setup({ tabs: [tab({ url: 'chrome://settings' })] });
+    const l = await rejection(locked.t.run({ action: 'picture' }));
+    expect(l.code).toBe(ErrorCode.tool_failed);
+    expect(l.message).toMatch(/browser/i);
+    expect(asleep.capture).not.toHaveBeenCalled();
+    expect(locked.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_failure_from_the_browser_is_tool_failed_with_a_plain_reason', async () => {
+    const { t, capture } = setup();
+    capture.mockRejectedValueOnce(new Error('Cannot capture this window'));
+    const e = await rejection(t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/could not take a picture/i);
+    expect(e.message).toContain('Cannot capture this window');
   });
 });
 

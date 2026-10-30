@@ -5,7 +5,7 @@
  */
 import { BrainClient, type BrainSocket, type BrainStatus } from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
-import type { PageApi, StorageArea, TabsApi } from './layer/api';
+import type { PageApi, PictureApi, StorageArea, TabsApi } from './layer/api';
 import { readSettings } from './settings';
 import { toolset } from './tools/registry';
 import type { PermissionBroker } from './permissions';
@@ -26,6 +26,7 @@ export interface BodyDeps {
   userAgent: string;
   tabs: TabsApi;
   page: PageApi;
+  picture: PictureApi;
   broker: PermissionBroker;
   /** Makes the id's 4 random chars; tests pin it. */
   random?: () => string;
@@ -55,7 +56,13 @@ export function createBody(deps: BodyDeps): BrowserBody {
     const settings = await readSettings(deps.storage);
     name = settings.name ?? browserName(kind);
     const set = toolset([
-      tabsTool({ tabs: deps.tabs, page: deps.page, needs: deps.broker, bodyName: name }),
+      tabsTool({
+        tabs: deps.tabs,
+        page: deps.page,
+        picture: deps.picture,
+        needs: deps.broker,
+        bodyName: name,
+      }),
     ]);
     client = new BrainClient({
       addr: settings.addr,

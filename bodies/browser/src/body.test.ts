@@ -32,6 +32,7 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       activeInFocusedWindow: () => Promise.resolve(null),
     },
     page: { read: () => Promise.reject(new Error('unused')) },
+    picture: { capture: () => Promise.reject(new Error('unused')) },
     broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
     random: () => 'ab12',
     openSocket: (url) => {

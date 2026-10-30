@@ -25,6 +25,11 @@ export interface TabsApi {
   activeInFocusedWindow(): Promise<TabInfo | null>;
 }
 
+export interface PictureApi {
+  /** A JPEG of what the given window is showing in its front tab. */
+  capture(windowId: number): Promise<{ mime: 'image/jpeg'; base64: string }>;
+}
+
 export interface PageApi {
   /** Injects the page reader into the tab and returns what it read. */
   read(tabId: number): Promise<PageReading>;

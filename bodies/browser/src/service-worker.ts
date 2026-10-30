@@ -7,6 +7,7 @@ import { createBody } from './body';
 import {
   chromePage,
   chromePermissions,
+  chromePicture,
   chromePrompt,
   chromeSession,
   chromeStorage,
@@ -33,6 +34,7 @@ const body = createBody({
   userAgent: navigator.userAgent,
   tabs: chromeTabs,
   page: chromePage,
+  picture: chromePicture,
   broker: new PermissionBroker(chromePermissions, chromePrompt),
   openSocket: webSocket,
 });

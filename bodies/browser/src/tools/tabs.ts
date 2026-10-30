@@ -1,11 +1,12 @@
 /**
- * The `tabs` tool: list the open tabs, or read the page in one. Reading asks for the tabs
- * permission and then the site, in that order (sharing one wait), and never wakes a sleeping tab or touches a
+ * The `tabs` tool: list the open tabs, read the page in one, or picture the one in front.
+ * Reading asks for the tabs permission and then the site, in that order (sharing one wait), and
+ * never wakes a sleeping tab or touches a
  * page Chrome keeps locked.
  */
 import type { Part } from '@tagalong/contract';
 import { MAX_PAGE_TEXT_CHARS } from '../content/limits';
-import type { PageApi, TabInfo, TabsApi } from '../layer/api';
+import type { PageApi, PictureApi, TabInfo, TabsApi } from '../layer/api';
 import { FILE_ORIGIN, PERMISSION_WAIT_MS, type Need } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 
@@ -18,6 +19,7 @@ export interface Needs {
 export interface TabsDeps {
   tabs: TabsApi;
   page: PageApi;
+  picture: PictureApi;
   needs: Needs;
   bodyName: string;
 }
@@ -51,7 +53,7 @@ function siteOrigin(url: string): string {
 }
 
 export function tabsTool(deps: TabsDeps): BrowserTool {
-  const { tabs, page, needs, bodyName } = deps;
+  const { tabs, page, picture: pictureApi, needs, bodyName } = deps;
 
   async function list(): Promise<Part[]> {
     await needs.ensure({ kind: 'permission', name: 'tabs' }, 'see which tabs are open');
@@ -78,11 +80,8 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     return found;
   }
 
-  async function read(tabId: unknown): Promise<Part[]> {
-    // One deadline for the whole read, so two questions never outlast the brain's own timeout.
-    const deadline = Date.now() + PERMISSION_WAIT_MS;
-    await needs.ensure({ kind: 'permission', name: 'tabs' }, 'read a tab', PERMISSION_WAIT_MS);
-    const tab = await pick(tabId);
+  /** Refuses a sleeping or locked tab; shared by read and picture. */
+  function refuseUnreadable(tab: TabInfo): void {
     if (tab.discarded) {
       throw failed(
         'That tab is asleep, and Scout will not wake it. Ask the user to open it first.',
@@ -90,11 +89,47 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     }
     const locked = lockedReason(tab.url);
     if (locked !== null) throw failed(`I cannot read that tab: ${locked}.`);
-    await needs.ensure(
+  }
+
+  function askSite(tab: TabInfo, deadline: number): Promise<void> {
+    return needs.ensure(
       { kind: 'site', origin: siteOrigin(tab.url) },
       `read ${tab.title || tab.url}`,
       Math.max(0, deadline - Date.now()),
     );
+  }
+
+  async function picture(tabId: unknown): Promise<Part[]> {
+    const deadline = Date.now() + PERMISSION_WAIT_MS;
+    await needs.ensure(
+      { kind: 'permission', name: 'tabs' },
+      'take a picture of a tab',
+      PERMISSION_WAIT_MS,
+    );
+    const tab = await pick(tabId);
+    refuseUnreadable(tab);
+    if (!tab.active) {
+      throw failed(
+        'Only the tab in front can be pictured, and Scout will not switch tabs. Ask the user to open it first.',
+      );
+    }
+    await askSite(tab, deadline);
+    try {
+      const shot = await pictureApi.capture(tab.windowId);
+      return [{ type: 'image', mime: shot.mime, data: shot.base64 }];
+    } catch (e) {
+      const why = e instanceof Error ? e.message : String(e);
+      throw failed(`I could not take a picture of that tab: ${why}`);
+    }
+  }
+
+  async function read(tabId: unknown): Promise<Part[]> {
+    // One deadline for the whole read, so two questions never outlast the brain's own timeout.
+    const deadline = Date.now() + PERMISSION_WAIT_MS;
+    await needs.ensure({ kind: 'permission', name: 'tabs' }, 'read a tab', PERMISSION_WAIT_MS);
+    const tab = await pick(tabId);
+    refuseUnreadable(tab);
+    await askSite(tab, deadline);
     let reading;
     try {
       reading = await page.read(tab.id);
@@ -114,13 +149,14 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     tool: {
       name: 'tabs',
       description:
-        'See the browser tabs the user has open, or read the text of one. Use action "list" to ' +
-        'find a tab, and action "read" to get the page text and any selection; leave tab_id out ' +
-        `to read the tab the user is looking at. This is the ${bodyName} browser.`,
+        'See the browser tabs the user has open, or read one. Use action "list" to find a tab, ' +
+        'and action "read" to get the page text and any selection; prefer "read". Use "picture" ' +
+        'only when the layout matters and text is not enough; it shows only the tab in front. ' +
+        `Leave tab_id out to use the tab the user is looking at. This is the ${bodyName} browser.`,
       input_schema: {
         type: 'object',
         properties: {
-          action: { type: 'string', enum: ['list', 'read'] },
+          action: { type: 'string', enum: ['list', 'read', 'picture'] },
           tab_id: { type: 'number', description: 'A tab id from list. Default: the active tab.' },
         },
         required: ['action'],
@@ -130,7 +166,8 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     async run(input) {
       if (input['action'] === 'list') return list();
       if (input['action'] === 'read') return read(input['tab_id']);
-      throw invalid('action must be "list" or "read"');
+      if (input['action'] === 'picture') return picture(input['tab_id']);
+      throw invalid('action must be "list", "read" or "picture"');
     },
   };
 }

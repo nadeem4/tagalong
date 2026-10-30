@@ -12,7 +12,7 @@ import {
   type PermissionsApi,
 } from '../permissions';
 import type { BrainSocket } from '@tagalong/contract';
-import type { PageApi, StorageArea, TabInfo, TabsApi } from './api';
+import type { PageApi, PictureApi, StorageArea, TabInfo, TabsApi } from './api';
 
 function area(store: chrome.storage.StorageArea): StorageArea {
   return {
@@ -88,6 +88,13 @@ export const chromePage: PageApi = {
       throw new Error('the page reader did not run in this tab');
     }
     return reading;
+  },
+};
+
+export const chromePicture: PictureApi = {
+  async capture(windowId) {
+    const url = await chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 70 });
+    return { mime: 'image/jpeg', base64: url.slice(url.indexOf(',') + 1) };
   },
 };
 
