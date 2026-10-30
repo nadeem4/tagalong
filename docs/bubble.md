@@ -163,7 +163,7 @@ The bubble keeps each one's state from its notification:
 Asks are described in [brain.md](brain.md).
 
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
-a remark or a brain status mark (there is no launch line any more). It fades after `holdMs` (7,000 ms
+a remark or a brain status mark. It fades after `holdMs` (7,000 ms
 by default, 12,000 for remarks) with a 300 ms fade (`LEAVE_MS`); pointing at it or
 focusing it holds it. Clicking the text opens the bubble (`onOpen`); × closes it (`onDone`).
 Optional `onNotNow` adds **Not now**, and

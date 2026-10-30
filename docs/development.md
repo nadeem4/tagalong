@@ -324,10 +324,10 @@ conversations are the brain's, saved in its own store (see [memory.md](memory.md
 
 ### Rolling memory
 
-Rolling memory's switch and its minutes are in Settings → **Privacy** (**Remember the last few minutes of the
-screen**) and take effect on save. It is off by default. Turn it on and the desktop keeps the last few
-minutes of every screen in memory, never on disk (ten by default, at most thirty). A small red dot on
-Scout shows while it records.
+Rolling memory's switch and its minutes are in Settings → **Privacy** (**Remember the last few
+minutes of the screen**, **Minutes of screen to remember**) and take effect on save. It is off by
+default. Turn it on and the desktop keeps the last few minutes of every screen in memory, never on
+disk (ten by default, at most thirty). A small red dot on Scout shows while it records.
 
 Capture is never silent. Every capture, including one Scout's own tool asked for, shows on Scout
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the

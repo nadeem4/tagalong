@@ -286,8 +286,7 @@ the bubble's settings card. After `SettingsStore` saves, it:
 - broadcasts the saved settings on `IPC.settingsChangedEvent`, which open windows apply at once
   (the panel reads its talk key and microphone from it).
 
-The settings that are read when used rather than at boot (exclusions, the window text budget,
-sight detail) are covered in [sight.md](sight.md); the settings store itself, the chat allowlist
+The exclusions are read when used rather than at boot and are covered in [sight.md](sight.md); the settings store itself, the chat allowlist
 and the settings card's checks are in [settings-and-secrets.md](settings-and-secrets.md).
 
 ### The IPC modules

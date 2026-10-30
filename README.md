@@ -157,12 +157,7 @@ _delivered_, and the expert carries on in the same session with your note (or th
 finished first). The expert's key moments, such as "Found the bug in `date.ts`", show on the
 card and are not said aloud.
 
-**Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
-without taking the keyboard: a build that failed and why, say. It follows window titles only, reads
-one window when you settle on it or its title reads like trouble, and most of the time says
-nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
-the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
-**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, its hello, a
+**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, a
 line it says on its own, a routine's result and its line about an expert that finished. Scout
 decides what to say: everything it writes is spoken, typed question or spoken, except what it
 puts in a block (a draft, code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
@@ -327,11 +322,6 @@ small picture of each screen every five seconds, in memory only, for the last te
 on Scout shows while it records. Ask "what was on screen a few minutes ago?" or "what changed?" and
 Scout looks back through it.
 
-**Watches.** Ask "tell me when the build finishes" and Scout watches for it, says in one line what it
-is watching, and tells you when it happens. A watch stops on its own when it fires or gives up (30
-minutes by default). A routine **When a watch fires** runs then too. Scout can also zoom in on small
-text and look at your other monitor ("what's on my other screen?"). Blind spots still apply.
-
 **Point, don't click.** Ask "where's the export button?" and Scout tells you, and a soft ring with a
 short label shows around it for a few seconds (`Esc` puts it away). Scout never moves the mouse,
 clicks or types.
@@ -354,13 +344,13 @@ screenshot is attached.
 
 ## Privacy
 
-- Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
-  you turn on, and keeping an eye on things (below). Every look badges Scout and the tray says what
+- Nothing on screen is read until you press a hotkey or ask, except screen memory, which
+  you turn on. Every look badges Scout and the tray says what
   was read and when.
 - **Check-ins.** Now and then, when nobody asked, Scout asks its own model once whether
   anything is worth saying, and most of the time says nothing. Each such call carries what the
   moment is about plus what Scout recalls for it (your preferences, its newest and matching
-  memories, up to two matching jobs of its own), your name, the time, what experts are doing and
+  memories, up to two matching jobs of its own), the time, what experts are doing and
   your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
   unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
   once the daily budget is spent.
@@ -376,7 +366,7 @@ screenshot is attached.
   Desktop. They are always on and listed in Settings; you can add your own.
 - Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
   leaves your computer, and Claude Code is told not to open secret files.
-- Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
+- Screenshots are not written to disk. Screen memory lives in memory only and are thrown
   away when you pause sight or quit.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.

@@ -331,9 +331,8 @@ provider-neutral: the store and every provider read and write the same thing.
 - A host ignores a notification name it does not know (`EngineClient`, `EngineConnection`), so
   adding a notification never breaks an older host.
 - Stored data is read with the same leniency: a `Pet` saved with since-removed fields still
-  parses, and `Settings` drops retired keys through `preprocess` steps (`withoutRetiredTalkKey`,
-  `withoutRetiredBaseUrls`, `withoutRetiredSummarizer`) and fills missing ones from
-  `SETTINGS_DEFAULTS`.
+  parses, and `Settings` drops retired keys, turns a retired talk key into the default through
+  `withoutRetiredTalkKey`, and fills missing ones from `SETTINGS_DEFAULTS`.
 - The workspace packages are private and versioned `0.0.0`; nothing is published to a registry.
 
 ## Where settings live
