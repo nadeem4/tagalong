@@ -156,6 +156,14 @@ class Bodies:
     def online_ids(self) -> list[str]:
         return list(self._online)
 
+    def display_ids(self) -> list[str]:
+        # Bodies that can show a turn or an ask; a body with display=false shows nothing.
+        return [i for i, o in self._online.items() if o.body.display is not False]
+
+    def body(self, body_id: str) -> Body | None:
+        current = self._online.get(body_id)
+        return current.body if current is not None else None
+
     def is_online(self, body_id: str) -> bool:
         return body_id in self._online
 

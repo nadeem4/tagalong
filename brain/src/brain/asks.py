@@ -36,7 +36,7 @@ class Asks:
         self._open: dict[str, _Open] = {}
 
     def anyone_online(self) -> bool:
-        return bool(self._bodies.online_ids())
+        return bool(self._bodies.display_ids())  # a body that shows nothing cannot be asked
 
     async def permission(self, call: Call, spec_name: str, locked: bool) -> str:
         if not self.anyone_online():

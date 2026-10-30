@@ -135,6 +135,7 @@ class Body(Model):
     id: Annotated[str, Field(pattern=r"^[a-z0-9-]{1,32}$")]
     kind: str
     name: str
+    display: bool | None = None  # false: shows nothing; omitted or true: shows turns and asks
 
 
 class EmptyResult(Model):
