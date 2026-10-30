@@ -560,8 +560,7 @@ window `findCaptureBlock` refuses is stored as null with the app kept. Migration
 `sight_log_fts` index over `title` and `app`, kept in step by triggers, which history search reads
 (see [memory.md](memory.md), [storage.md](storage.md)).
 
-**Retention and delete.** `sightLog.days` (default `SIGHT_LOG_DEFAULT_DAYS` = 7, 1 to 30; Settings
-→ Privacy → **Keep the record of what Scout saw**; talk may only lower it). `prune()` runs on every
+**Retention and delete.** `sightLog.days` (default `SIGHT_LOG_DEFAULT_DAYS` = 7, 1 to 30; Settings has no control for it now; talk may only lower it). `prune()` runs on every
 insert and once at engine boot. RPC (`packages/protocol/src/sight-log.ts`):
 
 | Method            | Params                     | Result                      |
@@ -612,11 +611,8 @@ crops, 640 for memory frames, 1024 for a watch's after-crop. With `sightDetail: 
 full-view snapshot carries two images (composite and focused display) however many monitors there
 are; `all` carries the composite plus one per display.
 
-`estimateImageTokens` (`bodies/ui/src/sight-bar.tsx`) sums width × height ÷ 750 over the
-screenshot, the composite and each display image and shows `~N image tokens` in the `SightBar`.
-`SightBar` is part of `ChatPanel`, which no body renders now (the Chrome side panel is gone); the desktop
-bubble shows chips for the window, the selection and a screenshot, with no estimate. What a turn
-actually costs is recorded by the usage meter (see [mind.md](mind.md)).
+The desktop bubble shows chips for the window, the selection and a screenshot, with no token
+estimate. What a turn actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 
 ## Interfaces
 
@@ -770,5 +766,4 @@ sight, pointing and drops. Points that follow from this design:
 | Sight-log rows per method, no content, titles scrubbed or dropped                                                                            | `packages/core/src/perception/record-sight.test.ts`, `packages/core/src/memory/sight-log.test.ts`                   |
 | `notKept` marker in episodes and bundles                                                                                                     | `packages/core/src/memory/experience.test.ts`, `packages/core/src/check-in/bundle.test.ts`, `check-in.test.ts`      |
 | Screenshot retention                                                                                                                         | `packages/core/src/perception/retention.test.ts`                                                                    |
-| Image token estimate                                                                                                                         | `bodies/ui/src/sight-bar.test.tsx`                                                                                  |
 | Real downscaled PNG, sight pause and sight settings end to end                                                                               | `bodies/desktop/e2e/smoke.spec.ts`                                                                                  |

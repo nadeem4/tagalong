@@ -189,7 +189,7 @@ Tests use `InMemorySecretStore`.
 
 | Key                                                     | Holds                                            | Written by                                                              | Read by                                                  |
 | ------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------- |
-| `anthropic.apiKey`, `openrouter.apiKey` (`SECRET_KEYS`) | A brain's API key                                | Desktop `IPC.saveApiKey`                                                | `KeyedProviderResolver.refresh`, `listModels`            |
+| `anthropic.apiKey`, `openrouter.apiKey` (`SECRET_KEYS`) | A brain's API key                                | Desktop `IPC.saveApiKey`                                                | `KeyedProviderResolver.refresh`                          |
 | `elevenlabs.apiKey` (`ELEVENLABS_SECRET_KEY`)           | The ElevenLabs voice key                         | Desktop `IPC.saveApiKey` (`elevenlabs`)                                 | Desktop main only (the engine never reads it)            |
 | `calendar.ics` (`CALENDAR_SECRET`)                      | The private calendar link                        | `calendar.setLink` (https only, at most 2,000 characters, null deletes) | `CalendarFeed`                                           |
 | `connection.<id>.token`, `connection.<id>.env.<NAME>`   | A pasted app token, a local command's env values | `connections.add` (`secrets`)                                           | `ConnectionManager` when it connects                     |
@@ -234,8 +234,8 @@ invent an entry). An empty key deletes the stored one.
 
 Nothing sends a key back to a renderer. `IPC.hostView` returns `providers` with `hasKey` booleans
 (`storedKeys`) and `elevenLabsKeyStored`, never a value. The renderer does not receive the
-`envVar` name either. `checkKey` asks the engine's `providers.check`, which tests the stored key with
-one guarded (not recorded) call and answers `{ ok, message }`.
+`envVar` name either. The engine's `providers.check` tests a stored key with one guarded (not recorded) call and
+answers `{ ok, message }`; the desktop no longer calls it.
 
 In the engine, `KeyedProviderResolver.refresh` re-reads every `SECRET_KEYS` entry at boot, before
 every `ask`, and before `providers.check`, so a key saved a moment ago answers the next question

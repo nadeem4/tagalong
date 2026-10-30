@@ -34,7 +34,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
-| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                   |
+| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
 | `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
 | `electron.vite.config.ts`                  | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
 | `electron-builder.json`                    | The installer                                                                                                                                                               |
@@ -197,7 +197,7 @@ Rules each module enforces:
 | Click on the pet (`IPC.openBubble`, `IPC.togglePanel` when hidden)        | `showPanelBeside`                                                     |
 | Second launch (`showPets`)                                                | `showPanelBeside`                                                     |
 | `connector.confirm`                                                       | `showPanelBeside` (via `bringUpBubble(true)`)                         |
-| Launch line or brain status (`greetOnLaunch`), `pet.remark`               | `showPanelQuietly`                                                    |
+| `pet.remark`                                                              | `showPanelQuietly`                                                    |
 | Talk key held (`talkPressed`)                                             | `showPanelQuietly`                                                    |
 | Words addressed to Scout from Always listening (`forwardEars` `onSpoken`) | `showPanelQuietly`, only when the pet is visible and the panel hidden |
 
@@ -466,12 +466,12 @@ data over the channels in `shared/ipc.ts`:
   (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](bubble.md#the-health-check)).
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
   the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys,
-  Home, the panel's placement and fit, the avatar's drag, the greeting, remark and routine lines,
+  Home, the panel's placement and fit, the avatar's drag, remark lines,
   voice and ears, Always listening, drops, the health facts and status marks.
 
 Each `on…` returns an unsubscribe function. `heldUntilHeard` (`preload/held.ts`) keeps the last
 value that arrived with no listener and hands it to the first one, for three events main may send
-before React subscribes: `greetLineEvent`, `homePageEvent` and `routineDraftEvent`. `micFrame`
+before React subscribes: Home's page (`homePageEvent`). `micFrame`
 uses `ipcRenderer.send` (no answer). `dropOnPet` turns each `File` into its path with
 `webUtils.getPathForFile` (`File.path` is gone in Electron 44; `webUtils` is available to a
 sandboxed preload) and drops an empty path.
@@ -661,15 +661,13 @@ the clean close and stops the brain client.
 - **A hotkey cannot be registered.** Reported, never fatal (see
   [The hotkey-problem path](#global-hotkeys)). The key hook failing to start reports the talk key
   the same way.
-- **A window not ready.** `showRemark`, `showPickUp`, `greetOnLaunch` and `editRoutine` wait for
-  `did-finish-load` when the target page is still loading; the preload holds the greeting, Home's
-  page and the routine draft until a listener subscribes.
+- **A window not ready.** `showRemark` waits for `did-finish-load` when the panel is still
+  loading; the preload holds Home's page until a listener subscribes.
 - **Logging fails.** Swallowed; the console still has the line.
 - **Unsupported OS.** `createPlatform` throws, `start` rejects, and the app shows the error and
   quits.
 - **Refused inputs.** `openSettings` throws for an
-  unknown Fix it target; `openPickUp` throws for an item the current pick-up did not name;
-  `copyText`, `applySettings` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
+  unknown Fix it target; `copyText` and `dropOnPet` throw for the wrong sender; `dragAvatar` and
   `fitPanel` ignore non-finite numbers.
 
 ## Privacy notes
@@ -692,7 +690,6 @@ when a button on its card asks. See [privacy.md](privacy.md).
 | `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
 | `src/main/ipc/*.test.ts`                                                                   | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
 | `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
-| `e2e/launch-greeting.spec.ts`                                                              | the brain mark with Fix it, the clean close record, the mind's launch line, the pick-up card                                                                                                                                                  |
 | `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                          |
 | `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                              |
 | `src/main/platform/index.test.ts`                                                          | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                            |

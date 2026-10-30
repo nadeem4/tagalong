@@ -54,10 +54,6 @@ used from the next question, with no restart.
 **The default for this guide: the Claude sign-in.** Install Claude Code, run `claude` once and sign
 in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Sonnet.
 
-**OpenRouter + Claude.** Get a key at <https://openrouter.ai/keys>, paste it in Home → Settings →
-Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
-and **Model** to a Claude id (for example `anthropic/claude-sonnet-5`). Save.
-
 **Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
 (`bodies/desktop/e2e/fixtures/fake-brain.ts`) and point the desktop at it. Scout streams a
 scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine.
@@ -66,14 +62,6 @@ scripted answer, hand-offs go to a scripted expert, and nothing leaves the machi
 time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwards).
 
 ## Scout's brain
-
-### H1. A key and the live model list
-
-1. **Setup:** an OpenRouter key.
-2. **Action:** Home → Settings → Advanced → API keys → OpenRouter → **Add key**, paste, Save. Open
-   Home's **Scout** page and pick OpenRouter.
-3. **Expected:** the key row says **Key stored**. The **Model** list holds OpenRouter's live models
-   (hundreds of ids), not a handful of built-in ones.
 
 ### H2. Text
 
@@ -102,20 +90,10 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 _Only on a data folder from a build before Nebius was removed._
 
 1. **Setup:** a `tagalong.db`, `settings.json` and `secrets.json` from a build where Scout thought
-   on Token Factory (`providerId: 'nebius'`), with summaries on it too and some spend recorded.
+   on Token Factory (`providerId: 'nebius'`), and some spend recorded.
 2. **Action:** launch the app, open Home, then ask Scout a question.
-3. **Expected:** Scout thinks with **Your Claude sign-in** on Haiku and answers. Settings shows
-   summaries on each pet's own brain. The Spend card still lists the old rows, as "Scout · nebius".
+3. **Expected:** Scout thinks with **Your Claude sign-in** on Haiku and answers. The Spend card still lists the old rows, as "Scout · nebius".
    `secrets.json` has no `nebius.apiKey` entry after the launch.
-
-### H6. Edge cases
-
-1. **Setup:** Home → Settings → Advanced → API keys.
-2. **Action:** (a) type `openrouter.ai` in OpenRouter's base URL box and Save; (b) blank it and Save;
-   (c) **Remove key** on OpenRouter with Scout on it, then ask.
-3. **Expected:** (a) refused with a message naming the service; (b) back to the default; (c) the
-   answer is the error "No OpenRouter API key is stored. Add one in Settings." and the app keeps
-   running.
 
 ### H.7. "Scout, what's wrong?"
 
@@ -600,9 +578,8 @@ _Fake brain:_ both steps are scripted experts.
 1. **Setup:** Claude Code installed and signed in (`claude auth status` says `"loggedIn": true`);
    Scout on the Claude sign-in with Haiku.
 2. **Action:** open Home → Settings.
-3. **Expected:** the first card reads **Your Claude sign-in · Haiku** with a **Signed in** chip (a
-   tick and the words). **Change it on the Scout page** opens Home's Scout page. Move Scout to
-   OpenRouter there and come back: the card reads **OpenRouter · <model>** with **Key stored**.
+3. **Expected:** the first card reads **Your Claude sign-in** with a **Signed in** chip (a tick and
+   the words). It has no model picker: the brain's model and key are set in its `.env`.
 
 ### S.2. Signed out, and Check again
 
@@ -618,14 +595,6 @@ _Fake brain:_ both steps are scripted experts.
 2. **Action:** open Settings.
 3. **Expected:** the brain card says Claude Code is not installed, with a **Check again** button.
    There is no service picker: the brain's model and key are set in the brain's `.env`.
-
-### S.4. API keys: add, replace, remove
-
-1. **Setup:** Settings → **Advanced** (closed until you open it).
-2. **Action:** **Add key** on OpenRouter, paste a key, Save. Then **Remove key** on it.
-3. **Expected:** after Save the row says **Key stored** and offers **Replace key**. **Remove key**
-   says "OpenRouter key removed." and the row goes back to **No key**. There is no row for the
-   Claude sign-in.
 
 ### S.5. A refused value inside Advanced opens Advanced
 
@@ -1682,15 +1651,6 @@ meeting with someone else 15 to 20 minutes from now.
 3. **Expected:** one `summary` row describing the topic, and **16** summarised messages. A
    follow-up that depends on the start of the conversation is still answered correctly.
 
-### M.3. Choose a different summarizer
-
-1. **Setup:** an OpenRouter key stored, Claude Code installed and signed in.
-2. **Action:** Home → Settings → **Advanced** → **Summaries** → **Summarize with**.
-3. **Expected:** the list starts with **Same as Scout (default)**, then a Claude sign-in group with
-   Haiku and Sonnet (no Opus), then OpenRouter's live models. Services with no key are not listed.
-   Pick one and Save; reopen Settings: the choice is still selected. Pick **Same as Scout** and Save
-   to go back.
-
 ## Screen memory
 
 SM.1 to SM.3 check the recording itself; SM.4 checks that Scout uses it, watches, and sees your other
@@ -1768,30 +1728,6 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
    cannot see that window. No ring.
 8. **Action:** turn on Windows' **Animation effects: Off** and ask again. **Expected:** the ring
    appears and disappears without a pulse or a fade.
-
-## Pick up where you left off
-
-### PU.1. Back the next morning, the mind may offer what you were in
-
-1. **Setup:** Settings → Privacy → **Pick up where you left off** is On. Open a git project in VS
-   Code with a file in front. Ask Scout something that ends in a hand-off card and close the card
-   without pressing Send. Leave Tagalong running for at least 15 minutes, then quit it.
-2. **Action:** to skip the six-hour wait, close Tagalong and, in `%APPDATA%\Tagalong\tagalong.db`
-   (any SQLite tool), set `taken_at` in the `pick_up` row to seven hours ago. Start Tagalong.
-   **Expected:** within about 15 s, usually one line beside Scout in the mind's own words (never
-   the old handwritten "Yesterday you were in ai_pet on …") with **Pick up** and **Not now**, or
-   nothing at all (the snapshot is then spent). With the "Fix it" line, or the hello switched off,
-   the pick-up goes to the next ten-minute look instead, once only.
-3. **Action:** press **Pick up**. **Expected:** the bubble shows a card with one row per item.
-   Nothing has opened yet.
-4. **Action:** press **Open in VS Code**. **Expected:** VS Code opens that folder with its own
-   open files, and the button says **Opened**. Nothing is typed or clicked for you.
-5. **Action:** press **Brief again**. **Expected:** the normal hand-off card with the old ask.
-   Nothing runs until you press Send.
-6. **Action:** repeat step 2 and press **Not now**. Restart again. **Expected:** no pick-up card.
-   The pick-up is used once.
-7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
-   pick-up is ever offered. A password manager or `.env` window in front is never named.
 
 ## How Scout decided
 
@@ -1918,15 +1854,12 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 2. **Action:** press `Ctrl+Shift+Alt+P` and ask "what's on my screen?". **Expected:** no new
    **Screenshot** or **Read text** row while paused.
 
-### WS.4. Delete one, delete all, and the days kept
+### WS.4. Delete one, delete all
 
 1. **Action:** press × on one row. **Expected:** only that row goes.
 2. **Action:** press **Delete all**, then **Keep them**. **Expected:** nothing goes. Press **Delete
    all**, then **Delete all for good**. **Expected:** the empty state; your conversations and
    Activity are untouched.
-3. **Action:** Home → Settings → Privacy → **Keep the record of what Scout saw**: type 31 and Save.
-   **Expected:** Settings refuses it and says 1 to 30 days. Type 3, Save, and reopen What Scout saw.
-   **Expected:** "Kept 3 days."
 
 ## Draft it for me
 
@@ -1963,8 +1896,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 
 ### SP.2. The cap stops Scout for the day
 
-1. **Setup:** start the brain with `TAGALONG_DAILY_BUDGET_USD=0.01`; the **Settings → Daily budget**
-   box does not change the brain's limit.
+1. **Setup:** start the brain with `TAGALONG_DAILY_BUDGET_USD=0.01`.
 2. **Action:** ask Scout questions until today's spend passes $0.01. **Expected:** the Spend card
    says "Today's $0.01 is spent; Scout pauses until midnight." (the brain counts the day by the
    machine's local date). The next question ends at once with the reason `over_budget`.

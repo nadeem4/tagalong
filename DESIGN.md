@@ -360,7 +360,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Page title** (Onest 600, 20px): each Home page's heading.
 - **Companion name** (Pixelify 700, 18px, 0.5px): Scout's name in Home's nav; the chat header uses the same face at 16px.
 - **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
-- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("EXPERTS", "RECENT").
+- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("JOBS", "SPEND").
 - **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
 - **Title** (Onest 600, 14px): buttons, nav items, headlines.
 - **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
@@ -413,7 +413,6 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 - **Ask:** chips for what Scout can see (Avatar Tile pills, Soft Text, each with a 24px round remove button), then the field: Field Navy, a 1px Sky border, 44px, 14px text, with a 12px Shell Muted label. Gold **primary** (36px, 8px radius, 600) and **quiet** buttons (28px, 6px radius, 1px Field Line border, Soft Text 12px). A 28px close button (Shell Muted, Avatar Tile on hover).
 - **Answer:** Markdown at 14px/1.5, up to 260px then scrolling; code on Avatar Tile, code blocks on Field Navy, tables with Field Line borders, links in Sky (shown as text with the address on hover). Errors are a Navy Error box.
 - **Full chat:** the bubble at full height with a Sidebar Navy header (Scout's name in Pixelify 16px), a scrolling log (your messages right-aligned on Avatar Tile) and a footer with the field, both behind Shell Line hairlines.
-- **Invitation:** one line typed in at 22ms a character, held at full height so the bubble does not grow, with Try it now and Got it (no Next, no step dots).
 - **Launch line:** one short line in a compact bubble (10px 8px 10px 14px padding) that fades out over 300ms. When Scout cannot think it shows the status row instead of words, with **Fix it**.
 - **Status marks:** neutral words, never Scout speaking. On Scout, a 1-2 word pill at the bottom centre, just above the corner dots (Onest 600 11px, 2px 7px, full radius; Warn Fill on Warn Ink for problems, `#6B7290` on Text for the rest), its sentence as the tooltip. In the bubble, a 12px `role="status"` row above the question box (`#F2D48A` for problems, Muted Text otherwise) with a quiet **Fix it** when there is a fix. No animation.
 - **Dock listening dot (Always listening):** the 8px green dot at Scout's bottom right, solid while on, outlined while paused, a lighter green (`#B8F5B9`) quick pulse (0.6s, to 1.35x) while speech is heard, and a 2px green ring outside its white ring during the follow-up window. Its tooltip names the state. Reduced motion stops the pulse.
@@ -421,13 +420,13 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 
 ### Cards in the bubble
 
-The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column, 72px for the routine card; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Send** for a hand-off, **Allow once** for a connector change, **Save** (or Pause, Turn on, Delete) for a routine. While an expert works, a Gold dot leads "Claude Code is on it" and its steps list in mono, the newest in Frost Text. Long details scroll inside 160px and take keyboard focus.
+The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Allow once** for a connector change or a permission ask, with Always allow and Deny beside it. Long details scroll inside 160px and take keyboard focus.
 
 ### Home
 
 - **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Jobs, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
-- **Experts and Connections:** rows between Panel Line hairlines with status chips and switches.
+- **Jobs and Connections:** rows between Panel Line hairlines with status chips and switches.
 
 ### Settings controls
 

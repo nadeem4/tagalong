@@ -363,36 +363,24 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
   and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
-  - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
-    locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
-    and saving moves Scout to it.
+  - **How Scout thinks**: whether Scout's brain can think, and whether your Claude Code sign-in
+    works (checked locally with `claude auth status`). The brain reads its own key from its `.env`.
   - **You**: what Scout calls you. Empty means no name.
-  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, how many
-    days the record of what Scout saw is kept, and what Scout never looks at.
+  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, wellbeing, screen memory
+    and what Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.
-  - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
-    the ElevenLabs voice (your key and a voice ID from your ElevenLabs library), sight detail,
-    screen memory and watches.
+  - **Advanced**, closed by default: the ElevenLabs voice (your key and a voice ID from your
+    ElevenLabs library), sight detail and watches.
 
 ## Providers and keys
 
-Scout runs on one provider and one model. Keys are entered in **Settings → Advanced →
-API keys** (old TypeScript core: encrypted with the OS keychain; the Python brain reads `ANTHROPIC_API_KEY` from its environment or `.env`), and only ever sent to the provider they belong to.
-
-| Setup                   | Where to get the key                                                                                                       | Model ids                                                                                                                                                                        |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code sign-in** | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. Scout thinks through `claude -p`.              | `haiku`, `sonnet`, `opus`.                                                                                                                                                       |
-| **OpenRouter + Claude** | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live. |
-| **Anthropic**           | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                          |
-
-If Scout answers "model not found", open Settings and pick the id from the live list next to the
-model box: it is the authority.
-
-Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
-URL in the base URL box, store its key there, and pick its model under **Settings → How Scout thinks**.
+Scout thinks through the Python brain. It reads `ANTHROPIC_API_KEY` from its environment or its
+`.env` file, or runs on your Claude Code sign-in (nothing to paste). Keys never pass through the
+desktop, except the ElevenLabs voice key under **Settings → Advanced**, kept in the OS keychain
+and sent only to ElevenLabs.
 
 ## The browser body
 
@@ -474,11 +462,6 @@ screenshot is attached.
 - **Scout's face** comes from the mind in a check-in (a wince, a cheer, tired), never from a title
   alone; it dozes after five minutes with no input or when the screen locks (one idle time number
   from the OS, kept on this computer).
-- **Pick up where you left off** is on by default: Scout keeps one note, from window titles only,
-  of the projects open in your editor and the hand-offs left half done. Back after six hours or
-  more, the mind may say one line about it with a Pick up card, or nothing, once; nothing opens
-  until you click on the card. Turn it off
-  under **Settings → Privacy → Pick up where you left off**, which also deletes the note.
 - **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, after an hour
   and a half with no break, or late at night, Scout checks in once with how long you have been at
   it and the window in front: it may say a line, offer a write-up by your expert, look tired, or
@@ -515,25 +498,24 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 ## Troubleshooting
 
-| Problem                                                        | What to do                                                                                                                                      |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scout shows **Signed out**, **No brain** or **No key**         | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
-| Scout says "No … API key is stored"                            | Paste that provider's key in Settings. It works on the next question.                                                                           |
-| Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
-| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) under **Settings → How Scout thinks**.                         |
-| A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
-| Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
-| Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
-| Scout shows **Mic busy**, **No mic** or **Can't listen**       | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself. |
-| With Always listening on, Scout doesn't react                  | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.  |
-| The first spoken question takes a while                        | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                         |
-| Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
-| The browser popup says Scout's brain is not reachable          | Start the brain (`cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself.                   |
-| "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
-| Sending logs with a problem report                             | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
-| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                  |
-| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.             |
-| It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |
+| Problem                                                  | What to do                                                                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
+| Scout says it has no API key                             | Put `ANTHROPIC_API_KEY` in the brain's `.env` file and restart the brain.                                                                       |
+| Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                |
+| A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
+| Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
+| Talk to Scout says it could not open the microphone      | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
+| Scout shows **Mic busy**, **No mic** or **Can't listen** | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself. |
+| With Always listening on, Scout doesn't react            | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.  |
+| The first spoken question takes a while                  | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                         |
+| Scout's voice changes after the first answers            | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
+| The browser popup says Scout's brain is not reachable    | Start the brain (`cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself.                   |
+| "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
+| Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
+| You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                  |
+| From source, a look always captures the whole screen     | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.             |
+| It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                  |
 
 # For developers
 

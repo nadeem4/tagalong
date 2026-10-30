@@ -697,8 +697,8 @@ waits for the others.
 
 ## Pick up where you left off
 
-On by default; switch it off under Settings → Privacy → **Pick up where you left off**. Off means no
-snapshot at all, and switching it off deletes the one kept.
+Part of the old TypeScript brain, with no switch in Settings now (the desktop's Pick up control is
+gone, and the Python brain does not do this).
 
 - **What it holds:** one row in `tagalong.db` (table `pick_up`), on this computer, overwritten
   every ten minutes while the app runs. From window titles only: up to three projects open in an
@@ -845,7 +845,7 @@ there is no switch, because it holds no content and an off switch would weaken t
   window titles keeping an eye on things follows every five seconds. Voice: audio never leaves the computer and is never stored, so there is no "heard"
   row; what you say to Scout becomes a question, and its text reaching the provider is a **Sent to
   AI** row.
-- **Kept 7 days** by default, 1 to 30 in **Settings → Privacy → Keep the record of what Scout saw**.
+- **Kept 7 days** (the old brain's `sightLog.days`, 1 to 30; Settings has no control for it now).
   Older rows are deleted as new ones are written and when Tagalong starts.
 - **Deleting.** Each row has a delete button; **Delete all** asks first. Deleting removes the record,
   not what was already sent, and does not touch your conversations.

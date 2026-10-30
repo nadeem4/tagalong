@@ -140,7 +140,6 @@ matching ask reaches you.
 | `packages/core/src/engine.ts`                    | Builds `Asks`, calls `boot` and `prune`, the `asks.*` and `tool.approve` handlers, `closeHeld` on shutdown                            |
 | `packages/core/src/tools/builtin/connections.ts` | Holds an app change through `deps.confirm` (`Asks.hold`); see [connected-apps.md](connected-apps.md)                                  |
 | `packages/core/src/experts/handoffs.ts`          | Adds a hand-off card (`Asks.add`), settles it on Send, Dismiss or a gone expert; see [experts.md](experts.md)                         |
-| `bodies/ui/src/home/home-view.tsx`               | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
 | `bodies/ui/src/connector-confirm.tsx`            | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
 
 ## How it works
@@ -249,8 +248,7 @@ Nothing is resumed after a restart.
 
 ### Home's Waiting on you
 
-Removed with the old TypeScript brain: Home has no Waiting on you page and the bubble no longer
-watches `asks.changed`. The Python brain's permission asks are answered on their cards in the bubble and
+Home has no Waiting on you page and the bubble does not watch `asks.changed`. The Python brain's permission asks are answered on their cards in the bubble and
 listed in Home's Approvals page.
 
 ## Interfaces

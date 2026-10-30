@@ -16,8 +16,8 @@
 Scout, the companion on screen, never does long work itself. It writes a brief and hands it to an
 **expert**, a back-office worker reached through a **connector**. The only connector that ships is
 Claude Code. Scout can also start background **jobs** of its own and read one **task board** over
-everything in flight. **Pick up where you left off** offers the projects and unsent briefs from the
-last session after a long break.
+everything in flight. **Pick up where you left off** (old brain only, no Settings switch now) offers the projects and
+unsent briefs from the last session after a long break.
 
 ## Where it lives
 

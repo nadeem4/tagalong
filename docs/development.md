@@ -77,7 +77,7 @@ tagalong/
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
-      dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
+      dock-pet.tsx, companion-bubble.tsx
       connector-confirm.tsx, drop-card.tsx,
       health-card.tsx, status-mark.tsx, answer.tsx
       home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
@@ -93,7 +93,7 @@ tagalong/
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       scripts/start-fresh.mjs       # runs the app on a new temp data folder
-      e2e/                          # smoke, brain-offline, launch-greeting, hotkey-recovery, listening
+      e2e/                          # smoke, brain-offline, hotkey-recovery, listening
                                     # (Always listening), asks, permissions and jobs.spec.ts
                                     # (Home's Jobs panel and a job's asks)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
@@ -131,7 +131,7 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
-| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
+| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context.                                                                              |
 | `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.                                   |
 | `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                                                  |
 
@@ -281,8 +281,7 @@ runs somewhere.
 
 The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds the Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Home),
-`launch-greeting.spec.ts`
-(the launch across launches on one profile), `hotkey-recovery.spec.ts`
+`hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
 that starts with "Scout" is heard and answered, switched off), plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
 test:e2e`.
@@ -295,7 +294,7 @@ its address as `TAGALONG_BRAIN_ADDR`.
 `brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
 `test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
-the feature back): the tool-call round trip and `launch-greeting.spec.ts`.
+the feature back): the tool-call round trip.
 A quit that does not finish in 45 s is
 killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
 cannot hold the single-instance lock or the data folder. When an e2e suite
@@ -594,9 +593,6 @@ together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
 
 Gaps that are real in the code on `main`, each explained in the doc it links to.
 
-- **No Tailwind build.** `@tagalong/ui`'s chat parts (`ChatPanel`, `MessageList`, `Composer`,
-  `SightBar`) use Tailwind utility classes, but the desktop does not ship Tailwind; `app.css`
-  hand-writes the structure instead. See [bubble.md](bubble.md).
 - **No Fast Refresh in dev.** The renderer uses Vite's esbuild JSX transform, not
   `@vitejs/plugin-react`. See [desktop.md](desktop.md#bundling-the-workspace-packages).
 - **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app
