@@ -1,7 +1,7 @@
 /**
- * Welcome's ears: listening all the time without the name, so every turn is an answer.
- * Contains setupEars, micFailure and the SetupListening state. Used by welcome.tsx;
- * micFailure is shared with talk-rules.ts.
+ * Ears that listen all the time without the name, so every turn is an answer. Contains
+ * setupEars, micFailure and the SetupListening state. micFailure is shared with talk-rules.ts;
+ * setupEars has no caller since Welcome went.
  */
 import { ListenController } from '@tagalong/ui';
 import type { ListenMic } from '@tagalong/ui';

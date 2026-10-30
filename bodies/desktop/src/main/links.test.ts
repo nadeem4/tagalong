@@ -13,7 +13,7 @@ describe('isAllowedLink', () => {
     expect(isAllowedLink('https://tokenfactory.nebius.com/')).toBe(false);
   });
 
-  it('opens the exact pages Welcome links to for installing a coding agent, and no others there', () => {
+  it('opens the exact pages that link to installing a coding agent, and no others there', () => {
     expect(isAllowedLink('https://claude.com/claude-code')).toBe(true);
     expect(isAllowedLink('https://github.com/google-gemini/gemini-cli')).toBe(true);
     expect(isAllowedLink('https://github.com/openai/codex')).toBe(true);

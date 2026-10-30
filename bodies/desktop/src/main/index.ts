@@ -1,6 +1,6 @@
 /**
  * The desktop app's main process: dials the brain, makes the windows (Scout, its bubble,
- * Home, Welcome), the tray and the hotkeys, and wires every IPC channel.
+ * Home), the tray and the hotkeys, and wires every IPC channel.
  * Handlers that need only the brain, settings or voice live in `ipc/`; the ones here need
  * Electron itself: they move windows, read the screen or open things through the shell.
  */
@@ -74,7 +74,6 @@ import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
 import type { BrainStatus } from './brain/brain-client';
-import { shouldOpenWelcome } from './welcome';
 import type { BrainClient } from './brain/brain-client';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
@@ -101,7 +100,6 @@ import {
 } from './windows/panel';
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
-import { createWelcomeWindow } from './windows/welcome';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { registerAskIpc } from './ipc/asks';
 import { forwardAppsChanged, registerConnectionIpc } from './ipc/connections';
@@ -141,10 +139,6 @@ interface Desktop {
   avatar: BrowserWindow | null;
   panel: BrowserWindow | null;
   tray: Tray;
-  /** The Welcome window, while it is open. */
-  welcomeWindow: BrowserWindow | null;
-  /** Scout is hidden until the first Welcome is done. */
-  scoutWaits: boolean;
   /** Home, while it is open. */
   homeWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
@@ -230,14 +224,10 @@ function logsDir(): string {
 // The pets live in the tray, so closing a window is never a reason to quit.
 app.on('window-all-closed', () => {});
 
-/** Set once quit begins, so a closing window never starts anything new on the way out. */
-let quitting = false;
-
 /** Stops the key hook that watches the talk key; nothing until it has started. */
 let stopTalkKey: () => void = () => {};
 
 app.on('before-quit', () => {
-  quitting = true;
   desktop?.hotkeys.dispose();
   stopTalkKey();
   desktop?.voiceWorker.stop();
@@ -367,8 +357,6 @@ async function start(): Promise<void> {
     avatar: null,
     panel: null,
     tray: createTray(),
-    welcomeWindow: null,
-    scoutWaits: false,
     homeWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
@@ -487,18 +475,14 @@ async function start(): Promise<void> {
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
     pet: () => desktop?.avatar ?? null,
   });
-  // A new install starts in Welcome alone; Scout arrives when Welcome is done.
-  const welcoming = shouldOpenWelcome(settings, process.env);
-  desktop.scoutWaits = welcoming;
   desktop.avatar = createAvatarWindow({
-    hidden: welcoming,
     position: settings.avatar,
     onMoved: (position) => rememberAvatarSpot(position),
   });
   // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
   // clean close too, not a crash.
   desktop.avatar.on('session-end', () => recordCleanClose(desktop?.settingsStore, new Date()));
-  // The pets hidden (the tray's Hide pets, or Welcome first): listening waits for them.
+  // The pets hidden (the tray's Hide pets): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));
   avatar.on('hide', () => pauseListening({ petsShown: false }));
@@ -537,10 +521,6 @@ async function start(): Promise<void> {
   stopTalkKey = talkKey.stop;
   desktop.talkKeyError = talkKey.error;
   applyHotkeys(settings);
-
-  // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
-  // Finishing it is remembered in settings; Home opens it again.
-  if (welcoming) openWelcome();
 }
 
 /** Stops the Always-listening guard on quit. */
@@ -549,8 +529,8 @@ let stopListeningGuard = (): void => undefined;
 let stopPresence = (): void => undefined;
 /** Stops reporting the front window to the brain on quit. */
 let stopFocusWatch = (): void => undefined;
-/** Why Always listening waits: a call or full screen in front, the pets hidden, or Welcome open. */
-let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
+/** Why Always listening waits: a call or full screen in front, or the pets hidden. */
+let listeningWhy = { blocked: false, petsShown: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
 /** The projects the pick-up last shown named: the only ones its Open may reach. */
@@ -674,15 +654,10 @@ function toPanel(channel: string): void {
  * shortcut never gets here. The bubble comes up without taking the keyboard: the release comes
  * from the key hook, not the bubble, and a bubble that took the focus would swallow the
  * shortcut the person meant if the press turns out to be Right Ctrl+C. The microphone only
- * ever opens in the panel, on this key or its mic button. While Welcome is open the key brings
- * Welcome forward instead: Welcome may be listening, and one mic is enough.
+ * ever opens in the panel, on this key or its mic button.
  */
 function talkPressed(): void {
   if (desktop === null) return;
-  if (desktop.welcomeWindow !== null && !desktop.welcomeWindow.isDestroyed()) {
-    desktop.welcomeWindow.focus();
-    return;
-  }
   if (desktop.panel === null || desktop.avatar === null) return;
   const { panel, avatar } = desktop;
   if (!panel.isVisible()) {
@@ -941,29 +916,6 @@ function openSettingsPage(target?: unknown): void {
   openHome(fixPage(target));
 }
 
-/** Opens Welcome, or brings the open one forward. */
-function openWelcome(): void {
-  if (desktop === null) return;
-  if (desktop.welcomeWindow !== null && !desktop.welcomeWindow.isDestroyed()) {
-    desktop.welcomeWindow.focus();
-    return;
-  }
-  const window = createWelcomeWindow();
-  // Always listening waits while Welcome is open, so the two never share the voice process.
-  pauseListening({ setupOpen: true });
-  window.on('closed', () => {
-    pauseListening({ setupOpen: false });
-    if (desktop === null) return;
-    desktop.welcomeWindow = null;
-    // Closed without Start, Scout still arrives: an install never ends with nothing on screen.
-    // Only the first Welcome hides it, so this never undoes the tray's Hide Scout. Not while
-    // quitting: the close is the app going away, and showing a window then can stall the exit.
-    if (desktop.scoutWaits && !quitting) desktop.avatar?.show();
-    desktop.scoutWaits = false;
-  });
-  desktop.welcomeWindow = window;
-}
-
 /**
  * Tells everyone that a capture just happened.
  *
@@ -1166,7 +1118,6 @@ function registerIpc(): void {
 
   // A Fix it names its target; fixPage refuses anything off the list.
   ipcMain.handle(IPC.openSettings, (_event, target: unknown) => openSettingsPage(target));
-  ipcMain.handle(IPC.openWelcome, () => openWelcome());
   // The health card's Open logs folder: the person picks what to send; no log text moves.
   ipcMain.handle(IPC.openLogsFolder, () =>
     openLogsFolder(logsDir(), (path) => shell.openPath(path)),

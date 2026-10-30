@@ -1,5 +1,5 @@
 /**
- * The brains Settings and Welcome offer, built from core's presets, and where each key lives in the
+ * The brains Settings offers, built from core's presets, and where each key lives in the
  * keychain. Contains providerChoices, storedKeys, secretKeyFor, forgetRetiredKeys and
  * ELEVENLABS_SECRET_KEY.
  */

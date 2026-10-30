@@ -82,7 +82,6 @@ export default defineConfig({
         input: {
           avatar: 'src/renderer/avatar.html',
           panel: 'src/renderer/panel.html',
-          welcome: 'src/renderer/welcome.html',
           home: 'src/renderer/home.html',
         },
       },

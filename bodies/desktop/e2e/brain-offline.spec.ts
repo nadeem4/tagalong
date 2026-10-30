@@ -34,7 +34,6 @@ test('brain offline: app opens and shows the offline mark', async () => {
       ...process.env,
       TAGALONG_BRAIN_ADDR: `127.0.0.1:${await freePort()}`,
       TAGALONG_FAKE_TTS: '1',
-      TAGALONG_SKIP_WELCOME: '1',
     },
   });
   let avatar = app.windows().find((w) => w.url().includes('avatar.html'));

@@ -35,8 +35,7 @@ Then run `Tagalong-Setup-<version>-x64.exe`.
 - Your settings, conversations and stored keys live in `%APPDATA%\Tagalong`. Uninstalling from
   **Settings → Apps** keeps that folder; delete it too to remove everything.
 
-Tagalong lives in the system tray, and Scout sits on your desktop. [First run: Welcome](#first-run-welcome)
-walks you through the rest.
+Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#first-run) says what to start.
 
 ## Run it from source
 
@@ -188,7 +187,7 @@ desktop no longer boots the engine. Read
 
 | In this build                                                                                                                          | Not in this build                                                   |
 | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a Welcome window and an NSIS installer                                                                        | macOS and Linux (the installer configs exist but are unverified)    |
+| Windows desktop app with an NSIS installer                                                                                             | macOS and Linux (the installer configs exist but are unverified)    |
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Speech to text through ElevenLabs                                   |
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
@@ -205,39 +204,9 @@ desktop no longer boots the engine. Read
 
 # Using Tagalong
 
-## First run: Welcome
+## First run
 
-The first time Tagalong starts, one **Set up Tagalong** window opens on the screen you are using.
-Scout runs it: it asks each question in its bubble and aloud, and moves on by itself as soon as you
-answer by typing in the answer box or tapping a card. There is no Next button. The steps along the
-top show what you answered; tap one to change it. If you close the window part-way, the next launch
-picks up at the same step, and Scout arrives on your screen either way.
-
-1. **What should I call you?** Scout says why it asks. Type your first name, or tap **Rather not**
-   and it never asks again. Scout uses it rarely, in a hello or a moment that warrants it. Change or
-   clear it under **Settings → You**.
-2. **How should I think?** Scout checks your real Claude sign-in. If Claude Code is installed and
-   signed in, it suggests that and needs no key. Signed out, **Sign in to Claude** opens a terminal
-   and Scout then suggests Claude once you are in. Not installed, install Claude Code or use **An API key**:
-   pick OpenRouter or Anthropic and paste a key. It goes into the operating
-   system's keychain and is tested once with one tiny request; if the service turns it down, Scout
-   says so and you stay on the step.
-3. **Should I talk?** Scout speaks a sample line so you hear how it sounds; choose **Yes, talk** or
-   **Text only**.
-4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Try it.** Scout docks on your screen with **Try it now** and **Got it** in its bubble, under a
-   first hello in its own words when it has one. **Try it now** has Scout look at your screen and say what it could hand to an expert;
-   **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
-   expert, so hand-offs work straight away.
-
-After that, each time Tagalong opens Scout may say one short line beside itself, in its own words,
-without taking the keyboard, or nothing at all; a line fades after a few seconds. It knows how long
-you were away, a crash or an update and what is new, routines that ran and where you left off, and
-reads nothing on your screen. Turn it off under **Settings → Privacy → Say hello when Tagalong
-opens**.
-
-Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in Welcome
-or in Settings works on the very next question. No restart is needed.
+There is no setup window. Start the brain (`cd brain && uv run brain`), then start Tagalong; Scout appears on your screen. The brain's model and key are in its `.env`; hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 
@@ -376,7 +345,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   **Debugger**, **Designer**, **Reviewer**) or **Blank**, which fills in the name, what it is good
   at, its **Standing instructions** (what it is told on every task, shown in full) and its switches;
   change any of it before you save. Claude Code is the first kind; it must be installed and signed
-  in on this computer, and Welcome adds it for you when it is. It only reads and searches unless you
+  in on this computer. It only reads and searches unless you
   switch on **Let it edit files by default** (Coder starts with it on) or allow edits when you send
   a task, and it searches the web only when **Let it search the web** is on. **Save and test**
   checks that Claude Code starts, which costs nothing. There is no default project folder: each
@@ -472,11 +441,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
     the ElevenLabs voice (your key and a voice ID from your ElevenLabs library), sight detail,
-    screen memory and watches, and **Open Welcome again**.
+    screen memory and watches.
 
 ## Providers and keys
 
-Scout runs on one provider and one model. Keys are entered in Welcome or in **Settings → Advanced →
+Scout runs on one provider and one model. Keys are entered in **Settings → Advanced →
 API keys** (old TypeScript core: encrypted with the OS keychain; the Python brain reads `ANTHROPIC_API_KEY` from its environment or `.env`), and only ever sent to the provider they belong to.
 
 | Setup                   | Where to get the key                                                                                                       | Model ids                                                                                                                                                                        |
@@ -611,7 +580,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Problem                                                        | What to do                                                                                                                                      |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scout shows **Signed out**, **No brain** or **No key**         | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
-| Scout says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
+| Scout says "No … API key is stored"                            | Paste that provider's key in Settings. It works on the next question.                                                                           |
 | Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
 | Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) on Home's Scout page.                                          |
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
@@ -624,8 +593,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
 | Sending logs with a problem report                             | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
-| You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |
-| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; Welcome opens on the next start. |
+| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                  |
 | From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.             |
 | It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |
 

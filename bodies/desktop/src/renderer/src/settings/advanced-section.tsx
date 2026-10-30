@@ -53,15 +53,6 @@ export function AdvancedSection({
       </h2>
       <div id="advanced-body" className="tg-advanced" hidden={!open}>
         {children}
-        <div className="tg-actions">
-          <button
-            type="button"
-            className="tg-btn-quiet"
-            onClick={() => void window.tagalongHost.openWelcome()}
-          >
-            Open Welcome again
-          </button>
-        </div>
       </div>
     </section>
   );

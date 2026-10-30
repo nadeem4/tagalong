@@ -1,7 +1,7 @@
 /**
  * The microphone in a renderer window: openMic streams 16 kHz mono frames through
  * mic-worklet.js until closed, and listMicrophones lists the devices for Settings.
- * Nothing is recorded or kept. Used by the bubble, Welcome and Settings.
+ * Nothing is recorded or kept. Used by the bubble and Settings.
  */
 import { EARS_SAMPLE_RATE, Pushable } from '@tagalong/protocol';
 import type { MicStream } from '@tagalong/protocol';

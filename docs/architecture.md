@@ -29,7 +29,7 @@ learns that an ask was spoken (`ask`'s `spoken: true`).
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   subgraph Electron["Tagalong desktop app"]
-    R["Renderer windows<br>avatar, panel, home,<br>welcome"]
+    R["Renderer windows<br>avatar, panel, home"]
     M["Electron main<br>BrainClient, platform,<br>tray, hotkeys, talk key"]
     V["Voice utility process<br>Kokoro, local ears"]
   end
@@ -55,7 +55,7 @@ flowchart LR
 | Process                  | Entry point                                    | What runs there                                                                                                                                                                        |
 | ------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Electron main            | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
-| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `welcome` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                |
+| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                           |
 | Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)           |
 | Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                         |
 | Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                      |
@@ -284,7 +284,7 @@ The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform 
 sight pause, opens the secret store and settings, records the launch, builds rolling memory, then
 calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
 retrying while it is down. The desktop does not boot `packages/core`. The panel and the avatar are
-created next; Welcome does not open yet. The sections below describe `packages/core`, the old brain.
+created next. The sections below describe `packages/core`, the old brain.
 
 `Engine.boot` (`packages/core/src/engine.ts`) in order:
 
@@ -360,7 +360,7 @@ flowchart LR
 | Doc                                                | Covers                                                                                 | Main code                                                                                                         |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | [protocol.md](protocol.md)                         | Envelope, every method and notification, main schemas, versioning                      | `packages/protocol/src`                                                                                           |
-| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file, Welcome    | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                            |
+| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file             | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                            |
 | [bubble.md](bubble.md)                             | The companion bubble, status marks, pointing, drafts, drops                            | `bodies/ui/src`                                                                                                   |
 | [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `packages/protocol/src/voice.ts` |
 | [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, sight log, rolling memory       | `bodies/desktop/src/main/platform`, `main/awareness`, `packages/core/src/perception`                              |

@@ -29,7 +29,6 @@ test.beforeAll(async () => {
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
       TAGALONG_FAKE_STT: '1',
-      TAGALONG_SKIP_WELCOME: '1',
     },
   });
 });

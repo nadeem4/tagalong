@@ -13,8 +13,6 @@ export interface AvatarWindowOptions {
   position: RememberedPosition;
   /** Called after the user drags the pet, so settings can remember where they left it. */
   onMoved: (position: Point) => void;
-  /** Created hidden: on a new install Scout arrives after Welcome, not beside it. */
-  hidden?: boolean;
 }
 
 /**
@@ -55,7 +53,6 @@ export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow 
     minimizable: false,
     fullscreenable: false,
     hasShadow: false,
-    show: options.hidden !== true,
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

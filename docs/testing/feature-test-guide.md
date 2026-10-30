@@ -7,7 +7,6 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 ## Contents
 
 - [Configuration](#configuration)
-- [First run: Welcome](#first-run-welcome)
 - [Scout's brain](#scouts-brain)
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
@@ -65,162 +64,6 @@ scripted answer, hand-offs go to a scripted expert, and nothing leaves the machi
 
 **A fresh profile.** Run `pnpm --filter @tagalong/desktop start:fresh` (a new temp data folder each
 time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwards).
-
-## First run: Welcome
-
-Scout asks each question in its bubble and moves on by itself once it is answered; there is no
-Next button. Anything Scout asks can be answered by typing in the answer box and pressing Enter,
-by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type; W.9 to W.14 talk.
-
-### W.1. Setup opens alone, at Talk or type
-
-1. **Setup:** a fresh profile.
-2. **Action:** start Tagalong.
-3. **Expected:** one window, **Set up Tagalong**, opens with the steps along the top (**Answer**,
-   **Name**, **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left (Bean, still, below its line) saying "Hi, I'm
-   Scout. A few quick questions and we're set. Will you talk to me, or type?" and the title **Talk
-   or type?** with **Talk to me**, **I'll type** and an answer box. Scout itself is not on the
-   desktop yet. The Windows microphone indicator is off.
-4. **Action:** tap **I'll type**. **Expected:** the first chip reads **Typing**, the title is **What
-   should I call you?** with **Rather not**, and the microphone indicator stays off.
-
-### W.2. The name, "Rather not" and the echo
-
-1. **Action:** type `Alex` and press Enter.
-2. **Expected:** Scout echoes "Got it, I’ll call you Alex.", the step becomes **How should I think?**
-   and the first chip reads **You: Alex**.
-3. **Action:** tap that chip, then **Rather not**.
-4. **Expected:** setup returns to **How should I think?** and the chip reads **No name**. Scout never
-   asks for the name again, not even after closing and relaunching. Typing `my name is 7`, or a
-   sentence, is not taken as a name: Scout asks again.
-
-### W.3. How Scout thinks
-
-1. **Signed in:** with Claude Code installed and signed in, **Claude, with your sign-in** is
-   suggested (gold outline). Say or type `claude`, or tap it: setup moves to **Should I talk?**
-   and the chip reads **Claude**. Typing `banana` gets "I didn't catch that" and stays.
-2. **Signed out:** run `claude auth logout` first. **Sign in to Claude** is suggested; tapping it
-   opens a terminal. Run `claude auth login`: within a few seconds Scout moves on by itself to
-   suggesting Claude.
-3. **Not installed:** with `claude` off the PATH, Scout says it did not find Claude Code and
-   offers **Install Claude Code** (opens its page), **I installed it, check again** and **An API
-   key**.
-4. **An API key:** tap it, then **OpenRouter**. A box **Your OpenRouter key** appears. Paste a
-   working key and press **Check key**: the key is tested once, and setup moves to **Should I talk?**
-   with the chip **OpenRouter**. **Back** returns to the other ways to think.
-5. **A failing key:** paste a wrong key. Scout says "OpenRouter turned that key down…" in its bubble
-   and setup stays on the step. Nothing red appears for that. Pasting a key never speaks it or shows
-   it in a line.
-
-### W.4. Voice
-
-1. **Action:** reach **Should I talk?**
-2. **Expected:** Scout speaks the line, so you hear how it sounds, even before you choose.
-3. **Action:** tap **Yes, talk** or **Text only** (or type `yes`, `text only`). **Expected:** the
-   step moves to **One key to remember**; the chip reads **Talks** or **Text only**. `don't talk`
-   is not an answer: Scout asks again.
-
-### W.5. Keys and finish
-
-1. **Action:** read **One key to remember**. Below the key caps, **Always listening** reads
-   **Off**, with "Off by default. I never switch it on myself." Tap it: it turns gold and reads
-   **On**; tap again for **Off**. It is the same switch as the bubble's and Settings → Privacy's
-   (open Home → Settings → Privacy to check), and Scout does not listen while setup is open.
-2. **Action:** say or type `got it`, or tap **Got it**.
-3. **Expected:** the setup window closes, Scout docks on the desktop, and its invitation opens (see
-   G.1). In Home → Experts, Claude Code is listed when it is installed. Home → Scout shows the
-   brain you chose.
-4. **Action:** quit and start Tagalong again. **Expected:** setup does not open; the launch
-   check-in runs instead: a line or nothing (G.2).
-
-### W.6. Closing mid-setup resumes
-
-1. **Action:** answer the name, then close the setup window with ×.
-2. **Expected:** Scout appears on the desktop anyway.
-3. **Action:** quit and start Tagalong. **Expected:** setup opens at **How should I think?**, with
-   **Typing** and **You: Alex** still on their chips.
-
-### W.7. The chips go back
-
-1. **Action:** from any later step, tap a done chip.
-2. **Expected:** setup shows that step again. Answering it returns to the step you had reached, not
-   to the one after it. A chip ahead of you does not open.
-
-### W.8. Welcome again
-
-1. **Action:** Home → Settings → Advanced → **Open Welcome again**.
-2. **Expected:** setup opens again at the top; it finishes as in W.5, and does not reopen on the
-   next launch. Even if you chose **Talk to me** last time, the microphone stays off until you
-   choose it again.
-
-### W.9. Answering by voice
-
-1. **Setup:** a fresh profile and a working microphone.
-2. **Action:** at **Talk or type?**, tap **Talk to me** (or type `talk`).
-3. **Expected:** the first chip reads **Talking**. The first time, the header right of the chips
-   says "Getting my ears ready… N%. Type or tap meanwhile." while the speech model downloads
-   (about 43 MB), and the Windows microphone indicator stays off. Once it is ready, a red dot and
-   "Listening for your answer" show, and the microphone indicator comes on. The hint under the
-   answer box reads "Answer by voice, typing or a tap…".
-4. **Action:** say `Alex`. **Expected:** "Got it, I'll call you Alex." and the next step, as if
-   typed. Say `claude`, then `yes, talk`, then `got it`: each moves setup on. Talking over Scout
-   stops its line. "Stop" is just a word here ("I didn't catch that"). Typing and tapping still
-   work the whole time.
-5. **Expected:** nothing you say leaves the computer; the words are matched on the computer.
-6. **Note:** on **Open Welcome again** with Scout on the desktop, an answer that starts with
-   "Scout, …" can also bring the bubble up quietly. That is expected and harmless.
-
-### W.10. No microphone
-
-1. **Setup:** a fresh profile, every microphone unplugged or disabled in Windows Sound settings.
-2. **Action:** tap **Talk to me**.
-3. **Expected:** after the model is ready, Scout says plainly "I can't find a microphone, so let's
-   type. Tap or type your answers." The listening line goes, the Answer chip reads **Typing**, and
-   setup carries on by typing at the same step. Closing and relaunching does not try again.
-
-### W.10a. The microphone is busy
-
-1. **Setup:** a fresh profile; another app holds the microphone exclusively (for example a
-   recorder with exclusive mode on in Windows Sound settings).
-2. **Action:** tap **Talk to me**.
-3. **Expected:** Scout says plainly "Another app is using the microphone, so let's type. Tap or
-   type your answers." (not that it can't find one). The chip reads **Typing** and typing
-   carries on.
-
-### W.11. Permission denied
-
-1. **Setup:** a fresh profile; Windows Settings → Privacy & security → Microphone → let desktop
-   apps access your microphone: Off.
-2. **Action:** tap **Talk to me**.
-3. **Expected:** Scout says plainly "I wasn't allowed to use the microphone, so let's type. You can
-   allow it later in Windows settings." The chip reads **Typing** and typing carries on. Switch the
-   permission back on, tap the **Typing** chip, then **Talk to me**: it listens.
-
-### W.12. The model download fails
-
-1. **Setup:** a fresh profile (no speech model in `%APPDATA%\Tagalong\voice`), and the network
-   off.
-2. **Action:** tap **Talk to me**.
-3. **Expected:** the microphone never opens (the Windows indicator stays off). Scout says plainly
-   "My listening model didn't download, so let's type for now." The chip reads **Typing** and
-   typing carries on. With the network back, the **Typing** chip then **Talk to me** retries.
-
-### W.13. The microphone turns off
-
-1. **Action:** in W.9, once listening, tap the **Talking** chip and then **I'll type**.
-   **Expected:** the red dot and the listening line go, and the Windows microphone indicator (in
-   the taskbar) turns off within a second or two.
-2. **Action:** choose **Talk to me** again and answer to the end. **Expected:** when **Try it** is
-   reached the setup window closes and the microphone indicator turns off. Closing the setup
-   window with × while listening turns it off too.
-
-### W.14. The talk key during setup
-
-1. **Action:** with the setup window open (behind another window), press the talk key
-   (Right Ctrl).
-2. **Expected:** setup comes to the front. The bubble does not open and no second microphone
-   opens. With Always listening on (re-run via **Open Welcome again**), Scout's mark shows
-   listening paused until the setup window closes.
 
 ## Scout's brain
 
@@ -860,10 +703,10 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 The hello is the launch check-in: the mind gets the facts and may say one short line, or nothing.
 No line is written in code, and the wording varies; run each check about three times.
 
-### G.1. The first hello after setup
+### G.1. The first hello
 
 1. **Setup:** a fresh install (empty `%APPDATA%\Tagalong`).
-2. **Action:** finish setup with **Try it**.
+2. **Action:** start Tagalong.
 3. **Expected:** Scout's bubble opens beside it without taking the keyboard with **Try it now**
    (focused) and **Got it**, and within about 15 s usually one short line from Scout above them,
    typed in and said once (it may greet you by name). Never "Here I am. Ask me one real thing…".
@@ -874,7 +717,7 @@ No line is written in code, and the wording varies; run each check about three t
 
 ### G.2. A later launch: a line or nothing
 
-1. **Setup:** an install that finished Welcome. Quit Tagalong.
+1. **Setup:** an install that has run before. Quit Tagalong.
 2. **Action:** start Tagalong again, and keep typing in another window.
 3. **Expected:** within about 15 s of Scout appearing, either one short line beside Scout (in the
    mind's own words; never "Morning. I'm here when you need me." boilerplate) or nothing at all;
@@ -897,8 +740,7 @@ No line is written in code, and the wording varies; run each check about three t
 
 ### G.4. Scout knows your name
 
-1. **Action:** on a fresh install, type `Nadeem` in Welcome's **What should I call you?** and
-   **Start**.
+1. **Action:** on a fresh install, open Home → Settings → **You**, type `Nadeem` and Save.
 2. **Expected:** the first hello may use the name; answers rarely do.
 3. **Action:** Settings → **You** → clear the box, Save. Restart.
 4. **Expected:** no line uses the name.
@@ -1059,12 +901,11 @@ alone never makes Scout wince or cheer.
    **Working** tag ("Scout is working on a job of its own"). An expert's task wins over a job, and
    your own question wins over both.
 
-### M.5a. Bean, still, in Welcome and Home
+### M.5a. Bean, still, in Home
 
-1. **Action:** open Welcome again (Home → Settings → Advanced → **Open Welcome again**), then open
-   Home → Activity after asking Scout one question. Turn on Windows' reduce-motion setting and look
+1. **Action:** open Home → Activity after asking Scout one question. Turn on Windows' reduce-motion setting and look
    again.
-2. **Expected:** Bean (still) shows beside Scout's line in Welcome, in the nav tile and on each
+2. **Expected:** Bean (still) shows beside Scout's line in the panel, in the nav tile and on each
    Activity entry: the same rest pose as the dock, smooth (not pixelated), filling the nav tile and
    the small entry tile without its ears or feet cut off. None of the three ever moves, with or
    without reduced motion. No pixel-art Scout appears anywhere.
@@ -1210,7 +1051,7 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.4. The hello, an expert finishing and a remark
 
-1. **Action:** finish Welcome; restart Tagalong; hand a task to Claude Code; cause a line from
+1. **Action:** restart Tagalong; hand a task to Claude Code; cause a line from
    keeping an eye on things (K.1).
 2. **Expected:** the first hello's line (if the mind says one) is spoken once as it appears; the
    line on a later launch (if any) is spoken;
@@ -1447,7 +1288,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
     "The microphone could not be opened…" shows once and stays; it does not flicker each time
     Scout finishes a line in the system voice.
 12. **Edge:** on a fresh install with no internet, switch **Always listening** on. Scout shows
-    **Ears** while the models download (with a percent when Welcome downloads them) and then
+    **Ears** while the models download (with a percent while they download) and then
     **Can't listen**. The bubble says the first-time download, then "Speech models didn’t download…" once; it does not
     go back to the download note or repeat as Scout finishes lines. Connect and wait: within
     about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
@@ -2307,9 +2148,9 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 1. **Setup:** a Windows machine or Windows Sandbox that has never run Tagalong, with no Node.js.
 2. **Action:** run the installer (SmartScreen: **More info → Run anyway**), keep the default folder,
-   finish, and complete Welcome.
+   and finish.
 3. **Expected:** no administrator prompt. Tagalong installs to `%LOCALAPPDATA%\Programs\Tagalong`,
-   adds Start menu and desktop shortcuts, starts when the installer finishes, opens Welcome, and a
+   adds Start menu and desktop shortcuts, starts when the installer finishes, and a
    first answer arrives — all without a terminal.
 
 ### I.3. Native modules work in the installed app
@@ -2325,7 +2166,7 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 1. **Action:** quit Tagalong, uninstall it from Windows **Settings → Apps**, then install it again.
 2. **Expected:** the uninstall removes the program folder and shortcuts but leaves
-   `%APPDATA%\Tagalong`. After reinstalling, Welcome does not open, and keys and history are as
+   `%APPDATA%\Tagalong`. After reinstalling, keys and history are as
    before.
 
 ## What needs me? _(real brain)_
@@ -2616,7 +2457,7 @@ start, then every 30 minutes, while no turn of yours and no job is running.
 
 Do not test these here.
 
-- **Cloud speech to text and a microphone step in Welcome.** Speech is turned into text on this
+- **Cloud speech to text.** Speech is turned into text on this
   computer only.
 - **"Always allow" for connected apps.** Every change asks.
 - **macOS and Linux.** The app stops at launch on both; their installer configs are unverified.

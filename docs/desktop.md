@@ -24,18 +24,18 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
 | `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
-| `src/main/windows/`                        | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `welcome.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)               |
+| `src/main/windows/`                        | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
 | `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
-| `src/main/launch.ts`, `welcome.ts`         | The launch record, brain readiness, Welcome's main-process half                                                                                                             |
+| `src/main/launch.ts`                       | The launch record, brain readiness                                                                                                                                          |
 | `src/main/claude-sign-in.ts`               | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                          |
 | `src/main/links.ts`, `fix-target.ts`       | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                           |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
 | `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
 | `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                   |
-| `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`, `welcome`                                                                                                                   |
+| `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
 | `electron.vite.config.ts`                  | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
 | `electron-builder.json`                    | The installer                                                                                                                                                               |
 | `scripts/`                                 | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                      |
@@ -74,7 +74,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
-   `applyHotkeys(settings)`. Welcome never opens, there is no launch greeting, and the keep-an-eye
+   `applyHotkeys(settings)`. There is no launch greeting, and the keep-an-eye
    and wellbeing ticks are not started.
 
 ```mermaid
@@ -138,7 +138,7 @@ running.
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
-- **Not wired yet.** Pets are a fixed local Scout. Welcome never opens. The launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
+- **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
   and routines come back as the brain's rows land. Any IPC that needs them throws "Scout cannot do
   that yet on the new brain."
 
@@ -151,12 +151,11 @@ preload `PRELOAD_PATH` (`dist/preload/index.cjs`). `loadPage` (`windows/page.ts`
 `${ELECTRON_RENDERER_URL}/<page>.html` in development and `dist/renderer/<page>.html` otherwise.
 Every page sets the CSP `default-src 'self'; style-src 'self' 'unsafe-inline'`.
 
-| Window  | Module               | Shape                                                                                                               | Created                              | Shown                                   |
-| ------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- |
-| Avatar  | `windows/avatar.ts`  | 96 x 96 (`AVATAR_SIZE`), transparent, frameless, always on top (`floating`), `skipTaskbar`, not resizable           | once, at start                       | at creation, unless `hidden` (Welcome)  |
-| Panel   | `windows/panel.ts`   | 420 wide (`PANEL_WIDTH`), 180 high to start (`BUBBLE_HEIGHT`), transparent, frameless, always on top, `skipTaskbar` | once, at start                       | `showPanelBeside` or `showPanelQuietly` |
-| Home    | `windows/home.ts`    | framed, 1440 x 800 content, min 880 (`HOME_MIN_WIDTH`) x 600, centred, titled "Home", no menu bar                   | on `openHome`, again after it closes | `ready-to-show`                         |
-| Welcome | `windows/welcome.ts` | framed, 900 x 620 content, centred on the display under the cursor, "Set up Tagalong"                               | `openWelcome`                        | `ready-to-show`                         |
+| Window | Module              | Shape                                                                                                               | Created                              | Shown                                   |
+| ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- |
+| Avatar | `windows/avatar.ts` | 96 x 96 (`AVATAR_SIZE`), transparent, frameless, always on top (`floating`), `skipTaskbar`, not resizable           | once, at start                       | at creation                             |
+| Panel  | `windows/panel.ts`  | 420 wide (`PANEL_WIDTH`), 180 high to start (`BUBBLE_HEIGHT`), transparent, frameless, always on top, `skipTaskbar` | once, at start                       | `showPanelBeside` or `showPanelQuietly` |
+| Home   | `windows/home.ts`   | framed, 1440 x 800 content, min 880 (`HOME_MIN_WIDTH`) x 600, centred, titled "Home", no menu bar                   | on `openHome`, again after it closes | `ready-to-show`                         |
 
 Rules each module enforces:
 
@@ -181,7 +180,6 @@ Rules each module enforces:
 - **Home.** Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`.
-- **Welcome.** Escape closes it. See [First run (Welcome)](#first-run-welcome).
 - **Navigation.** The avatar and panel call `guardNavigation`, which cancels every `will-navigate`,
   so a dropped file never opens in the window.
 
@@ -205,13 +203,11 @@ Rules each module enforces:
 | Launch line or brain status (`greetOnLaunch`), `pet.remark`, `pickUp.ready`      | `showPanelQuietly`                                                    |
 | `handoff.finished` with the pet visible (`bringUpBubble(false)`)                 | `showPanelQuietly`                                                    |
 | A routine result with a line (`deliverRoutine`)                                  | `showPanelQuietly`                                                    |
-| Welcome finished (`welcomed`, with `IPC.greetEvent`)                             | `showPanelQuietly`                                                    |
 | Talk key held (`talkPressed`)                                                    | `showPanelQuietly`                                                    |
 | Words addressed to Scout from Always listening (`forwardEars` `onSpoken`)        | `showPanelQuietly`, only when the pet is visible and the panel hidden |
 
 The talk key must not take focus: its release comes from the key hook in main, and a focused
-bubble would swallow the shortcut the person meant if the press turns into Right Ctrl+C. While
-Welcome is open, `talkPressed` focuses Welcome instead, so two microphones never open at once.
+bubble would swallow the shortcut the person meant if the press turns into Right Ctrl+C.
 
 **Hiding on blur.** On `blur` the panel reads `isStreaming()` (any `activeTurns`) at once, then
 after 60 ms asks `hidesOnBlur({ streaming, focusWentToPet, focusedAgain })`
@@ -291,7 +287,7 @@ which is how a rebind takes effect without a restart.
 
 ### Settings applied live
 
-`registerSettingsIpc`'s `save(patch, byTalk)` is the one save path for Settings, Home, Welcome and
+`registerSettingsIpc`'s `save(patch, byTalk)` is the one save path for Settings, Home and
 the bubble's settings card. After `SettingsStore` saves, it:
 
 - stores the result as `desktop.settings`;
@@ -315,7 +311,7 @@ only what the module reads, so every module is tested without Electron. `deps.en
 | Module              | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                                                                                                                                 | Engine calls / notes                                                                                                                                                                                                                                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `turns.ts`          | `ask` (`ask`), `stopWatch` (`watch:stop`), `interrupt` (`interrupt`), `remarkNotNow` (`remark:not-now`), `remarkAccept` (`remark:accept`)                                                                                                                                                                                            | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `watch.stop`, `interrupt`, `keepAnEye.notNow`, `keepAnEye.accept`                                                                                                                                                                                        |
-| `scout.ts`          | `listPets` (`pets:list`), `savePet` (`pets:save`), `switchScout` (`pets:switch-scout`), `finishWelcome` (`welcome:finish`)                                                                                                                                                                                                           | `pets.list`, `pets.upsert`, `experts.list`, `experts.upsert`, `settings.set`; reloads the avatar after a pet changes                                                                                                                                                                                                                                 |
+| `scout.ts`          | `listPets` (`pets:list`), `savePet` (`pets:save`), `switchScout` (`pets:switch-scout`)                                                                                                                                                                                                                                               | `pets.list`, `pets.upsert`, `experts.list`, `experts.upsert`, `settings.set`; reloads the avatar after a pet changes                                                                                                                                                                                                                                 |
 | `experts.ts`        | `listActivity`, `listExperience`, `getExperience`, `clearExperience`, `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`, `usageSummary`, `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`, `confirmHandoff`, `dismissHandoff`, `cancelHandoff`, `searchProjects` | `activity.list` and `experience.list` (default `limit` 30), `experience.*`, `self.*`, brain tool `spend_today` (`usageSummary`), `experts.*`, `handoffs.*`, `projects.search`                                                                                                                                                                        |
 | `connections.ts`    | `approveTool` (`tool:approve`), `answerJobAsk`, `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `signInConnection`                                                                                                                                                              | `approveTool` goes to the brain client's `answer` (`once`, `always` or `deny`); the connection calls go through `callJson` to the brain's `list_apps`, `add_app` (params parsed with `AppAddParams` first), `set_app_enabled`, `restart_app` and `remove_app`, and reject with `brain offline` while offline; `signInConnection` calls `sign_in_app` |
 | `asks.ts`           | `listAsks` (`asks:list`), `answerAsk` (`asks:answer`), `openAsk` (`asks:open`)                                                                                                                                                                                                                                                       | `asks.list`, `asks.answer`, `asks.open` (see [asks.md](asks.md))                                                                                                                                                                                                                                                                                     |
@@ -351,7 +347,7 @@ shell, the screen):
 | `openBubble`, `togglePanel`, `hidePanel`, `fitPanel` | the panel (see [Focus rules](#focus-rules-and-showpanelquietly))                                                                                  |
 | `dragAvatar`, `dropAvatar`                           | move the pet by a finite step; save its position                                                                                                  |
 | `openSettings`                                       | `openSettingsPage(fixPage(target))`; an unknown target throws                                                                                     |
-| `openHome`, `openWelcome`, `openLogsFolder`          | open the window or the folder                                                                                                                     |
+| `openHome`, `openLogsFolder`                         | open the window or the folder                                                                                                                     |
 | `checkClaudeSignIn`, `openClaudeSignIn`              | `signInFor(env)` (signed in clears the brain marks); a terminal that signs in                                                                     |
 | `openLink`                                           | `shell.openExternal` only when `isAllowedLink(url)`                                                                                               |
 | `dropOnPet` (`drop.ts`, `registerDropIpc`)           | only from the avatar's window (`fromWindow`); names the item and opens the bubble on `IPC.dropEvent`                                              |
@@ -481,7 +477,7 @@ data over the channels in `shared/ipc.ts`:
   `HostBridge` runs in both hosts. The panel page wraps it with three more bridge calls
   (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](bubble.md#the-health-check)).
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
-  the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys, Welcome,
+  the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys,
   Home, the panel's placement and fit, the avatar's drag, the greeting, remark and routine lines,
   voice and ears, Always listening, drops, the health facts and status marks.
 
@@ -493,7 +489,7 @@ uses `ipcRenderer.send` (no answer). `dropOnPet` turns each `File` into its path
 sandboxed preload) and drops an empty path.
 
 The renderer adds a third global itself, `window.tagalongVoice` (`renderer/src/voice-seam.ts`,
-installed by the panel and Welcome): the ears, the microphone and the ears' model download, built
+installed by the panel): the ears, the microphone and the ears' model download, built
 on `tagalongHost`. See [voice.md](voice.md).
 
 ### The platform adapter
@@ -534,80 +530,12 @@ is tested in plain Node with no display. `nut-js` and `get-windows` are imported
 
 Review rule for call sites: never put speech, screen or file text in a warning's first argument.
 
-### First run (Welcome)
+### Launch record
 
-On the brain, `shouldOpenWelcome` always returns false: Welcome never opens and `finishWelcome` throws. The
-code below is kept for when the brain brings first run back.
-
-`shouldOpenWelcome(settings, env)` is true while `settings.welcome.done` is false, unless
-`TAGALONG_SKIP_WELCOME=1` (the end-to-end suites). Then the avatar is created hidden and
-`scoutWaits` is set; Scout appears when Welcome finishes, or when its window closes without
-finishing (not while quitting). Only that first Welcome hides Scout. Home's Settings page reopens
-Welcome (`IPC.openWelcome`), from the top.
-
-The setup page (`renderer/src/welcome.tsx`) has no Next button. Scout asks each question in its
-bubble and aloud, and setup moves on by itself once a question is answered by voice, typing or a
-tap. The step machine (`renderer/src/first-run.ts`) is pure. Its steps are `WELCOME_STEPS`
-(protocol): `answer`, `name`, `think`, `voice`, `keys`, `try`.
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-stateDiagram-v2
-  [*] --> answer: startFirstRun
-  answer --> name: Talk to me, or I'll type
-  name --> think: a name, or Rather not
-  think --> voice: Claude, or a key that passed checkKey
-  voice --> keys: Yes, talk, or Text only
-  keys --> try: Got it
-  try --> [*]: finishWelcome
-```
-
-- `FirstRun { steps, current, reached }`. `startFirstRun(settings)` opens at
-  `settings.welcome.step` for an unfinished setup, else at `answer`. `answered(run,
-nameDeclined)` moves to the next step, or back to `reached` after a chip went back. `goTo`
-  serves the step chips, which open only steps already reached (`chipState`: `current`, `done`,
-  `ahead`). `settings.userNameDeclined` makes setup step past `name` on its own.
-- `answerPatch` builds the patch for one answer. It rebuilds the whole `welcome` record (`done`,
-  `step`, `answerBy`, `brain`) from the current one, because a patch replaces the record, and
-  never undoes `done`. Every save goes through one `oneAtATime()` queue, each built from the
-  settings the previous save returned, so closing the window mid-setup resumes at the same step.
-- `listensNow(run, settings)` decides when setup's microphone is open: `welcome.answerBy ===
-'talk'`, the reached step is past `answer`, and the current step is not `try`. One effect on
-  that value is the only place the page starts or stops its ears (`setupEars`, a
-  `ListenController` in `always` mode with no name needed; see [voice.md](voice.md)). The ears are
-  disposed on unmount and on `pagehide`. A microphone or model failure saves
-  `welcome.answerBy: 'type'`.
-- Answers are matched without AI (`first-run-match.ts`: whole words, exactly one choice, negations
-  and refusals ask again; `nameFrom` for the name). Every line Scout says or offers is in
-  `first-run-lines.ts`.
-- **How Scout thinks** reads `checkClaudeSignIn` (`signed-in`, `signed-out`, `not-installed`,
-  `unknown`). Signed out, **Sign in to Claude** runs `openClaudeSignIn` and the page checks again
-  every 3 s (`SIGN_IN_POLL_MS`). A pasted key is saved (`saveApiKey`) and tested once
-  (`checkKey`, the engine's `providers.check`); only a passing test moves setup on. Under
-  `TAGALONG_FAKE_PROVIDERS=1` the sign-in reads as signed in unless `TAGALONG_FAKE_SIGN_IN` names
-  another state.
-- **Finish.** `IPC.finishWelcome(providerId)` (`ipc/scout.ts`) makes Scout the Companion on that
-  provider at the model its role's tier recommends (`companionOn`), adds Claude Code as an expert
-  when `findAgents` finds `claude` on the PATH and no Claude Code expert exists
-  (`welcomeExperts`), saves `welcome: { ...current, done: true, step: 'try' }`, reloads the
-  avatar, then `welcomed()`: closes Welcome, shows the pet, sends `IPC.greetEvent` and shows the
-  panel quietly, and calls `checkIn.launch { crashed: false, lastVersion: null, version,
-releaseNotes: '', welcomed: true }`. The bubble's Try it invite is in
-  [bubble.md](bubble.md#companionbubble).
-- **Main's guards.** While Welcome is open the talk key focuses it, and `openWelcome` sets
-  `pauseListening({ setupOpen: true })` (cleared on close), so Always listening never shares the
-  voice process with setup's ears.
-
-**Later launches.** (Not started on the brain: the launch greeting returns with the brain's check-in.) `greetOnLaunch` runs when `shouldGreetOnLaunch(settings)` (Welcome done and
-`settings.greeting` on). It first checks `brainReadiness` with the sign-in check limited to
-`SIGN_IN_BUDGET_MS` (1,000 ms; a slow or failed check reads `unknown`, never a problem). When Scout
-cannot think, `brainStatus` sets a brain mark in `StatusMarks` and `brainLine` sends
-`IPC.greetLineEvent { status }`; the panel shows the mark's row with Fix it, never spoken. When it
-can, main calls `checkIn.launch { launch: { ...previousLaunch, version } }`, which answers at once; any line arrives later as `pet.remark` or
-`pickUp.ready`. Then main saves `lastOpenedAt`. The launch record (`launch.ts`): `recordLaunch`
+The launch record (`launch.ts`): `recordLaunch`
 reads whether the last launch closed cleanly and stores `closedCleanly: false` and the running
 version; `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on `before-quit` and
-on the avatar's `session-end`. The check-in itself is in [mind.md](mind.md).
+on the avatar's `session-end`.
 
 ### Bundling the workspace packages
 
@@ -628,7 +556,7 @@ on the avatar's `session-end`. The check-in itself is in [mind.md](mind.md).
   die with "bufferUtil.unmask is not a function" on the first masked frame.
 - **preload**: `src/preload/index.ts` to `dist/preload/index.cjs`, CommonJS, because a sandboxed
   preload cannot be an ES module while the package is.
-- **renderer**: root `src/renderer`, four HTML inputs (`avatar`, `panel`, `welcome`,
+- **renderer**: root `src/renderer`, three HTML inputs (`avatar`, `panel`,
   `home`) to `dist/renderer`. React and React DOM are aliased to the copies
   `@tagalong/ui` resolves, so there is one React instance. JSX uses Vite's esbuild transform
   (`jsx: 'automatic'`), not `@vitejs/plugin-react` (it needs Vite 8; the app is on Vite 7), so
@@ -643,7 +571,7 @@ the installer, so listing the workspace packages there would ship their trees tw
 
 Bean's frames are WebP strips under `src/renderer/src/bean/`, loaded with
 `import.meta.glob('./bean/*.webp', { query: '?url&no-inline' })` (`bean-assets.ts`), so Vite emits
-each strip once as a file that the avatar, Home and Welcome share; a `data:` URL would be blocked
+each strip once as a file that the avatar and Home share; a `data:` URL would be blocked
 by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate them.
 
 ### Packaging
@@ -677,12 +605,12 @@ Scripts (`bodies/desktop/package.json`): every build, run and package script fir
 prebuilt binary; it runs that download (never a compile), and a failure is only a warning: without
 the binding the active-window lookup answers no window and a look captures the whole screen.
 `package:mac`, `package:linux` and `package:dir` build the other targets. `start:fresh` runs the
-app on a new temporary `--user-data-dir`, so Welcome shows without touching real data.
+app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 ## Interfaces
 
 - `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`, `previousLaunch`,
-  `settings`, `secrets`, `avatar`, `panel`, `tray`, `welcomeWindow`,
+  `settings`, `secrets`, `avatar`, `panel`, `tray`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `rolling`, `perceptionMemory`, `voice`, `voiceWorker`,
   `listening`, `statusMarks`.
@@ -704,13 +632,10 @@ app on a new temporary `--user-data-dir`, so Welcome shows without touching real
 | `fitPanel` clamp                    | 80..520 px                     | `windows/panel.ts`                  |
 | Blur settle delay                   | 60 ms                          | `windows/panel.ts`                  |
 | `HOME_MIN_WIDTH`                    | 880 px (Home min height 600)   | `windows/home.ts`                   |
-| Welcome size                        | 900 x 620                      | `windows/welcome.ts`                |
 | `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`                        |
 | `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`                        |
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `packages/protocol/src/settings.ts` |
 | `SIGN_IN_BUDGET_MS`                 | 1,000 ms                       | `launch.ts`                         |
-| `SIGN_IN_POLL_MS`                   | 3,000 ms                       | `renderer/src/welcome.tsx`          |
-| `isOnPath` timeout                  | 5,000 ms                       | `welcome.ts`                        |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`                       |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`                  |
 | Sight log and memory list           | `limit: 200`                   | `ipc/sight-log.ts`, `ipc/memory.ts` |
@@ -725,7 +650,7 @@ The desktop host writes:
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
 - Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, `lastOpenedAt`, the launch record, the
-  Welcome record. See [settings-and-secrets.md](settings-and-secrets.md).
+  Welcome record (`Settings.welcome`, now unused by the desktop). See [settings-and-secrets.md](settings-and-secrets.md).
 - Keys through `SafeStorageSecretStore`. See [settings-and-secrets.md](settings-and-secrets.md).
 - Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
   [voice.md](voice.md).
@@ -780,8 +705,6 @@ when a button on its card asks. See [privacy.md](privacy.md).
 | `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
 | `src/main/ipc/*.test.ts`                                                                   | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
 | `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
-| `src/main/welcome.test.ts`, `src/renderer/src/first-run*.test.ts`, `setup-ears.test.ts`    | finding agents, when Welcome opens and greets, `companionOn`; the step machine, matching, lines, when setup listens, one save at a time                                                                                                       |
-| `e2e/first-run.spec.ts`                                                                    | setup alone, resume after close, chips, typed answers, saved answers, key tested once                                                                                                                                                         |
 | `e2e/launch-greeting.spec.ts`                                                              | the brain mark with Fix it, the clean close record, the mind's launch line, the pick-up card                                                                                                                                                  |
 | `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                          |
 | `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                              |

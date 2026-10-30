@@ -52,7 +52,7 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 | `summarizer`                   | null                                                                                                                                                 | `{ providerId, model }` or null (the pet's own brain)                                                                                   |
 | `rollingMemory`                | `{ enabled: false, minutes: 10 }`                                                                                                                    | Minutes 1 to 30 (`MAX_ROLLING_MEMORY_MINUTES`)                                                                                          |
 | `watch`                        | `{ maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 }`                                                                                     | 1 to 500, 1 to 10, 1 to 1,440                                                                                                           |
-| `welcome`                      | `{ done: false }`                                                                                                                                    | Plus optional `step` (`WELCOME_STEPS`), `answerBy`, `brain`                                                                             |
+| `welcome`                      | `{ done: false }`                                                                                                                                    | Plus optional `step` (`WELCOME_STEPS`), `answerBy`, `brain`; the desktop no longer reads or writes it                                   |
 | `greeting`                     | true                                                                                                                                                 | The launch check-in                                                                                                                     |
 | `lastOpenedAt`, `lastClosedAt` | null                                                                                                                                                 | ISO datetimes, written by the desktop                                                                                                   |
 | `closedCleanly`                | true                                                                                                                                                 | Set false at launch, true on a clean quit                                                                                               |
@@ -259,7 +259,7 @@ mode `0o600`. Only ciphertext is written.
 
 ### How keys are entered and never read back
 
-Keys are typed in Settings (the keys section and the brain section) or in Welcome's keys step, and
+Keys are typed in Settings (the keys section and the brain section), and
 sent once with `saveApiKey(providerId, key)`. Main maps the provider to its secret key with
 `secretKeyFor` (an unknown provider throws `'<id>' does not take an API key`, so a renderer cannot
 invent an entry). An empty key deletes the stored one.

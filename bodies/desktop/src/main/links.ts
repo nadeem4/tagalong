@@ -1,5 +1,5 @@
 /**
- * The links main will open for a renderer or the engine: provider key pages, Welcome's install
+ * The links main will open for a renderer or the engine: provider key pages, coding-agent install
  * pages and https sign-in pages. Contains isAllowedLink and isSignInPage.
  */
 
@@ -13,14 +13,14 @@ const ALLOWED_LINK_ORIGINS: ReadonlySet<string> = new Set([
   'https://console.anthropic.com',
 ]);
 
-/** Where Welcome sends someone to install a coding agent: these pages exactly, no others. */
+/** Where someone is sent to install a coding agent: these pages exactly, no others. */
 const ALLOWED_LINKS: ReadonlySet<string> = new Set([
   'https://claude.com/claude-code',
   'https://github.com/google-gemini/gemini-cli',
   'https://github.com/openai/codex',
 ]);
 
-/** Whether a link is a provider key page or one of Welcome's install pages. */
+/** Whether a link is a provider key page or a coding agent's install page. */
 export function isAllowedLink(url: string): boolean {
   if (!URL.canParse(url)) return false;
   return ALLOWED_LINK_ORIGINS.has(new URL(url).origin) || ALLOWED_LINKS.has(url);

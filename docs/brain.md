@@ -202,8 +202,7 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   open turn as failed; the next ask works without restarting the app.
 - The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
   settings (hotkeys, listening, rolling memory).
-- Pets, Welcome, the launch greeting, keep-an-eye, wellbeing, the pointer overlay and the separate
-  Settings window are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
+- Pets, the launch greeting, keep-an-eye and wellbeing are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
 
 ## Toolbox
 

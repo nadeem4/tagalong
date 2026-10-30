@@ -1,6 +1,6 @@
 /**
- * Puts `window.tagalongVoice` (ears, microphone, ears' models) on a window. The bubble and
- * Welcome both install it before they render.
+ * Puts `window.tagalongVoice` (ears, microphone, ears' models) on a window. The bubble
+ * installs it before it renders.
  */
 import type { Ears } from '@tagalong/protocol';
 import '../../shared/ipc';

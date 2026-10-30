@@ -115,10 +115,8 @@ export const IPC = {
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
-  openWelcome: 'tagalong:welcome:open',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
-  finishWelcome: 'tagalong:welcome:finish',
   openLink: 'tagalong:link:open',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
   openClaudeSignIn: 'tagalong:claude:open-sign-in',
@@ -236,7 +234,7 @@ export interface CaptureNotice {
   paused?: boolean;
 }
 
-/** One brain Scout can run on, as Settings and Welcome list it. */
+/** One brain Scout can run on, as Settings lists it. */
 export interface ProviderChoice {
   id: string;
   label: string;
@@ -265,15 +263,6 @@ export interface VoiceModels {
   mouth: boolean;
   /** Every one of the ears' files. */
   ears: boolean;
-}
-
-/** A coding agent Welcome looked for on this computer. */
-export interface FoundAgent {
-  id: string;
-  label: string;
-  found: boolean;
-  /** Whether the companion can think through this agent's sign-in, needing no key. */
-  canThink: boolean;
 }
 
 /** The models a provider offers, and whether the list is the service's own. */
@@ -346,9 +335,9 @@ export interface TagalongHostApi {
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
-  /** Welcome's one test of the key just saved for `providerId`. */
+  /** One test of the key just saved for `providerId`. */
   checkKey(providerId: string): Promise<ProvidersCheckResult>;
-  /** Opens a terminal that signs in to Claude Code; Welcome waits and checks again. */
+  /** Opens a terminal that signs in to Claude Code. */
   openClaudeSignIn(): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
   /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
@@ -358,17 +347,10 @@ export interface TagalongHostApi {
   openSettings(target?: FixTarget): Promise<void>;
   /** Opens the logs folder (the health card's Open logs folder). */
   openLogsFolder(): Promise<void>;
-  /** Opens the Welcome window, from Settings › Advanced. */
-  openWelcome(): Promise<void>;
   /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */
   openHome(): Promise<void>;
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
-  /**
-   * Finishes Welcome: Scout becomes the Companion thinking on `providerId` and docks alone,
-   * Welcome closes and the panel opens beside Scout.
-   */
-  finishWelcome(providerId: string): Promise<void>;
   /** Asks Claude Code, locally and with no model call, whether it is signed in. */
   checkClaudeSignIn(): Promise<ClaudeSignIn>;
   /**
@@ -377,14 +359,14 @@ export interface TagalongHostApi {
    */
   switchScout(providerId: string): Promise<Pet>;
   /**
-   * Opens a provider's key page, or one of Welcome's install pages, in the browser. Main
+   * Opens a provider's key page, or a coding agent's install page, in the browser. Main
    * refuses any other URL.
    */
   openLink(url: string): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;
-  /** Main asks the bubble for its one-time hello, right after Welcome. */
+  /** Main asks the bubble for its one-time hello. */
   onGreet(handler: () => void): () => void;
   /** Main hands the bubble the launch line, or the brain's status mark when Scout cannot think. */
   onGreetLine(handler: (line: GreetLine) => void): () => void;
