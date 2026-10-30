@@ -26,27 +26,29 @@ const brands = (
 ).map((b) => b.brand);
 
 const body = createBody({
-  local: chromeStorage,
+  storage: chromeStorage,
   session: chromeSession,
   brands,
   userAgent: navigator.userAgent,
   tabs: chromeTabs,
   page: chromePage,
-  needs: new PermissionBroker(chromePermissions, chromePrompt),
+  broker: new PermissionBroker(chromePermissions, chromePrompt),
   openSocket: webSocket,
 });
 
-chrome.runtime.onInstalled.addListener(() => void body.start());
-chrome.runtime.onStartup.addListener(() => void body.start());
+chrome.runtime.onInstalled.addListener(() => void body.start().catch(() => undefined));
+chrome.runtime.onStartup.addListener(() => void body.start().catch(() => undefined));
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === RECONNECT_ALARM && body.info().status !== 'online') void body.start();
+  if (alarm.name === RECONNECT_ALARM && body.info().status !== 'online')
+    void body.start().catch(() => undefined);
 });
 void chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });
 
 // The popup saves the address or name; the body dials again with the new values.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (ADDR_KEY in changes || NAME_KEY in changes)) void body.restart();
+  if (area === 'local' && (ADDR_KEY in changes || NAME_KEY in changes))
+    void body.restart().catch(() => undefined);
 });
 
 chrome.runtime.onMessage.addListener((message: Partial<WorkerQuery> | null, _sender, respond) => {
@@ -55,4 +57,4 @@ chrome.runtime.onMessage.addListener((message: Partial<WorkerQuery> | null, _sen
   return false;
 });
 
-void body.start();
+void body.start().catch(() => undefined);

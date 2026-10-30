@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The two things the popup lets the person change: where the brain is, and an
  * optional display name. Bad stored values fall back rather than break the connection.
  * No chrome.* here; storage is passed in.

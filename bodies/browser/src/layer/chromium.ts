@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The real Chrome behind the layer's interfaces: storage, tabs, page reading, permissions and
  * the brain websocket. The logic modules only ever see the interfaces in api.ts.
  */

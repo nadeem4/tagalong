@@ -40,7 +40,9 @@ describe('manifest', () => {
   });
 
   it('lets_extension_pages_open_websockets_to_any_host', () => {
-    expect(manifest.content_security_policy.extension_pages).toContain('connect-src ws:');
+    expect(manifest.content_security_policy.extension_pages).toBe(
+      "script-src 'self'; object-src 'self'; connect-src ws:",
+    );
   });
 
   it('describes_scout_within_the_store_summary_limit', () => {

@@ -11,7 +11,6 @@ import {
 } from '../permissions';
 
 export type WorkerQuery = { type: 'status' };
-export type WorkerStatus = { status: BrainStatus; id: string; name: string };
 export type GrantRow = { label: string; need: Need };
 
 /** The Chrome pattern for "every site"; not a real origin, but the one row that stands for all. */

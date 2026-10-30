@@ -28,6 +28,9 @@ describe('source guards', () => {
     for (const path of sources(join(SRC, 'tools'))) {
       expect(readFileSync(path, 'utf8'), path).not.toContain('permissions.request');
     }
+    for (const path of sources(join(SRC, 'layer'))) {
+      expect(readFileSync(path, 'utf8'), path).not.toMatch(/permissions\.request\(/);
+    }
     expect(read('permission/permission.ts')).toContain('permissions.request');
   });
 

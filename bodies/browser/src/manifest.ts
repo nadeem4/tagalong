@@ -6,7 +6,7 @@ export const manifest = {
   manifest_version: 3,
   name: 'Tagalong',
   description:
-    'Gives Scout, your Tagalong companion, eyes in your browser. Needs the Tagalong brain running.',
+    'Lets Scout, your Tagalong companion, read pages in your browser only when it needs to. Needs the Tagalong brain running.',
   version: '0.0.0',
   minimum_chrome_version: '116',
   background: { service_worker: 'service-worker.js', type: 'module' },

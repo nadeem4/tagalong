@@ -1,5 +1,6 @@
-﻿/** Tests for the browser body: its hello, its tools, its restarts and its keepalive. */
+/** Tests for the browser body: hello, tools, restart, stop and keepalive. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { PermissionBroker } from './permissions';
 import { createBody, type BodyDeps } from './body';
 import { FakeBrainSocket, memoryStorage, settle } from './test-support/fake-brain-socket';
 
@@ -8,7 +9,7 @@ const CHROME = { brands: ['Chromium', 'Google Chrome'], userAgent: 'Mozilla/5.0 
 function setup(overrides: Partial<BodyDeps> = {}) {
   const sockets: FakeBrainSocket[] = [];
   const deps: BodyDeps = {
-    local: memoryStorage(),
+    storage: memoryStorage(),
     session: memoryStorage(),
     ...CHROME,
     tabs: {
@@ -27,7 +28,8 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       activeInFocusedWindow: () => Promise.resolve(null),
     },
     page: { read: () => Promise.reject(new Error('unused')) },
-    needs: { ensure: () => Promise.resolve() },
+    broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
+    random: () => 'ab12',
     openSocket: (url) => {
       const s = new FakeBrainSocket(url);
       sockets.push(s);
@@ -56,14 +58,14 @@ describe('the browser body', () => {
       body: { id: string; kind: string; name: string };
       tools: { name: string }[];
     };
-    expect(params.body.id).toMatch(/^chrome-[a-z0-9]{4}$/);
+    expect(params.body.id).toBe('chrome-ab12');
     expect(params.body.kind).toBe('browser');
     expect(params.body.name).toBe('Chrome');
     expect(params.tools.map((t) => t.name)).toContain('tabs');
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {
-    const { body, sockets } = setup({ local: memoryStorage({ bodyName: 'Work Chrome' }) });
+    const { body, sockets } = setup({ storage: memoryStorage({ bodyName: 'Work Chrome' }) });
     await body.start();
     sockets[0]!.open();
     await settle();
@@ -72,18 +74,18 @@ describe('the browser body', () => {
   });
 
   it('a_second_install_gets_another_id', async () => {
-    const a = setup();
-    const b = setup();
+    const a = setup({ random: () => 'aaaa' });
+    const b = setup({ random: () => 'bbbb' });
     await a.body.start();
     await b.body.start();
     expect(a.body.info().id).not.toBe(b.body.info().id);
   });
 
   it('the_id_survives_a_restart', async () => {
-    const local = memoryStorage();
-    const first = setup({ local });
+    const storage = memoryStorage();
+    const first = setup({ storage, random: () => 'aaaa' });
     await first.body.start();
-    const second = setup({ local });
+    const second = setup({ storage, random: () => 'bbbb' });
     await second.body.start();
     expect(second.body.info().id).toBe(first.body.info().id);
   });
@@ -136,11 +138,11 @@ describe('the browser body', () => {
   });
 
   it('restart_dials_the_new_address', async () => {
-    const local = memoryStorage();
-    const { body, sockets } = setup({ local });
+    const storage = memoryStorage();
+    const { body, sockets } = setup({ storage });
     await body.start();
     expect(sockets[0]!.url).toBe('ws://127.0.0.1:47321');
-    await local.set('brainAddr', '192.168.1.5:9000');
+    await storage.set('brainAddr', '192.168.1.5:9000');
     await body.restart();
     expect(sockets[0]!.closed).toBe(true);
     expect(sockets[1]!.url).toBe('ws://192.168.1.5:9000');
@@ -155,6 +157,17 @@ describe('the browser body', () => {
     vi.advanceTimersByTime(20_000);
     const call = sockets[0]!.request('call')?.['params'] as { tool: string };
     expect(call.tool).toBe('spend_today');
+  });
+
+  it('stop_closes_the_socket_and_ends_the_keepalive', async () => {
+    vi.useFakeTimers();
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    body.stop();
+    expect(sockets[0]!.closed).toBe(true);
+    vi.advanceTimersByTime(60_000);
+    expect(sockets[0]!.request('call')).toBeUndefined();
   });
 
   it('brain_notifications_other_than_use_are_ignored', async () => {
