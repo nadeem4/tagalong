@@ -800,7 +800,7 @@ async function captureForPanel(
 }
 
 /**
- * Wires every IPC channel. The handlers that only need the engine, the settings or the
+ * Wires every IPC channel. The handlers that only need the settings or the
  * voice live in `ipc/`, which takes what it needs as arguments so it is tested without
  * Electron; the ones left here need Electron itself: they move windows, read the screen
  * or open things through the shell.

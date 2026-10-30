@@ -188,7 +188,7 @@ export interface VoiceModels {
  */
 export interface HostView {
   settings: Settings;
-  /** Empty while the engine is down. */
+  /** Always the local Scout. */
   pets: Pet[];
   engineVersion: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */

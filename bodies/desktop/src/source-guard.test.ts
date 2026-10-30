@@ -39,25 +39,27 @@ function walk(path: string): string[] {
 
 const files = (): string[] => {
   const top = readdirSync(ROOT).filter((n) => ROOT_PATTERNS.some((r) => r.test(n)));
-  return [...ROOTS, ...top].flatMap((r) => {
-    try {
-      return walk(join(ROOT, r));
-    } catch {
-      return [];
-    }
-  });
+  // A listed root that cannot be read throws, so the guard never goes quiet over a typo.
+  return [...ROOTS, ...top].flatMap((r) => walk(join(ROOT, r)));
 };
+const THIS_FILE = fileURLToPath(import.meta.url);
 
 // Built from pieces so this file does not name the package it forbids.
 const REMOVED_CORE = new RegExp(['@tagalong/' + 'core', 'packages/' + 'core'].join('|'));
 
 describe('source guard', () => {
+  it('fails_when_a_listed_root_is_missing', () => {
+    expect(() => walk(join(ROOT, 'no-such-root-for-the-guard'))).toThrow();
+  });
+
+  it('every_listed_root_exists', () => {
+    expect(() => files()).not.toThrow();
+  });
+
   it('nothing_names_the_removed_core_package', () => {
     const hits = files()
       .filter((f) => /\.(m?[jt]sx?|json|ya?ml|md|toml)$|\.prettierignore$/.test(f))
-      .filter(
-        (f) => !f.endsWith('source-guard.test.ts') && REMOVED_CORE.test(readFileSync(f, 'utf8')),
-      )
+      .filter((f) => f !== THIS_FILE && REMOVED_CORE.test(readFileSync(f, 'utf8')))
       .map(posix);
     expect(hits).toEqual([]);
   });
