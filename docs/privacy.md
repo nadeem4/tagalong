@@ -770,7 +770,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in                                   | the provider and model, how many characters and pictures         |
 | **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
-| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `voice, hotkeys`); never values |
+| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `voice, hotkeys`); never values  |
 
 - **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
   a test checks that it never gains one. A window title passes through the same secret scrubber as
