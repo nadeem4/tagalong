@@ -9,6 +9,7 @@ import {
   chromePermissions,
   chromePicture,
   chromePrompt,
+  chromeSearch,
   chromeSession,
   chromeStorage,
   chromeTabs,
@@ -35,6 +36,7 @@ const body = createBody({
   tabs: chromeTabs,
   page: chromePage,
   picture: chromePicture,
+  search: chromeSearch,
   broker: new PermissionBroker(chromePermissions, chromePrompt),
   openSocket: webSocket,
 });

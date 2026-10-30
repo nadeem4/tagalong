@@ -31,6 +31,32 @@ export interface PictureApi {
   capture(windowId: number): Promise<{ mime: 'image/jpeg'; base64: string }>;
 }
 
+/** One search result; for downloads `url` holds the state (complete, interrupted...). */
+export interface SearchHit {
+  title: string;
+  url: string;
+  when?: string | undefined;
+}
+
+export interface SearchApi {
+  history(
+    text: string,
+    sinceMs: number | undefined,
+    untilMs: number | undefined,
+    limit: number,
+  ): Promise<SearchHit[]>;
+  bookmarks(text: string, limit: number): Promise<SearchHit[]>;
+  /** Rejects with "not supported in this browser" when there is no reading list. */
+  readingList(text: string, limit: number): Promise<SearchHit[]>;
+  downloads(
+    text: string,
+    sinceMs: number | undefined,
+    untilMs: number | undefined,
+    limit: number,
+  ): Promise<SearchHit[]>;
+  closedTabs(limit: number): Promise<SearchHit[]>;
+}
+
 export interface PageApi {
   /** Injects the page reader into the tab and returns what it read. */
   read(tabId: number): Promise<PageReading>;

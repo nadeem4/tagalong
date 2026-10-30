@@ -5,10 +5,11 @@
  */
 import { BrainClient, type BrainSocket, type BrainStatus } from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
-import type { PageApi, PictureApi, StorageArea, TabsApi } from './layer/api';
+import type { PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
 import { readSettings } from './settings';
 import { toolset } from './tools/registry';
 import type { PermissionBroker } from './permissions';
+import { browserSearchTool } from './tools/browser-search';
 import { pagePartsTool } from './tools/page-parts';
 import { tabsTool } from './tools/tabs';
 
@@ -28,6 +29,7 @@ export interface BodyDeps {
   tabs: TabsApi;
   page: PageApi;
   picture: PictureApi;
+  search: SearchApi;
   broker: PermissionBroker;
   /** Makes the id's 4 random chars; tests pin it. */
   random?: () => string;
@@ -65,6 +67,7 @@ export function createBody(deps: BodyDeps): BrowserBody {
         bodyName: name,
       }),
       pagePartsTool({ tabs: deps.tabs, page: deps.page, needs: deps.broker, bodyName: name }),
+      browserSearchTool({ search: deps.search, needs: deps.broker, bodyName: name }),
     ]);
     client = new BrainClient({
       addr: settings.addr,

@@ -36,6 +36,13 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       parts: () => Promise.reject(new Error('unused')),
     },
     picture: { capture: () => Promise.reject(new Error('unused')) },
+    search: {
+      history: () => Promise.reject(new Error('unused')),
+      bookmarks: () => Promise.reject(new Error('unused')),
+      readingList: () => Promise.reject(new Error('unused')),
+      downloads: () => Promise.reject(new Error('unused')),
+      closedTabs: () => Promise.reject(new Error('unused')),
+    },
     broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
     random: () => 'ab12',
     openSocket: (url) => {
