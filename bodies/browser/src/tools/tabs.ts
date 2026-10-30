@@ -98,7 +98,8 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
     const lines = [`url: ${reading.url}`, `title: ${reading.title}`];
     if (reading.selection !== '') lines.push(`selection: ${reading.selection}`);
     let text = `${lines.join('\n')}\n\n${reading.text.slice(0, MAX_PAGE_TEXT_CHARS)}`;
-    if (reading.truncated) text += '\n[truncated at 40,000 characters]';
+    if (reading.truncated || reading.text.length > MAX_PAGE_TEXT_CHARS)
+      text += '\n[truncated at 40,000 characters]';
     return [{ type: 'text', text }];
   }
 

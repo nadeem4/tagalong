@@ -1,4 +1,7 @@
-/** Tests for the tabs tool, driven by fake tabs, page reader and permission needs. */
+/**
+ * Tests for the tabs tool, driven by fake tabs, page reader and permission needs.
+ * Covers list, read, the sleeping and locked-page refusals, and permission denials.
+ */
 import { ErrorCode, RpcError } from '@tagalong/contract';
 import { describe, expect, it, vi } from 'vitest';
 import type { PageApi, TabInfo, TabsApi } from '../layer/api';
@@ -26,7 +29,9 @@ const reading = (over: Partial<PageReading> = {}): PageReading => ({
   ...over,
 });
 
-function setup(opts: { tabs?: TabInfo[]; reading?: PageReading; denyWith?: RpcError } = {}) {
+function setup(
+  opts: { tabs?: TabInfo[]; reading?: PageReading; denyWith?: RpcError; denySite?: RpcError } = {},
+) {
   const all = opts.tabs ?? [tab()];
   const calls: Need[] = [];
   const tabs: TabsApi = {
@@ -40,6 +45,7 @@ function setup(opts: { tabs?: TabInfo[]; reading?: PageReading; denyWith?: RpcEr
     ensure: async (need) => {
       calls.push(need);
       if (opts.denyWith) throw opts.denyWith;
+      if (opts.denySite && need.kind === 'site') throw opts.denySite;
     },
   };
   const t = tabsTool({ tabs, page, needs, bodyName: 'Chrome' });
@@ -202,5 +208,31 @@ describe('tabs input and permissions', () => {
     const { t } = setup({ denyWith: denied });
     const e = await rejection(t.run({ action: 'list' }));
     expect(e).toBe(denied);
+  });
+
+  it('read_notes_a_cut_even_when_the_reader_did_not_flag_it', async () => {
+    const { text } = setup({ reading: reading({ text: 'x'.repeat(40_001), truncated: false }) });
+    expect((await text({ action: 'read' })).endsWith('\n[truncated at 40,000 characters]')).toBe(
+      true,
+    );
+  });
+
+  it('read_with_a_non_number_tab_id_is_invalid_params', async () => {
+    const { t } = setup();
+    const e = await rejection(t.run({ action: 'read', tab_id: '6' }));
+    expect(e.code).toBe(ErrorCode.invalid_params);
+  });
+
+  it('a_denied_site_stops_the_read', async () => {
+    const denied = new RpcError(ErrorCode.denied, 'You did not allow Scout on this site.');
+    const { t, read } = setup({ denySite: denied });
+    expect(await rejection(t.run({ action: 'read' }))).toBe(denied);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('a_sleeping_tab_never_asks_the_site_need', async () => {
+    const { t, calls } = setup({ tabs: [tab({ discarded: true })] });
+    await rejection(t.run({ action: 'read' }));
+    expect(calls.some((n) => n.kind === 'site')).toBe(false);
   });
 });

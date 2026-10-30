@@ -1,4 +1,7 @@
-/** Tests for the tool registry: what a body declares and how a call finds its tool. */
+/**
+ * Tests for the tool registry: what a body declares and how a call finds its tool,
+ * and the two errors every tool raises.
+ */
 import { ErrorCode, RpcError } from '@tagalong/contract';
 import { describe, expect, it } from 'vitest';
 import { failed, invalid, toolset, type BrowserTool } from './registry';
