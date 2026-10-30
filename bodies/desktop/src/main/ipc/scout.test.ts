@@ -28,7 +28,6 @@ describe('registerScoutIpc', () => {
   it.each([
     ['savePet', IPC.savePet, SCOUT],
     ['switchScout', IPC.switchScout, 'openrouter'],
-    ['finishWelcome', IPC.finishWelcome, 'claude-code'],
   ])('%s says it cannot do that yet', async (_name, channel, arg) => {
     const { invoke } = setup();
     await expect(invoke(channel, arg)).rejects.toThrow(NOT_YET);

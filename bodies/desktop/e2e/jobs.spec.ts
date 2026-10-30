@@ -31,7 +31,6 @@ test.beforeAll(async () => {
       TAGALONG_BRAIN_ADDR: brain.addr,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
-      TAGALONG_SKIP_WELCOME: '1',
     },
   });
 });

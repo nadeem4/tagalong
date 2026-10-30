@@ -58,7 +58,7 @@ export const LISTENING_MARK_MS = 8_000;
 /**
  * "Listening" on Scout for a few seconds at launch when Always listening is on, and each time
  * it is switched on; switching it off clears it. "Not listening" while it is on but paused
- * (a call, full screen, Welcome).
+ * (a call, full screen).
  */
 export function markListening(
   marks: StatusMarks,

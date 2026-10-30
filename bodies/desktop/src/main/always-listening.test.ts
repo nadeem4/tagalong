@@ -79,16 +79,11 @@ describe('listeningBlocked', () => {
 
 describe('listeningPaused', () => {
   it('pauses for a call or full screen, and while the pets are hidden: the mark is then never out of sight', () => {
-    const why = { blocked: false, petsShown: true, setupOpen: false };
+    const why = { blocked: false, petsShown: true };
     expect(listeningPaused(why)).toBe(false);
     expect(listeningPaused({ ...why, blocked: true })).toBe(true);
     expect(listeningPaused({ ...why, petsShown: false })).toBe(true);
     expect(listeningPaused({ ...why, blocked: true, petsShown: false })).toBe(true);
-  });
-
-  it('pauses while setup is open: setup has the mic to itself', () => {
-    expect(listeningPaused({ blocked: false, petsShown: true, setupOpen: true })).toBe(true);
-    expect(listeningPaused({ blocked: false, petsShown: true, setupOpen: false })).toBe(false);
   });
 });
 

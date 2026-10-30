@@ -19,5 +19,4 @@ export function registerScoutIpc(handle: IpcHandle): void {
   handle(IPC.listPets, (): Pet[] => [localScout()]);
   handle(IPC.savePet, () => Promise.reject(new Error(NOT_YET)));
   handle(IPC.switchScout, () => Promise.reject(new Error(NOT_YET)));
-  handle(IPC.finishWelcome, () => Promise.reject(new Error(NOT_YET)));
 }

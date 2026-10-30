@@ -68,16 +68,10 @@ export function listeningBlocked(windows: readonly WindowEntry[]): boolean {
 
 /**
  * Listening waits for a call or a full-screen window, and while the pets are hidden (the
- * tray's Hide pets): the mark on Scout is then never out of sight while the mic is open. It
- * also waits while Welcome is open, as Welcome may be listening for its answers and the
- * voice process hears one window at a time.
+ * tray's Hide pets): the mark on Scout is then never out of sight while the mic is open.
  */
-export function listeningPaused(why: {
-  blocked: boolean;
-  petsShown: boolean;
-  setupOpen: boolean;
-}): boolean {
-  return why.blocked || !why.petsShown || why.setupOpen;
+export function listeningPaused(why: { blocked: boolean; petsShown: boolean }): boolean {
+  return why.blocked || !why.petsShown;
 }
 
 export const LISTENING_GUARD_MS = 2_000;

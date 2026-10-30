@@ -82,10 +82,7 @@ export default defineConfig({
         input: {
           avatar: 'src/renderer/avatar.html',
           panel: 'src/renderer/panel.html',
-          settings: 'src/renderer/settings.html',
-          welcome: 'src/renderer/welcome.html',
           home: 'src/renderer/home.html',
-          pointer: 'src/renderer/pointer.html',
         },
       },
     },

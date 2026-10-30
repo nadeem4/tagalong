@@ -30,7 +30,6 @@ async function launch(
       ...process.env,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
-      TAGALONG_SKIP_WELCOME: '1',
       TAGALONG_FAKE_TOOL: tool,
       TAGALONG_FAKE_TOOL_INPUT: JSON.stringify(input),
     },
@@ -84,7 +83,7 @@ test.describe('the hand-off card', () => {
       ask: 'Fix the failing login test',
       expert_id: 'claude-code',
     }));
-    // The expert Welcome would add. Fake mode answers it with a scripted connector: no
+    // A Claude Code expert. Fake mode answers it with a scripted connector: no
     // claude process starts.
     const avatar = await windowFor(app, 'avatar');
     await avatar.evaluate(() =>

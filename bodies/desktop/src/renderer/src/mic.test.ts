@@ -1,7 +1,7 @@
 /** Tests for openMic: the microphone and audio graph are closed on every failure. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openMic } from './mic';
-import { micFailure } from './setup-ears';
+import { micFailure } from './mic-failure';
 
 /** A microphone and an audio graph that fails at `failAt`, in plain Node. */
 function fakeAudio(failAt: 'context' | 'worklet' | 'node' | 'worklet-abort') {

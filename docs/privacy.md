@@ -842,8 +842,7 @@ there is no switch, because it holds no content and an off switch would weaken t
   only its app.
 - **What makes no row.** A read the blind spots or your exclusions refused, and anything while sight is
   paused, because nothing was read. A watch comparing frames on this computer with no picture sent. The
-  window titles keeping an eye on things follows every five seconds. The key check in Welcome, which
-  sends no screen. Voice: audio never leaves the computer and is never stored, so there is no "heard"
+  window titles keeping an eye on things follows every five seconds. Voice: audio never leaves the computer and is never stored, so there is no "heard"
   row; what you say to Scout becomes a question, and its text reaching the provider is a **Sent to
   AI** row.
 - **Kept 7 days** by default, 1 to 30 in **Settings → Privacy → Keep the record of what Scout saw**.

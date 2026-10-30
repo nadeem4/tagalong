@@ -27,7 +27,6 @@ tools exist, what goes into the prompt and what is recorded. Windows is the only
 | Screenshots                    | `platform/capture.ts` (focused window, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/displays.ts` (every display, composite, `displayRefusals`), `platform/region.ts` (crop) |
 | Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                                                       |
 | Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                                                |
-| Pointing (sight side)          | `platform/find-element.ts`, `platform/point-target.ts`                                                                                                                                                          |
 | Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`                                                                       |
 | Rolling memory and diff        | `bodies/desktop/src/main/awareness/` (`rolling-memory.ts`, `frame-ring.ts`, `perception-memory.ts`, `pixel-diff.ts`, `native-codec.ts`, `clock.ts`)                                                             |
 | Exclusion rules and inventory  | `packages/core/src/perception/exclusions.ts`, `inventory.ts`, `text-layer.ts`, `retention.ts`, `browser-route.ts`, `host.ts`; `packages/protocol/src/blind-spots.ts`                                            |
@@ -69,7 +68,7 @@ Every method beyond `capture` is optional, and a tool requires both the capabili
 `No connected host can … right now.` tool result rather than an exception.
 
 The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`,
-`clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer`. It never advertises
+`clipboard`, `screenshot`, `displays`, `textLayer`, `recall`. It never advertises
 `pageText`; page text used to come only from the old Chrome extension. The browser body now
 offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
@@ -86,7 +85,6 @@ offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 | `captureRegion(params, exclusions)`                 | a native-resolution crop of one display                | `sight`       |
 | `readWindowText(params, exclusions)`                | one window's text                                      | `sight`       |
 | `lookAtWindow(params, exclusions)`                  | PNG of one listed window                               | `sight`       |
-| `findElement(params, exclusions)`                   | one element's rectangle, by its accessibility name     | `sight`       |
 | `captureSelection()`                                | the selection, by the clipboard trick                  | `handed-over` |
 | `readClipboard()`                                   | the clipboard text                                     | `handed-over` |
 
@@ -157,10 +155,9 @@ calls this function rather than its own copy of the arguments.
 `handleOf` turns an id back into a handle and returns null for anything the host did not mint, so a
 model-invented id fails as "no such window" rather than reaching a script.
 
-Callers that need titles only pass `countText: false`: keeping an eye, gentle nudges, the listening
-guard and `findElement`. Those three background loops call the gated platform directly in
-`index.ts`, not through the engine's host methods, so they write no sight-log row. Keeping an eye
-sends titles to the engine every `KEEP_AN_EYE_INTERVAL_MS` = 5,000 (see [mind.md](mind.md)).
+Callers that need titles only pass `countText: false`: gentle nudges and the listening guard.
+Those background loops call the gated platform directly in `index.ts`, not through the engine's
+host methods, so they write no sight-log row.
 
 `renderInventory` turns the list into prompt text: a three-line header, then windows grouped under
 `Screen 1:`, `Screen 2:` (numbered as the composite), `Not on a screen:` and `Minimized:`. Each
@@ -594,21 +591,10 @@ Conversations store only the ask text, the snapshot and the final answer text. T
 
 ### Pointing
 
-`point_at` is a sight read only in finding the place; drawing the ring is covered in
-[bubble.md](bubble.md). The sight side:
-
-- `{ windowId, name, label? }`: `findElementWith` looks the window up in the classified list
-  (titles only, `countText: false`), refuses a blocked window (`blocked`) or a minimized one (asks
-  to bring it forward), then runs `findElementScript`: `PER_MONITOR_AWARE`, the window by handle,
-  the first descendant whose UIA name matches exactly, then case-insensitively. An empty or
-  offscreen rectangle is `offscreen`. Timeout `WINDOW_TEXT_WALK_MS + 1,000` = 3,500. Only names and
-  one rectangle are read.
-- `{ displayId, rect, label? }`: no read at all; the rectangle is mapped by `displayRectToTarget`.
-- `answerPointAt` maps screen pixels to a display-local DIP rect (`screen.screenToDipRect`, the
-  display holding most of it wins) and answers `{ shown, screen?, blocked?, notes? }`.
-  `POINT_LABEL_MAX` = 40; `name` at most 200.
-- `findElement` is a `sight` method, so a pause refuses it. The overlay windows use
-  `setContentProtection(true)`, so Scout's own captures never show the ring.
+The desktop no longer answers `screen.pointAt`: the pointer overlay and its element lookup
+(`findElement`) were removed, and the desktop does not advertise the `pointer` capability. The
+engine's `point_at` tool and the protocol method stay in `packages/core` until that brain is
+deleted.
 
 ### Dropping things on Scout
 
@@ -706,7 +692,6 @@ actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 | `POINT_LABEL_MAX`                | 40              | `packages/protocol/src/methods.ts`                   |
 | `SIGHT_LOG_DEFAULT_DAYS`         | 7 (1 to 30)     | `packages/protocol/src/sight-log.ts`                 |
 | `MAX_SCREENSHOT_RETENTION_HOURS` | 24              | `packages/protocol/src/settings.ts`                  |
-| `KEEP_AN_EYE_INTERVAL_MS`        | 5,000           | `bodies/desktop/src/main/keep-an-eye.ts`             |
 
 ## Storage
 
@@ -776,7 +761,7 @@ sight, pointing and drops. Points that follow from this design:
 | `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                                                    |
 | Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                                                       |
 | Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                                                       |
-| Pointing lookup and mapping                                                                                                                  | `platform/find-element.test.ts`, `platform/point-target.test.ts`, `packages/core/src/tools/builtin/pointing.test.ts`                               |
+| Pointing lookup and mapping                                                                                                                  | `packages/core/src/tools/builtin/pointing.test.ts`                                                                                                 |
 | Exclusion matching, blind spots, secret files                                                                                                | `packages/core/src/perception/exclusions.test.ts`, `packages/protocol/src/blind-spots.test.ts`                                                     |
 | Inventory classification and the 400-token budget                                                                                            | `packages/core/src/perception/inventory.test.ts`                                                                                                   |
 | Attach policy (composite + focused, `all`, no empty image block), fence as data, image before text                                           | `packages/core/src/conversation/prompt-assembler.test.ts`                                                                                          |

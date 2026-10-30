@@ -22,10 +22,10 @@ configured brain still answers: a heard question goes to the engine as an ordina
 | Talk key (main)                | `bodies/desktop/src/main/talk-key.ts` (`TalkKeyWatch`, `startTalkKey`, `loadKeyHook`), `talkPressed` and `toPanel` in `bodies/desktop/src/main/index.ts`                                                                                                                                                                                                                                                                                                         |
 | Always listening (main)        | `bodies/desktop/src/main/always-listening.ts` (`AlwaysListening`, `listeningPaused`, `startListeningGuard`, `saveListening`), `markListening` in `bodies/desktop/src/main/status-marks.ts`                                                                                                                                                                                                                                                                       |
 | IPC                            | `bodies/desktop/src/main/ipc/voice.ts` (`registerVoiceIpc`, `forwardEars`), channels and types in `bodies/desktop/src/shared/ipc.ts`, the bridge in `bodies/desktop/src/preload/index.ts`                                                                                                                                                                                                                                                                        |
-| Renderer, hearing              | `bodies/desktop/src/renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`, `talk.ts` (`useTalk`), `talk-rules.ts`, `setup-ears.ts`, `voice-seam.ts`                                                                                                                                                                                                                                                                                                           |
+| Renderer, hearing              | `bodies/desktop/src/renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`, `talk.ts` (`useTalk`), `talk-rules.ts`, `mic-failure.ts`, `voice-seam.ts`                                                                                                                                                                                                                                                                                                          |
 | Renderer, speaking             | `bodies/desktop/src/renderer/src/voice-player.ts` (`prepareLine`, `playLine`, `onSystemVoice`, `pickSystemVoice`)                                                                                                                                                                                                                                                                                                                                                |
 | UI package                     | `bodies/ui/src/voice/listen-controller.ts`, `push-to-talk.ts`, `speech-queue.ts`, `spoken-stream.ts`, `speakable.ts`, `mouth.ts` (`QueueMouth`)                                                                                                                                                                                                                                                                                                                  |
-| Wiring                         | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechQueue`, `QueueMouth` and `useTalk`), `bodies/desktop/src/renderer/src/welcome.tsx` (setup's queue and `setupEars`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question, streams the spoken answer, barge-in)                                                                                                                                                                            |
+| Wiring                         | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechQueue`, `QueueMouth` and `useTalk`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question, streams the spoken answer, barge-in)                                                                                                                                                                                                                                                           |
 | Build                          | `bodies/desktop/electron.vite.config.ts` (entries `main` and `voice-worker`; `onnxruntime-node` and `uiohook-napi` in `NATIVE_DEPS`), `bodies/desktop/electron-builder.json` (`asarUnpack` for `*.node`, `onnxruntime-node/bin`, `@img`)                                                                                                                                                                                                                         |
 
 ## How it works
@@ -323,7 +323,7 @@ The always session (`#sync`):
 - One `always` session is open exactly while `always && !paused && !deaf`. A held session is left
   alone, because the key wins.
 - `setAlways(on)` is the person's switch. `setPaused(paused)` covers a call, full screen, the pets
-  hidden, or Welcome open. `setDeaf(deaf)` is true while the system voice speaks.
+  or hidden. `setDeaf(deaf)` is true while the system voice speaks.
 - When an always session ends mid-turn after it had already cut Scout off, `onDropped` fires and
   its words leave the bubble.
 
@@ -393,29 +393,18 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
 `useTalk` returns `talk.always` (`{ on, paused, onToggle }`) for the bubble's switch, and `hush()`
 for the stop button and the stop key.
 
-#### Setup ears
+#### Mic failures
 
-`renderer/src/setup-ears.ts#setupEars`. Welcome runs its own `ListenController` with
-`needsName: false`, so every turn is an answer.
+`renderer/src/mic-failure.ts#micFailure` maps a microphone error to `denied`, `busy` or `no-mic`:
 
-- `start()` first calls `ensureEars` and reports progress as `SetupListening`: a fraction capped
-  at 0.99. Only once the models are ready does it call `setAlways(true)`.
-- The mic closes on `stop()` or `dispose()`, on any failure, and while the system voice speaks.
-- A failure maps to a `ListenFailure`: `denied`, `busy`, `no-mic` or `model-failed`. `micFailure`
-  does the mapping:
-  - `NotAllowedError` or `SecurityError` is `denied`
-  - `NotReadableError` or `AbortError` is `busy`
-  - anything else is `no-mic`
-- A download that ends after a stop belongs to an earlier start and never opens the mic. The
-  `run` counter enforces this.
-
-While Welcome is open, main pauses Always listening (`setupOpen` in `listeningPaused`), and the
-talk key focuses Welcome instead of the panel. The voice process hears one window at a time.
+- `NotAllowedError` or `SecurityError` is `denied`
+- `NotReadableError` or `AbortError` is `busy`
+- anything else is `no-mic`
 
 #### The voice seam
 
 `renderer/src/voice-seam.ts#installVoiceSeam`. This puts `window.tagalongVoice` (`ears`,
-`openMic`, `ensureEars`) on the panel and Welcome. Its `ears.on` subscribes to `onEarsEvent` for
+`openMic`, `ensureEars`) on the panel. Its `ears.on` subscribes to `onEarsEvent` for
 good, and `listen` and `stop` go to one `held` `RemoteEars`. `ensureEars(onProgress)` invokes
 `IPC.ensureEars`. While the call runs, the preload relays `IPC.earsProgressEvent` to
 `onProgress`.
@@ -455,8 +444,7 @@ stateDiagram-v2
   down well within that time, so it never raises the bubble or cuts Scout off. A shorter tap is
   nothing. Repeated downs while the key is held are ignored.
 - **Press.** `onPress` calls `talkPressed()` in `main/index.ts`:
-  - If Welcome is open, the press focuses Welcome and does nothing else.
-  - Otherwise, if the bubble is hidden, it shows the avatar and brings the panel up with
+  - If the bubble is hidden, it shows the avatar and brings the panel up with
     `showPanelQuietly`, which does not take the keyboard. A focused bubble would swallow the
     shortcut the person meant.
   - It then sends `IPC.talkEvent` with `Date.now()`.
@@ -567,7 +555,7 @@ same addressing rule.
 
 Echo cancellation in `getUserMedia` removes Scout's own WebAudio playback, but not the system
 voice. While `speechSynthesis` speaks, `voice-player.ts` reports it through `onSystemVoice`.
-Both `useTalk` and `setupEars` pass that to `setDeaf(true)`, which closes the always session.
+`useTalk` passes that to `setDeaf(true)`, which closes the always session.
 When the system voice stops, the session opens again. A held question is not affected.
 
 ### The mouth
@@ -644,9 +632,6 @@ flowchart LR
   included, which is never played.
 - **Speaking flag.** `onSpeaking(true/false)` drives the panel's `speaking` state and the speaking
   indicator. A line that fails to play is logged and the queue moves on.
-
-Welcome builds its own `SpeechQueue`. On its `voice` step, the line is prepared with an empty
-preview (`prepareLine(text, {})`), so the sample plays even while Scout talks is off.
 
 #### Who says it
 
@@ -863,7 +848,7 @@ words, holders and clearing rules are in [bubble.md](bubble.md#status-marks). `r
   - The model downloads go to `huggingface.co`, fetching files only.
   - ElevenLabs is never used for hearing (no cloud speech to text).
 - **The key hook.** It compares every key event with one keycode and drops it.
-- **Always listening.** It is opt-in. It pauses for calls, full screen, hidden pets and Welcome.
+- **Always listening.** It is opt-in. It pauses for calls, full screen, and hidden pets.
   A mark on Scout always shows while it is on. An unaddressed turn is dropped, and its words are
   never passed on (`onUnaddressed` gets none).
 
@@ -889,6 +874,6 @@ The full statement is in `privacy.md`.
 | `bodies/ui/src/voice/speech-queue.test.ts`, `spoken-stream.test.ts`                                    | Sentence splitting, show-only blocks, list markers, short-line merging, one line ahead, stop dropping the prepared line.                                                                              |
 | `packages/protocol/src/addressing.test.ts`, `voice.test.ts`, `settings.test.ts`                        | "Scout"-like words, possessives, follow-up, stop, `mouthOrder`, `chosenMouth`, `Pushable`, the talk-key migration to `RightControl`.                                                                  |
 | `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`             | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                               |
-| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `setup-ears.test.ts`, `voice-player.test.ts`     | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, setup opening the mic only after the download, `micFailure`, system voice choice and its start and stop events.                            |
+| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`, `voice-player.test.ts`    | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`, system voice choice and its start and stop events.                                                                           |
 | `bodies/desktop/e2e/smoke.spec.ts`                                                                     | Talking to Scout through the real voice process on `FakeEars` and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint.                                                               |
 | `bodies/desktop/e2e/listening.spec.ts`                                                                 | Always listening off at launch, on only when switched, a "Scout, …" turn answered, then off again.                                                                                                    |

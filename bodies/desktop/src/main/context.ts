@@ -28,8 +28,6 @@ export const DESKTOP_CAPABILITIES = [
   // Advertised whether or not rolling memory is on: recall then answers that it
   // is not recording, which the pet can repeat, and diff works regardless for watches.
   'recall',
-  // Point, don't click: screen.pointAt draws a ring. Nothing is clicked or typed.
-  'pointer',
 ] as const;
 
 /**

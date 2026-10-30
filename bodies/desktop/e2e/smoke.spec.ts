@@ -1,6 +1,6 @@
 /**
  * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, capture, a
- * tool call over the real socket, the sight pause, hotkeys and sight settings, Welcome and Home.
+ * tool call over the real socket, the sight pause, hotkeys and sight settings, and Home.
  */
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -47,9 +47,6 @@ test.beforeAll(async () => {
       TAGALONG_FAKE_TTS: '1',
       // Talk to Scout hears a fixed question, through Chromium's fake microphone.
       TAGALONG_FAKE_STT: '1',
-      // Welcome would open on a fresh profile and change the window count the first test
-      // asserts. Its own test below opens it on purpose.
-      TAGALONG_SKIP_WELCOME: '1',
     },
   });
 });
@@ -488,24 +485,6 @@ test('sight detail and the window text budget save and read back', async () => {
   }
 });
 
-test('Setup opens on request: the steps are listed and an answer box waits', async () => {
-  const panel = await windowFor('panel');
-  await panel.evaluate(() => window.tagalongHost.openWelcome());
-  const setup = await windowFor('welcome');
-
-  await expect(setup).toHaveTitle('Set up Tagalong');
-  await expect(setup.getByRole('navigation', { name: 'Setup steps' })).toBeVisible();
-  await expect(setup.getByRole('heading', { level: 1 })).not.toBeEmpty();
-  await expect(setup.getByLabel('Answer Scout')).toBeVisible();
-
-  // Nothing is answered: finishing would change Scout and its settings for the rest of the suite.
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (w.webContents.getURL().includes('welcome.html')) w.close();
-    }
-  });
-});
-
 test('Home is one window: Scout, experts, activity and settings', async () => {
   test.skip(true, 'returns with row 8: the Experts page and its hand-off');
   const panel = await windowFor('panel');
@@ -548,12 +527,11 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
-  // Advanced is closed until asked for; it holds keys, summaries, sight detail and Welcome.
+  // Advanced is closed until asked for; it holds keys, summaries and sight detail.
   const advanced = home.getByRole('button', { name: /Advanced/ });
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
   await advanced.click();
   await expect(home.getByRole('list', { name: 'API keys' })).toBeVisible();
-  await expect(home.getByRole('button', { name: 'Open Welcome again' })).toBeVisible();
 
   // The Experts page lists the tools the companion hands work to.
   await nav.getByRole('button', { name: 'Experts' }).click();

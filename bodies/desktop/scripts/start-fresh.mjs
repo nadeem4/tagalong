@@ -2,7 +2,7 @@
 /* global console, process */
 /**
  * Starts the app as on a new install: on a data folder of its own in the temp directory,
- * so Welcome and Scout's first hello show every time. Your real data in
+ * so a first run shows every time. Your real data in
  * %APPDATA%\Tagalong (settings, the database, saved keys) is never touched.
  */
 import { spawnSync } from 'node:child_process';

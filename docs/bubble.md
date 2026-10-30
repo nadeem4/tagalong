@@ -188,7 +188,7 @@ finished card or a later step). The hand-off flow itself is in [experts.md](expe
 in [asks.md](asks.md); routines in [routines.md](routines.md); the settings card's checks in
 [settings-and-secrets.md](settings-and-secrets.md).
 
-**The hello after Welcome.** With `greeting` set (main's `IPC.greetEvent` after Welcome),
+**The hello.** With `greeting` set (main's `IPC.greetEvent`, which nothing sends on the Python brain yet),
 `TryItInvite` shows **Try it now** (focused) and **Got it**, and writes no line of its own. The
 line above them is the mind's: the first `pet.remark` without a `handoffId` that arrives while the
 hello is up, typed in at 22 ms a character (`TYPE_MS`; whole under `prefers-reduced-motion`), read
@@ -292,7 +292,7 @@ percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `brain-signed-out`, `brain-no-sign-in`, `brain-no-key` | `greetOnLaunch` from `brainReadiness`                                                                                                          | a `turn.completed` with text, or a sign-in check that finds Claude signed in (`clearBrainMarks`) |
 | `listening-on`                                         | `markListening`: at launch when Always listening is on, and each time it is switched on, for 8 s (`LISTENING_MARK_MS`)                         | the time, or switching it off                                                                    |
-| `listening-paused`                                     | `markListening`: on but paused (a call, full screen, Welcome)                                                                                  | resuming or switching off                                                                        |
+| `listening-paused`                                     | `markListening`: on but paused (a call, full screen)                                                                                           | resuming or switching off                                                                        |
 | `ears-loading` (with `percent`), `ears-failed`         | `forwardEars` from the voice process's `ears.status` and `ears.progress`; a voice process that exits after the ears were used is `ears-failed` | the next `ready`                                                                                 |
 | `mic-busy`, `mic-failed`, `say-name`                   | the panel only, through `IPC.setStatusMark(id, on)`; `say-name` for 8 s (`SAY_NAME_MARK_MS`)                                                   | the panel; `setPanelMark` refuses every other id                                                 |
 

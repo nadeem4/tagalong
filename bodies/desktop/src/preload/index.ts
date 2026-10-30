@@ -60,7 +60,6 @@ import type {
   HostView,
   ListeningState,
   ModelList,
-  PointerRing,
   SpeakPreview,
   SpeakResult,
   TagalongHostApi,
@@ -264,7 +263,6 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
   checkKey: (providerId: string) =>
     ipcRenderer.invoke(IPC.checkKey, providerId) as Promise<ProvidersCheckResult>,
-  openClaudeSignIn: () => ipcRenderer.invoke(IPC.openClaudeSignIn) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
   openBubble: () => ipcRenderer.invoke(IPC.openBubble) as Promise<void>,
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
@@ -305,15 +303,11 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,
   openLogsFolder: () => ipcRenderer.invoke(IPC.openLogsFolder) as Promise<void>,
-  openWelcome: () => ipcRenderer.invoke(IPC.openWelcome) as Promise<void>,
   openHome: () => ipcRenderer.invoke(IPC.openHome) as Promise<void>,
   onHomePage: (handler) => homePage.listen(handler),
-  finishWelcome: (providerId: string) =>
-    ipcRenderer.invoke(IPC.finishWelcome, providerId) as Promise<void>,
   checkClaudeSignIn: () => ipcRenderer.invoke(IPC.checkClaudeSignIn) as Promise<ClaudeSignIn>,
   switchScout: (providerId: string) =>
     ipcRenderer.invoke(IPC.switchScout, providerId) as Promise<Pet>,
-  openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
   browserFolder: () => ipcRenderer.invoke(IPC.browserFolder) as Promise<BrowserFolder>,
   showBrowserFolder: () => ipcRenderer.invoke(IPC.showBrowserFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
@@ -374,11 +368,6 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, state: ListeningState): void => handler(state);
     ipcRenderer.on(IPC.listeningEvent, listener);
     return () => void ipcRenderer.off(IPC.listeningEvent, listener);
-  },
-  onPointer: (handler) => {
-    const listener = (_event: IpcRendererEvent, ring: PointerRing): void => handler(ring);
-    ipcRenderer.on(IPC.pointerShow, listener);
-    return () => void ipcRenderer.off(IPC.pointerShow, listener);
   },
   // File.path is gone in Electron 44: webUtils, which a sandboxed preload may use, gives
   // the path. A File made in script, with no file behind it, gives '' and is left out.

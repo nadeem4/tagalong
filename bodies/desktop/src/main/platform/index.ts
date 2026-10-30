@@ -7,7 +7,6 @@
 import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
-import type { FindElementAnswer } from './find-element';
 import type { RegionCaptureParams } from './region';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import type { LookAtWindowAnswer } from './window-shot';
@@ -98,14 +97,6 @@ export interface Platform {
     params: { windowId: string; maxLongSide: number },
     exclusions: CaptureExclusions,
   ): Promise<LookAtWindowAnswer>;
-  /**
-   * Point, don't click: one element's rectangle, in screen pixels, found by its accessibility
-   * name inside one listed window. Reads names only. The exclusion check runs first.
-   */
-  findElement(
-    params: { windowId: string; name: string },
-    exclusions: CaptureExclusions,
-  ): Promise<FindElementAnswer>;
 }
 
 /**

@@ -52,7 +52,6 @@ export const SIGHT_POLICY: { readonly [K in keyof Platform]: 'sight' | 'handed-o
   captureRegion: 'sight',
   readWindowText: 'sight',
   lookAtWindow: 'sight',
-  findElement: 'sight',
   captureSelection: 'handed-over',
   readClipboard: 'handed-over',
 };
