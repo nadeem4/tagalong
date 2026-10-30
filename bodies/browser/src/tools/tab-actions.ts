@@ -83,7 +83,7 @@ export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
     await need('sessions', 'reopen the tab you closed last');
     const tab = await attempt('reopen a tab', () => actions.reopen());
     if (tab === null) return text('Nothing was recently closed, so nothing was reopened.');
-    return text(`Reopened "${tab.title}" (${tab.url}).`);
+    return text(`Reopened a tab.\nurl: ${tab.url}\ntitle: ${tab.title}`);
   }
 
   /** The page to save: what the call names, else the tab the person is looking at. */
@@ -118,7 +118,7 @@ export function tabActionsTool(deps: TabActionsDeps): BrowserTool {
     await need(permission, reason, remaining());
     const page = await pageToSave(input, remaining);
     await attempt(`save that to ${where}`, () => run(page.title, page.url));
-    return text(`Saved "${page.title}" to ${where}.`);
+    return text(`Saved to ${where}.\nurl: ${page.url}\ntitle: ${page.title}`);
   }
 
   return {

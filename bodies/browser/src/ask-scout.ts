@@ -5,6 +5,7 @@
  * the person's authority, and nothing is asked from a private window.
  */
 import { stripUrl } from './events';
+import type { PermissionsApi } from './permissions';
 
 export const MENU_ID = 'ask-scout';
 export const MENU_TITLE = 'Ask Scout about this';
@@ -15,7 +16,7 @@ const SELECTION_LEAD =
 
 export interface Ask {
   text: string;
-  /** Left out when neither the address nor the title is known (no `tabs` permission). */
+  /** Left out when neither the address nor the title is known or allowed (see gateAsk). */
   context?: { url: string; title: string };
 }
 
@@ -42,7 +43,23 @@ export function fromMenuClick(
     .slice(0, SELECTION_LIMIT)
     .replaceAll('"', "'");
   if (selected === '') return null;
-  return ask(`${SELECTION_LEAD}"${selected}"`, tab?.url ?? info.pageUrl, tab?.title);
+  // The click's own address is what the docs promise; the tab's is only a fallback.
+  return ask(`${SELECTION_LEAD}"${selected}"`, info.pageUrl ?? tab?.url, tab?.title);
+}
+
+/**
+ * Chrome fills a tab's url and title from host access alone, so the `tabs` allow is checked here.
+ * Without it a right-click keeps only its own address (no title), and the address bar sends none.
+ */
+export async function gateAsk(
+  ask: Ask | null,
+  source: 'menu' | 'omnibox',
+  permissions: Pick<PermissionsApi, 'contains'>,
+): Promise<Ask | null> {
+  if (!ask?.context) return ask;
+  if (await permissions.contains({ kind: 'permission', name: 'tabs' })) return ask;
+  if (source === 'omnibox') return { text: ask.text };
+  return { text: ask.text, context: { url: ask.context.url, title: '' } };
 }
 
 export function fromOmnibox(typed: string, tab: PageTab): Ask | null {

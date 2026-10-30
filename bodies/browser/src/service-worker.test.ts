@@ -3,7 +3,24 @@
  * and context-menu click listeners exist as soon as the module runs, so a stopped worker that is
  * woken by one of those events receives it.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// A fake body, so the tests can see what the worker says to Scout.
+const say = vi.hoisted(() => vi.fn(async (_text: string, _context?: unknown) => undefined));
+vi.mock('./body', () => ({
+  createBody: () => ({
+    start: async () => undefined,
+    restart: async () => undefined,
+    info: () => ({ status: 'offline' }),
+    tabChanged: () => undefined,
+    downloadChanged: () => undefined,
+    say,
+  }),
+}));
+
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+};
 
 type Listener = (...args: never[]) => unknown;
 
@@ -37,6 +54,8 @@ function fakeChrome() {
   return chrome;
 }
 
+beforeEach(() => say.mockClear());
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
@@ -64,7 +83,25 @@ describe('the service worker', () => {
       tab: { url: string; title: string },
     ) => void;
     onClicked({ menuItemId: 'other', selectionText: 'x' }, { url: 'https://a.test/', title: 'A' });
-    await Promise.resolve();
-    expect(chrome.tabs.query).not.toHaveBeenCalled();
+    await flush();
+    expect(chrome.permissions.contains).not.toHaveBeenCalled();
+    expect(say).not.toHaveBeenCalled();
+  });
+
+  it('a_click_on_the_menu_item_says_the_ask', async () => {
+    const chrome = fakeChrome();
+    vi.stubGlobal('chrome', chrome);
+    await import('./service-worker');
+    const onClicked = chrome.contextMenus.onClicked.listeners[0] as unknown as (
+      info: { menuItemId: string; selectionText: string },
+      tab: { url: string; title: string },
+    ) => void;
+    onClicked(
+      { menuItemId: 'ask-scout', selectionText: 'x' },
+      { url: 'https://a.test/', title: 'A' },
+    );
+    await flush();
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(say.mock.calls[0]?.[1]).toEqual({ url: 'https://a.test/', title: '' });
   });
 });

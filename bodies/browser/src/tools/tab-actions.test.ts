@@ -146,6 +146,8 @@ describe('tab_actions tool', () => {
     const out = await t.run({ action: 'reopen' });
     expect(asked).toEqual([{ kind: 'permission', name: 'sessions' }]);
     expect(text(out as never)).toContain('Back');
+    expect(text(out as never)).toContain('title: Back');
+    expect(text(out as never)).not.toContain('"Back"');
     actions.reopen.mockResolvedValueOnce(null);
     const none = await t.run({ action: 'reopen' });
     expect(text(none as never)).toContain('Nothing was recently closed');
@@ -153,7 +155,9 @@ describe('tab_actions tool', () => {
 
   it('bookmark_defaults_to_the_active_tab', async () => {
     const { t, actions, asked } = setup();
-    await t.run({ action: 'bookmark' });
+    const saved = await t.run({ action: 'bookmark' });
+    expect(text(saved as never)).toContain('title: Active page');
+    expect(text(saved as never)).not.toContain('"Active page"');
     expect(asked).toEqual([
       { kind: 'permission', name: 'bookmarks' },
       { kind: 'permission', name: 'tabs' },

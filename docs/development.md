@@ -487,8 +487,9 @@ the length of the shared prefix through timing.
 
 ## The browser body in detail
 
-The browser body is a second body for the Python brain: it offers Scout a `tabs` tool (list the open
-tabs, read one). It has no chat and no side panel; Scout talks in the desktop bubble. Everything is in
+The browser body is a second body for the Python brain: it offers Scout the `tabs`, `page_parts`,
+`browser_search` and `tab_actions` tools, and you can ask Scout from a right-click on selected text or
+the address bar. It has no chat and no side panel; Scout talks in the desktop bubble. Everything is in
 [browser-body.md](browser-body.md).
 
 **It needs the brain running.** The body dials the brain on `127.0.0.1:47321` (change it in the

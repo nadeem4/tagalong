@@ -36,7 +36,7 @@ What it does:
 
 How it works:
 - Ask Scout about your tabs ("what tabs do I have open?", "read this page").
-- The first time Scout needs something, a small window asks you. Choose Allow on this site, Allow on all sites, or Not now.
+- The first time Scout needs something, a small window asks you. For a site you choose Allow on this site, Allow on all sites, or Not now; for anything else (tabs, history, bookmarks and so on) you choose Allow or Not now.
 - The toolbar button shows whether Scout's brain is reachable, lets you change its address, name this browser, and see or remove what you allowed.
 
 Setup: load the extension, then start the Tagalong brain. There is nothing to paste: the extension finds the brain at 127.0.0.1:47321, or at the address you set in the toolbar popup.
@@ -44,7 +44,7 @@ Setup: load the extension, then start the Tagalong brain. There is nothing to pa
 Privacy:
 - Reads a page only when Scout asks and you allowed it. Nothing runs in pages in the background.
 - Opens, closes, switches and groups tabs, and adds bookmarks or reading list entries, only when Scout does it for you. Each action asks you first in Tagalong until you set it to auto.
-- Sends text you select, or type after "scout" in the address bar, to Scout when you make that ask. With the tabs permission it also sends the page title and address, without query or fragment. Nothing from a private window.
+- Sends text you select, or type after "scout" in the address bar, to Scout when you make that ask. A right-click always sends the page address; the page title, and the address for an ask typed in the address bar, come only with the tabs permission. The address has no query or fragment. Nothing from a private window.
 - Talks only to the Tagalong brain at the address you set (127.0.0.1 unless you change it). There is no Tagalong server.
 - The brain sends your question and what you attached to the AI service you chose in Tagalong.
 - No ads, no analytics, no tracking. Nothing sold.
@@ -185,9 +185,8 @@ installer is public and the extension has been used for a while.
 The store needs a public URL for the policy. Steps for GitHub Pages from this repo. Nothing has
 been enabled.
 
-The repo is **private**. GitHub Pages from a private repo needs a paid GitHub plan (Pro or above),
-and the published site is still public. If that does not suit, copy `privacy-policy.md` into a
-small public repo and follow the same steps there.
+The repo is **public**, so GitHub Pages is free for it. If you would rather not publish from this
+repo, copy `privacy-policy.md` into a small separate public repo and follow the same steps there.
 
 1. Fill in the `[CONTACT EMAIL]` and `[EFFECTIVE DATE]` placeholders in `privacy-policy.md` and
    merge.
