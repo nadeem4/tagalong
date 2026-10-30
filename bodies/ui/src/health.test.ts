@@ -120,8 +120,8 @@ describe('healthRows', () => {
       connections: [{ name: 'GitHub', status: 'error' }],
     });
     expect(healthHeadline(rows)).toBe('Two things need you.');
-    expect(healthHeadline(healthRows({ ...ALL_GOOD, microphone: { count: 0, pickedMissing: false } }))).toBe(
-      'One thing needs you.',
-    );
+    expect(
+      healthHeadline(healthRows({ ...ALL_GOOD, microphone: { count: 0, pickedMissing: false } })),
+    ).toBe('One thing needs you.');
   });
 });

@@ -319,8 +319,7 @@ test('a tool call travels the real socket and the real host answers it', async (
   test.skip(true, 'returns with row 5d: window tools as body tools');
   const avatar = await windowFor('avatar');
 
-  // Every test in packages/core/src/perception hands the toolset a fake host, and every
-  // test in bodies/desktop/src/main/platform feeds a parser fixture output, so a tool and a
+  // Every test in bodies/desktop/src/main/platform feeds a parser fixture output, so a tool and a
   // host can each be right while the perception.* method between them is missing and the
   // whole suite stays green. This drives the real round trip.
   //

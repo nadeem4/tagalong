@@ -38,12 +38,7 @@ import {
 import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import {
-  StatusMarks,
-  markBrainLink,
-  markListening,
-  setPanelMark,
-} from './status-marks';
+import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';

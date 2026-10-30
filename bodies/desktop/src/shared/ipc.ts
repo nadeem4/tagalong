@@ -188,7 +188,7 @@ export interface VoiceModels {
  */
 export interface HostView {
   settings: Settings;
-  /** Empty while the engine is down: pets live in its database. */
+  /** Empty while the engine is down. */
   pets: Pet[];
   engineVersion: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */

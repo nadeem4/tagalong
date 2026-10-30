@@ -5,39 +5,39 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 
 /**
- * Flat config. The rule that matters most here is the purity guard on
- * packages/core and packages/protocol: neither may reach for electron, react,
+ * Flat config. The rule that matters most here is the purity guard on the protocol
+ * packages (packages/protocol and protocol/ts): neither may reach for electron, react,
  * or the DOM. If that rule fires, fix the import, never the rule.
  */
-const PURE_PACKAGES = ['packages/core/**/*.ts', 'packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'];
+const PURE_PACKAGES = ['packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'];
 
 const PURITY_PATHS = [
   {
     name: 'electron',
-    message: 'packages/core and packages/protocol must stay host-agnostic.',
+    message: 'The protocol packages must stay host-agnostic.',
   },
   {
     name: 'react',
-    message: 'packages/core and packages/protocol must stay UI-agnostic.',
+    message: 'The protocol packages must stay UI-agnostic.',
   },
   {
     name: 'react-dom',
-    message: 'packages/core and packages/protocol must stay UI-agnostic.',
+    message: 'The protocol packages must stay UI-agnostic.',
   },
 ];
 
 const PURITY_PATTERNS = [
   {
     group: ['electron/*', 'electron-*'],
-    message: 'packages/core and packages/protocol must stay host-agnostic.',
+    message: 'The protocol packages must stay host-agnostic.',
   },
   {
     group: ['react/*', 'react-dom/*'],
-    message: 'packages/core and packages/protocol must stay UI-agnostic.',
+    message: 'The protocol packages must stay UI-agnostic.',
   },
   {
     group: ['@tagalong/ui', '@tagalong/ui/*'],
-    message: 'The engine must not depend on the UI package.',
+    message: 'The protocol packages must not depend on the UI package.',
   },
 ];
 
@@ -74,31 +74,10 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { paths: PURITY_PATHS, patterns: PURITY_PATTERNS }],
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'No DOM globals in the engine.' },
-        { name: 'document', message: 'No DOM globals in the engine.' },
-        { name: 'navigator', message: 'No DOM globals in the engine.' },
-        { name: 'localStorage', message: 'No DOM globals in the engine.' },
-      ],
-    },
-  },
-  {
-    // The runner and engine reach tools through the registry, so there is one place a
-    // turn's tools are decided. Repeats the purity lists: a later block replaces a rule's
-    // options rather than merging them.
-    files: ['packages/core/src/conversation/**/*.ts', 'packages/core/src/engine.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: PURITY_PATHS,
-          patterns: [
-            ...PURITY_PATTERNS,
-            {
-              group: ['**/tools/builtin', '**/tools/builtin/**'],
-              message: 'Import tools from tools/registry or the tools index, never a built-in.',
-            },
-          ],
-        },
+        { name: 'window', message: 'No DOM globals in the protocol packages.' },
+        { name: 'document', message: 'No DOM globals in the protocol packages.' },
+        { name: 'navigator', message: 'No DOM globals in the protocol packages.' },
+        { name: 'localStorage', message: 'No DOM globals in the protocol packages.' },
       ],
     },
   },

@@ -168,9 +168,7 @@ describe('DockPet', () => {
   });
 
   it('shows the top status mark as a tag, named in its label', () => {
-    const { rerender } = render(
-      <DockPet pet={SCOUT} mood="idle" status={{ id: 'mic-busy' }} />,
-    );
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" status={{ id: 'mic-busy' }} />);
     expect(screen.getByTestId('status-mark')).toHaveTextContent('Mic busy');
     expect(screen.getByRole('img')).toHaveAccessibleName(
       `Scout is idle, ${STATUS_WORDS['mic-busy'].detail}`,
@@ -295,13 +293,7 @@ describe('moods', () => {
 
   it('keeps every mark over Bean: tag, paused, listening and status', () => {
     render(
-      <DockPet
-        pet={SCOUT}
-        mood="working"
-        recording
-        listening="on"
-        status={{ id: 'mic-busy' }}
-      />,
+      <DockPet pet={SCOUT} mood="working" recording listening="on" status={{ id: 'mic-busy' }} />,
     );
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
     expect(screen.getByTestId('recording-dot')).toBeInTheDocument();

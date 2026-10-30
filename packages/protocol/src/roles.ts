@@ -1,7 +1,6 @@
 /**
- * Roles: the job a pet does, compiled from `packages/core/roles/*.md` by core's gen-roles
- * script. Contains Role and ModelTier. Also published as `@tagalong/protocol/roles` so the
- * script can validate role files without loading the whole package.
+ * Roles: the job a pet does. Contains Role and ModelTier. Also published as
+ * `@tagalong/protocol/roles`.
  */
 import { z } from 'zod';
 
@@ -11,7 +10,7 @@ export type ModelTier = z.infer<typeof ModelTier>;
 
 /**
  * A job a pet does: what it is good at, the tools it reaches for, and the model it would
- * like. Compiled from `packages/core/roles/*.md`. The role only recommends a model; the
+ * like. The role only recommends a model; the
  * pet's own model setting always wins.
  */
 export const Role = z.object({

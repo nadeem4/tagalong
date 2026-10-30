@@ -109,7 +109,7 @@ export type TurnEvent =
       [N in TurnNotification]: { type: N } & NotificationParamsOf<N>;
     }[TurnNotification]
   // The brain only says the apps changed; the page reads the list again. The old engine's
-  // payload (packages/core) is not part of the bodies' contract.
+  // payload is not part of the bodies' contract.
   | { type: 'connections.changed' };
 
 export interface AskInput {

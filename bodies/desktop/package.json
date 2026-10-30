@@ -32,7 +32,6 @@
     "@fontsource/pixelify-sans": "5.3.0",
     "@playwright/test": "1.63.0",
     "@tagalong/contract": "workspace:*",
-    "@tagalong/core": "workspace:*",
     "@tagalong/protocol": "workspace:*",
     "@tagalong/ui": "workspace:*",
     "@types/cross-spawn": "6.0.6",

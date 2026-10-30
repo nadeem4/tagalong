@@ -25,7 +25,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ steps.filter.outputs.code == 'true' || steps.filter.outputs.roles == 'true' }}
+      code: ${{ steps.filter.outputs.code == 'true' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -33,15 +33,12 @@ jobs:
         id: filter
         with:
           predicate-quantifier: every
-          # `code`: any file outside docs/ that is not Markdown. `roles`: the role files are
-          # Markdown but compile into core, and a test fails when the compiled file is stale.
+          # `code`: any file outside docs/ that is not Markdown.
           filters: |
             code:
               - '**'
               - '!docs/**'
               - '!**/*.md'
-            roles:
-              - 'packages/core/roles/**'
 
   # Everything that runs anywhere runs here, on Linux: a Linux minute bills at half a Windows one.
   # It also runs when `changes` itself failed: a skipped required check counts as passed, so
@@ -128,9 +125,9 @@ jobs:
         run: pnpm build
 
       # The unit tests that skip themselves off Windows: the real PowerShell transport and
-      # recogniser, and the npm .cmd shims claude is started through.
+      # recogniser.
       - name: Windows-only unit tests
-        run: pnpm exec vitest run integration.test claude-sign-in.test claude-code.test
+        run: pnpm exec vitest run integration.test
 
       # The runner is windows-latest, which has an interactive desktop session, so Electron
       # opens real windows and needs no xvfb-style wrapper. The step is capped because

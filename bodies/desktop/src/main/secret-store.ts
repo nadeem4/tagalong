@@ -31,7 +31,7 @@ export interface SafeStorageLike {
 }
 
 /**
- * The engine's SecretStore backed by the OS keychain through Electron safeStorage.
+ * The SecretStore backed by the OS keychain through Electron safeStorage.
  *
  * Only ciphertext is written, base64 wrapped so the file stays plain JSON. If the OS has
  * no encryption backend the store refuses to write at all: an API key sitting readable in
