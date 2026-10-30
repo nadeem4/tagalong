@@ -3,7 +3,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import {
   AlwaysListening,
   LISTENING_GUARD_MS,

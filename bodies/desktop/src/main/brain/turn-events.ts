@@ -4,7 +4,7 @@
  * the whole reply, but the brain streams it, so the mapper keeps each open turn's text.
  */
 import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
-import type { TurnEvent } from '@tagalong/ui';
+import type { TurnEvent } from '@tagalong/ui/shapes';
 
 const BUDGET_MESSAGE = "Scout has used today's budget. It starts again tomorrow.";
 const ERROR_MESSAGE = "Scout's brain hit a problem with that one. Try again?";
@@ -44,8 +44,6 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         turnId: p.turn,
         text,
         stopReason,
-        // The contract carries no token counts; the UI only needs the field to exist.
-        usage: { inputTokens: 0, outputTokens: 0 },
       },
     ];
   }
@@ -81,8 +79,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
   }
 
   // Ids of the confirm cards shown, so a closed frame only dismisses a card that was shown.
-  // The dismissal is its own event, not asks.changed: Home counts and lists those from the
-  // old engine, which knows nothing of the brain's asks.
+  // The dismissal is its own event, not asks.changed: Home lists asks from the brain itself.
   const asks = new Set<string>();
 
   const dismiss = (approvalId: string): TurnEvent => ({ type: 'connector.dismiss', approvalId });

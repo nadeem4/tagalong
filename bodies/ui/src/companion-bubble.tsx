@@ -7,13 +7,15 @@
 
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pushable } from '@tagalong/protocol';
+import { Pushable } from './shapes';
 import type {
   ConnectorConfirmParams,
   ContextSnapshot,
+  FixTarget,
   Mouth,
   StatusMark as StatusMarkValue,
-} from '@tagalong/protocol';
+  TurnEvent,
+} from './shapes';
 import { ANSWER_CSS, Answer } from './answer';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
@@ -22,9 +24,8 @@ import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { wantsHealthCheck } from './health-ask';
 import { healthHeadline, healthRows } from './health';
-import type { FixTarget, HealthRow } from './health';
+import type { HealthRow } from './health';
 import { HealthCard } from './health-card';
-import type { TurnEvent } from './host-bridge';
 import { themeTokens as t } from './theme/tokens';
 import { stopStatus } from './stop-status';
 import { SpokenStream } from './voice/spoken-stream';
@@ -393,7 +394,7 @@ export function CompanionBubble({
 
   /**
    * Asks one question, with what the companion can see, and keeps the last answer above.
-   * A spoken question may cut in on an answer still running: the engine stops that turn.
+   * A spoken question may cut in on an answer still running: the brain stops that turn.
    */
   const submit = (
     text: string,
@@ -439,7 +440,7 @@ export function CompanionBubble({
       .catch((error: unknown) =>
         setReply({
           state: 'failed',
-          text: error instanceof Error ? error.message : 'Tagalong could not reach its engine.',
+          text: error instanceof Error ? error.message : 'Tagalong could not reach its brain.',
         }),
       );
   };

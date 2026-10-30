@@ -3,7 +3,7 @@
  * Contains fixPage.
  */
 
-import type { FixTarget } from '@tagalong/ui';
+import type { FixTarget } from '@tagalong/ui/shapes';
 
 /**
  * Where each Fix it lands: a Settings section (`settings#<section id>`) or a Home page. The

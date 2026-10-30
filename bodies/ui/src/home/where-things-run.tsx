@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo } from '@tagalong/protocol';
+import type { AppInfo } from '../shapes';
 import { useHostBridge, type BrainLink } from '../host-bridge';
 import { STATUS_DOT, STATUS_WORDS } from './connections-panel';
 

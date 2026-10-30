@@ -5,7 +5,7 @@
  */
 import { BrainClient } from '@tagalong/contract';
 import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';

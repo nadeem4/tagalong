@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppInfo } from '@tagalong/protocol';
+import type { AppInfo } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';

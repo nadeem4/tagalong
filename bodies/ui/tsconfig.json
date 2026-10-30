@@ -7,6 +7,5 @@
     "jsx": "react-jsx"
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "references": [{ "path": "../../packages/protocol" }]
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

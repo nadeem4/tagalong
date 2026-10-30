@@ -1,10 +1,11 @@
 /**
- * The Platform interface: everything the engine can ask this machine to perceive. Contains
+ * The Platform interface: everything the brain can ask this machine to perceive. Contains
  * Platform, its shapes (WindowBounds, ActiveWindowInfo, CapturedImage, WindowInventory) and
  * createPlatform. Windows is the only adapter.
  */
 
-import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { ScreenInfo, WindowEntry } from '@tagalong/ui/shapes';
 
 import type { DisplaysCapture } from './displays';
 import type { RegionCaptureParams } from './region';
@@ -33,7 +34,7 @@ export interface CapturedImage {
   height: number;
 }
 
-/** Everything the engine can ask this machine to perceive. */
+/** Everything the brain can ask this machine to perceive. */
 export interface Platform {
   getActiveWindow(): Promise<ActiveWindowInfo | null>;
   captureSelection(): Promise<string | null>;
@@ -101,7 +102,7 @@ export interface Platform {
 
 /**
  * Throws on an unsupported platform rather than returning a stub: a host that silently
- * perceives nothing looks like a broken engine, not a missing adapter.
+ * perceives nothing looks like a broken brain, not a missing adapter.
  */
 export function createPlatform(platform: NodeJS.Platform = process.platform): Platform {
   if (platform === 'win32') return new Win32Platform();

@@ -104,7 +104,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
 
 - **The built-in blind spots.** Always on, listed read-only in Settings → Privacy under **Scout never looks
   at**, as chips built from the `BLIND_SPOTS` labels, and kept apart from your own exclusion list so clearing that list never removes them
-  (`BLIND_SPOTS` in `packages/protocol/src/blind-spots.ts`):
+  (`BLIND_SPOTS` in `bodies/desktop/src/shared/blind-spots.ts`):
   - password managers: 1Password, Bitwarden, KeePass, KeePassXC, LastPass, Dashlane, Keeper, Proton
     Pass, Enpass;
   - the Windows sign-in screen, the UAC prompt, Windows Security and Credential Manager;
@@ -225,9 +225,6 @@ it.
   Set `screenshotRetention` to `{ "mode": "hours", "hours": 1-24 }` to keep them for debugging;
   expired images — and every stored image, the moment you switch retention back off — are swept on
   the next turn.
-- A pet whose provider cannot see images never receives the screenshot: it is dropped before the
-  request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
-  turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - A pasted key is saved to the OS keychain
   before its one test (one tiny request to that service); a key that fails the test stays there

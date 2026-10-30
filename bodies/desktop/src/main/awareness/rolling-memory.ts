@@ -5,7 +5,7 @@
  */
 
 import { findCaptureBlock } from '../platform/exclusions';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import type { Platform } from '../platform/index';
 import { isSightPaused } from '../platform/sight-gate';
 import type { Clock } from './clock';

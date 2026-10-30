@@ -7,7 +7,7 @@ import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
 import type { ListeningDot } from '@tagalong/ui';
-import type { Pet, StatusMark } from '@tagalong/protocol';
+import type { Pet, StatusMark } from '@tagalong/ui/shapes';
 import type { ListeningState } from '../../shared/ipc';
 // Bundled, not fetched: the dock's tags are Onest 600, Latin subset only.
 import '@fontsource/onest/latin-600.css';

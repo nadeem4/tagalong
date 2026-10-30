@@ -32,7 +32,6 @@
     "@fontsource/pixelify-sans": "5.3.0",
     "@playwright/test": "1.63.0",
     "@tagalong/contract": "workspace:*",
-    "@tagalong/protocol": "workspace:*",
     "@tagalong/ui": "workspace:*",
     "@types/cross-spawn": "6.0.6",
     "@types/react": "19.3.0",
@@ -46,7 +45,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "vite": "^7.3.6",
-    "ws": "8.21.3"
+    "ws": "8.21.3",
+    "zod": "4.6.2"
   },
   "description": "Tagalong: Scout, an AI companion that sees what you are working on and hands work to experts.",
   "author": "Tagalong"

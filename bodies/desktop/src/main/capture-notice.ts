@@ -3,7 +3,7 @@
  * captureNotice and captureTooltip.
  */
 
-import type { CaptureBlock } from '@tagalong/protocol';
+import type { CaptureBlock } from '@tagalong/ui/shapes';
 import type { CaptureNotice } from '../shared/ipc';
 
 export interface CaptureNoticeInput {

@@ -4,20 +4,19 @@
  * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
  */
 
-import type { CaptureBlock } from '@tagalong/protocol';
+import type { CaptureBlock } from '@tagalong/ui/shapes';
 import type {
   ContextSnapshot,
   EarsEvent,
   ListenMode,
   Pet,
   PetRemarkParams,
-  Settings,
-  SettingsPatch,
   StatusMark,
   MouthId,
-  VoiceId,
-} from '@tagalong/protocol';
-import type { DropOffer, FixTarget, HostBridge } from '@tagalong/ui';
+} from '@tagalong/ui/shapes';
+import type { Settings, SettingsPatch, VoiceId } from './settings';
+import type { DropOffer, HostBridge } from '@tagalong/ui';
+import type { FixTarget } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {
@@ -190,7 +189,8 @@ export interface HostView {
   settings: Settings;
   /** Always the local Scout. */
   pets: Pet[];
-  engineVersion: string;
+  /** The desktop app's own version (not the brain's). */
+  appVersion: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
   /** `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */

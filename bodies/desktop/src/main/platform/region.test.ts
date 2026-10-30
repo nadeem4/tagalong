@@ -6,7 +6,8 @@ import { captureRegionWith } from './region';
 import type { RegionCaptureDeps } from './region';
 import type { DisplayImagePort } from './displays';
 import type { ActiveWindowInfo } from './index';
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 /** A capturer thumbnail that records how it was cropped and resized. */
 function fakeImage(

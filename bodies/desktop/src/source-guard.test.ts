@@ -44,8 +44,17 @@ const files = (): string[] => {
 };
 const THIS_FILE = fileURLToPath(import.meta.url);
 
-// Built from pieces so this file does not name the package it forbids.
+// Built from pieces so this file does not name the packages it forbids.
 const REMOVED_CORE = new RegExp(['@tagalong/' + 'core', 'packages/' + 'core'].join('|'));
+const REMOVED_PROTOCOL = new RegExp(
+  ['@tagalong/' + 'protocol', 'packages/' + 'protocol'].join('|'),
+);
+
+const namers = (re: RegExp): string[] =>
+  files()
+    .filter((f) => /\.(m?[jt]sx?|json|ya?ml|md|toml)$|\.prettierignore$/.test(f))
+    .filter((f) => f !== THIS_FILE && re.test(readFileSync(f, 'utf8')))
+    .map(posix);
 
 describe('source guard', () => {
   it('fails_when_a_listed_root_is_missing', () => {
@@ -57,10 +66,10 @@ describe('source guard', () => {
   });
 
   it('nothing_names_the_removed_core_package', () => {
-    const hits = files()
-      .filter((f) => /\.(m?[jt]sx?|json|ya?ml|md|toml)$|\.prettierignore$/.test(f))
-      .filter((f) => f !== THIS_FILE && REMOVED_CORE.test(readFileSync(f, 'utf8')))
-      .map(posix);
-    expect(hits).toEqual([]);
+    expect(namers(REMOVED_CORE)).toEqual([]);
+  });
+
+  it('nothing_names_the_removed_protocol_package', () => {
+    expect(namers(REMOVED_PROTOCOL)).toEqual([]);
   });
 });

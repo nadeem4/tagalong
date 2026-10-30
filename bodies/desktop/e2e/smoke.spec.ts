@@ -324,7 +324,7 @@ test('a tool call travels the real socket and the real host answers it', async (
   // whole suite stays green. This drives the real round trip.
   //
   // The fake pet is scripted to call list_windows before it answers, so asking anything
-  // drives a real core-to-host request over the loopback socket into the real Electron
+  // drives a real brain-to-host request over the loopback socket into the real Electron
   // host, which really enumerates this machine's windows.
   const events = await avatar.evaluate(async () => {
     const seen: Array<{ type: string; tool: string | undefined; ok: boolean | undefined }> = [];

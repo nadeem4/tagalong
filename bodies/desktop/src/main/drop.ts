@@ -8,8 +8,8 @@
 
 import { posix, win32 } from 'node:path';
 import { secretFileRule } from './platform/exclusions';
-import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
-import type { CapturedImage, Dropped } from '@tagalong/protocol';
+import { MAX_SELECTION_CHARS } from '@tagalong/ui/shapes';
+import type { CapturedImage, Dropped } from '@tagalong/ui/shapes';
 import type { DropOffer } from '@tagalong/ui';
 import { MAX_SCREENSHOT_LONG_SIDE } from './context';
 import type { IpcHandle } from './ipc/handle';

@@ -8,8 +8,8 @@
  * Nothing is ever typed either: this watches, it sends no input.
  */
 
-import type { TalkKey } from '@tagalong/protocol';
-import { TALK_KEY_RIGHT_CTRL } from '@tagalong/protocol';
+import type { TalkKey } from '../shared/settings';
+import { TALK_KEY_RIGHT_CTRL } from '../shared/settings';
 
 /** The part of uiohook-napi this module uses, so tests can drive key events by hand. */
 export interface KeyHook {

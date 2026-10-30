@@ -1,7 +1,8 @@
 /** Tests for the fake ears. */
 
 import { describe, expect, it } from 'vitest';
-import { EARS_FRAME, Pushable } from '@tagalong/protocol';
+import { EARS_FRAME } from '../../../shared/voice';
+import { Pushable } from '@tagalong/ui/shapes';
 import { FAKE_ALWAYS_TRANSCRIPT, FAKE_TRANSCRIPT, FAKE_TURN_FRAMES, FakeEars } from './fake-ears';
 
 const FRAME = new Float32Array(EARS_FRAME);

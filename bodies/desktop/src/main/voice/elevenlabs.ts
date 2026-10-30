@@ -1,6 +1,6 @@
 /** Speech from ElevenLabs with the person's own key. Contains elevenLabsTts. */
 
-import { MAX_ELEVENLABS_SPEED, MIN_VOICE_SPEED } from '@tagalong/protocol';
+import { MAX_ELEVENLABS_SPEED, MIN_VOICE_SPEED } from '../../shared/settings';
 import type { Tts } from './voice';
 
 /** ElevenLabs' low-latency model, made for real-time speech. */

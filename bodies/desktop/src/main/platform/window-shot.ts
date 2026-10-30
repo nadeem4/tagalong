@@ -3,7 +3,7 @@
  * classified inventory before any pixel is read. Contains lookAtWindowWith.
  */
 
-import type { CaptureBlock, WindowEntry } from '@tagalong/protocol';
+import type { CaptureBlock, WindowEntry } from '@tagalong/ui/shapes';
 import { handleOf } from './window-list';
 import type { CapturedImage } from './index';
 

@@ -1,10 +1,10 @@
 /** Tests for the pet IPC on the brain: Scout is a fixed local pet. */
 
 import { describe, expect, it } from 'vitest';
-import { SCOUT_ID } from '@tagalong/protocol';
+
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
-import { localScout, registerScoutIpc } from './scout';
+import { SCOUT_ID, localScout, registerScoutIpc } from './scout';
 
 function setup() {
   const ipc = fakeIpc();

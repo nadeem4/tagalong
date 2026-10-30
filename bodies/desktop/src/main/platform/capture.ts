@@ -4,7 +4,8 @@
  * captureActiveWindowImageWith and captureWindowImageWith.
  */
 
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 
 import { displayRefusals } from './displays';
 import { fitWithin } from './downscale';

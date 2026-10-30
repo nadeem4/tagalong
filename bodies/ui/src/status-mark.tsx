@@ -4,8 +4,8 @@
  * spoken, never in Scout's voice. Contains StatusMark.
  */
 
-import { STATUS_WORDS, statusTag } from '@tagalong/protocol';
-import type { FixTarget, StatusMark as Mark } from '@tagalong/protocol';
+import { STATUS_WORDS, statusTag } from './shapes';
+import type { FixTarget, StatusMark as Mark } from './shapes';
 import { themeTokens as t } from './theme/tokens';
 
 export interface StatusMarkProps {

@@ -1,6 +1,6 @@
 /** Tests for reading one window's text, with OCR when the text layer is thin. */
 
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { describe, expect, it, vi } from 'vitest';
 
 import { readWindowTextWith } from './read-text';

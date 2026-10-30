@@ -1,6 +1,6 @@
 ---
 name: tagalong-phase
-description: Use when building any phase or task of the Tagalong project in this repo - before scaffolding packages, writing core/protocol/ui/desktop/extension code, committing, or marking a Notion task Done.
+description: Use when building any phase or task of the Tagalong project in this repo - before scaffolding packages, writing protocol/ts, ui, desktop or browser body code, committing, or marking a Notion task Done.
 ---
 
 # Tagalong Phase Execution
@@ -31,11 +31,11 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 2. **Write the failing test first.** No production code without a test that motivated it.
 3. Make it pass. Refactor.
 4. Update `README.md`, the subsystem doc in `docs/` (the index is `docs/README.md`;
-   `docs/architecture.md` for the processes, packages and the life of a turn), `docs/protocol.md`
-   ("How to add a method") for a new method, and any doc the change invalidates. Docs are part of
+   `docs/architecture.md` for the processes, packages and the life of a turn), `protocol/README.md`
+   for a new contract message, and any doc the change invalidates. Docs are part of
    done, not a follow-up.
 5. Commit with a Conventional Commit message scoped to the package
-   (`feat(core): add PromptAssembler`, `chore(repo): add eslint flat config`).
+   (`feat(desktop): add the talk key`, `chore(repo): add eslint flat config`).
 6. Set the task `Status` to `Done` only when its `Acceptance` text is literally satisfied.
 
 ## The loop, per phase
@@ -55,7 +55,7 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 
 ## Invariants that outrank convenience
 
-- **The protocol packages are pure.** `packages/protocol` and `protocol/ts` must never import `electron`,
+- **The contract package is pure.** `protocol/ts` depends on zod only and must never import `electron`,
   `react`, or DOM globals. An ESLint `no-restricted-imports` rule enforces it — if that rule
   fires, fix the import, never the rule.
 - **No computer control, ever.** No mouse or keyboard automation anywhere in the repo. The one
@@ -118,7 +118,7 @@ a decision the next agent will have to re-think unless it is written down.
 
 ## Red flags — stop and re-read the phase page
 
-- About to import `electron` or `react` into `core` or `protocol`
+- About to import `electron` or `react` into `protocol/ts` or `@tagalong/ui/shapes`
 - About to write production code with no failing test behind it
 - About to mark a task `Done` without running its `Acceptance` text
 - About to start phase N+1 while a phase N task is still `Not started`

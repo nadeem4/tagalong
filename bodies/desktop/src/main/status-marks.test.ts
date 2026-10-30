@@ -1,7 +1,7 @@
 /** Tests for the status marks holder: the top mark by order, the time limit and change events. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusMark } from '@tagalong/protocol';
+import type { StatusMark } from '@tagalong/ui/shapes';
 import { AlwaysListening } from './always-listening';
 import {
   LISTENING_MARK_MS,

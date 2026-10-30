@@ -29,7 +29,6 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - protocol/examples: sample frames shared by the TypeScript and Python tests
 - protocol/ts: `@tagalong/contract`, zod schemas for contract v1
 - brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types; `server.py` is the websocket server, `sessions.py` the one conversation, `memory.py` the memory store, `tools.py` the brain's own tools, `toolbox.py` the tool gate, `apps.py`, `app_oauth.py` and `app_tools.py` connected apps (MCP), their browser sign-in and their tools, `asks.py` permission asks, `side_check.py` Scout approving an ask under a preference, `offers.py` Scout offering a preference, `guardrails.py` the budget, `guards.py` the guard runner, `masking.py` the Masker, save guard and log filter (secrets become `[secret]` before they are saved), `builtin_guards.py` the built-in guards, `events.py` and `scheduler.py` the event kinds and the wakes (Scout speaks first), `timers.py` Scout's timers, `questions.py` an expert's question to Scout first, `mind/` Scout's soul, `events.md` (per-kind notes), `approvals.md` (side-check and offer wording), prompt, thinking loop and `resume.py` (rebuilds history from the saved chat); see docs/brain.md)
-- packages/protocol: wire types and the JSON-RPC method catalog shared by brain and bodies
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
 - bodies/desktop: Electron body (dials the Python brain)
 - bodies/browser: browser body (Chromium)
@@ -37,7 +36,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 
 ## Conventions
 
-- Protocol packages stay pure: packages/protocol and protocol/ts never import electron, react or browser globals (ESLint enforces).
+- The contract package stays pure: protocol/ts depends on zod only and never imports electron, react or browser globals (ESLint enforces). Shared React-free shapes live in bodies/ui/src/shapes (`@tagalong/ui/shapes`).
 - Use the tagalong-phase skill when building a phase or task.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...

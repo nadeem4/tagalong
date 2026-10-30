@@ -10,7 +10,8 @@ import type {
   PerceptionTarget,
   Pet,
   MemoryEntry,
-} from '@tagalong/protocol';
+  TurnEvent,
+} from '../shapes';
 import type {
   ApprovalCounts,
   ApprovalRow,
@@ -20,7 +21,6 @@ import type {
   JobRow,
   PermissionRow,
   PreferenceRow,
-  TurnEvent,
 } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {

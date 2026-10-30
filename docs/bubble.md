@@ -123,7 +123,7 @@ stateDiagram-v2
   steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`, and a typed
   question's answer goes to `onSay` once.
 - `turn.error` for `mine`, or a rejected `ask`, shows a `role="alert"` line (the error message, or
-  "Tagalong could not reach its engine.").
+  "Tagalong could not reach its brain.").
 - **Stop** (while running) calls `interrupt(mine)`.
 - A spoken question (`talk.onHeard`) asks with `asSpoken`: the bubble opens a `Pushable` stream on
   `mouth.speak` and feeds each `turn.delta` through a `SpokenStream`, so the first sentence is said
@@ -235,7 +235,7 @@ speech.
 Only the mind speaks in Scout's voice. What the body knows (it cannot think, the microphone is
 busy, the speech models are downloading, listening is paused) shows as a neutral status mark.
 
-- **The wording table** is `packages/protocol/src/status.ts`. `StatusId`, in the order that picks
+- **The wording table** is `bodies/ui/src/shapes/status.ts`. `StatusId`, in the order that picks
   the top mark: `brain-offline`, `brain-outdated`, `ears-failed`, `mic-busy`,
   `mic-failed`, `ears-loading`, `listening-paused`, `say-name`, `listening-on`. `StatusMark { id,
 percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail` (the tooltip,

@@ -3,7 +3,7 @@
  * and `focus` (the front window changed). Facts only; the brain decides whether to speak.
  * A blocked window is never reported, so an excluded app never leaves the machine.
  */
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
 
 /** How often the front window is read. */

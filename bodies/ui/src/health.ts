@@ -4,10 +4,7 @@
  * FixTarget, healthRows and healthHeadline.
  */
 
-import type { ConnectionStatus, FixTarget, MouthId } from '@tagalong/protocol';
-
-/** Where a Fix it button lands; the type lives in protocol, beside the status marks. */
-export type { FixTarget };
+import type { ConnectionStatus, FixTarget, MouthId } from './shapes';
 
 /**
  * What the health check read, from calls the host already makes. Each is `unknown` when its

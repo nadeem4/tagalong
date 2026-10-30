@@ -3,7 +3,7 @@
  * window changed). Fake timers; the clock is injected.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
 import { createBackSender, frontWindow, startFocusWatch } from './body-events';
 

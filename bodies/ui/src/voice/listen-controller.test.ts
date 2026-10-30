@@ -1,7 +1,7 @@
 /** Tests for ListenController: held, always, and always without the name. */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
+import type { Ears, EarsEvent, ListenMode, MicStream } from '../shapes';
 import { ListenController } from './listen-controller';
 import type { ListenControllerOptions, ListenMic } from './listen-controller';
 

@@ -4,8 +4,8 @@
  * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes,
  * HeardInbox and NOTHING_HEARD.
  */
-import { STATUS_WORDS, addressedToScout } from '@tagalong/protocol';
-import type { ListenMode } from '@tagalong/protocol';
+import { STATUS_WORDS, addressedToScout } from '@tagalong/ui/shapes';
+import type { ListenMode } from '@tagalong/ui/shapes';
 import { micFailure } from './mic-failure';
 
 export const FIRST_TIME =

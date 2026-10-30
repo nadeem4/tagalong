@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS } from '../shared/settings';
 import { SETTINGS_FILENAME, SettingsStore } from './settings-store';
 import { InMemorySecretStore } from './test-support/in-memory-secret-store';
 

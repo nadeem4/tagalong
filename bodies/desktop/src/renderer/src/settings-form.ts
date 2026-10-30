@@ -8,8 +8,9 @@ import {
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
   SettingsPatch,
-} from '@tagalong/protocol';
-import type { SettingsPatch as SettingsPatchType, VoiceAdapterFacts } from '@tagalong/protocol';
+} from '../../shared/settings';
+import type { SettingsPatch as SettingsPatchType } from '../../shared/settings';
+import type { VoiceAdapterFacts } from '../../shared/voice';
 
 /** The settings form's raw values, as `FormData` hands them over: every field a string. */
 export interface SettingsFormValues {

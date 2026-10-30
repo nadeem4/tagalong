@@ -1,7 +1,7 @@
 /**
  * What a log line keeps of console arguments, and forwardConsole, which the voice process
  * uses to send its warnings to main's log file. Kept apart from log-file.ts so the voice
- * process's bundle needs neither core nor the disk. Contains keptText and forwardConsole.
+ * process's bundle needs neither the brain nor the disk. Contains keptText and forwardConsole.
  */
 
 export type Level = 'warn' | 'error';

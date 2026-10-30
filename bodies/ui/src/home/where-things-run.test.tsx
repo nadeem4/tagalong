@@ -5,7 +5,7 @@
 
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppInfo } from '@tagalong/protocol';
+import type { AppInfo } from '../shapes';
 import { HostBridgeProvider, type BrainLink } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { WhereThingsRun } from './where-things-run';

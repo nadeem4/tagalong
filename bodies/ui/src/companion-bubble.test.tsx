@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot } from './shapes';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';
@@ -46,7 +46,6 @@ const done = (turnId: string, text: string) =>
     turnId,
     text,
     stopReason: 'end',
-    usage: { inputTokens: 0, outputTokens: 0 },
   }) as const;
 
 const ask = (text: string) => {
@@ -213,7 +212,6 @@ describe('CompanionBubble and background turns', () => {
         petId: 'scout',
         conversationId: CONVERSATION,
         background: true,
-        jobId: '20000000-0000-4000-8000-000000000001',
       });
     });
     act(() => bridge.emit({ type: 'turn.delta', turnId: 'job-turn', text: 'Job gist.' }));

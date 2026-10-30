@@ -4,7 +4,7 @@
  * Scout keeps its local voice. The key is stored like the others and never read back into the
  * form.
  */
-import type { Settings } from '@tagalong/protocol';
+import type { Settings } from '../../../shared/settings';
 import { Info, Tip, useInvalid } from './section';
 
 export function ElevenLabsSection({

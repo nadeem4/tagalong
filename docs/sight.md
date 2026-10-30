@@ -27,8 +27,8 @@ The desktop host does the reading. Windows is the only platform.
 | Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                                                |
 | Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`                                                                       |
 | Rolling memory and diff        | `bodies/desktop/src/main/awareness/` (`rolling-memory.ts`, `frame-ring.ts`, `perception-memory.ts`, `pixel-diff.ts`, `native-codec.ts`, `clock.ts`)                                                             |
-| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `packages/protocol/src/blind-spots.ts`                                                                                 |
-| Wire shapes                    | `packages/protocol/src/context.ts`, `awareness.ts`, `methods.ts` (`coreToHostMethods`), `limits.ts`, `settings.ts`                                                                                              |
+| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                                                             |
+| Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `bodies/desktop/src/main/awareness/recall.ts`, `shared/settings.ts`                                                                                  |
 
 ## How it works
 
@@ -36,7 +36,7 @@ The desktop host does the reading. Windows is the only platform.
 
 The Python brain does not ask for reads yet. On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the bubble's capture path call it from `context.ts`.
 
-The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`. It never advertises `pageText`; the browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
+The desktop advertises `DESKTOP_CAPABILITIES` (`context.ts`): `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
 ### The platform adapter
 
@@ -240,7 +240,7 @@ Two lists, one matcher. `findCaptureBlock(window, exclusions)` (`exclusions.ts`)
 `CaptureBlock` (`{ rule: 'processName' | 'titlePattern', entry }`) that refuses a window, or null.
 It checks, in order:
 
-1. `BUILT_IN_EXCLUSIONS`, built from `BLIND_SPOTS` (`packages/protocol/src/blind-spots.ts`), always:
+1. `BUILT_IN_EXCLUSIONS`, built from `BLIND_SPOTS` (`bodies/desktop/src/shared/blind-spots.ts`), always:
    - password managers: process names `1Password.exe`, `Bitwarden.exe`, `KeePass.exe`,
      `KeePassXC.exe`, `LastPass.exe`, `Dashlane.exe`, `Keeper Password Manager.exe`,
      `Proton Pass.exe`, `Enpass.exe`, and title globs `*1Password*`, `*Bitwarden*`, `*KeePass*`,
@@ -402,34 +402,33 @@ not block a drop.
 | `tagalong:get-sight-paused`, `tagalong:toggle-sight-pause`, `tagalong:sight-pause-event` | invoke / event | pause state                                                  |
 | `tagalong:get-recording`, `tagalong:recording-event`                                     | invoke / event | the recording dot                                            |
 
-**Settings** (`packages/protocol/src/settings.ts`): `captureExclusions`, `rollingMemory`, `hotkeys.ask`, `hotkeys.pauseSight`.
+**Settings** (`bodies/desktop/src/shared/settings.ts`): `captureExclusions`, `rollingMemory`, `hotkeys.ask`, `hotkeys.pauseSight`.
 
 ## Constants and limits
 
-| Constant                     | Value           | File                                 |
-| ---------------------------- | --------------- | ------------------------------------ |
-| `MAX_SCREENSHOT_LONG_SIDE`   | 1568            | `bodies/desktop/src/main/context.ts` |
-| `FRAME_LONG_SIDE`            | 640             | `awareness/rolling-memory.ts`        |
-| `AFTER_CROP_LONG_SIDE`       | 1024            | `awareness/perception-memory.ts`     |
-| `OCR_MAX_LONG_SIDE`          | 2,500           | `platform/ocr.ts`                    |
-| `OCR_TIMEOUT_MS`             | 10,000          | `platform/ocr.ts`                    |
-| `WINDOW_HELPER_TIMEOUT_MS`   | 8,000           | `platform/win32.ts`                  |
-| `WINDOW_TEXT_WALK_MS`        | 2,500           | `platform/window-text.ts`            |
-| `WINDOW_COUNT_WALK_MS`       | 400             | `platform/window-text.ts`            |
-| `COUNT_PASS_TIMEOUT_MS`      | 5,000           | `platform/text-layer.ts`             |
-| `MAX_OUTPUT_BYTES`           | 1,000,000       | `platform/window-helper.ts`          |
-| `MAX_WINDOWS`                | 64              | `platform/window-list.ts`            |
-| `THIN_TEXT_CHARS`            | 500             | `platform/text-layer-notes.ts`       |
-| `COPY_SETTLE_MS`             | 150             | `platform/selection.ts`              |
-| `MAX_SELECTION_CHARS`        | 20,000          | `packages/protocol/src/limits.ts`    |
-| `MAX_PAGE_TEXT_CHARS`        | 40,000          | `packages/protocol/src/limits.ts`    |
-| `DEFAULT_WINDOW_TEXT_CHARS`  | 8,000           | `packages/protocol/src/limits.ts`    |
-| `MAX_WINDOW_TEXT_CHARS`      | 40,000          | `packages/protocol/src/limits.ts`    |
-| `ROLLING_TICK_MS`            | 5,000           | `awareness/rolling-memory.ts`        |
-| `MAX_ROLLING_MEMORY_MINUTES` | 30 (default 10) | `packages/protocol/src/settings.ts`  |
-| `FRESH_MS`                   | 1,000           | `awareness/perception-memory.ts`     |
-| `SCRATCH_IDLE_MS`            | 30,000          | `awareness/perception-memory.ts`     |
-| `CHANNEL_TOLERANCE`          | 24              | `awareness/pixel-diff.ts`            |
+| Constant                     | Value           | File                                    |
+| ---------------------------- | --------------- | --------------------------------------- |
+| `MAX_SCREENSHOT_LONG_SIDE`   | 1568            | `bodies/desktop/src/main/context.ts`    |
+| `FRAME_LONG_SIDE`            | 640             | `awareness/rolling-memory.ts`           |
+| `AFTER_CROP_LONG_SIDE`       | 1024            | `awareness/perception-memory.ts`        |
+| `OCR_MAX_LONG_SIDE`          | 2,500           | `platform/ocr.ts`                       |
+| `OCR_TIMEOUT_MS`             | 10,000          | `platform/ocr.ts`                       |
+| `WINDOW_HELPER_TIMEOUT_MS`   | 8,000           | `platform/win32.ts`                     |
+| `WINDOW_TEXT_WALK_MS`        | 2,500           | `platform/window-text.ts`               |
+| `WINDOW_COUNT_WALK_MS`       | 400             | `platform/window-text.ts`               |
+| `COUNT_PASS_TIMEOUT_MS`      | 5,000           | `platform/text-layer.ts`                |
+| `MAX_OUTPUT_BYTES`           | 1,000,000       | `platform/window-helper.ts`             |
+| `MAX_WINDOWS`                | 64              | `platform/window-list.ts`               |
+| `THIN_TEXT_CHARS`            | 500             | `platform/text-layer-notes.ts`          |
+| `COPY_SETTLE_MS`             | 150             | `platform/selection.ts`                 |
+| `MAX_SELECTION_CHARS`        | 20,000          | `bodies/ui/src/shapes/context.ts`       |
+| `MAX_PAGE_TEXT_CHARS`        | 40,000          | `bodies/browser/src/content/limits.ts`  |
+| `DEFAULT_WINDOW_TEXT_CHARS`  | 8,000           | `main/brain/body-tools.ts`              |
+| `ROLLING_TICK_MS`            | 5,000           | `awareness/rolling-memory.ts`           |
+| `MAX_ROLLING_MEMORY_MINUTES` | 30 (default 10) | `bodies/desktop/src/shared/settings.ts` |
+| `FRESH_MS`                   | 1,000           | `awareness/perception-memory.ts`        |
+| `SCRATCH_IDLE_MS`            | 30,000          | `awareness/perception-memory.ts`        |
+| `CHANNEL_TOLERANCE`          | 24              | `awareness/pixel-diff.ts`               |
 
 ## Storage
 
@@ -476,7 +475,7 @@ The privacy reference for everything above is [privacy.md](privacy.md): what is 
 | `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                     |
 | Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                        |
 | Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                        |
-| Exclusion matching, blind spots, secret files                                                                                                | `platform/exclusions.test.ts`, `packages/protocol/src/blind-spots.test.ts`                                          |
+| Exclusion matching, blind spots, secret files                                                                                                | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                                                         |
 | Inventory classification, text-layer notes                                                                                                   | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                                                   |
 | Rolling memory: opt-in, 640 px every 5 s, skip on exclusion, clear on pause/off/quit, no `fs`                                                | `bodies/desktop/src/main/awareness/rolling-memory.test.ts`, `frame-ring.test.ts`                                    |
 | Recall and diff, scratch ring expiry, refusal on exclusion                                                                                   | `awareness/perception-memory.test.ts`, `awareness/pixel-diff.test.ts`                                               |

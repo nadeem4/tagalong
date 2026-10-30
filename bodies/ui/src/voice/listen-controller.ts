@@ -4,8 +4,8 @@
  * ListenController and ListenMic. Used by the desktop renderer's talk wiring.
  */
 
-import { FOLLOW_UP_MS, addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
-import type { Ears, ListenMode, MicStream } from '@tagalong/protocol';
+import { FOLLOW_UP_MS, addressedToScout, isStopListening, mightBeStop } from '../shapes';
+import type { Ears, ListenMode, MicStream } from '../shapes';
 
 /** The open microphone, as the controller needs it: its frames, and a way to close it. */
 export type ListenMic = MicStream & { close(): void };

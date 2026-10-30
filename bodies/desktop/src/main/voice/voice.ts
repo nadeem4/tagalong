@@ -4,8 +4,9 @@
  * voice. Contains createVoiceService, LazyLocalVoice, the mouths and fakeTts.
  */
 
-import { chosenMouth, mouthOrder } from '@tagalong/protocol';
-import type { MouthId, Settings, VoiceId } from '@tagalong/protocol';
+import { chosenMouth, mouthOrder } from '../../shared/voice';
+import type { MouthId } from '@tagalong/ui/shapes';
+import type { Settings, VoiceId } from '../../shared/settings';
 import type { SpeakResult } from '../../shared/ipc';
 
 /** How a line is said: the local voice's id, and how fast. */

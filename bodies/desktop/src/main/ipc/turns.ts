@@ -4,8 +4,8 @@
  */
 
 import type { Part, SayParams } from '@tagalong/contract';
-import { STATUS_WORDS } from '@tagalong/protocol';
-import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
+import { STATUS_WORDS } from '@tagalong/ui/shapes';
+import type { ContextSnapshot, Dropped } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import { BrainOffline } from '@tagalong/contract';
 import type { BrainClient, BrainStatus } from '@tagalong/contract';

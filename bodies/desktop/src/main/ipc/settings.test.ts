@@ -2,8 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { InMemorySecretStore } from '../test-support/in-memory-secret-store';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings, SettingsPatch } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS } from '../../shared/settings';
+import type { Settings, SettingsPatch } from '../../shared/settings';
 import { IPC } from '../../shared/ipc';
 import type { HostView } from '../../shared/ipc';
 import { ELEVENLABS_SECRET_KEY } from '../secret-store';
@@ -43,7 +43,7 @@ describe('registerSettingsIpc: hostView', () => {
       elevenLabsKeyStored: true,
       settings: STORED_SETTINGS,
       pets: [localScout()],
-      engineVersion: '1.2.3',
+      appVersion: '1.2.3',
       platform: process.platform,
     });
   });

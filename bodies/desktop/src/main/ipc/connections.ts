@@ -6,12 +6,18 @@
  */
 
 import { ErrorCode } from '@tagalong/contract';
-import { AppAddParams, AppIdParams, AppSetEnabledParams, AppsList } from '@tagalong/protocol';
 import { RpcError } from '@tagalong/contract';
+import { AppAddParams, AppsList } from '@tagalong/ui/shapes';
+import { z } from 'zod';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
+
+/** What the brain's set_app_enabled takes. */
+export const AppSetEnabledParams = z.object({ id: z.string().min(1), enabled: z.boolean() });
+/** For the brain's remove_app, restart_app and sign_in_app. */
+export const AppIdParams = z.object({ id: z.string().min(1) });
 
 export interface ConnectionIpcDeps {
   /** Runs the brain's Home tools; rejects with BrainOffline while the brain is down. */

@@ -1,17 +1,22 @@
 /**
  * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window, open_url.
- * Declared in `hello`, run when the brain sends `use`. Names and descriptions carry over from
- * the old brain's perception tools. Every run is bounded at 15 s, and any capture that
- * reads pixels raises the capture notice, as the old engine host did.
+ * Declared in `hello`, run when the brain sends `use`. Every run is bounded at 15 s, and any
+ * capture that reads pixels raises the capture notice.
  */
 import { ErrorCode, type Part, type Tool } from '@tagalong/contract';
-import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
-import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
+
+import type { CaptureBlock } from '@tagalong/ui/shapes';
+import type { CaptureExclusions } from '../../shared/settings';
 import { captureNotice } from '../capture-notice';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { RpcError } from '@tagalong/contract';
 
+/**
+ * How much of one window's text a read returns unless asked otherwise: roughly 2,000 tokens,
+ * enough for a terminal's scrollback or an email body without spending a whole context window.
+ */
+const DEFAULT_WINDOW_TEXT_CHARS = 8_000;
 const RUN_TIMEOUT_MS = 15_000;
 const LONG_SIDE = 1568;
 const MINIMIZED = 'That window is minimized, so there is nothing drawn to look at.';

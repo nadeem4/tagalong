@@ -3,7 +3,7 @@
  * voice process, Always listening and the model check. Contains registerVoiceIpc and forwardEars.
  */
 
-import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
+import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import type { SpeakPreview, VoiceModels } from '../../shared/ipc';
 import { EARS_FILES, filesPresent } from '../voice/ears/model-files';

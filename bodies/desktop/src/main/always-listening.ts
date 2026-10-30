@@ -8,7 +8,8 @@
  */
 
 import { callOrFullScreenInFront } from './front-window';
-import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '../shared/settings';
+import type { WindowEntry } from '@tagalong/ui/shapes';
 import type { ListeningState } from '../shared/ipc';
 
 export type { ListeningState };

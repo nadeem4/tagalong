@@ -11,12 +11,12 @@ tagalong/
   package.json                      # pnpm workspace root (private)
   pnpm-workspace.yaml
   tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
-  vitest.config.ts                  # projects: packages/*, bodies/*; coverage thresholds
+  vitest.config.ts                  # projects: bodies/*, protocol/ts; coverage thresholds
   eslint.config.js
   .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
   docs/
     README.md                       # the index and reading order
-    architecture.md, protocol.md    # the whole system; the wire protocol
+    architecture.md                 # the whole system
     desktop.md, bubble.md, voice.md, browser-body.md   # the hosts
     sight.md, memory.md, connected-apps.md, brain.md   # the subsystems
     settings-and-secrets.md, privacy.md, development.md
@@ -28,23 +28,11 @@ tagalong/
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
                                     # config.py, bodies.py, server.py, apps.py, app_tools.py and
                                     # main.py (see docs/brain.md)
-  packages/
-    protocol/src/
-      index.ts                      # the contract's public exports
-      context.ts                    # ContextSnapshot, CapturedImage, DisplaySnapshot, WindowEntry,
-                                    # ContextSnapshotPatch, PerceptionTarget
-      pet.ts                        # Pet, SCOUT_ID
-      message.ts                    # Conversation, Message, MessageContent
-      rpc.ts                        # JSON-RPC envelopes and error codes
-      settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS
-      methods.ts                    # the method and notification catalog
-      roles.ts                      # Role, ModelTier
-                                    # plus activity, addressing, asks, awareness, blind-spots,
-                                    # connections, experience, experts, limits, memory, pick-up,
-                                    # routines, self, sight-log, status, usage and voice schemas
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
+      shapes/                       # @tagalong/ui/shapes, React-free: addressing, apps, context, memory,
+                                    # pet, status, turn-events, voice (also imported by desktop main)
       dock-pet.tsx, companion-bubble.tsx
       connector-confirm.tsx, drop-card.tsx,
       health-card.tsx, status-mark.tsx, answer.tsx
@@ -87,6 +75,8 @@ tagalong/
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock and Home
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
+      src/shared/                   # settings.ts (Settings schema and defaults), blind-spots.ts, voice.ts
+      src/main/awareness/recall.ts  # the recall result types (plain interfaces)
     browser/                        # browser body (Chromium MV3), built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/body.ts, identity.ts      # the body: one BrainClient, tools, body id <browser>-<4 chars>
@@ -95,12 +85,12 @@ tagalong/
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
-| Package             | Responsibility                                                                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                  |
-| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context.                                            |
-| `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears. |
-| `bodies/browser`    | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                |
+| Package          | Responsibility                                                                                                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocol/ts`    | `@tagalong/contract`: zod schemas for contract v1. Depends only on zod.                                                                                                      |
+| `bodies/ui`      | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context. `@tagalong/ui/shapes` is the React-free part. |
+| `bodies/desktop` | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.    |
+| `bodies/browser` | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                   |
 
 ## How to run
 
@@ -168,7 +158,7 @@ the root `vitest.config.ts`.
 
 | Area                                                       | Floor (statements / branches / functions / lines) |
 | ---------------------------------------------------------- | ------------------------------------------------- |
-| `packages/protocol/src`                                    | 70 / 70 / 70 / 70                                 |
+| `protocol/ts/src`                                          | 70 / 70 / 70 / 70                                 |
 | `bodies/ui/src`                                            | 91 / 83 / 90 / 93                                 |
 | `bodies/desktop/src/main` and `bodies/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
 
@@ -388,7 +378,7 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 ## Environment variables
 
 `.env.example` is a **reference list of the variables the project uses**, not a file the app loads.
-Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `bodies/`
+Nothing reads `.env.local`: there is no dotenv dependency, and no code in `protocol/` or `bodies/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
 Three environment variables are read by the desktop, all straight from the process environment. **Set them in the
@@ -412,8 +402,9 @@ rather than leaving a key readable on disk.
   motivated it.
 - **Never overengineer.** Build what the current task needs. Interfaces exist only where a second
   implementation is already planned.
-- **Protocol stays pure.** `packages/protocol` and `protocol/ts` must not import `electron`, `react`, or
-  browser globals. An ESLint `no-restricted-imports` rule enforces it.
+- **Protocol stays pure.** `protocol/ts` depends on zod only and must not import `electron`, `react`, or
+  browser globals. An ESLint `no-restricted-imports` rule enforces it. `@tagalong/ui/shapes` must stay
+  React-free (ESLint block plus `bodies/ui/src/source-guard.test.ts`).
 - **Docs are part of done.** Update `README.md`, the subsystem doc in `docs/` that describes the
   code you changed (the [index](README.md) lists them), and `docs/testing/feature-test-guide.md`
   with every change.

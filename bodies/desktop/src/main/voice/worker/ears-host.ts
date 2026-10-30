@@ -3,8 +3,8 @@
  * load. Contains createEarsHost and the failure lines the bubble shows.
  */
 
-import { Pushable } from '@tagalong/protocol';
-import type { Ears, EarsEvent, ListenMode } from '@tagalong/protocol';
+import { Pushable } from '@tagalong/ui/shapes';
+import type { Ears, EarsEvent, ListenMode } from '@tagalong/ui/shapes';
 import { FakeEars } from '../ears/fake-ears';
 import { LocalEars } from '../ears/local-ears';
 import { ModelIntegrityError } from '../ears/model-files';

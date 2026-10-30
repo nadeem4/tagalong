@@ -1,6 +1,6 @@
 /** Tests for panelSettings: the talk key as a person reads it, and the microphone. */
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
+import { SETTINGS_DEFAULTS, Settings } from '../../shared/settings';
 import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 
 describe('panelSettings', () => {

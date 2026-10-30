@@ -1,6 +1,6 @@
 /** Tests for startBrain: where it dials, that it starts at once, and the tools it declares. */
 import { describe, expect, it } from 'vitest';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import { startBrain } from './start';
 import type { BrainSocket } from '@tagalong/contract';
 import type { Platform } from '../platform/index';

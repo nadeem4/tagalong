@@ -1,8 +1,8 @@
 /** Tests for saveAvatarSpot: Scout's dragged position reaches the settings file and the live settings. */
 
 import { describe, expect, it, vi } from 'vitest';
-import type { Settings, SettingsPatch } from '@tagalong/protocol';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '../shared/settings';
+import { SETTINGS_DEFAULTS } from '../shared/settings';
 import { saveAvatarSpot } from './avatar-spot';
 
 describe('saveAvatarSpot', () => {

@@ -15,7 +15,6 @@ export type {
   PreferenceRow,
   PermissionRow,
   SpendToday,
-  TurnEvent,
 } from './host-bridge';
 
 export { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -27,7 +26,7 @@ export { BeanClip } from './theme/bean-clip';
 export type { BeanClipData } from './theme/bean-clip';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 
-/** Exported so hosts can test their renderer wiring without booting an engine. */
+/** Exported so hosts can test their renderer wiring without booting a brain. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 /** Home: the one window for jobs, permissions, approvals, connections, memory and settings. */
@@ -46,4 +45,4 @@ export { ListenController } from './voice/listen-controller';
 export type { ListenMic } from './voice/listen-controller';
 
 /** "Scout, what's wrong?": what a host reads for the health card, and where Fix it lands. */
-export type { FixTarget, HealthFacts } from './health';
+export type { HealthFacts } from './health';

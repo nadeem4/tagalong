@@ -141,7 +141,6 @@ describe('createTurnEvents', () => {
         turnId: T,
         text: 'Hello',
         stopReason,
-        usage: { inputTokens: 0, outputTokens: 0 },
       },
     ]);
   });
@@ -396,8 +395,8 @@ describe('createTurnEvents: asks', () => {
     });
   });
 
-  // Home counts asks.changed and lists them from the old engine, which knows nothing of the
-  // brain's asks, so a brain ask is dismissed through an event only the bubble handles.
+  // A brain ask is dismissed through an event only the bubble handles: Home lists asks from
+  // the brain itself, so asks.changed is not the way to take a card down.
   it('a closed ask dismisses just that card and never emits asks.changed', () => {
     const m = make();
     m.map('ask', open());
@@ -442,7 +441,6 @@ describe('createTurnEvents claim and blank remarks', () => {
         turnId: T,
         text: 'Time to stretch.',
         stopReason: 'end',
-        usage: { inputTokens: 0, outputTokens: 0 },
       },
     ]);
     expect(ended.some((e) => e.type === 'pet.remark')).toBe(false);

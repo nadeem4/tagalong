@@ -11,10 +11,10 @@ import {
   SETTINGS_DEFAULTS,
   TALK_KEYS,
   TALK_KEY_LABELS,
-  adaptersFor,
-  chosenMouth,
-} from '@tagalong/protocol';
-import type { MouthId, Settings, VoiceId } from '@tagalong/protocol';
+} from '../../../shared/settings';
+import { adaptersFor, chosenMouth } from '../../../shared/voice';
+import type { MouthId } from '@tagalong/ui/shapes';
+import type { Settings, VoiceId } from '../../../shared/settings';
 import { listMicrophones } from '../mic';
 import { voiceFacts } from '../settings-form';
 import { playLine } from '../voice-player';

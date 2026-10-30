@@ -527,7 +527,7 @@ Review rule for call sites: never put speech, screen or file text in a warning's
 - **main**: two entries, `main` (`src/main/index.ts`) and `voice-worker`
   (`src/main/voice/worker/main.ts`), to `dist/main.js` and `dist/voice-worker.js`, ES modules.
   `externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })` keeps the app's `dependencies`
-  external and bundles `@tagalong/protocol` and `@tagalong/ui`. They compile with
+  external and bundles `@tagalong/ui`. They compile with
   `moduleResolution: bundler`, so their emitted relative imports have no file extension and Node's
   ESM loader could not resolve them at runtime; Rollup resolves them at build time instead.
   `rollupOptions.external: NATIVE_DEPS` keeps the native modules out of the bundle even when a
@@ -607,22 +607,22 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 ## Constants and limits
 
-| Constant                            | Value                          | Where                               |
-| ----------------------------------- | ------------------------------ | ----------------------------------- |
-| `AVATAR_SIZE`, `AVATAR_EDGE_MARGIN` | 96 px, 16 px                   | `windows/position.ts`               |
-| `PANEL_WIDTH`, `PANEL_HEIGHT`       | 420 px, 520 px                 | `windows/panel.ts`                  |
-| `BUBBLE_HEIGHT`                     | 180 px (first height)          | `windows/panel.ts`                  |
-| `fitPanel` clamp                    | 80..520 px                     | `windows/panel.ts`                  |
-| Blur settle delay                   | 60 ms                          | `windows/panel.ts`                  |
-| `HOME_MIN_WIDTH`                    | 880 px (Home min height 600)   | `windows/home.ts`                   |
-| `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`                        |
-| `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`                        |
-| Default ask hotkey                  | `CommandOrControl+Shift+Space` | `packages/protocol/src/settings.ts` |
-| `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`                       |
-| `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`                  |
-| Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`                     |
-| Tray icon                           | 16 x 16                        | `tray-icon.ts`                      |
-| `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`              |
+| Constant                            | Value                          | Where                    |
+| ----------------------------------- | ------------------------------ | ------------------------ |
+| `AVATAR_SIZE`, `AVATAR_EDGE_MARGIN` | 96 px, 16 px                   | `windows/position.ts`    |
+| `PANEL_WIDTH`, `PANEL_HEIGHT`       | 420 px, 520 px                 | `windows/panel.ts`       |
+| `BUBBLE_HEIGHT`                     | 180 px (first height)          | `windows/panel.ts`       |
+| `fitPanel` clamp                    | 80..520 px                     | `windows/panel.ts`       |
+| Blur settle delay                   | 60 ms                          | `windows/panel.ts`       |
+| `HOME_MIN_WIDTH`                    | 880 px (Home min height 600)   | `windows/home.ts`        |
+| `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`             |
+| `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`             |
+| Default ask hotkey                  | `CommandOrControl+Shift+Space` | `src/shared/settings.ts` |
+| `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`            |
+| `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`       |
+| Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`          |
+| Tray icon                           | 16 x 16                        | `tray-icon.ts`           |
+| `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`   |
 
 ## Storage
 

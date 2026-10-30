@@ -2,7 +2,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot } from './shapes';
 import { HostBridgeProvider, useHostBridge } from './host-bridge';
 import { createFakeHostBridge } from './test-support/fake-host-bridge';
 

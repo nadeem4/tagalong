@@ -1,7 +1,7 @@
 /** Tests for the voice process's ears. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { EARS_FRAME } from '@tagalong/protocol';
+import { EARS_FRAME } from '../../../shared/voice';
 import {
   createEarsHost,
   EARS_DOWNLOAD_FAILED,

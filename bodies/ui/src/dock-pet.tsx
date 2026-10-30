@@ -5,8 +5,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { STATUS_WORDS } from '@tagalong/protocol';
-import type { Pet, StatusMark as StatusMarkValue } from '@tagalong/protocol';
+import { STATUS_WORDS } from './shapes';
+import type { Pet, StatusMark as StatusMarkValue } from './shapes';
 import { StatusMark } from './status-mark';
 import { BeanClip, type BeanClipData } from './theme/bean-clip';
 import { themeTokens as t } from './theme/tokens';

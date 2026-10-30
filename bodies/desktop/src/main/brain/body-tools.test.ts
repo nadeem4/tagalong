@@ -1,7 +1,7 @@
 /** Tests for the desktop's body tools: declarations, minimized windows, refusals, notices, timeout. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, Tool } from '@tagalong/contract';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
 import { RpcError } from '@tagalong/contract';

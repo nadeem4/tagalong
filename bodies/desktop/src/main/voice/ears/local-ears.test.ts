@@ -1,7 +1,8 @@
 /** Tests for LocalEars, held and always listening. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { EARS_FRAME, Pushable } from '@tagalong/protocol';
+import { EARS_FRAME } from '../../../shared/voice';
+import { Pushable } from '@tagalong/ui/shapes';
 import {
   GIVE_UP_FRAMES,
   LocalEars,

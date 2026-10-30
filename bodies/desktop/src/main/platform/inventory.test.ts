@@ -1,6 +1,6 @@
 /** Tests for the window inventory: browsers, blocked windows and text counts. */
 import { describe, expect, it } from 'vitest';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions } from '../../shared/settings';
 
 import { buildInventory } from './inventory';
 import type { ObservedWindow } from './inventory';
