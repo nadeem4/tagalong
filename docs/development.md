@@ -351,8 +351,6 @@ before the bubble takes the focus. A click on Scout captures nothing, because it
 Scout's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
 seconds to enumerate) and other monitors are Scout's own tools, taken only when a question needs
 them. The pause key takes sight away entirely — see [Pausing sight](privacy.md#pausing-sight).
-**With several monitors, a look sends** (Settings → Advanced → Sight detail) decides whether a capture of every
-display attaches only the composite and the focused display, or every display.
 
 Every accelerator is editable in Home → Settings → Shortcuts and rebinds while the app runs — no
 restart — and an accelerator another application already owns is reported rather than silently

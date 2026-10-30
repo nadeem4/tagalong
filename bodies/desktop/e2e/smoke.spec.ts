@@ -504,12 +504,12 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
-  // Advanced is closed until asked for; it holds the ElevenLabs voice, sight detail and watches.
+  // Advanced is closed until asked for; it holds the ElevenLabs voice and the screen-memory minutes.
   const advanced = home.getByRole('button', { name: /Advanced/ });
   await expect(advanced).toHaveAttribute('aria-expanded', 'false');
   await advanced.click();
   await expect(advanced).toHaveAttribute('aria-expanded', 'true');
-  await expect(home.getByText('With several monitors, a look sends')).toBeVisible();
+  await expect(home.getByText('Minutes of screen to remember')).toBeVisible();
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();
