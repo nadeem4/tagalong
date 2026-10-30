@@ -56,6 +56,37 @@ chrome.storage.onChanged.addListener((changes, area) => {
     void body.restart().catch(() => undefined);
 });
 
+// Facts for Scout. They never prompt: without the `tabs` permission a tab arrives with no url
+// and the reporter drops it; `chrome.downloads` only exists once its permission is granted.
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.tabs
+    .get(tabId)
+    .then((tab) => body.tabChanged({ title: tab.title ?? '', url: tab.url ?? '' }))
+    .catch(() => undefined);
+});
+chrome.tabs.onUpdated.addListener((_id, change, tab) => {
+  if (tab.active && (change.url !== undefined || change.title !== undefined))
+    body.tabChanged({ title: tab.title ?? '', url: tab.url ?? '' });
+});
+
+let downloadsWatched = false;
+function watchDownloads(): void {
+  if (downloadsWatched || !chrome.downloads) return;
+  downloadsWatched = true;
+  chrome.downloads.onChanged.addListener((delta) => {
+    const state = delta.state?.current;
+    if (state !== 'complete' && state !== 'interrupted') return;
+    chrome.downloads
+      .search({ id: delta.id })
+      .then(([item]) => {
+        if (item) body.downloadChanged({ filename: item.filename, state });
+      })
+      .catch(() => undefined);
+  });
+}
+watchDownloads();
+chrome.permissions.onAdded.addListener(watchDownloads);
+
 chrome.runtime.onMessage.addListener((message: Partial<WorkerQuery> | null, _sender, respond) => {
   if (message?.type !== 'status') return false;
   respond(body.info());

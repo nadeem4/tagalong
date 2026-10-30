@@ -128,6 +128,36 @@ describe('the browser body', () => {
     expect(JSON.parse(reply.result.output[0]!.text).tabs[0].url).toBe('https://a.test/');
   });
 
+  it('tab_changes_reach_the_brain_as_event_frames', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    body.tabChanged({ title: 'Docs', url: 'https://a.test/docs?q=1' });
+    expect(sockets[0]!.request('event')?.['params']).toEqual({
+      name: 'tab',
+      data: { title: 'Docs', url: 'https://a.test/docs' },
+    });
+  });
+
+  it('downloads_reach_the_brain_as_event_frames', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    body.downloadChanged({ filename: 'C:\\Users\\a\\Downloads\\tax.pdf', state: 'complete' });
+    expect(sockets[0]!.request('event')?.['params']).toEqual({
+      name: 'download',
+      data: { name: 'tax.pdf', state: 'complete' },
+    });
+  });
+
+  it('events_are_not_sent_while_offline', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    body.tabChanged({ title: 'Docs', url: 'https://a.test/docs' });
+    body.downloadChanged({ filename: 'tax.pdf', state: 'complete' });
+    expect(sockets[0]!.request('event')).toBeUndefined();
+  });
+
   it('an_unknown_tool_is_unknown_tool', async () => {
     const { body, sockets } = setup();
     await body.start();
