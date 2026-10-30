@@ -1,8 +1,7 @@
 /**
  * The `tabs` tool: list the open tabs, read the page in one, or picture the one in front.
  * Reading asks for the tabs permission and then the site, in that order (sharing one wait), and
- * never wakes a sleeping tab or touches a
- * page Chrome keeps locked.
+ * never wakes a sleeping tab or touches a page Chrome keeps locked.
  */
 import type { Part } from '@tagalong/contract';
 import { MAX_PAGE_TEXT_CHARS } from '../content/limits';
@@ -70,7 +69,7 @@ function refuseUnreadable(tab: TabInfo): void {
     throw failed('That tab is asleep, and Scout will not wake it. Ask the user to open it first.');
   }
   const locked = lockedReason(tab.url);
-  if (locked !== null) throw failed(`I cannot read that tab: ${locked}.`);
+  if (locked !== null) throw failed(`I cannot use that tab: ${locked}.`);
 }
 
 /**
@@ -121,7 +120,12 @@ export function tabsTool(deps: TabsDeps): BrowserTool {
         );
       }
     });
-    const tab = allowed;
+    // The person may have switched tabs while the site question was open; picture only what was allowed.
+    const now = await tabs.get(allowed.id);
+    if (now === null || !now.active || siteOrigin(now.url) !== siteOrigin(allowed.url)) {
+      throw failed('The tab in front changed while I was asking, so I did not take a picture.');
+    }
+    const tab = now;
     try {
       const shot = await pictureApi.capture(tab.windowId);
       return [{ type: 'image', mime: shot.mime, data: shot.base64 }];

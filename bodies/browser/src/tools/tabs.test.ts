@@ -36,7 +36,14 @@ const reading = (over: Partial<PageReading> = {}): PageReading => ({
 });
 
 function setup(
-  opts: { tabs?: TabInfo[]; reading?: PageReading; denyWith?: RpcError; denySite?: RpcError } = {},
+  opts: {
+    tabs?: TabInfo[];
+    reading?: PageReading;
+    denyWith?: RpcError;
+    denySite?: RpcError;
+    /** Runs once the site is allowed, to model the person switching tabs meanwhile. */
+    afterSite?: (all: TabInfo[]) => void;
+  } = {},
 ) {
   const all = opts.tabs ?? [tab()];
   const calls: Need[] = [];
@@ -52,6 +59,7 @@ function setup(
       calls.push(need);
       if (opts.denyWith) throw opts.denyWith;
       if (opts.denySite && need.kind === 'site') throw opts.denySite;
+      if (need.kind === 'site') opts.afterSite?.(all);
     },
   };
   const capture = vi.fn(
@@ -250,6 +258,39 @@ describe('tabs picture', () => {
     expect(locked.capture).not.toHaveBeenCalled();
   });
 
+  it('picture_after_a_denied_site_or_tabs_never_captures', async () => {
+    const site = new RpcError(ErrorCode.denied, 'You did not allow Scout on this site.');
+    const a = setup({ denySite: site });
+    expect(await rejection(a.t.run({ action: 'picture' }))).toBe(site);
+    const tabsDenied = new RpcError(ErrorCode.denied, 'You did not allow Scout to see your tabs.');
+    const b = setup({ denyWith: tabsDenied });
+    expect(await rejection(b.t.run({ action: 'picture' }))).toBe(tabsDenied);
+    expect(a.capture).not.toHaveBeenCalled();
+    expect(b.capture).not.toHaveBeenCalled();
+  });
+
+  it('picture_fails_if_the_tab_in_front_changed_while_asking', async () => {
+    const other = setup({
+      tabs: [tab({ id: 1 }), tab({ id: 2, active: false })],
+      afterSite: (all) => {
+        all[0] = tab({ id: 1, active: false });
+        all[1] = tab({ id: 2, active: true });
+      },
+    });
+    const e = await rejection(other.t.run({ action: 'picture' }));
+    expect(e.code).toBe(ErrorCode.tool_failed);
+    expect(e.message).toMatch(/changed while I was asking/);
+    const moved = setup({
+      afterSite: (all) => {
+        all[0] = tab({ url: 'https://evil.test/x' });
+      },
+    });
+    const m = await rejection(moved.t.run({ action: 'picture' }));
+    expect(m.code).toBe(ErrorCode.tool_failed);
+    expect(other.capture).not.toHaveBeenCalled();
+    expect(moved.capture).not.toHaveBeenCalled();
+  });
+
   it('picture_failure_from_the_browser_is_tool_failed_with_a_plain_reason', async () => {
     const { t, capture } = setup();
     capture.mockRejectedValueOnce(new Error('Cannot capture this window'));
@@ -331,7 +372,11 @@ describe('tabs read deadline', () => {
         get: async () => tab(),
         activeInFocusedWindow: async () => tab(),
       },
-      page: { read: async () => reading() },
+      page: {
+        read: async () => reading(),
+        parts: () => Promise.reject(new Error('unused')),
+      },
+      picture: { capture: () => Promise.reject(new Error('unused')) },
       needs: broker,
       bodyName: 'Chrome',
     });
@@ -357,7 +402,11 @@ describe('tabs read deadline', () => {
         get: async () => tab(),
         activeInFocusedWindow: async () => tab(),
       },
-      page: { read: async () => reading() },
+      page: {
+        read: async () => reading(),
+        parts: () => Promise.reject(new Error('unused')),
+      },
+      picture: { capture: () => Promise.reject(new Error('unused')) },
       needs,
       bodyName: 'Chrome',
     });
