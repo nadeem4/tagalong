@@ -3,6 +3,7 @@
  * the renderer expects out. No socket and no Electron involved.
  */
 import { describe, expect, it } from 'vitest';
+import { dockMood, IDLE_DOCK, nextDock, type DockEvent } from '../../renderer/src/dock.js';
 import { createTurnEvents } from './turn-events.js';
 
 const T = 'turn-1';
@@ -190,6 +191,17 @@ describe('createTurnEvents', () => {
         summary: 'no',
       },
     ]);
+  });
+
+  it('strips the body prefix from a body tool name, so the dock sees look_at_window', () => {
+    const m = make();
+    const tool = { seq: 1, turn: T, call: 'c1', name: 'desktop__look_at_window', state: 'started' };
+    const [request] = m.map('tool', tool) as DockEvent[];
+    expect(request).toMatchObject({ type: 'turn.toolRequest', tool: 'look_at_window' });
+    const [result] = m.map('tool', { ...tool, state: 'ended' }) as DockEvent[];
+    expect(result).toMatchObject({ type: 'turn.toolResult', tool: 'look_at_window' });
+    const started = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    expect(dockMood(nextDock(started, request!))).toBe('reading');
   });
 
   it('maps ask and changed to nothing', () => {

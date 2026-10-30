@@ -52,6 +52,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
 
   function tool(p: ToolParams): TurnEvent[] {
     if (quiet.has(p.turn)) return [];
+    // The brain offers a body's tools as `<body>__<tool>`; the dock knows the bare names.
+    const name = p.name.includes('__') ? p.name.slice(p.name.indexOf('__') + 2) : p.name;
     if (p.state === 'started') {
       // The brain runs its own tools and asks nobody, so the call id stands in for the
       // approval id and there is no input to show.
@@ -61,7 +63,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
           turnId: p.turn,
           approvalId: p.call,
           callId: p.call,
-          tool: p.name,
+          tool: name,
           input: {},
         },
       ];
@@ -71,7 +73,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         type: 'turn.toolResult',
         turnId: p.turn,
         callId: p.call,
-        tool: p.name,
+        tool: name,
         ok: p.ok ?? true,
         summary: p.summary ?? '',
       },
