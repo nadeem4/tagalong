@@ -62,8 +62,8 @@ function LiveSwitches() {
           <p className="tg-help">
             Off by default. When on, Scout hears everything said near the computer but only answers
             when you start with &ldquo;Scout&rdquo;. It stays on after a restart until you switch it
-            off; a mark on Scout shows the whole time. Audio is understood on this computer and
-            never sent or stored.
+            off; a mark on Scout shows the whole time. Audio goes only to your own brain and is
+            never stored; with the brain on this computer it never leaves it.
           </p>
         </div>
         <button

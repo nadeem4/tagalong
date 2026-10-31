@@ -102,8 +102,8 @@ its bodies fit together.
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Windows desktop app with an NSIS installer                                                                                                                                                                                                                                                                    | macOS and Linux (the installer configs exist but are unverified)    |
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                                                                                                                                                                                                     |                                                                     |
-| Scout talks: answers read aloud in a calm British voice, made on this computer                                                                                                                                                                                                                                |                                                                     |
-| Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                                                                                                                                                                                              |                                                                     |
+| Scout talks: answers read aloud in a calm British voice, made by your own brain                                                                                                                                                                                                                               |                                                                     |
+| Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text by your own brain. Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.                                                                                 |                                                                     |
 | Scout thinks with your Anthropic key, set in the brain's `.env`                                                                                                                                                                                                                                               | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                                                                                          |                                                                     |
 | Timers: Scout sets its own reminders and repeating checks, and speaks first when a job ends or you come back                                                                                                                                                                                                  |                                                                     |
@@ -142,10 +142,10 @@ Claude Code asks for permission or has a question, Scout gets it first and answe
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
 moment") and it passes the note on.
 
-**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, a
-line it says on its own and its line about an expert that finished. Scout
-decides what to say: everything it writes is spoken, typed question or spoken, except what it
-puts in a block (code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
+**Scout talks.** Scout reads its answers aloud, so you can look away. For now it speaks the
+answer to a question you asked out loud (typed questions and the lines it says on its own are
+shown, not spoken yet). Scout decides what to say: what it puts in a block (code, a long list)
+is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
 92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
@@ -160,9 +160,9 @@ It starts speaking on the first sentence rather than waiting for the whole answe
 Scout speaks cuts it off. When it is done the bubble says "Hold Right Ctrl to reply".
 The microphone opens on that key or the mic button, or all the time only if you switch Always
 listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off; it pauses while a
-call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text on this computer, by
-small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB); the
-audio is never sent or kept.
+call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text by your own brain, by
+small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB).
+Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.
 
 **Read it to me.** Type or say "read this to me" and Scout reads your selection, or the window in
 front, aloud in full: the text itself, lists as sentences, code described rather than spelled out.
@@ -287,9 +287,10 @@ such as `.env` are refused.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
-- Scout's voice is made on your computer; the words it speaks are never sent anywhere.
-- When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
-  it and is never stored; only the text goes to Scout's provider, like a typed question.
+- Scout's voice is made by your own brain; the words it speaks are never sent anywhere else.
+- When you talk to Scout, your speech is turned into text by your brain. Audio goes only to your own
+  brain and is never stored; with the brain on this computer it never leaves it. Only the text goes
+  to Scout's provider, like a typed question.
 - The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other

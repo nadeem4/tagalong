@@ -110,7 +110,7 @@ export default tseslint.config(
     },
   },
   {
-    // Desktop main and the voice process import these, so no React may sneak in.
+    // Desktop main and the windows import these, so no React may sneak in.
     // They also run in node, so no DOM globals, and they stay inside their folder.
     files: ['bodies/ui/src/shapes/**/*.ts'],
     languageOptions: {

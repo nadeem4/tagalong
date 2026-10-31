@@ -4,7 +4,7 @@
  * FixTarget, healthRows and healthHeadline.
  */
 
-import type { ConnectionStatus, FixTarget, MouthId } from './shapes';
+import type { ConnectionStatus, FixTarget } from './shapes';
 
 /**
  * What the health check read, from calls the host already makes. Each is `unknown` when its
@@ -15,9 +15,6 @@ export interface HealthFacts {
   voice:
     | {
         enabled: boolean;
-        mouth: MouthId;
-        /** Whether the local voice's model is downloaded. */
-        mouthReady: boolean;
         /** Whether listening or Talk to Scout is in use, so the ears matter. */
         earsUsed: boolean;
         earsReady: boolean;
@@ -78,12 +75,10 @@ function connectionsRow(connections: HealthFacts['connections']): HealthRow {
 function voiceRow(voice: HealthFacts['voice']): HealthRow {
   if (voice === 'unknown') return make('voice', 'unknown', UNKNOWN);
   const problems: string[] = [];
-  if (voice.earsUsed && !voice.earsReady) problems.push('Speech model not downloaded.');
+  if (voice.earsUsed && !voice.earsReady)
+    problems.push('The brain could not load its speech models.');
   if (problems.length > 0) return make('voice', 'broken', problems.join(' '), 'voice');
   if (!voice.enabled) return make('voice', 'info', 'Voice is off.', 'voice');
-  if (voice.mouth === 'kokoro' && !voice.mouthReady) {
-    return make('voice', 'ok', 'Voice downloads on first use.');
-  }
   return make('voice', 'ok', 'Ready.');
 }
 

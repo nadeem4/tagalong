@@ -1,6 +1,6 @@
-/** Tests for the voice adapter facts, mouth order and chosenMouth. */
+/** Tests for the voice adapter facts and chosenMouth. */
 import { describe, expect, it } from 'vitest';
-import { LOCAL_MOUTH, VOICE_ADAPTERS, adaptersFor, chosenMouth, mouthOrder } from './voice';
+import { VOICE_ADAPTERS, adaptersFor, chosenMouth } from './voice';
 
 describe('voice adapters', () => {
   it('lists each adapter once, with plain facts for Settings', () => {
@@ -9,23 +9,16 @@ describe('voice adapters', () => {
       'mouth:kokoro',
       'mouth:system',
     ]);
-    expect(adaptersFor('mouth').find((adapter) => adapter.id === 'kokoro')).toMatchObject({
-      offline: true,
-      screenshots: false,
-    });
+    expect(adaptersFor('mouth').map((adapter) => adapter.label)).toEqual([
+      'Kokoro (on the brain)',
+      'System voice',
+    ]);
     expect(adaptersFor('ears')).toEqual([expect.objectContaining({ id: 'local', offline: true })]);
   });
 
   it('has only the ears and mouth slots', () => {
     // @ts-expect-error 'live' is not a slot.
     expect(adaptersFor('live')).toEqual([]);
-  });
-});
-
-describe('mouthOrder', () => {
-  it('tries the chosen voice, then the local one, then the system voice', () => {
-    expect(mouthOrder(LOCAL_MOUTH)).toEqual(['kokoro', 'system']);
-    expect(mouthOrder('system')).toEqual(['system', 'kokoro']);
   });
 });
 

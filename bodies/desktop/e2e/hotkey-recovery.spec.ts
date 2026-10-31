@@ -45,7 +45,6 @@ test.beforeAll(async () => {
       // Nothing listens here, so the spec never dials a developer's real brain.
       TAGALONG_BRAIN_ADDR: `127.0.0.1:${await freePort()}`,
       TAGALONG_START_BRAIN: '0',
-      TAGALONG_FAKE_TTS: '1',
     },
   });
 });

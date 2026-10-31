@@ -8,18 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import {
-  BrowserWindow,
-  Menu,
-  Tray,
-  app,
-  dialog,
-  ipcMain,
-  powerMonitor,
-  shell,
-  utilityProcess,
-} from 'electron';
+import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
 import type { Settings } from '../shared/settings';
@@ -40,12 +29,6 @@ import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { realLaunch } from './brain/launch';
 import type { BrainProcess } from './brain/launch';
-import { kokoroDownloaded } from './voice/kokoro';
-import { createVoiceService, localMouth } from './voice/voice';
-import { VoiceWorker } from './voice/worker/client';
-import type { WorkerProcess } from './voice/worker/messages';
-import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
-import type { VoiceService } from './voice/voice';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
@@ -88,7 +71,8 @@ import { registerSpendIpc } from './ipc/spend';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
-import { forwardEars, registerVoiceIpc } from './ipc/voice';
+import { createVoiceBridge, registerVoiceIpc } from './ipc/voice';
+import type { VoiceBridge } from './ipc/voice';
 import { registerBrowserIpc } from './ipc/browser';
 import { fixPage } from './fix-target';
 import { IPC } from '../shared/ipc';
@@ -119,10 +103,8 @@ interface Desktop {
   talkKeyError: string | null;
   /** Whether the user has sight turned off. Read by the platform gate on every read. */
   sightPause: SightPause;
-  /** Turns Scout's lines into audio for the panel to play. */
-  voice: VoiceService;
-  /** The process the voice models run in, Scout's voice and its ears; stopped on quit. */
-  voiceWorker: VoiceWorker;
+  /** The mic and Scout's voice, both through the brain. */
+  voiceBridge: VoiceBridge;
   /** Always listening: from the saved setting at launch, saved again on each switch. */
   listening: AlwaysListening;
   /** The status marks on Scout and in the bubble; the top one goes to every window. */
@@ -146,9 +128,9 @@ function rememberAvatarSpot(position: { x: number | null; y: number | null }): v
 /** The item last dropped on Scout, held unread until a button on its card takes it. */
 const drops = dropDesk(nodeDropFs);
 
-// The fake ears need no real microphone: Chromium's fake device stands in for one, and
+// The e2e suites need no real microphone: Chromium's fake device stands in for one, and
 // the permission prompt answers itself. Switches only take effect before the app is ready.
-if (process.env.TAGALONG_FAKE_STT === '1') {
+if (process.env.TAGALONG_FAKE_MIC === '1') {
   app.commandLine.appendSwitch('use-fake-device-for-media-stream');
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 }
@@ -194,7 +176,6 @@ let brainProcess: Promise<BrainProcess> | null = null;
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
   stopTalkKey();
-  desktop?.voiceWorker.stop();
   stopListeningGuard();
   stopPresence();
   stopFocusWatch();
@@ -263,12 +244,16 @@ async function start(): Promise<void> {
           }
         }
       }
+      // Heard words, the voice's status and spoken sentences: the voice bridge sends them on.
+      desktop?.voiceBridge.onNotification(method, params);
       turnEvents.map(method, params).forEach(forwardTurn);
     },
     onResync: () => turnEvents.resync().forEach(forwardTurn),
     onStatus: (status) => {
       brainStatus = status;
       markBrainLink(statusMarks, status);
+      // A listening session open when the link dropped asks the new connection to listen.
+      if (status === 'online') desktop?.voiceBridge.onOnline();
       watchOffline(status);
       // Home's "Where things run" shows the link; it reads it again when it changes.
       for (const window of BrowserWindow.getAllWindows()) {
@@ -276,15 +261,6 @@ async function start(): Promise<void> {
       }
     },
   });
-
-  // The voice models run in their own process; it starts when first needed: at launch if an earlier run downloaded Kokoro, otherwise on Scout's first line.
-  const voiceWorker = new VoiceWorker(
-    () =>
-      utilityProcess.fork(fileURLToPath(new URL('./voice-worker.js', import.meta.url)), [], {
-        serviceName: 'Tagalong voice',
-        env: { ...process.env, TAGALONG_VOICE_DIR: join(dataDir, 'voice') },
-      }) as unknown as WorkerProcess,
-  );
 
   desktop = {
     brain,
@@ -310,26 +286,35 @@ async function start(): Promise<void> {
     }),
     talkKeyError: null,
     sightPause,
-    voiceWorker,
     listening,
     statusMarks,
-    voice: (() => {
-      // The model downloads into the data dir on first use, never at start.
-      const local = new WorkerLocalVoice(voiceWorker);
-      return createVoiceService({
-        env: process.env,
-        settings: () => (desktop?.settings ?? settings).voice,
-        local,
-        mouths: {
-          kokoro: localMouth(local),
-        },
-      });
-    })(),
+    // What the ears hear goes to every open window: each listening window keeps only its own
+    // session's words. Words addressed to Scout bring the bubble up if it is hidden, beside a
+    // visible pet, and without the keyboard: the person may be typing in another app when they
+    // say "Scout", and a click back elsewhere would hide the bubble.
+    voiceBridge: createVoiceBridge({
+      brain,
+      send: (channel, payload) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.webContents.send(channel, payload);
+        }
+      },
+      sendToPanel: (channel, payload) => {
+        const panel = desktop?.panel;
+        if (panel != null && !panel.isDestroyed()) panel.webContents.send(channel, payload);
+      },
+      onSpoken: () => {
+        const panel = desktop?.panel;
+        const avatar = desktop?.avatar;
+        if (panel != null && avatar != null && avatar.isVisible() && !panel.isVisible()) {
+          showPanelQuietly(panel, avatar);
+        }
+      },
+      // A reply in the follow-up window needs no name.
+      followUp: () => listening.state.followUp,
+      marks: statusMarks,
+    }),
   };
-
-  // Kokoro loads now only when an earlier run downloaded it, so Scout's first lines are
-  // Kokoro rather than the system voice. A first download still waits for the first line.
-  desktop.voice.warmAtStart(kokoroDownloaded(join(dataDir, 'voice')));
 
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.
@@ -373,29 +358,6 @@ async function start(): Promise<void> {
   });
 
   registerIpc();
-
-  // What the ears hear goes to every open window: each listening window keeps only its own
-  // session's words. Subscribing does not start the voice process; the first listen does.
-  // Words addressed to Scout bring the bubble up if it is hidden, beside a visible pet, and
-  // without the keyboard: the person may be typing in another app when they say "Scout".
-  // Speaking a question needs no keyboard, and a click back elsewhere would hide the bubble.
-  forwardEars(
-    voiceWorker,
-    (channel, payload) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(channel, payload);
-      }
-    },
-    () => {
-      const panel = desktop?.panel;
-      const avatar = desktop?.avatar;
-      if (panel != null && avatar != null && avatar.isVisible() && !panel.isVisible()) {
-        showPanelQuietly(panel, avatar);
-      }
-    },
-    // A reply in the follow-up window needs no name; the download and ears failures show on Scout.
-    { followUp: () => listening.state.followUp, marks: statusMarks },
-  );
 
   desktop.panel = createPanelWindow({
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
@@ -768,6 +730,8 @@ function registerIpc(): void {
   registerTurnIpc(handle, {
     brain: required().brain,
     claimTurn: (turnId) => claimTurn(turnId),
+    stopVoice: () => stopVoice(),
+    voice: () => required().settings.voice,
     status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
@@ -804,13 +768,11 @@ function registerIpc(): void {
     },
   });
   registerVoiceIpc(handle, {
-    voice: () => required().voice,
-    // The voice process starts on the first listen, if Scout has not spoken yet.
-    worker: () => required().voiceWorker,
+    bridge: required().voiceBridge,
+    brain: required().brain,
     noteActiveWindow: () => noteActiveWindow(required()),
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
-    voiceDir: () => join(app.getPath('userData'), 'voice'),
   });
   registerBrowserIpc(handle, {
     packaged: app.isPackaged,

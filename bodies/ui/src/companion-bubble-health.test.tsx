@@ -12,22 +12,20 @@ const FACTS: HealthFacts = {
   connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
   voice: {
     enabled: true,
-    mouth: 'kokoro',
-    mouthReady: true,
     earsUsed: false,
     earsReady: false,
   },
   microphone: { count: 1, pickedMissing: false },
 };
 
-function setup(health: Partial<HostBridge> = {}, props: { onSay?: (text: string) => void } = {}) {
+function setup(health: Partial<HostBridge> = {}) {
   const fake = createFakeHostBridge();
   const checkHealth = vi.fn(() => Promise.resolve(FACTS));
   const openFix = vi.fn(() => Promise.resolve());
   const bridge: HostBridge = Object.assign(fake, { checkHealth, openFix }, health);
   render(
     <HostBridgeProvider bridge={bridge}>
-      <CompanionBubble petId="scout" petName="Scout" {...props} />
+      <CompanionBubble petId="scout" petName="Scout" />
     </HostBridgeProvider>,
   );
   return { fake, checkHealth, openFix };
@@ -43,8 +41,7 @@ const flush = () => act(async () => await Promise.resolve());
 
 describe('CompanionBubble, the health check', () => {
   it('answers “what’s wrong?” with the health card, and asks Scout nothing', async () => {
-    const onSay = vi.fn();
-    const { fake, checkHealth } = setup({}, { onSay });
+    const { fake, checkHealth } = setup({});
     ask('Scout, what’s wrong?');
     await flush();
     expect(checkHealth).toHaveBeenCalledOnce();
@@ -52,12 +49,9 @@ describe('CompanionBubble, the health check', () => {
     const card = screen.getByRole('region', { name: 'Health check' });
     expect(card).toHaveTextContent('One thing needs you.');
     expect(card).toHaveTextContent('GitHub needs you to sign in again.');
-    // Typed: nothing is said aloud.
-    expect(onSay).not.toHaveBeenCalled();
   });
 
-  it('says nothing aloud even when the question was asked by voice: health is shown', async () => {
-    const onSay = vi.fn();
+  it('asks nothing of the brain even when the question was asked by voice: health is shown', async () => {
     let hear: (text: string) => void = () => undefined;
     const talk = {
       state: 'idle' as const,
@@ -75,7 +69,7 @@ describe('CompanionBubble, the health check', () => {
     });
     render(
       <HostBridgeProvider bridge={bridge}>
-        <CompanionBubble petId="scout" petName="Scout" talk={talk} onSay={onSay} />
+        <CompanionBubble petId="scout" petName="Scout" talk={talk} />
       </HostBridgeProvider>,
     );
     act(() => hear('Scout, what’s wrong?'));
@@ -83,7 +77,6 @@ describe('CompanionBubble, the health check', () => {
     expect(screen.getByRole('region', { name: 'Health check' })).toHaveTextContent(
       'One thing needs you.',
     );
-    expect(onSay).not.toHaveBeenCalled();
   });
 
   it('opens the fix the row names', async () => {
@@ -121,11 +114,7 @@ describe('CompanionBubble, the health check', () => {
 
   it('drops a check that finishes after a newer question', async () => {
     let finish: (facts: HealthFacts) => void = () => undefined;
-    const onSay = vi.fn();
-    setup(
-      { checkHealth: () => new Promise<HealthFacts>((resolve) => (finish = resolve)) },
-      { onSay },
-    );
+    setup({ checkHealth: () => new Promise<HealthFacts>((resolve) => (finish = resolve)) });
     ask('what’s wrong?');
     await flush();
     ask('explain this error');
@@ -135,7 +124,6 @@ describe('CompanionBubble, the health check', () => {
       await Promise.resolve();
     });
     expect(screen.queryByRole('region', { name: 'Health check' })).toBeNull();
-    expect(onSay).not.toHaveBeenCalledWith('One thing needs you.');
   });
 
   it('clears the card when the next question is asked', async () => {

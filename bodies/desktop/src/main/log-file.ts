@@ -1,8 +1,7 @@
 /**
  * The log file: the app's warnings and errors, kept on disk so a person can send them when
  * something goes wrong. Contains logLine, installLogFile, rendererConsole and openLogsFolder.
- * The windows' warnings come in
- * through rendererConsole and the voice process's through forwardConsole (log-text.ts).
+ * The windows' warnings come in through rendererConsole.
  *
  * Privacy: a line keeps only a text first argument and, for an Error, its name and
  * message; every other argument becomes its type, so no speech, screen text or turn

@@ -1,98 +1,113 @@
-/** Tests for the voice IPC, forwarding the ears and the model check. */
+/** Tests for the voice IPC: the mic and listen on their way to the brain, and what comes back. */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BrainOffline } from '@tagalong/contract';
+import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
-import { EARS_FILES } from '../voice/ears/model-files';
-import { KOKORO_MODEL } from '../voice/kokoro';
 import { AlwaysListening } from '../always-listening';
-import { VoiceWorker } from '../voice/worker/client';
-import type { FromWorker, ToWorker, WorkerProcess } from '../voice/worker/messages';
-import { fakeIpc } from './fake-ipc';
 import { StatusMarks } from '../status-marks';
-import { forwardEars, registerVoiceIpc } from './voice';
+import { fakeIpc } from './fake-ipc';
+import { createVoiceBridge, registerVoiceIpc } from './voice';
 
-function setup(noteActiveWindow: () => Promise<unknown> = () => Promise.resolve()) {
+function fakeBrain() {
+  return {
+    listen: vi.fn(() => Promise.resolve()),
+    mic: vi.fn(() => true),
+    unlisten: vi.fn(),
+    hush: vi.fn(),
+    call: vi.fn(),
+  };
+}
+
+function setup(
+  noteActiveWindow: () => Promise<unknown> = () => Promise.resolve(),
+  more: { onSpoken?: () => void; followUp?: () => boolean; marks?: StatusMarks } = {},
+) {
   const ipc = fakeIpc();
-  const voice = { speak: vi.fn(() => Promise.resolve({ kind: 'off' as const })) };
-  const worker = { send: vi.fn(), call: vi.fn(async () => true as unknown) };
+  const brain = fakeBrain();
+  const sent: [string, unknown][] = [];
+  const toPanel: [string, unknown][] = [];
+  const bridge = createVoiceBridge({
+    brain,
+    send: (channel, payload) => void sent.push([channel, payload]),
+    sendToPanel: (channel, payload) => void toPanel.push([channel, payload]),
+    ...more,
+  });
   const listening = new AlwaysListening();
   registerVoiceIpc(ipc.handle, {
-    voice: () => voice,
-    worker: () => worker,
+    bridge,
+    brain,
     noteActiveWindow,
     listening: () => listening,
     on: ipc.on,
   });
-  return { ...ipc, voice, worker, listening };
+  return { ...ipc, brain, bridge, listening, sent, toPanel };
 }
 
 describe('registerVoiceIpc', () => {
-  it('speaks only the line, as a string', async () => {
-    const { invoke, voice } = setup();
-    expect(await invoke(IPC.speak, 42, { voice: 'af_heart' })).toEqual({ kind: 'off' });
-    expect(voice.speak).toHaveBeenCalledWith('42', { voice: 'af_heart' });
-  });
-
-  it('notes the window for a held question, then starts listening in the voice process', async () => {
+  it('notes the window for a held question, then asks the brain to listen', async () => {
     const order: string[] = [];
-    const { invoke, worker } = setup(async () => void order.push('note'));
-    worker.send.mockImplementation(() => void order.push('listen'));
+    const { invoke, brain } = setup(async () => void order.push('note'));
+    brain.listen.mockImplementation(() => (order.push('listen'), Promise.resolve()));
     await invoke(IPC.earsListen, 'held');
     expect(order).toEqual(['note', 'listen']);
-    expect(worker.send).toHaveBeenCalledWith({ kind: 'ears.listen', mode: 'held' });
+    expect(brain.listen).toHaveBeenCalledWith('held');
   });
 
   it('still listens when the window could not be noted', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const { invoke, worker } = setup(() => Promise.reject(new Error('no window')));
+    const { invoke, brain } = setup(() => Promise.reject(new Error('no window')));
     await invoke(IPC.earsListen, 'held');
-    expect(worker.send).toHaveBeenCalledWith({ kind: 'ears.listen', mode: 'held' });
+    expect(brain.listen).toHaveBeenCalledWith('held');
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
 
-  it('ensures the ears’ models through the voice process and resolves with nothing', async () => {
-    const { invoke, worker } = setup();
-    expect(await invoke(IPC.ensureEars)).toBeUndefined();
-    expect(worker.call).toHaveBeenCalledWith({ kind: 'call', method: 'ears.ensure' });
-  });
-
   it('refuses a mode it does not know, rather than guessing', async () => {
-    const { invoke, worker } = setup();
+    const { invoke, brain } = setup();
     await expect(invoke(IPC.earsListen, 'forever')).rejects.toThrow('listening mode');
-    expect(worker.send).not.toHaveBeenCalled();
+    expect(brain.listen).not.toHaveBeenCalled();
   });
 
-  it('forwards each mic frame as Float32Array, and stop', async () => {
-    const { send, invoke, worker } = setup();
-    send(IPC.micFrame, [0.5, 0.25]);
+  it('sends each mic frame as clamped 16-bit samples, and stop as unlisten', async () => {
+    const { send, invoke, brain } = setup();
+    send(IPC.micFrame, [0.5, -1, 2, 0]);
     await Promise.resolve();
-    expect(worker.send).toHaveBeenCalledWith({
-      kind: 'ears.frame',
-      samples: new Float32Array([0.5, 0.25]),
-    });
+    await Promise.resolve();
+    expect(brain.mic).toHaveBeenCalledWith(new Int16Array([16384, -32768, 32767, 0]));
     await invoke(IPC.earsStop);
-    expect(worker.send).toHaveBeenLastCalledWith({ kind: 'ears.stop' });
+    expect(brain.unlisten).toHaveBeenCalledOnce();
   });
 
   it('keeps frames and stop behind a listen still noting the window', async () => {
     let noted!: () => void;
-    const { invoke, send, worker } = setup(() => new Promise<void>((resolve) => (noted = resolve)));
+    const { invoke, send, brain } = setup(() => new Promise<void>((resolve) => (noted = resolve)));
+    const calls: string[] = [];
+    brain.listen.mockImplementation(() => (calls.push('listen'), Promise.resolve()));
+    brain.mic.mockImplementation(() => (calls.push('mic'), true));
+    brain.unlisten.mockImplementation(() => void calls.push('unlisten'));
     const listening = invoke(IPC.earsListen, 'held');
     send(IPC.micFrame, new Float32Array([0.1]));
     const stopping = invoke(IPC.earsStop);
     await Promise.resolve();
-    expect(worker.send).not.toHaveBeenCalled();
+    expect(calls).toEqual([]);
     noted();
     await Promise.all([listening, stopping]);
-    expect(worker.send.mock.calls.map(([message]) => (message as { kind: string }).kind)).toEqual([
-      'ears.listen',
-      'ears.frame',
-      'ears.stop',
+    expect(calls).toEqual(['listen', 'mic', 'unlisten']);
+  });
+
+  it('says listening failed, in the desktop’s words, when the brain is not reachable', async () => {
+    const { invoke, brain, sent } = setup();
+    brain.listen.mockRejectedValue(new BrainOffline());
+    await expect(invoke(IPC.earsListen, 'always')).resolves.toBeUndefined();
+    expect(sent).toEqual([
+      [IPC.earsStatusEvent, { status: 'failed', message: expect.stringContaining('brain') }],
     ]);
+  });
+
+  it('hushes the brain on the panel’s say-so', async () => {
+    const { invoke, brain } = setup();
+    await invoke(IPC.hush);
+    expect(brain.hush).toHaveBeenCalledOnce();
   });
 
   it('switches Always listening only when asked, with a boolean', async () => {
@@ -104,11 +119,8 @@ describe('registerVoiceIpc', () => {
       followUp: false,
     });
     await expect(invoke(IPC.setListening, 'yes')).rejects.toThrow('on or off');
-    expect(await invoke(IPC.getListening)).toEqual({ on: true, paused: false, followUp: false });
   });
-});
 
-describe('registerVoiceIpc, the follow-up window', () => {
   it('takes the panel’s follow-up window, with a boolean, only while listening is on', async () => {
     const { invoke, listening } = setup();
     await invoke(IPC.setFollowUp, true);
@@ -117,235 +129,177 @@ describe('registerVoiceIpc, the follow-up window', () => {
     await invoke(IPC.setFollowUp, true);
     expect(listening.state.followUp).toBe(true);
     await expect(invoke(IPC.setFollowUp, 'yes')).rejects.toThrow('open or closed');
-    await invoke(IPC.setFollowUp, false);
-    expect(listening.state.followUp).toBe(false);
   });
-});
 
-describe('a voice process that dies mid-question', () => {
-  it('tells the panel, and the next talk press starts a fresh process listening', async () => {
-    const processes: { sent: ToWorker[]; die: () => void }[] = [];
-    const worker = new VoiceWorker(() => {
-      const sent: ToWorker[] = [];
-      const exits: (() => void)[] = [];
-      processes.push({ sent, die: () => exits.forEach((exit) => exit()) });
-      return {
-        postMessage: (message: ToWorker) => void sent.push(message),
-        on: ((event: string, listener: () => void) => {
-          if (event === 'exit') exits.push(listener);
-        }) as WorkerProcess['on'],
-        kill: () => true,
-      };
-    });
-    const ipc = fakeIpc();
-    registerVoiceIpc(ipc.handle, {
-      voice: () => ({ speak: vi.fn() }),
-      worker: () => worker,
-      noteActiveWindow: () => Promise.resolve(),
-      listening: () => new AlwaysListening(),
-      on: ipc.on,
-    });
-    const statuses: unknown[] = [];
-    forwardEars(worker, (channel, payload) => {
-      if (channel === IPC.earsStatusEvent) statuses.push(payload);
-    });
-
-    await ipc.invoke(IPC.earsListen, 'held');
-    processes[0]!.die();
-    expect(statuses).toEqual([
-      { status: 'failed', message: 'Listening stopped unexpectedly. Try again.' },
+  it('previews a voice through the brain’s speak_sample, and gives back the audio', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockResolvedValue([
+      { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'UklGRg==' }) },
     ]);
+    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1.1)).toEqual({
+      mime: 'audio/wav',
+      data: 'UklGRg==',
+    });
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', {
+      text: 'Hello',
+      voice: 'bm_george',
+      speed: 1.1,
+    });
+  });
 
-    await ipc.invoke(IPC.earsListen, 'held');
-    expect(processes).toHaveLength(2);
-    expect(processes[1]!.sent).toEqual([{ kind: 'ears.listen', mode: 'held' }]);
+  it('gives back null when the brain has no voice to preview with', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockResolvedValue([{ type: 'text', text: 'Voice is not running on this brain.' }]);
+    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+    brain.call.mockRejectedValue(new BrainOffline());
+    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+  });
+
+  it('coerces what the panel sends for a preview before it reaches the brain', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockResolvedValue([
+      { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'AA==' }) },
+    ]);
+    await invoke(IPC.speakSample, 'Hi', 5, '1.5');
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', { text: 'Hi', voice: '5', speed: 1.5 });
+    brain.call.mockClear();
+    expect(await invoke(IPC.speakSample, 'Hi', 'bm_george', 'fast')).toBeNull();
+    expect(brain.call).not.toHaveBeenCalled();
+  });
+
+  it('gives back null when the brain rejects the preview as an RPC error', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockRejectedValue(new Error('speak_sample: text is too long'));
+    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
   });
 });
 
-describe('forwardEars', () => {
-  it('sends the ears’ events and status to the panel, and says listening failed if the process dies', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
-    const exits: (() => void)[] = [];
-    const sent: [string, unknown][] = [];
-    forwardEars(
-      {
-        onMessage: (l) => (listeners.push(l), () => undefined),
-        onExit: (l) => (exits.push(l), () => undefined),
-      },
-      (channel, payload) => void sent.push([channel, payload]),
-    );
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'what' }));
-    listeners.forEach((l) => l({ kind: 'ears', event: 'speechStart' }));
-    listeners.forEach((l) => l({ kind: 'ears.status', status: 'loading' }));
-    listeners.forEach((l) => l({ kind: 'ears.status', status: 'failed', message: 'offline' }));
-    listeners.forEach((l) => l({ kind: 'ears.progress', fraction: 0.25 }));
-    listeners.forEach((l) => l({ kind: 'kokoro.ready' }));
-    exits.forEach((l) => l());
+describe('the brain coming back', () => {
+  it('listens when it returns after a listen that found it offline, and tells the panel to retry now', async () => {
+    const { invoke, brain, bridge, sent } = setup();
+    brain.listen.mockRejectedValueOnce(new BrainOffline());
+    await invoke(IPC.earsListen, 'always');
+    sent.length = 0;
+    bridge.onOnline();
+    expect(brain.listen).toHaveBeenLastCalledWith('always');
+    expect(brain.listen).toHaveBeenCalledTimes(2);
+    expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'online' }]);
+  });
+
+  it('asks to listen again if a session was open, and not after stop', async () => {
+    const { invoke, brain, bridge } = setup();
+    await invoke(IPC.earsListen, 'always');
+    brain.listen.mockClear();
+    bridge.onOnline();
+    expect(brain.listen).toHaveBeenCalledWith('always');
+    await invoke(IPC.earsStop);
+    brain.listen.mockClear();
+    bridge.onOnline();
+    expect(brain.listen).not.toHaveBeenCalled();
+  });
+});
+
+describe('what the brain sends back', () => {
+  const heard = (bridge: ReturnType<typeof setup>['bridge'], event: string, text?: string) =>
+    bridge.onNotification('heard', text === undefined ? { event } : { event, text });
+
+  it('forwards heard events to the panel in the ears’ own words', () => {
+    const { bridge, sent } = setup();
+    heard(bridge, 'speech_start');
+    heard(bridge, 'partial', 'what');
+    heard(bridge, 'final', 'what is');
+    heard(bridge, 'turn_end', 'what is this');
     expect(sent).toEqual([
-      [IPC.earsEvent, { event: 'partial', text: 'what' }],
       [IPC.earsEvent, { event: 'speechStart' }],
-      [IPC.earsStatusEvent, { status: 'loading' }],
-      [IPC.earsStatusEvent, { status: 'failed', message: 'offline' }],
-      [IPC.earsProgressEvent, { fraction: 0.25 }],
-      [
-        IPC.earsStatusEvent,
-        { status: 'failed', message: 'Listening stopped unexpectedly. Try again.' },
-      ],
+      [IPC.earsEvent, { event: 'partial', text: 'what' }],
+      [IPC.earsEvent, { event: 'final', text: 'what is' }],
+      [IPC.earsEvent, { event: 'turnEnd', text: 'what is this' }],
     ]);
   });
 
-  it('in the follow-up window, any words bring the bubble up, but a plain "stop" does not', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
-    const onSpoken = vi.fn();
-    let followUp = true;
-    forwardEars(
-      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
-      () => undefined,
-      onSpoken,
-      { followUp: () => followUp },
-    );
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'stop' }));
-    expect(onSpoken).not.toHaveBeenCalled();
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'and tomorrow?' }));
-    expect(onSpoken).toHaveBeenCalledOnce();
-    followUp = false;
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'and tomorrow?' }));
-    expect(onSpoken).toHaveBeenCalledOnce();
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'Scott, and tomorrow?' }));
-    expect(onSpoken).toHaveBeenCalledTimes(2);
-  });
-
-  it('shows the speech models download and an ears failure on Scout until they are ready', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
-    const exits: (() => void)[] = [];
+  it('forwards the voice status and progress, and shows loading and failure on Scout', () => {
     const marks = new StatusMarks();
-    forwardEars(
-      {
-        onMessage: (l) => (listeners.push(l), () => undefined),
-        onExit: (l) => (exits.push(l), () => undefined),
-      },
-      () => undefined,
-      undefined,
-      { marks },
-    );
-    const say = (m: FromWorker) => listeners.forEach((l) => l(m));
-    say({ kind: 'ears.status', status: 'loading' });
+    const { bridge, sent } = setup(undefined, { marks });
+    bridge.onNotification('voice', { status: 'loading' });
     expect(marks.top()).toEqual({ id: 'ears-loading' });
-    say({ kind: 'ears.progress', fraction: 0.4 });
+    bridge.onNotification('voice', { status: 'loading', progress: 0.4 });
     expect(marks.top()).toEqual({ id: 'ears-loading', percent: 40 });
-    say({ kind: 'ears.status', status: 'failed', message: 'offline' });
+    bridge.onNotification('voice', { status: 'failed', message: 'offline' });
     expect(marks.top()).toEqual({ id: 'ears-failed' });
-    say({ kind: 'ears.status', status: 'ready' });
+    bridge.onNotification('voice', { status: 'ready' });
     expect(marks.top()).toBeNull();
-    say({ kind: 'ears.progress', fraction: 0.5 });
-    say({ kind: 'ears.progress', fraction: 1 });
-    expect(marks.top()).toBeNull();
-    exits.forEach((l) => l());
-    expect(marks.top()).toEqual({ id: 'ears-failed' });
+    expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'loading', progress: 0.4 }]);
+    expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'failed', message: 'offline' }]);
+    expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'ready' }]);
   });
 
-  it('a voice process that only spoke and then stopped is not an ears failure', () => {
-    const exits: (() => void)[] = [];
-    const marks = new StatusMarks();
-    forwardEars(
-      { onMessage: () => () => undefined, onExit: (l) => (exits.push(l), () => undefined) },
-      () => undefined,
-      undefined,
-      { marks },
-    );
-    exits.forEach((l) => l());
-    expect(marks.top()).toBeNull();
+  it('forwards speech chunks and the end of a turn’s speech to the panel alone', () => {
+    const { bridge, sent, toPanel } = setup();
+    bridge.onNotification('speech', { turn: 't1', text: 'Hi.', pcm: 'AAA=', sample_rate: 24000 });
+    bridge.onNotification('speech', { turn: 't1', text: 'Plain.' });
+    bridge.onNotification('speech', { turn: 't1', done: true });
+    expect(sent).toEqual([]);
+    expect(toPanel).toEqual([
+      [IPC.speechChunk, { turn: 't1', text: 'Hi.', pcm: 'AAA=', sampleRate: 24000 }],
+      [IPC.speechChunk, { turn: 't1', text: 'Plain.' }],
+      [IPC.speechDone, { turn: 't1' }],
+    ]);
+  });
+
+  it('ignores notifications that are not voice ones', () => {
+    const { bridge, sent } = setup();
+    bridge.onNotification('reply', { turn: 't1', delta: 'x' });
+    expect(sent).toEqual([]);
+  });
+
+  it('reports the ears as fine until the brain says they failed', () => {
+    const { bridge } = setup();
+    expect(bridge.models()).toEqual({ ears: true });
+    bridge.onNotification('voice', { status: 'failed' });
+    expect(bridge.models()).toEqual({ ears: false });
+    bridge.onNotification('voice', { status: 'ready' });
+    expect(bridge.models()).toEqual({ ears: true });
   });
 
   it('brings the bubble up only for words addressed to Scout, never for bare speech', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
     const onSpoken = vi.fn();
-    forwardEars(
-      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
-      () => undefined,
-      onSpoken,
-    );
-    listeners.forEach((l) => l({ kind: 'ears', event: 'speechStart' }));
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'what' }));
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'what is Scout doing' }));
+    const { bridge } = setup(undefined, { onSpoken });
+    heard(bridge, 'speech_start');
+    heard(bridge, 'partial', 'what');
+    heard(bridge, 'turn_end', 'what is Scout doing');
     expect(onSpoken).not.toHaveBeenCalled();
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, what' }));
+    heard(bridge, 'partial', 'Scout, what');
     expect(onSpoken).toHaveBeenCalledOnce();
   });
 
   it('a partial "Scout, st" might still be "stop", so the bubble stays down', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
     const onSpoken = vi.fn();
-    forwardEars(
-      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
-      () => undefined,
-      onSpoken,
-    );
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, st' }));
+    const { bridge } = setup(undefined, { onSpoken });
+    heard(bridge, 'partial', 'Scout, st');
     expect(onSpoken).not.toHaveBeenCalled();
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, sta' }));
+    heard(bridge, 'partial', 'Scout, sta');
     expect(onSpoken).toHaveBeenCalledOnce();
   });
 
   it('"Scout, stop" switches listening off without bringing the bubble up', () => {
-    const listeners: ((m: FromWorker) => void)[] = [];
     const onSpoken = vi.fn();
-    const sent: [string, unknown][] = [];
-    forwardEars(
-      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
-      (channel, payload) => void sent.push([channel, payload]),
-      onSpoken,
-    );
-    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, stop' }));
-    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'Scout, stop listening.' }));
+    const { bridge, sent } = setup(undefined, { onSpoken });
+    heard(bridge, 'partial', 'Scout, stop');
+    heard(bridge, 'turn_end', 'Scout, stop listening.');
     expect(onSpoken).not.toHaveBeenCalled();
-    // The panel still hears it, and switches listening off.
     expect(sent).toHaveLength(2);
   });
-});
 
-describe('voiceModels, for the health check', () => {
-  const dirs: string[] = [];
-  afterEach(() => {
-    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
-  });
-
-  function withVoiceDir() {
-    const dir = mkdtempSync(join(tmpdir(), 'tagalong-voice-'));
-    dirs.push(dir);
-    const ipc = fakeIpc();
-    registerVoiceIpc(ipc.handle, {
-      voice: () => ({ speak: vi.fn() }),
-      worker: () => ({ send: vi.fn(), call: vi.fn() }),
-      noteActiveWindow: () => Promise.resolve(),
-      listening: () => new AlwaysListening(),
-      on: ipc.on,
-      voiceDir: () => dir,
-    });
-    return { dir, invoke: ipc.invoke };
-  }
-
-  const place = (dir: string, path: string) => {
-    mkdirSync(dirname(join(dir, path)), { recursive: true });
-    writeFileSync(join(dir, path), 'x');
-  };
-
-  it('says neither model is downloaded in an empty voice folder, and fetches nothing', async () => {
-    const { invoke } = withVoiceDir();
-    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: false, ears: false });
-  });
-
-  it('says the mouth and the ears are there once their files are', async () => {
-    const { dir, invoke } = withVoiceDir();
-    place(dir, `${KOKORO_MODEL}/onnx/model_quantized.onnx`);
-    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: true, ears: false });
-    for (const file of EARS_FILES) place(dir, file.path);
-    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: true, ears: true });
-  });
-
-  it('counts the ears as missing while any one file is', async () => {
-    const { dir, invoke } = withVoiceDir();
-    for (const file of EARS_FILES.slice(1)) place(dir, file.path);
-    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: false, ears: false });
+  it('in the follow-up window, any words bring the bubble up, but a plain "stop" does not', () => {
+    const onSpoken = vi.fn();
+    let followUp = true;
+    const { bridge } = setup(undefined, { onSpoken, followUp: () => followUp });
+    heard(bridge, 'turn_end', 'stop');
+    expect(onSpoken).not.toHaveBeenCalled();
+    heard(bridge, 'turn_end', 'and tomorrow?');
+    expect(onSpoken).toHaveBeenCalledOnce();
+    followUp = false;
+    heard(bridge, 'turn_end', 'and tomorrow?');
+    expect(onSpoken).toHaveBeenCalledOnce();
   });
 });

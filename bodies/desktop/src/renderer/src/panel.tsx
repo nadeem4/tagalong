@@ -1,18 +1,11 @@
 /**
  * The panel window's page: Scout's bubble beside the pet and the full chat one click behind
- * it, with talk-to-Scout (talk.ts), Scout's voice, the health check (health-facts.ts) and the
+ * it, with talk-to-Scout (talk.ts), Scout's voice (the brain's speech, played here), the health check (health-facts.ts) and the
  * cards Scout opens (Scout's own wake lines and dropped items).
  */
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  ApprovedReport,
-  CompanionBubble,
-  GreetingLine,
-  HostBridgeProvider,
-  QueueMouth,
-  SpeechQueue,
-} from '@tagalong/ui';
+import { ApprovedReport, CompanionBubble, GreetingLine, HostBridgeProvider } from '@tagalong/ui';
 import type { ContextSnapshot, PetRemarkParams, StatusMark } from '@tagalong/ui/shapes';
 import type { DropOffer } from '@tagalong/ui';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
@@ -21,7 +14,7 @@ import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
-import { prepareLine } from './voice-player';
+import { SpeechPlayer } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
@@ -54,12 +47,21 @@ function Panel() {
   const [speaking, setSpeaking] = useState(false);
   // A spoken answer still streaming in: the follow-up window waits for the end of all of it.
   const [answering, setAnswering] = useState(false);
-  const [mouth] = useState(
+  // The voice settings the player reads when a sentence arrives, so a save applies at once.
+  const mouthRef = useRef<PanelSettings['mouth']>('kokoro');
+  const speedRef = useRef(1);
+  // The brain speaks; this plays its sentences in order and cuts them off on Stop.
+  const [player] = useState(
     () =>
-      new QueueMouth(
-        new SpeechQueue({ prepare: (text) => prepareLine(text), onSpeaking: setSpeaking }),
-        { onAnswering: setAnswering },
-      ),
+      new SpeechPlayer({
+        mouth: () => mouthRef.current,
+        rate: () => speedRef.current,
+        hush: () => void window.tagalongHost.hush(),
+        onState: ({ speaking: now, answering: streaming }) => {
+          setSpeaking(now);
+          setAnswering(streaming);
+        },
+      }),
   );
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
   const [talkKey, setTalkKey] = useState(DEFAULT_TALK_KEY);
@@ -72,6 +74,8 @@ function Panel() {
   function apply(next: PanelSettings): void {
     setTalkKey(next.talkKey);
     setMicrophoneId(next.microphoneId);
+    mouthRef.current = next.mouth;
+    speedRef.current = next.speed;
   }
   const {
     talk,
@@ -83,7 +87,7 @@ function Panel() {
     speaking,
     answering,
     onBegin: () => {
-      mouth.stop();
+      player.stop();
       setRemark(null);
     },
   });
@@ -98,10 +102,19 @@ function Panel() {
     () =>
       window.tagalongHost.onStopVoice(() => {
         hush();
-        mouth.stop();
+        player.stop();
       }),
-    [mouth, hush],
+    [player, hush],
   );
+  // What the brain says arrives a sentence at a time, then a mark that the turn is done.
+  useEffect(() => {
+    const offChunk = window.tagalongHost.onSpeechChunk((chunk) => player.enqueue(chunk));
+    const offDone = window.tagalongHost.onSpeechDone((turn) => player.done(turn));
+    return () => {
+      offChunk();
+      offDone();
+    };
+  }, [player]);
   // Transparent around the bubble's rounded corners; the window itself is transparent.
   useEffect(() => {
     document.body.style.background = 'transparent';
@@ -122,9 +135,8 @@ function Panel() {
       window.tagalongHost.onRemark((next) => {
         setMode('bubble');
         setRemark(next);
-        mouth.say(next.text);
       }),
-    [mouth],
+    [],
   );
 
   // The window follows what is shown: the chat at its full height, the bubble at its own.
@@ -221,7 +233,7 @@ function Panel() {
               holdMs={12_000}
               onDone={() => {
                 setRemark(null);
-                mouth.stop();
+                player.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setRemark(null)}
@@ -234,19 +246,17 @@ function Panel() {
               onOpenChat={() => setMode('chat')}
               onCollapse={() => setMode('bubble')}
               onClose={() => {
-                mouth.stop();
+                player.stop();
                 cancelTalk();
                 void window.tagalongHost.hidePanel();
               }}
               tail={side === 'left' ? 'right' : 'left'}
-              onSay={(said) => mouth.say(said)}
-              mouth={mouth}
               talk={talk}
               seeing={{ on: seeing, onToggle: () => void window.tagalongHost.toggleSightPause() }}
               speaking={speaking}
               onStopSpeaking={() => {
                 hush();
-                mouth.stop();
+                player.stop();
               }}
               {...(snapshot !== null ? { snapshot } : {})}
               {...(drop !== null ? { drop } : {})}

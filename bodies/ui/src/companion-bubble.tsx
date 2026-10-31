@@ -7,12 +7,10 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pushable } from './shapes';
 import type {
   ConnectorConfirmParams,
   ContextSnapshot,
   FixTarget,
-  Mouth,
   StatusMark as StatusMarkValue,
   TurnEvent,
 } from './shapes';
@@ -28,7 +26,6 @@ import type { HealthRow } from './health';
 import { HealthCard } from './health-card';
 import { themeTokens as t } from './theme/tokens';
 import { stopStatus } from './stop-status';
-import { SpokenStream } from './voice/spoken-stream';
 
 /**
  * Talk to Scout, as the bubble sees it: the host holds the microphone and turns speech into
@@ -67,13 +64,6 @@ export interface CompanionBubbleProps {
   onClose?: () => void;
   /** Which side of the bubble the pet is on: the speech tail points there. */
   tail?: 'left' | 'right';
-  /**
-   * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
-   * and a wake's words. Called once per line, with the text as shown.
-   */
-  onSay?: (text: string) => void;
-  /** Speaks the answer to a spoken question, sentence by sentence as it streams. */
-  mouth?: Mouth;
   /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
   speaking?: boolean;
   onStopSpeaking?: () => void;
@@ -144,8 +134,6 @@ export function CompanionBubble({
   onCollapse,
   onClose,
   tail,
-  onSay,
-  mouth,
   speaking = false,
   onStopSpeaking,
   talk,
@@ -172,8 +160,8 @@ export function CompanionBubble({
   const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
-  // A spoken question's answer, said sentence by sentence as it streams.
-  const spoken = useRef<{ stream: SpokenStream; lines: Pushable<string> } | null>(null);
+  // The running question was asked aloud: the brain speaks its answer, and the bubble offers the key to reply.
+  const askedSpoken = useRef(false);
   // The last answer was to a spoken question: the bubble offers the key to reply.
   const [spokenReply, setSpokenReply] = useState(false);
   // The question was spoken: the bubble shows what it heard, so a mishearing is visible.
@@ -227,7 +215,6 @@ export function CompanionBubble({
         return;
       case 'turn.delta':
         if (event.turnId !== mine.current) return;
-        spoken.current?.stream.push(event.text);
         setReply((current) =>
           current.state === 'running' ? { ...current, text: current.text + event.text } : current,
         );
@@ -238,28 +225,16 @@ export function CompanionBubble({
         // Nothing said, with a reason: a quiet status, never spoken.
         const status = stopStatus(event.text, event.stopReason);
         if (status !== null) {
-          spoken.current?.stream.end();
-          spoken.current?.lines.end();
-          spoken.current = null;
           setReply({ state: 'done', text: '', status });
           return;
         }
         setReply({ state: 'done', text: event.text });
-        if (spoken.current === null) {
-          onSay?.(event.text);
-        } else {
-          spoken.current.stream.end();
-          spoken.current.lines.end();
-          spoken.current = null;
-          setSpokenReply(true);
-        }
+        if (askedSpoken.current) setSpokenReply(true);
         return;
       }
       case 'turn.error':
         if (event.turnId !== mine.current) return;
         mine.current = null;
-        spoken.current?.lines.end();
-        spoken.current = null;
         setReply({ state: 'failed', text: event.message });
         return;
       case 'pet.remark':
@@ -271,7 +246,6 @@ export function CompanionBubble({
         }
         setQuestion(null);
         setReply({ state: 'done', text: event.text });
-        onSay?.(event.text);
         return;
       default:
         return;
@@ -401,12 +375,7 @@ export function CompanionBubble({
     setSpokenReply(false);
     setAskedAloud(heard);
     mine.current = null;
-    spoken.current?.lines.end();
-    if (asSpoken && mouth !== undefined) {
-      const lines = new Pushable<string>();
-      mouth.speak(lines);
-      spoken.current = { stream: new SpokenStream((line) => lines.push(line)), lines };
-    } else spoken.current = null;
+    askedSpoken.current = asSpoken;
     bridge
       .ask({
         petId,
@@ -436,8 +405,7 @@ export function CompanionBubble({
   const checkHealth = (text: string, asSpoken: boolean): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
     mine.current = null;
-    spoken.current?.lines.end();
-    spoken.current = null;
+    askedSpoken.current = false;
     setQuestion(text);
     setAskedAloud(asSpoken);
     setSpokenReply(false);
@@ -481,8 +449,6 @@ export function CompanionBubble({
   // and nothing more of it is said.
   const bargeIn = useEffectEvent(() => {
     if (reply.state !== 'running') return;
-    spoken.current?.lines.end();
-    spoken.current = null;
     if (mine.current !== null) void bridge.interrupt(mine.current);
     // The bubble keeps what was said so far and ignores the rest of the stopped turn.
     mine.current = null;

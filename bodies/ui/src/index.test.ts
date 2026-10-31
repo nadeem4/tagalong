@@ -16,8 +16,6 @@ describe('ui package surface', () => {
         'BeanClip',
         'SETTINGS_CSS',
         'createFakeHostBridge',
-        'SpeechQueue',
-        'QueueMouth',
         'PushToTalk',
         'ListenController',
       ].sort(),

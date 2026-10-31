@@ -3,7 +3,6 @@
  * microphone) from host calls that already exist, each within a time budget, with no model
  * call. Used by the bubble (panel.tsx).
  */
-import { chosenMouth } from '../../shared/voice';
 import type { AppsList } from '@tagalong/ui/shapes';
 import type { HealthFacts } from '@tagalong/ui';
 import type { HostView, VoiceModels } from '../../shared/ipc';
@@ -62,8 +61,6 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
         ? 'unknown'
         : {
             enabled: settings.voice.enabled,
-            mouth: chosenMouth(settings.voice),
-            mouthReady: models.mouth,
             // The ears matter once listening is on, or a microphone was picked for talking.
             earsUsed: settings.listening.always || picked !== undefined,
             earsReady: models.ears,

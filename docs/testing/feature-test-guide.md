@@ -79,13 +79,13 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 ### H.7. "Scout, what's wrong?"
 
-1. **Setup:** switch Always listening on with the listening model not downloaded; stop the brain.
+1. **Setup:** switch Always listening on with the brain's listening models unable to load; stop the brain.
 2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Voice row;
    (c) type "are you OK?"; (d) type "what's wrong with this code?", then
    "what's broken?"; (e) press **Open logs folder** on the card.
 3. **Expected:** (a) at once, with no "thinking", a card starting "One thing needs you.", then a
-   row each for Connections ("Not checked.", the brain is stopped), Voice ("Speech model not
-   downloaded.") and Microphone ("A microphone is ready." with one plugged in); nothing is
+   row each for Connections ("Not checked.", the brain is stopped), Voice ("The brain could not load its
+   speech models.") and Microphone ("A microphone is ready." with one plugged in); nothing is
    spoken; no key appears anywhere on the card. No row says "I" or "my". (b) Home opens at
    Settings › Voice. (c) the same card, and nothing is spoken: health is shown, never said.
    (d) Scout answers both as normal questions; no card. With everything fixed, the card says
@@ -587,27 +587,27 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 
 ## Voice: Scout talks
 
-Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
-any brain is fine. The first line downloads the
-voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APPDATA%\Tagalong\voice`.
+Run from source with the brain running (`cd brain && uv run brain`; the real voice needs the
+brain's speech extras) and speakers on. The brain fetches Kokoro (about 92 MB, each file checked
+against a pinned SHA-256) the first time it speaks. Only a question asked by voice is spoken.
 
 ### V.1. Scout reads an answer aloud
 
-1. **Setup:** a fresh profile, so the voice model is not downloaded yet.
-2. **Action:** ask Scout anything in the bubble.
+1. **Setup:** a fresh brain data folder, so the voice model is not downloaded yet.
+2. **Action:** hold the talk key and ask Scout anything.
 3. **Expected:** the answer is spoken by the system voice (a British male voice such as Microsoft
-   George if installed) while the model downloads; three bars beside × move with the voice. A
-   later answer is spoken by the Kokoro voice. With Windows' reduce-animations setting on, the bars
-   hold still.
+   George if installed) while the brain's model downloads, or by Kokoro once it is ready; three bars
+   beside × move with the voice. With Windows' reduce-animations setting on, the bars hold still.
+   A typed question is answered in the bubble and not spoken.
 
 ### V.2. Blocks are shown, not read
 
-1. **Action:** type "show me a short TypeScript code sample".
+1. **Action:** hold the talk key and ask "show me a short TypeScript code sample".
 2. **Expected:** Scout says its own words around the code, in full; nothing inside
    the code block is read, and Scout never says "The rest is in the bubble." or
    "The answer is in the bubble." Then ask "give me three numbered steps to make tea": a short list
-   written outside a block is read item by item, without the numbers. Typed or spoken, the same
-   answer is said the same way.
+   written outside a block is read item by item, without the numbers. A typed question
+   gets the same answer in the bubble, unspoken.
 
 ### V.3. Stopping
 
@@ -618,28 +618,26 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.3a. No pause between lines
 
-1. **Setup:** the Kokoro voice downloaded (V.1).
+1. **Setup:** the brain's Kokoro voice loaded (V.1).
 2. **Action:** ask a spoken question (hold the talk key) whose answer runs to several sentences.
 3. **Expected:** each sentence follows the last without a pause of a second or more between them.
-4. **Action:** type a question with a long answer ("explain how a CPU cache works, in detail").
+4. **Action:** ask by voice for a long answer ("explain how a CPU cache works, in detail").
 5. **Expected:** Scout starts speaking within a second or two of the answer showing, says all of
    it a sentence at a time, and the bubble stays responsive throughout; pressing the stop key
-   cuts it at once.
+   cuts it at once, and the brain stops sending sentences (the desktop sends `hush`).
 
 ### V.3b. Kokoro from the first line
 
-1. **Setup:** the Kokoro voice downloaded (V.1), and Scout talks on. Quit Tagalong.
-2. **Action:** start Tagalong and, after a few seconds, ask Scout something.
-3. **Expected:** the answer is spoken by Kokoro, not the system voice. On a fresh profile, starting
-   Tagalong downloads nothing into `%APPDATA%\Tagalong\voice` until Scout first speaks.
+1. **Setup:** the brain's Kokoro voice loaded (V.1), and Scout talks on. Quit Tagalong, leave the
+   brain running.
+2. **Action:** start Tagalong and, after a few seconds, ask Scout something by voice.
+3. **Expected:** the answer is spoken by Kokoro, not the system voice.
 
 ### V.4. The hello, an expert finishing and a remark
 
 1. **Action:** restart Tagalong; hand a task to Claude Code.
-2. **Expected:** the first hello's line (if the mind says one) is spoken once as it appears; the
-   line on a later launch (if any) is spoken;
-   when the hand-off finishes, only the mind's one line about it is spoken (if there is one; the
-   answer itself is not read out).
+2. **Expected:** the hello (if the mind says one), a wake's remark and the line about the finished
+   hand-off are shown, not read aloud: the brain speaks only the answer to a spoken question.
 
 ### V.5. Settings → Voice
 
@@ -650,21 +648,22 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.5b. Who speaks: System voice
 
-1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, then press **▶ Preview**.
-2. **Expected:** the preview plays in the system voice and no Kokoro download starts, with no Save needed (the voice folder under `%APPDATA%\Tagalong` stays empty).
-3. **Action:** set the speed slider to its fastest, Save, and ask a question.
+1. **Action:** in Settings → Voice pick **System voice** under **Who speaks** (the other choice is
+   **Kokoro (on the brain)**), then press **▶ Preview**.
+2. **Expected:** the preview plays in the system voice, with no Save needed.
+3. **Action:** set the speed slider to its fastest, Save, and ask a question by voice.
 4. **Expected:** the answer is spoken in the system voice at the saved speed, not at normal speed.
 
 ### V.7. Read aloud: the mind decides what is said
 
 1. **Setup:** a real brain, Scout talks on. Have a research paper
    (a PDF or an arXiv page, well over 300 words) and a short paragraph of plain text to hand.
-2. **Action:** (a) select the short paragraph and type "read this to me" in the bubble. (b) Type
-   "summarise this". (c) Put the research paper in front and type "read this to me". (d) Ask
+2. **Action:** (a) select the short paragraph and ask by voice "read this to me". (b) Ask by voice
+   "summarise this". (c) Put the research paper in front and ask by voice "read this to me". (d) Ask
    "show me a short code sample". (e) Say "Scout, stop" (Always listening on), press
    the bars, or hold the talk key partway through a reading.
-3. **Expected:** (a) the typed request reads the paragraph in full, every sentence, with no cap
-   and no "The rest is in the bubble."; the same holds when you say it with the talk key. (b) Scout
+3. **Expected:** (a) the request reads the paragraph in full, every sentence, with no cap
+   and no "The rest is in the bubble."; a typed "read this to me" is answered in the bubble only. (b) Scout
    speaks a summary in its own words, not the text. (c) for the paper Scout does not recite it all:
    it gives the gist first and asks what to dig into (the wording varies; there is no fixed opener).
    (d) the code shows in a block and is not read; only Scout's line around it is said.
@@ -712,24 +711,23 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ## Talk to Scout
 
-Run from source **without** `TAGALONG_FAKE_STT` and `TAGALONG_FAKE_TTS`, with a microphone and
-speakers. The fake brain is fine for T.1 to T.6; T.7 needs a real one. The first spoken question
-downloads the speech models (Silero VAD, Moonshine tiny and Smart Turn, about 43 MB) into
-`%APPDATA%\Tagalong\voice`. With `TAGALONG_FAKE_STT=1` every held question is heard as "What am I
-looking at?" and Chromium's fake microphone stands in for a real one.
+Run from source with the brain running (its speech extras installed), a microphone and speakers.
+The brain hears and speaks: the first spoken question makes it fetch its speech models (Silero VAD,
+Moonshine tiny and Smart Turn, about 43 MB). With `TAGALONG_FAKE_MIC=1` Chromium's fake microphone
+stands in for a real one (the brain still needs to hear something).
 
 ### T.1. Hold to talk
 
-1. **Setup:** a fresh profile, so the speech models are not downloaded yet.
+1. **Setup:** a fresh brain data folder, so the speech models are not downloaded yet.
 2. **Action:** hold Right Ctrl on its own, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
-   note that the first time downloads the speech models (about 43 MB). Once they have loaded, the
+   note while the brain loads its speech models (about 43 MB the first time). Once they have loaded, the
    words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
    into text…", then shows what it heard and answers. Windows shows the microphone in use only
    while the key is held.
-4. **Action:** hold the key again and ask a second question, now that the models are downloaded.
-5. **Expected:** no download note; your words show live while you talk, and the answer follows the
-   release. Quit and start Tagalong again, then hold the key: still no download note.
+4. **Action:** hold the key again and ask a second question, now that the models are loaded.
+5. **Expected:** no loading note; your words show live while you talk, and the answer follows the
+   release. Quit and start Tagalong again, then hold the key: still no loading note.
 6. **Action:** click into another app (Notepad, say) so it has the keyboard, hold Right Ctrl, ask
    a question and let go.
 7. **Expected:** the bubble comes up without taking the keyboard, listens, and the question is sent
@@ -752,10 +750,10 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.3. Barge-in
 
-1. **Action:** ask a typed question that gets a long answer; while Scout speaks, hold the talk key
+1. **Action:** ask a spoken question that gets a long answer; while Scout speaks, hold the talk key
    (Right Ctrl).
-2. **Expected:** Scout stops speaking at once, the bubble listens, and the new spoken question is
-   answered.
+2. **Expected:** Scout stops speaking at once (the desktop sends `hush` to the brain), the bubble
+   listens, and the new spoken question is answered.
 3. **Action:** ask a spoken question with a long answer and hold the talk key again while it is
    still streaming, then say nothing and let go.
 4. **Expected:** Scout stops and says nothing more of the old answer; the bubble keeps what was
@@ -790,35 +788,19 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.6a. When listening cannot start
 
-1. **Setup:** a fresh profile (the speech models not downloaded yet), and the network off.
+1. **Setup:** stop the brain.
 2. **Action:** hold the talk key for about five seconds, then let go.
-3. **Expected:** the bubble says "Speech models didn’t download. Check the internet
-   connection." and Scout shows **Can't listen** until listening next works. It does not flicker or keep retrying while the key is held, and the
-   Windows microphone icon goes away soon after the message (no raw "fetch failed" text).
-4. **Action:** turn the network on and hold the key again.
-5. **Expected:** the first-time download note shows, then listening works as in T.1.
-6. **Action:** hold the key and, while speaking, end the `Tagalong` voice process (Task Manager →
-   the `Tagalong` utility process using the most memory while listening).
-7. **Expected:** the bubble says "Listening stopped unexpectedly. Try again." and does not reopen the
-   microphone while the key is still held. Let go and hold the key again: listening works (the voice
-   process starts again).
-
-### T.6b. A damaged model file is replaced
-
-1. **Setup:** listening has worked once (T.1), so the speech models are in
-   `%APPDATA%\Tagalong\voice`. Quit Tagalong.
-2. **Action:** open `%APPDATA%\Tagalong\voice\ears\silero-vad\model.onnx` in a text editor, change
-   one character, save, then start Tagalong and hold the talk key.
-3. **Expected:** the first-time download note does not show (the file is still there), the damaged
-   file is downloaded again (about 2 MB), and listening works as in T.1. The file's size matches the
-   original again.
-4. **Action:** do the same to `%APPDATA%\Tagalong\voice\onnx-community\Kokoro-82M-v1.0-ONNX\config.json`,
-   start Tagalong and ask Scout something.
-5. **Expected:** the answer is spoken by Kokoro (after the file is fetched again, the first line or
-   two may use the system voice), and `config.json` is back to its original content.
-6. **Note:** the "The speech model download was damaged. Check the connection."
-   message shows only when the fresh copy is wrong twice (a proxy that alters downloads); unit tests
-   in `model-files.test.ts` and `ears-host.test.ts` cover it.
+3. **Expected:** the bubble says the brain is not running (the offline words) and Scout shows the
+   brain-offline mark. The microphone icon goes away soon after the message, with no raw error text.
+4. **Action:** start the brain and hold the key again.
+5. **Expected:** listening works as in T.1.
+6. **Action:** with Always listening on, stop the brain and start it again.
+7. **Expected:** listening resumes by itself once the brain is back (the desktop asks it to listen
+   again), with the switch untouched.
+8. **Action:** make the brain's speech models fail to load (for example no internet on a fresh brain
+   data folder) and hold the key.
+9. **Expected:** the bubble says listening could not start, the health card says "The brain could
+   not load its speech models.", and Scout keeps speaking in the system voice.
 
 ### T.7. Confirmations in a spoken turn
 
@@ -858,10 +840,10 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 11. **Edge:** block the microphone in Windows privacy settings with Always listening on. The note
     "The microphone could not be opened…" shows once and stays; it does not flicker each time
     Scout finishes a line in the system voice.
-12. **Edge:** on a fresh install with no internet, switch **Always listening** on. Scout shows
-    **Ears** while the models download (with a percent while they download) and then
-    **Can't listen**. The bubble says the first-time download, then "Speech models didn’t download…" once; it does not
-    go back to the download note or repeat as Scout finishes lines. Connect and wait: within
+12. **Edge:** with a fresh brain and no internet, switch **Always listening** on. Scout shows
+    **Ears** while the brain loads its models (with a percent while they download) and then
+    **Can't listen**. The bubble says listening could not start once; it does not
+    repeat as Scout finishes lines. Connect and wait: within
     about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
     listening works, with the switch untouched. Switching Always listening off and on retries
     at once. The same happens if a speech model breaks while listening: the bubble stops showing
@@ -878,7 +860,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.10. Always listening: the name, calls, and the system voice
 
-Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always listening** on first.
+Run with a real microphone. Switch **Always listening** on first.
 
 1. **Action:** say "what time is it?" (no name), or talk to someone else in the room.
 2. **Expected:** nothing happens: no bubble, no words, no reply. The mark stays on.
@@ -1503,7 +1485,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    holds only the new line.
 4. **Action:** (a) with Always listening on and the microphone blocked, open the bubble: the
    panel's own warning is written as a `[renderer]` line; (b) on a fresh install with no
-   internet, switch Always listening on: the ears' failure is written as a `[voice process]`
+   internet, switch Always listening on: the brain's listening failure is written as a `[main]`
    line; (c) with Always listening on, put a video full screen for a few seconds, then leave it.
 5. **Expected:** (a) and (b) one line each, with the same time, level and 300-character rules;
    (c) one `[listening] paused: a full-screen window in front (<app>)` line and one

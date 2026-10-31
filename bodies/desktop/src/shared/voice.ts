@@ -1,8 +1,7 @@
 /**
  * What only the desktop knows about Scout's voice: the audio format the ears hear, the adapter
- * facts Settings shows, the order mouths are tried in, and which mouth the person picked.
- * The slot interfaces themselves live in `@tagalong/ui/shapes`. Imports nothing but those
- * types, so desktop main, the voice process and the windows all share it.
+ * facts Settings shows, and which mouth the person picked. The voice itself runs in the brain.
+ * The slot interfaces live in `@tagalong/ui/shapes`. Imports nothing but those types.
  */
 import type { MouthId } from '@tagalong/ui/shapes';
 
@@ -10,7 +9,7 @@ import type { MouthId } from '@tagalong/ui/shapes';
 export const EARS_SAMPLE_RATE = 16_000;
 export const EARS_FRAME = 512;
 
-/** The voice on this computer: what the chosen one falls back to before the system voice. */
+/** Kokoro, the brain's voice: what is spoken until the person picks the system voice. */
 export const LOCAL_MOUTH: MouthId = 'kokoro';
 
 /** What a person needs to know before picking an adapter. */
@@ -26,21 +25,21 @@ export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
   {
     id: 'local',
     slot: 'ears',
-    label: 'On this computer',
+    label: 'The brain’s ears',
     offline: true,
     screenshots: false,
   },
   {
     id: 'kokoro',
     slot: 'mouth',
-    label: 'Kokoro, on this computer',
+    label: 'Kokoro (on the brain)',
     offline: true,
     screenshots: false,
   },
   {
     id: 'system',
     slot: 'mouth',
-    label: 'The system voice',
+    label: 'System voice',
     offline: true,
     screenshots: false,
   },
@@ -50,12 +49,7 @@ export function adaptersFor(slot: VoiceAdapterFacts['slot']): readonly VoiceAdap
   return VOICE_ADAPTERS.filter((adapter) => adapter.slot === slot);
 }
 
-/** The chosen voice, then the local one, then the system voice, each once. */
-export function mouthOrder(chosen: MouthId): MouthId[] {
-  return [...new Set<MouthId>([chosen, LOCAL_MOUTH, 'system'])];
-}
-
-/** The mouth the person picked; the local voice until they pick another. */
+/** The mouth the person picked; Kokoro until they pick another. */
 export function chosenMouth(voice: { mouth?: MouthId | undefined }): MouthId {
   return voice.mouth ?? LOCAL_MOUTH;
 }

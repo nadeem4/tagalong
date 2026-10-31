@@ -29,7 +29,6 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_TTS: '1',
     },
   });
 });

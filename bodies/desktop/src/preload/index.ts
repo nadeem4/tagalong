@@ -39,8 +39,8 @@ import type {
   EarsStatus,
   HostView,
   ListeningState,
-  SpeakPreview,
-  SpeakResult,
+  SpeakSample,
+  SpeechChunk,
   TagalongHostApi,
   VoiceModels,
 } from '../shared/ipc';
@@ -166,8 +166,19 @@ const host: TagalongHostApi = {
   showBrowserFolder: () => ipcRenderer.invoke(IPC.showBrowserFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
-  speak: (text: string, preview?: SpeakPreview) =>
-    ipcRenderer.invoke(IPC.speak, text, preview) as Promise<SpeakResult>,
+  speakSample: (text, voice, speed) =>
+    ipcRenderer.invoke(IPC.speakSample, text, voice, speed) as Promise<SpeakSample | null>,
+  hush: () => ipcRenderer.invoke(IPC.hush) as Promise<void>,
+  onSpeechChunk: (handler) => {
+    const listener = (_event: IpcRendererEvent, chunk: SpeechChunk): void => handler(chunk);
+    ipcRenderer.on(IPC.speechChunk, listener);
+    return () => void ipcRenderer.off(IPC.speechChunk, listener);
+  },
+  onSpeechDone: (handler) => {
+    const listener = (_event: IpcRendererEvent, done: { turn: string }): void => handler(done.turn);
+    ipcRenderer.on(IPC.speechDone, listener);
+    return () => void ipcRenderer.off(IPC.speechDone, listener);
+  },
   onStopVoice: (handler) => {
     const listener = (): void => handler();
     ipcRenderer.on(IPC.stopVoiceEvent, listener);
@@ -189,7 +200,7 @@ const host: TagalongHostApi = {
     return () => void ipcRenderer.off(IPC.talkCancelEvent, listener);
   },
   earsListen: (mode) => ipcRenderer.invoke(IPC.earsListen, mode) as Promise<void>,
-  // A frame at a time, without waiting for an answer: the ears are in the voice process.
+  // A frame at a time, without waiting for an answer: the ears are in the brain.
   micFrame: (samples) => ipcRenderer.send(IPC.micFrame, samples),
   earsStop: () => ipcRenderer.invoke(IPC.earsStop) as Promise<void>,
   onEarsEvent: (handler) => {
@@ -204,16 +215,6 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, status: EarsStatus): void => handler(status);
     ipcRenderer.on(IPC.earsStatusEvent, listener);
     return () => void ipcRenderer.off(IPC.earsStatusEvent, listener);
-  },
-  ensureEars: async (onProgress) => {
-    const listener = (_event: IpcRendererEvent, payload: { fraction: number }): void =>
-      onProgress(payload.fraction);
-    ipcRenderer.on(IPC.earsProgressEvent, listener);
-    try {
-      await ipcRenderer.invoke(IPC.ensureEars);
-    } finally {
-      ipcRenderer.off(IPC.earsProgressEvent, listener);
-    }
   },
   getListening: () => ipcRenderer.invoke(IPC.getListening) as Promise<ListeningState>,
   setListening: (on) => ipcRenderer.invoke(IPC.setListening, on) as Promise<ListeningState>,

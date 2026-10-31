@@ -35,9 +35,6 @@ export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
 
-/** Scout talks: the queue that says one line at a time, and the mouth that plays it. */
-export { SpeechQueue } from './voice/speech-queue';
-export { QueueMouth } from './voice/mouth';
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
 export type { TalkAction } from './voice/push-to-talk';

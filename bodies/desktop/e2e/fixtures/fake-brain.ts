@@ -9,6 +9,11 @@
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included.
+ *
+ * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
+ * live words, then the question once `unlisten` arrives; always: the whole question). A say
+ * asked `spoken` is followed by `speech` frames, one sentence with a tiny silent clip, then
+ * `speech {done}`. Listen, unlisten, hush and mic counts are recorded for the test.
  */
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
@@ -24,6 +29,8 @@ export interface FakeBrain {
   stops: string[];
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
+  /** What the desktop asked of the brain's ears and mouth, in order. */
+  voice: { listens: string[]; unlistens: number; hushes: number; mics: number; spokenSays: number };
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   close(): Promise<void>;
@@ -137,6 +144,16 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     { ...DEFAULT_PREFERENCE },
     { ...TEST_PREFERENCE },
   ];
+  const voice: FakeBrain['voice'] = {
+    listens: [],
+    unlistens: 0,
+    hushes: 0,
+    mics: 0,
+    spokenSays: 0,
+  };
+  // 3 s of silence at the mouth's 24 kHz: long enough for a test to see the panel speaking
+  // and press Stop before it ends on its own.
+  const SILENCE = Buffer.alloc(24_000 * 3 * 2).toString('base64');
   const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
   const permissions = [
@@ -165,12 +182,18 @@ export async function startFakeBrain(): Promise<FakeBrain> {
       socket.send(JSON.stringify({ jsonrpc: '2.0', method, params: { seq: ++seq, ...params } }));
     // What a turn still has to say once its open ask is answered.
     const held = new Map<string, () => void>();
+    // The ears' side of this connection: the mode asked for and the frames since.
+    let mode: string | null = null;
+    let frames = 0;
+    // Voice frames are live-only: no seq, never replayed.
+    const live = (method: string, params: Record<string, unknown>) =>
+      socket.send(JSON.stringify({ jsonrpc: '2.0', method, params }));
 
     socket.on('message', (raw) => {
       const msg = JSON.parse(String(raw)) as {
         id?: string;
         method?: string;
-        params?: { text?: string; ask?: string; option?: string };
+        params?: { text?: string; ask?: string; option?: string; spoken?: boolean; mode?: string };
         result?: unknown;
         error?: { code: number; message: string };
       };
@@ -184,17 +207,54 @@ export async function startFakeBrain(): Promise<FakeBrain> {
       } else if (msg.method === 'hello') {
         const result = { protocol: 1, session: 's1', tools: [], seq, resync: false };
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
+      } else if (msg.method === 'listen') {
+        mode = String(msg.params?.mode);
+        frames = 0;
+        voice.listens.push(mode);
+        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
+      } else if (msg.method === 'mic') {
+        voice.mics += 1;
+        frames += 1;
+        if (frames === 3 && mode === 'held') {
+          live('heard', { event: 'speech_start' });
+          live('heard', { event: 'partial', text: 'What am I' });
+        } else if (frames === 3 && mode === 'always') {
+          live('heard', { event: 'speech_start' });
+          live('heard', { event: 'final', text: 'Scout, what am I looking at?' });
+          live('heard', { event: 'turn_end', text: 'Scout, what am I looking at?' });
+        }
+      } else if (msg.method === 'unlisten') {
+        // Letting go of the talk key ends a held question.
+        if (mode === 'held' && frames >= 3) {
+          live('heard', { event: 'final', text: 'What am I looking at?' });
+          live('heard', { event: 'turn_end', text: 'What am I looking at?' });
+        }
+        voice.unlistens += 1;
+        mode = null;
+      } else if (msg.method === 'hush') {
+        voice.hushes += 1;
       } else if (msg.method === 'say') {
         const turn = `t${++turns}`;
         socket.send(
           JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { turn, joined: false } }),
         );
         const base = { turn, body: 'desktop' };
+        const spoken = msg.params?.spoken === true;
         const finish = () => {
           notify('reply', { ...base, delta: 'This is the ' });
           notify('reply', { ...base, delta: 'fake brain.' });
           notify('reply', { ...base, done: true });
           notify('turn', { ...base, state: 'ended', reason: 'done' });
+          if (spoken) {
+            voice.spokenSays += 1;
+            live('speech', {
+              turn,
+              text: 'This is the fake brain.',
+              pcm: SILENCE,
+              sample_rate: 24000,
+            });
+            live('speech', { turn, done: true });
+          }
         };
         notify('turn', { ...base, state: 'started' });
         if (msg.params?.text?.includes('windows')) {
@@ -339,6 +399,7 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     permissionSets,
     stops,
     removedPreferences,
+    voice,
     sendApproved: (note) => {
       for (const socket of sockets) {
         socket.send(

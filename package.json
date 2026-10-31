@@ -41,7 +41,6 @@
       "electron-winstaller",
       "esbuild",
       "get-windows",
-      "onnxruntime-node",
       "protobufjs",
       "sharp",
       "uiohook-napi"

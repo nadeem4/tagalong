@@ -4,13 +4,22 @@ import { SETTINGS_DEFAULTS, Settings } from '../../shared/settings';
 import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 
 describe('panelSettings', () => {
-  it('reads the talk key and the microphone the panel uses', () => {
+  it('reads the talk key, the microphone and the voice the panel uses', () => {
     const settings = Settings.parse({
       ...SETTINGS_DEFAULTS,
       hotkeys: { ...SETTINGS_DEFAULTS.hotkeys, ask: 'CommandOrControl+J', talk: 'RightShift' },
-      voice: { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic' },
+      voice: { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic', mouth: 'system', speed: 1.2 },
     });
-    expect(panelSettings(settings)).toEqual({ talkKey: 'Right Shift', microphoneId: 'usb-mic' });
+    expect(panelSettings(settings)).toEqual({
+      talkKey: 'Right Shift',
+      microphoneId: 'usb-mic',
+      mouth: 'system',
+      speed: 1.2,
+    });
+  });
+
+  it('speaks with Kokoro until another voice is picked', () => {
+    expect(panelSettings(Settings.parse(SETTINGS_DEFAULTS)).mouth).toBe('kokoro');
   });
 
   it('falls back to Right Ctrl', () => {

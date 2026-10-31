@@ -1,6 +1,6 @@
 /**
  * Source guard for the shared UI: the shapes folder stays React-free so desktop main and the
- * voice process can import it.
+ * brain can import it.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

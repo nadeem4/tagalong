@@ -34,7 +34,7 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
         ],
       }),
     listMicrophones: () => Promise.resolve([{ id: 'mic-1', label: 'Desk mic' }]),
-    voiceModels: () => Promise.resolve({ mouth: true, ears: false }),
+    voiceModels: () => Promise.resolve({ ears: false }),
     testBudgetMs: 5_000,
     ...patch,
   };
@@ -47,8 +47,6 @@ describe('gatherHealth', () => {
       connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
       voice: {
         enabled: true,
-        mouth: 'kokoro',
-        mouthReady: true,
         earsUsed: false,
         earsReady: false,
       },

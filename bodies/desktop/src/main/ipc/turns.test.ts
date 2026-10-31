@@ -15,12 +15,14 @@ function setup(
     outdated?: boolean;
     joined?: boolean;
     takeDrop?: () => Promise<never>;
+    voiceOn?: boolean;
   } = {},
 ) {
   const ipc = fakeIpc();
   const said: SayParams[] = [];
   const cancelled: string[] = [];
   const claimed: string[] = [];
+  const stopped: string[] = [];
   registerTurnIpc(ipc.handle, {
     brain: {
       say: (params) => {
@@ -32,20 +34,35 @@ function setup(
       cancel: (turn) => void cancelled.push(turn),
     },
     claimTurn: (turn) => void claimed.push(turn),
+    stopVoice: () => void stopped.push('voice'),
+    voice: () => ({ enabled: options.voiceOn !== false, voice: 'bm_george', speed: 0.95 }),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
-  return { ...ipc, said, cancelled, claimed };
+  return { ...ipc, said, cancelled, claimed, stopped };
 }
 
 describe('registerTurnIpc', () => {
+  it('interrupt cancels the turn and stops its speech', async () => {
+    const { invoke, cancelled, stopped } = setup();
+    await invoke(IPC.interrupt, 't1');
+    expect(cancelled).toEqual(['t1']);
+    expect(stopped).toEqual(['voice']);
+  });
+
   it('ask sends say with text and returns turnId', async () => {
     const { invoke, said } = setup();
     expect(await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true })).toEqual({
       turnId: 't1',
     });
-    expect(said).toEqual([{ text: 'hi', spoken: true }]);
+    expect(said).toEqual([{ text: 'hi', spoken: true, voice: 'bm_george', speed: 0.95 }]);
+  });
+
+  it('a spoken ask with Scout talks switched off is asked as text', async () => {
+    const { invoke, said } = setup(null, { voiceOn: false });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true });
+    expect(said).toEqual([{ text: 'hi' }]);
   });
 
   it('ask that joins a running turn claims it, so a quiet wake turn shows', async () => {

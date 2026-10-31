@@ -1,7 +1,7 @@
 /**
  * Scout's voice slots: Ears turn the microphone into words and a Mouth turns an answer into
  * speech. Contains the slot interfaces, the adapter ids and Pushable. Imports nothing, so
- * desktop main, the voice process and the windows all share it.
+ * desktop main, the brain and the windows all share it.
  */
 
 /** The microphone, as the ears take it: one frame after another until it closes. */
@@ -20,12 +20,6 @@ export interface Ears {
   listen(mic: MicStream): void;
   stop(): void;
   on(event: EarsEvent, handler: (text?: string) => void): void;
-}
-
-/** Scout's answer to speech, streamed sentence by sentence, stoppable at once. */
-export interface Mouth {
-  speak(text: AsyncIterable<string>): void;
-  stop(): void;
 }
 
 export const EARS_IDS = ['local'] as const;

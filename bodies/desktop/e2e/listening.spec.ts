@@ -26,8 +26,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       TAGALONG_BRAIN_ADDR: brain.addr,
-      TAGALONG_FAKE_TTS: '1',
-      TAGALONG_FAKE_STT: '1',
+      TAGALONG_FAKE_MIC: '1',
     },
   });
 });
@@ -65,13 +64,17 @@ test('Always listening: off at launch, on only when switched, Scout hears and an
   // Switching on shows "Listening" on Scout for a few seconds: a mark, not a spoken line.
   await expect(avatar.getByTestId('status-mark')).toHaveAttribute('data-id', 'listening-on');
 
-  // The fake ears end one turn by themselves after a few frames of Chromium's fake mic. They
-  // say "Scout, what am I looking at?": the bubble asks it without the name.
+  // The fake brain hears one turn after a few mic frames from Chromium's fake mic and sends
+  // "Scout, what am I looking at?": the bubble asks it without the name. The desktop asked the
+  // brain to listen and streamed audio to it.
+  await expect.poll(() => brain.voice.listens).toContain('always');
   await expect(panel.getByText(/what am I looking at\?/i).first()).toBeVisible({
     timeout: 30_000,
   });
   await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
+  expect(brain.voice.mics).toBeGreaterThanOrEqual(3);
 
   await panel.getByRole('switch', { name: 'Always listening' }).click();
   await expect(avatar.getByTestId('listening-mark')).toHaveCount(0);
+  await expect.poll(() => brain.voice.unlistens).toBeGreaterThan(0);
 });
