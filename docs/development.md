@@ -252,15 +252,18 @@ review: `home.png` and `connections.png`.
 
 ## Running the desktop app
 
-Start the brain, then the desktop (see Commands in CLAUDE.md):
+One command is enough: the desktop starts the brain if none is running (see Commands in CLAUDE.md):
 
 ```powershell
-cd brain; uv run brain   # leave it running
+cd brain; uv sync; cd ..
 pnpm install
 pnpm dev:desktop
 ```
 
-The desktop dials the brain at `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and retries every 2 s, so the order does not matter.
+The desktop dials the brain at `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and retries every 2 s. It spawns `uv run brain` (cwd `brain/`) only when the address is local and
+nothing answers there, and on quit stops only the brain it started; a brain you started yourself
+(`cd brain && uv run brain`) is used as is and left running. Set `TAGALONG_START_BRAIN=0` to stop
+the desktop starting one.
 
 To see what a new user sees, run `pnpm --filter @tagalong/desktop
 start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
@@ -338,7 +341,7 @@ the address bar. It has no chat and no side panel; Scout talks in the desktop bu
 [browser-body.md](browser-body.md).
 
 **It needs the brain running.** The body dials the brain on `127.0.0.1:47321` (change it in the
-popup) and retries by itself, so start `cd brain && uv run brain` first.
+popup) and retries by itself, so start a brain first (`pnpm dev:desktop` does, or `cd brain && uv run brain`).
 
 ### Build and load it
 
@@ -382,6 +385,7 @@ listed in `.env.example` and described in [brain.md](brain.md).
 | Variable                | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`   | **Read** (`brain/start.ts`). Host:port the desktop dials for the brain; default `127.0.0.1:47321`. The brain reads the same name for where it listens.                                                                                                                                                                                                                                                     |
+| `TAGALONG_START_BRAIN`  | **Read** (`brain/launch.ts`). `0` stops the desktop starting a local brain when none is running; the Electron specs that need the brain down set it.                                                                                                                                                                                                                                                       |
 | `TAGALONG_VOICE_DIR`    | **Read** (`voice/worker/main.ts`). Folder of the voice models. Main sets it for the voice process (to `<data folder>/voice`); you never set it.                                                                                                                                                                                                                                                            |
 | `ELECTRON_RENDERER_URL` | **Read** (`windows/page.ts`). The dev server's address, set by `electron-vite` under `pnpm dev:desktop`; the packaged app loads its files instead.                                                                                                                                                                                                                                                         |
 | `TAGALONG_FAKE_TTS=1`   | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                                         |

@@ -192,9 +192,9 @@ flowchart LR
 
 The desktop app (`bodies/desktop`) is a body of this brain.
 
-- Start the brain first (`cd brain && uv run brain`), then the desktop (`pnpm dev:desktop`). The
-  desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
-  listens on) and retries every 2 s, so either order works.
+- `pnpm dev:desktop` starts the brain if none is running (or run `cd brain && uv run brain`
+  yourself first). The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
+  variable the brain listens on) and retries every 2 s, so either order works.
 - It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
   `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.

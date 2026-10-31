@@ -39,11 +39,11 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 ## Configuration
 
 Every test runs on the Windows desktop app, either installed ([Installer](#installer)) or from
-source (start the brain with `cd brain; uv run brain`, then `pnpm dev:desktop`), unless a step says otherwise.
+source (`pnpm dev:desktop` starts the brain if none is running; or start it with `cd brain; uv run brain` first), unless a step says otherwise.
 Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A saved key or brain is
 used from the next question, with no restart.
 
-**The default for this guide: the Python brain.** Start it with `cd brain && uv run brain`; it holds the
+**The default for this guide: the Python brain.** `pnpm dev:desktop` starts it if none is running, or run `cd brain && uv run brain` yourself; it holds the
 model and its keys (see [brain.md](../brain.md)). The desktop has no provider, model or sign-in settings.
 
 **Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
@@ -204,6 +204,21 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key in `~/.ta
 13. **Action:** while an ask is open, restart the desktop app (or drop and restore the connection).
     **Expected:** the ask is still open in the bubble. With a second body connected, answering in
     one closes the card in the other.
+
+### The desktop starts the brain
+
+Run from source with no brain running. Steps 3 to 7 above stop and start the brain by hand, so
+run it on its own for those.
+
+1. **Setup:** make sure nothing listens on `127.0.0.1:47321`, then run `pnpm dev:desktop` alone.
+   **Expected:** a `uv` process (and its `python` child) appears, Scout appears, and no "Scout's
+   brain is not running." mark stays. An ask works. The brain's output shows in the terminal.
+2. **Action:** quit the app from the tray.
+   **Expected:** the `uv` and `python` processes the app started are gone.
+3. **Action:** start `cd brain && uv run brain` yourself, then `pnpm dev:desktop`. Quit the app.
+   **Expected:** the app starts no second brain, and your brain is still running after quit.
+4. **Action:** set `TAGALONG_BRAIN_ADDR=10.0.0.5:9000` (or `TAGALONG_START_BRAIN=0`) and start the app.
+   **Expected:** no `uv` process starts; the app shows the offline mark and keeps retrying.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 

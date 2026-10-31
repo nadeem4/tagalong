@@ -1,7 +1,7 @@
 /**
- * Starts the desktop's brain client on a real websocket. The desktop does not launch the
- * brain; it dials the address the brain listens on (TAGALONG_BRAIN_ADDR, the same variable)
- * and BrainClient keeps retrying while it is down. It declares the window body tools.
+ * Starts the desktop's brain client on a real websocket. It dials the address the brain
+ * listens on (TAGALONG_BRAIN_ADDR, the same variable; launch.ts starts a local brain first
+ * if none runs) and BrainClient keeps retrying while it is down. It declares the window body tools.
  */
 import { BrainClient } from '@tagalong/contract';
 import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';

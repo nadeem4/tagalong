@@ -39,21 +39,19 @@ Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#
 
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
-The desktop talks to the Python brain, so start the brain first (you need `uv` and an Anthropic
-key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)).
+The desktop talks to the Python brain and starts it for you when none is running (you need `uv`
+and an Anthropic key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)).
 
 ```powershell
 cd brain
 uv sync
-uv run brain        # leave this running
-```
-
-In a second terminal, from the repo root:
-
-```powershell
+cd ..
 pnpm install
-pnpm dev:desktop
+pnpm dev:desktop    # starts the brain too, and stops it when you quit
 ```
+
+To run the brain on its own instead (for example on another machine), use
+`cd brain && uv run brain`; the desktop connects to it and leaves it running.
 
 To let Scout hand work to Claude Code, install its adapter once with
 `npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer). Claude Code must be
@@ -118,7 +116,7 @@ its bodies fit together.
 
 ## First run
 
-There is no setup window. Start the brain (`cd brain && uv run brain`), then start Tagalong; Scout appears on your screen. The brain's model and key are in its `.env`; hotkeys, listening and the rest are under **Home → Settings**.
+There is no setup window. Start Tagalong (it starts the brain if none is running); Scout appears on your screen. The brain's model and key are in its `.env`; hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 
@@ -253,7 +251,7 @@ reading list, downloads and recently closed tabs. It also tells Scout which tab 
 download just finished, without waking it. Scout can also open, close, switch, group, bookmark and
 save tabs when you ask, and you can ask Scout from a right-click on selected text or by typing
 `scout` and a question in the address bar; the answer appears in the desktop bubble. It is a second
-body for the Python brain, so the brain (`cd brain && uv run brain`) must be running.
+body for the Python brain, so a brain must be running (`pnpm dev:desktop` starts one, or run `cd brain && uv run brain`).
 
 1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
 2. Click **Load unpacked** and choose the folder shown in **Home → Settings → Add Scout to your
@@ -305,24 +303,24 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 ## Troubleshooting
 
-| Problem                                                  | What to do                                                                                                                                      |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
-| Scout says it has no API key                             | Put `ANTHROPIC_API_KEY` in the brain's `.env` file and restart the brain.                                                                       |
-| Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                |
-| A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
-| Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
-| Talk to Scout says it could not open the microphone      | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
-| Scout shows **Mic busy**, **No mic** or **Can't listen** | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself. |
-| With Always listening on, Scout doesn't react            | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.  |
-| The first spoken question takes a while                  | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                         |
-| Scout's voice changes after the first answers            | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
-| The browser popup says Scout's brain is not reachable    | Start the brain (`cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself.                   |
-| "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
-| Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
-| You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                  |
-| From source, a look always captures the whole screen     | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.             |
-| It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                  |
+| Problem                                                  | What to do                                                                                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                                    |
+| Scout says it has no API key                             | Put `ANTHROPIC_API_KEY` in the brain's `.env` file and restart the brain.                                                                               |
+| Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                        |
+| A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).                   |
+| Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                                 |
+| Talk to Scout says it could not open the microphone      | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                                 |
+| Scout shows **Mic busy**, **No mic** or **Can't listen** | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself.         |
+| With Always listening on, Scout doesn't react            | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.          |
+| The first spoken question takes a while                  | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                                 |
+| Scout's voice changes after the first answers            | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.           |
+| The browser popup says Scout's brain is not reachable    | Start a brain (`pnpm dev:desktop` does, or `cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself. |
+| "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                                    |
+| Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.               |
+| You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                          |
+| From source, a look always captures the whole screen     | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.                     |
+| It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                          |
 
 # For developers
 

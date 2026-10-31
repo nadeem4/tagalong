@@ -5,8 +5,9 @@
 `bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
 (contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
 global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
-brain directly. The desktop does not run a brain of its own; start the brain
-yourself with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
+brain directly. In development the desktop starts the brain itself when none is running (see
+[The brain in the main process](#the-brain-in-the-main-process)); or run it yourself
+with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
 [sight.md](sight.md). Hearing, speaking, the talk key and Always listening are in
@@ -19,6 +20,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/main/index.ts`                        | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
 | `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
+| `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; stops only that child on quit                                               |
 | `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
 | `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
 | `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
@@ -97,6 +99,14 @@ flowchart TD
 declares four body tools in `hello` (`brain/body-tools.ts`) and answers the brain's `use` for them.
 If the socket is down the client retries every 2 s, so the app opens whether or not the brain is
 running.
+
+Before dialing, an unpackaged desktop runs `launchBrain` (`brain/launch.ts`). If the address is
+local (`127.0.0.1`, `localhost` or `::1`), the repo's `brain/` folder has a `pyproject.toml`, and a
+TCP connect to the address is refused, it spawns `uv run brain` there with the environment passed
+through; the child writes to the dev terminal, not to `tagalong.log`. If something already answers, or the address is remote, it spawns nothing. On
+quit it stops only the child it started (on Windows `taskkill /pid <pid> /t /f`, so uv's Python
+child dies too). If `uv` is missing or the child exits, it logs one line and does not respawn; the
+client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
 
 - **Body tools.** `list_windows` returns visible and minimized windows as JSON text.
   `read_window_text(windowId)` works on minimized windows, and a read from pixels (OCR) raises the
