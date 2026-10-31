@@ -1,8 +1,8 @@
 """The guard runner: one ordered list of checks per hook, folded into a single verdict.
 
-Refusals go through here so precedence and logging live once; in G1 that is the budget and the
-step cap (later slices move the tool gate, asks and wake caps). A guard that raises or returns
-a non-Verdict counts as a block, so spend and tool hooks fail closed.
+Refusals go through here so precedence and logging live once: the budget, the step cap, the wake
+caps, the tool gate, asks and the save mask. A guard that raises or returns a non-Verdict counts
+as a block, so spend and tool hooks fail closed.
 """
 
 import dataclasses

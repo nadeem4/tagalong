@@ -480,7 +480,7 @@ transcript.
   setting before any window opens, and every change goes to every window as
   `IPC.listeningEvent`.
 - **Who changes it.** Only `setListening(on)` changes `on`: the bubble's switch, Settings →
-  Privacy, or "Scout, stop" through the panel. `listeningOff` in the settings IPC also sets it off.
+  Privacy, or "Scout, stop" through the panel.
 - **Follow-up flag.** `followUp` can be true only while `on && !paused`. Pausing or switching off
   clears it.
 - **Saving.** `saveListening` saves `on` with `settings.set { listening: { always } }` when it

@@ -6,6 +6,6 @@ pnpm-lock.yaml
 .remember/
 release/
 .impeccable/
-bodies/desktop/.impeccable/
+CLAUDE.local.md
 .claude/worktrees/
 .superpowers/

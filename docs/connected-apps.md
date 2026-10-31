@@ -6,9 +6,6 @@ Scout can use the user's own apps (Notion, GitHub, Linear, or any local tool) th
 Context Protocol. The Python brain is the MCP client (the official `mcp` SDK). Each app tool becomes
 one Scout tool: reads run at once, changes ask first, and risky ones ask every time until unlocked on Home.
 
-Status: the brain side (slice 9a), Home's Connections page on it (9b) and browser sign-in (OAuth,
-9c) are built.
-
 ## Where it lives
 
 | File                             | What it holds                                                                |

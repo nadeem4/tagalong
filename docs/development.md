@@ -161,7 +161,7 @@ the root `vitest.config.ts`.
 | `bodies/ui/src`                                            | 91 / 83 / 90 / 93                                 |
 | `bodies/desktop/src/main` and `bodies/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
 
-The `bodies/ui` and desktop host floors sit just below what they measured when they were added.
+The `bodies/ui` and desktop host floors sit just below what they measure.
 Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and
 the browser body are not measured: the Playwright suites cover them.
 
@@ -227,8 +227,11 @@ The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` hold
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Home),
 `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
-that starts with "Scout" is heard and answered, switched off), plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
-test:e2e`.
+that starts with "Scout" is heard and answered, switched off), `brain-offline.spec.ts`,
+`asks.spec.ts` (the permission ask in the bubble), `approvals.spec.ts` (Home's Approvals page and
+the `approved` report card), `jobs.spec.ts` (Claude Code jobs and their cards), `permissions.spec.ts`
+(Home's Permissions list) and `where-things-run.spec.ts` (Overview's "Where things run" card). Run
+them with `pnpm --filter @tagalong/desktop test:e2e`.
 
 The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
 `listening.spec.ts` start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
@@ -329,7 +332,7 @@ The Python brain has no pairing token: it is single user and listens on `127.0.0
 `hello` carries only the protocol version, its kind and its tools (see
 [protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
 
-The data directory is still `%APPDATA%\Tagalong` on Windows, which is `productName` in
+The data directory is `%APPDATA%\Tagalong` on Windows, which is `productName` in
 `bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
 settings and saved keys with no migration.
 

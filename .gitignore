@@ -5,9 +5,7 @@ node_modules/
 # build output
 dist/
 out/
-build/
 *.tsbuildinfo
-.turbo/
 
 # electron-builder
 release/
@@ -31,7 +29,6 @@ test-results/
 Thumbs.db
 .idea/
 .vscode/*
-!.vscode/extensions.json
 
 # local agent history
 .remember/

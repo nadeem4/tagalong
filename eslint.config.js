@@ -26,6 +26,8 @@ const PURITY_PATHS = [
   },
 ];
 
+// A rule's options are replaced, not merged, by a later block, so the one block per file set
+// below spells out every ban it needs from these lists.
 const PURITY_PATTERNS = [
   {
     group: ['electron/*', 'electron-*'],
@@ -36,10 +38,15 @@ const PURITY_PATTERNS = [
     message: 'protocol/ts must stay UI-agnostic.',
   },
   {
-    group: ['@tagalong/ui', '@tagalong/ui/*'],
-    message: 'protocol/ts must not depend on the UI package.',
+    group: ['@tagalong/*'],
+    message: 'protocol/ts sits at the bottom of the dependency graph.',
   },
 ];
+
+const NO_NODE_BUILTINS = {
+  group: ['node:*'],
+  message: 'protocol/ts depends on zod and nothing else.',
+};
 
 export default tseslint.config(
   {
@@ -71,7 +78,10 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
     rules: {
-      'no-restricted-imports': ['error', { paths: PURITY_PATHS, patterns: PURITY_PATTERNS }],
+      'no-restricted-imports': [
+        'error',
+        { paths: PURITY_PATHS, patterns: [...PURITY_PATTERNS, NO_NODE_BUILTINS] },
+      ],
       'no-restricted-globals': [
         'error',
         { name: 'window', message: 'No DOM globals in protocol/ts.' },
@@ -82,46 +92,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ['protocol/ts/**/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            { name: 'electron', message: 'protocol/ts depends on zod and nothing else.' },
-            { name: 'react', message: 'protocol/ts depends on zod and nothing else.' },
-          ],
-          patterns: [
-            { group: ['node:*'], message: 'protocol/ts depends on zod and nothing else.' },
-            {
-              group: ['@tagalong/*'],
-              message: 'protocol/ts sits at the bottom of the dependency graph.',
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
     // The examples test reads the sample files, so tests alone may import node:fs, node:path
-    // and node:url. Repeats the other bans: a later block replaces a rule's options.
+    // and node:url; every other ban still applies.
     files: ['protocol/ts/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            { name: 'electron', message: 'protocol/ts depends on zod and nothing else.' },
-            { name: 'react', message: 'protocol/ts depends on zod and nothing else.' },
-          ],
-          patterns: [
-            {
-              group: ['@tagalong/*'],
-              message: 'protocol/ts sits at the bottom of the dependency graph.',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': ['error', { paths: PURITY_PATHS, patterns: PURITY_PATTERNS }],
     },
   },
   {

@@ -377,7 +377,6 @@ status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
 | `GreetingLine` `holdMs`                 | 7,000 ms default; 12,000 ms for remarks | `companion-bubble.tsx`, `panel.tsx`               |
 | `LEAVE_MS`                              | 300 ms fade                             | `companion-bubble.tsx`                            |
 | Answer box height                       | 260 px max, then scrolls                | `companion-bubble.tsx` (`BUBBLE_CSS`)             |
-| `COPIED_MS`                             | 2,000 ms                                | `answer.tsx`                                      |
 | `SHORT_LINE`                            | 40 characters                           | `voice/speakable.ts`                              |
 | `HEALTH_TEST_BUDGET_MS`                 | 5,000 ms per call                       | `bodies/desktop/src/renderer/src/health-facts.ts` |
 | Dock size (`SIZE`)                      | 96 px                                   | `dock-pet.tsx`                                    |

@@ -3,8 +3,7 @@
   "productName": "Tagalong",
   "copyright": "Copyright \u00a9 2026 Tagalong",
   "directories": {
-    "output": "release",
-    "buildResources": "resources"
+    "output": "release"
   },
   "files": ["dist/**/*", "package.json"],
   "asar": true,

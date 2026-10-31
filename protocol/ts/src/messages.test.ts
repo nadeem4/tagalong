@@ -1,6 +1,6 @@
 /**
  * Type-level pin: the method maps expose their literal method names, so bodies can
- * type a method argument without repeating the list. Also pins the 10c additions:
+ * type a method argument without repeating the list. Also pins
  * started_by on turns and the back and focus event data.
  */
 import { readFileSync } from 'node:fs';

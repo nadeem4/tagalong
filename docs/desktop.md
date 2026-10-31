@@ -577,7 +577,7 @@ by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate 
 | `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                  |
 | `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false` |
 | `mac`, `linux`         | `dmg`; `AppImage` and `deb`. Configured, not verified                                                                                                                                  |
-| `directories`          | output `release`, build resources `resources`                                                                                                                                          |
+| `directories`          | output `release`                                                                                                                                                                       |
 
 Node cannot `dlopen` from inside an asar archive; files under `app.asar.unpacked` are loaded from
 there by Electron's `require` redirect, which is why every `.node` file and the ONNX runtime's DLLs
@@ -597,15 +597,14 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 - `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
   `settings`, `avatar`, `panel`, `tray`,
-  `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
+  `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `voice`, `voiceWorker`,
   `listening`, `statusMarks`.
 - `startBrain({ onNotification, onStatus, onResync, env?, openSocket? })` returns the `BrainClient`.
 - `HotkeyBindings { ask, pauseSight, stopVoice }`, `HotkeyOutcome`, `HotkeyAction`
   (`ask | pauseSight | stopVoice | talk`), `HotkeyRegistrar` (the test seam over `globalShortcut`).
 - `IPC`, `HostView`, `TagalongHostApi`,
-  `CaptureNotice`, `SpeakResult`, `ListeningState`, `PetDrop`, `ProviderChoice`,
-  `ClaudeSignIn`, `VoiceModels`, `FoundAgent` (`shared/ipc.ts`).
+  `CaptureNotice`, `SpeakResult`, `ListeningState`, `PetDrop`, `VoiceModels` (`shared/ipc.ts`).
 - `Platform`, `WindowInventory`, `ActiveWindowInfo`, `CapturedImage` (`platform/index.ts`).
 
 ## Constants and limits
@@ -683,7 +682,7 @@ when a button on its card asks. See [privacy.md](privacy.md).
 | `src/main/windows/bubble-focus.test.ts`              | `hidesOnBlur`: other app hides; streaming, the pet, or focus back keeps it                                                                                                                                                                                              |
 | `src/main/windows/home.test.ts`                      | `HOME_MIN_WIDTH`                                                                                                                                                                                                                                                        |
 | `src/main/tray-menu.test.ts`                         | four items, the Pause sight check, each item's action                                                                                                                                                                                                                   |
-| `src/main/ipc/*.test.ts`                             | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `handle.test.ts` the sender check; `apply-settings.test.ts` listening never switched on                                               |
+| `src/main/ipc/*.test.ts`                             | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `handle.test.ts` the sender check                                                                                                     |
 | `src/main/log-file.test.ts`                          | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                                                     |
 | `src/main/fix-target.test.ts`                        | Fix it targets                                                                                                                                                                                                                                                          |
 | `src/preload/held.test.ts`                           | `heldUntilHeard`                                                                                                                                                                                                                                                        |

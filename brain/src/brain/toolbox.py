@@ -155,7 +155,7 @@ class Toolbox:
         offers: Offers | None = None,
         guards: Guards | None = None,
     ) -> None:
-        self.sources = sources  # brain source first; later tasks append body sources
+        self.sources = sources  # brain source first, then the body and app sources
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
