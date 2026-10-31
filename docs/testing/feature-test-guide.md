@@ -81,10 +81,11 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 1. **Setup:** switch Always listening on with the listening model not downloaded; stop the brain.
 2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Voice row;
-   (c) say "are you OK?" with the talk key; (d) type "what's wrong with this code?", then
+   (c) type "are you OK?"; (d) type "what's wrong with this code?", then
    "what's broken?"; (e) press **Open logs folder** on the card.
-3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
-   row each for Connections, Voice ("Speech model not downloaded.") and Microphone; nothing is
+3. **Expected:** (a) at once, with no "thinking", a card starting "One thing needs you.", then a
+   row each for Connections ("Not checked.", the brain is stopped), Voice ("Speech model not
+   downloaded.") and Microphone ("A microphone is ready." with one plugged in); nothing is
    spoken; no key appears anywhere on the card. No row says "I" or "my". (b) Home opens at
    Settings › Voice. (c) the same card, and nothing is spoken: health is shown, never said.
    (d) Scout answers both as normal questions; no card. With everything fixed, the card says

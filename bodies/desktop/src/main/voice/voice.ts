@@ -1,7 +1,7 @@
 /**
- * Scout's mouth in main: picks who says a line (Kokoro or the system voice), falls through on failure,
- * and returns audio for the bubble to play, or tells the bubble to use the window's own system
- * voice. Contains createVoiceService, LazyLocalVoice, the mouths and fakeTts.
+ * Scout's mouth in main: picks who says a line (Kokoro or the system voice), falls through on
+ * failure, and returns audio for the bubble to play, or tells the bubble to use the window's own
+ * system voice. Contains createVoiceService, LazyLocalVoice, the mouths and fakeTts.
  */
 
 import { chosenMouth, mouthOrder } from '../../shared/voice';

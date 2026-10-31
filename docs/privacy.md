@@ -152,8 +152,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
 - Screenshots are never saved: the saved chat keeps only the marker `[screenshot]` (see [memory.md](memory.md#saved-chat)).
 - The desktop stores no API keys. Keys are never spoken, shown or logged.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
-  computer and the brain: whether a key is stored (never
-  the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
+  computer and the brain: whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
   the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the
   card never shows a key, token or secret.
 - With every question, Scout's AI provider also gets one **Now** line: your local date, time and UTC

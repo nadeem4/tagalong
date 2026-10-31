@@ -15,7 +15,8 @@ import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on save.
+ * Sections in page order: Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on
+ * save.
  */
 export function SettingsPage() {
   const [view, setView] = useState<HostView | null>(null);

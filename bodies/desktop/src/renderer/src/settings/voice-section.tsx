@@ -1,6 +1,7 @@
 /**
  * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
- * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold to speak, and which microphone listens.
+ * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold
+ * to speak, and which microphone listens.
  */
 import { useEffect, useState } from 'react';
 import {
