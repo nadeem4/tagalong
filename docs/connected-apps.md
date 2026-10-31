@@ -226,8 +226,8 @@ than the brain's; TLS, pairing and multi-user.
   hostless url), the store, and the manager against a real fake server over stdio and http (connect,
   call, hang, exit, drop, restart, process cleanup).
 - `brain/tests/test_app_tools.py`: classification, names, results and `AppSource`.
-- `brain/tests/test_apps.py` also pins the secret split, the merge at connect, the startup
-  migration and clearing every key on remove.
+- `brain/tests/test_apps.py` also pins the secret split, the merge at connect and
+  clearing every key on remove.
 - `brain/tests/test_app_oauth.py`: token storage, the loopback listener, and sign-in against a
   fake OAuth server.
 - `bodies/ui/src/home/connections-panel.test.tsx`: the Sign in button, Waiting for the browser, the

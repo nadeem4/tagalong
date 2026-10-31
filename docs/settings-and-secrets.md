@@ -86,7 +86,7 @@ directory, never in the `apps` table:
 | `app-oauth/<id>.json` | An app's OAuth client and tokens                                                                    |
 
 `${VAR}` references stay in the row and are filled from the brain's environment at connect. The
-rules, the startup migration and the missing-key error are in [connected apps](connected-apps.md).
+rules and the missing-key error are in [connected apps](connected-apps.md).
 Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
 by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 

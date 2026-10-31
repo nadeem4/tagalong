@@ -32,31 +32,10 @@ describe('Settings', () => {
     expect(s.avatar).toEqual({ x: null, y: null });
   });
 
-  it('drops the retired look and see-everything keys from an older settings file', () => {
-    // Scout takes screenshots and reads other windows itself now, so those keys bind
-    // nothing. An older file still parses; the keys simply fall away.
-    const s = Settings.parse({
-      hotkeys: { ask: 'Alt+Space', look: 'Alt+S', seeEverything: 'Alt+Shift+S' },
-    });
-    expect(s.hotkeys).toEqual({ ask: 'Alt+Space' });
-  });
-
-  it('drops every retired field of an older settings file, and a patch ignores them too', () => {
-    const old = {
-      providerId: 'anthropic',
-      defaultModel: 'claude-opus-5',
-      defaultPetId: 'ink',
-      hiddenPets: ['bolt'],
-      onboarding: { done: true },
-      enginePort: 47321,
-      userName: 'Ada',
-      keepAnEye: true,
-      sightDetail: 'all',
-      budget: { dailyUsd: 1 },
-    };
-    expect(Object.keys(Settings.parse(old))).not.toContain('userName');
-    expect(Settings.parse(old)).toEqual(Settings.parse({}));
-    expect(SettingsPatch.parse(old)).toEqual({});
+  it('drops keys the schema does not know', () => {
+    const extra = { hotkeys: { ask: 'Alt+Space', unknown: 'Alt+S' }, unknown: 1 };
+    expect(Settings.parse(extra)).toEqual(Settings.parse({ hotkeys: { ask: 'Alt+Space' } }));
+    expect(SettingsPatch.parse({ unknown: 1 })).toEqual({});
   });
 
   it('keeps explicit values', () => {
