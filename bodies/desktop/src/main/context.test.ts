@@ -1,12 +1,11 @@
-/** Tests for the ask's snapshot and perception.capture. */
+/** Tests for the ask's snapshot and the voice path's window-only snapshot. */
 
 import { describe, expect, it, vi } from 'vitest';
 import { basename } from 'node:path';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import type { CaptureExclusions } from '../shared/settings';
 import type { WindowEntry } from '@tagalong/ui/shapes';
-import { answerCapture, captureAskSnapshot, capturePatch } from './context';
-import type { DisplaysCapture } from './platform/displays';
+import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { Platform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 
@@ -18,12 +17,6 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
       bounds: { x: 0, y: 0, width: 1280, height: 800 },
     }),
     captureSelection: async () => 'the highlighted paragraph',
-    readClipboard: async () => 'clipboard contents',
-    captureActiveWindowImage: async () => ({ base64: 'cG5n', width: 1568, height: 882 }),
-    // Nothing in this file asks for displays yet; the stub exists so the fake
-    // still satisfies Platform, and returns an empty capture so a test that reaches it by
-    // accident fails on missing displays rather than on a missing method.
-    captureDisplays: async () => ({ displays: [], composite: null }),
     // Nothing in this file reads window text; the stub keeps the fake a valid
     // Platform and answers with an empty read, so a test that reaches it by accident
     // fails on missing text rather than on a missing method.
@@ -85,25 +78,18 @@ describe('captureAskSnapshot', () => {
     expect(snapshot.app?.name).toBe('Code.exe');
   });
 
-  it('takes no picture and reads no displays or windows, so the ask stays cheap', async () => {
-    // Ctrl+Shift+Space must stay cheap. Enumerating windows costs seconds and a picture
-    // costs tokens; Scout takes either itself, through a tool, when a question needs it.
-    const captureActiveWindowImage = vi.fn(async () => null);
-    const captureDisplays = vi.fn();
+  it('reads no window list, so the ask stays cheap', async () => {
+    // Ctrl+Shift+Space must stay cheap. Enumerating windows costs seconds; Scout takes
+    // it itself, through a tool, when a question needs it.
     const listWindows = vi.fn();
 
-    const { snapshot, blocked } = await captureAskSnapshot(
-      fakePlatform({ captureActiveWindowImage, captureDisplays, listWindows }),
-      { exclusions: NOTHING_EXCLUDED },
-    );
+    const { snapshot, blocked } = await captureAskSnapshot(fakePlatform({ listWindows }), {
+      exclusions: NOTHING_EXCLUDED,
+    });
 
-    expect(captureActiveWindowImage).not.toHaveBeenCalled();
-    expect(captureDisplays).not.toHaveBeenCalled();
     expect(listWindows).not.toHaveBeenCalled();
-    expect(snapshot.screenshot).toBeUndefined();
-    expect(snapshot.displays).toBeUndefined();
-    expect(snapshot.windows).toBeUndefined();
     expect(blocked).toBeNull();
+    expect(Object.keys(snapshot).sort()).toEqual(['app', 'capturedAt', 'host', 'id', 'selection']);
   });
 
   it('says which rule blocks an excluded window and keeps its title out', async () => {
@@ -165,50 +151,26 @@ describe('captureAskSnapshot', () => {
   });
 });
 
-describe('capturePatch', () => {
-  it('reads only what the brain asked for', async () => {
-    const { patch } = await capturePatch(fakePlatform(), ['clipboard'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
+describe('captureActiveWindow', () => {
+  it('names the window in focus and reads no selection', async () => {
+    const captureSelection = vi.fn(async () => 'text');
+    const { patch, blocked, paused } = await captureActiveWindow(
+      fakePlatform({ captureSelection }),
+      {
+        exclusions: NOTHING_EXCLUDED,
+      },
+    );
 
-    expect(patch).toEqual({ clipboard: 'clipboard contents' });
-  });
-
-  it('reads nothing when nothing is asked for', async () => {
-    const { patch } = await capturePatch(fakePlatform(), [], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch).toEqual({});
-  });
-
-  it('answers a screenshot request from a pet tool with a PNG', async () => {
-    const { patch, blocked } = await capturePatch(fakePlatform(), ['screenshot'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.screenshot).toEqual({
-      mime: 'image/png',
-      base64: 'cG5n',
-      width: 1568,
-      height: 882,
-    });
+    expect(patch.app).toEqual({ name: 'Code.exe', windowTitle: 'selection.ts — tagalong' });
+    expect(captureSelection).not.toHaveBeenCalled();
     expect(blocked).toBeNull();
+    expect(paused).toBe(false);
   });
 
   it('looks past its own windows to the one the person was using', async () => {
     // Scout's bubble has the focus while the person types to it, so "the window in front"
     // is Scout itself. The next window down is the one they mean.
     const own = basename(process.execPath);
-    const captureActiveWindowImage = vi.fn(async () => ({
-      base64: 'c2VsZg==',
-      width: 8,
-      height: 8,
-    }));
-    const lookAtWindow = vi.fn(async () => ({
-      windowId: 'w-2',
-      image: { mime: 'image/png' as const, base64: 'ZWRpdG9y', width: 800, height: 600 },
-    }));
     const windows: WindowEntry[] = [
       { id: 'w-1', processName: own, title: 'Tagalong', state: 'foreground', browser: false },
       {
@@ -220,8 +182,6 @@ describe('capturePatch', () => {
       },
     ];
     const platform = fakePlatform({
-      captureActiveWindowImage,
-      lookAtWindow,
       getActiveWindow: async () => ({
         appName: own,
         title: 'Tagalong',
@@ -230,23 +190,13 @@ describe('capturePatch', () => {
       listWindows: async () => ({ windows }),
     });
 
-    const { patch } = await capturePatch(platform, ['activeWindow', 'screenshot'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
+    const { patch } = await captureActiveWindow(platform, { exclusions: NOTHING_EXCLUDED });
 
-    expect(captureActiveWindowImage).not.toHaveBeenCalled();
-    expect(lookAtWindow).toHaveBeenCalledWith(
-      { windowId: 'w-2', maxLongSide: expect.any(Number) },
-      NOTHING_EXCLUDED,
-    );
     expect(patch.app).toEqual({ name: 'Code.exe', windowTitle: 'engine.ts - ai_pet' });
-    expect(patch.screenshot?.base64).toBe('ZWRpdG9y');
   });
 
-  it('enforces the exclusions on a tool-driven capture too', async () => {
-    const captureActiveWindowImage = vi.fn(async () => ({ base64: 'cG5n', width: 8, height: 8 }));
+  it('reports the rule that blocks the window and keeps its title out', async () => {
     const platform = fakePlatform({
-      captureActiveWindowImage,
       getActiveWindow: async () => ({
         appName: '1Password.exe',
         title: 'All Items',
@@ -254,236 +204,19 @@ describe('capturePatch', () => {
       }),
     });
 
-    const { patch, blocked } = await capturePatch(platform, ['screenshot', 'activeWindow'], {
+    const { patch, blocked } = await captureActiveWindow(platform, {
       exclusions: PASSWORD_MANAGER,
     });
 
-    expect(captureActiveWindowImage).not.toHaveBeenCalled();
-    expect(patch.screenshot).toBeUndefined();
     expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
     expect(patch.app).toEqual({ name: '1Password.exe', blocked });
   });
-});
 
-describe('the windows perception target', () => {
-  const inventory: WindowEntry[] = [
-    {
-      id: 'w-1',
-      processName: 'Code.exe',
-      title: 'context.ts — tagalong',
-      state: 'minimized',
-      displayId: 1,
-      browser: false,
-    },
-  ];
+  it('reports a pause instead of an empty read', async () => {
+    const result = await captureActiveWindow(pausedPlatform(), { exclusions: NOTHING_EXCLUDED });
 
-  it('asks the platform for the inventory and puts it in the patch', async () => {
-    const platform = fakePlatform({ listWindows: async () => ({ windows: inventory }) });
-
-    const { patch } = await capturePatch(platform, ['windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.windows).toEqual(inventory);
-  });
-
-  it('does not enumerate windows when the brain did not ask for them', async () => {
-    // The enumeration spawns PowerShell. A text-only ask must not pay for it.
-    const listWindows = vi.fn(async () => ({ windows: inventory }));
-    const platform = fakePlatform({ listWindows });
-
-    await capturePatch(platform, ['selection'], { exclusions: NOTHING_EXCLUDED });
-
-    expect(listWindows).not.toHaveBeenCalled();
-  });
-
-  it('hands the exclusion list down, so blocked windows are marked at the source', async () => {
-    const listWindows = vi.fn(async () => ({ windows: inventory }));
-    const platform = fakePlatform({ listWindows });
-
-    await capturePatch(platform, ['windows'], { exclusions: PASSWORD_MANAGER });
-
-    expect(listWindows).toHaveBeenCalledWith(PASSWORD_MANAGER);
-  });
-
-  it('leaves windows out of the patch when the enumeration fails', async () => {
-    // Perception is best effort. A helper that will not run costs the inventory, not the
-    // ask behind it.
-    const platform = fakePlatform({
-      listWindows: async () => {
-        throw new Error('powershell is not available');
-      },
-    });
-
-    const { patch } = await capturePatch(platform, ['windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch).not.toHaveProperty('windows');
-  });
-
-  it('omits an empty inventory rather than claiming the desktop is empty', async () => {
-    const platform = fakePlatform({ listWindows: async () => ({ windows: [] }) });
-
-    const { patch } = await capturePatch(platform, ['windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch).not.toHaveProperty('windows');
-  });
-});
-
-describe('a failed window enumeration', () => {
-  it('complains rather than passing off an empty desktop as the truth', async () => {
-    // The whole reason this exists. A broken helper and a quiet desktop both produced an
-    // empty list, so a completely non-functional enumeration shipped through a task, a
-    // review and a green CI run without one line of output anywhere saying so.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const platform = fakePlatform({
-      listWindows: async () => ({ windows: [], failure: 'no-output' as const }),
-    });
-
-    const { patch, warnings } = await capturePatch(platform, ['windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.windows).toBeUndefined();
-    expect(warnings.join(' ')).toMatch(/window list|enumerat/i);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
-  });
-
-  it('keeps omitting the inventory from the snapshot, so the pet is not told a lie', async () => {
-    // An empty list must not reach the prompt as "no windows are open". The omission
-    // comes with a complaint instead of silence.
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const platform = fakePlatform({
-      listWindows: async () => ({ windows: [], failure: 'no-windows' as const }),
-    });
-
-    const { patch } = await capturePatch(platform, ['windows'], { exclusions: NOTHING_EXCLUDED });
-
-    expect(patch.windows).toBeUndefined();
-    warn.mockRestore();
-  });
-
-  it('says nothing when the enumeration worked', async () => {
-    const platform = fakePlatform({
-      listWindows: async () => ({
-        windows: [
-          {
-            id: 'w-1',
-            processName: 'Code.exe',
-            title: 'a',
-            state: 'background' as const,
-            browser: false,
-          },
-        ],
-      }),
-    });
-
-    const { patch, warnings } = await capturePatch(platform, ['windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.windows).toHaveLength(1);
-    expect(warnings).toEqual([]);
-  });
-});
-
-const PNG = { base64: 'aGk=', width: 1568, height: 882 };
-
-function displayCapture(overrides: Partial<DisplaysCapture> = {}): DisplaysCapture {
-  return {
-    composite: PNG,
-    displays: [
-      {
-        id: 101,
-        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-        scaleFactor: 1,
-        primary: true,
-        focused: true,
-        blocked: null,
-        image: PNG,
-      },
-      {
-        id: 102,
-        bounds: { x: 1920, y: 0, width: 1920, height: 1080 },
-        scaleFactor: 1,
-        primary: false,
-        focused: false,
-        blocked: null,
-        image: PNG,
-      },
-    ],
-    ...overrides,
-  };
-}
-
-describe('capturePatch, displays', () => {
-  it('answers the displays target', async () => {
-    // A host that ignores a target the brain may ask for makes the brain call something
-    // that silently returns nothing, which reads as a broken pet.
-    const platform = fakePlatform({
-      captureDisplays: async () => displayCapture(),
-      listWindows: async () => ({ windows: [] }),
-    });
-
-    const { patch } = await capturePatch(platform, ['displays'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.displays).toHaveLength(2);
-    expect(patch.composite?.mime).toBe('image/png');
-  });
-
-  it('does not capture displays for a target that did not ask for them', async () => {
-    const captureDisplays = vi.fn();
-    await capturePatch(fakePlatform({ captureDisplays }), ['selection'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(captureDisplays).not.toHaveBeenCalled();
-  });
-
-  it('reports the refusal when the focused display is blanked', async () => {
-    const platform = fakePlatform({
-      captureDisplays: async () =>
-        displayCapture({
-          displays: [
-            {
-              id: 101,
-              bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-              scaleFactor: 1,
-              primary: true,
-              focused: true,
-              blocked: { rule: 'processName', entry: '1Password.exe' },
-              image: PNG,
-            },
-          ],
-        }),
-    });
-
-    const { blocked } = await capturePatch(platform, ['displays'], {
-      exclusions: PASSWORD_MANAGER,
-    });
-
-    expect(blocked?.entry).toBe('1Password.exe');
-  });
-
-  it('warns rather than staying quiet when the displays cannot be read', async () => {
-    const platform = fakePlatform({
-      captureDisplays: async () => {
-        throw new Error('desktopCapturer unavailable');
-      },
-    });
-
-    const { patch, warnings } = await capturePatch(platform, ['displays'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(patch.displays).toBeUndefined();
-    expect(warnings.join(' ')).toContain('displays');
+    expect(result.paused).toBe(true);
+    expect(result.patch.app).toBeUndefined();
   });
 });
 
@@ -503,16 +236,12 @@ describe('captureAskSnapshot while sight is paused', () => {
     expect(capture.paused).toBe(true);
   });
 
-  it('carries no app, no picture and no displays', async () => {
+  it('carries no app', async () => {
     const capture = await captureAskSnapshot(pausedPlatform(), {
       exclusions: NOTHING_EXCLUDED,
     });
 
-    expect(capture.snapshot.screenshot).toBeUndefined();
     expect(capture.snapshot.app).toBeUndefined();
-    expect(capture.snapshot.displays).toBeUndefined();
-    expect(capture.snapshot.composite).toBeUndefined();
-    expect(capture.snapshot.windows).toBeUndefined();
   });
 
   it('still carries the selection the user highlighted', async () => {
@@ -542,71 +271,6 @@ describe('captureAskSnapshot while sight is paused', () => {
     });
 
     expect(capture.paused).toBe(false);
-  });
-});
-
-describe('capturePatch while sight is paused', () => {
-  it('reports paused and returns none of the gated targets', async () => {
-    const result = await capturePatch(pausedPlatform(), ['screenshot', 'displays', 'windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(result.paused).toBe(true);
-    expect(result.patch.screenshot).toBeUndefined();
-    expect(result.patch.displays).toBeUndefined();
-    expect(result.patch.windows).toBeUndefined();
-  });
-
-  it('answers a paused screenshot with the pause, like every other screen tool', async () => {
-    const result = await capturePatch(pausedPlatform(), ['screenshot'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-    expect(() => answerCapture(['screenshot'], result)).toThrow(/sight is paused/);
-  });
-
-  it('still answers an ungated read while paused', async () => {
-    const result = await capturePatch(pausedPlatform(), ['selection', 'activeWindow'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-    expect(answerCapture(['selection', 'activeWindow'], result)).toBe(result.patch);
-  });
-
-  it('does not complain that the displays failed, because they did not', async () => {
-    // A paused capture is a refusal, not a broken one. Warning about it would train the
-    // user to ignore the warnings that mean something is actually wrong.
-    const result = await capturePatch(pausedPlatform(), ['displays', 'windows'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(result.warnings).toEqual([]);
-  });
-
-  it('still answers the clipboard and the selection', async () => {
-    const result = await capturePatch(pausedPlatform(), ['selection', 'clipboard'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(result.paused).toBe(false);
-    expect(result.patch.selection).toBe('the highlighted paragraph');
-    expect(result.patch.clipboard).toBe('clipboard contents');
-  });
-
-  it('reports paused for a mixed request and keeps the ungated half', async () => {
-    const result = await capturePatch(pausedPlatform(), ['selection', 'screenshot'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(result.paused).toBe(true);
-    expect(result.patch.selection).toBe('the highlighted paragraph');
-    expect(result.patch.screenshot).toBeUndefined();
-  });
-
-  it('reports not paused on an ordinary capture', async () => {
-    const result = await capturePatch(fakePlatform(), ['selection'], {
-      exclusions: NOTHING_EXCLUDED,
-    });
-
-    expect(result.paused).toBe(false);
   });
 });
 

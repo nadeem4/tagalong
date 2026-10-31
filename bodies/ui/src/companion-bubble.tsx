@@ -98,7 +98,7 @@ interface Exchange {
 
 /** One removable part of what the companion can see. */
 interface Chip {
-  id: 'app' | 'selection' | 'screenshot';
+  id: 'app' | 'selection';
   label: string;
 }
 
@@ -110,26 +110,16 @@ function chipsOf(snapshot: ContextSnapshot | undefined): Chip[] {
     chips.push({ id: 'app', label: title ? `${snapshot.app.name} · ${title}` : snapshot.app.name });
   }
   if (snapshot.selection !== undefined) chips.push({ id: 'selection', label: 'Selected text' });
-  if (snapshot.screenshot !== undefined || snapshot.composite !== undefined) {
-    chips.push({ id: 'screenshot', label: 'Screenshot' });
-  }
   return chips;
 }
 
 /** The snapshot without the parts the person took out. */
 function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): ContextSnapshot {
-  const { app, selection, screenshot, composite, displays, ...rest } = snapshot;
+  const { app, selection, ...rest } = snapshot;
   return {
     ...rest,
     ...(app !== undefined && !removed.has('app') ? { app } : {}),
     ...(selection !== undefined && !removed.has('selection') ? { selection } : {}),
-    ...(removed.has('screenshot')
-      ? {}
-      : {
-          ...(screenshot !== undefined ? { screenshot } : {}),
-          ...(composite !== undefined ? { composite } : {}),
-          ...(displays !== undefined ? { displays } : {}),
-        }),
   };
 }
 
@@ -378,9 +368,7 @@ export function CompanionBubble({
     <StatusMark
       mark={status}
       variant="row"
-      {...(bridge.openFix !== undefined
-        ? { onFix: (target: FixTarget) => void bridge.openFix?.(target) }
-        : {})}
+      onFix={(target: FixTarget) => void bridge.openFix(target)}
     />
   );
   const replyHint = talk !== undefined && spokenReply && reply.state === 'done' && (
@@ -404,7 +392,7 @@ export function CompanionBubble({
     }
     healthRun.current += 1;
     setHealth(null);
-    if (bridge.checkHealth !== undefined && wantsHealthCheck(text)) {
+    if (wantsHealthCheck(text)) {
       checkHealth(text, asSpoken);
       return;
     }
@@ -456,8 +444,8 @@ export function CompanionBubble({
     setReply({ state: 'idle' });
     setHealth({ rows: null });
     const run = healthRun.current;
-    const read = bridge.checkHealth?.() ?? Promise.reject(new Error('no health check'));
-    read
+    bridge
+      .checkHealth()
       .then((facts) => {
         if (run !== healthRun.current) return;
         const rows = healthRows(facts);
@@ -560,10 +548,8 @@ export function CompanionBubble({
     ) : (
       <HealthCard
         rows={health.rows}
-        {...(bridge.openFix !== undefined
-          ? { onFix: (target: FixTarget) => void bridge.openFix?.(target) }
-          : {})}
-        {...(bridge.openLogs !== undefined ? { onOpenLogs: () => void bridge.openLogs?.() } : {})}
+        onFix={(target: FixTarget) => void bridge.openFix(target)}
+        onOpenLogs={() => void bridge.openLogs()}
       />
     );
   const answerConfirm = (decision: 'once' | 'always' | 'deny'): void => {
@@ -571,7 +557,7 @@ export function CompanionBubble({
     const { approvalId } = confirm;
     // The card goes once the answer got through. A refusal (the brain is offline) leaves it up
     // to click again: the brain does not replay an ask after a plain reconnect.
-    void Promise.resolve(bridge.approveTool?.(approvalId, decision)).then(
+    void bridge.approveTool(approvalId, decision).then(
       () => dropConfirms((c) => c.approvalId === approvalId),
       () => undefined,
     );
@@ -579,7 +565,7 @@ export function CompanionBubble({
   const replyConfirm = (answer: JobAnswer): void => {
     if (confirm === null) return;
     const { approvalId } = confirm;
-    void Promise.resolve(bridge.answerJobAsk?.(approvalId, answer)).then(
+    void bridge.answerJobAsk(approvalId, answer).then(
       () => dropConfirms((c) => c.approvalId === approvalId),
       () => undefined,
     );

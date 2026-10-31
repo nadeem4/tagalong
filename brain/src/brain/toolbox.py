@@ -160,7 +160,6 @@ class Toolbox:
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
         self._approvals = approvals  # None records nothing
-        self._side_check = side_check  # None: every ask goes to the person
         self._offers = offers  # None: no offers to auto-approve
         if guards is None:
             # Standalone toolbox: build the same chain the Session registers.

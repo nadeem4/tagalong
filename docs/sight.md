@@ -4,52 +4,49 @@
 
 The Python brain reaches the screen only through the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`); this doc covers what the desktop reads and the rules around it.
 
-How Scout sees the desktop: the window list, window text (accessibility tree and OCR), screenshots
-of a window, a display or a region, and the composite of every display. This doc covers how each read is made and what refuses it (blind spots,
+How Scout sees the desktop: the window list, window text (accessibility tree and OCR) and a screenshot
+of one window. This doc covers how each read is made and what refuses it (blind spots,
 the person's exclusions, the sight pause).
 
 The desktop host does the reading. Windows is the only platform.
 
 ## Where it lives
 
-| Area                           | Files                                                                                                                                                                              |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform interface and factory | `bodies/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                                      |
-| Windows adapter                | `bodies/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                                      |
-| Sight pause gate               | `bodies/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `bodies/desktop/src/main/sight-pause.ts` (`SightPause`)                        |
-| PowerShell transport           | `bodies/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`)              |
-| Window list                    | `platform/window-list.ts` (`parseWindowList`, `placeOnDisplays`, `countableHandles`, `handleOf`, `screensOf`)                                                                      |
-| Window text                    | `platform/window-text.ts` (scripts, `parseWindowText`), `platform/text-layer.ts` (`TextLayerProvider`), `platform/read-text.ts` (`readWindowTextWith`)                             |
-| OCR                            | `platform/ocr.ts` (`recognizeText`, `OCR_SCRIPT`)                                                                                                                                  |
-| Screenshots                    | `platform/capture.ts` (focused window, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/displays.ts` (every display, composite, `displayRefusals`) |
-| Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                          |
-| Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                   |
-| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`), `capture-notice.ts`                                                                  |
-| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                                |
-| Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `shared/settings.ts`                                                                                                    |
+| Area                           | Files                                                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform interface and factory | `bodies/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                         |
+| Windows adapter                | `bodies/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                         |
+| Sight pause gate               | `bodies/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `bodies/desktop/src/main/sight-pause.ts` (`SightPause`)           |
+| PowerShell transport           | `bodies/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`) |
+| Window list                    | `platform/window-list.ts` (`parseWindowList`, `placeOnDisplays`, `countableHandles`, `handleOf`, `screensOf`)                                                         |
+| Window text                    | `platform/window-text.ts` (scripts, `parseWindowText`), `platform/text-layer.ts` (`TextLayerProvider`), `platform/read-text.ts` (`readWindowTextWith`)                |
+| OCR                            | `platform/ocr.ts` (`recognizeText`, `OCR_SCRIPT`)                                                                                                                     |
+| Screenshots                    | `platform/capture.ts` (`captureWindowImageWith`, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/downscale.ts` (`fitWithin`)         |
+| Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                      |
+| Body tools                     | `bodies/desktop/src/main/brain/body-tools.ts` (`list_windows`, `read_window_text`, `look_at_window`)                                                                  |
+| Ask and voice snapshots        | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `captureActiveWindow`), `capture-notice.ts`                                                               |
+| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                   |
+| Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `shared/settings.ts`                                                                                       |
 
 ## How it works
 
 ### The read path
 
-The Python brain does not ask for reads yet. On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the bubble's capture path call it from `context.ts`.
+On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the talk key call it from `context.ts`; the brain calls it through the body tools.
 
-The desktop answers `perception.capture` for `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays` and `windows`, and reads window text by id. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
+The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. Each takes a window id minted by the list. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
 ### The platform adapter
 
 `Platform` (`platform/index.ts`) is every read the host can make:
 
-| Method                                              | Reads                                                  | Pause class   |
-| --------------------------------------------------- | ------------------------------------------------------ | ------------- |
-| `getActiveWindow()`                                 | app name, title and bounds of the foreground window    | `sight`       |
-| `captureActiveWindowImage(maxLongSide, exclusions)` | PNG of the focused window, or its screen as a fallback | `sight`       |
-| `captureDisplays(maxLongSide, exclusions)`          | every display plus a composite                         | `sight`       |
-| `listWindows(exclusions, { countText? })`           | every top-level window, no contents                    | `sight`       |
-| `readWindowText(params, exclusions)`                | one window's text                                      | `sight`       |
-| `lookAtWindow(params, exclusions)`                  | PNG of one listed window                               | `sight`       |
-| `captureSelection()`                                | the selection, by the clipboard trick                  | `handed-over` |
-| `readClipboard()`                                   | the clipboard text                                     | `handed-over` |
+| Method                                    | Reads                                               | Pause class   |
+| ----------------------------------------- | --------------------------------------------------- | ------------- |
+| `getActiveWindow()`                       | app name, title and bounds of the foreground window | `sight`       |
+| `listWindows(exclusions, { countText? })` | every top-level window, no contents                 | `sight`       |
+| `readWindowText(params, exclusions)`      | one window's text                                   | `sight`       |
+| `lookAtWindow(params, exclusions)`        | PNG of one listed window                            | `sight`       |
+| `captureSelection()`                      | the selection, by the clipboard trick               | `handed-over` |
 
 `createPlatform` returns `Win32Platform` on `win32` and throws on any other OS, so an unsupported
 platform fails at boot instead of perceiving nothing.
@@ -113,7 +110,7 @@ calls this function rather than its own copy of the arguments.
    `vivaldi`, `opera`, `chromium`, `firefox`), and for a blocked window `blocked` set, `title`
    emptied and `textChars` left out.
 6. `screensOf` adds `displays` (`ScreenInfo`: id, bounds, primary) in `screen.getAllDisplays()`
-   order, which is the order the composite numbers its slots.
+   order.
 
 `handleOf` turns an id back into a handle and returns null for anything the host did not mint, so a
 model-invented id fails as "no such window" rather than reaching a script.
@@ -126,46 +123,28 @@ Callers that need titles only pass `countText: false`: the focus watch, the list
   `captureAskSnapshot` (`context.ts`): `getActiveWindow`, then the exclusion check, then the
   selection unless that window is blocked. No picture, no displays, no window list ride along with
   an ask; Scout takes those by tool.
-- Holding the talk key (Right Ctrl) calls `captureForPanel(['activeWindow'])` through the voice IPC
+- Holding the talk key (Right Ctrl) calls `captureActiveWindow` through the voice IPC
   (`ipc/voice.ts`, `noteActiveWindow`): the window only, never the selection, because copying
   would press keys while the talk key is held. See [voice.md](voice.md).
 - A click on the pet captures nothing (`openPanelNow`).
 - `windowInFocus` looks past Tagalong's own windows: when the foreground app is Tagalong's own
   executable (`process.execPath`), it uses the topmost non-minimized window from the list that is
-  not Tagalong's, and screenshots it with `lookAtWindow` by id.
+  not Tagalong's. The talk-key path uses it, so the window named is the one the person is on.
 - `appOf` builds the snapshot's `app`: for a blocked window only `{ name, blocked }`, never the title, so the title never reaches a prompt or an expert's brief.
 
 ### Screenshots and captures
 
-| Capture                   | Function                                      | Size limit                                  | Exclusion check                                                                    |
-| ------------------------- | --------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Focused window            | `captureActiveWindowImageWith` (`capture.ts`) | `MAX_SCREENSHOT_LONG_SIDE` = 1568 long side | caller checks the focused window first; the screen fallback runs `displayRefusals` |
-| One listed window         | `lookAtWindowWith` + `captureWindowImageWith` | 1568 (`CROP_LONG_SIDE` in the tool)         | against the classified list before any pixel; minimized refused (nothing drawn)    |
-| Every display + composite | `captureDisplaysWith` (`displays.ts`)         | 1568 per display and for the composite      | `displayRefusals` per display, inside the capture                                  |
-| OCR picture               | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500                 | the text read's own check                                                          |
+| Capture           | Function                                      | Size limit                           | Exclusion check                                                                 |
+| ----------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| One listed window | `lookAtWindowWith` + `captureWindowImageWith` | `LONG_SIDE` = 1568 (`body-tools.ts`) | against the classified list before any pixel; minimized refused (nothing drawn) |
+| OCR picture       | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500          | the text read's own check                                                       |
 
 Rules shared by every picture:
 
 - The size bound goes into the `desktopCapturer.getSources` request (`thumbnailSize`), and
   `fitWithin` resizes afterwards as a safety net. `fitWithin` never upscales and clamps each side
   to at least 1 pixel. All images are PNG (`CapturedImage`, `mime: 'image/png'`).
-- `captureDisplaysWith` asks the capturer for sources once per look, not once per display.
-- The focused-window picker matches a capturer window source by title (Electron's ids and
-  `get-windows` share nothing else), then falls back to the screen holding the window, then any
-  allowed screen. A window picture by handle matches source ids `window:<handle>:`.
-- A display that no source covers keeps `image` absent (and the gutter colour in the composite),
-  never a stale or empty image block.
-- Region crops convert DIP display bounds to real pixels with `scaleFactor`, clamp the rectangle
-  to the display, and refuse one entirely off it.
-
-The composite (`buildComposite`) is the one image Tagalong draws. `layoutComposite` places each
-display by its DIP geometry inside a canvas fitted to 1568 on its long side, rounding each edge
-from its absolute position so touching monitors leave no seam. Slots are filled by resizing each
-thumbnail and blitting BGRA buffers (`canvas.ts`); the backdrop is `GUTTER` rgb(24, 24, 27). Each
-slot gets its 1-based ordinal drawn in a 3x5 pixel font (`label.ts`) at scale
-`clamp(round(slotHeight / 60), 1, 6)`. A blocked display is a flat `BLOCKED_FILL` rgb(63, 63, 70)
-panel reading BLOCKED, both in its own image and in its composite slot. The only Electron call is
-the final `nativeImage.createFromBitmap(...).toPNG()`.
+- A window picture matches the capturer's source ids `window:<handle>:`.
 
 #### Capture announcements
 
@@ -179,18 +158,17 @@ unless the notice is paused or blocked.
 
 Which reads announce:
 
-| Path                                                                                 | Announced                                                    |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Ask hotkey (`openPanelWithContext`)                                                  | yes, `screenshot: false`                                     |
-| Bubble capture (`IPC.capture`, `captureForPanel`), talk key                          | yes, `screenshot` when asked for                             |
-| `perception.capture` (look_at_screen, get_selection, list_displays, look_at_display) | yes, `screenshot` only when the targets include `screenshot` |
-| `perception.captureWindow` (look_at_window)                                          | yes, `screenshot: true`                                      |
-| `perception.readText` read by OCR                                                    | yes, `screenshot: true`                                      |
-| `perception.readText` by UI Automation, and `perception.listWindows`                 | no notice                                                    |
+| Path                                                | Announced                |
+| --------------------------------------------------- | ------------------------ |
+| Ask hotkey (`openPanelWithContext`)                 | yes, `screenshot: false` |
+| Talk key (`noteActiveWindow`)                       | yes, `screenshot: false` |
+| `look_at_window`                                    | yes, `screenshot: true`  |
+| `read_window_text` read by OCR                      | yes, `screenshot: true`  |
+| `read_window_text` by UI Automation, `list_windows` | no notice                |
 
 ### Screen text, selection and OCR
 
-**Window text.** `readWindowTextWith` (`read-text.ts`) answers `perception.readText`:
+**Window text.** `readWindowTextWith` (`read-text.ts`) answers `read_window_text`:
 
 1. Lists windows (classified) and finds the target by id, or the foreground window when no id is
    given. Missing, blocked and unknown-id cases return an answer with empty `text` and a `notes`
@@ -211,9 +189,8 @@ Which reads announce:
    published, under 500 characters (likely menus only), a browser window (active tab only; other
    tabs need the extension), or truncated.
 
-The per-read budget is `windowTextBudget` (default `DEFAULT_WINDOW_TEXT_CHARS` = 8,000, at most
-`MAX_WINDOW_TEXT_CHARS` = 40,000). The tool reads the setting per call; a `maxChars` the model
-names wins.
+The per-read budget is `DEFAULT_WINDOW_TEXT_CHARS` = 8,000 in `body-tools.ts`; a `maxChars` the
+model names wins.
 
 **OCR.** `recognizeText` (`ocr.ts`) runs `OCR_SCRIPT` with `OCR_TIMEOUT_MS` = 10,000. The PNG goes
 to PowerShell's stdin as base64, so it is never written to disk. The script uses
@@ -224,9 +201,7 @@ Never rejects.
 **Selection.** `captureSelectionWith` (`selection.ts`) saves the clipboard, presses Ctrl+C, waits
 `COPY_SETTLE_MS` = 150, reads, and restores the original clipboard in a `finally`. An unchanged or
 empty clipboard means nothing was selected (`null`). The result is cut to `MAX_SELECTION_CHARS` =
-20,000. In a browser, `get_selection` and a hotkey ask prefer the extension's DOM selection
-(`browser-route.ts`, `BROWSER_HOST_TIMEOUT_MS` = 500); see
-[browser-body.md](browser-body.md).
+20,000. Only the ask hotkey reads the selection.
 
 ### Exclusions
 
@@ -264,32 +239,27 @@ anything else to `titlePatterns`); applying it is the person's click. See
 
 Enforcement points, all before any pixel or text is read:
 
-| Read                                       | Where the refusal happens                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| Ask snapshot                               | `captureAskSnapshot`: blocked window keeps only its app name; Ctrl+C is never pressed there |
-| Window list                                | `countableHandles` skips the text count; `buildInventory` drops title and count             |
-| Window text, window picture, pointing      | the target is looked up in the classified list; `blocked` returns before the read           |
-| Every display, a crop, the screen fallback | `displayRefusals` (below)                                                                   |
+| Read                                  | Where the refusal happens                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Ask snapshot                          | `captureAskSnapshot`: blocked window keeps only its app name; Ctrl+C is never pressed there |
+| Window list                           | `countableHandles` skips the text count; `buildInventory` drops title and count             |
+| Window text, window picture, pointing | the target is looked up in the classified list; `blocked` returns before the read           |
 
-`displayRefusals` (`displays.ts`) makes one decision for every whole-display capture. A display is
-refused when a non-minimized blocked window with a known `displayId` is on it, or when it holds the
-focused window and that window is blocked. The focused check is the floor that still holds when
-the window list fails. `refusalFor.any` is used for a capturer source with no usable `display_id`:
-if anything at all is blocked, such a screen is refused. Minimized windows never blank a display,
-and an unplaced window never blanks a guessed one.
+No whole-screen capture exists, so there is no display-level refusal: a picture is always of one
+listed window, and that window was checked first.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
-  A[Capture a display] --> B{Sight paused?}
+  A[look_at_window] --> B{Sight paused?}
   B -- yes --> P[SightPausedError, nothing read]
-  B -- no --> C{Visible blocked window on this display?}
-  C -- yes --> X[BLOCKED panel, blocked = entry]
-  C -- no --> D{Focused window on this display and blocked?}
-  D -- yes --> X
-  D -- no --> E{Capturer source usable?}
-  E -- no --> N[image absent]
-  E -- yes --> I[PNG fitted to the long side]
+  B -- no --> C{Window in the list?}
+  C -- no --> N[no such window]
+  C -- yes --> D{Window blocked?}
+  D -- yes --> X[refused, blocked = entry]
+  D -- no --> E{Minimized?}
+  E -- yes --> M[refused, nothing drawn]
+  E -- no --> I[PNG fitted to the long side]
 ```
 
 ### Pausing sight
@@ -302,13 +272,12 @@ the tray's **Pause sight** checkbox, and is never persisted: every launch starts
 the app holds the ungated adapter. `SIGHT_POLICY` is a mapped type over `keyof Platform`, so a new
 `Platform` method without a pause decision does not compile. Every `sight` method checks
 `isPaused()` per call and rejects with `SightPausedError` before reaching the adapter;
-`handed-over` methods (`captureSelection`, `readClipboard`) pass through.
+the `handed-over` method (`captureSelection`) passes through.
 
 A paused read throws rather than returning nothing, so it cannot look like a quiet desktop.
 `attempt` in `context.ts` swallows ordinary perception failures but re-throws this one;
-`unlessPaused` turns it into `paused: true` on the whole capture; `answerCapture` re-throws
-`SightPausedError` when a paused `perception.capture` asked for `screenshot` or `displays`.
-`AskCapture.paused` is separate from `blocked`, because the fix differs (a key versus a list).
+`unlessPaused` turns it into `paused: true` on the whole capture; the body tools let it reach the
+brain as a failed tool call. `AskCapture.paused` is separate from `blocked`, because the fix differs (a key versus a list).
 
 On a change, `sightPause.onChange` sends
 `IPC.sightPauseEvent` (`tagalong:sight-pause-event`) to every window (the avatar greys its eye),
@@ -330,12 +299,11 @@ not block a drop.
 
 **Desktop IPC** (`bodies/desktop/src/shared/ipc.ts`):
 
-| Channel                                                                                  | Direction      | Use                                                          |
-| ---------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------ |
-| `tagalong:capture` (`IPC.capture`)                                                       | invoke         | bubble capture of named targets; null when refused or paused |
-| `tagalong:context:get`, `tagalong:context-event`                                         | invoke / event | the pending ask snapshot                                     |
-| `tagalong:capture-event`                                                                 | event          | `CaptureNotice`                                              |
-| `tagalong:get-sight-paused`, `tagalong:toggle-sight-pause`, `tagalong:sight-pause-event` | invoke / event | pause state                                                  |
+| Channel                                                                                  | Direction      | Use                      |
+| ---------------------------------------------------------------------------------------- | -------------- | ------------------------ |
+| `tagalong:context:get`, `tagalong:context-event`                                         | invoke / event | the pending ask snapshot |
+| `tagalong:capture-event`                                                                 | event          | `CaptureNotice`          |
+| `tagalong:get-sight-paused`, `tagalong:toggle-sight-pause`, `tagalong:sight-pause-event` | invoke / event | pause state              |
 
 **Settings** (`bodies/desktop/src/shared/settings.ts`): `captureExclusions`, `hotkeys.ask`, `hotkeys.pauseSight`.
 
@@ -343,7 +311,8 @@ not block a drop.
 
 | Constant                    | Value     | File                                   |
 | --------------------------- | --------- | -------------------------------------- |
-| `MAX_SCREENSHOT_LONG_SIDE`  | 1568      | `bodies/desktop/src/main/context.ts`   |
+| `LONG_SIDE`                 | 1568      | `main/brain/body-tools.ts`             |
+| `MAX_SCREENSHOT_LONG_SIDE`  | 1568      | `bodies/desktop/src/main/drop.ts`      |
 | `OCR_MAX_LONG_SIDE`         | 2,500     | `platform/ocr.ts`                      |
 | `OCR_TIMEOUT_MS`            | 10,000    | `platform/ocr.ts`                      |
 | `WINDOW_HELPER_TIMEOUT_MS`  | 8,000     | `platform/win32.ts`                    |
@@ -366,17 +335,14 @@ not block a drop.
 
 - **Perception is best effort.** `attempt` logs and returns null for one failed read, so the rest
   of a capture survives. The sight pause is the exception and is re-thrown.
-- **Silent emptiness is named.** An empty window list carries `failure` and becomes a warning in
-  `PatchCapture.warnings` ("the window list helper returned nothing at all", and so on); a
-  `displays` target with no result warns "the displays could not be captured". Empty lists are
-  left out of the prompt rather than rendered as "no windows".
+- **Silent emptiness is named.** An empty window list carries `failure`, and
+  `list_windows` turns it into a failed tool call ("the window list could not be read"), so an
+  empty list is never reported as "no windows".
 - **PowerShell never throws** to callers; text reads distinguish "the read never happened" from
   "the window published nothing".
-- **Model mistakes are answers.** Unknown window or display ids, closed windows, zero-area crops,
-  off-screen rectangles and minimized windows come back as tool results with a sentence the pet can
-  repeat.
-- **No foreground window** (locked session, UAC, full-screen game) falls through to a screen
-  capture, still under `displayRefusals`.
+- **Model mistakes are answers.** Unknown window ids, closed windows and minimized windows come
+  back as tool results with a sentence the pet can repeat.
+- **No foreground window** (locked session, UAC, full-screen game) gives a snapshot with no app.
 
 ## Privacy notes
 
@@ -388,19 +354,18 @@ The privacy reference for everything above is [privacy.md](privacy.md): what is 
 
 ## Tests that pin it
 
-| Behaviour                                                                                                                                    | Tests                                                                                                          |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                          | `bodies/desktop/src/main/platform/sight-gate.test.ts`                                                          |
-| Pause state and listeners                                                                                                                    | `bodies/desktop/src/main/sight-pause.test.ts`                                                                  |
-| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; looks past Tagalong's own windows; tool captures obey exclusions | `bodies/desktop/src/main/context.test.ts`                                                                      |
-| Notice wording and tooltip                                                                                                                   | `bodies/desktop/src/main/capture-notice.test.ts`                                                               |
-| Display blanking (focused and unfocused, minimized ignored), composite placeholder, one `getSources` call                                    | `platform/displays.test.ts`, `platform/composite.test.ts`, `platform/canvas.test.ts`, `platform/label.test.ts` |
-| Screenshot picking and resizing, never upscaling                                                                                             | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts`                       |
-| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                                                  |
-| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                             | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`                           |
-| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                |
-| Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                   |
-| Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                   |
-| Exclusion matching, blind spots, secret files                                                                                                | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                                                    |
-| Inventory classification, text-layer notes                                                                                                   | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                                              |
-| Real downscaled PNG, sight pause and sight settings end to end                                                                               | `bodies/desktop/e2e/smoke.spec.ts`                                                                             |
+| Behaviour                                                                                                                                               | Tests                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                                     | `bodies/desktop/src/main/platform/sight-gate.test.ts`                                    |
+| Pause state and listeners                                                                                                                               | `bodies/desktop/src/main/sight-pause.test.ts`                                            |
+| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; the voice snapshot reads the window only; looks past Tagalong's own windows | `bodies/desktop/src/main/context.test.ts`                                                |
+| Notice wording and tooltip                                                                                                                              | `bodies/desktop/src/main/capture-notice.test.ts`                                         |
+| Screenshot picking and resizing, never upscaling                                                                                                        | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts` |
+| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                           | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                            |
+| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                                        | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`     |
+| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                                       | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                          |
+| Real PowerShell transport and real recogniser (Windows CI only)                                                                                         | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`             |
+| Selection borrow and restore                                                                                                                            | `platform/selection.test.ts`                                                             |
+| Exclusion matching, blind spots, secret files                                                                                                           | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                              |
+| Inventory classification, text-layer notes                                                                                                              | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                        |
+| A paused sight refuses a `list_windows` tool call, and sight settings, end to end                                                                       | `bodies/desktop/e2e/smoke.spec.ts`                                                       |

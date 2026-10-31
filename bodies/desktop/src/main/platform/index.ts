@@ -7,7 +7,6 @@
 import type { CaptureExclusions } from '../../shared/settings';
 import type { ScreenInfo, WindowEntry } from '@tagalong/ui/shapes';
 
-import type { DisplaysCapture } from './displays';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import type { LookAtWindowAnswer } from './window-shot';
 import type { WindowEnumerationFailure } from './window-list';
@@ -37,28 +36,10 @@ export interface CapturedImage {
 export interface Platform {
   getActiveWindow(): Promise<ActiveWindowInfo | null>;
   captureSelection(): Promise<string | null>;
-  readClipboard(): Promise<string>;
-  /**
-   * Takes the exclusion list for its screen fallback: when no window matches, a whole screen
-   * is used only if the per-display refusal allows it.
-   */
-  captureActiveWindowImage(
-    maxLongSide: number,
-    exclusions: CaptureExclusions,
-  ): Promise<CapturedImage | null>;
-  /**
-   * Every display at once, plus a composite showing how they are arranged.
-   *
-   * Takes the exclusion list. `captureActiveWindowImage` uses it only for its screen
-   * fallback; its caller checks the focused window first. Here one display can be refused
-   * while the others are returned, and the composite has to show the refusal in that
-   * display's slot, so the decision has to be made inside the capture rather than above it.
-   */
-  captureDisplays(maxLongSide: number, exclusions: CaptureExclusions): Promise<DisplaysCapture>;
   /**
    * Every top-level window, with no window text in it.
    *
-   * Takes the exclusion list for the same reason `captureDisplays` does — one window is
+   * Takes the exclusion list so one window is
    * refused while the rest are returned, so the decision belongs inside the enumeration.
    * Entries come back already classified, so nothing downstream has to remember to check.
    */
@@ -106,7 +87,7 @@ export function createPlatform(platform: NodeJS.Platform = process.platform): Pl
  */
 export interface WindowInventory {
   windows: WindowEntry[];
-  /** Every screen in composite order, so the list can be grouped as "Screen 1", "Screen 2". */
+  /** Every screen in display order, so the list can be grouped as "Screen 1", "Screen 2". */
   displays?: ScreenInfo[];
   failure?: WindowEnumerationFailure;
 }

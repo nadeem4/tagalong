@@ -43,7 +43,6 @@ export const IPC = {
   usageSummary: 'tagalong:usage:summary',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
-  capture: 'tagalong:capture',
   contextEvent: 'tagalong:context-event',
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
@@ -198,9 +197,14 @@ export interface BrowserFolder {
 }
 
 /**
+ * What the preload can supply of the HostBridge; renderer/src/full-bridge.ts adds the rest.
+ */
+export type PreloadBridge = Omit<HostBridge, 'checkHealth' | 'openFix' | 'openLogs'>;
+
+/**
  * Host-only concerns, deliberately kept off `window.tagalong`.
  *
- * `window.tagalong` is exactly the HostBridge that @tagalong/ui knows how to consume;
+ * `window.tagalong` is the HostBridge that @tagalong/ui knows how to consume (less three calls);
  * anything specific to this host lives here instead, so a component can never grow a
  * dependency on something the Chrome host will not have.
  */
@@ -306,7 +310,7 @@ export interface TagalongHostApi {
 
 declare global {
   interface Window {
-    tagalong: HostBridge;
+    tagalong: PreloadBridge;
     tagalongHost: TagalongHostApi;
   }
 }

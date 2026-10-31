@@ -1,5 +1,5 @@
 /**
- * Answers perception.readText: one window's text, through the text layer and OCR when the text
+ * Answers read_window_text: one window's text, through the text layer and OCR when the text
  * layer is thin. Checked against the classified inventory first. Contains readWindowTextWith.
  */
 
@@ -9,7 +9,7 @@ import type { WindowEntry } from '@tagalong/ui/shapes';
 import type { TextLayerProvider } from './text-layer';
 import { handleOf } from './window-list';
 
-/** Exactly what `perception.readText` answers with. */
+/** Exactly what read_window_text answers with. */
 export interface ReadTextAnswer {
   windowId: string;
   text: string;
@@ -53,7 +53,7 @@ function nothing(
 }
 
 /**
- * Answers `perception.readText` for one window.
+ * Answers read_window_text for one window.
  *
  * The exclusion check happens against the inventory *before* the read, not after it. A
  * read that runs and is then discarded has already pulled the vault's contents into this

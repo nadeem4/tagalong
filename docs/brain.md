@@ -647,14 +647,13 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 
 ### Hooks
 
-| Hook          | Runs                                          | Built in                                                                                                                                                                            |
-| ------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model_call`  | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
-| `emit`        | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
-| `tool_call`   | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
-| `ask`         | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
-| `tool_result` | After a tool returns                          | Later slice                                                                                                                                                                         |
-| `save`        | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
+| Hook         | Runs                                          | Built in                                                                                                                                                                            |
+| ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_call` | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
+| `emit`       | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
+| `tool_call`  | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
+| `ask`        | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
+| `save`       | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
 The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
 body that displays is connected (a `display: false` body does not count). `side_check` lets Scout approve once under a preference (an allow-once, so the

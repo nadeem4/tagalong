@@ -233,11 +233,4 @@ describe('PermissionsPanel', () => {
     unmount();
     expect(off).toHaveBeenCalled();
   });
-
-  it('shows nothing on a host without permissions', () => {
-    const bridge = createFakeHostBridge();
-    delete bridge.listPermissions;
-    renderPanel(bridge);
-    expect(screen.queryByRole('region', { name: 'Permissions' })).toBeNull();
-  });
 });

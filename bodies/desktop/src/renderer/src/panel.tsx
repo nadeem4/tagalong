@@ -26,38 +26,10 @@ import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
-import type { HostBridge } from '@tagalong/ui';
-import type { FixTarget } from '@tagalong/ui/shapes';
-import { gatherHealth, HEALTH_TEST_BUDGET_MS } from './health-facts';
-import { listMicrophones } from './mic';
+import { fullBridge } from './full-bridge';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
-
-const unavailable = (): Promise<never> => Promise.reject(new Error('not available here'));
-
-/**
- * The bubble's bridge: the preload's, plus the health check ("Scout, what's wrong?"), read
- * from calls Home and Settings already make, its Fix it, which opens the right place, and
- * Open logs folder.
- */
-function bubbleBridge(): HostBridge {
-  const bridge = window.tagalong;
-  const host = window.tagalongHost;
-  return {
-    ...bridge,
-    checkHealth: () =>
-      gatherHealth({
-        getHostView: () => host.getHostView(),
-        listConnections: () => bridge.listConnections?.() ?? unavailable(),
-        listMicrophones: () => listMicrophones(),
-        voiceModels: () => host.voiceModels(),
-        testBudgetMs: HEALTH_TEST_BUDGET_MS,
-      }),
-    openFix: (target: FixTarget) => host.openSettings(target),
-    openLogs: () => host.openLogsFolder(),
-  };
-}
 
 /**
  * The companion's bubble beside the pet, with the full chat one click behind it. The
@@ -94,7 +66,7 @@ function Panel() {
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
   // Seeing: off is sight paused, the same switch as the pause key and the tray.
   const [seeing, setSeeing] = useState(true);
-  const [bridge] = useState(bubbleBridge);
+  const [bridge] = useState(fullBridge);
   // The top status mark: a muted row in the bubble, the same mark as the tag on Scout.
   const [status, setStatus] = useState<StatusMark | null>(null);
   function apply(next: PanelSettings): void {

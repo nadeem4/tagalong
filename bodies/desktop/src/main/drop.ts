@@ -11,9 +11,11 @@ import { secretFileRule } from './platform/exclusions';
 import { MAX_SELECTION_CHARS } from '@tagalong/ui/shapes';
 import type { CapturedImage, Dropped } from '@tagalong/ui/shapes';
 import type { DropOffer } from '@tagalong/ui';
-import { MAX_SCREENSHOT_LONG_SIDE } from './context';
 import type { IpcHandle } from './ipc/handle';
 import { IPC } from '../shared/ipc';
+
+/** Long side of a dropped image, in pixels: past about 1568 the model downscales it anyway. */
+const MAX_SCREENSHOT_LONG_SIDE = 1568;
 
 /** A text file past this is named with its size, not read. */
 export const MAX_TEXT_FILE_BYTES = 1024 * 1024;

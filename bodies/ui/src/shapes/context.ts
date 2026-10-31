@@ -1,8 +1,7 @@
 /**
- * What the desktop saw when the person asked: the context snapshot and its parts (images,
- * displays, the window inventory, something dropped on Scout). Contains ContextSnapshot,
- * PerceptionTarget, CaptureBlock and the shapes they are built from. Imports only zod, so
- * desktop main and the renderer share it.
+ * What the desktop saw when the person asked: the context snapshot (app, selection, something
+ * dropped on Scout) and the shapes the window tools share (CaptureBlock, WindowEntry, ScreenInfo).
+ * Imports only zod, so desktop main and the renderer share it.
  */
 import { z } from 'zod';
 
@@ -15,7 +14,7 @@ export const MAX_SELECTION_CHARS = 20_000;
  * Carries the matching rule rather than a bare boolean so the UI can say "1Password.exe is
  * on your exclusion list" instead of "blocked", and so a user who did not expect a refusal
  * can find the line that caused it. The reason travels with the snapshot because a
- * full-view capture refuses one display or one window while returning the rest.
+ * list_windows refuses one window while returning the rest.
  */
 export const CaptureBlock = z.object({
   rule: z.enum(['processName', 'titlePattern']),
@@ -26,7 +25,7 @@ export type CaptureBlock = z.infer<typeof CaptureBlock>;
 
 /**
  * A picture a host captured. PNG only, so providers get one predictable image format.
- * The one shape is shared by the screenshot, each display and the composite.
+ * The one shape is shared by a dropped image and a window screenshot.
  */
 export const CapturedImage = z.object({
   mime: z.literal('image/png'),
@@ -50,34 +49,22 @@ export const DisplayBounds = z.object({
 });
 export type DisplayBounds = z.infer<typeof DisplayBounds>;
 
-/** One monitor, as the host found it. */
-export const DisplaySnapshot = z.object({
+/**
+ * One monitor: enough to number the screens and say how big they are.
+ *
+ * Listed in the host's own order, so a window list can be grouped as "Screen 1", "Screen 2".
+ */
+export const ScreenInfo = z.object({
   id: z.number().int(),
   bounds: DisplayBounds,
-  scaleFactor: z.number().positive(),
   primary: z.boolean(),
-  /** True for the display holding the foreground window, if the OS reports one. */
-  focused: z.boolean(),
-  /** Present when an exclusion refused this display; its image is then a placeholder. */
-  blocked: CaptureBlock.optional(),
-  /** Absent when the capturer offered no usable source for this display. */
-  image: CapturedImage.optional(),
 });
-export type DisplaySnapshot = z.infer<typeof DisplaySnapshot>;
-
-/**
- * A display without its picture: enough to number the screens and say how big they are.
- *
- * Listed in the host's own order, the order the composite labels 1, 2, 3, so a window
- * list grouped by these reads as the same "screen 2" the user sees in the picture.
- */
-export const ScreenInfo = DisplaySnapshot.pick({ id: true, bounds: true, primary: true });
 export type ScreenInfo = z.infer<typeof ScreenInfo>;
 
 /**
  * One top-level window in the inventory: what it is and where, never what is in it.
  *
- * The inventory is attached to every full-view capture, so it has to stay cheap. Reading a
+ * The inventory has to stay cheap. Reading a
  * window's text is a separate, deliberate tool call against a single `id`.
  */
 export const WindowEntry = z.object({
@@ -148,37 +135,7 @@ export const ContextSnapshot = z.object({
     })
     .optional(),
   selection: z.string().max(MAX_SELECTION_CHARS).optional(),
-  clipboard: z.string().optional(),
-  /** A single screenshot. `displays` and `composite` carry the full view. */
-  screenshot: CapturedImage.optional(),
-  /**
-   * Every display, in the order the host enumerated them.
-   *
-   * A display may arrive with no `image`: the capturer offers no source for a screen it
-   * was not allowed to read, and an honest gap beats a stale or invented picture.
-   */
-  displays: z.array(DisplaySnapshot).optional(),
-  /** Every display drawn into one picture, laid out by monitor geometry. */
-  composite: CapturedImage.optional(),
-  /**
-   * Every top-level window, with no text in it. It rides along with every full-view
-   * capture, so it stays cheap; the pet spends a tool call to read inside one.
-   */
-  windows: z.array(WindowEntry).optional(),
   /** What the person dropped on Scout and then chose to send, with a button. */
   dropped: Dropped.optional(),
 });
 export type ContextSnapshot = z.infer<typeof ContextSnapshot>;
-
-/** The things the desktop can be asked to perceive. */
-export const PerceptionTarget = z.enum([
-  'selection',
-  'screenshot',
-  'activeWindow',
-  'clipboard',
-  /** Every display plus the composite. */
-  'displays',
-  /** The window inventory, with no window text in it. */
-  'windows',
-]);
-export type PerceptionTarget = z.infer<typeof PerceptionTarget>;

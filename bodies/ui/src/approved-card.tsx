@@ -33,7 +33,7 @@ export function ApprovedReport({ onHide }: { onHide: () => void }) {
     if (note === null) opened.current = next.cameUp === true;
     setNote(next);
   });
-  useEffect(() => bridge.onApproved?.(arrive), [bridge]);
+  useEffect(() => bridge.onApproved(arrive), [bridge]);
   if (note === null) return null;
   return (
     <ApprovedCard

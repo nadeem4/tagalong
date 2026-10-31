@@ -12,7 +12,6 @@ import type {
   AppsList,
   ContextSnapshot,
   EarsEvent,
-  PerceptionTarget,
   Pet,
   PetRemarkParams,
   StatusMark,
@@ -24,7 +23,6 @@ import type {
   AskInput,
   BrainLink,
   DropOffer,
-  HostBridge,
   ApprovalCounts,
   ApprovalRow,
   JobRow,
@@ -33,6 +31,7 @@ import type {
   SpendToday,
 } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
+import type { PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
   BrowserFolder,
@@ -52,10 +51,8 @@ ipcRenderer.on(IPC.homePageEvent, (_event: IpcRendererEvent, page: string) =>
   homePage.arrived(page),
 );
 
-const bridge: HostBridge = {
+const bridge: PreloadBridge = {
   ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
-  capture: (targets: readonly PerceptionTarget[]) =>
-    ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>

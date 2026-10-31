@@ -81,7 +81,7 @@ describe('buildInventory', () => {
 
   it('withholds the title of a blocked window', () => {
     // The title is the leak. "Chase — Transfer to savings" says most of what the window
-    // holds, and the inventory is attached to every full-view capture.
+    // holds, and the inventory is what list_windows hands the brain.
     const [entry] = buildInventory(
       [observed({ processName: '1Password.exe', title: 'AWS root — production' })],
       PASSWORD_MANAGER,

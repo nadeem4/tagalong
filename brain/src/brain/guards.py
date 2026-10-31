@@ -25,7 +25,6 @@ class Hook(StrEnum):
     model_call = "model_call"
     tool_call = "tool_call"
     ask = "ask"
-    tool_result = "tool_result"
     emit = "emit"
     save = "save"
 

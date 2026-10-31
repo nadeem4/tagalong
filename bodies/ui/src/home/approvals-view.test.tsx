@@ -369,11 +369,4 @@ describe('ApprovalsView brain link', () => {
     expect(await screen.findByRole('group', { name: 'Summary' })).toBeVisible();
     expect(screen.getByText(/None yet/)).toBeVisible();
   });
-
-  it('renders nothing when the bridge has no listApprovals', () => {
-    const bridge = createFakeHostBridge();
-    delete (bridge as { listApprovals?: unknown }).listApprovals;
-    renderPage(bridge);
-    expect(screen.queryByRole('heading', { name: 'Approvals' })).toBeNull();
-  });
 });

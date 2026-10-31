@@ -8,8 +8,6 @@ import { BrainOffline } from '@tagalong/contract';
 import { fakeIpc } from './fake-ipc';
 import { registerTurnIpc } from './turns';
 
-const PNG = { mime: 'image/png' as const, base64: 'AAAA', width: 1, height: 1 };
-
 function setup(
   snapshot: Partial<ContextSnapshot> | null = null,
   options: {
@@ -60,13 +58,12 @@ describe('registerTurnIpc', () => {
     expect(fresh.claimed).toEqual([]);
   });
 
-  it('ask with a pending snapshot adds an image part', async () => {
-    const { invoke, said } = setup({ screenshot: PNG, app: { name: 'Code', windowTitle: 'a.ts' } });
+  it('ask with a pending snapshot sends the window title as context', async () => {
+    const { invoke, said } = setup({ app: { name: 'Code', windowTitle: 'a.ts' } });
     await invoke(IPC.ask, { petId: 'scout', text: 'what is this?' });
     expect(said).toEqual([
       {
         text: 'what is this?',
-        parts: [{ type: 'image', mime: 'image/png', data: 'AAAA' }],
         context: { window: 'a.ts' },
       },
     ]);

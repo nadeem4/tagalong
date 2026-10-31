@@ -163,9 +163,7 @@ export function placeOnDisplays(
 /**
  * Every screen, numbered by its place in `getAllDisplays()`.
  *
- * That is the order the composite labels 1, 2, 3, so the window list can say "screen 2"
- * and mean the screen the picture calls 2. Geometry only: listing windows never takes a
- * picture.
+ * Geometry only: listing windows never takes a picture.
  */
 export function screensOf(screen: {
   getAllDisplays(): Array<{ id: number; bounds: WindowBounds }>;

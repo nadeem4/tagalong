@@ -12,7 +12,6 @@ import type {
   ContextSnapshot,
   FixTarget,
   MemoryEntry,
-  PerceptionTarget,
   Pet,
   TurnEvent,
 } from './shapes';
@@ -112,85 +111,79 @@ export interface AskInput {
  */
 export interface HostBridge {
   ask(input: AskInput): Promise<{ turnId: string }>;
-  /**
-   * Perceives the screen now, on the user's click. Resolves to null when the host
-   * refused — an excluded window — so the panel can say capture is blocked here
-   * instead of silently staying blind.
-   */
-  capture(targets: readonly PerceptionTarget[]): Promise<ContextSnapshot | null>;
   interrupt(turnId: string): Promise<void>;
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
   /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
-  approveTool?(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
+  approveTool(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
   /**
    * The answer to a Claude Code job's ask: one of its own option names, or typed text for a
    * question. Separate from approveTool because these options are not allow/always/deny.
    */
-  answerJobAsk?(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
+  answerJobAsk(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
   /**
-   * Home's Connections page: the apps the brain keeps (MCP). All optional: a host without
-   * Home never shows the page. They reject with "brain offline" while the brain is away.
+   * Home's Connections page: the apps the brain keeps (MCP). They reject with "brain offline"
+   * while the brain is away.
    * Only `listConnections` and `addConnection` have answers worth reading; the page lists again
    * after the rest.
    */
-  listConnections?(): Promise<AppsList>;
-  addConnection?(params: AppAddParams): Promise<{ id: string }>;
-  setConnectionEnabled?(id: string, enabled: boolean): Promise<unknown>;
-  restartConnection?(id: string): Promise<unknown>;
+  listConnections(): Promise<AppsList>;
+  addConnection(params: AppAddParams): Promise<{ id: string }>;
+  setConnectionEnabled(id: string, enabled: boolean): Promise<unknown>;
+  restartConnection(id: string): Promise<unknown>;
   /** Opens the app's sign-in in the browser on the brain's machine; the outcome arrives as `connections.changed`. */
-  signInConnection?(id: string): Promise<unknown>;
+  signInConnection(id: string): Promise<unknown>;
   /** Remove: the brain forgets the app and deletes its stored key. */
-  removeConnection?(id: string): Promise<unknown>;
+  removeConnection(id: string): Promise<unknown>;
   /**
    * Home's What Scout remembers: its facts, preferences and summaries, newest first, each
-   * deletable. Optional: a host without Home never shows the page.
+   * deletable.
    */
-  listMemories?(): Promise<MemoryEntry[]>;
-  deleteMemory?(id: string): Promise<boolean>;
+  listMemories(): Promise<MemoryEntry[]>;
+  deleteMemory(id: string): Promise<boolean>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
-  usageSummary?(): Promise<SpendToday>;
+  usageSummary(): Promise<SpendToday>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
-  listPermissions?(): Promise<PermissionRow[]>;
+  listPermissions(): Promise<PermissionRow[]>;
   /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
-  setPermission?(tool: string, mode: 'ask' | 'auto'): Promise<void>;
+  setPermission(tool: string, mode: 'ask' | 'auto'): Promise<void>;
   /** Home's Jobs panel: recent Claude Code jobs, newest first. */
-  listJobs?(): Promise<JobRow[]>;
+  listJobs(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
-  stopJob?(job: string): Promise<void>;
+  stopJob(job: string): Promise<void>;
   /** Home's Approvals history, newest first; `before` is the `next` cursor of the page above. */
-  listApprovals?(
+  listApprovals(
     filter: 'all' | 'scout' | 'refused',
     before?: number,
   ): Promise<{ approvals: ApprovalRow[]; counts: ApprovalCounts; next: number | null }>;
   /** The preferences Scout follows, the built-in one included. */
-  listPreferences?(): Promise<PreferenceRow[]>;
+  listPreferences(): Promise<PreferenceRow[]>;
   /** Removes a preference; rejects when the brain refuses (already gone, say). */
-  removePreference?(id: number): Promise<void>;
+  removePreference(id: number): Promise<void>;
   /** Rewrites a preference's sentence; rejects when the brain refuses it. */
-  editPreference?(id: number, sentence: string): Promise<void>;
+  editPreference(id: number, sentence: string): Promise<void>;
   /** Scout approved an ask under a preference: tell the person once. Returns an unsubscribe. */
-  onApproved?(
+  onApproved(
     handler: (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void,
   ): () => void;
-  /** Home's "Where things run": the brain's address and link status. Optional: no brain, no card. */
-  brainLink?(): Promise<BrainLink>;
+  /** Home's "Where things run": the brain's address and link status. */
+  brainLink(): Promise<BrainLink>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection
    * to the brain goes up or down): read it again. Returns an
-   * unsubscribe function. Optional: a host without a brain never sends it.
+   * unsubscribe function.
    */
-  onBrainChanged?(handler: (what: string) => void): () => void;
+  onBrainChanged(handler: (what: string) => void): () => void;
   /**
    * "Scout, what's wrong?": what the health card reads, from calls the host already makes.
    * No model call, so it works when Scout cannot think. Never a key or a secret.
    */
-  checkHealth?(): Promise<HealthFacts>;
+  checkHealth(): Promise<HealthFacts>;
   /** A health card's Fix it: opens the Settings section or Home page that fixes it. */
-  openFix?(target: FixTarget): Promise<void>;
+  openFix(target: FixTarget): Promise<void>;
   /** The health card's Open logs folder: shows the folder; no log text leaves the host. */
-  openLogs?(): Promise<void>;
+  openLogs(): Promise<void>;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);

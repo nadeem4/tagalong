@@ -75,15 +75,4 @@ describe('SpendCard', () => {
       expect(screen.getByText('Tagalong could not read what was spent.')).toBeInTheDocument(),
     );
   });
-
-  it('renders nothing when the host has no spend', () => {
-    const bridge = createFakeHostBridge();
-    delete bridge.usageSummary;
-    const { container } = render(
-      <HostBridgeProvider bridge={bridge}>
-        <SpendCard />
-      </HostBridgeProvider>,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
 });

@@ -17,10 +17,8 @@ export function PermissionsPanel() {
   const switches = useRef(new Map<string, HTMLButtonElement>());
 
   const refresh = useCallback(() => {
-    const list = bridge.listPermissions;
-    if (list === undefined) return;
-    list
-      .call(bridge)
+    bridge
+      .listPermissions()
       .then((latest) => {
         setFailed(false);
         setRows(latest);
@@ -33,7 +31,7 @@ export function PermissionsPanel() {
 
   useEffect(() => {
     refresh();
-    return bridge.onBrainChanged?.((what) => {
+    return bridge.onBrainChanged((what) => {
       if (what === 'permissions') refresh();
     });
   }, [bridge, refresh]);
@@ -57,14 +55,12 @@ export function PermissionsPanel() {
   const apply = (name: string, mode: 'ask' | 'auto'): void => {
     closeWarning(name);
     void bridge
-      .setPermission?.(name, mode)
+      .setPermission(name, mode)
       // Read again either way: on success for hosts that never send the change, on a
       // refusal so the switch shows what the brain really holds.
       .catch((error: unknown) => console.error('could not set permission', error))
       .then(refresh);
   };
-
-  if (bridge.listPermissions === undefined) return null;
 
   return (
     <section className="home-card home-perms" aria-label="Permissions">

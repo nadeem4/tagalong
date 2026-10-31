@@ -130,14 +130,4 @@ describe('WhereThingsRun', () => {
     expect(await screen.findByText(/^Odd · node$/)).toBeInTheDocument();
     expect(screen.getByText('Bare')).toBeInTheDocument();
   });
-
-  it('shows nothing on a host without a brain link', async () => {
-    const bridge = createFakeHostBridge();
-    delete bridge.brainLink;
-    renderCard(bridge);
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(screen.queryByRole('region', { name: 'Where things run' })).toBeNull();
-  });
 });

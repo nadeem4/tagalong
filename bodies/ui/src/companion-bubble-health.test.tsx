@@ -103,30 +103,11 @@ describe('CompanionBubble, the health check', () => {
     expect(openLogs).toHaveBeenCalledOnce();
   });
 
-  it('has no Open logs folder on a host that cannot open it', async () => {
-    setup();
-    ask('are you ok?');
-    await flush();
-    expect(screen.queryByRole('button', { name: 'Open logs folder' })).toBeNull();
-  });
-
   it('leaves a real question to Scout', async () => {
     const { fake, checkHealth } = setup();
     ask('what’s wrong with this code?');
     await flush();
     expect(checkHealth).not.toHaveBeenCalled();
-    expect(fake.asks).toHaveLength(1);
-  });
-
-  it('asks Scout as before on a host with no health check', async () => {
-    const fake = createFakeHostBridge();
-    render(
-      <HostBridgeProvider bridge={fake}>
-        <CompanionBubble petId="scout" petName="Scout" />
-      </HostBridgeProvider>,
-    );
-    ask('what’s wrong?');
-    await flush();
     expect(fake.asks).toHaveLength(1);
   });
 

@@ -107,7 +107,7 @@ its bodies fit together.
 | Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                                                                                          |                                                                     |
 | Timers: Scout sets its own reminders and repeating checks, and speaks first when a job ends or you come back                                                                                                                                                                                                  |                                                                     |
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                |                                                                     |
-| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             |                                                                     |
+| Sight: selection, a screenshot of one window, every open window, window text, built-in blind spots                                                                                                                                                                                                            |                                                                     |
 |                                                                                                                                                                                                                                                                                                               | Data export and delete-all in Settings                              |
 | Memory across restarts                                                                                                                                                                                                                                                                                        | Code signing (the installer is unsigned) and an app icon of its own |
 | The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, searches history, bookmarks and downloads, acts on tabs, and takes questions from a right-click or the address bar, in Chrome, Edge and other Chromium browsers, after you allow each step |                                                                     |
@@ -124,7 +124,7 @@ Press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. A click opens it
 looking; the key also brings what you are on. Drag Scout anywhere on your screen and the bubble
 follows. Escape or the × closes it.
 
-The bubble shows what Scout can see as chips (the app and window, selected text, a screenshot).
+The bubble shows what Scout can see as chips (the app and window, selected text).
 Remove any chip you do not want sent, type the question and press Enter. The answer appears in the
 bubble, the next question continues the same conversation, and **Open full chat** shows the whole
 conversation in a taller window (**Back to bubble** returns).
@@ -319,7 +319,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                                    |
 | Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.               |
 | You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                          |
-| From source, a look always captures the whole screen     | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.                     |
+| From source, Scout never knows which window you are on   | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.                     |
 | It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                          |
 
 # For developers
