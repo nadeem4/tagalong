@@ -7,7 +7,7 @@ import { themeTokens as t } from '../theme/tokens';
 
 export const WALKTHROUGH_CSS = `
 .wt {
-  display: grid; grid-template-columns: ${t.size.navWidth}px 1fr; height: 100vh; margin: 0;
+  display: grid; grid-template-columns: ${t.size.navWidth}px minmax(0, 1fr); height: 100vh; margin: 0;
   background: ${t.color.panel}; color: ${t.color.panelText};
   font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px;
 }
@@ -52,6 +52,8 @@ export const WALKTHROUGH_CSS = `
 .wt-page { display: grid; grid-template-rows: 1fr auto; min-height: 0; padding-top: 40px; position: relative; -webkit-app-region: no-drag; }
 .wt-page::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 40px; -webkit-app-region: drag; }
 .wt-body { overflow-y: auto; padding: ${t.space.xs}px 48px 28px; min-height: 0; animation: wt-enter 320ms cubic-bezier(.16, 1, .3, 1) both; }
+/* A small or highly scaled screen: tighter gutters so the pinned footer wraps instead of overflowing. */
+@media (max-width: 800px) { .wt-body { padding-left: 24px; padding-right: 24px; } .wt-footer { padding: 12px 24px; } }
 @keyframes wt-enter { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .wt-body { animation: none; } }
 .wt h1 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: ${t.fontWeight.semibold}; letter-spacing: -.01em; max-width: 30ch; text-wrap: balance; }
@@ -107,7 +109,7 @@ export const WALKTHROUGH_CSS = `
 .wt-setting h3 { margin: 0; font-size: 15px; font-weight: ${t.fontWeight.semibold}; }
 
 /* Footer */
-.wt-footer { display: flex; align-items: center; gap: ${t.space.lg}px; padding: 16px 48px; border-top: 1px solid ${t.color.panelLine}; background: ${t.color.panel}; }
+.wt-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px ${t.space.lg}px; padding: 16px 48px; min-width: 0; border-top: 1px solid ${t.color.panelLine}; background: ${t.color.panel}; }
 .wt-spacer { flex: 1; }
 .wt-primary, .wt-quiet, .wt-text {
   height: ${t.size.fieldHeight}px; padding: 0 16px; border-radius: ${t.radius.field}px; font-size: 14px; font-weight: ${t.fontWeight.semibold};

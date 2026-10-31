@@ -71,6 +71,14 @@ const visible = (name: string) =>
     `${name}.html`,
   );
 
+const walkthroughWindows = () =>
+  app!.evaluate(
+    ({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().filter((w) =>
+        w.webContents.getURL().includes('walkthrough.html'),
+      ).length,
+  );
+
 const settingsFile = () => readFileSync(join(dataDir!, 'settings.json'), 'utf8');
 const tourDone = () =>
   (JSON.parse(settingsFile()) as { walkthrough?: { done?: boolean } }).walkthrough?.done;
@@ -93,9 +101,11 @@ async function pasteAndCheck(tour: Page): Promise<void> {
 }
 
 /** The one place the main process writes "seen": closing the card or Skip tour with a key. */
-async function expectClosedAndDone(tour: Page): Promise<void> {
-  await tour.waitForEvent('close', { timeout: 30_000 }).catch(() => undefined);
+async function expectClosedAndDone(): Promise<void> {
+  // Polled, not waitForEvent('close'): Playwright never reports Electron's window as a closed page,
+  // so that wait always ran out its 30 s.
   await expect.poll(tourDone, { timeout: 15_000 }).toBe(true);
+  await expect.poll(() => walkthroughWindows(), { timeout: 15_000 }).toBe(0);
 }
 
 test('fresh start shows the walkthrough and hides the pet, bubble and dock', async () => {
@@ -117,7 +127,7 @@ test('existing user with a key sees it once, can skip the key step, then never a
   await tour.getByRole('button', { name: 'Finish' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await tour.getByRole('button', { name: 'Close' }).click();
-  await expectClosedAndDone(tour);
+  await expectClosedAndDone();
   await expect.poll(() => visible('avatar')).toBe(true);
 
   // A second launch on the same data directory goes straight to the pet.
@@ -141,7 +151,7 @@ test('Skip tour with a key closes the window and marks it seen', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
   await tour.getByRole('button', { name: 'Skip tour' }).click();
-  await expectClosedAndDone(tour);
+  await expectClosedAndDone();
 });
 
 test('closing mid-way brings the pet back and the tour returns next launch', async () => {
@@ -182,7 +192,7 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
   expect(brain!.keyAttempts).toBe(2);
   await tour.getByRole('button', { name: 'Finish' }).click();
   await tour.getByRole('button', { name: 'Close' }).click();
-  await expectClosedAndDone(tour);
+  await expectClosedAndDone();
   expect(settingsFile()).not.toContain(FAKE_KEY);
 
   // Settings > Change key still works after the tour.
@@ -276,3 +286,33 @@ test('every step fits the window: footer in view, nothing wider than the page (1
     if (step < 9) await tour.getByRole('button', { name: 'Next' }).click();
   }
 });
+
+test('a small work area still keeps the footer in view and nothing wider than the page', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  // 1024x768 at 150% leaves about 682x512 DIPs; shrink the window to that, as main now does.
+  await app!.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().includes('walkthrough.html'))
+      ?.setContentSize(682, 512),
+  );
+  for (let step = 1; step <= 9; step += 1) {
+    await expect
+      .poll(() => fitOf(tour), { message: `step ${step}` })
+      .toEqual({ footerInView: true, noSideScroll: true });
+    if (step < 9) await tour.getByRole('button', { name: 'Next' }).click();
+  }
+});
+
+async function fitOf(tour: Page) {
+  await tour.locator('.wt-footer').waitFor();
+  return tour.evaluate(() => {
+    const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
+    const body = document.querySelector('.wt-body')!;
+    return {
+      footerInView:
+        footer.bottom <= window.innerHeight + 1 && footer.right <= window.innerWidth + 1,
+      noSideScroll: body.scrollWidth <= body.clientWidth,
+    };
+  });
+}

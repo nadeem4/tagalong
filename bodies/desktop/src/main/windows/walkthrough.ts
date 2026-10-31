@@ -1,17 +1,17 @@
 /**
- * The first-run walkthrough's window: about 1040x680 with no title bar of its own, only the
+ * The first-run walkthrough's window: about 1040x680 (smaller on a small screen) with no title bar of its own, only the
  * system's close button over the page (Escape does not close it). Contains
  * createWalkthroughWindow. Closing it never marks the walkthrough seen; that is Finish and Skip.
  */
 
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
+import { walkthroughSize } from './walkthrough-size';
 
 /** Opens the walkthrough, at `step` when one is named (the no-key button opens step 9). */
 export function createWalkthroughWindow(step?: number): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1040,
-    height: 680,
+    ...walkthroughSize(screen.getPrimaryDisplay().workArea),
     useContentSize: true,
     // Frameless would leave no way to close it, since Escape does nothing here; the overlay
     // keeps the system's own buttons over the page's 40px top strip.

@@ -193,7 +193,7 @@ Rules each module enforces:
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`
   calls `openWalkthrough(9)` instead.
-- **Walkthrough.** `windows/walkthrough.ts` makes a 1040 x 680 window (not resizable, no title
+- **Walkthrough.** `windows/walkthrough.ts` makes a 1040 x 680 window (shrunk to the work area by `walkthroughSize` on a small screen; not resizable, no title
   bar of its own: `titleBarOverlay` keeps the system's close button over the page's top strip,
   because Escape does not close it) with the same web preferences as Home, loading
   `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). The page
