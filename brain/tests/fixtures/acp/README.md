@@ -1,3 +1,0 @@
-# ACP fixtures
-
-Real frames captured from `@agentclientprotocol/claude-agent-acp` 0.98.0 through `agent-client-protocol` 0.12.1. Each file is `{description, ...}` plus either `frames` (a list) or named variants (each a list). A frame is `{dir, msg}`: `dir` is `client->agent` or `agent->client`, `msg` the JSON-RPC message. Paths, session ids (`sess-1`), usage, auth and command-list frames are redacted or dropped. `handshake.json` (`frames`): initialize, session/new, one prompt. `cancel.json` (`frames`): session/cancel mid-Bash. `permission.json` variants: `selected`, `cancelled`, `session_cancel_while_pending`. `question.json` variants: `pick_option`, `free_text`, `two_questions_multi_select_answered`, `two_questions_declined`.

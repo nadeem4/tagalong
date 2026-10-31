@@ -2,7 +2,7 @@
 
 Run as a subprocess over stdio. FAKE_ACP_SCRIPT names a JSON list of steps replayed on
 each session/prompt; FAKE_ACP_LOG names a file that gets every frame the client sent,
-one JSON object per line. Frame shapes follow tests/fixtures/acp/. Needs only Python.
+one JSON object per line. Needs only Python.
 
 The script may instead be a list of step lists, one per prompt (the last is reused).
 Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
