@@ -27,8 +27,7 @@ decides to hand to it.
 | `status-mark.tsx`                                | `StatusMark` (`tag` and `row`)                                                           |
 | `dock-pet.tsx`, `theme/bean-clip.tsx`            | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                          |
 | `home/`                                          | `HomeView` and its pages                                                                 |
-| `voice/speakable.ts`, `voice/spoken-stream.ts`   | `toSpeakable`, `mergeShortLines`, `SpokenStream`: what of a line is said                 |
-| `voice/` (the rest)                              | `SpeechQueue`, `QueueMouth`, `PushToTalk`, `ListenController` (see [voice.md](voice.md)) |
+| `voice/`                                         | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                              |
 | `theme/tokens.ts`, `settings/settings-styles.ts` | Theme tokens; `SETTINGS_CSS`                                                             |
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
@@ -78,7 +77,7 @@ delivers an event to every subscriber synchronously, so tests need no timers. `a
 The desktop panel window renders `CompanionBubble` (`companion-bubble.tsx`) inside
 `HostBridgeProvider`. Its props, as the panel passes them: `petId`, `petName`, `snapshot` (what the
 ask hotkey captured), `expanded`, `tail` (`'left' | 'right'`, the side the pet is on),
-`onSay` and `mouth` (speech), `speaking` and `onStopSpeaking`, `talk` (`BubbleTalk`: the mic state,
+`speaking` and `onStopSpeaking`, `talk` (`BubbleTalk`: the mic state,
 heard text, partials, the key label, Always listening), `seeing` (`{ on, onToggle }`),
 `drop`, `status`, and the callbacks `onOpenChat`, `onCollapse`, `onClose`,
 `onDropDone`.
@@ -119,15 +118,15 @@ stateDiagram-v2
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
   `stopReason` shows `stopStatus` as a quiet line ("Declined" for `refusal`, "Stopped: too many
   steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`, and a typed
-  question's answer goes to `onSay` once.
+  question's answer is not read aloud.
 - `turn.error` for `mine`, or a rejected `ask`, shows a `role="alert"` line (the error message, or
   "Tagalong could not reach its brain.").
 - **Stop** (while running) calls `interrupt(mine)`.
-- A spoken question (`talk.onHeard`) asks with `asSpoken`: the bubble opens a `Pushable` stream on
-  `mouth.speak` and feeds each `turn.delta` through a `SpokenStream`, so the first sentence is said
-  while the rest streams. After it completes the hints show "Hold <key> to reply".
-- **Barge-in** (`talk.onListen` while running) ends the spoken stream, interrupts the turn, clears
-  `mine` and keeps what was said so far as `done`.
+- A spoken question (`talk.onHeard`) asks with `asSpoken`, so the ask carries `spoken: true`. The
+  brain speaks the answer and the panel plays it ([voice.md](voice.md)). After the turn completes
+  the hints show "Hold <key> to reply".
+- **Barge-in** (`talk.onListen` while running) interrupts the turn, clears `mine` and keeps what
+  was said so far as `done`. The panel's `SpeechPlayer.stop()` tells the brain to `hush`.
 
 **Chips.** `chipsOf(snapshot)` makes up to two removable chips: the app (`name · window title`),
 and `Selected text`. Removing one leaves that part out of the ask (`without`). A new snapshot
@@ -193,20 +192,10 @@ is `openLogsFolder`.
 ### Show-only blocks
 
 The mind decides what is said: everything it writes is spoken except what it puts in a show-only
-block, which the bubble shows and the voice skips. Show-only means a fenced code block, a table row (a line starting with `|`) or a quoted line (starting with `>`, a
-quote). Bare URLs are dropped too.
-
-- `toSpeakable(text)` (`voice/speakable.ts`) does this for a whole line: removes fenced blocks,
-  quoted and table lines, strips heading and list markers, images, link targets, inline code
-  marks, emphasis and URLs, and collapses spaces. Nothing is cut and nothing is added: an answer
-  that is all blocks says nothing.
-- `SpokenStream` (`voice/spoken-stream.ts`) does the same while an answer streams: it hands each
-  complete sentence (`SENTENCE_END`: `.`, `!` or `?` followed by a space, or a line break) to the
-  voice at once, tracks whether it is inside a fence (keeping a fence's first backticks in case the
-  rest is still arriving), drops a show-only line up to its line break, and waits on a line start
-  that could still turn into a list marker.
-- `mergeShortLines` joins consecutive lines under `SHORT_LINE` (40 characters), which the local
-  voice says badly alone.
+block, which the bubble shows and the voice skips. Show-only means a fenced code block, a table row
+(a line starting with `|`) or a quoted line (starting with `>`). Bare URLs are dropped too. The
+brain does this before it speaks (`brain/src/brain/voice/speakable.py`; see
+[brain.md](brain.md#brain-mouth)); the bubble only shows the full answer.
 
 ### Answers
 
@@ -217,7 +206,7 @@ bubble's own window). A fenced block is an ordinary code block.
 ### Status marks
 
 Only the mind speaks in Scout's voice. What the body knows (it cannot think, the microphone is
-busy, the speech models are downloading, listening is paused) shows as a neutral status mark.
+busy, the brain is loading its speech models, listening is paused) shows as a neutral status mark.
 
 - **The wording table** is `bodies/ui/src/shapes/status.ts`. `StatusId`, in the order that picks
   the top mark: `brain-offline`, `brain-outdated`, `ears-failed`, `mic-busy`,
@@ -238,13 +227,13 @@ percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail
   optional time limit per mark, and a callback that broadcasts the top mark on
   `IPC.statusMarkEvent`. Windows read `getStatusMark()` on mount. Who sets what:
 
-| Mark                                           | Set by                                                                                                                                         | Cleared by                                       |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `brain-offline`, `brain-outdated`              | `markBrainLink`: from the brain link status (offline, or an outdated brain)                                                                    | the link coming back to online                   |
-| `listening-on`                                 | `markListening`: at launch when Always listening is on, and each time it is switched on, for 8 s (`LISTENING_MARK_MS`)                         | the time, or switching it off                    |
-| `listening-paused`                             | `markListening`: on but paused (a call, full screen)                                                                                           | resuming or switching off                        |
-| `ears-loading` (with `percent`), `ears-failed` | `forwardEars` from the voice process's `ears.status` and `ears.progress`; a voice process that exits after the ears were used is `ears-failed` | the next `ready`                                 |
-| `mic-busy`, `mic-failed`, `say-name`           | the panel only, through `IPC.setStatusMark(id, on)`; `say-name` for 8 s (`SAY_NAME_MARK_MS`)                                                   | the panel; `setPanelMark` refuses every other id |
+| Mark                                           | Set by                                                                                                                 | Cleared by                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `brain-offline`, `brain-outdated`              | `markBrainLink`: from the brain link status (offline, or an outdated brain)                                            | the link coming back to online                   |
+| `listening-on`                                 | `markListening`: at launch when Always listening is on, and each time it is switched on, for 8 s (`LISTENING_MARK_MS`) | the time, or switching it off                    |
+| `listening-paused`                             | `markListening`: on but paused (a call, full screen)                                                                   | resuming or switching off                        |
+| `ears-loading` (with `percent`), `ears-failed` | `createVoiceBridge` from the brain's `voice` frames (`loading` with progress, `ready`, `failed`)                       | the next `ready`                                 |
+| `mic-busy`, `mic-failed`, `say-name`           | the panel only, through `IPC.setStatusMark(id, on)`; `say-name` for 8 s (`SAY_NAME_MARK_MS`)                           | the panel; `setPanelMark` refuses every other id |
 
 A turn that ends with nothing said is not a status mark; it shows `stopStatus`'s line.
 
@@ -373,7 +362,6 @@ status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
 | `GreetingLine` `holdMs`                 | 7,000 ms default; 12,000 ms for remarks | `companion-bubble.tsx`, `panel.tsx`               |
 | `LEAVE_MS`                              | 300 ms fade                             | `companion-bubble.tsx`                            |
 | Answer box height                       | 260 px max, then scrolls                | `companion-bubble.tsx` (`BUBBLE_CSS`)             |
-| `SHORT_LINE`                            | 40 characters                           | `voice/speakable.ts`                              |
 | `HEALTH_TEST_BUDGET_MS`                 | 5,000 ms per call                       | `bodies/desktop/src/renderer/src/health-facts.ts` |
 | Dock size (`SIZE`)                      | 96 px                                   | `dock-pet.tsx`                                    |
 | Blink interval                          | 3,000 to 6,000 ms                       | `dock-pet.tsx`                                    |
@@ -404,17 +392,16 @@ marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test (under `bodies/ui/src/` unless noted)                                       | Pins                                                                                                                                                                                                                                                                                                                        |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `companion-bubble.test.tsx`                                                      | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold and offers; each answer said once; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
-| `companion-bubble-health.test.tsx`                                               | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                                                      |
-| `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                   | which questions match; rows and the headline; the card                                                                                                                                                                                                                                                                      |
-| `answer.test.tsx`                                                                | Markdown formatted, links as text, HTML as text, tables                                                                                                                                                                                                                                                                     |
-| `voice/speakable.test.ts`, `voice/spoken-stream.test.ts`                         | show-only blocks never read (fences, tables, quotes), lists read without markers, no cap, sentences handed over early, fences in pieces                                                                                                                                                                                     |
-| `connector-confirm.test.tsx`, `drop-card.test.tsx`                               | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                                              |
-| `status-mark.test.tsx`                                                           | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                     |
-| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                        |
-| `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                             |
-| `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                           |
-| the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                          |
-| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the public surface                                                                                                                                                                                                                                                                       |
+| Test (under `bodies/ui/src/` unless noted)                                       | Pins                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `companion-bubble.test.tsx`                                                      | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold and offers; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
+| `companion-bubble-health.test.tsx`                                               | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                               |
+| `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                   | which questions match; rows and the headline; the card                                                                                                                                                                                                                                               |
+| `answer.test.tsx`                                                                | Markdown formatted, links as text, HTML as text, tables                                                                                                                                                                                                                                              |
+| `connector-confirm.test.tsx`, `drop-card.test.tsx`                               | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                       |
+| `status-mark.test.tsx`                                                           | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                              |
+| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                 |
+| `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                      |
+| `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                    |
+| the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                   |
+| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the public surface                                                                                                                                                                                                                                                |

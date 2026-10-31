@@ -372,7 +372,7 @@ describe('ListenController, always', () => {
     await tick();
     expect(controller.mode).toBe('held');
     expect(ears.made.map((made) => made.mode)).toEqual(['always', 'held']);
-    // The always session ends before the held one opens its mic: the voice process runs them in order.
+    // The always session ends before the held one opens its mic: the brain runs them in order.
     expect(order).toEqual(['open, always stopped: false', 'open, always stopped: true']);
     ears.say('partial', 'what is');
     controller.release();
@@ -626,7 +626,7 @@ describe('ListenController, always', () => {
     controller.setAlways(true);
     await tick();
     expect(controller.mode).toBe('always');
-    // The voice process runs sessions in order: the held question's words come first.
+    // The brain runs sessions in order: the held question's words come first.
     ears.say('partial', 'Scout, the held');
     ears.say('turnEnd', 'Scout, the held one');
     expect(calls.heard.mock.calls).toEqual([['Scout, the held one']]);

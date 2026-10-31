@@ -59,10 +59,7 @@ tagalong/
                                     # tray-icon.ts, tray-menu.ts,
                                     # sight-pause.ts, drop.ts, settings-store.ts, hide-secrets.ts,
                                     # log-file.ts, ipc/,
-                                    # platform/, voice/, windows/
-      src/main/voice/               # voice.ts (the mouths), kokoro.ts, ears/ (models, LocalEars)
-      src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
-                                    # handler.ts, ears-host.ts, worker-local-voice.ts, main.ts (its bootstrap)
+                                    # platform/, windows/
       src/main/platform/            # capture, downscale, ocr,
                                     # read-text, text-layer, sight-gate,
                                     # window-helper, window-list, window-shot, selection, win32
@@ -239,8 +236,7 @@ The suites run offline on fakes. The desktop answers turns only through a brain,
 `hello`, then every `say` with one scripted reply; it also answers Home's permission and jobs tools and, for a
 say that mentions "permission" or "hand off", opens the asks `asks.spec.ts` and `jobs.spec.ts` need), and pass
 its address as `TAGALONG_BRAIN_ADDR`.
-`brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
-`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`.
+`brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. The fake microphone: `TAGALONG_FAKE_MIC=1`.
 A quit that does not finish in 45 s is
 killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
 cannot hold the single-instance lock or the data folder. When an e2e suite
@@ -386,14 +382,12 @@ The desktop reads the variables below straight from the process environment. **S
 shell you launch from**, as shown above. The brain's variables (its key, model, budget and limits) are
 listed in `.env.example` and described in [brain.md](brain.md).
 
-| Variable                | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`   | **Read** (`brain/start.ts`). Host:port the desktop dials for the brain; default `127.0.0.1:47321`. The brain reads the same name for where it listens.                                                                                                                                                                                                                                                     |
-| `TAGALONG_START_BRAIN`  | **Read** (`brain/launch.ts`). `0` stops the desktop starting a local brain when none is running; the Electron specs that need the brain down set it.                                                                                                                                                                                                                                                       |
-| `TAGALONG_VOICE_DIR`    | **Read** (`voice/worker/main.ts`). Folder of the voice models. Main sets it for the voice process (to `<data folder>/voice`); you never set it.                                                                                                                                                                                                                                                            |
-| `ELECTRON_RENDERER_URL` | **Read** (`windows/page.ts`). The dev server's address, set by `electron-vite` under `pnpm dev:desktop`; the packaged app loads its files instead.                                                                                                                                                                                                                                                         |
-| `TAGALONG_FAKE_TTS=1`   | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                                         |
-| `TAGALONG_FAKE_STT=1`   | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
+| Variable                | Status                                                                                                                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`   | **Read** (`brain/start.ts`). Host:port the desktop dials for the brain; default `127.0.0.1:47321`. The brain reads the same name for where it listens.                                                                                   |
+| `TAGALONG_START_BRAIN`  | **Read** (`brain/launch.ts`). `0` stops the desktop starting a local brain when none is running; the Electron specs that need the brain down set it.                                                                                     |
+| `ELECTRON_RENDERER_URL` | **Read** (`windows/page.ts`). The dev server's address, set by `electron-vite` under `pnpm dev:desktop`; the packaged app loads its files instead.                                                                                       |
+| `TAGALONG_FAKE_MIC=1`   | **Read** (`main/index.ts`). Chromium's fake microphone stands in for a real one (`use-fake-device-for-media-stream`). The brain does the hearing, so the specs' fake brain scripts what it heard. The smoke and listening suites set it. |
 
 ## Conventions
 
@@ -415,38 +409,6 @@ listed in `.env.example` and described in [brain.md](brain.md).
   share (copy it from any doc in `docs/`): grey lines and titles, so diagrams read on GitHub's light
   and dark themes.
 
-## Voice models
-
-The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
-installer. The first time listening is used, `bodies/desktop/src/main/voice/ears/model-files.ts`
-downloads the missing files into the voice folder, each streamed to a `.part` file, hashed as it
-arrives and renamed only when it is complete and matches, so an interrupted or damaged download
-never looks done. Each file is pinned to one
-Hugging Face commit and checked against a SHA-256 in that file; `KOKORO_FILES` does the same for
-the voice (92,364,770 bytes). Nothing is fetched at launch or
-in tests. Audio is never sent anywhere; only these model files are downloaded.
-
-| File                                                                          | Source                               | Bytes          | Licence      |
-| ----------------------------------------------------------------------------- | ------------------------------------ | -------------- | ------------ |
-| `ears/silero-vad/model.onnx`                                                  | `onnx-community/silero-vad`          | 2,243,022      | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/config.json`                              | `onnx-community/moonshine-tiny-ONNX` | 921            | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/generation_config.json`                   | `onnx-community/moonshine-tiny-ONNX` | 147            | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/preprocessor_config.json`                 | `onnx-community/moonshine-tiny-ONNX` | 128            | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/tokenizer.json`                           | `onnx-community/moonshine-tiny-ONNX` | 3,761,754      | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/tokenizer_config.json`                    | `onnx-community/moonshine-tiny-ONNX` | 135,735        | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/onnx/encoder_model_quantized.onnx`        | `onnx-community/moonshine-tiny-ONNX` | 7,937,661      | MIT          |
-| `onnx-community/moonshine-tiny-ONNX/onnx/decoder_model_merged_quantized.onnx` | `onnx-community/moonshine-tiny-ONNX` | 20,243,286     | MIT          |
-| `ears/smart-turn-v3/smart-turn-v3.2-cpu.onnx`                                 | `pipecat-ai/smart-turn-v3`           | 8,679,182      | BSD-2-Clause |
-| **Total**                                                                     |                                      | **43,001,836** |              |
-
-Silero VAD (MIT) spots speech, Moonshine tiny (MIT) turns it into text through transformers.js, and
-Smart Turn (BSD-2-Clause) decides when a turn has ended. The Moonshine files sit in the
-transformers.js cache layout under the voice folder, the same cache Kokoro uses. The byte counts are
-exact at the pinned commit. To bump a model, pick the new commit, read each file's SHA-256 from
-`https://huggingface.co/api/models/<repo>/tree/<commit>` (the LFS `oid`; hash a small non-LFS file
-at that commit and check it against its git blob `oid`), and change the URL, `bytes` and `sha256`
-together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
-
 ## Known gaps
 
 Gaps that are real in the code on `main`, each explained in the doc it links to.
@@ -456,6 +418,5 @@ Gaps that are real in the code on `main`, each explained in the doc it links to.
 - **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app
   stops at launch there; the Windows installer is unsigned. See
   [desktop.md](desktop.md#the-platform-adapter) and [desktop.md](desktop.md#packaging).
-- **Real voice models are not run in CI.** Tests and the Electron suites use `TAGALONG_FAKE_TTS=1`
-  and `TAGALONG_FAKE_STT=1`, so model downloads, synthesis and transcription run only on a real
-  machine. See [voice.md](voice.md#tests-that-pin-it).
+- **Real voice models are not run in CI.** The Python tests use fake adapters and the Electron
+  suites run on a fake brain, so synthesis and transcription run only on a real machine. See [voice.md](voice.md#tests-that-pin-it).

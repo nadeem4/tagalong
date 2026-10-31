@@ -765,8 +765,8 @@ turn loop, not a guard (see [What a turn does](#what-a-turn-does)).
 
 The brain hears the mic itself. A body sends `listen {mode}`, then `mic {pcm}` frames (16 kHz
 int16, base64), and gets `heard` and `voice` back; the contract is in
-[protocol/README.md](../protocol/README.md). The desktop still uses its own voice process until a
-later slice switches it over. The body keeps deciding what a heard turn means (addressing,
+[protocol/README.md](../protocol/README.md). The desktop uses it: it
+streams the mic and has no speech model of its own. The body keeps deciding what a heard turn means (addressing,
 follow-up) and sends the words as an ordinary `say` with `spoken: true`.
 
 Audio goes only to your own brain and is never stored; with the brain on this computer it never
@@ -825,8 +825,8 @@ while someone speaks, but a slower computer will lag.
 
 ## Brain mouth
 
-A spoken reply is read aloud on the body that shows it. The desktop still speaks with its own
-voice process until a later slice switches it over.
+A spoken reply is read aloud on the body that shows it. The desktop plays what the
+brain sends and falls back to the system voice for a text-only `speech` frame.
 
 - **Which turns.** A `say` with `spoken: true` makes its turn spoken (a spoken `say` that joins a
   running typed turn makes it spoken from then on). `Session` passes that turn's `reply`

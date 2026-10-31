@@ -1,7 +1,7 @@
 /**
  * Scout's voice slots: Ears turn the microphone into words and a Mouth turns an answer into
  * speech. Contains the slot interfaces, the adapter ids and Pushable. Imports nothing, so
- * desktop main, the voice process and the windows all share it.
+ * desktop main, the brain and the windows all share it.
  */
 
 /** The microphone, as the ears take it: one frame after another until it closes. */

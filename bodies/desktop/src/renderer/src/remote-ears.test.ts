@@ -73,7 +73,7 @@ describe('RemoteEars', () => {
   it('says so when listening could not start', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const host = fakeHost();
-    host.earsListen.mockRejectedValueOnce(new Error('no voice process'));
+    host.earsListen.mockRejectedValueOnce(new Error('brain offline'));
     new RemoteEars(host, 'held').listen(new Pushable<Float32Array>());
     await tick();
     expect(warn).toHaveBeenCalledWith('[ears] could not start', expect.any(Error));

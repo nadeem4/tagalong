@@ -53,7 +53,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 `index.ts` runs at import time, before the app is ready:
 
-1. With `TAGALONG_FAKE_STT=1` it appends Chromium's `use-fake-device-for-media-stream` and
+1. With `TAGALONG_FAKE_MIC=1` it appends Chromium's `use-fake-device-for-media-stream` and
    `use-fake-ui-for-media-stream` switches (a fake microphone for tests).
 2. `app.requestSingleInstanceLock()`. A second launch quits at once; the first gets
    `second-instance` and runs `showPets()` (shows the pet and the bubble with focus). This happens before anything else.
@@ -74,10 +74,10 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
    mark on `IPC.statusMarkEvent`).
 4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
    throws and never blocks boot: if the brain is not running, the client retries every 2 s.
-5. Creates the `VoiceWorker` (a `utilityProcess.fork` of `voice-worker.js`, started lazily; see
+5. Creates the voice bridge (`createVoiceBridge`; hearing and speaking happen in the brain, see
    [voice.md](voice.md)) and the `Desktop` record, including the tray, the `HotkeyManager` and the
    `TalkKeyWatch`.
-6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
+6. Wires the sight pause, Always listening, the listening guard and the voice bridge's notifications, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
    `applyHotkeys(settings)`. The desktop makes no launch greeting of its own; the brain decides
@@ -203,15 +203,15 @@ Rules each module enforces:
 - `showPanelQuietly(panel, avatar)`: `placePanel`, `showInactive()`. The bubble appears without
   taking focus from the app the person is typing in.
 
-| Trigger                                                                   | Shown with                                                            |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Ask hotkey or tray click (`openPanelWithContext`)                         | `showPanelBeside`                                                     |
-| Click on the pet (`IPC.openBubble`, `IPC.togglePanel` when hidden)        | `showPanelBeside`                                                     |
-| Second launch (`showPets`)                                                | `showPanelBeside`                                                     |
-| `connector.confirm`                                                       | `showPanelBeside` (via `bringUpBubble(true)`)                         |
-| `pet.remark`                                                              | `showPanelQuietly`                                                    |
-| Talk key held (`talkPressed`)                                             | `showPanelQuietly`                                                    |
-| Words addressed to Scout from Always listening (`forwardEars` `onSpoken`) | `showPanelQuietly`, only when the pet is visible and the panel hidden |
+| Trigger                                                                         | Shown with                                                            |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Ask hotkey or tray click (`openPanelWithContext`)                               | `showPanelBeside`                                                     |
+| Click on the pet (`IPC.openBubble`, `IPC.togglePanel` when hidden)              | `showPanelBeside`                                                     |
+| Second launch (`showPets`)                                                      | `showPanelBeside`                                                     |
+| `connector.confirm`                                                             | `showPanelBeside` (via `bringUpBubble(true)`)                         |
+| `pet.remark`                                                                    | `showPanelQuietly`                                                    |
+| Talk key held (`talkPressed`)                                                   | `showPanelQuietly`                                                    |
+| Words addressed to Scout from Always listening (`createVoiceBridge` `onSpoken`) | `showPanelQuietly`, only when the pet is visible and the panel hidden |
 
 The talk key must not take focus: its release comes from the key hook in main, and a focused
 bubble would swallow the shortcut the person meant if the press turns into Right Ctrl+C.
@@ -311,20 +311,20 @@ use the brain client directly; the rest call brain tools through `callJson`. A g
 (`ipc/ipc-channels.test.ts`) fails when a channel in `shared/ipc.ts` is not used by both main and
 the preload, so a dead channel cannot linger.
 
-| Module           | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                         | Brain calls / notes                                                                                                                                                                                                                                                                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `turns.ts`       | `ask` (`ask`), `interrupt` (`interrupt`)                                                                                                                                                                                     | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `interrupt`                                                                                                                                                                                                                                              |
-| `scout.ts`       | `listPets` (`pets:list`)                                                                                                                                                                                                     | The one fixed local Scout, no brain call                                                                                                                                                                                                                                                                                                             |
-| `connections.ts` | `approveTool` (`tool:approve`), `answerJobAsk`, `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `signInConnection`                                                      | `approveTool` goes to the brain client's `answer` (`once`, `always` or `deny`); the connection calls go through `callJson` to the brain's `list_apps`, `add_app` (params parsed with `AppAddParams` first), `set_app_enabled`, `restart_app` and `remove_app`, and reject with `brain offline` while offline; `signInConnection` calls `sign_in_app` |
-| `spend.ts`       | `usageSummary` (`usage:summary`)                                                                                                                                                                                             | brain tool `spend_today` (parsed as `SpendToday`; a bad answer throws)                                                                                                                                                                                                                                                                               |
-| `memory.ts`      | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                             | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
-| `permissions.ts` | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                  | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
-| `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                            | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
-| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`)                                                                                                                                                                   | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
-| `voice.ts`       | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent` | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
-| `browser.ts`     | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                            | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
-| `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`, `fromWindow`                                                                                                                                                                                                                                                                                                    |
-| `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
+| Module           | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                                       | Brain calls / notes                                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turns.ts`       | `ask` (`ask`), `interrupt` (`interrupt`)                                                                                                                                                                                                   | `ask` (with `pendingSnapshot`, and `snapshot.dropped` from `takeDrop()` when `drop: true`), `interrupt`                                                                                                                                                                                                                                              |
+| `scout.ts`       | `listPets` (`pets:list`)                                                                                                                                                                                                                   | The one fixed local Scout, no brain call                                                                                                                                                                                                                                                                                                             |
+| `connections.ts` | `approveTool` (`tool:approve`), `answerJobAsk`, `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `signInConnection`                                                                    | `approveTool` goes to the brain client's `answer` (`once`, `always` or `deny`); the connection calls go through `callJson` to the brain's `list_apps`, `add_app` (params parsed with `AppAddParams` first), `set_app_enabled`, `restart_app` and `remove_app`, and reject with `brain offline` while offline; `signInConnection` calls `sign_in_app` |
+| `spend.ts`       | `usageSummary` (`usage:summary`)                                                                                                                                                                                                           | brain tool `spend_today` (parsed as `SpendToday`; a bad answer throws)                                                                                                                                                                                                                                                                               |
+| `memory.ts`      | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                                           | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
+| `permissions.ts` | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                                | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
+| `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                                          | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
+| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`)                                                                                                                                                                                 | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
+| `voice.ts`       | `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `hush`, `speakSample`, `getListening`, `setListening`, `setFollowUp`, `voiceModels`; `createVoiceBridge` sends `earsEvent`, `earsStatusEvent`, `speechChunk`, `speechDone` | The brain's `listen`, `mic`, `unlisten`, `hush` and its `speak_sample` tool. See [voice.md](voice.md)                                                                                                                                                                                                                                                |
+| `browser.ts`     | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                                          | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
+| `handle.ts`      | none                                                                                                                                                                                                                                       | `IpcHandle`, `IpcOn`, `IpcListener`, `fromWindow`                                                                                                                                                                                                                                                                                                    |
+| `fake-ipc.ts`    | none                                                                                                                                                                                                                                       | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
 `HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `appVersion`,
 `hotkeyError` and `platform` (`process.platform`).
@@ -514,8 +514,6 @@ is tested in plain Node with no display. `nut-js` and `get-windows` are imported
   300 characters (`MAX_LINE`).
 - `rendererConsole(details)` takes a window's `console-message`: level `warning` becomes
   `console.warn('[renderer] …')`, `error` becomes `console.error`; others are dropped.
-- The voice process
-  posts its kept text as a `{ kind: 'log' }` message, logged in main as `[voice process] …`.
 - `openLogsFolder(dir, open)` makes the folder, then `shell.openPath` on it (`IPC.openLogsFolder`,
   the health card's Open logs folder). No log text crosses IPC.
 
@@ -525,15 +523,14 @@ Review rule for call sites: never put speech, screen or file text in a warning's
 
 `electron.vite.config.ts` builds three targets:
 
-- **main**: two entries, `main` (`src/main/index.ts`) and `voice-worker`
-  (`src/main/voice/worker/main.ts`), to `dist/main.js` and `dist/voice-worker.js`, ES modules.
+- **main**: one entry, `main` (`src/main/index.ts`), to `dist/main.js`, an ES module.
   `externalizeDepsPlugin({ exclude: WORKSPACE_PACKAGES })` keeps the app's `dependencies`
   external and bundles `@tagalong/ui`. They compile with
   `moduleResolution: bundler`, so their emitted relative imports have no file extension and Node's
   ESM loader could not resolve them at runtime; Rollup resolves them at build time instead.
   `rollupOptions.external: NATIVE_DEPS` keeps the native modules out of the bundle even when a
   workspace package imports them:
-  `NATIVE_DEPS = ['get-windows', 'onnxruntime-node', 'uiohook-napi']`. Pure
+  `NATIVE_DEPS = ['get-windows', 'uiohook-napi']`. Pure
   JavaScript dependencies of the workspace packages (`ws`) are inlined. The
   build defines `process.env.WS_NO_BUFFER_UTIL` and `WS_NO_UTF_8_VALIDATE` as `"1"`: Vite would
   otherwise replace `ws`'s absent optional addons with an empty object, and the main process would
@@ -547,10 +544,8 @@ Review rule for call sites: never put speech, screen or file text in a warning's
   there is no Fast Refresh in development.
 
 The workspace packages are `devDependencies` of `bodies/desktop`. Its `dependencies` are exactly what
-the packaged app loads at runtime: `@huggingface/transformers` 3.8.1, `@nut-tree-fork/nut-js`
-4.2.6, `get-windows` 9.3.0, `kokoro-js` 1.2.1, `onnxruntime-node` 1.21.0
-(the version `@huggingface/transformers` pins, so one ONNX runtime serves every voice model) and
-`uiohook-napi` 1.5.5 (the talk key's hook). electron-builder copies the `dependencies` tree into
+the packaged app loads at runtime: `@nut-tree-fork/nut-js` 4.2.6, `get-windows` 9.3.0 and
+`uiohook-napi` 1.5.5 (the talk key's hook). The speech models are not here: the brain runs them. electron-builder copies the `dependencies` tree into
 the installer, so listing the workspace packages there would ship their trees twice.
 
 Bean's frames are WebP strips under `src/renderer/src/bean/`, loaded with
@@ -567,7 +562,7 @@ by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate 
 | `appId`, `productName` | `dev.tagalong.desktop`, `Tagalong` (`productName` also names the user data folder, `%APPDATA%\Tagalong`)                                                                               |
 | `files`                | `dist/**/*`, `package.json`                                                                                                                                                            |
 | `asar`                 | `true`                                                                                                                                                                                 |
-| `asarUnpack`           | `**/*.node`, `**/node_modules/onnxruntime-node/bin/**`, `**/node_modules/@img/**`                                                                                                      |
+| `asarUnpack`           | `**/*.node`                                                                                                                                                                            |
 | `npmRebuild`           | `false`: every native module ships an N-API binary, which Electron loads as is                                                                                                         |
 | `publish`              | `null`: no update channel                                                                                                                                                              |
 | `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked)                                                                                                 |
@@ -631,12 +626,10 @@ The desktop host writes:
 - Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, hotkeys, voice and the other settings
   in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
-- Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
-  [voice.md](voice.md).
 
 Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is
-in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the voice
-worker, the listening-guard and presence timers, records
+in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the
+listening-guard and presence timers, records
 the clean close and stops the brain client.
 
 ## Failure handling

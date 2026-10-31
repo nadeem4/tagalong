@@ -1,5 +1,5 @@
 /**
- * RemoteEars: the Ears interface for a renderer window. The ears run in the voice process;
+ * RemoteEars: the Ears interface for a renderer window. The ears run in the brain;
  * mic frames go out and heard words come back over IPC. Used by talk.ts and voice-seam.ts.
  */
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/ui/shapes';

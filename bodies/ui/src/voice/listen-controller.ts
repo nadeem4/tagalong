@@ -64,7 +64,7 @@ interface Session {
   live: boolean;
   /**
    * Held: the key was let go. Every window hears the one stream of the ears' events, and the
-   * voice process runs sessions one after another, so a turnEnd can belong to the session
+   * The brain runs sessions one after another, so a turnEnd can belong to the session
    * before this one: a held session takes a turnEnd only once it has been released.
    */
   released: boolean;
@@ -112,7 +112,7 @@ export class ListenController {
   hold(): void {
     this.closeFollowUp();
     if (this.#session?.mode === 'held') return;
-    // The voice process runs sessions in order: the always session stops before this one listens.
+    // The brain runs sessions in order: the always session stops before this one listens.
     this.#end();
     this.#start('held');
   }
@@ -135,7 +135,7 @@ export class ListenController {
 
   /**
    * Drops the question being asked, and any released question whose words have not come
-   * (the bubble closed, a voice process that died): none of them is heard later. Always
+   * (the bubble closed, the brain going offline): none of them is heard later. Always
    * listening is not a question: it goes on (or comes back after the held one).
    */
   cancel(): void {
@@ -146,11 +146,11 @@ export class ListenController {
   }
 
   /**
-   * The ears failed (the first download offline, models that would not start): every
+   * The ears failed (models that would not load): every
    * question is dropped and the mic closes. Always listening stays switched on but does not
    * retry at once, which would fail again: it retries on its own after a wait (30 s, then
    * doubling up to five minutes), or sooner on the next switch, call or system voice (the
-   * voice process tries its download again). Returns what was listening.
+   * brain loads its models again). Returns what was listening.
    */
   earsFailed(): ListenMode | null {
     const mode = this.mode;
@@ -257,7 +257,7 @@ export class ListenController {
 
   /**
    * Always: words heard while a released question still waits are that question's, as the
-   * voice process runs sessions in order; only talk addressed to Scout counts, and it cuts
+   * The brain runs sessions in order; only talk addressed to Scout counts, and it cuts
    * Scout off once per turn. A partial that may still become "stop" ("Scout, st") is not
    * addressed yet: it neither cuts Scout off nor shows.
    */
@@ -321,7 +321,7 @@ export class ListenController {
         return;
       }
       if (!session.released) return;
-      // The voice process ends sessions in order: a turnEnd is the oldest released question's.
+      // The brain ends sessions in order: a turnEnd is the oldest released question's.
       if (this.#taken || this.#released.values().next().value !== session) return;
       this.#taken = true;
       queueMicrotask(() => (this.#taken = false));

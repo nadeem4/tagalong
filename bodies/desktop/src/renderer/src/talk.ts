@@ -46,7 +46,7 @@ function mark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): void {
 /**
  * Talk to Scout in the panel: the talk key (held; main sees it go down and up) or the mic
  * button opens the microphone,
- * its frames stream to the ears in the voice process, the words heard so far show as they
+ * its frames stream to the ears in the brain, the words heard so far show as they
  * come, and letting go hands the question to the bubble. With Always listening switched on
  * (read at mount, so a launch with it on listens from the start) the microphone stays open
  * as well, closed during a call or full screen, while Scout is hidden and while the system

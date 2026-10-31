@@ -275,7 +275,7 @@ export interface TagalongHostApi {
   onTalkRelease(handler: () => void): () => void;
   /** Fires when another key went down while the talk key was held: the mic closes, nothing is sent. */
   onTalkCancel(handler: () => void): () => void;
-  /** Listening starts in the voice process; a held question first notes the window you are on. */
+  /** Listening starts in the brain; a held question first notes the window you are on. */
   earsListen(mode: ListenMode): Promise<void>;
   /** One 16 kHz mono frame from the microphone, for the ears. Never kept. */
   micFrame(samples: Float32Array): void;

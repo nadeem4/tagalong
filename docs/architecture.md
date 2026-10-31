@@ -34,7 +34,6 @@ flowchart LR
   subgraph Electron["Tagalong desktop app"]
     R["Renderer windows<br>avatar, panel, home"]
     M["Electron main<br>BrainClient, platform,<br>tray, hotkeys, talk key"]
-    V["Voice utility process<br>Kokoro, local ears"]
   end
   subgraph Chrome["Chrome or Edge"]
     SW["Browser body service worker<br>BrainClient"]
@@ -45,21 +44,19 @@ flowchart LR
   X["Model providers,<br>Claude Code, MCP servers"]
   R -- "IPC via preload" --> M
   M -- "ws://127.0.0.1:47321" --> P
-  M -- "parentPort messages" --> V
   SW -- "ws://127.0.0.1:47321" --> P
   PU -- "runtime messages" --> SW
   CS -- "page text" --> SW
   P --> X
 ```
 
-| Process                | Entry point                                    | What runs there                                                                                                                                                                                   |
-| ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main          | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers                            |
-| Renderer windows       | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                                      |
-| Voice utility process  | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)                      |
-| Browser service worker | `bodies/browser/src/service-worker.ts`         | The browser body's one `BrainClient` socket to the brain; runs the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, the right-click and address-bar asks, and asks for permissions |
-| Browser popup          | `bodies/browser/src/popup/popup.html`          | Link status, brain address, browser name, what has been allowed (talks to the worker by runtime message)                                                                                          |
-| Browser page reader    | `bodies/browser/src/content/page-reader.ts`    | Injected on demand to read a page's readable text (Readability)                                                                                                                                   |
+| Process                | Entry point                                 | What runs there                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron main          | `bodies/desktop/src/main/index.ts`          | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers                            |
+| Renderer windows       | `bodies/desktop/src/renderer/*.html`        | One page per window: `avatar`, `panel` (the bubble), `home` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                                      |
+| Browser service worker | `bodies/browser/src/service-worker.ts`      | The browser body's one `BrainClient` socket to the brain; runs the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, the right-click and address-bar asks, and asks for permissions |
+| Browser popup          | `bodies/browser/src/popup/popup.html`       | Link status, brain address, browser name, what has been allowed (talks to the worker by runtime message)                                                                                          |
+| Browser page reader    | `bodies/browser/src/content/page-reader.ts` | Injected on demand to read a page's readable text (Readability)                                                                                                                                   |
 
 How they connect:
 
@@ -70,10 +67,9 @@ How they connect:
 - **Main to brain.** `BrainClient` dials `ws://${TAGALONG_BRAIN_ADDR}` (default 127.0.0.1:47321) and
   retries every 2 s. There is no pairing token. Brain notifications are mapped to turn events and
   forwarded to every window as `IPC.turnEvent` by `forwardToRenderers` in `main/index.ts`.
-- **Main to voice process.** Numbered `call` messages and plain events over the utility
-  process's `parentPort` (`voice/worker/messages.ts`). The process starts on first need; if it
-  dies, waiting calls fail at once and the next call starts a fresh one. Details in
-  [voice.md](voice.md).
+- **Voice.** Also through the brain. Main forwards the microphone to it as `mic` frames and
+  relays its `heard`, `voice` and `speech` frames to the windows; the panel plays the audio. There
+  is nothing voice-specific running in Electron. Details in [voice.md](voice.md).
 - **Browser to brain.** The service worker owns a `BrainClient` socket (default
   `127.0.0.1:47321`, the same address as the desktop), with a keepalive call every 20 s so the
   worker stays awake. See [browser-body.md](browser-body.md).
@@ -106,8 +102,8 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 | `bodies/desktop` | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings store                                                                                                            |                                                  |                                                                                                                                                   |
 | `bodies/browser` | Browser body (Chromium MV3): the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, right-click and address-bar asks, permission window, popup; speaks the brain contract through `@tagalong/contract` | `@tagalong/ui`                                   | Not a dependency and not a project reference                                                                                                      |
 
-`@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process, the
-voice process and the UI share: addressing, apps, context, memory, pet, status marks, turn events
+`@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process and the
+UI share: addressing, apps, context, memory, pet, status marks, turn events
 and voice ids. It has no React, so main can import it. The desktop's own files are
 `bodies/desktop/src/shared/{settings,blind-spots,voice}.ts`.
 
@@ -116,7 +112,7 @@ than adding to them, so for `protocol/ts` the lint list is exactly `electron`, `
 and `@tagalong/*`.
 
 The desktop bundles the workspace packages into its main, preload and renderer builds with
-electron-vite; only the native dependencies stay external (`get-windows`, `onnxruntime-node`,
+electron-vite; only the native dependencies stay external (`get-windows` and
 `uiohook-napi`; `bodies/desktop/electron.vite.config.ts`). See [desktop.md](desktop.md).
 
 ## Body contracts
@@ -147,7 +143,7 @@ pairing or TLS yet (single user).
    (`captureAskSnapshot` in `main/context.ts`: the front window and the selection, no pixels) and
    opens the bubble; a click on the figure opens it with nothing captured. Typing or the talk key
    produces the text: the talk key is watched by a key hook in main (`main/talk-key.ts`), the
-   microphone runs in the renderer, and the voice process transcribes ([voice.md](voice.md)). The
+   microphone runs in the renderer, and the brain transcribes it ([voice.md](voice.md)). The
    bubble sends `IPC.ask`; `registerTurnIpc` (`main/ipc/turns.ts`) adds the pending snapshot, or a
    dropped item when a drop card's button sent it, and sends the ask to the brain.
 2. **Turn.** The brain runs the turn: prompt, model, tools, asks. It answers only with
@@ -155,10 +151,10 @@ pairing or TLS yet (single user).
 3. **Bubble.** Main maps the brain's notifications to turn events (`main/brain/turn-events.ts`)
    and forwards each to every window as `IPC.turnEvent` (`forwardToRenderers` in `main/index.ts`).
    See [bubble.md](bubble.md).
-4. **Voice.** The bubble hands each finished line to the desktop's mouth; the renderer calls
-   `IPC.speak` (`renderer/src/voice-player.ts`), main synthesises with Kokoro in the voice process
-   or answers `fallback` for the system voice, and the window plays the audio.
-   See [voice.md](voice.md).
+4. **Voice.** A question asked by voice carries `spoken: true`, so the brain speaks the answer with
+   Kokoro and sends `speech` frames. Main relays them as `IPC.speechChunk` and the panel's
+   `SpeechPlayer` (`renderer/src/voice-player.ts`) plays them, or speaks a text-only frame with the
+   system voice. Stop sends `hush`. See [voice.md](voice.md).
 
 ## Boot and shutdown
 
@@ -167,7 +163,7 @@ sight pause, opens the settings, records the launch, then
 calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
 retrying while it is down. The panel and the avatar are created next.
 
-On `before-quit` the desktop disposes the hotkeys, the talk key hook, the voice process, presence,
+On `before-quit` the desktop disposes the hotkeys, the talk key hook, presence,
 records a clean close and closes the brain client.
 
 ## Subsystem map
@@ -200,16 +196,16 @@ flowchart LR
   DK --> SS
 ```
 
-| Doc                                                | Covers                                                                                 | Main code                                                                                                        |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| [protocol/README.md](../protocol/README.md)        | Contract v1 between the brain and the bodies                                           | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                 |
-| [brain.md](brain.md)                               | The Python brain: files, tools, asks, experts, memory, the mind                        | `brain/src/brain`                                                                                                |
-| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file             | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                           |
-| [bubble.md](bubble.md)                             | The companion bubble, status marks, drops                                              | `bodies/ui/src`                                                                                                  |
-| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
-| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight                                  | `bodies/desktop/src/main/platform`                                                                               |
-| [memory.md](memory.md)                             | The memory store                                                                       | `brain/src/brain/memory.py`                                                                                      |
-| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `brain/src/brain/apps.py`, `app_tools.py`                                                                        |
-| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                             |
-| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, hiding secrets in logs                                                 | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                   |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                 |
+| Doc                                                | Covers                                                                     | Main code                                                                                                                            |
+| -------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [protocol/README.md](../protocol/README.md)        | Contract v1 between the brain and the bodies                               | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                                     |
+| [brain.md](brain.md)                               | The Python brain: files, tools, asks, experts, memory, the mind            | `brain/src/brain`                                                                                                                    |
+| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                                               |
+| [bubble.md](bubble.md)                             | The companion bubble, status marks, drops                                  | `bodies/ui/src`                                                                                                                      |
+| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, barge-in, the system voice  | `main/ipc/voice.ts`, `renderer/src/voice-player.ts`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
+| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight                      | `bodies/desktop/src/main/platform`                                                                                                   |
+| [memory.md](memory.md)                             | The memory store                                                           | `brain/src/brain/memory.py`                                                                                                          |
+| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                          | `brain/src/brain/apps.py`, `app_tools.py`                                                                                            |
+| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install   | `bodies/browser/src`                                                                                                                 |
+| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, hiding secrets in logs                                     | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                                       |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                   | across the above                                                                                                                     |

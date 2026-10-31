@@ -220,29 +220,29 @@ writes outside a block is spoken, whether you typed or spoke, with no length cap
 the stop button and the talk key cut it off at once. Never the screen, the window list, the
 question or the conversation. A health check and an expert's narration are shown, never spoken.
 
-**Reading aloud.** When you ask Scout to read something to you, it reads your selection or the
-window in front (as for any question about your screen) and says that text, typed or spoken; for
-something long it may give the gist first and ask what you want read. So the text of that window or selection goes to the
-chosen speech engine, and it stays on this computer with Kokoro or the system voice. With **Scout talks** off, the reading is only shown
-in the bubble.
+**Reading aloud.** When you ask Scout something by voice, it says its answer aloud. If you ask it
+to read something to you, it reads your selection or the window in front (as for any question
+about your screen). So the text of that answer goes to the speech engine, and it stays with your
+brain (Kokoro) or on this computer (the system voice). A question you type is answered in the
+bubble only, and with **Scout talks** off nothing is read aloud.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
-  B["Bubble line"] --> S["Shortened in the panel"]
-  S --> M["Main process"]
-  M -->|"default"| K["Kokoro on this computer"]
-  M -->|"model still downloading, or failed"| W["System voice in the panel"]
-  K --> P
+  B["Spoken question"] --> M["Your brain"]
+  M -->|"default"| K["Kokoro on your brain"]
+  M -->|"text only, or you chose System voice"| W["System voice in the panel"]
+  K --> P["Audio played in the panel"]
 ```
 
-- **Kokoro, on this computer (default).** The Kokoro-82M model (Apache-2.0, quantised, about
-  92 MB) is downloaded from Hugging Face the first time Scout speaks, into the `voice` folder of
-  the app's data directory (`%APPDATA%\Tagalong\voice` on Windows), and read from there afterwards.
-  The download fetches the model only; no text is sent. Speech is made on the CPU. Its files are
-  checked like the listening models (see **Model files are checked** under "Talking to Scout" below).
-- **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
-  the operating system's own voice (a British male voice such as Microsoft George when installed).
+- **Kokoro, on your brain (default).** The Kokoro-82M model (Apache-2.0, quantised, about 92 MB)
+  is fetched by the brain from Hugging Face the first time it speaks, and read from its own data
+  folder afterwards. The download fetches the model only; no text is sent. Speech is made on the
+  CPU, and its files are checked like the listening models (see **Model files are checked**
+  under "Talking to Scout" below).
+- **The system voice.** If the brain cannot speak, or you chose **System voice** in Settings, the
+  panel speaks through the operating system's own voice (a British male voice such as Microsoft
+  George when installed).
 - Nothing spoken is recorded or stored. Closing the bubble or `Ctrl+Shift+Alt+M` stops speech at
   once.
 
@@ -269,37 +269,32 @@ microphone and sends nothing, because you meant a shortcut.
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   K["Talk key held, mic clicked, or Always listening on"] --> M["Mic (echo cancellation)"]
-  M --> V["Voice process on this computer: VAD, Moonshine, Smart Turn"]
+  M --> V["Your own brain: VAD, Moonshine, Smart Turn"]
   V --> T["Text"]
   T -->|"addressed to Scout, or asked by key or mic button"| P["Scout's provider, like a typed question"]
   T -.->|"not addressed (Always listening)"| D["Dropped"]
   V -.->|"audio dropped as heard"| X["Nothing kept"]
 ```
 
-- **On this computer.** While you talk, the microphone's audio streams in memory, a frame at a
-  time, from the panel through the app to its voice process, where three small models turn it into
-  text on the CPU: Silero VAD (MIT, about 2 MB) spots speech, Moonshine tiny (Useful Sensors, MIT,
-  quantised, about 32 MB) writes the words, shown in the bubble as you talk, and Smart Turn v3.2
-  (Pipecat, BSD-2-Clause, about 9 MB) judges when you have finished. They are about 43 MB in all,
-  downloaded from Hugging Face (`onnx-community/silero-vad`, `onnx-community/moonshine-tiny-ONNX`,
-  `pipecat-ai/smart-turn-v3`) the first time you talk to Scout, into the same `voice` folder as the
-  voice. The download fetches the models only; no audio is sent.
-- **Model files are checked.** Every model file (listening and Kokoro) is fetched from one fixed
-  Hugging Face commit, never from a branch that can move, and must match a SHA-256 written into the
-  app. A file that does not match is never kept: it is deleted and fetched once more. If the
-  listening models are still wrong, the bubble says "The speech model download was damaged.
-  Check the connection."; if Kokoro's are and Kokoro is the chosen voice, Scout keeps speaking in the system voice. The files on disk are checked again once each
-  time the voice process starts. The model library is told never to fetch anything itself, so it
-  only reads files that were checked. Kokoro's voices come with the app's own packages. A copy
-  already on disk is checked like any other and replaced if it does not match.
-- **The audio never leaves the computer and is never stored.** It lives in memory until it has been
-  turned into text, and is then dropped. Before you start to speak, only the last quarter of a
-  second is held in memory (so the first syllable of a word is not cut off), each frame dropped as
-  a newer one comes. Only the text goes on, to Scout's provider, exactly as if
-  you had typed it, with the name of the window you are on (never the selected text).
+- **Your own brain.** While you talk, the microphone's audio streams in memory, a frame at a time,
+  from the panel through the app to your brain, where three small models turn it into text on the
+  CPU: Silero VAD (MIT, about 2 MB) spots speech, Moonshine tiny (Useful Sensors, MIT, quantised,
+  about 32 MB) writes the words, shown in the bubble as you talk, and Smart Turn v3.2 (Pipecat,
+  BSD-2-Clause, about 9 MB) judges when you have finished. The app itself holds no speech model.
+- **Model files are checked.** The brain fetches its model files (listening and Kokoro) from one
+  fixed Hugging Face commit, never from a branch that can move, and each must match a SHA-256
+  written into the brain. A file that does not match is never kept. The download fetches the
+  models only; no audio is sent. If the models cannot load, the bubble says so, and Scout keeps
+  speaking in the system voice when Kokoro is the one that failed.
+- **Audio goes only to your own brain and is never stored; with the brain on this computer it never
+  leaves it.** It lives in memory until it has been turned into text, and is then dropped. Before
+  you start to speak, only the last quarter of a second is held in memory (so the first syllable
+  of a word is not cut off), each frame dropped as a newer one comes. Only the text goes on, to
+  Scout's provider, exactly as if you had typed it, with the name of the window you are on (never
+  the selected text).
 - The microphone is the one picked in Settings → Voice, or the system default. Windows' own
   microphone privacy setting applies.
-- There is no cloud speech to text: Scout's voice is made on this computer, and your voice is never sent anywhere.
+- There is no cloud speech to text: Scout's voice is made by your brain, and your voice is never sent to anyone else.
 
 ### Always listening
 
@@ -456,16 +451,14 @@ wrong. It never leaves your computer on its own.
 - **Where.** `%APPDATA%\Tagalong\logs\tagalong.log`. The health card ("Scout, what's wrong?") has
   **Open logs folder**, which only opens the folder: you choose what to send, and no log text is
   copied anywhere.
-- **What is written.** Only the desktop app's warnings and errors: main's, the windows' (marked `[renderer]`) and the voice process's
-  (marked `[voice process]`). Each is a time, `WARN` or `ERROR`, the app's own fixed text and, for
+- **What is written.** Only the desktop app's warnings and errors: main's, the windows' (marked `[renderer]`). Each is a time, `WARN` or `ERROR`, the app's own fixed text and, for
   an error, its name and message, for example
   `2026-10-16T21:40:00.000Z WARN [main] could not save Always listening Error: EPERM`. When Always
   listening pauses for a call or a full-screen window, one line says so with the app's process
   name (for example `Code`), never the window's title, and one more when it resumes.
 - **What is never written.** Anything passed along with a warning other than an error (an object, a
   turn, a second piece of text) becomes just its type, such as `[object]`, so what you said, what
-  is on your screen, file contents and Scout's answers never reach the file. The voice process
-  sends main only that kept text. A window's warning arrives as one line Chromium has already put
+  is on your screen, file contents and Scout's answers never reach the file. A window's warning arrives as one line Chromium has already put
   together, so there it is the app's own rule (no speech, screen or file text in a warning) that
   keeps it clean. Nothing is logged on ordinary use.
 - **Secrets are hidden** with the same rules as everything sent to a brain (a key becomes
