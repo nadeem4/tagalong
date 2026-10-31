@@ -20,7 +20,9 @@ describe('StepFive', () => {
   it('talk key choices are exactly Right Ctrl, Right Alt, Right Shift, Scroll Lock', async () => {
     mount();
     const select = await screen.findByLabelText('Talk key');
-    const options = within(select).getAllByRole('option').map((option) => option.textContent);
+    const options = within(select)
+      .getAllByRole('option')
+      .map((option) => option.textContent);
     expect(options).toEqual(['Right Ctrl', 'Right Alt', 'Right Shift', 'Scroll Lock']);
   });
 

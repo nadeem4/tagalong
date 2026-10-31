@@ -9,8 +9,8 @@ export function StepOne() {
       <h1>One companion for all your AI tools</h1>
       <p className="wt-lead">
         No more copying from one AI tool, pasting into another and carrying the answer back. Scout
-        sits on your screen, sees what you’re working on when you let it, and hands real work to
-        the right expert. The result comes back to where you are.
+        sits on your screen, sees what you’re working on when you let it, and hands real work to the
+        right expert. The result comes back to where you are.
       </p>
       <div className="wt-cols">
         <ul className="wt-facts">

@@ -50,9 +50,7 @@ function AskForm({
             <>
               <label htmlFor="wt-ask">Ask key</label>
               <input id="wt-ask" value={ask} onChange={(event) => setAsk(event.target.value)} />
-              <p className="wt-help">
-                Use CommandOrControl, Shift, Alt and a key, joined with +.
-              </p>
+              <p className="wt-help">Use CommandOrControl, Shift, Alt and a key, joined with +.</p>
             </>
           ) : (
             <>

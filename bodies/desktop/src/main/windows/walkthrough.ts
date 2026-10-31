@@ -1,5 +1,6 @@
 /**
- * The first-run walkthrough's window: frameless, about 1040x680, navy behind the page. Contains
+ * The first-run walkthrough's window: about 1040x680 with no title bar of its own, only the
+ * system's close button over the page (Escape does not close it). Contains
  * createWalkthroughWindow. Closing it never marks the walkthrough seen; that is Finish and Skip.
  */
 
@@ -12,12 +13,16 @@ export function createWalkthroughWindow(step?: number): BrowserWindow {
     width: 1040,
     height: 680,
     useContentSize: true,
-    frame: false,
+    // Frameless would leave no way to close it, since Escape does nothing here; the overlay
+    // keeps the system's own buttons over the page's 40px top strip.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#F6F7FB', symbolColor: '#12162B', height: 40 },
     resizable: false,
+    maximizable: false,
     show: false,
     center: true,
     title: 'Welcome to Tagalong',
-    backgroundColor: '#0f1b33',
+    backgroundColor: '#F6F7FB',
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

@@ -13,6 +13,8 @@ interface AvatarWindowOptions {
   position: RememberedPosition;
   /** Called after the user drags the pet, so settings can remember where they left it. */
   onMoved: (position: Point) => void;
+  /** False opens it hidden, for a launch that starts with the walkthrough. Default true. */
+  show?: boolean;
 }
 
 /**
@@ -42,6 +44,7 @@ export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow 
   const window = new BrowserWindow({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
+    show: options.show ?? true,
     x,
     y,
     transparent: true,

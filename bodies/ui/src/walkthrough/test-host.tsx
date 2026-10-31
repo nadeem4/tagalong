@@ -49,7 +49,9 @@ export function makeWalkthroughHost(
 export function mountStep(step: ReactElement): { save(): Promise<void> } {
   let registered: (() => Promise<void>) | null = null;
   render(
-    <StepSaveContext.Provider value={(save) => (registered = save)}>{step}</StepSaveContext.Provider>,
+    <StepSaveContext.Provider value={(save) => (registered = save)}>
+      {step}
+    </StepSaveContext.Provider>,
   );
   return { save: async () => registered?.() };
 }

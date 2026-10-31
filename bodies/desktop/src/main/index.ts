@@ -64,6 +64,7 @@ import {
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
 import { createWalkthroughWindow } from './windows/walkthrough';
+import { petsVisible, shouldOpenWalkthrough } from './walkthrough-gate';
 import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connections';
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
@@ -392,12 +393,15 @@ async function start(): Promise<void> {
   desktop.avatar = createAvatarWindow({
     position: settings.avatar,
     onMoved: (position) => rememberAvatarSpot(position),
+    // The walkthrough opens first on a launch that has not finished it; the pet waits.
+    show: !shouldOpenWalkthrough(settings),
   });
   // The pets hidden (the tray's Hide pets): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));
   avatar.on('hide', () => pauseListening({ petsShown: false }));
   pauseListening({ petsShown: avatar.isVisible() });
+  if (shouldOpenWalkthrough(settings)) openWalkthrough();
   // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
   // The brain hears of a return after the same 5-minute idle, and of the front window changing.
   const sendToBrain = (name: string, data: unknown): boolean =>
@@ -526,7 +530,7 @@ function toPanel(channel: string): void {
  */
 function talkPressed(): void {
   if (desktop === null) return;
-  if (desktop.panel === null || desktop.avatar === null) return;
+  if (desktop.panel === null || desktop.avatar === null || petsHidden()) return;
   const { panel, avatar } = desktop;
   if (!panel.isVisible()) {
     avatar.show();
@@ -589,14 +593,14 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
 function bringUpBubble(focus: boolean): boolean {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
-  if (panel == null || avatar == null || panel.isVisible()) return false;
+  if (panel == null || avatar == null || panel.isVisible() || petsHidden()) return false;
   if (focus) showPanelBeside(panel, avatar);
   else showPanelQuietly(panel, avatar);
   return true;
 }
 
 function showPets(): void {
-  if (desktop === null) return;
+  if (desktop === null || petsHidden()) return;
   desktop.avatar?.show();
   if (desktop.panel !== null && desktop.avatar !== null) {
     showPanelBeside(desktop.panel, desktop.avatar);
@@ -620,7 +624,7 @@ function buildTrayMenu(): Menu {
     trayMenuTemplate(
       {
         togglePets: () => {
-          if (desktop?.avatar === null || desktop === null) return;
+          if (desktop?.avatar === null || desktop === null || petsHidden()) return;
           if (desktop.avatar?.isVisible() === true) {
             desktop.avatar.hide();
             desktop.panel?.hide();
@@ -685,9 +689,21 @@ function openWalkthrough(step?: number): void {
   }
   const window = createWalkthroughWindow(step);
   window.on('closed', () => {
-    if (desktop !== null) desktop.walkthroughWindow = null;
+    if (desktop === null) return;
+    desktop.walkthroughWindow = null;
+    // Finish, Skip tour and closing part-way all bring the pet back.
+    const pet = desktop.avatar;
+    if (petsVisible({ walkthroughOpen: false }) && pet != null && !pet.isDestroyed()) pet.show();
   });
   desktop.walkthroughWindow = window;
+  if (desktop.avatar != null && !desktop.avatar.isDestroyed()) desktop.avatar.hide();
+  if (desktop.panel != null && !desktop.panel.isDestroyed()) desktop.panel.hide();
+}
+
+/** Whether the walkthrough is open: the pet, bubble and dock stay hidden meanwhile. */
+function petsHidden(): boolean {
+  const open = desktop?.walkthroughWindow;
+  return !petsVisible({ walkthroughOpen: open != null && !open.isDestroyed() });
 }
 
 /**
@@ -717,6 +733,7 @@ function announceCapture(notice: CaptureNotice): void {
  */
 async function openPanelWithContext(): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
+  if (petsHidden()) return;
 
   const { snapshot, blocked, paused } = await captureAskSnapshot(desktop.platform, {
     exclusions: desktop.settings.captureExclusions,
@@ -735,7 +752,7 @@ async function openPanelWithContext(): Promise<void> {
  * the keyboard and the clipboard only to find Tagalong itself. The hotkeys still capture.
  */
 function openPanelNow(current: Desktop): void {
-  if (current.panel === null || current.avatar === null) return;
+  if (current.panel === null || current.avatar === null || petsHidden()) return;
   current.pendingSnapshot = null;
   current.panel.webContents.send(IPC.contextEvent, null);
   current.avatar.show();

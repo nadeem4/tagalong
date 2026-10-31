@@ -23,13 +23,7 @@ const VOICES: readonly { value: string; label: string }[] = [
 
 const SAMPLE = 'Hi, I’m Scout. This is how I sound.';
 
-function VoiceForm({
-  host,
-  settings,
-}: {
-  host: WalkthroughHost;
-  settings: WalkthroughSettings;
-}) {
+function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: WalkthroughSettings }) {
   const start = settings.voice;
   const startTalk = settings.hotkeys.talk ?? 'RightControl';
   const startMouth = start.mouth === 'system' ? 'system' : 'kokoro';

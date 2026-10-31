@@ -54,4 +54,8 @@ export type { HealthFacts } from './health';
 
 /** The first-run walkthrough window's content. */
 export { Walkthrough } from './walkthrough/walkthrough';
-export type { VoicePreview, WalkthroughHost, WalkthroughSettings } from './walkthrough/walkthrough-host';
+export type {
+  VoicePreview,
+  WalkthroughHost,
+  WalkthroughSettings,
+} from './walkthrough/walkthrough-host';
