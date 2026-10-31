@@ -8,16 +8,7 @@
     "emitDeclarationOnly": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["node"],
-    // React is a @tagalong/ui dependency and this app may not add dependencies of its
-    // own; the renderer borrows the declarations the ui package already resolves. The
-    // vite config points the runtime at that same copy, so there is one React.
-    "paths": {
-      "react": ["../ui/node_modules/@types/react"],
-      "react/*": ["../ui/node_modules/@types/react/*"],
-      "react-dom": ["../ui/node_modules/@types/react-dom"],
-      "react-dom/*": ["../ui/node_modules/@types/react-dom/*"]
-    }
+    "types": ["node"]
   },
   // Bean's manifest is imported by the avatar window; JSON is only included when listed.
   "include": ["src/**/*", "src/renderer/src/bean/manifest.json"],

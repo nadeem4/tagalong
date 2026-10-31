@@ -1052,9 +1052,6 @@ database with `sqlite3` or DB Browser for SQLite.
       token param.
 - [ ] Delete the `<app id>:env:API_KEY` line from `app-tokens.json` and press **Restart**: the row
       says `<name> needs its secret added again.`
-- [ ] Old row: with the brain stopped, edit a row's `config` in `tagalong.db` to hold a literal env
-      secret, start the brain: the secret has moved to `app-tokens.json`, the row is clean, and the
-      app connects.
 - [ ] **Remove** an app with secrets: no `<app id>` or `<app id>:...` key is left in
       `app-tokens.json`.
 - [ ] In the chat, paste `my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz` and
