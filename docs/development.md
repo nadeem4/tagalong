@@ -58,7 +58,7 @@ tagalong/
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts,
                                     # sight-pause.ts, drop.ts, settings-store.ts, hide-secrets.ts,
-                                    # log-file.ts, awareness/, ipc/,
+                                    # log-file.ts, ipc/,
                                     # platform/, voice/, windows/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
@@ -76,7 +76,6 @@ tagalong/
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
       src/shared/                   # settings.ts (Settings schema and defaults), blind-spots.ts, voice.ts
-      src/main/awareness/recall.ts  # the recall result types (plain interfaces)
     browser/                        # browser body (Chromium MV3), built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/body.ts, identity.ts      # the body: one BrainClient, tools, body id <browser>-<4 chars>
@@ -314,12 +313,7 @@ A fresh install starts with one companion, **Scout**, which lives in the Python 
 conversations are the brain's, saved in its own store (see [memory.md](memory.md) and
 [brain.md](brain.md)).
 
-### Rolling memory
-
-Rolling memory's switch and its minutes are in Settings → **Privacy** (**Remember the last few
-minutes of the screen**, **Minutes of screen to remember**) and take effect on save. It is off by
-default. Turn it on and the desktop keeps the last few minutes of every screen in memory, never on
-disk (ten by default, at most thirty). A small red dot on Scout shows while it records.
+### Capture
 
 Capture is never silent. Every capture, including one Scout's own tool asked for, shows on Scout
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the

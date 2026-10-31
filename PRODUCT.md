@@ -51,8 +51,7 @@ its result.
   to talk to Scout.
 - "What do you see?" is answered per screen from the window list, without a screenshot. Scout
   reads one window, or photographs it, only when you ask about it.
-- Ask "tell me when the build finishes" and Scout starts a watch that stops on its own. With
-  screen memory on, it answers "what was on screen a few minutes ago?" and "what changed?". It
+- Ask "tell me when the build finishes" and Scout starts a watch that stops on its own. It
   zooms in on small text and looks at another monitor when asked.
 - Keep an eye on things: every few seconds Scout looks at window titles only. After you settle on
   something new, or a title looks like an error, it may read that window and say one short line,

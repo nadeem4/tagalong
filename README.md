@@ -111,7 +111,7 @@ its bodies fit together.
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             | ElevenLabs voice cost on the Spend card                             |
 |                                                                                                                                                                                                                                                                                                               | Data export and delete-all in Settings                              |
-| Memory across restarts, and rolling screen memory the body keeps (opt-in; the brain cannot read it yet)                                                                                                                                                                                                       | Code signing (the installer is unsigned) and an app icon of its own |
+| Memory across restarts                                                                                                                                                                                                                                                                                        | Code signing (the installer is unsigned) and an app icon of its own |
 | The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, searches history, bookmarks and downloads, acts on tabs, and takes questions from a right-click or the address bar, in Chrome, Edge and other Chromium browsers, after you allow each step |                                                                     |
 
 # Using Tagalong
@@ -233,8 +233,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
   and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
-  - **Privacy**: screen memory (on or off, and how many minutes it keeps) and what Scout never
-    looks at.
+  - **Privacy**: what Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
@@ -271,20 +270,15 @@ Ask Scout about your tabs. The first time it needs something (your tabs, a site,
 so on), a small window asks you. More in
 [The browser body](docs/browser-body.md).
 
-## Screen memory
+## Drop it on Scout
 
-**Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
-small picture of each screen every five seconds, in memory only, for the last ten minutes. A red dot
-on Scout shows while it records. The body keeps the frames, but the brain has no tool that reads them yet, so Scout cannot recall from them.
-
-**Drop it on Scout.** Drag a file, an image, a link or selected text onto Scout and it asks whether
+Drag a file, an image, a link or selected text onto Scout and it asks whether
 to explain it or hand it to an expert. Nothing is read until you press a button, and secrets files
 such as `.env` are refused.
 
 ## Privacy
 
-- Nothing on screen is read until you press a hotkey or ask, except screen memory, which
-  you turn on, and the title of your front window, which the desktop sends to the brain. Every look badges Scout and the tray says what
+- Nothing on screen is read until you press a hotkey or ask, except the title of your front window, which the desktop sends to the brain. Every look badges Scout and the tray says what
   was read and when.
 - **Scout's face** dozes after five minutes with no input or when the screen locks (one idle time
   number from the OS, kept on this computer).
@@ -293,8 +287,7 @@ such as `.env` are refused.
   Desktop. They are always on and listed in Settings; you can add your own.
 - Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
   leaves your computer.
-- Screenshots are not written to disk. Screen memory lives in memory only and are thrown
-  away when you pause sight or quit.
+- Screenshots are not written to disk.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.

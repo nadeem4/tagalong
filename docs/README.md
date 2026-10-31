@@ -27,11 +27,11 @@ source of truth; each doc cites the files it describes. How to build and run fro
 
 ### Perception, memory and apps
 
-| Doc                                    | Covers                                                                                           |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight, rolling memory |
-| [memory.md](memory.md)                 | The memory store, recall, summaries, forgetting, the saved chat                                  |
-| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                                |
+| Doc                                    | Covers                                                                           |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight |
+| [memory.md](memory.md)                 | The memory store, recall, summaries, forgetting, the saved chat                  |
+| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                |
 
 ### Foundations
 

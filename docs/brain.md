@@ -205,7 +205,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.
 - The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
-  settings (hotkeys, listening, rolling memory).
+  settings (hotkeys, listening).
 - Pets are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
 
 ## Toolbox

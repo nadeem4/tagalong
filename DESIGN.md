@@ -17,7 +17,6 @@ colors:
   soft-text: '#C9CEE0'
   done-green: '#7DD87F'
   paused-grey: '#6B7290'
-  recording-red: '#E5484D'
   disabled-line: '#2A3050'
   quote-line: '#3A4270'
   navy-error-fill: '#3A1D2A'
@@ -318,7 +317,6 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 - **Sky** (sky, hard-coded): inside the bubble, the focus ring, the ask field's border, links in an answer, the "hearing" listening dot; also the Seeing tag, the "Your companion" line in Home's nav.
 - **Done Green** (done-green, hard-coded): the listening mark on the dock (the dot while Always listening is on).
-- **Recording Red** (recording-red, hard-coded): the 8px rolling-memory dot on the dock, with a 1px white ring.
 
 ### Neutral
 
@@ -378,7 +376,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 ## Layout
 
-- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the recording and listening dots 8px up and 16px in from the bottom corners, and the status tag 18px up, centred.
+- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the listening dot 8px up and 16px in from the bottom corner, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
 
@@ -392,8 +390,6 @@ Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines
 
 ### Shadow Vocabulary
 
-- **Recording ring** (`box-shadow: 0 0 0 1px #fff`): the white ring around the recording dot.
-
 **The No Lift Rule.** No drop shadows on the bubble, cards, buttons or the nav.
 
 ## Shapes
@@ -404,7 +400,7 @@ Gently rounded chrome. The bubble, Home cards use 12px; fields and primary butto
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), working (typing at a laptop, a gear turns) and dozing (rising z's). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (Scout's own job); thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), working (typing at a laptop, a gear turns) and dozing (rising z's). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (Scout's own job); thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood).
 
 ### The bubble
 
@@ -441,7 +437,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
-- **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, chips carry words, the Overview dot sits beside "Ready".
+- **Status is never colour alone:** dock tags are words, the Paused chip says Paused, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`), and Sky in the bubble.
 - **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 

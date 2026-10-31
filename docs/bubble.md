@@ -283,10 +283,8 @@ order: seeing, reading, thinking, working, a held drop (Seeing), dozing, idle.
 - A `turn.started` without `background` adds to `turns` (thinking); with `background: true` to
   `jobs` (working). `turn.completed` and `turn.error` remove the turn from both and from `reading`
   (an aborted turn sends no tool result).
-- `reading` is a `turn.toolRequest` for one of `READING_TOOLS` (`look_at_screen`,
-  `look_at_display`, `look_at_window`, `look_closer`, `read_window_text`, `get_selection`,
-  `list_windows`, `list_displays`, `recall_screen`, `what_changed`; spelled out because the
-  renderer never bundles core) until its `turn.toolResult`.
+- `reading` is a `turn.toolRequest` for one of `READING_TOOLS` (`list_windows`,
+  `read_window_text`, `look_at_window`; spelled out because the renderer never bundles main) until its `turn.toolResult`.
 - Seeing lasts `SEEING_MS` (2,500 ms, `avatar.tsx`) after a capture notice that was neither paused
   nor blocked.
 - Presence comes from main (`presence.ts#watchPresence`): `powerMonitor.getSystemIdleTime()`
@@ -297,13 +295,12 @@ order: seeing, reading, thinking, working, a held drop (Seeing), dozing, idle.
 
 - `sightPaused`: a Paused pill top left (`data-testid="paused-eye"`). It also hides the mood's tag,
   which would overlap it; the pose and the label still say the mood.
-- `recording`: the rolling-memory dot ("recording the screen" in the label, not while paused).
 - `listening` (`ListeningDot`): `on` (a solid dot), `paused` (an outline), `hearing` (a pulse while
   speech is heard; no words are read) and `follow-up` (a ring: one reply needs no name). The avatar
   derives it from `ListeningState` and the ears' `speechStart` / `turnEnd`.
 - `status`: the top status mark as a `tag`.
 
-The `aria-label` reads `<name> <mood words>`, then ", sight paused", ", recording the screen",
+The `aria-label` reads `<name> <mood words>`, then ", sight paused",
 ", listening" (or "listening paused", "listening for your reply") and the status mark's detail.
 
 **Blinking.** In `idle` and `listening` only, a blink is due every 3 to 6 s (random, or
@@ -366,7 +363,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
 - `CompanionBubbleProps`, `BubbleTalk { state: 'idle' | 'listening' | 'hearing', onHeard,
 onListen?, note, partial?, keyLabel, onMic, always? }`, `GreetingLineProps`.
 - `DropOffer = { dropped, explain } | { refusal }` (`drop-card.tsx`).
-- `DockPetProps { pet, mood, figure, sightPaused?, recording?, listening?, blinkEveryMs?,
+- `DockPetProps { pet, mood, figure, sightPaused?, listening?, blinkEveryMs?,
 status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
 - `StatusMarkProps { mark, variant: 'tag' | 'row', onFix? }`; `StatusId`, `StatusMark`,
   `STATUS_WORDS`, `FixTarget` (protocol).
@@ -423,7 +420,7 @@ never spoken. See [privacy.md](privacy.md).
 | `voice/speakable.test.ts`, `voice/spoken-stream.test.ts`                         | show-only blocks never read (fences, tables, quotes), lists read without markers, no cap, sentences handed over early, fences in pieces                                                                                                                                                                                     |
 | `connector-confirm.test.tsx`, `drop-card.test.tsx`                               | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                                              |
 | `status-mark.test.tsx`                                                           | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                     |
-| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, recording, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                             |
+| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                        |
 | `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                             |
 | `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                           |
 | the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                          |
