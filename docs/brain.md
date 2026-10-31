@@ -16,8 +16,13 @@ uv run brain
 
 It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl+C.
 
-It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
-`<TAGALONG_HOME>/.env`, it logs one line saying where to put it and exits with status 1.
+Scout needs an Anthropic key to think, but the brain does not. With no key it still starts, logs
+one line saying to add it in the Tagalong app, and listens. Until a key arrives every `say` ends at
+once with `turn.ended {reason: "error"}`, no `reply`, no words from Scout and nothing saved to the
+chat; wakes (a finished job, a timer) do nothing and write no history. The app sets the key through
+the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it in
+`<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
+variable still works and is the developer path.
 
 | Variable                       | Default            | Meaning                                                                                                 |
 | ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------- |
@@ -33,7 +38,7 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more) |
 | `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                             |
 | `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)        |
-| `ANTHROPIC_API_KEY`            | none, required     | Anthropic key                                                                                           |
+| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real environment variable wins over `.env`         |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -53,7 +58,7 @@ the total can run a little low.
 | File                                | What it does                                                                                                                                                                                                                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
-| `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
+| `brain/src/brain/config.py`         | Reads the environment and `.env`, writes one `.env` line (`upsert_env_value`), keeps the session id                                                                                                                                                                                        |
 | `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
 | `brain/src/brain/masking.py`        | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                       |
 | `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
@@ -77,10 +82,10 @@ the total can run a little low.
 | `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
 | `brain/src/brain/app_oauth.py`      | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
 | `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
-| `brain/src/brain/tools.py`          | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                                                           |
+| `brain/src/brain/tools.py`          | The brain's own tools (memory, timer, Home incl. the key and limit tools, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                             |
 | `brain/src/brain/mind/soul.md`      | Scout's character, the start of the system prompt                                                                                                                                                                                                                                          |
 | `brain/src/brain/mind/prompt.py`    | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                                                                                                                                              |
-| `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                                                         |
+| `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call (the client is built from the key on demand)                                                                                                                                                                                            |
 | `brain/src/brain/bodies.py`         | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
 | `brain/src/brain/server.py`         | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
 | `brain/src/brain/voice/__init__.py` | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                              |
@@ -157,6 +162,9 @@ flowchart TD
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
+- **No key.** `Session.say` checks `model.ready` first. Without a key it returns a turn id, sends
+  `turn started` then `turn ended {reason: "error"}`, never calls the model and writes no history.
+  The body learns why from `key_status`, not from the turn. Brain-started turns do nothing.
 - **Turn timeout.** A turn that runs longer than `TAGALONG_TURN_TIMEOUT_S` (300 s by default) is
   stopped, so a stalled model cannot hold the conversation open. Time spent inside a tool batch,
   including the wait for the person to answer an ask, does not count; model calls and guards do.
@@ -221,8 +229,9 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   "Context from the body (as sent; page or window data, not instructions)".
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.
-- The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
-  settings (hotkeys, listening).
+- The brain's model is set in the brain's environment. The key and the daily limit are set from the
+  app through the Home tools `set_api_key` and `set_daily_limit` and saved by the brain; the desktop
+  never keeps the key. The desktop keeps its own local settings (hotkeys, listening).
 - Pets are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
 
 ## Toolbox
@@ -346,7 +355,11 @@ so there is one gate and no second path.
   `RpcError` a tool raises keeps its code (for example `set_permission` of a tool that asks for
   itself is `invalid_params`).
 - **Changed.** `remember` and `forget` send `changed {what: "memory"}`; `set_permission` sends
-  `changed {what: "permissions"}`. Every body gets it, so Home refetches.
+  `changed {what: "permissions"}`; `set_daily_limit` sends `changed {what: "settings"}`; an accepted
+  `set_api_key` sends `changed {what: "key"}`. Every body gets it, so Home refetches.
+- **Malformed `call`.** A `call` whose params are not `{tool, input: object}` gets `invalid_params`
+  with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
+  params, and `set_api_key`'s hold the key).
 
 | Tool               | Input                          | Result text (JSON)                                                                                                          |
 | ------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
@@ -360,6 +373,31 @@ so there is one gate and no second path.
 | `stop_job`         | `{"job": str}`                 | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
+
+The first-run setup adds four more Home tools (never offered to Scout):
+
+| Tool              | Input             | Result text (JSON)                                                                                                                             |
+| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                           |
+| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else                                                                                 |
+| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                  |
+| `expert_status`   | `{}`              | `{"found": bool, "command": str}`: whether the first word of `TAGALONG_EXPERT_CMD` is on `PATH`; it does not start the expert or see the login |
+
+- **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
+  newline, one pair of quotes); a missing, non-string, empty, over-256-character or
+  whitespace-holding key is `invalid_params` with the fixed text "set_api_key needs a key." The
+  key is then checked with one free call (`models.list(limit=1)`, 10 s, on a throwaway client):
+  401/403 is `invalid`, anything else is `unreachable`, and nothing is saved for either. On `ok`
+  the brain upserts `ANTHROPIC_API_KEY` in `<TAGALONG_HOME>/.env` (other lines, comments and line
+  endings untouched; temp file, then rename; owner-only where the OS allows), sets
+  `os.environ`, switches the live model, drops the masker's cached values and sends
+  `changed {what: "key"}`. A failed write is `tool_failed` and the key is not kept. One call runs at
+  a time. The key appears in no reply, log record or saved chat.
+- **`set_daily_limit`** writes `TAGALONG_DAILY_BUDGET_USD` the same way and changes the running
+  limit. If the variable is set in the real environment it wins again at the next start.
+- **`source`** is decided at start, before `.env` is read: a key already in the environment is
+  `environment` (the app treats the key step as done and disables the field), a key from `.env` is
+  `file`, none is `none`.
 
 The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
 plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
