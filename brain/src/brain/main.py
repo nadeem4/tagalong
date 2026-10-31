@@ -25,6 +25,8 @@ from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
+from brain.voice.load import ears_loader
+from brain.voice.service import VoiceService
 
 log = logging.getLogger("brain")
 
@@ -85,6 +87,9 @@ async def _run() -> None:
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),
     )
+    session.voice = VoiceService(
+        bodies, ears_loader(config.data_dir)
+    )  # models load on first listen
     try:
         server = await start_server(
             config.host, config.port, bodies, session_id(config.data_dir), session

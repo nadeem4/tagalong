@@ -50,41 +50,46 @@ the total can run a little low.
 
 ## Files
 
-| File                                | What it does                                                                                                                                                                                                                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `brain/src/brain/protocol.py`       | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
-| `brain/src/brain/config.py`         | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
-| `brain/src/brain/guardrails.py`     | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
-| `brain/src/brain/masking.py`        | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                       |
-| `brain/src/brain/guards.py`         | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
-| `brain/src/brain/builtin_guards.py` | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                 |
-| `brain/src/brain/sessions.py`       | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
-| `brain/src/brain/mind/resume.py`    | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                      |
-| `brain/src/brain/memory.py`         | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                                                                                                                                                       |
-| `brain/src/brain/toolbox.py`        | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                               |
-| `brain/src/brain/asks.py`           | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                                                                                                                                                        |
-| `brain/src/brain/approvals.py`      | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `scout_approved` (logs a Scout approval and reports it) |
-| `brain/src/brain/side_check.py`     | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                           |
-| `brain/src/brain/offers.py`         | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                |
-| `brain/src/brain/mind/approvals.md` | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                               |
-| `brain/src/brain/experts.py`        | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                                                                                                                                           |
-| `brain/src/brain/events.py`         | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
-| `brain/src/brain/scheduler.py`      | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
-| `brain/src/brain/timers.py`         | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
-| `brain/src/brain/mind/events.md`    | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
-| `brain/src/brain/questions.py`      | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
-| `brain/src/brain/jobs.py`           | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
-| `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
-| `brain/src/brain/app_oauth.py`      | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
-| `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
-| `brain/src/brain/tools.py`          | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                                                           |
-| `brain/src/brain/mind/soul.md`      | Scout's character, the start of the system prompt                                                                                                                                                                                                                                          |
-| `brain/src/brain/mind/prompt.py`    | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                                                                                                                                              |
-| `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                                                         |
-| `brain/src/brain/bodies.py`         | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
-| `brain/src/brain/server.py`         | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
-| `brain/src/brain/voice/__init__.py` | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to (`Session.voice`)                                                                                                                                                                                       |
-| `brain/src/brain/main.py`           | The `uv run brain` entry point                                                                                                                                                                                                                                                             |
+| File                                                     | What it does                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brain/src/brain/protocol.py`                            | Contract v1 as pydantic types                                                                                                                                                                                                                                                              |
+| `brain/src/brain/config.py`                              | Reads the environment and `.env`, keeps the session id                                                                                                                                                                                                                                     |
+| `brain/src/brain/guardrails.py`                          | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                              |
+| `brain/src/brain/masking.py`                             | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                       |
+| `brain/src/brain/guards.py`                              | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                       |
+| `brain/src/brain/builtin_guards.py`                      | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                 |
+| `brain/src/brain/sessions.py`                            | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                     |
+| `brain/src/brain/mind/resume.py`                         | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                      |
+| `brain/src/brain/memory.py`                              | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                                                                                                                                                       |
+| `brain/src/brain/toolbox.py`                             | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                               |
+| `brain/src/brain/asks.py`                                | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                                                                                                                                                        |
+| `brain/src/brain/approvals.py`                           | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `scout_approved` (logs a Scout approval and reports it) |
+| `brain/src/brain/side_check.py`                          | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                           |
+| `brain/src/brain/offers.py`                              | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                |
+| `brain/src/brain/mind/approvals.md`                      | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                               |
+| `brain/src/brain/experts.py`                             | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                                                                                                                                           |
+| `brain/src/brain/events.py`                              | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
+| `brain/src/brain/scheduler.py`                           | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
+| `brain/src/brain/timers.py`                              | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
+| `brain/src/brain/mind/events.md`                         | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
+| `brain/src/brain/questions.py`                           | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
+| `brain/src/brain/jobs.py`                                | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
+| `brain/src/brain/apps.py`                                | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
+| `brain/src/brain/app_oauth.py`                           | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
+| `brain/src/brain/app_tools.py`                           | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
+| `brain/src/brain/tools.py`                               | The brain's own tools (memory, timer, Home, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                                                           |
+| `brain/src/brain/mind/soul.md`                           | Scout's character, the start of the system prompt                                                                                                                                                                                                                                          |
+| `brain/src/brain/mind/prompt.py`                         | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                                                                                                                                              |
+| `brain/src/brain/mind/turn.py`                           | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                                                         |
+| `brain/src/brain/bodies.py`                              | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
+| `brain/src/brain/server.py`                              | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
+| `brain/src/brain/voice/__init__.py`                      | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to (`Session.voice`)                                                                                                                                                                                       |
+| `brain/src/brain/voice/ears.py`                          | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                      |
+| `brain/src/brain/voice/service.py`                       | `VoiceService`: one listening session at a time, buffers frames while models load, runs `Ears` in a thread, sends `heard` and `voice` live-only                                                                                                                                            |
+| `brain/src/brain/voice/models.py`                        | Pinned model files (`EARS_FILES`) and `ensure_files`, the checked download                                                                                                                                                                                                                 |
+| `brain/src/brain/voice/{silero,moonshine,smart_turn}.py` | The real model adapters (imported lazily); `smart_turn.features` is the numpy Whisper log-mel code                                                                                                                                                                                         |
+| `brain/src/brain/voice/load.py`                          | `ears_loader`: downloads the files and loads the three models; only `main.py` imports it                                                                                                                                                                                                   |
+| `brain/src/brain/main.py`                                | The `uv run brain` entry point                                                                                                                                                                                                                                                             |
 
 ## What a connection does
 
@@ -103,9 +108,10 @@ the total can run a little low.
   (`Session._display_target`). `answer` is described under
   [Permissions and asks](#permissions-and-asks) and `call` under [Home tools](#home-tools). `event` goes to `Session.body_event` (a bad shape is dropped); unknown notifications are ignored. An
   unknown request gets `method_not_found`.
-- Voice methods go to the voice seam, `Session.voice` (a `VoiceHooks` in `brain/voice/`). It is
-  `None` until the voice service is wired in a later slice, so today `listen` gets
-  `method_not_found` and `mic`, `unlisten` and `hush` are ignored.
+- Voice methods go to the voice seam, `Session.voice` (a `VoiceHooks` in `brain/voice/`).
+  `main.py` sets it to a `VoiceService` (see [Brain ears](#brain-ears)); it is `None` only in
+  tests that leave it out, and then `listen` gets `method_not_found` and `mic`, `unlisten` and
+  `hush` are ignored.
 
   | Method     | Server does                                                                                                                                                                 |
   | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -758,6 +764,69 @@ One function, one test, one `add` in `sessions.py`:
 The limits are `TAGALONG_DAILY_BUDGET_USD` and `TAGALONG_STEP_CAP` (see [Run it](#run-it)); no env
 name or meaning changed. The turn timeout `TAGALONG_TURN_TIMEOUT_S` is a plain argument to the
 turn loop, not a guard (see [What a turn does](#what-a-turn-does)).
+
+## Brain ears
+
+The brain hears the mic itself. A body sends `listen {mode}`, then `mic {pcm}` frames (16 kHz
+int16, base64), and gets `heard` and `voice` back; the contract is in
+[protocol/README.md](../protocol/README.md). The desktop still uses its own voice process until a
+later slice switches it over. The body keeps deciding what a heard turn means (addressing,
+follow-up) and sends the words as an ordinary `say` with `spoken: true`.
+
+Audio goes only to your own brain and is never stored; with the brain on this computer it never
+leaves it.
+
+| Piece           | Model                                        | Job                                                |
+| --------------- | -------------------------------------------- | -------------------------------------------------- |
+| `silero.py`     | Silero VAD v5 on onnxruntime                 | Speech or not, per 32 ms window                    |
+| `moonshine.py`  | Moonshine tiny streaming (`moonshine-voice`) | The words so far                                   |
+| `smart_turn.py` | Smart Turn v3.2 on onnxruntime               | Whether the person has finished, from the last 8 s |
+
+- **`Ears`** (`voice/ears.py`) is synchronous and holds no asyncio, so tests drive it frame by
+  frame with fakes (`tests/fake_voice.py`). Silence is ignored. The first speech frame emits
+  `speech_start` (the 256 ms before it are fed in too). Every 10 speech frames, if the words
+  changed, `partial`. 256 ms of quiet closes the stretch and emits `final`. Held mode ends the
+  turn only on `finish` (the key was released), with the last words kept and exactly one
+  `turn_end`, even if nothing was said. Always mode asks Smart Turn at each pause and ends the
+  turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as
+  "over". A stretch of speech with no pause is closed after about 30 s.
+- **`VoiceService`** implements `VoiceHooks`. `listen` starts a session for that body (replacing
+  any earlier one, from any body, which goes silent: one listening session at a time); `mic` converts int16 to float32 and queues it; one worker
+  task per session feeds 512-sample frames to `Ears` with `asyncio.to_thread`, so a slow decode
+  never stalls the websocket. Downloads time out after 30 s, and Moonshine's load progress is handed
+  back to the event loop before it reaches a body. `unlisten` on a held
+  session flushes the queue and sends the last words and one `turn_end`; on an always session it
+  stops at once and sends nothing. `hush` does nothing yet (the mouth arrives later). A disconnect
+  calls `unlisten`, so a gone body never keeps a session.
+- **Events** go out with `Bodies.send_live`: no `seq`, never stored or replayed. `heard
+{event, text?}`; `voice {status: loading | ready | failed, message?, progress?}`. `loading`
+  with `progress` is sent only while something is downloaded (at most every 2%), then `ready`.
+  Frames that arrive while the models load are kept (the newest 30 s). If loading fails (no
+  internet on the first run, a damaged download, a model that would not start) the body gets
+  `voice {failed, message}` once, the session ends, and the next `listen` tries again.
+- **Models** load on the first `listen`, not at start. Files live in `<TAGALONG_HOME>/voice`
+  (no new setting): `ears/silero-vad/model.onnx` and `ears/smart-turn-v3/…onnx` (about 11 MB,
+  pinned to a commit with a SHA-256, written to `.part` then renamed, one retry on a bad hash)
+  and `moonshine/` (about 45 MB, fetched by `moonshine-voice` into that folder). The first
+  `listen` on a new computer downloads about 56 MB.
+- **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx`, used for speech in a later slice, supports
+  3.10 to 3.13). Dependencies: `moonshine-voice`, `onnxruntime`, `numpy`. Linux wheels exist for all
+  three, so the CI brain job resolves them from `uv.lock`.
+
+### Speed check on Windows (slice 15b)
+
+Measured on the development machine (Windows 11, Python 3.12, CPU only):
+
+| Piece                              | Result                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Moonshine tiny streaming           | About 20 to 26 ms per 32 ms frame, about 6 ms to read the words; first frame up to 0.45 s                                                         |
+| Silero VAD                         | About 0.4 ms per window                                                                                                                           |
+| Smart Turn v3.2                    | About 40 to 60 ms for one 8 s inference                                                                                                           |
+| Kokoro int8 with `espeakng-loader` | Loads in 1.2 s; 0.31 to 0.39 real-time factor; the espeak-ng DLL and data ship inside the `espeakng-loader` wheel, so no system install is needed |
+
+Moonshine does its own splitting into lines, so the stream is reset between our stretches
+(`stop` then `start`). Moonshine at about 80% of real time is the tightest part: it is fed only
+while someone speaks, but a slower computer will lag.
 
 ## Not built yet
 
