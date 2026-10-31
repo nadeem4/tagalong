@@ -3,15 +3,7 @@
  * record what the components asked for. Contains createFakeHostBridge and FakeHostBridge.
  */
 
-import type {
-  AppAddParams,
-  AppInfo,
-  ContextSnapshot,
-  PerceptionTarget,
-  Pet,
-  MemoryEntry,
-  TurnEvent,
-} from '../shapes';
+import type { AppAddParams, AppInfo, Pet, MemoryEntry, TurnEvent } from '../shapes';
 import type {
   ApprovalCounts,
   ApprovalRow,
@@ -30,10 +22,6 @@ export interface FakeHostBridge extends HostBridge {
   emitChanged(what: string): void;
   readonly asks: readonly AskInput[];
   readonly interrupts: readonly string[];
-  /** The targets of every capture() call, in order. */
-  readonly captures: readonly (readonly PerceptionTarget[])[];
-  /** What the next capture() resolves to; null stands in for a blocked window. */
-  nextCapture: ContextSnapshot | null;
   /** What Scout remembers, newest first; delete edits it. */
   memories: MemoryEntry[];
   /** Home's Permissions rows; setPermission edits them, a test may swap them. */
@@ -73,7 +61,6 @@ export interface FakeHostBridge extends HostBridge {
 export function createFakeHostBridge(
   options: {
     pets?: Pet[];
-    capture?: ContextSnapshot | null;
     /** The brain's apps to start with. */
     apps?: AppInfo[];
     /** Listing apps rejects with this message, as "brain offline" does. */
@@ -101,7 +88,6 @@ export function createFakeHostBridge(
   const preferenceEdits: { id: number; sentence: string }[] = [];
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
-  const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
   const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
   const jobAnswers: { approvalId: string; option: string; text?: string }[] = [];
@@ -116,17 +102,10 @@ export function createFakeHostBridge(
   const fake: FakeHostBridge = {
     asks,
     interrupts,
-    captures,
-    nextCapture: options.capture ?? null,
     ask(input) {
       asks.push(input);
       turnCount += 1;
       return Promise.resolve({ turnId: `turn-${turnCount}` });
-    },
-    capture(targets) {
-      captures.push(targets);
-      // Read off the object so a test can change the answer between captures.
-      return Promise.resolve(fake.nextCapture);
     },
     interrupt(turnId) {
       interrupts.push(turnId);
@@ -221,6 +200,19 @@ export function createFakeHostBridge(
     },
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
+    usageSummary() {
+      return Promise.resolve({ spentUsd: 0, limitUsd: null });
+    },
+    // A test that wants a health card replaces this; the default fails like a host that cannot say.
+    checkHealth() {
+      return Promise.reject(new Error('no health facts in this fake'));
+    },
+    openFix() {
+      return Promise.resolve();
+    },
+    openLogs() {
+      return Promise.resolve();
+    },
     brainLink() {
       return Promise.resolve(
         options.brainLink ?? { addr: 'ws://127.0.0.1:47321', status: 'online' },

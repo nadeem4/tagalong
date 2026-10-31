@@ -73,7 +73,7 @@ export function ConnectionsPanel() {
 
   const reload = useCallback(() => {
     bridge
-      .listConnections?.()
+      .listConnections()
       .then((latest) => {
         setOffline(false);
         setApps(latest.apps);
@@ -93,19 +93,13 @@ export function ConnectionsPanel() {
     [bridge, reload],
   );
 
-  if (bridge.listConnections === undefined) {
-    return <p className="home-note">Connections are set up in the Tagalong desktop app.</p>;
-  }
   if (apps === null) return <p className="home-note">Loading connections…</p>;
 
   // Run a call, then read the list again whatever it said: the brain is the truth.
-  const act = async (
-    call: (() => Promise<unknown>) | undefined,
-    done?: string,
-  ): Promise<boolean> => {
+  const act = async (call: () => Promise<unknown>, done?: string): Promise<boolean> => {
     setStatus(null);
     try {
-      await call?.();
+      await call();
       if (done !== undefined) setStatus({ text: done, error: false });
       return true;
     } catch (error) {
@@ -119,7 +113,7 @@ export function ConnectionsPanel() {
   };
 
   const add = (params: AppAddParams): Promise<boolean> =>
-    act(() => bridge.addConnection!(params), `${params.name} added.`);
+    act(() => bridge.addConnection(params), `${params.name} added.`);
 
   return (
     <div className="tg-panel home-controls home-conns">
@@ -152,11 +146,11 @@ export function ConnectionsPanel() {
             <AppRow
               key={app.id}
               app={app}
-              onSwitch={() => void act(() => bridge.setConnectionEnabled!(app.id, !app.enabled))}
-              onRestart={() => void act(() => bridge.restartConnection!(app.id))}
-              onSignIn={() => void act(() => bridge.signInConnection!(app.id))}
+              onSwitch={() => void act(() => bridge.setConnectionEnabled(app.id, !app.enabled))}
+              onRestart={() => void act(() => bridge.restartConnection(app.id))}
+              onSignIn={() => void act(() => bridge.signInConnection(app.id))}
               onRemove={() =>
-                void act(() => bridge.removeConnection!(app.id), `${app.name} removed.`)
+                void act(() => bridge.removeConnection(app.id), `${app.name} removed.`)
               }
             />
           ))}

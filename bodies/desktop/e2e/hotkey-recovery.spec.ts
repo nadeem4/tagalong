@@ -1,7 +1,7 @@
 /**
  * End-to-end: an accelerator Windows refuses, saved in settings, must not stop the app before a
  * window appears. The app names the binding that broke, the panel shows it, and the other
- * hotkeys and capture still work. No unit test can see this: every hotkey test injects a fake
+ * hotkeys still work. No unit test can see this: every hotkey test injects a fake
  * registrar.
  */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -104,12 +104,8 @@ test('the panel shows the problem, so a user who cannot press the key can still 
   await expect(notice).toContainText('Ask');
 });
 
-test('the app works: the other hotkeys are bound and capture still runs', async () => {
+test('correcting the binding clears the problem without a restart', async () => {
   const panel = await windowFor('panel');
-
-  // A started app that cannot do anything would satisfy the boot test and nothing else.
-  const snapshot = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
-  expect(snapshot, 'capture must work despite one refused accelerator').not.toBeNull();
 
   // Fixing the binding clears the problem in the running app, which is the other half of
   // not being locked out: the user can recover without restarting.

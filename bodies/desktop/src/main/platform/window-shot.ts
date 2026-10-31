@@ -1,5 +1,5 @@
 /**
- * Answers perception.captureWindow: a screenshot of one listed window, checked against the
+ * Answers look_at_window: a screenshot of one listed window, checked against the
  * classified inventory before any pixel is read. Contains lookAtWindowWith.
  */
 
@@ -7,7 +7,7 @@ import type { CaptureBlock, WindowEntry } from '@tagalong/ui/shapes';
 import { handleOf } from './window-list';
 import type { CapturedImage } from './index';
 
-/** Exactly what `perception.captureWindow` answers with. */
+/** Exactly what look_at_window answers with. */
 export interface LookAtWindowAnswer {
   windowId: string;
   image?: { mime: 'image/png'; base64: string; width: number; height: number };
@@ -22,7 +22,7 @@ interface LookAtWindowDeps {
 }
 
 /**
- * Answers `perception.captureWindow`: a screenshot of one listed window, in front or not.
+ * Answers look_at_window: a screenshot of one listed window, in front or not.
  *
  * Checked against the classified inventory before any pixel is read, like a text read, so
  * a blind spot is refused rather than captured and thrown away. Every miss is an answer

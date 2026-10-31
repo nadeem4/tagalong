@@ -22,7 +22,6 @@ import {
 } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
-import type { PerceptionTarget } from '@tagalong/ui/shapes';
 import type { Settings } from '../shared/settings';
 import { SettingsStore } from './settings-store';
 import {
@@ -35,7 +34,7 @@ import { watchPresence } from './presence';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
 import { captureNotice, captureTooltip } from './capture-notice';
-import { captureAskSnapshot, capturePatch } from './context';
+import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
@@ -731,16 +730,11 @@ function openPanelNow(current: Desktop): void {
  * The panel's own capture button. Null means refused, which is how the panel learns to
  * say capture is blocked here rather than silently staying blind.
  */
-async function captureForPanel(
-  current: Desktop,
-  targets: readonly PerceptionTarget[],
-): Promise<ContextSnapshot | null> {
-  const { patch, blocked, paused } = await capturePatch(current.platform, targets, {
+async function captureForPanel(current: Desktop): Promise<ContextSnapshot | null> {
+  const { patch, blocked, paused } = await captureActiveWindow(current.platform, {
     exclusions: current.settings.captureExclusions,
   });
-  announceCapture(
-    captureNotice({ at: new Date(), screenshot: targets.includes('screenshot'), blocked, paused }),
-  );
+  announceCapture(captureNotice({ at: new Date(), screenshot: false, blocked, paused }));
   // Null is how the panel learns to say why it is blind. Paused and blocked are different
   // sentences, and the notice above carries which one it was.
   if (blocked !== null || paused) return null;
@@ -813,7 +807,7 @@ function registerIpc(): void {
     voice: () => required().voice,
     // The voice process starts on the first listen, if Scout has not spoken yet.
     worker: () => required().voiceWorker,
-    noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
+    noteActiveWindow: () => captureForPanel(required()),
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
     voiceDir: () => join(app.getPath('userData'), 'voice'),
@@ -839,10 +833,6 @@ function registerIpc(): void {
     required();
     return toggleSightPause();
   });
-
-  ipcMain.handle(IPC.capture, async (_event, targets: PerceptionTarget[]) =>
-    captureForPanel(required(), targets),
-  );
 
   ipcMain.handle(IPC.openBubble, () => {
     const current = required();

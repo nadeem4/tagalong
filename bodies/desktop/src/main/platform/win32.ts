@@ -4,15 +4,13 @@
  */
 
 import { setTimeout as delay } from 'node:timers/promises';
-import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
+import { clipboard, desktopCapturer, screen } from 'electron';
 import { buildInventory } from './inventory';
 import type { CaptureExclusions } from '../../shared/settings';
-import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
+import { captureWindowImageWith } from './capture';
 import { lookAtWindowWith } from './window-shot';
 import { OCR_MAX_LONG_SIDE, recognizeText } from './ocr';
 import type { LookAtWindowAnswer } from './window-shot';
-import { captureDisplaysWith } from './displays';
-import type { DisplaysCapture } from './displays';
 import { readWindowTextWith } from './read-text';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import { captureSelectionWith } from './selection';
@@ -27,7 +25,7 @@ import {
   placeOnDisplays,
   screensOf,
 } from './window-list';
-import type { ActiveWindowInfo, CapturedImage, Platform, WindowInventory } from './index';
+import type { ActiveWindowInfo, Platform, WindowInventory } from './index';
 
 /**
  * Sends Ctrl+C to the foreground app.
@@ -69,27 +67,6 @@ export class Win32Platform implements Platform {
       wait: (ms) => delay(ms),
       log: (message) => console.log(`[platform:win32] ${message}`),
     });
-  }
-
-  async readClipboard(): Promise<string> {
-    return clipboard.readText();
-  }
-
-  async captureActiveWindowImage(
-    maxLongSide: number,
-    exclusions: CaptureExclusions,
-  ): Promise<CapturedImage | null> {
-    return captureActiveWindowImageWith(
-      {
-        desktopCapturer,
-        screen,
-        getActiveWindow: () => this.getActiveWindow(),
-        listWindows: async () => (await this.listWindows(exclusions)).windows,
-        exclusions,
-        log: (message) => console.log(`[platform:win32] ${message}`),
-      },
-      maxLongSide,
-    );
   }
 
   /**
@@ -165,38 +142,6 @@ export class Win32Platform implements Platform {
         },
       },
       params,
-    );
-  }
-
-  async captureDisplays(
-    maxLongSide: number,
-    exclusions: CaptureExclusions,
-  ): Promise<DisplaysCapture> {
-    return captureDisplaysWith(
-      {
-        screen: {
-          getAllDisplays: () =>
-            screen.getAllDisplays().map((display) => ({
-              id: display.id,
-              bounds: display.bounds,
-              scaleFactor: display.scaleFactor,
-              primary: display.id === screen.getPrimaryDisplay().id,
-            })),
-          getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
-        },
-        desktopCapturer,
-        getActiveWindow: () => this.getActiveWindow(),
-        listWindows: async () => (await this.listWindows(exclusions)).windows,
-        exclusions,
-        // The one Electron call the composite makes. Everything upstream of it is buffer
-        // arithmetic the unit tests drive with no display attached.
-        encodePng: (bitmap) =>
-          nativeImage
-            .createFromBitmap(bitmap.data, { width: bitmap.width, height: bitmap.height })
-            .toPNG(),
-        log: (message) => console.log(`[platform:win32] ${message}`),
-      },
-      maxLongSide,
     );
   }
 }

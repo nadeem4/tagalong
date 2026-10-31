@@ -33,10 +33,8 @@ export function SpendCard() {
   const [failed, setFailed] = useState(false);
 
   const refresh = useCallback(() => {
-    const read = bridge.usageSummary;
-    if (read === undefined) return;
-    read
-      .call(bridge)
+    bridge
+      .usageSummary()
       .then((next) => {
         setFailed(false);
         setSpend(next);
@@ -51,7 +49,6 @@ export function SpendCard() {
     });
   }, [bridge, refresh]);
 
-  if (bridge.usageSummary === undefined) return null;
   const limit = spend?.limitUsd ?? null;
   const spentOut = spend !== null && limit !== null && spend.spentUsd >= limit;
   return (

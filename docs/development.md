@@ -63,7 +63,7 @@ tagalong/
       src/main/voice/               # voice.ts (the mouths), kokoro.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
                                     # handler.ts, ears-host.ts, worker-local-voice.ts, main.ts (its bootstrap)
-      src/main/platform/            # capture, downscale, composite, canvas, label, displays, ocr,
+      src/main/platform/            # capture, downscale, ocr,
                                     # read-text, text-layer, sight-gate,
                                     # window-helper, window-list, window-shot, selection, win32
       src/main/windows/             # one module per window: avatar, panel, home
@@ -224,7 +224,7 @@ runs somewhere.
 ### End-to-end tests and fakes
 
 The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds the Playwright suites
-that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Home),
+that launch the built app: `smoke.spec.ts` (the bubble, talking, a tool call, pause, hotkeys, Home),
 `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
 that starts with "Scout" is heard and answered, switched off), `brain-offline.spec.ts`,

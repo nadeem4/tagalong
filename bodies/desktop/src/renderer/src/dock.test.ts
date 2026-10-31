@@ -114,7 +114,7 @@ describe('reading the screen', () => {
     const source = readFileSync(new URL('../../main/brain/body-tools.ts', import.meta.url), 'utf8');
     const declared = [...source.matchAll(/^\s{4}name: '(\w+)',/gm)].map((m) => m[1]);
     expect(declared.filter((name) => name !== 'open_url').sort()).toEqual([...READS].sort());
-    for (const tool of ['look_at_screen', 'get_selection', 'recall', 'open_url']) {
+    for (const tool of ['recall', 'open_url']) {
       expect(dockMood(look(turn, tool))).toBe('thinking');
     }
   });
@@ -123,7 +123,7 @@ describe('reading the screen', () => {
     expect(look(turn, 'remember')).toBe(turn);
     expect(result(turn, T, 'remember')).toBe(turn);
     expect(result(turn)).toBe(turn);
-    expect(nextDock(turn, { type: 'turn.toolRequest', tool: 'look_at_screen' })).toBe(turn);
+    expect(nextDock(turn, { type: 'turn.toolRequest', tool: 'recall' })).toBe(turn);
   });
 
   it('keeps reading while another turn still reads', () => {

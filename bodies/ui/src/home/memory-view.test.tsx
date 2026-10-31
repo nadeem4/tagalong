@@ -101,18 +101,4 @@ describe('MemoryView', () => {
     unmount();
     expect(off).toHaveBeenCalled();
   });
-
-  it('works on a host that never reports changes', async () => {
-    const bridge = createFakeHostBridge({ memories: [TEA] });
-    delete bridge.onBrainChanged;
-    renderView(bridge);
-    expect(await screen.findByRole('list', { name: 'What Scout remembers' })).toBeInTheDocument();
-  });
-
-  it('says the page is not available on a host without it', () => {
-    const bridge = createFakeHostBridge();
-    delete bridge.listMemories;
-    renderView(bridge);
-    expect(screen.getByText('This page is not available here.')).toBeInTheDocument();
-  });
 });

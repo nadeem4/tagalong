@@ -47,10 +47,8 @@ export function MemoryView({ name }: { name: string }) {
   const [failed, setFailed] = useState(false);
 
   const refresh = useCallback(() => {
-    const list = bridge.listMemories;
-    if (list === undefined) return;
-    list
-      .call(bridge)
+    bridge
+      .listMemories()
       .then((latest) => {
         setFailed(false);
         setMemories(latest);
@@ -64,21 +62,17 @@ export function MemoryView({ name }: { name: string }) {
   useEffect(() => {
     refresh();
     // The brain says so when Scout remembers or forgets something mid-turn.
-    return bridge.onBrainChanged?.((what) => {
+    return bridge.onBrainChanged((what) => {
       if (what === 'memory') refresh();
     });
   }, [bridge, refresh]);
 
   const remove = (id: string): void => {
     void bridge
-      .deleteMemory?.(id)
+      .deleteMemory(id)
       .then(() => setMemories((current) => (current ?? []).filter((memory) => memory.id !== id)))
       .catch((error: unknown) => console.error('could not delete a memory', error));
   };
-
-  if (bridge.listMemories === undefined) {
-    return <p className="home-note">This page is not available here.</p>;
-  }
 
   const title = `What ${name} remembers`;
   return (

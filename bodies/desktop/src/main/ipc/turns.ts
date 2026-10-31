@@ -54,13 +54,6 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
       // Only a drop card's button sends the dropped item, and it is read only now.
       const dropped = input.drop === true && deps.takeDrop ? await deps.takeDrop() : null;
       const parts: Part[] = [];
-      if (snapshot?.screenshot) {
-        parts.push({
-          type: 'image',
-          mime: snapshot.screenshot.mime,
-          data: snapshot.screenshot.base64,
-        });
-      }
       if (dropped !== null) parts.push(...droppedParts(dropped));
       const windowTitle = snapshot?.app?.windowTitle;
       const say: SayParams = {

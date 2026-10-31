@@ -46,16 +46,15 @@ snapshot?, spoken?, drop? }`. No `conversationId` opens a new conversation; `tur
   reports its id. `spoken: true` marks a question asked by voice. `drop: true` is set only by a
   button on the drop card, and the host then reads the dropped item and attaches it as
   `snapshot.dropped`.
-- `capture(targets): Promise<ContextSnapshot | null>`. Null means the host refused (an excluded
-  window, or sight paused), so the UI can say so instead of staying blind.
 - `interrupt(turnId)`.
 - `onTurnEvent(handler)`, returning an unsubscribe function.
 - `listPets()`.
 
-Everything else is optional, so a host without a feature never shows it: Home's
-calls (approvals, jobs, connections, permissions, memories, `usageSummary`); the hand-off questions;
-`approveTool`; and the health calls (`checkHealth`, `openFix`, `openLogs`). Each method's
-channel on desktop is in [desktop.md](desktop.md#the-ipc-modules).
+Every method is required: Home's calls (approvals, jobs, connections, permissions, memories,
+`usageSummary`), the hand-off questions, `approveTool` and the health calls (`checkHealth`,
+`openFix`, `openLogs`). On desktop the preload supplies all but the health calls (`PreloadBridge`);
+the renderer's `fullBridge()` adds those. Each method's channel on desktop is in
+[desktop.md](desktop.md#the-ipc-modules).
 
 `TurnEvent` is derived from the protocol's notification catalog, not restated: `{ type: N } &
 NotificationParamsOf<N>` for every `turn.*` notification plus `connector.confirm`, `connector.dismiss`,
@@ -71,9 +70,8 @@ be used inside a HostBridgeProvider" when none is there, so a wiring mistake fai
 in-memory `HostBridge` shipped from the package, so a body's tests can use it too. `emit(event)`
 delivers an event to every subscriber synchronously, so tests need no timers. `ask` resolves
 `{ turnId: 'turn-<n>' }`, and the fake records what components asked for: `asks`, `interrupts`,
-`captures`, `approvals`, `copied` and the rest. Options seed its data (`pets`, `capture`, `jobs`,
-`memories`, `permissions`, ...). `nextCapture` is what the next `capture()` resolves to; null stands in for a
-blocked window. It implements no `checkHealth`; a test adds one.
+`approvals`, `copied` and the rest. Options seed its data (`pets`, `jobs`, `memories`,
+`permissions`, ...). Its `checkHealth` rejects; a test that wants a health card replaces it.
 
 ### CompanionBubble
 
@@ -131,10 +129,9 @@ stateDiagram-v2
 - **Barge-in** (`talk.onListen` while running) ends the spoken stream, interrupts the turn, clears
   `mine` and keeps what was said so far as `done`.
 
-**Chips.** `chipsOf(snapshot)` makes up to three removable chips: the app (`name · window title`),
-`Selected text`, and `Screenshot` (a screenshot or a composite). Removing one leaves that part out
-of the ask (`without`, which also drops `composite` and `displays` with the screenshot). A new
-snapshot brings every chip back.
+**Chips.** `chipsOf(snapshot)` makes up to two removable chips: the app (`name · window title`),
+and `Selected text`. Removing one leaves that part out of the ask (`without`). A new snapshot
+brings every chip back.
 
 **The header.** The mic button sits inside the question box. **Always listening** and **Seeing**
 are `role="switch"` buttons with `aria-checked`; Seeing calls `toggleSightPause` (the same pause as
@@ -351,9 +348,8 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   decided, and a chip (Approved, Refused, Timed out, No one online). A Scout row reads "Scout decided,
   per your preference" with the sentence it relied on, and an "Auto" pill. **Show more** pages back
   with `before: next`; a click while that read is out is ignored, and an answer for a list since
-  re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert. A
-  bridge without `listApprovals` (an old body) renders nothing. `e2e/approvals.spec.ts` covers it on
-  the fake brain.
+  re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert.
+  `e2e/approvals.spec.ts` covers it on the fake brain.
 - **Jobs.** `JobsPanel` (`home/jobs-panel.tsx`) lists the jobs Scout handed to Claude Code, each with
   Stop while it runs; see [brain.md](brain.md#experts).
 
@@ -396,7 +392,6 @@ the brain.
 - A rejected `ask` shows the error as a `role="alert"` line; the panel never sits streaming.
 - `turn.error` shows its message. A turn with no text and a refusal or tool-limit reason shows
   the quiet `stopStatus` line.
-- `capture` returning null is a refusal: the bubble asks without a snapshot.
 - A card's bridge call that fails: the connector confirm card keeps the card and shows the error.
 - A health check that throws shows "Health check failed."; a late one is dropped.
 - `useHostBridge` throws without a provider.
@@ -422,4 +417,4 @@ marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 | `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                             |
 | `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                           |
 | the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                          |
-| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the fake's capture recording, the public surface                                                                                                                                                                                                                                         |
+| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the public surface                                                                                                                                                                                                                                                                       |

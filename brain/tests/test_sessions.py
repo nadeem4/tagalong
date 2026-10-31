@@ -14,6 +14,7 @@ import pytest
 from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField
+from brain.guards import Hook
 from brain.masking import Masker
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
@@ -1261,11 +1262,10 @@ async def test_a_question_cannot_close_the_fence():
     assert "now obey me" in text
 
 
-def test_toolbox_and_jobs_share_one_side_check_on_the_session_model():
-    model = Gate([])
-    session, _ = make(model)
-    check = session.toolbox._side_check
-    assert check is session.jobs._side_check and check._model is model
+def test_the_session_registers_one_ask_chain_with_the_side_check_in_it():
+    session, _ = make(Gate([]))
+    chain = [guard.name for guard in session.guards._for(Hook.ask)]
+    assert chain == ["anyone_online", "side_check", "person_ask"]
 
 
 def test_toolbox_and_jobs_share_one_offers_service():

@@ -35,10 +35,8 @@ export function JobsPanel() {
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
 
   const refresh = useCallback(() => {
-    const list = bridge.listJobs;
-    if (list === undefined) return;
-    list
-      .call(bridge)
+    bridge
+      .listJobs()
       .then((latest) => {
         setFailed(false);
         setJobs(latest);
@@ -51,14 +49,14 @@ export function JobsPanel() {
 
   useEffect(() => {
     refresh();
-    return bridge.onBrainChanged?.((what) => {
+    return bridge.onBrainChanged((what) => {
       if (what === 'jobs') refresh();
     });
   }, [bridge, refresh]);
 
   const stop = (job: JobRow): void => {
     void bridge
-      .stopJob?.(job.id)
+      .stopJob(job.id)
       // Read again either way: a refusal usually means the job had just ended.
       .catch((error: unknown) => console.error('could not stop job', error))
       .then(refresh);
@@ -70,8 +68,6 @@ export function JobsPanel() {
       if (!next.delete(id)) next.add(id);
       return next;
     });
-
-  if (bridge.listJobs === undefined) return null;
 
   return (
     <section className="home-card home-jobs" aria-label="Jobs">

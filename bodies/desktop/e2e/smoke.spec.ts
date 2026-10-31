@@ -1,5 +1,5 @@
 /**
- * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, capture, a
+ * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, a
  * tool call over the real socket, the sight pause, hotkeys and sight settings, and Home.
  */
 import { mkdtempSync } from 'node:fs';
@@ -211,145 +211,18 @@ test('the bubble asks, shows the answer, and opens the full chat', async () => {
   await expect(panel.getByLabel('Message')).toBeVisible({ timeout: 15_000 });
 });
 
-test('capture takes a real, downscaled PNG of the screen', async () => {
-  const avatar = await windowFor('avatar');
-
-  // Driven through the bridge the preload already exposes, not through Ctrl+Shift+S: a
-  // global hotkey needs the app to hold focus, which nothing guarantees on a CI desktop.
-  //
-  // This is the one thing a unit test cannot reach. `capture.test.ts` proves the picking
-  // and resizing logic against an injected fake capturer; only here does a real
-  // `desktopCapturer.getSources` run inside a real Electron main process, against real
-  // displays, and come back through IPC as the snapshot a turn would receive.
-  //
-  // The decoding happens inside the page on purpose. The base64 of a 1568px PNG is
-  // megabytes, and returning it whole would push all of it over the CDP connection just
-  // to look at its first four bytes.
-  const shot = await avatar.evaluate(async () => {
-    const snapshot = await window.tagalong.capture(['screenshot', 'activeWindow']);
-    const screenshot = snapshot?.screenshot;
-    if (screenshot === undefined) return null;
-    // 12 base64 characters decode to 9 whole bytes, which is more than the signature needs.
-    const head = atob(screenshot.base64.slice(0, 12));
-    return {
-      mime: screenshot.mime,
-      base64Length: screenshot.base64.length,
-      width: screenshot.width,
-      height: screenshot.height,
-      magic: [...head].slice(0, 4).map((character) => character.charCodeAt(0)),
-    };
-  });
-
-  if (shot === null) {
-    throw new Error(
-      'perception.capture returned no screenshot: either the host refused it or ' +
-        'desktopCapturer found nothing capturable on this machine',
-    );
-  }
-
-  // Bytes, not a truthy string: a scripted stub, an empty buffer or a JPEG would all pass
-  // a "something came back" assertion. 89 50 4E 47 is the PNG signature.
-  expect(shot.magic).toEqual([0x89, 0x50, 0x4e, 0x47]);
-  expect(shot.mime).toBe('image/png');
-  expect(shot.base64Length).toBeGreaterThan(0);
-
-  // Positive dimensions, and the downscale actually applied in the running app — 1568 is
-  // MAX_SCREENSHOT_LONG_SIDE, past which the vision models charge without seeing more.
-  expect(shot.width).toBeGreaterThan(0);
-  expect(shot.height).toBeGreaterThan(0);
-  expect(Math.max(shot.width, shot.height)).toBeLessThanOrEqual(1568);
-});
-
-test('a full-view capture returns every real display and a composite', async () => {
-  const avatar = await windowFor('avatar');
-
-  // The only place the full-view capture runs for real. The unit tests in
-  // `displays.test.ts`, `composite.test.ts` and `context.test.ts` inject a fake capturer:
-  // they prove the layout maths and the policy, and would all pass with the Electron call
-  // wired to nothing. So this asserts the real `screen.getAllDisplays` and `desktopCapturer`
-  // ran and came back as the snapshot a turn would receive.
-  const full = await avatar.evaluate(async () => {
-    const snapshot = await window.tagalong.capture(['displays']);
-    const displays = snapshot?.displays;
-    const composite = snapshot?.composite;
-    if (displays === undefined || composite === undefined) return null;
-    const head = atob(composite.base64.slice(0, 12));
-    return {
-      count: displays.length,
-      // A display is either blanked by an exclusion or carries a picture; neither state
-      // is "silently absent", which is what a dead capture would look like.
-      accounted: displays.every(
-        (display) => display.image !== undefined || display.blocked !== undefined,
-      ),
-      longestSide: Math.max(
-        ...displays.map((display) =>
-          Math.max(display.image?.width ?? 0, display.image?.height ?? 0),
-        ),
-      ),
-      compositeMagic: [...head].slice(0, 4).map((character) => character.charCodeAt(0)),
-      compositeWidth: composite.width,
-      compositeHeight: composite.height,
-    };
-  });
-
-  if (full === null) {
-    throw new Error(
-      'perception.capture returned no displays or no composite: the displays target is ' +
-        'advertised as a capability, so an empty answer here is a broken capture rather ' +
-        'than a quiet machine',
-    );
-  }
-
-  // A running desktop has at least one display. Zero is a failure, not a state — the
-  // same reasoning that made an empty window enumeration a complaint rather than silence.
-  expect(full.count).toBeGreaterThan(0);
-  expect(full.accounted).toBe(true);
-  expect(full.longestSide).toBeGreaterThan(0);
-  expect(full.longestSide).toBeLessThanOrEqual(1568);
-
-  // The composite is the one image Tagalong builds rather than captures, so its bytes
-  // prove the BGRA blitting and the nativeImage encode ran, not just that a field exists.
-  expect(full.compositeMagic).toEqual([0x89, 0x50, 0x4e, 0x47]);
-  expect(full.compositeWidth).toBeGreaterThan(0);
-  expect(full.compositeHeight).toBeGreaterThan(0);
-  expect(Math.max(full.compositeWidth, full.compositeHeight)).toBeLessThanOrEqual(1568);
-});
-
-/**
- * The test that catches a pause that does not pause.
- *
- * Every unit test in this repo injects a fake platform, and the gate is applied to the
- * real one in `start()`. So the whole suite passes with the gating removed. A privacy
- * control whose failure mode is silence needs a check that runs the real wiring.
- */
-test('pausing sight refuses a real capture, and resuming restores it', async () => {
+test('pausing sight and resuming it round-trips through the host', async () => {
   const panel = await windowFor('panel');
 
   const running = await panel.evaluate(() => window.tagalongHost.getSightPaused());
   expect(running, 'sight should start running').toBe(false);
 
-  const before = await panel.evaluate(() =>
-    window.tagalong.capture(['screenshot', 'activeWindow']),
-  );
-  expect(before, 'a capture should work before pausing').not.toBeNull();
-
   const paused = await panel.evaluate(() => window.tagalongHost.toggleSightPause());
   expect(paused, 'the toggle should report the state it moved to').toBe(true);
   expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(true);
 
-  // Null is how the host says it did not look. If the gate is not wired in, a real
-  // screenshot comes back here and this line is the only thing in the repo that notices.
-  const during = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
-  expect(during, 'a capture while paused must be refused, not taken').toBeNull();
-
-  const inventory = await panel.evaluate(() => window.tagalong.capture(['windows']));
-  expect(inventory, 'the window inventory must be refused while paused').toBeNull();
-
   await panel.evaluate(() => window.tagalongHost.toggleSightPause());
   expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(false);
-
-  const after = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
-  expect(after, 'resuming must restore capture, or pause is a one-way door').not.toBeNull();
 });
 
 /**

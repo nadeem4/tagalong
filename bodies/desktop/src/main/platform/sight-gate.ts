@@ -40,19 +40,16 @@ export function isSightPaused(error: unknown): error is SightPausedError {
  * Outlook" is screen content, and a pet that cannot see the window but can name it has
  * not been paused in any sense the user meant.
  *
- * `handed-over` is the selection and the clipboard. The user highlighted or copied those
+ * `handed-over` is the selection. The user highlighted it
  * deliberately, and blinding the pet is not the same as refusing what it is passed — a
  * paused pet is still worth talking to about text you give it.
  */
 export const SIGHT_POLICY: { readonly [K in keyof Platform]: 'sight' | 'handed-over' } = {
   getActiveWindow: 'sight',
-  captureActiveWindowImage: 'sight',
-  captureDisplays: 'sight',
   listWindows: 'sight',
   readWindowText: 'sight',
   lookAtWindow: 'sight',
   captureSelection: 'handed-over',
-  readClipboard: 'handed-over',
 };
 
 /**

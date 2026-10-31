@@ -162,11 +162,4 @@ describe('JobsPanel', () => {
     unmount();
     expect(off).toHaveBeenCalled();
   });
-
-  it('shows nothing on a host without jobs', () => {
-    const bridge = createFakeHostBridge();
-    delete bridge.listJobs;
-    renderPanel(bridge);
-    expect(screen.queryByRole('region', { name: 'Jobs' })).toBeNull();
-  });
 });

@@ -1,12 +1,6 @@
 /** Tests for the context snapshot and its displays, windows and dropped items. */
 import { describe, expect, it } from 'vitest';
-import {
-  ContextSnapshot,
-  DisplaySnapshot,
-  MAX_SELECTION_CHARS,
-  PerceptionTarget,
-  WindowEntry,
-} from './context';
+import { ContextSnapshot, DisplaySnapshot, MAX_SELECTION_CHARS, WindowEntry } from './context';
 
 const valid = {
   id: '9f1d6b64-2a5e-4f3a-9c11-8a2e7b4d5c60',
@@ -44,19 +38,6 @@ describe('ContextSnapshot', () => {
       ContextSnapshot.safeParse({ ...valid, selection: 'x'.repeat(MAX_SELECTION_CHARS + 1) })
         .success,
     ).toBe(false);
-  });
-
-  it('accepts a png screenshot block', () => {
-    const parsed = ContextSnapshot.parse({
-      ...valid,
-      screenshot: { mime: 'image/png', base64: 'aGk=', width: 1568, height: 900 },
-    });
-    expect(parsed.screenshot?.width).toBe(1568);
-  });
-
-  it('rejects a screenshot that is not png', () => {
-    const screenshot = { mime: 'image/jpeg', base64: 'aGk=', width: 10, height: 10 };
-    expect(ContextSnapshot.safeParse({ ...valid, screenshot }).success).toBe(false);
   });
 });
 
@@ -161,82 +142,5 @@ describe('WindowEntry', () => {
     });
     expect(parsed.blocked?.rule).toBe('processName');
     expect(parsed.textChars).toBeUndefined();
-  });
-});
-
-describe('ContextSnapshot, full view fields', () => {
-  it('parses a snapshot carrying displays, a composite and a window inventory', () => {
-    const parsed = ContextSnapshot.parse({
-      ...valid,
-      displays: [{ ...display, image: png }],
-      composite: png,
-      windows: [window_],
-    });
-    expect(parsed.displays).toHaveLength(1);
-    expect(parsed.composite?.mime).toBe('image/png');
-    expect(parsed.windows?.[0]?.processName).toBe('Code.exe');
-  });
-
-  it('still parses a snapshot with none of them', () => {
-    const parsed = ContextSnapshot.parse(valid);
-    expect(parsed.displays).toBeUndefined();
-    expect(parsed.composite).toBeUndefined();
-    expect(parsed.windows).toBeUndefined();
-  });
-
-  it('accepts an empty display list without accepting a malformed one', () => {
-    expect(ContextSnapshot.safeParse({ ...valid, displays: [] }).success).toBe(true);
-    expect(ContextSnapshot.safeParse({ ...valid, displays: [{ id: 1 }] }).success).toBe(false);
-  });
-
-  it('rejects a composite that is not a PNG', () => {
-    expect(
-      ContextSnapshot.safeParse({ ...valid, composite: { ...png, mime: 'image/jpeg' } }).success,
-    ).toBe(false);
-  });
-});
-
-describe('PerceptionTarget', () => {
-  it('knows the two new full-view targets', () => {
-    expect(PerceptionTarget.safeParse('displays').success).toBe(true);
-    expect(PerceptionTarget.safeParse('windows').success).toBe(true);
-  });
-
-  it('still knows the original perception targets', () => {
-    for (const target of ['selection', 'screenshot', 'activeWindow', 'clipboard']) {
-      expect(PerceptionTarget.safeParse(target).success, target).toBe(true);
-    }
-  });
-
-  it('does not know pageText, which no body produces', () => {
-    expect(PerceptionTarget.safeParse('pageText').success).toBe(false);
-  });
-});
-
-describe('ContextSnapshot.dropped', () => {
-  const png = { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 4, height: 3 };
-
-  it('parses each kind of thing dropped on Scout', () => {
-    for (const dropped of [
-      { kind: 'text', text: 'a paragraph' },
-      { kind: 'link', text: 'https://example.com/post' },
-      { kind: 'file', name: 'report.md', path: 'C:\\work\\report.md', size: 120, text: '# Hi' },
-      { kind: 'image', name: 'chart.png', path: '/home/a/chart.png', image: png },
-    ]) {
-      expect(ContextSnapshot.parse({ ...valid, dropped }).dropped).toEqual(dropped);
-    }
-  });
-
-  it('rejects an unknown kind', () => {
-    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'folder' } }).success).toBe(
-      false,
-    );
-  });
-
-  it('rejects dropped text past the selection cap', () => {
-    const text = 'x'.repeat(MAX_SELECTION_CHARS + 1);
-    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'text', text } }).success).toBe(
-      false,
-    );
   });
 });

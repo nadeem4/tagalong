@@ -31,9 +31,9 @@ export function WhereThingsRun() {
   const [apps, setApps] = useState<AppInfo[]>([]);
 
   const refresh = useCallback(() => {
-    void bridge.brainLink?.().then(setLink, () => undefined);
+    void bridge.brainLink().then(setLink, () => undefined);
     // Offline the list call fails; the note below covers it, and apps only render when online.
-    void bridge.listConnections?.().then(
+    void bridge.listConnections().then(
       (latest) => setApps(latest.apps),
       () => undefined,
     );
@@ -41,19 +41,19 @@ export function WhereThingsRun() {
 
   useEffect(() => {
     refresh();
-    const stopBrain = bridge.onBrainChanged?.((what) => {
+    const stopBrain = bridge.onBrainChanged((what) => {
       if (what === 'link' || what === 'apps') refresh();
     });
     const stopTurn = bridge.onTurnEvent((event) => {
       if (event.type === 'connections.changed') refresh();
     });
     return () => {
-      stopBrain?.();
+      stopBrain();
       stopTurn();
     };
   }, [bridge, refresh]);
 
-  if (bridge.brainLink === undefined || link === null) return null;
+  if (link === null) return null;
   const state = LINK[link.status];
 
   return (

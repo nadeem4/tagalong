@@ -23,10 +23,8 @@ export function ApprovalsView() {
   const latest = useRef(0);
 
   const refresh = useCallback(() => {
-    const list = bridge.listApprovals;
-    if (list === undefined) return;
     const mine = ++latest.current;
-    Promise.all([list.call(bridge, filter), bridge.listPreferences?.() ?? Promise.resolve([])])
+    Promise.all([bridge.listApprovals(filter), bridge.listPreferences()])
       .then(([page, prefs]) => {
         if (mine !== latest.current) return;
         setFailed(false);
@@ -44,7 +42,7 @@ export function ApprovalsView() {
 
   useEffect(() => {
     refresh();
-    return bridge.onBrainChanged?.((what) => {
+    return bridge.onBrainChanged((what) => {
       if (what === 'approvals') refresh();
     });
   }, [bridge, refresh]);
@@ -76,15 +74,13 @@ export function ApprovalsView() {
   // Each action rejects when the brain refuses it, so the card can say so; the list is read
   // again after a success only.
   const remove = async (id: number): Promise<void> => {
-    await bridge.removePreference?.(id);
+    await bridge.removePreference(id);
     refresh();
   };
   const edit = async (id: number, sentence: string): Promise<void> => {
-    await bridge.editPreference?.(id, sentence);
+    await bridge.editPreference(id, sentence);
     refresh();
   };
-
-  if (bridge.listApprovals === undefined) return null;
 
   return (
     <>

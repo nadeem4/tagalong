@@ -488,8 +488,7 @@ on `tagalongHost`. See [voice.md](voice.md).
 ### The platform adapter
 
 Everything OS-specific sits behind `Platform` (`src/main/platform/index.ts`):
-`getActiveWindow`, `captureSelection`, `readClipboard`, `captureActiveWindowImage`,
-`captureDisplays`, `listWindows`, `readWindowText` and `lookAtWindow`.
+`getActiveWindow`, `captureSelection`, `listWindows`, `readWindowText` and `lookAtWindow`.
 Each method that reads the screen takes the exclusion list, so a refusal happens
 inside the read. `createPlatform(platform = process.platform)` returns `Win32Platform` on
 `win32` and throws "Tagalong has no platform adapter for '…'. It runs on Windows only." anywhere
@@ -500,7 +499,7 @@ Each capability is a free function taking its Electron dependencies (`desktopCap
 `nativeImage`) as ports, and `Win32Platform` only wires the real ones in, so the perception layer
 is tested in plain Node with no display. `nut-js` and `get-windows` are imported lazily inside
 `win32.ts` because both load native code. The adapter's internals (PowerShell over
-`-EncodedCommand`, the inventory, OCR, the composite) are in [sight.md](sight.md).
+`-EncodedCommand`, the inventory, OCR) are in [sight.md](sight.md).
 
 ### The log file
 
@@ -589,7 +588,7 @@ Scripts (`bodies/desktop/package.json`): every build, run and package script fir
 `electron-builder --win nsis --x64 --publish never`. `fetch-native.mjs` exists because
 `get-windows` is in the root `pnpm.ignoredBuiltDependencies`, which also skips the download of its
 prebuilt binary; it runs that download (never a compile), and a failure is only a warning: without
-the binding the active-window lookup answers no window and a look captures the whole screen.
+the binding the active-window lookup answers no window and the ask carries no app name.
 `package:mac`, `package:linux` and `package:dir` build the other targets. `start:fresh` runs the
 app on a new temporary `--user-data-dir`, so a run never touches real data.
 
@@ -668,7 +667,7 @@ the clean close and stops the brain client.
 
 Main holds the one brain connection, so the brain's address never needs to reach a window. Every capture
 is announced on the avatar and in the tray tooltip. The log file keeps only kept text with secrets
-hidden. Main reads the clipboard only when a turn asks for it (`readClipboard`); the selection copy saves and restores it; Settings' Copy buttons write a path or address to it. A dropped item is named on drop and read only
+hidden. Main never reads the clipboard for its content; the selection copy saves and restores it; Settings' Copy buttons write a path or address to it. A dropped item is named on drop and read only
 when a button on its card asks. See [privacy.md](privacy.md).
 
 ## Tests that pin it

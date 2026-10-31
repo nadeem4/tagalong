@@ -129,15 +129,9 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
 - **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](brain.md#experts)). A note you ask Scout to pass to a working expert
   (`tell_expert`) leaves the machine to that expert like the brief did.
-- **A monitor with an excluded window on it.** If a password manager is open and visible on your
-  second screen, that whole screen is blanked in the full-view capture — not just when it is the
-  window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
-  the pet can see that something was withheld rather than being handed a gap it might guess at.
-  Minimized windows do not blank their monitor: a vault in the taskbar is not on screen, and
-  blanking a screen you are working on because something is hidden would be a bug, not caution.
-  The same check runs before a plain screenshot falls back to a whole screen: a screen with an
-  excluded window on it is never photographed. When Tagalong cannot tell which screen
-  a picture is of, it takes none while anything at all is blocked.
+- **A monitor with an excluded window on it.** Tagalong never photographs a whole screen, only
+  one listed window at a time, and a window on the exclusion list is refused before any pixel is
+  read. A password manager open beside the window Scout looks at is not in the picture.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 
 ## The rest

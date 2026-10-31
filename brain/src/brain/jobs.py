@@ -66,7 +66,6 @@ class Jobs:
         self._clock = clock
         self._scout = scout_questions
         self._approvals = approvals  # None records nothing
-        self._side_check = side_check  # None: every permission goes to the person
         self._offers = offers  # None: no offers to auto-approve
         if guards is None:
             # Standalone jobs: build the same ask chain the Session registers.

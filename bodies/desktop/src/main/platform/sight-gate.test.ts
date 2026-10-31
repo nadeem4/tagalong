@@ -19,9 +19,6 @@ function openPlatform(): Platform {
       bounds: { x: 0, y: 0, width: 800, height: 600 },
     }),
     captureSelection: async () => 'the highlighted paragraph',
-    readClipboard: async () => 'clipboard contents',
-    captureActiveWindowImage: async () => ({ base64: 'cG5n', width: 10, height: 10 }),
-    captureDisplays: async () => ({ displays: [], composite: null }),
     listWindows: async () => ({ windows: [] }),
     readWindowText: async () => ({
       windowId: 'w-1',
@@ -40,12 +37,6 @@ function callOf(platform: Platform, method: keyof Platform): () => Promise<unkno
       return () => platform.getActiveWindow();
     case 'captureSelection':
       return () => platform.captureSelection();
-    case 'readClipboard':
-      return () => platform.readClipboard();
-    case 'captureActiveWindowImage':
-      return () => platform.captureActiveWindowImage(1568, NOTHING_EXCLUDED);
-    case 'captureDisplays':
-      return () => platform.captureDisplays(1568, NOTHING_EXCLUDED);
     case 'listWindows':
       return () => platform.listWindows(NOTHING_EXCLUDED);
     case 'readWindowText':
@@ -66,13 +57,10 @@ describe('SIGHT_POLICY', () => {
     // asserts the runtime object really carries every key, which is what the gate walks.
     expect(METHODS.sort()).toEqual(
       [
-        'captureActiveWindowImage',
-        'captureDisplays',
         'captureSelection',
         'getActiveWindow',
         'listWindows',
         'lookAtWindow',
-        'readClipboard',
         'readWindowText',
       ].sort(),
     );
@@ -80,22 +68,15 @@ describe('SIGHT_POLICY', () => {
 
   it('gates every method that reads the screen', () => {
     expect(GATED.sort()).toEqual(
-      [
-        'getActiveWindow',
-        'captureActiveWindowImage',
-        'captureDisplays',
-        'listWindows',
-        'readWindowText',
-        'lookAtWindow',
-      ].sort(),
+      ['getActiveWindow', 'listWindows', 'readWindowText', 'lookAtWindow'].sort(),
     );
   });
 
-  it('leaves the two the user hands over deliberately', () => {
-    // The selection and the clipboard are not sight: the user highlighted or copied them
-    // on purpose. Pausing sight blinds the pet; it does not stop the user handing it
-    // something, which is what makes a paused pet still worth talking to.
-    expect(OPEN.sort()).toEqual(['captureSelection', 'readClipboard']);
+  it('leaves the one the user hands over deliberately', () => {
+    // The selection is not sight: the user highlighted it on purpose. Pausing sight blinds
+    // the pet; it does not stop the user handing it something, which is what makes a paused
+    // pet still worth talking to.
+    expect(OPEN.sort()).toEqual(['captureSelection']);
   });
 });
 
@@ -125,11 +106,10 @@ describe('gateSight while paused', () => {
     }
   });
 
-  it('still lets the user hand over a selection and a clipboard', async () => {
+  it('still lets the user hand over a selection', async () => {
     const gated = gateSight(openPlatform(), () => true);
 
     expect(await gated.captureSelection()).toBe('the highlighted paragraph');
-    expect(await gated.readClipboard()).toBe('clipboard contents');
   });
 
   it('never reaches the platform at all for a gated call', async () => {
@@ -139,15 +119,15 @@ describe('gateSight while paused', () => {
     const platform = openPlatform();
     const spy: Platform = {
       ...platform,
-      captureDisplays: async (...args) => {
+      listWindows: async (...args) => {
         reached = true;
-        return platform.captureDisplays(...args);
+        return platform.listWindows(...args);
       },
     };
 
-    await expect(
-      gateSight(spy, () => true).captureDisplays(1568, NOTHING_EXCLUDED),
-    ).rejects.toThrow(SightPausedError);
+    await expect(gateSight(spy, () => true).listWindows(NOTHING_EXCLUDED)).rejects.toThrow(
+      SightPausedError,
+    );
     expect(reached).toBe(false);
   });
 
