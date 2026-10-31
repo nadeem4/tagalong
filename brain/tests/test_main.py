@@ -4,12 +4,14 @@ import asyncio
 import io
 import logging
 import os
+import sys
 
 import pytest
 
 from brain import main
 from brain.main import _run
 from brain.masking import Masker, SecretLogFilter
+from brain.voice.service import VoiceService
 
 
 def test_missing_api_key_exits(monkeypatch, tmp_path):
@@ -44,6 +46,27 @@ def test_main_opens_db_under_data_dir(monkeypatch, tmp_path):
     with pytest.raises(Stop):
         asyncio.run(_run())
     assert (tmp_path / "tagalong.db").exists()
+
+
+def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    seen = {}
+
+    async def stop(host, port, bodies, session_id, session):
+        seen["voice"] = session.voice
+        raise Stop
+
+    for name in ("moonshine_voice", "onnxruntime"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    assert isinstance(seen["voice"], VoiceService)
+    assert "moonshine_voice" not in sys.modules and "onnxruntime" not in sys.modules
 
 
 def test_memory_open_failure_exits(monkeypatch, tmp_path):

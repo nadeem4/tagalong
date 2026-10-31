@@ -125,7 +125,9 @@ class Ears:
             if self._in_speech:
                 self._close_stretch(stopping=True)
         except Exception:
-            log.warning("the speech model failed; ending the turn with what was heard", exc_info=True)
+            log.warning(
+                "the speech model failed; ending the turn with what was heard", exc_info=True
+            )
         finally:
             self._end_turn(held=True)
 

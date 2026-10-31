@@ -97,9 +97,7 @@ async def _download(
             raise ModelIntegrityError(file.path)
 
 
-async def _ensure(
-    folder: Path, files: list[ModelFile], fetch: Fetch, report: Progress
-) -> None:
+async def _ensure(folder: Path, files: list[ModelFile], fetch: Fetch, report: Progress) -> None:
     missing = [f for f in files if not await _verified(folder / f.path, f)]
     if not missing:
         report(1.0)

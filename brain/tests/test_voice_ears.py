@@ -4,14 +4,16 @@ Ported from the desktop's local-ears tests; each frame is 32 ms and loud means s
 """
 
 import pytest
+from fake_voice import LOUD, QUIET, LevelVad, WordStt, parts, soft
 
 from brain.voice.ears import GIVE_UP_FRAMES, MAX_STRETCH_FRAMES, PAUSE_FRAMES, PRE_ROLL_FRAMES, Ears
-from fake_voice import LOUD, QUIET, LevelVad, WordStt, parts, soft
 
 
 def hear(mode, p):
     events: list[str] = []
-    ears = Ears(p, mode, lambda event, text: events.append(event if text is None else f"{event}:{text}"))
+    ears = Ears(
+        p, mode, lambda event, text: events.append(event if text is None else f"{event}:{text}")
+    )
     return ears, events
 
 

@@ -16,7 +16,9 @@ from brain.voice.models import (
 
 
 def file_for(path: str, data: bytes) -> ModelFile:
-    return ModelFile(f"https://example.test/{path}", path, len(data), hashlib.sha256(data).hexdigest())
+    return ModelFile(
+        f"https://example.test/{path}", path, len(data), hashlib.sha256(data).hexdigest()
+    )
 
 
 class Net:
