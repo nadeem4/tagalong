@@ -227,7 +227,7 @@ that launch the built app: `smoke.spec.ts` (the bubble, talking, a tool call, pa
 `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
 that starts with "Scout" is heard and answered, switched off), `brain-offline.spec.ts`,
-`asks.spec.ts` (the permission ask in the bubble), `approvals.spec.ts` (Home's Approvals page and
+`walkthrough.spec.ts` (the first-run tour and its key step, on a fake brain whose key state and `set_api_key` answers a test scripts), `asks.spec.ts` (the permission ask in the bubble), `approvals.spec.ts` (Home's Approvals page and
 the `approved` report card), `jobs.spec.ts` (Claude Code jobs and their cards), `permissions.spec.ts`
 (Home's Permissions list) and `where-things-run.spec.ts` (Overview's "Where things run" card). Run
 them with `pnpm --filter @tagalong/desktop test:e2e`.

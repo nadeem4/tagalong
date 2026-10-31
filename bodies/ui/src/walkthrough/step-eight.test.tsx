@@ -52,7 +52,11 @@ describe('StepEight', () => {
     await screen.findByDisplayValue('5');
     for (const bad of ['0', '-3', '', 'abc']) {
       fireEvent.change(limit(), { target: { value: bad } });
-      await expect(step.save()).rejects.toThrow('Enter an amount above $0.');
+      const failure = await step.save().then(
+        () => null,
+        (error: unknown) => error,
+      );
+      expect((failure as Error | null)?.message).toBe('Enter an amount above $0.');
     }
     expect(host.setDailyLimit).not.toHaveBeenCalled();
   });

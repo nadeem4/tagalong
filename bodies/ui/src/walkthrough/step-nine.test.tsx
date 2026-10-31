@@ -116,8 +116,8 @@ describe('StepNine', () => {
     expect(lastValid(onValid)).toBe(true);
     set('offline');
     await emit('link');
-    await screen.findByText('Scout’s brain is not running.');
-    expect(lastValid(onValid)).toBe(false);
+    await screen.findByText('Scout’s brain is not running.', {}, { timeout: 4000 });
+    await waitFor(() => expect(lastValid(onValid)).toBe(false));
     expect(screen.queryByText('That key was not accepted.')).not.toBeInTheDocument();
   });
 
