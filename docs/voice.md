@@ -4,7 +4,7 @@
 
 How Scout hears and speaks. This covers the talk key, the mic button, Always listening, the
 follow-up window, barge-in, and the speech models in the voice utility process. On the speaking
-side it covers Kokoro, ElevenLabs and the system voice. Speech to text runs on this computer. The
+side it covers Kokoro and the system voice. Speech to text runs on this computer. The
 configured brain still answers: a heard question goes to the brain as an ordinary ask with
 `spoken: true`.
 
@@ -15,7 +15,7 @@ configured brain still answers: a heard question goes to the brain as an ordinar
 | Shared types and rules         | `bodies/ui/src/shapes/voice.ts` (`Ears`, `Mouth`, `ListenMode`, `EARS_IDS`, `MOUTH_IDS`), `bodies/desktop/src/shared/voice.ts` (`EARS_SAMPLE_RATE`, `EARS_FRAME`, `mouthOrder`, `chosenMouth`, `VOICE_ADAPTERS`), `bodies/ui/src/shapes/addressing.ts` (`addressedToScout`, `isStopListening`, `mightBeStop`, `FOLLOW_UP_MS`), `bodies/desktop/src/shared/settings.ts` (`TALK_KEYS`, `TALK_KEY_LABELS`, `voice`, `listening`, `hotkeys.talk`), `bodies/ui/src/shapes/status.ts` (the ears and mic marks) |
 | Voice utility process          | `bodies/desktop/src/main/voice/worker/main.ts` (entry), `messages.ts`, `handler.ts`, `ears-host.ts`, `client.ts` (`VoiceWorker`, in main), `worker-local-voice.ts` (`WorkerLocalVoice`, in main)                                                                                                                                                                                                                                                                                                         |
 | Ears (voice process)           | `bodies/desktop/src/main/voice/ears/local-ears.ts`, `ort-ears.ts`, `smart-turn.ts`, `load-ears.ts`, `fake-ears.ts`, `model-files.ts`                                                                                                                                                                                                                                                                                                                                                                     |
-| Mouth (main and voice process) | `bodies/desktop/src/main/voice/voice.ts` (`createVoiceService`, `LazyLocalVoice`, `localMouth`, `elevenLabsMouth`, `fakeTts`), `kokoro.ts`, `elevenlabs.ts`, `model-cache.ts`                                                                                                                                                                                                                                                                                                                            |
+| Mouth (main and voice process) | `bodies/desktop/src/main/voice/voice.ts` (`createVoiceService`, `LazyLocalVoice`, `localMouth`, `fakeTts`), `kokoro.ts`, `model-cache.ts`                                                                                                                                                                                                                                                                                                                                                                |
 | Talk key (main)                | `bodies/desktop/src/main/talk-key.ts` (`TalkKeyWatch`, `startTalkKey`, `loadKeyHook`), `talkPressed` and `toPanel` in `bodies/desktop/src/main/index.ts`                                                                                                                                                                                                                                                                                                                                                 |
 | Always listening (main)        | `bodies/desktop/src/main/always-listening.ts` (`AlwaysListening`, `listeningPaused`, `startListeningGuard`, `saveListening`), `markListening` in `bodies/desktop/src/main/status-marks.ts`                                                                                                                                                                                                                                                                                                               |
 | IPC                            | `bodies/desktop/src/main/ipc/voice.ts` (`registerVoiceIpc`, `forwardEars`), channels and types in `bodies/desktop/src/shared/ipc.ts`, the bridge in `bodies/desktop/src/preload/index.ts`                                                                                                                                                                                                                                                                                                                |
@@ -570,8 +570,7 @@ flowchart LR
     PL --> SY["speechSynthesis"]
   end
   subgraph Main["Main"]
-    VS["createVoiceService: mouthOrder"] --> EL["ElevenLabs"]
-    VS --> WL["WorkerLocalVoice"]
+    VS["createVoiceService: mouthOrder"] --> WL["WorkerLocalVoice"]
   end
   subgraph VP["Voice process"]
     KO["LazyLocalVoice: Kokoro"]
@@ -640,17 +639,14 @@ flowchart LR
   no download and no network.
 - **The order.** Otherwise the service walks `mouthOrder(preview?.mouth ?? chosenMouth(voice))`:
   the chosen mouth, then `kokoro` (`LOCAL_MOUTH`), then `system`, each once.
-  - `chosenMouth` is `voice.mouth` when set. When it is unset, a non-empty `elevenLabsVoiceId`
-    means `elevenlabs`, and anything else means `kokoro`.
+  - `chosenMouth` is `voice.mouth` when set, and `kokoro` when it is unset.
   - For each mouth other than `system`: if it is not `usable()`, the service skips it. If its
     `speak` returns `null` (not ready), the service moves on. If it throws, the service logs
     `[voice] <id> failed, trying the next voice` and moves on.
   - Reaching `system` answers `{ kind: 'fallback', speed }`, the preview speed or the saved one.
-- **The mouths.** The `MouthEngines` registry has two entries:
+- **The mouths.** The `MouthEngines` registry has one entry, since the system voice is the window's own:
   - `kokoro` (`localMouth`) is always usable. If Kokoro is not `ready()`, it calls `warm()` and
     returns `null`, so the first line before the model loads falls through.
-  - `elevenlabs` (`elevenLabsMouth`) is usable only when the `elevenlabs.apiKey` secret is
-    non-empty and `elevenLabsVoiceId` is set.
 - **Preview.** A preview overrides `voice`, `speed` and `mouth` with what the form shows.
 - **`warmAtStart(downloaded)`** calls `local.warm()` only when Kokoro was downloaded on an earlier
   run, Scout talks is on, the chosen mouth is not `system`, and the fake is off. It never starts a
@@ -666,19 +662,6 @@ process exits. In the voice process:
   `KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: 'q8', device: 'cpu' })`.
 - `speak` calls `generate(text, { voice, speed })` and returns `toWav()` as `audio/wav`.
 - The voices are `bm_george` (default) and `bm_fable`.
-
-**ElevenLabs** (`elevenlabs.ts#elevenLabsTts`):
-
-- It POSTs to
-  `https://api.elevenlabs.io/v1/text-to-speech/<voiceId>/stream?output_format=mp3_44100_128`.
-  The headers are `xi-api-key` and `accept: audio/mpeg`. The body is
-  `{ text, model_id: 'eleven_flash_v2_5', voice_settings: { speed } }`.
-- The speed is clamped to `MIN_VOICE_SPEED`–`MAX_ELEVENLABS_SPEED` (0.7–1.2), ElevenLabs' own bounds. The
-  settings slider matches: with ElevenLabs chosen it stops at 1.2 and shows a higher saved speed as 1.2.
-  Saving with ElevenLabs chosen stores the capped speed, which every voice then uses.
-- The request is aborted after `ELEVENLABS_TIMEOUT_MS` (15 s), audio included.
-- A non-OK status throws, so the line falls to Kokoro.
-- Only the line is sent.
 
 #### Playing
 
@@ -745,21 +728,19 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 `bodies/desktop/src/shared/settings.ts`.
 
-| Field                     | Default                          | Meaning                                                                      |
-| ------------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
-| `voice.enabled`           | `true`                           | Scout talks.                                                                 |
-| `voice.voice`             | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                     |
-| `voice.speed`             | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3 (slider: 1.2 for ElevenLabs). |
-| `voice.elevenLabsVoiceId` | `''`                             | A voice from the person's ElevenLabs library.                                |
-| `voice.microphoneId`      | absent                           | Absent means the system default.                                             |
-| `voice.mouth`             | absent                           | `kokoro`, `elevenlabs` or `system`. Absent means `chosenMouth` decides.      |
-| `voice.ears`              | absent                           | Only `local` exists (`EARS_IDS`).                                            |
-| `listening.always`        | `false`                          | Always listening.                                                            |
-| `hotkeys.talk`            | `'RightControl'`                 | One of `TALK_KEYS`.                                                          |
-| `hotkeys.stopVoice`       | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                |
+| Field                | Default                          | Meaning                                        |
+| -------------------- | -------------------------------- | ---------------------------------------------- |
+| `voice.enabled`      | `true`                           | Scout talks.                                   |
+| `voice.voice`        | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.       |
+| `voice.speed`        | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3 |
+| `voice.microphoneId` | absent                           | Absent means the system default.               |
+| `voice.mouth`        | absent                           | `kokoro` or `system`. Absent means `kokoro`.   |
+| `voice.ears`         | absent                           | Only `local` exists (`EARS_IDS`).              |
+| `listening.always`   | `false`                          | Always listening.                              |
+| `hotkeys.talk`       | `'RightControl'`                 | One of `TALK_KEYS`.                            |
+| `hotkeys.stopVoice`  | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                  |
 
-The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
-`settings-and-secrets.md`. The voice fields that chat can change are listed there too.
+See `settings-and-secrets.md` for the whole schema.
 
 ## Constants and limits
 
@@ -785,8 +766,6 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 | `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms                                      | `status-marks.ts`                                 |
 | Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                            |
 | `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                    |
-| `ELEVENLABS_TIMEOUT_MS`                  | 15,000 ms                                                | `elevenlabs.ts`                                   |
-| ElevenLabs speed clamp                   | 0.7–1.2 (`MAX_ELEVENLABS_SPEED`)                         | `elevenlabs.ts`, `settings.ts`                    |
 | Download attempts per file               | 2                                                        | `model-files.ts`                                  |
 | Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                  |
 
@@ -817,7 +796,6 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 | Voice process exits                                                                  | Pending calls reject. Windows get `failed`, "Listening stopped unexpectedly. Try again." The `ears-failed` mark is set only if the ears were used in that process. The next call forks a fresh process, so the next talk press listens again (pinned in `ipc/voice.test.ts` and `listen-controller.test.ts`). |
 | Ears status `failed` in the panel                                                    | `earsFailed()` drops every question and ends the always session, then retries with back-off. `EarsNotes` shows the failure line once and clears the first-time download note. The note is shown only if a question was being asked or always listening was running.                                           |
 | Kokoro not loaded or failed                                                          | The line falls through to `system` (`fallback`). The next line tries the load again.                                                                                                                                                                                                                          |
-| ElevenLabs refused, timed out or offline                                             | It is logged, and the line falls through to Kokoro, then to the system voice.                                                                                                                                                                                                                                 |
 | A line fails to play                                                                 | `SpeechQueue` logs `[voice] a line could not be spoken` and plays the next.                                                                                                                                                                                                                                   |
 | Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                                                                         |
 | A mic frame cannot reach the voice process                                           | It is logged, and the next frame still goes.                                                                                                                                                                                                                                                                  |
@@ -835,10 +813,9 @@ words, holders and clearing rules are in [bubble.md](bubble.md#status-marks). `r
   The ask carries the name of the window you are on (`noteActiveWindow`), never the selection,
   because copying the selection would press keys while the talk key is held.
 - **What leaves the machine for speech.**
-  - ElevenLabs gets the text of each line it speaks, and only when it is the chosen and usable
-    mouth.
+  - No spoken word or heard sound is sent anywhere.
   - The model downloads go to `huggingface.co`, fetching files only.
-  - ElevenLabs is never used for hearing (no cloud speech to text).
+  - There is no cloud speech to text.
 - **The key hook.** It compares every key event with one keycode and drops it.
 - **Always listening.** It is opt-in. It pauses for calls, full screen, and hidden pets.
   A mark on Scout always shows while it is on. An unaddressed turn is dropped, and its words are
@@ -856,8 +833,7 @@ The full statement is in `privacy.md`.
 | `bodies/desktop/src/main/voice/ears/fake-ears.test.ts`                                                                    | The fake transcripts in both modes.                                                                                                                                                                   |
 | `bodies/desktop/src/main/voice/worker/ears-host.test.ts`                                                                  | Frames buffered while loading, one session at a time, superseded and skipped sessions, the held drain after stop, and the failure lines and reload.                                                   |
 | `bodies/desktop/src/main/voice/worker/client.test.ts`, `handler.test.ts`, `worker-local-voice.test.ts`                    | Lazy fork, id matching, every pending call rejected on exit, `kokoro.ready`.                                                                                                                          |
-| `bodies/desktop/src/main/voice/voice.test.ts`                                                                             | The mouth order and fall-through, the ElevenLabs gating, off and preview, `warmAtStart`, the system voice choice never loading Kokoro, the fake.                                                      |
-| `elevenLabsTts` cases in `bodies/desktop/src/main/voice/voice.test.ts`                                                    | The ElevenLabs request shape, timeout and fall-through.                                                                                                                                               |
+| `bodies/desktop/src/main/voice/voice.test.ts`                                                                             | The mouth order and fall-through, off and preview, `warmAtStart`, the system voice choice never loading Kokoro, the fake.                                                                             |
 | `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                            |
 | `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, `forwardEars` addressing (follow-up, "stop", `mightBeStop`), marks, the voice-process exit.                                                                 |
 | `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                           |

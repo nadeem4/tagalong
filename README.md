@@ -102,14 +102,14 @@ its bodies fit together.
 | In this build                                                                                                                                                                                                                                                                                                 | Not in this build                                                   |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Windows desktop app with an NSIS installer                                                                                                                                                                                                                                                                    | macOS and Linux (the installer configs exist but are unverified)    |
-| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                                                                                                                                                                                                     | Speech to text through ElevenLabs                                   |
-| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                                                                                                                                                                                       |                                                                     |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                                                                                                                                                                                                     |                                                                     |
+| Scout talks: answers read aloud in a calm British voice, made on this computer                                                                                                                                                                                                                                |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                                                                                                                                                                                              |                                                                     |
 | Scout thinks with your Anthropic key, set in the brain's `.env`                                                                                                                                                                                                                                               | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                                                                                          |                                                                     |
 | Timers: Scout sets its own reminders and repeating checks, and speaks first when a job ends or you come back                                                                                                                                                                                                  |                                                                     |
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                |                                                                     |
-| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             | ElevenLabs voice cost on the Spend card                             |
+| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                                                                                                                                                                                             |                                                                     |
 |                                                                                                                                                                                                                                                                                                               | Data export and delete-all in Settings                              |
 | Memory across restarts                                                                                                                                                                                                                                                                                        | Code signing (the installer is unsigned) and an app icon of its own |
 | The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, searches history, bookmarks and downloads, acts on tabs, and takes questions from a right-click or the address bar, in Chrome, Edge and other Chromium browsers, after you allow each step |                                                                     |
@@ -170,7 +170,7 @@ front, aloud in full: the text itself, lists as sentences, code described rather
 Ask "summarise this" and it speaks a summary; for something long it gives the gist first. The stop key, ×
 and the bars cut it off. Ask "what's in this chart?" (or about a photo, diagram or screenshot) and
 Scout gives the kind, the axes, the trend and the values that stand out, and says when it can't
-make one out. With ElevenLabs as the voice, the text read goes to ElevenLabs.
+make one out.
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts. See and delete
 what it remembers in Home, or say "Scout, forget that".
@@ -238,15 +238,12 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.
-  - **Advanced**, closed by default: the ElevenLabs voice (your key and a voice ID from your
-    ElevenLabs library).
 
 ## Providers and keys
 
 Scout thinks through the Python brain. It needs `ANTHROPIC_API_KEY` in its environment or in `<TAGALONG_HOME>/.env` (see
 `.env.example`). Experts run on your Claude Code sign-in instead. Keys never pass through the
-desktop, except the ElevenLabs voice key under **Settings → Advanced**, kept in the OS keychain
-and sent only to ElevenLabs.
+desktop.
 
 ## The browser body
 
@@ -291,8 +288,7 @@ such as `.env` are refused.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
-- Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
-  says are sent to ElevenLabs, never your screen or your questions.
+- Scout's voice is made on your computer; the words it speaks are never sent anywhere.
 - When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
   it and is never stored; only the text goes to Scout's provider, like a typed question.
 - The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs.

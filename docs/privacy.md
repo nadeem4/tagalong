@@ -150,10 +150,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   rules: a window that cannot be named is allowed, because a pet that never sees reads as broken.
 - Everything is stored locally in SQLite.
 - Screenshots are never saved: the saved chat keeps only the marker `[screenshot]` (see [memory.md](memory.md#saved-chat)).
-- API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
-- A pasted key is saved to the OS keychain
-  before its one test (one tiny request to that service); a key that fails the test stays there
-  until you replace it or remove it in Settings. It is never spoken, shown or logged.
+- The desktop stores no API keys. Keys are never spoken, shown or logged.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
   computer and the brain: whether a key is stored (never
   the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
@@ -233,8 +230,7 @@ question or the conversation. A health check and an expert's narration are shown
 **Reading aloud.** When you ask Scout to read something to you, it reads your selection or the
 window in front (as for any question about your screen) and says that text, typed or spoken; for
 something long it may give the gist first and ask what you want read. So the text of that window or selection goes to the
-chosen speech engine: it stays on this computer with Kokoro or the system voice, and is sent to
-ElevenLabs when ElevenLabs is the chosen voice. With **Scout talks** off, the reading is only shown
+chosen speech engine, and it stays on this computer with Kokoro or the system voice. With **Scout talks** off, the reading is only shown
 in the bubble.
 
 ```mermaid
@@ -242,10 +238,8 @@ in the bubble.
 flowchart LR
   B["Bubble line"] --> S["Shortened in the panel"]
   S --> M["Main process"]
-  M -->|"your key and a voice ID set"| E["ElevenLabs: the spoken words only"]
   M -->|"default"| K["Kokoro on this computer"]
   M -->|"model still downloading, or failed"| W["System voice in the panel"]
-  E --> P["Played in the panel"]
   K --> P
 ```
 
@@ -256,10 +250,6 @@ flowchart LR
   checked like the listening models (see **Model files are checked** under "Talking to Scout" below).
 - **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
   the operating system's own voice (a British male voice such as Microsoft George when installed).
-- **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or, while nothing is picked there, whenever an ElevenLabs voice ID is set, and only with your own key and a voice ID you picked from your ElevenLabs
-  library, both under Settings → Advanced. Each spoken line is sent to ElevenLabs' Flash model and
-  billed to your account, including every line of a reading aloud. The key is encrypted with the OS keychain like the others. If ElevenLabs
-  fails, Scout uses Kokoro.
 - Nothing spoken is recorded or stored. Closing the bubble or `Ctrl+Shift+Alt+M` stops speech at
   once.
 
@@ -317,7 +307,7 @@ flowchart LR
   you had typed it, with the name of the window you are on (never the selected text).
 - The microphone is the one picked in Settings → Voice, or the system default. Windows' own
   microphone privacy setting applies.
-- There is no cloud speech to text: ElevenLabs is used for Scout's voice only, never for yours.
+- There is no cloud speech to text: Scout's voice is made on this computer, and your voice is never sent anywhere.
 
 ### Always listening
 
@@ -362,8 +352,8 @@ Nothing is said aloud about it.
   counts: a Teams window in front pauses listening even with no
   call, and a call behind another window does not.
 - **Deaf while the system voice speaks.** The system voice is not echo-cancelled, so Scout
-  ignores what it hears while that voice is speaking. Kokoro and ElevenLabs are echo-cancelled,
-  so you can interrupt them by saying "Scout".
+  ignores what it hears while that voice is speaking. Kokoro is echo-cancelled,
+  so you can interrupt it by saying "Scout".
 - **Hold-to-talk and the mic button need no name**, in every case, also while Always listening
   is on: that question is asked as said, then listening carries on.
 - **Closing the bubble does not stop listening.** It drops a question being asked; switch Always
@@ -480,7 +470,7 @@ expert** and **Cancel**.
   (PDF, Word, a WebP or GIF, a file too big): its name, path and size only. Tagalong does not open
   it, and an expert you hand it to reads it from the path. A link or dropped text is passed as it is.
 - **Secrets files are refused.** A file whose name matches the secret-file list (`.env`,
-  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "Looks like a secrets file: not read, not
+  `id_rsa`, `secrets.yaml`, `*.pem` and the rest) gets "Looks like a secrets file: not read, not
   passed on." with no buttons. Secrets inside other text are still hidden on the
   way out, like everything sent to a brain.
 - **Only a button sends it.** With Always listening on, saying "Scout, explain it" while the card

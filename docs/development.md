@@ -55,12 +55,12 @@ tagalong/
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
-                                    # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
+                                    # hotkeys.ts, talk-key.ts, always-listening.ts,
                                     # tray-icon.ts, tray-menu.ts,
                                     # sight-pause.ts, drop.ts, settings-store.ts, hide-secrets.ts,
                                     # log-file.ts, ipc/,
                                     # platform/, voice/, windows/
-      src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
+      src/main/voice/               # voice.ts (the mouths), kokoro.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
                                     # handler.ts, ears-host.ts, worker-local-voice.ts, main.ts (its bootstrap)
       src/main/platform/            # capture, downscale, composite, canvas, label, displays, ocr,
@@ -276,7 +276,7 @@ you normally never call it yourself.
 
 ### Choosing Scout's brain
 
-The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker, no API key rows (apart from the optional ElevenLabs voice key) and no sign-in check.
+The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker, no API key rows and no sign-in check.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -377,20 +377,13 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local`: there is no dotenv dependency, and no code in `protocol/` or `bodies/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Three environment variables are read by the desktop, all straight from the process environment. **Set them in the
+Two environment variables are read by the desktop, both straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
 | Variable              | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_TTS=1` | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
+| `TAGALONG_FAKE_TTS=1` | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                                         |
 | `TAGALONG_FAKE_STT=1` | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
-| `ANTHROPIC_API_KEY`   | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
-| `OPENROUTER_API_KEY`  | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
-| `ELEVENLABS_API_KEY`  | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
-
-Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
-as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
-rather than leaving a key readable on disk.
 
 ## Conventions
 

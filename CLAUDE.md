@@ -39,7 +39,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - The contract package stays pure: protocol/ts depends on zod only and never imports electron, react or browser globals (ESLint enforces). Shared React-free shapes live in bodies/ui/src/shapes (`@tagalong/ui/shapes`).
 - No computer control: no mouse or keyboard automation anywhere. The one exception is the desktop's Ctrl+C selection copy (bodies/desktop/src/main/platform/selection.ts), scoped to reading the selection and restoring the clipboard.
 - Tests run on fakes, never real providers: the fake brain in bodies/desktop/e2e/fixtures and fake clients in the Python tests. A real API call costs the user money; only make one when the user asks in that session.
-- Secrets never enter git: keys live in the environment, `<TAGALONG_HOME>/.env` or the OS keychain. Every variable the code reads appears in .env.example.
+- Secrets never enter git: keys live in the environment or `<TAGALONG_HOME>/.env`. Every variable the code reads appears in .env.example.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md. A contract change also updates protocol/README.md, protocol/examples, protocol/ts and brain/src/brain/protocol.py together.

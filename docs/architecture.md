@@ -42,7 +42,7 @@ flowchart LR
     CS["Page reader<br>injected on demand"]
   end
   P["Python brain<br>brain/, started by hand"]
-  X["Model providers,<br>Claude Code, MCP servers,<br>ElevenLabs"]
+  X["Model providers,<br>Claude Code, MCP servers"]
   R -- "IPC via preload" --> M
   M -- "ws://127.0.0.1:47321" --> P
   M -- "parentPort messages" --> V
@@ -50,7 +50,6 @@ flowchart LR
   PU -- "runtime messages" --> SW
   CS -- "page text" --> SW
   P --> X
-  M -- "ElevenLabs TTS" --> X
 ```
 
 | Process                | Entry point                                    | What runs there                                                                                                                                                                                   |
@@ -104,7 +103,7 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `protocol/ts`    | `@tagalong/contract`: zod schemas for contract v1, the brain-body wire                                                                                                                                              | `node:*`, `electron`, `react`, any `@tagalong/*` | `eslint.config.js` (block for `protocol/ts/**`); its only dependency is `zod`                                                                     |
 | `bodies/ui`      | React components the desktop renders: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge. Its `shapes` export holds the React-free shared shapes        | `electron`, `ws`, `node:*`                       | `shapes/**` may not import React or `../*` (ESLint block and `bodies/ui/src/source-guard.test.ts`); no lint rule bans electron, ws or node:* here |
-| `bodies/desktop` | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings and secret stores (`SafeStorageSecretStore`)                                                                     |                                                  |                                                                                                                                                   |
+| `bodies/desktop` | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings store                                                                                                            |                                                  |                                                                                                                                                   |
 | `bodies/browser` | Browser body (Chromium MV3): the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, right-click and address-bar asks, permission window, popup; speaks the brain contract through `@tagalong/contract` | `@tagalong/ui`                                   | Not a dependency and not a project reference                                                                                                      |
 
 `@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process, the
@@ -158,13 +157,13 @@ pairing or TLS yet (single user).
    See [bubble.md](bubble.md).
 4. **Voice.** The bubble hands each finished line to the desktop's mouth; the renderer calls
    `IPC.speak` (`renderer/src/voice-player.ts`), main synthesises with Kokoro in the voice process
-   or with ElevenLabs, or answers `fallback` for the system voice, and the window plays the audio.
+   or answers `fallback` for the system voice, and the window plays the audio.
    See [voice.md](voice.md).
 
 ## Boot and shutdown
 
 The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform adapter behind the
-sight pause, opens the secret store and settings, records the launch, then
+sight pause, opens the settings, records the launch, then
 calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
 retrying while it is down. The panel and the avatar are created next.
 
@@ -212,5 +211,5 @@ flowchart LR
 | [memory.md](memory.md)                             | The memory store                                                                       | `brain/src/brain/memory.py`                                                                                      |
 | [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `brain/src/brain/apps.py`, `app_tools.py`                                                                        |
 | [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                             |
-| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, the secret store, hiding secrets in logs                               | `bodies/desktop/src/main/settings-store.ts`, `secret-store.ts`, `hide-secrets.ts`                                |
+| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, hiding secrets in logs                                                 | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                   |
 | [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                 |
