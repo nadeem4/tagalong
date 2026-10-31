@@ -152,6 +152,11 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
 - Everything is stored locally in SQLite.
 - Screenshots are never saved: the saved chat keeps only the marker `[screenshot]` (see [memory.md](memory.md#saved-chat)).
 - The desktop stores no API keys. Keys are never spoken, shown or logged.
+- **Your Anthropic key.** You paste it once, in the first-run walkthrough or in Settings. The
+  desktop hands it to your brain in one call and keeps no copy: not in its settings, its logs or
+  the page once it is saved. The brain checks it with one free call to Anthropic (listing models),
+  saves it in its own `.env` in the data folder, and never returns any part of it: the reply is
+  only `ok`, `invalid` or `unreachable`. It is masked in logs and never reaches the saved chat.
 - The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
   computer and the brain: your connections' states,
   the microphones' ids against the one you picked, whether the voice models' files are on disk. Nothing it reads is stored or sent anywhere, and the

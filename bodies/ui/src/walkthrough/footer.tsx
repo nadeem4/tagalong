@@ -13,9 +13,22 @@ interface FooterProps {
   onNext: () => void;
   onSkipStep: () => void;
   onSkipTour: () => void;
+  /** Finish is off until the key step says the key is good. */
+  canFinish?: boolean;
+  onFinish?: () => void;
 }
 
-export function Footer({ step, busy, error, onBack, onNext, onSkipStep, onSkipTour }: FooterProps) {
+export function Footer({
+  step,
+  busy,
+  error,
+  onBack,
+  onNext,
+  onSkipStep,
+  onSkipTour,
+  canFinish = false,
+  onFinish,
+}: FooterProps) {
   const info = STEPS.find((candidate) => candidate.id === step);
   const last = step === STEPS.length;
   return (
@@ -38,7 +51,12 @@ export function Footer({ step, busy, error, onBack, onNext, onSkipStep, onSkipTo
         </button>
       )}
       {last ? (
-        <button type="button" className="wt-primary" disabled>
+        <button
+          type="button"
+          className="wt-primary"
+          disabled={!canFinish || busy}
+          onClick={onFinish}
+        >
           Finish
         </button>
       ) : (

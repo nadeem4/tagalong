@@ -27,8 +27,10 @@ export function registerWalkthroughIpc(handle: IpcHandle, deps: WalkthroughIpcDe
     deps.save({ walkthrough: { done: false } });
     deps.open(stepOf(input));
   });
-  handle(IPC.walkthroughFinish, () => {
+  // Finish marks the tour seen but leaves the finish card up (close: false); the card's own
+  // buttons then close the window. Skip tour and the card's buttons use the default (close).
+  handle(IPC.walkthroughFinish, (_event: unknown, input?: { close?: boolean }) => {
     deps.save({ walkthrough: { done: true } });
-    deps.close();
+    if (input?.close !== false) deps.close();
   });
 }

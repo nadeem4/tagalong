@@ -9,7 +9,7 @@ import { useStepSave, useWalkthroughSettings } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
 // The same four keys Settings offers; the host refuses anything else.
-const TALK_KEYS: readonly { value: string; label: string }[] = [
+export const TALK_KEYS: readonly { value: string; label: string }[] = [
   { value: 'RightControl', label: 'Right Ctrl' },
   { value: 'RightAlt', label: 'Right Alt' },
   { value: 'RightShift', label: 'Right Shift' },

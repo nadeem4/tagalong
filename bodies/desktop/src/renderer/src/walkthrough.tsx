@@ -29,12 +29,17 @@ const walkthroughHost: WalkthroughHost = {
   onBrainChanged: bridge.onBrainChanged,
   openWalkthrough: bridge.openWalkthrough,
   expertStatus: () => host.expertStatus(),
-  finishWalkthrough: () => host.finishWalkthrough(),
+  openKeyPage: () => host.openKeyPage(),
+  finishWalkthrough: (options) => host.finishWalkthrough(options),
   getSettings: async () => (await host.getHostView()).settings,
   // Main validates the patch; the steps send plain strings the form already limited.
   saveSettings: (patch) => host.saveSettings(patch as SettingsPatch),
   previewVoice: (preview) => previewVoice(preview, new AbortController().signal),
   listMicrophones: () => listMicrophones(),
+  browserFolder: () => host.browserFolder(),
+  showBrowserFolder: () => host.showBrowserFolder(),
+  copyText: (text) => navigator.clipboard.writeText(text),
+  openHome: () => host.openHome(),
 };
 
 const stepParam = Number(new URLSearchParams(window.location.search).get('step'));

@@ -247,7 +247,9 @@ const host: TagalongHostApi = {
   },
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
   expertStatus: () => ipcRenderer.invoke(IPC.expertStatus) as Promise<ExpertStatus>,
-  finishWalkthrough: () => ipcRenderer.invoke(IPC.walkthroughFinish) as Promise<void>,
+  finishWalkthrough: (options?: { close?: boolean }) =>
+    ipcRenderer.invoke(IPC.walkthroughFinish, options) as Promise<void>,
+  openKeyPage: () => ipcRenderer.invoke(IPC.keyOpenPage) as Promise<void>,
   getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
   setStatusMark: (id, on) => ipcRenderer.invoke(IPC.setStatusMark, id, on) as Promise<void>,
   onStatusMark: (handler) => {

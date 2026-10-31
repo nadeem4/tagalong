@@ -9,7 +9,10 @@ import { registerKeyIpc } from './key';
 const FAKE_KEY = 'sk-ant-example-not-a-real-key';
 const text = (value: unknown) => [{ type: 'text', text: JSON.stringify(value) }];
 
-function setup(reply: () => unknown) {
+function setup(
+  reply: () => unknown,
+  openExternal: (url: string) => Promise<void> = async () => {},
+) {
   const ipc = fakeIpc();
   const calls: [string, object | undefined][] = [];
   const brain = {
@@ -18,11 +21,25 @@ function setup(reply: () => unknown) {
       return Promise.resolve(reply() as never);
     },
   };
-  registerKeyIpc(ipc.handle, { brain });
+  registerKeyIpc(ipc.handle, { brain, openExternal });
   return { ...ipc, calls };
 }
 
 describe('registerKeyIpc', () => {
+  it('key:open-page opens the Console key page and nothing the renderer names', async () => {
+    const opened: string[] = [];
+    const { invoke } = setup(
+      () => text({}),
+      async (url) => void opened.push(url),
+    );
+    await invoke(IPC.keyOpenPage, 'https://evil.example/');
+    await invoke(IPC.keyOpenPage);
+    expect(opened).toEqual([
+      'https://console.anthropic.com/settings/keys',
+      'https://console.anthropic.com/settings/keys',
+    ]);
+  });
+
   it('key:status maps key_status', async () => {
     const { invoke, calls } = setup(() =>
       text({ has_key: true, source: 'file', env_path: 'C:/home/.env', daily_limit_usd: 5 }),
@@ -55,7 +72,10 @@ describe('registerKeyIpc', () => {
 
   it('key:set returns offline when the brain call rejects as not connected', async () => {
     const ipc = fakeIpc();
-    registerKeyIpc(ipc.handle, { brain: { call: () => Promise.reject(new BrainOffline()) } });
+    registerKeyIpc(ipc.handle, {
+      brain: { call: () => Promise.reject(new BrainOffline()) },
+      openExternal: async () => {},
+    });
     expect(await ipc.invoke(IPC.keySet, FAKE_KEY)).toBe('offline');
   });
 
@@ -63,6 +83,7 @@ describe('registerKeyIpc', () => {
     const ipc = fakeIpc();
     registerKeyIpc(ipc.handle, {
       brain: { call: () => Promise.reject(new Error(`boom with ${FAKE_KEY}`)) },
+      openExternal: async () => {},
     });
     const failure = await ipc.invoke(IPC.keySet, FAKE_KEY).catch((e: unknown) => e as Error);
     expect(failure).toBeInstanceOf(Error);
@@ -71,6 +92,7 @@ describe('registerKeyIpc', () => {
     const rpc = fakeIpc();
     registerKeyIpc(rpc.handle, {
       brain: { call: () => Promise.reject(new RpcError(-32602, 'set_api_key needs a key.')) },
+      openExternal: async () => {},
     });
     await expect(rpc.invoke(IPC.keySet, '')).rejects.toThrow('set_api_key needs a key.');
 

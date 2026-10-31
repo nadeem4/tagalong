@@ -1594,7 +1594,7 @@ with a fake key; the real check against Anthropic is done by hand here.
 
 1. **Action:** delete `settings.json` and start Tagalong, with or without a brain. **Expected:**
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
-2. **Action:** press **Next** through steps 1 to 5; use **Skip for now** on one. **Expected:**
+2. **Action:** press **Next** through the steps; use **Skip for now** on one. **Expected:**
    Back is off on step 1; the side list jumps only to steps you have reached; Skip for now saves
    nothing.
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
@@ -1609,6 +1609,37 @@ with a fake key; the real check against Anthropic is done by hand here.
    hide Scout**. **Expected:** the tour comes forward; the pet stays hidden.
 7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
    **Expected:** the tour opens once; after Finish or Skip tour it never opens again.
+
+### K.5. Steps 6 to 9 and the end
+
+The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
+
+1. **Action:** on step 6 with Claude Code's connector installed. **Expected:** "Claude Code's
+   connector is installed on this computer." and nothing about the login. Rename the command or
+   stop the brain, press **Check again**. **Expected:** "was not found" with the
+   `npm install -g @agentclientprotocol/claude-agent-acp` line, or "Scout's brain is not running".
+   Gemini CLI, Codex and other coding agents read **Coming soon**.
+2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
+   folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
+   what you pasted; the folder opens.
+3. **Action:** on step 8 set the limit to 0, then 8, press **Next**. **Expected:** 0 shows "Enter
+   an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip for now**
+   leaves the limit alone.
+4. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
+   was not accepted." with the field kept and **Finish** off; then the field empties, "A key is
+   already set." shows and **Finish** turns on. With the network off the line reads "Scout could
+   not reach Anthropic. Try again." and Finish stays off.
+5. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
+   Finish off; start the brain and Check turns on by itself. The step never says to edit a file;
+   it shows where the machine running Scout's brain saved the key.
+6. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
+   step 9 reads "Set by your environment" and Finish is on.
+7. **Action:** press **Finish**. **Expected:** the card "Scout is on your screen" shows the ask
+   and talk keys, and the tour is marked seen at once. **Close** (or **Open Home**) closes the
+   window and the pet appears; closing the card with the window's X does the same. Either way the
+   tour does not open at the next launch (closing part-way, before Finish, brings it back).
+8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
+   Anthropic Console API keys page.
 
 ## Not supported
 
