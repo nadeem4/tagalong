@@ -1,4 +1,4 @@
-"""Tests for the pinned model file cache: checked download, retry, sharing, progress."""
+"""Tests for the pinned model file cache: checked download, retry, progress."""
 
 import asyncio
 import hashlib
@@ -11,7 +11,6 @@ from brain.voice.models import (
     ModelFile,
     ModelIntegrityError,
     ensure_files,
-    files_present,
 )
 
 
@@ -59,7 +58,6 @@ async def test_good_download_is_renamed_from_part_and_progress_ends_at_one(tmp_p
     assert (tmp_path / "x/a.bin").read_bytes() == a and (tmp_path / "x/b.bin").read_bytes() == b
     assert list(tmp_path.rglob("*.part")) == []
     assert seen[-1] == 1 and max(seen) <= 1 and seen == sorted(seen)
-    assert files_present(tmp_path, [fa, fb])
 
 
 async def test_a_bad_hash_is_deleted_and_fetched_once_more(tmp_path):
@@ -116,20 +114,3 @@ async def test_progress_counts_files_already_good_from_the_start(tmp_path):
     seen: list[float] = []
     await ensure_files(tmp_path, [fa, fb], Net({fb.url: [b]}), seen.append)
     assert seen[0] == 0.5 and seen[-1] == 1
-
-
-async def test_two_concurrent_calls_share_one_download(tmp_path):
-    data = b"s" * 20
-    f = file_for("m.bin", data)
-    net = Net({f.url: [data]})
-    net.gate = asyncio.Event()
-    first: list[float] = []
-    second: list[float] = []
-    one = asyncio.create_task(ensure_files(tmp_path, [f], net, first.append))
-    await asyncio.sleep(0.01)
-    two = asyncio.create_task(ensure_files(tmp_path, [f], net, second.append))
-    await asyncio.sleep(0.01)
-    net.gate.set()
-    await asyncio.gather(one, two)
-    assert net.fetched == [f.url]
-    assert first[-1] == 1 and second[-1] == 1

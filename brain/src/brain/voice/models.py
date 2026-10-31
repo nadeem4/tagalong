@@ -7,12 +7,9 @@ network is a seam (`fetch`) so tests never touch it. Moonshine fetches its own f
 
 import asyncio
 import hashlib
-import logging
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
-
-log = logging.getLogger("brain")
 
 Fetch = Callable[[str], AsyncIterator[bytes]]
 Progress = Callable[[float], None]
@@ -46,11 +43,6 @@ EARS_FILES = [
         "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f",
     ),
 ]
-
-
-def files_present(folder: Path, files: list[ModelFile]) -> bool:
-    """Look only, never hash: enough to say 'downloading'."""
-    return all((folder / f.path).exists() for f in files)
 
 
 def _sha256_of(path: Path) -> str:
@@ -97,52 +89,23 @@ async def _download(
             raise ModelIntegrityError(file.path)
 
 
-async def _ensure(folder: Path, files: list[ModelFile], fetch: Fetch, report: Progress) -> None:
+async def ensure_files(
+    folder: Path, files: list[ModelFile], fetch: Fetch, on_progress: Progress
+) -> None:
     missing = [f for f in files if not await _verified(folder / f.path, f)]
     if not missing:
-        report(1.0)
+        on_progress(1.0)
         return
     total = sum(f.bytes for f in files)
     done = total - sum(f.bytes for f in missing)
     if done > 0:
-        report(done / total)
+        on_progress(done / total)
 
     def on_bytes(count: int) -> None:
         nonlocal done
         done += count
-        report(min(max(done / total, 0.0), 1.0))
+        on_progress(min(max(done / total, 0.0), 1.0))
 
     for file in missing:
         await _download(folder / file.path, file, fetch, on_bytes)
-    report(1.0)
-
-
-_running: dict[tuple, tuple[asyncio.Task, list[Progress]]] = {}
-
-
-async def ensure_files(
-    folder: Path, files: list[ModelFile], fetch: Fetch, on_progress: Progress
-) -> None:
-    """Make every file present and verified. A caller arriving while a download is under way
-    joins it, hearing progress from then on, so two never write the same `.part`. A failure
-    lets the next call start afresh."""
-    key = (str(folder), tuple(f.path for f in files))
-    running = _running.get(key)
-    if running is None:
-        listeners: list[Progress] = [on_progress]
-
-        def report(fraction: float) -> None:
-            for listener in list(listeners):
-                listener(fraction)
-
-        task = asyncio.ensure_future(_ensure(folder, files, fetch, report))
-        _running[key] = (task, listeners)
-        task.add_done_callback(lambda _t: _running.pop(key, None))
-    else:
-        task, listeners = running
-        listeners.append(on_progress)
-    try:
-        await asyncio.shield(task)
-    finally:
-        if on_progress in listeners:
-            listeners.remove(on_progress)
+    on_progress(1.0)

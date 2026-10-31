@@ -81,9 +81,10 @@ class VoiceService:
         self._lock = asyncio.Lock()  # the models hold state: one session uses them at a time
 
     def listen(self, body_id: str, mode: Literal["held", "always"]) -> None:
-        old = self._sessions.pop(body_id, None)
-        if old is not None:
+        # One listening session at a time, across bodies: a new listen ends the current one.
+        for old in self._sessions.values():
             old.silence()
+        self._sessions.clear()
         session = _Session(body_id, mode)
         self._sessions[body_id] = session
         session.task = asyncio.get_running_loop().create_task(self._work(session))
@@ -156,6 +157,7 @@ class VoiceService:
         def emit(event: str, text: str | None) -> None:
             session.pending.append((event, text))
 
+        ears = None
         try:
             ears = await asyncio.to_thread(Ears, parts, session.mode, emit)
             rest = np.zeros(0, dtype=np.float32)
@@ -176,6 +178,8 @@ class VoiceService:
             self._parts = None  # the next listen loads the models afresh
             if session.mode == "held" and session.live:
                 try:
+                    if ears is None:
+                        raise RuntimeError("the ears never started")
                     await asyncio.to_thread(ears.finish)
                 except Exception:
                     session.pending.append(("turn_end", ""))

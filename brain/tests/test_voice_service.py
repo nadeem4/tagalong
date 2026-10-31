@@ -253,6 +253,20 @@ async def test_a_new_session_resets_the_vad_state():
     assert p.vad.resets == 2
 
 
+async def test_a_model_start_error_still_ends_a_held_turn_with_one_turn_end(monkeypatch):
+    sent = Sent()
+    svc, _, _ = service(sent)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("no ears")
+
+    monkeypatch.setattr("brain.voice.service.Ears", broken)
+    svc.listen("d", "held")
+    svc.unlisten("d")
+    await settle()
+    assert sent.heard() == ["turn_end:"]
+
+
 async def test_a_model_error_ends_a_held_turn_with_what_was_heard_and_reloads_next_time():
     sent = Sent()
     from fake_voice import LevelVad
@@ -267,18 +281,19 @@ async def test_a_model_error_ends_a_held_turn_with_what_was_heard_and_reloads_ne
     assert calls["n"] == 2
 
 
-async def test_two_bodies_listen_without_mixing():
+async def test_a_second_body_listening_ends_the_first_session_and_hears_alone():
     sent = Sent()
     svc, _, _ = service(sent)
-    svc.listen("a", "held")
-    svc.listen("b", "held")
-    svc.mic("a", pcm(LOUD, 1))
+    svc.listen("a", "always")
+    await settle(10)
+    svc.listen("b", "held")  # one listening session at a time, across bodies
+    svc.mic("a", pcm(LOUD, 1))  # a's session is over: dropped
     svc.mic("b", pcm(LOUD, 2))
-    svc.unlisten("a")
     svc.unlisten("b")
     await settle()
-    assert sent.heard("a")[-1] == "turn_end:word"
+    assert sent.heard("a") == []
     assert sent.heard("b")[-1] == "turn_end:word word"
+    assert sent.voice("b")[-1] == {"status": "ready"}
 
 
 async def test_the_buffer_while_loading_keeps_only_the_newest_seconds():

@@ -85,8 +85,8 @@ the total can run a little low.
 | `brain/src/brain/server.py`                              | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
 | `brain/src/brain/voice/__init__.py`                      | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to (`Session.voice`)                                                                                                                                                                                       |
 | `brain/src/brain/voice/ears.py`                          | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                      |
-| `brain/src/brain/voice/service.py`                       | `VoiceService`: one session per body, buffers frames while models load, runs `Ears` in a thread, sends `heard` and `voice` live-only                                                                                                                                                       |
-| `brain/src/brain/voice/models.py`                        | Pinned model files (`EARS_FILES`) and `ensure_files`, the checked, shared download                                                                                                                                                                                                         |
+| `brain/src/brain/voice/service.py`                       | `VoiceService`: one listening session at a time, buffers frames while models load, runs `Ears` in a thread, sends `heard` and `voice` live-only                                                                                                                                            |
+| `brain/src/brain/voice/models.py`                        | Pinned model files (`EARS_FILES`) and `ensure_files`, the checked download                                                                                                                                                                                                                 |
 | `brain/src/brain/voice/{silero,moonshine,smart_turn}.py` | The real model adapters (imported lazily); `smart_turn.features` is the numpy Whisper log-mel code                                                                                                                                                                                         |
 | `brain/src/brain/voice/load.py`                          | `ears_loader`: downloads the files and loads the three models; only `main.py` imports it                                                                                                                                                                                                   |
 | `brain/src/brain/main.py`                                | The `uv run brain` entry point                                                                                                                                                                                                                                                             |
@@ -791,9 +791,10 @@ leaves it.
   turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as
   "over". A stretch of speech with no pause is closed after about 30 s.
 - **`VoiceService`** implements `VoiceHooks`. `listen` starts a session for that body (replacing
-  any earlier one, which goes silent); `mic` converts int16 to float32 and queues it; one worker
+  any earlier one, from any body, which goes silent: one listening session at a time); `mic` converts int16 to float32 and queues it; one worker
   task per session feeds 512-sample frames to `Ears` with `asyncio.to_thread`, so a slow decode
-  never stalls the websocket. Only one session uses the models at a time. `unlisten` on a held
+  never stalls the websocket. Downloads time out after 30 s, and Moonshine's load progress is handed
+  back to the event loop before it reaches a body. `unlisten` on a held
   session flushes the queue and sends the last words and one `turn_end`; on an always session it
   stops at once and sends nothing. `hush` does nothing yet (the mouth arrives later). A disconnect
   calls `unlisten`, so a gone body never keeps a session.
