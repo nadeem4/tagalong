@@ -21,13 +21,11 @@ describe('buildSettingsPatch removed fields', () => {
   it('never emits a key the Settings schema no longer has', () => {
     const patch = buildSettingsPatch({
       ...values,
-      rollingMemoryEnabled: true,
-      rollingMemoryMinutes: '5',
       voiceEnabled: true,
       voice: 'bm_george',
       voiceSpeed: '1',
     });
-    const live = ['avatar', 'captureExclusions', 'hotkeys', 'listening', 'rollingMemory', 'voice'];
+    const live = ['avatar', 'captureExclusions', 'hotkeys', 'listening', 'voice'];
     expect(Object.keys(patch).filter((key) => !live.includes(key))).toEqual([]);
     for (const removed of ['sightDetail', 'windowTextBudget', 'greeting', 'userName', 'watch']) {
       expect(patch).not.toHaveProperty(removed);
@@ -90,14 +88,14 @@ describe('field errors', () => {
   it('names the field a refused value belongs to, so Settings can mark it', () => {
     let caught: unknown;
     try {
-      buildSettingsPatch({ ...values, rollingMemoryEnabled: true, rollingMemoryMinutes: '45' });
+      buildSettingsPatch({ ...values, voice: 'bm_george', voiceSpeed: '45' });
     } catch (error) {
       caught = error;
     }
     expect(caught).toBeInstanceOf(SettingsFieldError);
-    expect(caught).toMatchObject({ field: 'rollingMemoryMinutes' });
+    expect(caught).toMatchObject({ field: 'voiceSpeed' });
     expect(isAdvancedField('askHotkey')).toBe(false);
-    expect(isAdvancedField('rollingMemoryMinutes')).toBe(false);
+    expect(isAdvancedField('voiceSpeed')).toBe(false);
   });
 });
 
@@ -105,27 +103,6 @@ describe('keyCaps', () => {
   it('shows an accelerator as the keys to press on this computer', () => {
     expect(keyCaps('CommandOrControl+Shift+Alt+P', 'win32')).toEqual(['Ctrl', 'Shift', 'Alt', 'P']);
     expect(keyCaps('CommandOrControl+Shift+Space', 'darwin')).toEqual(['Cmd', 'Shift', 'Space']);
-  });
-});
-
-describe('buildSettingsPatch rolling memory', () => {
-  const memory = { rollingMemoryEnabled: true, rollingMemoryMinutes: '5' };
-
-  it('carries the switch and the minutes when the form shows them', () => {
-    expect(buildSettingsPatch({ ...values, ...memory }).rollingMemory).toEqual({
-      enabled: true,
-      minutes: 5,
-    });
-  });
-
-  it('leaves it alone when the form does not show it', () => {
-    expect(buildSettingsPatch(values).rollingMemory).toBeUndefined();
-  });
-
-  it('refuses minutes outside one to thirty, saying the bounds', () => {
-    expect(() => buildSettingsPatch({ ...values, ...memory, rollingMemoryMinutes: '45' })).toThrow(
-      /1 and 30/,
-    );
   });
 });
 

@@ -1,11 +1,11 @@
-/** Tests for the ask's snapshot, perception.capture and the desktop's capabilities. */
+/** Tests for the ask's snapshot and perception.capture. */
 
 import { describe, expect, it, vi } from 'vitest';
 import { basename } from 'node:path';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import type { CaptureExclusions } from '../shared/settings';
 import type { WindowEntry } from '@tagalong/ui/shapes';
-import { DESKTOP_CAPABILITIES, answerCapture, captureAskSnapshot, capturePatch } from './context';
+import { answerCapture, captureAskSnapshot, capturePatch } from './context';
 import type { DisplaysCapture, Platform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 
@@ -335,28 +335,6 @@ describe('the windows perception target', () => {
   });
 });
 
-describe('DESKTOP_CAPABILITIES', () => {
-  it('advertises that this host can enumerate and photograph every display', () => {
-    expect(DESKTOP_CAPABILITIES).toContain('displays');
-  });
-
-  it('advertises the text layer, now that perception.readText is answered', () => {
-    // Task 3 asserted the opposite, deliberately: advertising a capability the host
-    // cannot honour makes the brain call a method that fails, which reads to the user as
-    // a broken pet rather than a missing feature. The claim only became true here, when
-    // the read landed, so the assertion flips here and nowhere earlier.
-    expect(DESKTOP_CAPABILITIES).toContain('textLayer');
-  });
-
-  it('advertises recall, now that perception.recall and perception.diff are answered', () => {
-    expect(DESKTOP_CAPABILITIES).toContain('recall');
-  });
-
-  it('no longer advertises the pointer: the overlay that drew it is gone', () => {
-    expect(DESKTOP_CAPABILITIES).not.toContain('pointer');
-  });
-});
-
 describe('a failed window enumeration', () => {
   it('complains rather than passing off an empty desktop as the truth', async () => {
     // The whole reason this exists. A broken helper and a quiet desktop both produced an
@@ -445,10 +423,9 @@ function displayCapture(overrides: Partial<DisplaysCapture> = {}): DisplaysCaptu
 }
 
 describe('capturePatch, displays', () => {
-  it('answers the displays target the host advertises a capability for', async () => {
-    // DESKTOP_CAPABILITIES names `displays`, so the brain is entitled to ask for it.
-    // A host that advertises a capability and then ignores the target makes the brain
-    // call something that silently returns nothing, which reads as a broken pet.
+  it('answers the displays target', async () => {
+    // A host that ignores a target the brain may ask for makes the brain call something
+    // that silently returns nothing, which reads as a broken pet.
     const platform = fakePlatform({
       captureDisplays: async () => displayCapture(),
       listWindows: async () => ({ windows: [] }),

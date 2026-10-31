@@ -27,7 +27,6 @@ function setup({ problem = null as string | null } = {}) {
     version: () => '1.2.3',
     setSettings: vi.fn(),
     applyHotkeys: vi.fn(),
-    configureRolling: vi.fn(),
     broadcast: vi.fn(),
   };
   registerSettingsIpc(ipc.handle, deps);
@@ -66,18 +65,13 @@ describe('registerSettingsIpc: saveSettings', () => {
     expect(deps.setSettings).toHaveBeenCalledWith(saved);
     expect(deps.broadcast).toHaveBeenCalledWith(saved);
     expect(deps.applyHotkeys).not.toHaveBeenCalled();
-    expect(deps.configureRolling).not.toHaveBeenCalled();
   });
 
-  it('applies hotkeys and rolling memory now', async () => {
+  it('applies hotkeys now', async () => {
     const { invoke, deps } = setup();
-    const patch: SettingsPatch = {
-      hotkeys: SETTINGS_DEFAULTS.hotkeys,
-      rollingMemory: SETTINGS_DEFAULTS.rollingMemory,
-    };
+    const patch: SettingsPatch = { hotkeys: SETTINGS_DEFAULTS.hotkeys };
     const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
     expect(deps.applyHotkeys).toHaveBeenCalledWith(saved);
-    expect(deps.configureRolling).toHaveBeenCalledWith(saved.rollingMemory);
   });
 });
 

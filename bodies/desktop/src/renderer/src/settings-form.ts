@@ -3,12 +3,7 @@
  * Node. Contains SettingsFormValues, buildSettingsPatch and its field checks, SettingsFieldError,
  * and helpers the sections share (key caps, voice facts).
  */
-import {
-  MAX_ROLLING_MEMORY_MINUTES,
-  MAX_VOICE_SPEED,
-  MIN_VOICE_SPEED,
-  SettingsPatch,
-} from '../../shared/settings';
+import { MAX_VOICE_SPEED, MIN_VOICE_SPEED, SettingsPatch } from '../../shared/settings';
 import type { SettingsPatch as SettingsPatchType } from '../../shared/settings';
 import type { VoiceAdapterFacts } from '../../shared/voice';
 
@@ -18,9 +13,6 @@ export interface SettingsFormValues {
   pauseSightHotkey: string;
   stopVoiceHotkey: string;
   talkHotkey: string;
-  /** Present together when the form shows rolling memory. */
-  rollingMemoryEnabled?: boolean;
-  rollingMemoryMinutes?: string;
   /** Voice. Present together when the form shows the Voice section. */
   voiceEnabled?: boolean;
   voice?: string;
@@ -88,20 +80,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
           },
         }
       : {}),
-    ...(values.rollingMemoryMinutes !== undefined
-      ? {
-          rollingMemory: {
-            enabled: values.rollingMemoryEnabled === true,
-            minutes: wholeNumber(
-              'rollingMemoryMinutes',
-              values.rollingMemoryMinutes,
-              1,
-              MAX_ROLLING_MEMORY_MINUTES,
-              `Rolling memory must keep between 1 and ${MAX_ROLLING_MEMORY_MINUTES} minutes.`,
-            ),
-          },
-        }
-      : {}),
   });
 }
 
@@ -157,21 +135,6 @@ function parseSpeed(raw: string): number {
     );
   }
   return speed;
-}
-
-/** A whole number in bounds, or the sentence the person needs to fix it. */
-function wholeNumber(
-  field: string,
-  raw: string,
-  min: number,
-  max: number,
-  problem: string,
-): number {
-  const value = Number(raw.trim());
-  if (raw.trim().length === 0 || !Number.isInteger(value) || value < min || value > max) {
-    throw new SettingsFieldError(field, problem);
-  }
-  return value;
 }
 
 /** An accelerator as the keys to press: `CommandOrControl` is Cmd on a Mac, Ctrl elsewhere. */

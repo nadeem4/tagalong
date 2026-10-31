@@ -64,8 +64,6 @@ export const IPC = {
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
   settingsChangedEvent: 'tagalong:settings-changed-event',
   openBubble: 'tagalong:bubble:open',
-  recordingEvent: 'tagalong:recording-event',
-  getRecording: 'tagalong:get-recording',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
   speak: 'tagalong:voice:speak',
@@ -234,10 +232,6 @@ export interface TagalongHostApi {
    * the gate is left unwired.
    */
   toggleSightPause(): Promise<boolean>;
-  /** Whether rolling memory is recording now, for a window that just opened. */
-  getRecording(): Promise<boolean>;
-  /** Fires when rolling memory starts or stops: the avatar's red dot. */
-  onRecording(handler: (recording: boolean) => void): () => void;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** Saves the ElevenLabs key for the voice. An empty key deletes the stored one. */

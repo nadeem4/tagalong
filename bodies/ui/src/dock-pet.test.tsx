@@ -120,13 +120,10 @@ describe('DockPet', () => {
     expect(tag.style.padding).toBe('1px 3px');
   });
 
-  it('shows that sight is paused, and that memory is recording, in marks and words', () => {
-    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" sightPaused />);
+  it('shows that sight is paused in a mark and in words', () => {
+    render(<DockPet pet={SCOUT} mood="idle" sightPaused />);
     expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, sight paused');
-    rerender(<DockPet pet={SCOUT} mood="idle" recording />);
-    expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
-    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, recording the screen');
   });
 
   it('shows that Scout is listening the whole time it is, and when that is paused', () => {
@@ -292,11 +289,8 @@ describe('moods', () => {
   });
 
   it('keeps every mark over Bean: tag, paused, listening and status', () => {
-    render(
-      <DockPet pet={SCOUT} mood="working" recording listening="on" status={{ id: 'mic-busy' }} />,
-    );
+    render(<DockPet pet={SCOUT} mood="working" listening="on" status={{ id: 'mic-busy' }} />);
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
-    expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
     expect(screen.getByTestId('listening-mark')).toBeInTheDocument();
     expect(screen.getByTestId('status-mark')).toBeInTheDocument();
   });

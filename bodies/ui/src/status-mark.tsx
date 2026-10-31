@@ -28,7 +28,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         title={detail}
         style={{
           position: 'absolute',
-          // Bottom centre, just above the 8 px recording and listening dots in the corners.
+          // Bottom centre, just above the 8 px listening dot in the corner.
           bottom: 18,
           left: '50%',
           transform: 'translateX(-50%)',

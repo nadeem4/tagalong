@@ -1,14 +1,13 @@
 /**
- * Settings' Privacy section: Seeing and Always listening (live switches), rolling memory on or
- * off with its minutes, and the built-in blind spots, listed from BLIND_SPOTS and never
- * switchable.
+ * Settings' Privacy section: Seeing and Always listening (live switches) and the built-in
+ * blind spots, listed from BLIND_SPOTS and never switchable.
  */
 import { useEffect, useState } from 'react';
 import { BLIND_SPOTS } from '../../../shared/blind-spots';
-import { MAX_ROLLING_MEMORY_MINUTES, SETTINGS_DEFAULTS } from '../../../shared/settings';
+import { SETTINGS_DEFAULTS } from '../../../shared/settings';
 import type { Settings } from '../../../shared/settings';
 import { keyCaps } from '../settings-form';
-import { Info, Section, Tip, useInvalid } from './section';
+import { Info, Section, Tip } from './section';
 
 /**
  * Seeing and Always listening act at once, through main, so they are no form fields: each
@@ -90,67 +89,11 @@ function LiveSwitches() {
   );
 }
 
-/** How long screen memory keeps, beside its switch. Applies only while the switch is on. */
-function MemoryMinutes({ minutes }: { minutes: number }) {
-  const invalid = useInvalid('rollingMemoryMinutes');
-  return (
-    <div className="tg-grid tg-grid--narrow">
-      <div>
-        <label htmlFor={invalid.props.id}>
-          <span>Minutes of screen to remember</span>
-          <input
-            name="rollingMemoryMinutes"
-            type="number"
-            min={1}
-            max={MAX_ROLLING_MEMORY_MINUTES}
-            defaultValue={minutes}
-            {...invalid.props}
-          />
-        </label>
-        {invalid.message}
-      </div>
-    </div>
-  );
-}
-
 export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
-  const [remember, setRemember] = useState(settings.rollingMemory.enabled);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
       <LiveSwitches />
-      <div className="tg-setting">
-        <div className="tg-setting__text">
-          <div className="tg-titlerow">
-            <h3 className="tg-sub" id="memory-label">
-              Remember the last few minutes of the screen
-            </h3>
-            <Info tip="memory" label="About screen memory" />
-          </div>
-          <p className="tg-help">
-            So you can ask &ldquo;what was I reading five minutes ago?&rdquo;.
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          className="tg-switch"
-          aria-checked={remember}
-          aria-labelledby="memory-label"
-          onClick={() => setRemember((on) => !on)}
-        >
-          {remember ? 'On' : 'Off'}
-        </button>
-        {remember && <input type="hidden" name="rollingMemoryEnabled" value="on" />}
-      </div>
-      <Tip tip="memory">
-        Every five seconds Tagalong keeps a small picture of each screen and the list of open
-        windows, in memory only. Nothing is written to disk. Pausing sight or quitting throws it all
-        away, blind spots are never recorded, and a red dot shows on Scout while it records. Off by
-        default.
-      </Tip>
-      <MemoryMinutes minutes={settings.rollingMemory.minutes} />
-      <hr className="tg-divider" />
       <div className="tg-titlerow">
         <h3 className="tg-sub">Scout never looks at</h3>
         <Info tip="blind" label="About what Scout never looks at" />

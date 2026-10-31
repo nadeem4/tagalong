@@ -451,29 +451,6 @@ test('a rebound hotkey is applied on save, without a restart', async () => {
   expect(after.settings.hotkeys.ask).toBe(original.ask);
 });
 
-/** Rolling memory's minutes must survive the round trip through the real store. */
-test('rolling memory minutes save and read back', async () => {
-  const settings = await windowFor('panel');
-
-  const before = await settings.evaluate(() => window.tagalongHost.getHostView());
-  const saved = await settings.evaluate(() =>
-    window.tagalongHost.saveSettings({ rollingMemory: { enabled: false, minutes: 7 } }),
-  );
-  expect(saved.rollingMemory.minutes).toBe(7);
-
-  try {
-    const reread = await settings.evaluate(() => window.tagalongHost.getHostView());
-    expect(reread.settings.rollingMemory.minutes).toBe(7);
-  } finally {
-    // Same reason as the hotkey test: this persists, and a suite that leaves it changed
-    // changes what every later run keeps in memory.
-    await settings.evaluate(
-      (previous) => window.tagalongHost.saveSettings({ rollingMemory: previous }),
-      before.settings.rollingMemory,
-    );
-  }
-});
-
 test('Home is one window: Scout, jobs, connections and settings', async () => {
   const panel = await windowFor('panel');
   // The tray's Open Tagalong item calls the same main-process function as this host call;

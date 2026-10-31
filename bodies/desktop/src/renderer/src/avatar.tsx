@@ -1,7 +1,7 @@
 /**
  * The avatar window's page: Scout on the desktop as Bean, the 3D figure, with its mood, the
- * sight-paused, recording and listening marks, and the top status mark. Mood rules live in dock.ts and pointer and
- * drop handling in pet-input.ts; this file only wires them to the host.
+ * sight-paused and listening marks, and the top status mark. Mood rules live in dock.ts and
+ * pointer and drop handling in pet-input.ts; this file only wires them to the host.
  */
 import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -32,7 +32,6 @@ function Avatar() {
   const [pet, setPet] = useState<Pet | null>(null);
   const [dock, send] = useReducer(nextDock, IDLE_DOCK);
   const [sightPaused, setSightPaused] = useState(false);
-  const [recording, setRecording] = useState(false);
   const [listening, setListening] = useState<ListeningState>({
     on: false,
     paused: false,
@@ -59,15 +58,6 @@ function Avatar() {
       .then(setSightPaused)
       .catch((error: unknown) => console.error('could not read the sight pause', error));
     return window.tagalongHost.onSightPause(setSightPaused);
-  }, []);
-
-  // The recording dot, read on mount for the same reason as the pause above.
-  useEffect(() => {
-    window.tagalongHost
-      .getRecording()
-      .then(setRecording)
-      .catch((error: unknown) => console.error('could not read rolling memory state', error));
-    return window.tagalongHost.onRecording(setRecording);
   }, []);
 
   // Always listening, read on mount too: the mark shows from the first second it is on.
@@ -162,7 +152,6 @@ function Avatar() {
           mood={dockMood(dock)}
           figure={FIGURE}
           sightPaused={sightPaused}
-          recording={recording}
           listening={listeningDot(listening, hearing)}
           status={status}
         />
