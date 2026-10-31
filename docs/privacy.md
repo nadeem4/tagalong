@@ -230,8 +230,8 @@ question or the conversation. A health check and an expert's narration are shown
 **Reading aloud.** When you ask Scout something by voice, it says its answer aloud. If you ask it
 to read something to you, it reads your selection or the window in front (as for any question
 about your screen). So the text of that answer goes to the speech engine, and it stays with your
-brain (Kokoro) or on this computer (the system voice). A question you type is answered in the
-bubble only, and with **Scout talks** off nothing is read aloud.
+brain (Kokoro) or on this computer (the system voice). With **Scout talks** on, a question you type is read
+aloud too (the desktop tells the brain it wants read-aloud); with it off nothing is read aloud.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

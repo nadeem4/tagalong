@@ -150,6 +150,25 @@ async def test_a_failed_load_stays_text_only_and_is_retried_next_turn():
     assert attempts["n"] == 2
 
 
+async def test_the_system_voice_gets_text_only_and_kokoro_is_never_loaded():
+    sent = Sent()
+    attempts = {"n": 0}
+
+    async def load():
+        attempts["n"] += 1
+        return FakeTts()
+
+    m, _ = mouth(sent, load=load)
+    m.spoken("t", "d", "af_bella", 1.2, True)
+    m.reply("t", {"delta": f"{ONE} {TWO} "})
+    m.reply("t", {"done": True})
+    await settle()
+    out = sent.speech()
+    assert [p.get("text") for p in out] == [ONE, TWO, None]
+    assert not [1 for p in out if "pcm" in p]
+    assert attempts["n"] == 0
+
+
 async def test_two_turns_never_synthesise_at_once():
     sent = Sent()
     m, tts = mouth(sent, FakeTts(sleep=0.03))

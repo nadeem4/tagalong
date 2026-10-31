@@ -110,8 +110,15 @@ class VoiceService:
     def hush(self, body_id: str) -> None:
         self._mouth.hush(body_id)
 
-    def spoken(self, turn: str, body_id: str, voice: str | None, speed: float | None) -> None:
-        self._mouth.spoken(turn, body_id, voice, speed)
+    def spoken(
+        self,
+        turn: str,
+        body_id: str,
+        voice: str | None,
+        speed: float | None,
+        system_voice: bool = False,
+    ) -> None:
+        self._mouth.spoken(turn, body_id, voice, speed, system_voice)
 
     def reply(self, turn: str, body_id: str | None, params: dict) -> None:
         self._mouth.reply(turn, params)

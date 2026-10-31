@@ -14,6 +14,8 @@ from datetime import datetime
 from functools import partial
 from typing import Any, Literal
 
+from pydantic import ValidationError
+
 from brain.app_tools import AppSource, app_home_tools
 from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
@@ -45,7 +47,7 @@ from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
-from brain.protocol import SayParams, SayResult, Tool
+from brain.protocol import ReadAloudData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler
 from brain.side_check import SideCheck
@@ -113,7 +115,7 @@ class Session:
             guards=self.guards,
             busy=self._busy,
             last_body=lambda: self._last_body,
-            start=lambda body_id, content: self._start_turn(body_id, content, "brain"),
+            start=self._start_wake,
             now=now,
             wakes_per_hour=wakes_per_hour,
             kinds=kinds or EVENT_KINDS,
@@ -192,6 +194,9 @@ class Session:
         self._last_body: str | None = None  # where a wake turn goes first
         self._turn_body: str | None = None  # the body showing the running turn
         self._spoken: set[str] = set()  # running turns whose reply is read aloud
+        # Each body's last `read_aloud` event: read every turn it shows aloud, in which voice, and
+        # whether it uses its system voice. Kept across a reconnect; the body also resends it.
+        self._read_aloud: dict[str, ReadAloudData] = {}
         bodies.on_connect = self._on_connect
         for job in memory.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
@@ -214,15 +219,23 @@ class Session:
         self._speak(turn, shown_on, params)
         return SayResult(turn=turn, joined=False)
 
-    def _speak(self, turn: str | None, shown_on: str | None, params: SayParams) -> None:
-        """A spoken say makes its turn spoken, on the body that shows it: speech never goes to
-        a body that did not display the turn."""
-        if not params.spoken or self.voice is None or shown_on is None or turn is None:
+    def _speak(self, turn: str | None, shown_on: str | None, params: SayParams | None) -> None:
+        """A turn is read aloud when the user spoke (`params.spoken`) or the body showing it asked
+        for read-aloud; on that body only, because speech never goes to a body that did not
+        display the turn. `params` is None for a turn the brain started."""
+        if self.voice is None or shown_on is None or turn is None:
             return
+        ask = self._read_aloud.get(shown_on)
+        if not (params is not None and params.spoken) and not (ask and ask.on):
+            return
+        voice, speed = (ask.voice, ask.speed) if ask else (None, None)
+        if params is not None:
+            voice = params.voice if params.voice is not None else voice
+            speed = params.speed if params.speed is not None else speed
         self._spoken.add(turn)
-        # Every time: the voice drops a hushed turn, and a later spoken say must re-arm it. It
-        # ignores a say for a turn it is already speaking.
-        self.voice.spoken(turn, shown_on, params.voice, params.speed)
+        # Every time: the voice drops a hushed turn, and a later say must re-arm it. It ignores
+        # a say for a turn it is already speaking.
+        self.voice.spoken(turn, shown_on, voice, speed, ask.system_voice if ask else False)
 
     def _display_target(self) -> str | None:
         shown = self._bodies.display_ids()
@@ -231,6 +244,13 @@ class Session:
         return shown[0] if shown else None
 
     def body_event(self, body_id: str, name: str, data: object) -> None:
+        if name == "read_aloud":  # a setting of the body, not something that happened
+            try:
+                ask = ReadAloudData.model_validate(data)
+            except ValidationError:
+                return
+            self._read_aloud[body_id] = ask
+            return
         event = from_body(body_id, name, data)
         if event is not None:
             self.scheduler.emit(event)
@@ -255,6 +275,11 @@ class Session:
 
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()
+
+    def _start_wake(self, body_id: str | None, content: list) -> str:
+        turn = self._start_turn(body_id, content, "brain")
+        self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
+        return turn
 
     def _start_turn(
         self, body_id: str | None, content: list, started_by: Literal["user", "brain"] = "user"

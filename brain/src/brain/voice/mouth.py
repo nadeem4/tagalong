@@ -35,8 +35,9 @@ class _Sender(Protocol):
 
 
 class _Turn:
-    def __init__(self, body_id: str, voice: str, speed: float) -> None:
+    def __init__(self, body_id: str, voice: str, speed: float, system_voice: bool) -> None:
         self.body_id = body_id
+        self.system_voice = system_voice
         self.voice = voice
         self.speed = speed
         self.queue: asyncio.Queue[str | None] = asyncio.Queue()  # None: no more sentences
@@ -57,14 +58,20 @@ class Mouth:
         self._turns: dict[str, _Turn] = {}
 
     def spoken(
-        self, turn: str, body_id: str | None, voice: str | None, speed: float | None
+        self,
+        turn: str,
+        body_id: str | None,
+        voice: str | None,
+        speed: float | None,
+        system_voice: bool = False,
     ) -> None:
-        """The turn's reply will be read aloud on `body_id`, the body showing it."""
+        """The turn's reply will be read aloud on `body_id`, the body showing it. With
+        `system_voice` the body speaks it itself: text only, and the voice is never loaded."""
         live = self._turns.get(turn)
         if body_id is None or (live is not None and not live.hushed):
             return  # already speaking this turn; a hushed one is replaced below
         self._failed = False
-        st = _Turn(body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED)
+        st = _Turn(body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED, system_voice)
         st.task = asyncio.get_running_loop().create_task(self._run(turn, st))
         self._turns[turn] = st
 
@@ -131,7 +138,7 @@ class Mouth:
 
     async def _say(self, turn: str, st: _Turn, line: str) -> None:
         frame: dict = {"turn": turn, "text": line}
-        tts = self._tts_now()
+        tts = None if st.system_voice else self._tts_now()
         if tts is not None:
             try:
                 async with self._synth:

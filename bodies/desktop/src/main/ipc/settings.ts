@@ -18,6 +18,8 @@ interface SettingsIpcDeps {
   version: () => string;
   setSettings: (settings: Settings) => void;
   applyHotkeys: (settings: Settings) => void;
+  /** Tells the brain the voice setting (read aloud, voice, speed, mouth) as just saved. */
+  applyVoice: (settings: Settings) => void;
   /** Sends the saved settings to every open window. */
   broadcast: (settings: Settings) => void;
 }
@@ -45,6 +47,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     // not after a restart.
     deps.setSettings(saved);
     if (patch.hotkeys !== undefined) deps.applyHotkeys(saved);
+    if (patch.voice !== undefined) deps.applyVoice(saved);
     // An open panel reads its keys and microphone from here, not a restart.
     deps.broadcast(saved);
     return Promise.resolve(saved);

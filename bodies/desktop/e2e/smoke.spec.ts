@@ -199,11 +199,17 @@ test('the bubble asks, shows the answer, and opens the full chat', async () => {
   const field = panel.getByLabel(/^Ask /);
   await field.waitFor({ state: 'visible', timeout: 30_000 });
 
+  // The desktop told the brain on connect that Scout talks, in its voice, so a typed question
+  // is read aloud too (not only a spoken one).
+  await expect.poll(() => brain.voice.readAloud.at(-1)).toMatchObject({ on: true });
+  const spokenBefore = brain.voice.spokenSays;
+
   await field.fill('what is on my screen?');
   await field.press('Enter');
 
   // The settled answer replaces "is thinking…"; the fake provider's words are fixed.
   await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => brain.voice.spokenSays).toBe(spokenBefore + 1);
   await expect(panel.getByRole('button', { name: 'Stop' })).toHaveCount(0, { timeout: 30_000 });
 
   // The bubble is still up after the answer: nothing during the turn may have hidden it.

@@ -5,10 +5,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
-import { createBackSender, frontWindow, startFocusWatch } from './body-events';
+import { createBackSender, frontWindow, readAloudEvent, startFocusWatch } from './body-events';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+describe('readAloudEvent', () => {
+  const voice = { enabled: true, voice: 'bm_fable', speed: 1.2 } as const;
+
+  it('asks for read-aloud with the chosen voice and speed when Scout talks is on', () => {
+    expect(readAloudEvent(voice)).toEqual({
+      on: true,
+      voice: 'bm_fable',
+      speed: 1.2,
+      system_voice: false,
+    });
+  });
+
+  it('turns it off with Scout talks', () => {
+    expect(readAloudEvent({ ...voice, enabled: false }).on).toBe(false);
+  });
+
+  it('says the system voice was picked, so the brain loads nothing', () => {
+    expect(readAloudEvent({ ...voice, mouth: 'system' }).system_voice).toBe(true);
+    expect(readAloudEvent({ ...voice, mouth: 'kokoro' }).system_voice).toBe(false);
+  });
+});
 
 describe('createBackSender', () => {
   it('sends back with the whole seconds away', () => {

@@ -832,8 +832,12 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   running typed turn makes it spoken from then on). `Session` passes that turn's `reply`
   notifications to `Session.voice.reply`, plus `spoken` when the turn starts and `turn_ended`
   when it ends (also when cancelled). The body is the turn's displaying body, never the sender
-  of a display-less body, and a turn with no displaying body is not spoken. A typed turn never
-  reaches the voice. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
+  of a display-less body, and a turn with no displaying body is not spoken. A body can also send the
+  `read_aloud {on, voice?, speed?, system_voice?}` event; `Session` keeps the latest per body (it
+  forgets it when the body disconnects) and, while `on` is true, speaks every turn that body displays:
+  typed replies, the hello, wake remarks and `pet.remark` lines (`_speak`, also called by the
+  scheduler's wake start). A bad event shape is ignored. With `system_voice` the turn is
+  spoken with text-only `speech` frames and `Mouth` never loads Kokoro. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
   (default 1.0); an unknown voice id speaks with `bm_george`.
 - **Sentences.** `voice/speakable.py` turns the streamed reply into sentences: fenced code, table rows, `>` quotes
   and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. The

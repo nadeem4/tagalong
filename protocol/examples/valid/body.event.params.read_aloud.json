@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": {
+    "name": "read_aloud",
+    "data": { "on": true, "voice": "bm_george", "speed": 1.1, "system_voice": false }
+  }
+}

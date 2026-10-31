@@ -637,7 +637,8 @@ against a pinned SHA-256) the first time it speaks. Only a question asked by voi
 
 1. **Action:** restart Tagalong; hand a task to Claude Code.
 2. **Expected:** the hello (if the mind says one), a wake's remark and the line about the finished
-   hand-off are shown, not read aloud: the brain speaks only the answer to a spoken question.
+   hand-off are shown and, with Scout talks on, read aloud (the desktop sends `read_aloud` on
+   connect). With Scout talks off they are shown only.
 
 ### V.5. Settings → Voice
 
