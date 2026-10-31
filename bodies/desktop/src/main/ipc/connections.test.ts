@@ -8,7 +8,7 @@ import { fakeIpc } from './fake-ipc';
 import {
   AppIdParams,
   AppSetEnabledParams,
-  forwardAppsChanged,
+  forwardConnectionsChanged,
   registerConnectionIpc,
 } from './connections';
 
@@ -192,16 +192,16 @@ describe('registerConnectionIpc', () => {
   });
 });
 
-describe('forwardAppsChanged', () => {
+describe('forwardConnectionsChanged', () => {
   it('forwards connections.changed with no payload when the apps changed', () => {
     const sent: unknown[] = [];
-    forwardAppsChanged('apps', (n) => sent.push(n));
+    forwardConnectionsChanged('apps', (n) => sent.push(n));
     expect(sent).toEqual([{ method: 'connections.changed', params: {} }]);
   });
 
   it('ignores any other change', () => {
     const sent: unknown[] = [];
-    forwardAppsChanged('memory', (n) => sent.push(n));
+    forwardConnectionsChanged('memory', (n) => sent.push(n));
     expect(sent).toEqual([]);
   });
 });

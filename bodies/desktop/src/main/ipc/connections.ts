@@ -2,7 +2,7 @@
  * IPC for Home's connected apps and the answer to a change Scout asked to make in one. Apps go
  * through the brain's Home tools (list_apps, add_app, ...); the brain owns them, and a refusal or
  * an offline brain rejects here so the page can say so. Contains registerConnectionIpc and
- * forwardAppsChanged.
+ * forwardConnectionsChanged.
  */
 
 import { ErrorCode } from '@tagalong/contract';
@@ -28,8 +28,8 @@ export interface ConnectionIpcDeps {
   reply: (ask: string, option: string, text?: string) => Promise<void>;
 }
 
-/** The brain's `changed` for apps reaches the page as the old `connections.changed`, no payload. */
-export function forwardAppsChanged(
+/** The brain's `changed` for apps reaches the page as `connections.changed`, no payload. */
+export function forwardConnectionsChanged(
   what: string,
   forward: (notification: { method: string; params: unknown }) => void,
 ): void {
