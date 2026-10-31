@@ -152,6 +152,12 @@ describe('registerVoiceIpc', () => {
     brain.call.mockRejectedValue(new BrainOffline());
     expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
   });
+
+  it('gives back null when the brain rejects the preview as an RPC error', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockRejectedValue(new Error('speak_sample: text is too long'));
+    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+  });
 });
 
 describe('the brain coming back', () => {
