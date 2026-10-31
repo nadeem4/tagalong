@@ -27,6 +27,8 @@ interface BridgeDeps {
   brain: VoiceBrain;
   /** Sends to every open window. */
   send: (channel: string, payload: unknown) => void;
+  /** Sends to the panel alone: the spoken audio is played there, and nowhere else. */
+  sendToPanel: (channel: string, payload: unknown) => void;
   /** Words addressed to Scout were heard: the bubble may come up. */
   onSpoken?: () => void;
   /** The follow-up window is open: a reply needs no name. */
@@ -58,7 +60,7 @@ function toInt16(samples: Float32Array): Int16Array {
 }
 
 export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
-  const { brain, send, marks } = deps;
+  const { brain, send, sendToPanel, marks } = deps;
   /** The open listening session, if any, so a reconnect can ask again. */
   let mode: 'held' | 'always' | null = null;
   let voiceFailed = false;
@@ -71,7 +73,7 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
     try {
       await brain.listen(wanted);
     } catch (error) {
-      mode = null;
+      // The session stays open: when the brain is back, onOnline asks it to listen again.
       failed(
         error instanceof BrainOffline
           ? STATUS_WORDS['brain-offline'].detail
@@ -131,6 +133,8 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
     },
     onOnline: () => {
       if (mode !== null) void request(mode);
+      // A listening session that gave up waits to retry on its own: tell it to go now.
+      send(IPC.earsStatusEvent, { status: 'online' });
     },
     onNotification: (method, params) => {
       if (method === 'heard') heard(params as Parameters<typeof heard>[0]);
@@ -143,9 +147,9 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
           sample_rate?: number;
           done?: true;
         };
-        if (p.done === true) send(IPC.speechDone, { turn: p.turn });
+        if (p.done === true) sendToPanel(IPC.speechDone, { turn: p.turn });
         else {
-          send(IPC.speechChunk, {
+          sendToPanel(IPC.speechChunk, {
             turn: p.turn,
             ...(p.text === undefined ? {} : { text: p.text }),
             ...(p.pcm === undefined ? {} : { pcm: p.pcm }),
@@ -155,7 +159,7 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
       }
     },
     // The brain's `voice` frames come from the ears alone; the mouth has no status to show.
-    models: () => ({ mouth: true, ears: !voiceFailed }),
+    models: () => ({ ears: !voiceFailed }),
   };
 }
 
@@ -227,12 +231,15 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
   // (no voice running, brain offline) is null, and the form falls back to the system voice.
   handle(
     IPC.speakSample,
-    async (_event, text: string, voice: string, speed: number): Promise<SpeakSample | null> => {
+    async (_event, text: unknown, voice: unknown, speed: unknown): Promise<SpeakSample | null> => {
+      // Whatever the panel sends is coerced here; a speed that is no number is no preview.
+      const rate = Number(speed);
+      if (!Number.isFinite(rate)) return null;
       try {
         const sample = (await callJson(deps.brain, 'speak_sample', {
           text: String(text),
-          voice,
-          speed,
+          voice: String(voice),
+          speed: rate,
         })) as Partial<SpeakSample>;
         return typeof sample.mime === 'string' && typeof sample.data === 'string'
           ? { mime: sample.mime, data: sample.data }

@@ -12,8 +12,6 @@ const FACTS: HealthFacts = {
   connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
   voice: {
     enabled: true,
-    mouth: 'kokoro',
-    mouthReady: true,
     earsUsed: false,
     earsReady: false,
   },

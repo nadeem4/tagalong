@@ -80,11 +80,16 @@ Contract v1 (see [protocol/README.md](../protocol/README.md)):
 | `speech { turn, done: true }`                | brain to body | The last sentence of that turn has been sent.                                                                                                          |
 
 `heard`, `voice` and `speech` are live only (no `seq`), so they are not replayed after a
-reconnect. `createVoiceBridge` remembers the open listening mode, and when the brain comes back
-(`onOnline`) it sends `listen` again, so Always listening survives a brain restart.
+reconnect. `createVoiceBridge` remembers the open listening mode (also when `listen` found the
+brain offline), and when the brain comes back (`onOnline`) it sends `listen` again and sends the
+renderer an `earsStatusEvent` of `online`, which makes `ListenController.retryNow()` skip the
+30 s to 5 min wait. So Always listening survives a brain restart and starts at launch as soon as
+the brain is up. Spoken audio (`speechChunk`, `speechDone`) goes to the panel alone; everything
+else the ears send goes to every window. The preview (`speakSample`) coerces what the panel
+sends: the voice to a string, the speed to a number, and a speed that is no number is no preview.
 
-`models()` (the health check) reports `{ mouth: true, ears: !failed }`: the ears are fine until
-the brain sends `voice { status: 'failed' }`, and the mouth has no status of its own. Its row
+`models()` (the health check) reports `{ ears: !failed }`: the ears are fine until
+the brain sends `voice { status: 'failed' }`; the mouth has no status of its own and is not reported. Its row
 reads "The brain could not load its speech models."
 
 ### The renderer side

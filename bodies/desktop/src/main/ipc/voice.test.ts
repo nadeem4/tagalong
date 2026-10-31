@@ -25,9 +25,11 @@ function setup(
   const ipc = fakeIpc();
   const brain = fakeBrain();
   const sent: [string, unknown][] = [];
+  const toPanel: [string, unknown][] = [];
   const bridge = createVoiceBridge({
     brain,
     send: (channel, payload) => void sent.push([channel, payload]),
+    sendToPanel: (channel, payload) => void toPanel.push([channel, payload]),
     ...more,
   });
   const listening = new AlwaysListening();
@@ -38,7 +40,7 @@ function setup(
     listening: () => listening,
     on: ipc.on,
   });
-  return { ...ipc, brain, bridge, listening, sent };
+  return { ...ipc, brain, bridge, listening, sent, toPanel };
 }
 
 describe('registerVoiceIpc', () => {
@@ -153,6 +155,18 @@ describe('registerVoiceIpc', () => {
     expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
   });
 
+  it('coerces what the panel sends for a preview before it reaches the brain', async () => {
+    const { invoke, brain } = setup();
+    brain.call.mockResolvedValue([
+      { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'AA==' }) },
+    ]);
+    await invoke(IPC.speakSample, 'Hi', 5, '1.5');
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', { text: 'Hi', voice: '5', speed: 1.5 });
+    brain.call.mockClear();
+    expect(await invoke(IPC.speakSample, 'Hi', 'bm_george', 'fast')).toBeNull();
+    expect(brain.call).not.toHaveBeenCalled();
+  });
+
   it('gives back null when the brain rejects the preview as an RPC error', async () => {
     const { invoke, brain } = setup();
     brain.call.mockRejectedValue(new Error('speak_sample: text is too long'));
@@ -161,6 +175,17 @@ describe('registerVoiceIpc', () => {
 });
 
 describe('the brain coming back', () => {
+  it('listens when it returns after a listen that found it offline, and tells the panel to retry now', async () => {
+    const { invoke, brain, bridge, sent } = setup();
+    brain.listen.mockRejectedValueOnce(new BrainOffline());
+    await invoke(IPC.earsListen, 'always');
+    sent.length = 0;
+    bridge.onOnline();
+    expect(brain.listen).toHaveBeenLastCalledWith('always');
+    expect(brain.listen).toHaveBeenCalledTimes(2);
+    expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'online' }]);
+  });
+
   it('asks to listen again if a session was open, and not after stop', async () => {
     const { invoke, brain, bridge } = setup();
     await invoke(IPC.earsListen, 'always');
@@ -208,12 +233,13 @@ describe('what the brain sends back', () => {
     expect(sent).toContainEqual([IPC.earsStatusEvent, { status: 'ready' }]);
   });
 
-  it('forwards speech chunks and the end of a turn’s speech to the panel', () => {
-    const { bridge, sent } = setup();
+  it('forwards speech chunks and the end of a turn’s speech to the panel alone', () => {
+    const { bridge, sent, toPanel } = setup();
     bridge.onNotification('speech', { turn: 't1', text: 'Hi.', pcm: 'AAA=', sample_rate: 24000 });
     bridge.onNotification('speech', { turn: 't1', text: 'Plain.' });
     bridge.onNotification('speech', { turn: 't1', done: true });
-    expect(sent).toEqual([
+    expect(sent).toEqual([]);
+    expect(toPanel).toEqual([
       [IPC.speechChunk, { turn: 't1', text: 'Hi.', pcm: 'AAA=', sampleRate: 24000 }],
       [IPC.speechChunk, { turn: 't1', text: 'Plain.' }],
       [IPC.speechDone, { turn: 't1' }],
@@ -228,11 +254,11 @@ describe('what the brain sends back', () => {
 
   it('reports the ears as fine until the brain says they failed', () => {
     const { bridge } = setup();
-    expect(bridge.models()).toEqual({ mouth: true, ears: true });
+    expect(bridge.models()).toEqual({ ears: true });
     bridge.onNotification('voice', { status: 'failed' });
-    expect(bridge.models()).toEqual({ mouth: true, ears: false });
+    expect(bridge.models()).toEqual({ ears: false });
     bridge.onNotification('voice', { status: 'ready' });
-    expect(bridge.models()).toEqual({ mouth: true, ears: true });
+    expect(bridge.models()).toEqual({ ears: true });
   });
 
   it('brings the bubble up only for words addressed to Scout, never for bare speech', () => {

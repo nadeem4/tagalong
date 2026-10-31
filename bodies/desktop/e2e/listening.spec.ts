@@ -1,4 +1,4 @@
-﻿/**
+/**
  * End-to-end: Always listening is off at launch, on only when switched, hears and answers, and
  * switches off.
  */

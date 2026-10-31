@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The desktop app's main process: dials the brain, makes the windows (Scout, its bubble,
  * Home), the tray and the hotkeys, and wires every IPC channel.
  * Handlers that need only the brain, settings or voice live in `ipc/`; the ones here need
@@ -299,6 +299,10 @@ async function start(): Promise<void> {
           if (!window.isDestroyed()) window.webContents.send(channel, payload);
         }
       },
+      sendToPanel: (channel, payload) => {
+        const panel = desktop?.panel;
+        if (panel != null && !panel.isDestroyed()) panel.webContents.send(channel, payload);
+      },
       onSpoken: () => {
         const panel = desktop?.panel;
         const avatar = desktop?.avatar;
@@ -319,7 +323,7 @@ async function start(): Promise<void> {
       window.webContents.send(IPC.sightPauseEvent, paused);
     }
     desktop?.tray.setContextMenu(buildTrayMenu());
-    desktop?.tray.setToolTip(paused ? 'Tagalong â€” sight is paused' : 'Tagalong');
+    desktop?.tray.setToolTip(paused ? 'Tagalong — sight is paused' : 'Tagalong');
   });
 
   // Every window that shows Always listening follows this one state. Only `on` is saved.
@@ -783,7 +787,7 @@ function registerIpc(): void {
   // shows sight running while it is paused is the one lie this feature cannot afford.
   ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
   ipcMain.handle(IPC.getStatusMark, () => required().statusMarks.top());
-  // Only the panel's own marks (the mic failing, Say â€œScoutâ€); setPanelMark refuses the rest.
+  // Only the panel's own marks (the mic failing, Say “Scout”); setPanelMark refuses the rest.
   ipcMain.handle(IPC.setStatusMark, (_event, id: unknown, on: unknown) =>
     setPanelMark(required().statusMarks, id, on),
   );

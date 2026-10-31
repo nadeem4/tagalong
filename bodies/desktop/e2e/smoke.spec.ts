@@ -174,6 +174,15 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   expect(brain.voice.listens).toContain('held');
   expect(brain.voice.spokenSays).toBeGreaterThan(0);
 
+  // The audio was played: the bubble shows Scout speaking, and Stop cuts it off, which the
+  // brain hears as a hush.
+  const stop = panel.getByRole('button', { name: 'Stop speaking' });
+  await expect(stop).toBeVisible({ timeout: 30_000 });
+  const hushesBefore = brain.voice.hushes;
+  await stop.click();
+  await expect(stop).toHaveCount(0);
+  await expect.poll(() => brain.voice.hushes).toBeGreaterThan(hushesBefore);
+
   await avatar.evaluate(() => window.tagalongHost.hidePanel());
 });
 

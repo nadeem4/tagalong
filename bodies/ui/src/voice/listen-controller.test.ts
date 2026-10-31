@@ -466,6 +466,25 @@ describe('ListenController, always', () => {
     expect(timers.pending()).toEqual([300_000]);
   });
 
+  it('retryNow listens again at once, cancels the pending wait and starts the waits over', async () => {
+    const timers = fakeTimers();
+    const { controller, openMic } = setup(undefined, { setTimer: timers.set, retryMs: 1_000 });
+    controller.setAlways(true);
+    await tick();
+    controller.earsFailed();
+    timers.fire();
+    await tick();
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([2_000]);
+    controller.retryNow();
+    await tick();
+    expect(timers.pending()).toEqual([]);
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledTimes(3);
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([1_000]);
+  });
+
   it('switching always listening off cancels the retry', async () => {
     const timers = fakeTimers();
     const { controller, openMic } = setup(undefined, { setTimer: timers.set });

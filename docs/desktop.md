@@ -346,8 +346,7 @@ shell, the screen):
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
 `sightPauseEvent`, `hotkeyProblemEvent`, `settingsChangedEvent`,
 `statusMarkEvent`, `listeningEvent`, `homePageEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
-`talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`,
-`earsProgressEvent`.
+`talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`.
 
 `dropOnPet` checks the sender with `fromWindow(window)` (in `handle.ts`), which compares
 `event.sender` (set by Electron in main, so a page cannot forge it) with that window's

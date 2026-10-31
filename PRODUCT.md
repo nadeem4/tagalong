@@ -62,8 +62,8 @@ its result.
   on until you switch it off, and Scout never switches it on itself. A clear mark on Scout shows
   the whole time. Listening pauses while a call or a full-screen window is in front, and while
   the pets are hidden. Scout acts only on what starts with its name ("Scout, what is this?");
-  everything else is dropped on the computer and goes nowhere. "Scout, stop" switches it off. Audio is understood on the computer and never sent or
-  stored. Otherwise the microphone opens only on the talk key or the mic in the text box, and
+  everything else is dropped on the computer and goes nowhere. "Scout, stop" switches it off. Audio goes only to your own brain and is never
+  stored; with the brain on this computer it never leaves it. Otherwise the microphone opens only on the talk key or the mic in the text box, and
   those need no name. The bubble offers the key to reply.
 - The bubble's header has Always listening (off by default) and Seeing (sight on or paused);
   Settings has both, plus who speaks and who listens.
@@ -86,7 +86,8 @@ its result.
   brain's model and key live in its `.env`. The body never speaks as Scout; only the mind does.
 - Speech runs on the computer (Kokoro, downloaded on first use). Speech to text runs on the
   computer too (Moonshine, with Silero VAD and Smart Turn, downloaded on first use); the words show
-  in the bubble as you talk, and the audio is never sent or stored.
+  in the bubble as you talk. Audio goes only to your own brain and is never stored; with the brain
+  on this computer it never leaves it.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens stay in the brain's data folder.

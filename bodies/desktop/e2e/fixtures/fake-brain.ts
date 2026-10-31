@@ -29,9 +29,9 @@ export interface FakeBrain {
   stops: string[];
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
-  /** Tell every connected body that Scout approved an ask under a preference. */
   /** What the desktop asked of the brain's ears and mouth, in order. */
   voice: { listens: string[]; unlistens: number; hushes: number; mics: number; spokenSays: number };
+  /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   close(): Promise<void>;
 }
@@ -151,8 +151,9 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     mics: 0,
     spokenSays: 0,
   };
-  // 100 ms of silence at the mouth's 24 kHz: enough for the desktop to play something.
-  const SILENCE = Buffer.alloc(2400 * 2).toString('base64');
+  // 3 s of silence at the mouth's 24 kHz: long enough for a test to see the panel speaking
+  // and press Stop before it ends on its own.
+  const SILENCE = Buffer.alloc(24_000 * 3 * 2).toString('base64');
   const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
   const permissions = [

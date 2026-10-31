@@ -221,6 +221,10 @@ export function useTalk(options: TalkOptions): {
   useEffect(
     () =>
       window.tagalongHost.onEarsStatus(({ status, message }) => {
+        if (status === 'online') {
+          controller.made.retryNow();
+          return;
+        }
         if (status !== 'failed') {
           setNote(earsNotes.status(noteNow.current, status));
           return;

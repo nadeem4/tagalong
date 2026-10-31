@@ -118,9 +118,12 @@ export interface ListeningState {
   followUp: boolean;
 }
 
-/** The brain's voice models: loading (the first time, a download), ready, or failed and why. */
+/**
+ * The brain's voice models: loading (the first time, a download), ready, or failed and why;
+ * or `online`: the brain is back, so a listening session that was waiting to retry goes now.
+ */
 export interface EarsStatus {
-  status: 'loading' | 'ready' | 'failed';
+  status: 'loading' | 'ready' | 'failed' | 'online';
   message?: string;
   /** 0..1 while a download runs. */
   progress?: number;
@@ -166,8 +169,6 @@ export interface CaptureNotice {
 
 /** Whether the brain's voice models work, for the health check: its last word, never a download. */
 export interface VoiceModels {
-  /** The brain's speaking voice (Kokoro). */
-  mouth: boolean;
   /** The brain's ears. */
   ears: boolean;
 }

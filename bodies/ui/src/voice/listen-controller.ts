@@ -161,6 +161,12 @@ export class ListenController {
     return mode;
   }
 
+  /** The brain is back: stop waiting for the retry and listen at once (always, if it is on). */
+  retryNow(): void {
+    this.#resetRetry();
+    this.#sync();
+  }
+
   /** Always listening, as the person switched it. Off cancels a pending retry. */
   setAlways(on: boolean): void {
     this.#always = on;

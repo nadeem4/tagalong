@@ -250,8 +250,8 @@ flowchart LR
 
 Scout listens continuously only after you switch **Always listening** on, once, in the bubble
 (or in Settings → Privacy). It is remembered until you switch it off. A clear mark on Scout shows
-the whole time it is on, and Scout never switches it on itself. Audio is understood on the
-computer and is never sent or stored.
+the whole time it is on, and Scout never switches it on itself. Audio goes only to your own
+brain and is never stored; with the brain on this computer it never leaves it.
 
 Otherwise the microphone is used only while you hold the talk key (Right Ctrl on its own by
 default, Settings → Voice) or after you click the mic in the text box, until you let go or click

@@ -835,8 +835,7 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   of a display-less body, and a turn with no displaying body is not spoken. A typed turn never
   reaches the voice. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
   (default 1.0); an unknown voice id speaks with `bm_george`.
-- **Sentences.** `voice/speakable.py` (a port of the desktop's `speakable.ts` and
-  `spoken-stream.ts`) turns the streamed reply into sentences: fenced code, table rows, `>` quotes
+- **Sentences.** `voice/speakable.py` turns the streamed reply into sentences: fenced code, table rows, `>` quotes
   and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. The
   first complete sentence goes out at once. Short sentences (under 40 characters) that are
   already waiting are said together, because the voice clips a very short line.

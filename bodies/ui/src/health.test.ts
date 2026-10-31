@@ -8,8 +8,6 @@ const ALL_GOOD: HealthFacts = {
   connections: [{ name: 'GitHub', status: 'connected' }],
   voice: {
     enabled: true,
-    mouth: 'kokoro',
-    mouthReady: true,
     earsUsed: true,
     earsReady: true,
   },
@@ -41,7 +39,6 @@ describe('healthRows', () => {
     const lines = [
       ...healthRows(ALL_GOOD),
       ...healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }),
-      ...healthRows({ ...ALL_GOOD, voice: { ...voice, mouth: 'kokoro', mouthReady: false } }),
     ].map((each) => each.line);
     for (const line of lines) expect(line).not.toMatch(/^I\s|\bI’|\bmy\b/i);
   });
