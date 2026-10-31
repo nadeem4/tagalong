@@ -193,11 +193,28 @@ Rules each module enforces:
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`
   calls `openWalkthrough(9)` instead.
-- **Walkthrough.** `windows/walkthrough.ts` makes a frameless 1040 x 680 window (not resizable,
-  navy `#0f1b33` behind the page) with the same web preferences as Home, loading
-  `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). It is a
-  placeholder page for now that prints the step number. `openWalkthrough(step?)` in `index.ts`
-  focuses the open window (reloading it at `?step=N` when a step is named) or creates one.
+- **Walkthrough.** `windows/walkthrough.ts` makes a 1040 x 680 window (not resizable, no title
+  bar of its own: `titleBarOverlay` keeps the system's close button over the page's top strip,
+  because Escape does not close it) with the same web preferences as Home, loading
+  `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). The page
+  (`src/walkthrough.tsx`) mounts `Walkthrough` from `@tagalong/ui` (`bodies/ui/src/walkthrough/`):
+  a navy side panel with the nine-step list, the step on the page, and a footer (Back, Skip tour,
+  Skip for now, Next). Steps 1 to 5 are built (welcome, how it fits, what to ask, asking, voice);
+  steps 6 to 9 show a "coming" line until the next slice. Steps 4 and 5 stage their choices (ask
+  key, talk key, Scout talks, voice, speed, microphone) and write them through `saveSettings`
+  only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
+  already reached. Skip tour finishes when a key is set, else goes to step 9.
+  `openWalkthrough(step?)` in `index.ts` focuses the open window (reloading it at `?step=N` when
+  a step is named) or creates one.
+- **Launch gate.** `walkthrough-gate.ts` holds `shouldOpenWalkthrough` (open at launch while
+  `walkthrough.done` is false, with or without a brain) and `petsVisible`, plus
+  `createWalkthroughGate`, the open and close handlers (written against fakes, so they are
+  tested without Electron). While the window is open the pet, bubble and dock are hidden (the
+  avatar window is created with `show: false` on such a launch) and the hotkeys, talk key and
+  remarks do nothing; a second launch or the tray's show/hide brings the tour forward instead.
+  Finish and Skip tour set `done` and close the window; closing it part-way leaves `done`
+  false. Either way the pet comes back, if it was showing when the tour opened (a launch counts
+  as showing). **Show the tour again** hides them again.
 - **Navigation.** The avatar and panel call `guardNavigation`, which cancels every `will-navigate`,
   so a dropped file never opens in the window.
 

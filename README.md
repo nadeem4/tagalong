@@ -117,7 +117,7 @@ its bodies fit together.
 
 ## First run
 
-Start Tagalong (it starts the brain if none is running); Scout appears on your screen. The first-run walkthrough asks for your Anthropic key (change it later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
+Start Tagalong (it starts the brain if none is running). The first launch opens the walkthrough, a nine-step tour (steps 1 to 5 are in; the rest follow), and Scout appears on your screen when you finish, skip or close it. It asks for your Anthropic key (change it later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 

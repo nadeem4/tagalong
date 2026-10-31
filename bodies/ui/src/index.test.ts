@@ -19,6 +19,7 @@ describe('ui package surface', () => {
         'HomeView',
         'BeanClip',
         'SETTINGS_CSS',
+        'Walkthrough',
         'createFakeHostBridge',
         'PushToTalk',
         'ListenController',

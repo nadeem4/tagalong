@@ -1565,8 +1565,8 @@ with a fake key; the real check against Anthropic is done by hand here.
 1. **Action:** start Tagalong with no key set. **Expected:** the dock tag reads **Add key**; open
    the bubble: its status row says "Add your Anthropic key to start." with an **Add key** button.
    Ask a question: Scout gives no answer line, only the app's own words.
-2. **Action:** press **Add key**. **Expected:** the walkthrough window opens (for now a plain page
-   naming step 9).
+2. **Action:** press **Add key**. **Expected:** the walkthrough window opens at step 9, and the
+   pet and bubble are hidden while it is open.
 3. **Action:** open **Home → Settings** and find the **Anthropic key** section. **Expected:** the
    field is masked; **Show** reveals it; **Check key** stays off while the field is empty.
 
@@ -1587,7 +1587,28 @@ with a fake key; the real check against Anthropic is done by hand here.
 ### K.3. Show the tour again
 
 1. **Action:** **Home → Overview → Show the tour again**. **Expected:** the walkthrough window
-   opens at step 1 (a placeholder for now). Closing it with the X does not mark the tour seen.
+   opens at step 1 and the pet hides. Closing it with the X brings the pet back and does not mark
+   the tour seen (it opens again at the next launch).
+
+### K.4. First launch and the steps
+
+1. **Action:** delete `settings.json` and start Tagalong, with or without a brain. **Expected:**
+   the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
+2. **Action:** press **Next** through steps 1 to 5; use **Skip for now** on one. **Expected:**
+   Back is off on step 1; the side list jumps only to steps you have reached; Skip for now saves
+   nothing.
+3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
+   key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
+4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, change the voice and speed,
+   press **Preview**, then **Next**. **Expected:** Preview plays the chosen voice; the choices
+   appear in Home → Settings. There is no Always listening control.
+5. **Action:** with a key set, press **Skip tour**. **Expected:** the window closes, the pet
+   appears and the tour does not open at the next launch. With no key, **Skip tour** goes to step
+   9 instead.
+6. **Action:** while the tour is open, start Tagalong a second time, or use the tray's **Show or
+   hide Scout**. **Expected:** the tour comes forward; the pet stays hidden.
+7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
+   **Expected:** the tour opens once; after Finish or Skip tour it never opens again.
 
 ## Not supported
 

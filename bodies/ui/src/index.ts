@@ -51,3 +51,11 @@ export type { ListenMic } from './voice/listen-controller';
 
 /** "Scout, what's wrong?": what a host reads for the health card, and where Fix it lands. */
 export type { HealthFacts } from './health';
+
+/** The first-run walkthrough window's content. */
+export { Walkthrough } from './walkthrough/walkthrough';
+export type {
+  VoicePreview,
+  WalkthroughHost,
+  WalkthroughSettings,
+} from './walkthrough/walkthrough-host';
