@@ -116,7 +116,7 @@ stateDiagram-v2
   `bridge.ask` with the current `conversationId`. The ask's `turnId` fills `mine` if
   `turn.started` has not already.
 - `turn.started` is taken only while `running` and only when it is not `background: true` (a
-  routine's or a job's turn never answers in the bubble). It sets `mine` and the conversation id
+  job's turn never answers in the bubble). It sets `mine` and the conversation id
   the next question continues.
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
   `stopReason` shows `stopStatus` as a quiet line ("Declined" for `refusal`, "Stopped: too many
@@ -155,10 +155,10 @@ panel that was already showing is left alone.
 **The cards.** Below the answer, in this order: the drop card, then the connector confirm card.
 The bubble keeps each one's state from its notification:
 
-| Card                   | Opened by           | Buttons and bridge calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ---------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DropCard`             | the `drop` prop     | Explain (asks "Explain this." or the person's words), Hand it to an expert (asks "Hand this to an expert: … (path)"), both with `drop: true`; Cancel                                                                                                                                                                                                                                                                                                                                                                                                                           | a button; a new drop reopens it                                                                              |
-| `ConnectorConfirmCard` | `connector.confirm` | Allow once / Always allow / Deny (`approveTool(approvalId, 'once' \| 'always' \| 'deny')`). Always allow shows only when the event's `options` include `always` (a locked tool has none); an event without `options` (the old brain) gets Allow once and Deny. A brain ask (it has `options`) leads with Scout's own words and shows the tool name, never "Change in <app>"; its text shows whole. Open asks queue oldest first and the card shows the head, so several asks at once each get their turn. A click that does not get through (brain offline) leaves the card up | an answer that got through; its turn ending; `connector.dismiss` for it; `asks.changed` no longer listing it |
+| Card                   | Opened by           | Buttons and bridge calls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Closes when                                                                                                  |
+| ---------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `DropCard`             | the `drop` prop     | Explain (asks "Explain this." or the person's words), Hand it to an expert (asks "Hand this to an expert: … (path)"), both with `drop: true`; Cancel                                                                                                                                                                                                                                                                                                                                                                                                           | a button; a new drop reopens it                                                                              |
+| `ConnectorConfirmCard` | `connector.confirm` | Allow once / Always allow / Deny (`approveTool(approvalId, 'once' \| 'always' \| 'deny')`). Always allow shows only when the event's `options` include `always` (a locked tool has none); an event without `options` gets Allow once and Deny. A brain ask (it has `options`) leads with Scout's own words and shows the tool name, never "Change in <app>"; its text shows whole. Open asks queue oldest first and the card shows the head, so several asks at once each get their turn. A click that does not get through (brain offline) leaves the card up | an answer that got through; its turn ending; `connector.dismiss` for it; `asks.changed` no longer listing it |
 
 Asks are described in [brain.md](brain.md).
 
@@ -198,8 +198,8 @@ is `openLogsFolder`.
 
 The mind decides what is said: everything it writes is spoken except what it puts in a show-only
 block, which the bubble shows and the voice skips. Show-only means a fenced block (a `draft`,
-code), a table row (a line starting with `|`) or a quoted line (starting with `>`, which mostly
-holds a translation). Bare URLs are dropped too.
+code), a table row (a line starting with `|`) or a quoted line (starting with `>`, a
+quote). Bare URLs are dropped too.
 
 - `toSpeakable(text)` (`voice/speakable.ts`) does this for a whole line: removes fenced blocks,
   quoted and table lines, strips heading and list markers, images, link targets, inline code
@@ -284,7 +284,7 @@ one-shot. Each clip is keyed by mood, so a one-shot always plays from its first 
 | `listening` | Seeing (blue)         | a capture just happened, or a drop is held over the pet | is looking at your screen      |
 | `reading`   | none                  | a screen tool is in flight                              | is reading your screen         |
 | `thinking`  | none                  | Scout is answering the person                           | is thinking                    |
-| `working`   | Working (gold)        | one of Scout's own background turns (a job, a routine)  | is working on a job of its own |
+| `working`   | Working (gold)        | one of Scout's own background turns (a job)             | is working on a job of its own |
 | `dozing`    | none                  | the person is away or the screen is locked              | is dozing                      |
 
 **Where the mood comes from.** The desktop avatar page keeps `DockState` with a pure reducer,

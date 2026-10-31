@@ -21,17 +21,17 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | Doc                                | Covers                                                                                                                       |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | [desktop.md](desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file |
-| [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, pointing, drafts, drops                                                   |
+| [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, drafts, drops                                                             |
 | [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, models and downloads, the voice process           |
 | [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                    |
 
 ### Perception, memory and apps
 
-| Doc                                    | Covers                                                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight, the sight log, rolling memory |
-| [memory.md](memory.md)                 | The memory store, recall, the digest, summaries, forgetting, retention                                          |
-| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                                               |
+| Doc                                    | Covers                                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [sight.md](sight.md)                   | Perception: window list, captures, OCR, exclusions, attach policy, pausing sight, rolling memory |
+| [memory.md](memory.md)                 | The memory store, recall, summaries, forgetting, the saved chat                                  |
+| [connected-apps.md](connected-apps.md) | MCP connections, tool calls, approvals for writes                                                |
 
 ### Foundations
 

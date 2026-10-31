@@ -79,8 +79,8 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
 7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
-   `applyHotkeys(settings)`. There is no launch greeting, launch record, keep-an-eye or
-   wellbeing tick.
+   `applyHotkeys(settings)`. The desktop makes no launch greeting of its own; the brain decides
+   whether Scout speaks first.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -143,8 +143,7 @@ running.
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
   rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
-- **Not wired yet.** Pets are a fixed local Scout. The launch greeting, keep-an-eye and wellbeing
-  come back as the brain's rows land; the old TypeScript brain's IPC for them is deleted, not stubbed.
+- **Not wired yet.** Pets are a fixed local Scout; they come back when the brain plans them.
 
 `shutdown()` stops the client.
 
@@ -320,7 +319,7 @@ the preload, so a dead channel cannot linger.
 | `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`                                                                                                                                                                                                                                                                                                                  |
 | `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
-`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `engineVersion`,
+`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `appVersion`,
 `hotkeyError`, `platform` (`process.platform`) and
 `elevenLabsKeyStored`.
 
@@ -381,8 +380,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
   rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/spend.ts`,
-  answering `{ spentUsd, limitUsd }`): the by-provider rows and the month are gone until the brain can
-  report them. Home's Permissions list (a card under the Settings form,
+  answering `{ spentUsd, limitUsd }`). Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
   pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
@@ -620,7 +618,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `src/shared/settings.ts` |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`            |
 | `MAX_COPY_CHARS`                    | 20,000 characters              | `ipc/clipboard.ts`       |
-| Sight log and memory list           | `limit: 200`                   | `ipc/memory.ts`          |
+| Memory list                         | `limit: 200`                   | `ipc/memory.ts`          |
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`           |
 | `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`   |
 

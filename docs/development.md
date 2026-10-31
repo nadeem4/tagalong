@@ -13,7 +13,7 @@ tagalong/
   tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
   vitest.config.ts                  # projects: bodies/*, protocol/ts; coverage thresholds
   eslint.config.js
-  .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
+  .github/workflows/ci.yml          # changes, build (Linux), brain (Linux), e2e (Windows)
   docs/
     README.md                       # the index and reading order
     architecture.md                 # the whole system
@@ -194,20 +194,22 @@ the browser body are not measured: the Playwright suites cover them.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every pull request to `main` and every push to `main`. Three
+`.github/workflows/ci.yml` runs on every pull request to `main` and every push to `main`. Four
 jobs:
 
 - **`changes`** (Linux, seconds). Asks `dorny/paths-filter` whether anything outside `docs/` that is
-  not Markdown changed. When nothing counts, the other two jobs are skipped. If `changes` itself
+  not Markdown changed. When nothing counts, the other three jobs are skipped. If `changes` itself
   fails, `build` runs anyway rather than skipping.
 - **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
   the unit tests with coverage and the floors above.
+- **`brain`** (Linux). The Python brain: `uv sync --locked`, `uv run ruff check`,
+  `uv run ruff format --check` and `uv run pytest`, run from `brain/`. Gated like `build`.
 - **`e2e`** (Windows). Starts only after `build` passes. Runs `pnpm build` first, because the tests
   import the workspace packages from their compiled `dist` (on Linux the typecheck's `tsc -b` does
   this). Then the unit tests that skip themselves off Windows (`*.integration.test.ts` against a
   real PowerShell), and the Electron end-to-end suites.
 
-Branch protection on `main` requires `build` and `e2e`. A docs-only pull request skips both, and a
+Branch protection on `main` requires `build`, `e2e` and `brain`. A docs-only pull request skips all three, and a
 skipped required check counts as passed, so it can merge. A `paths-ignore` trigger would not work
 here: the workflow would never start, the required checks would never report, and the pull request
 would wait forever. Docs-only changes also skip the format check, so run `pnpm format:check` locally

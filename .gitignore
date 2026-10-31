@@ -35,10 +35,11 @@ Thumbs.db
 
 # local agent history
 .remember/
+.superpowers/
+docs/superpowers/
 
 # design tool scratch (local only)
-.impeccable/questions/
-.impeccable/review/
+.impeccable/
 .claude/worktrees/
 
 # python (brain)

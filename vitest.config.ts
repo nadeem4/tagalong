@@ -3,8 +3,7 @@ import { defineConfig } from 'vitest/config';
 // Floors for the host and the shared UI sit just below what they measure today, so CI
 // passes now and fails the moment coverage drops. Raise them as coverage grows.
 const desktopHostFloor = { statements: 59, branches: 62, functions: 49, lines: 60 };
-// The ui floor dropped when the crew UI went: the deleted crew strip, pet avatar and furniture
-// were fully covered, and the crew tests also covered chat-panel and message-list paths.
+// The ui floor sits just below what the shared UI measures today, like the host floor above.
 const uiFloor = { statements: 91, branches: 83, functions: 90, lines: 93 };
 
 export default defineConfig({

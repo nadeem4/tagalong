@@ -191,7 +191,7 @@ flowchart LR
 
 ## The desktop body
 
-The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs the TypeScript engine.
+The desktop app (`bodies/desktop`) is a body of this brain.
 
 - Start the brain first (`cd brain && uv run brain`), then the desktop (`pnpm dev:desktop`). The
   desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
@@ -206,7 +206,7 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   open turn as failed; the next ask works without restarting the app.
 - The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
   settings (hotkeys, listening, rolling memory).
-- Pets, the launch greeting, keep-an-eye and wellbeing are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
+- Pets are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
 
 ## Toolbox
 

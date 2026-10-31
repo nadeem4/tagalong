@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FRAMES = os.path.join(HERE, 'out', 'frames')
 DELIVERY = os.path.join(HERE, 'out', 'delivery')
 PX, FPS, QUALITY = 192, 12, 85
-ONE_SHOT = {'cheer', 'wince', 'idle-blink', 'listening-blink'}   # play once, hold the last frame
+ONE_SHOT = {'idle-blink', 'listening-blink'}   # play once, hold the last frame
 
 
 def main():

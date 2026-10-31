@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Python brain does not ask for screen reads yet; this doc covers what the desktop reads and the rules around it.
+The Python brain reaches the screen only through the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`); this doc covers what the desktop reads and the rules around it.
 
 How Scout sees the desktop: the window list, window text (accessibility tree and OCR), screenshots
 of a window, a display or a region, the composite of every display, and the opt-in rolling memory
@@ -121,7 +121,7 @@ calls this function rather than its own copy of the arguments.
 `handleOf` turns an id back into a handle and returns null for anything the host did not mint, so a
 model-invented id fails as "no such window" rather than reaching a script.
 
-Callers that need titles only pass `countText: false`: gentle nudges and the listening guard.
+Callers that need titles only pass `countText: false`: the focus watch, the listening guard and the `list_windows` tool.
 
 ### Active window and title handling
 
@@ -148,7 +148,7 @@ Callers that need titles only pass `countText: false`: gentle nudges and the lis
 | Region crop (`look_closer`) | `captureRegionWith` (`region.ts`)             | captured at the display's full pixel size, crop then fit to 1568 | `displayRefusals` for that display; null when refused                              |
 | OCR picture                 | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500                                      | the text read's own check                                                          |
 | Rolling memory frame        | `captureDisplays`                             | `FRAME_LONG_SIDE` = 640                                          | focused window first, then per display                                             |
-| Watch after-crop            | `captureRegion`                               | `AFTER_CROP_LONG_SIDE` = 1024                                    | `displayRefusals`                                                                  |
+| Diff after-crop             | `captureRegion`                               | `AFTER_CROP_LONG_SIDE` = 1024                                    | `displayRefusals`                                                                  |
 
 Rules shared by every picture:
 
@@ -185,14 +185,14 @@ unless the notice is paused or blocked.
 
 Which reads announce:
 
-| Path                                                                                                                                                   | Announced                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Ask hotkey (`openPanelWithContext`)                                                                                                                    | yes, `screenshot: false`                                             |
-| Bubble capture (`IPC.capture`, `captureForPanel`), talk key                                                                                            | yes, `screenshot` when asked for                                     |
-| `perception.capture` (look_at_screen, get_selection, list_displays, look_at_display)                                                                   | yes, `screenshot` only when the targets include `screenshot`         |
-| `perception.captureWindow` (look_at_window)                                                                                                            | yes, `screenshot: true`                                              |
-| `perception.readText` read by OCR                                                                                                                      | yes, `screenshot: true`                                              |
-| `perception.readText` by UI Automation, `perception.listWindows`, `perception.captureRegion`, `perception.recall`, `perception.diff`, `screen.pointAt` | no notice (each still writes a sight-log row when it read something) |
+| Path                                                                                                                                 | Announced                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Ask hotkey (`openPanelWithContext`)                                                                                                  | yes, `screenshot: false`                                     |
+| Bubble capture (`IPC.capture`, `captureForPanel`), talk key                                                                          | yes, `screenshot` when asked for                             |
+| `perception.capture` (look_at_screen, get_selection, list_displays, look_at_display)                                                 | yes, `screenshot` only when the targets include `screenshot` |
+| `perception.captureWindow` (look_at_window)                                                                                          | yes, `screenshot: true`                                      |
+| `perception.readText` read by OCR                                                                                                    | yes, `screenshot: true`                                      |
+| `perception.readText` by UI Automation, `perception.listWindows`, `perception.captureRegion`, `perception.recall`, `perception.diff` | no notice                                                    |
 
 ### Screen text, selection and OCR
 
@@ -321,7 +321,7 @@ On a change, `sightPause.onChange` stops rolling memory and clears its ring
 (`rolling.pauseChanged`), clears the diff scratch rings (`perceptionMemory.clear()`), sends
 `IPC.sightPauseEvent` (`tagalong:sight-pause-event`) to every window (the avatar greys its eye),
 rebuilds the tray menu and sets the tooltip to `Tagalong — sight is paused`. A window that opens
-later reads the state with `IPC.getSightPaused`. Keeping an eye, nudges and the listening guard
+later reads the state with `IPC.getSightPaused`. The focus watch and the listening guard
 also check the pause before listing. Drops are not refused by a pause: they are handed over.
 
 ### Rolling memory
@@ -360,10 +360,9 @@ answers on mount.
 
 **PerceptionMemory** (`perception-memory.ts`) answers both methods:
 
-- `recall` reads the rolling ring with `nearest(now - secondsAgo, displayId)`. Rolling memory off
+- The body keeps the frames; the brain has no tool that reads them yet, so Scout cannot recall from them. `recall` reads the rolling ring with `nearest(now - secondsAgo, displayId)`. Rolling memory off
   returns `recording: false` and no frames.
-- `diff` takes a fresh 640-pixel frame of every display (reused if under `FRESH_MS` = 1,000 old,
-  since a watch asks twice per tick), refusing first if an excluded window has focus. It pushes the
+- `diff` takes a fresh 640-pixel frame of every display (reused if under `FRESH_MS` = 1,000 old), refusing first if an excluded window has focus. It pushes the
   frame into a per-display scratch ring, finds the earlier frame nearest `sinceSeconds` ago in the
   rolling ring or the scratch ring, decodes both (`nativeCodec`, BGRA) and runs `diffBitmaps`. A
   pixel changes when any channel moves more than `CHANNEL_TOLERANCE` = 24; the ratio is changed
@@ -371,14 +370,10 @@ answers on mount.
   adds the before crop from memory and an after crop re-captured at native resolution through
   `captureRegion` (1024 long side), falling back to the frame's own pixels.
 - Scratch rings exist only for displays a diff asked about and are dropped after
-  `SCRATCH_IDLE_MS` = 30,000 without one, on a pause, and on quit. So watches work with rolling
+  `SCRATCH_IDLE_MS` = 30,000 without one, on a pause, and on quit. So a diff works with rolling
   memory off.
 
 Quitting calls `rolling.dispose()` and `perceptionMemory.clear()`; nothing was written anywhere.
-
-### Pointing
-
-The desktop does not answer `screen.pointAt`: the pointer overlay and its element lookup were removed, and the desktop does not advertise the `pointer` capability.
 
 ### Dropping things on Scout
 
@@ -387,7 +382,7 @@ touches sight: a dropped image becomes `snapshot.dropped.image` scaled to
 `MAX_SCREENSHOT_LONG_SIDE` = 1568 and leads the attached images; a file whose name matches
 `secretFileRule` is refused with `SECRET_REFUSAL`; text files up to `MAX_TEXT_FILE_BYTES` = 1 MB,
 PNG and JPEG up to `MAX_IMAGE_FILE_BYTES` = 10 MB, an unsent item released after `DROP_HOLD_MS` =
-10 minutes (`drop.ts`). A dropped image follows the screenshot retention rule. Pausing sight does
+10 minutes (`drop.ts`). A dropped image is saved only as the `[screenshot]` marker. Pausing sight does
 not block a drop.
 
 ## Interfaces

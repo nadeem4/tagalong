@@ -1,7 +1,7 @@
 /**
  * Source guard: the old TypeScript brain is gone, so nothing
- * in the repo may name it again. A grep-style walk catches config, docs and
- * skills that unit tests cannot see. docs/superpowers dated plans are history.
+ * in the repo may name it again. A grep-style walk catches config and docs
+ * that unit tests cannot see. docs/superpowers is local agent scratch.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -15,7 +15,6 @@ const ROOTS = [
   'bodies',
   'protocol',
   '.github',
-  '.claude/skills',
   'docs',
   'eslint.config.js',
   'vitest.config.ts',
