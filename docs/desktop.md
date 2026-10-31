@@ -207,11 +207,14 @@ Rules each module enforces:
   `openWalkthrough(step?)` in `index.ts` focuses the open window (reloading it at `?step=N` when
   a step is named) or creates one.
 - **Launch gate.** `walkthrough-gate.ts` holds `shouldOpenWalkthrough` (open at launch while
-  `walkthrough.done` is false, with or without a brain) and `petsVisible`. While the window is
-  open the pet, bubble and dock are hidden (the avatar window is created with `show: false` on
-  such a launch) and every way to show them (tray, hotkeys, talk key, second launch, remarks)
-  does nothing. Finish and Skip tour set `done` and close the window; closing it part-way leaves
-  `done` false. Either way the pet comes back. **Show the tour again** hides them again.
+  `walkthrough.done` is false, with or without a brain) and `petsVisible`, plus
+  `createWalkthroughGate`, the open and close handlers (written against fakes, so they are
+  tested without Electron). While the window is open the pet, bubble and dock are hidden (the
+  avatar window is created with `show: false` on such a launch) and the hotkeys, talk key and
+  remarks do nothing; a second launch or the tray's show/hide brings the tour forward instead.
+  Finish and Skip tour set `done` and close the window; closing it part-way leaves `done`
+  false. Either way the pet comes back, if it was showing when the tour opened (a launch counts
+  as showing). **Show the tour again** hides them again.
 - **Navigation.** The avatar and panel call `guardNavigation`, which cancels every `will-navigate`,
   so a dropped file never opens in the window.
 

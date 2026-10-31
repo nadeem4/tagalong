@@ -1597,15 +1597,17 @@ with a fake key; the real check against Anthropic is done by hand here.
 2. **Action:** press **Next** through steps 1 to 5; use **Skip for now** on one. **Expected:**
    Back is off on step 1; the side list jumps only to steps you have reached; Skip for now saves
    nothing.
-3. **Action:** on step 4 press **Change**, type `Alt+Space`, press **Next**. **Expected:** the ask
-   key is now Alt+Space (see Home → Settings). Unchanged, **Next** saves nothing.
+3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
+   key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
 4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, change the voice and speed,
    press **Preview**, then **Next**. **Expected:** Preview plays the chosen voice; the choices
    appear in Home → Settings. There is no Always listening control.
 5. **Action:** with a key set, press **Skip tour**. **Expected:** the window closes, the pet
    appears and the tour does not open at the next launch. With no key, **Skip tour** goes to step
    9 instead.
-6. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
+6. **Action:** while the tour is open, start Tagalong a second time, or use the tray's **Show or
+   hide Scout**. **Expected:** the tour comes forward; the pet stays hidden.
+7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
    **Expected:** the tour opens once; after Finish or Skip tour it never opens again.
 
 ## Not supported
