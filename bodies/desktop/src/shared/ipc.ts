@@ -85,8 +85,6 @@ export const IPC = {
   setListening: 'tagalong:voice:set-listening',
   setFollowUp: 'tagalong:voice:set-follow-up',
   listeningEvent: 'tagalong:voice:listening',
-  // Draft it for me: a draft's Copy, from the bubble only. Writes the clipboard, never reads it.
-  copyText: 'tagalong:clipboard:copy-text',
   // Drop it on Scout: a file, link or text dropped on the figure (not dropAvatar, which
   // ends a move of the pet), and the card main hands the bubble for it.
   dropOnPet: 'tagalong:avatar:drop-on-pet',

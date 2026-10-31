@@ -19,7 +19,7 @@ decides to hand to it.
 | `host-bridge.ts`                                 | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`             |
 | `test-support/fake-host-bridge.ts`               | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                       |
 | `companion-bubble.tsx`                           | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                          |
-| `answer.tsx`                                     | `Answer` (Markdown), `DraftBlock` (a draft with Copy), `ANSWER_CSS`                      |
+| `answer.tsx`                                     | `Answer` (Markdown), `ANSWER_CSS`                                                        |
 | `connector-confirm.tsx`, `drop-card.tsx`         | The other cards in the bubble                                                            |
 | `approved-card.tsx`                              | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`       |
 | `health-ask.ts`, `health.ts`, `health-card.tsx`  | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard` |
@@ -54,7 +54,7 @@ snapshot?, spoken?, drop? }`. No `conversationId` opens a new conversation; `tur
 
 Everything else is optional, so a host without a feature never shows it: Home's
 calls (approvals, jobs, connections, permissions, memories, `usageSummary`); the hand-off questions;
-`approveTool`; `copyText`; and the health calls (`checkHealth`, `openFix`, `openLogs`). Each method's
+`approveTool`; and the health calls (`checkHealth`, `openFix`, `openLogs`). Each method's
 channel on desktop is in [desktop.md](desktop.md#the-ipc-modules).
 
 `TurnEvent` is derived from the protocol's notification catalog, not restated: `{ type: N } &
@@ -197,8 +197,7 @@ is `openLogsFolder`.
 ### Show-only blocks
 
 The mind decides what is said: everything it writes is spoken except what it puts in a show-only
-block, which the bubble shows and the voice skips. Show-only means a fenced block (a `draft`,
-code), a table row (a line starting with `|`) or a quoted line (starting with `>`, a
+block, which the bubble shows and the voice skips. Show-only means a fenced code block, a table row (a line starting with `|`) or a quoted line (starting with `>`, a
 quote). Bare URLs are dropped too.
 
 - `toSpeakable(text)` (`voice/speakable.ts`) does this for a whole line: removes fenced blocks,
@@ -213,22 +212,11 @@ quote). Bare URLs are dropped too.
 - `mergeShortLines` joins consecutive lines under `SHORT_LINE` (40 characters), which the local
   voice says badly alone.
 
-### Drafts and the clipboard
+### Answers
 
-Scout writes a short draft (a reply, a message, a PR description) alone in a fenced `draft` block.
 `Answer` (`answer.tsx`) renders answers with `react-markdown` and `remark-gfm` (`skipHtml`: HTML
 stays out; a link renders as text with its address in `title`, because a click would navigate the
-bubble's own window). Its `pre` renderer turns a code element with class `language-draft` into
-`DraftBlock`: the text framed, without the fence's closing newline, and **Copy** when `onCopy` is
-given. Copy shows "Copied" or "Couldn't copy" for 2 s (`COPIED_MS`). Any other fenced block stays a
-code block with no Copy.
-
-The bubble passes `bridge.copyText` as `onCopy` when the host has it; a host without it gets no
-copy button. On desktop `copyText` goes to main (`IPC.copyText`), which writes the
-clipboard itself because `navigator.clipboard` fails while the panel is unfocused. Main takes only a
-string of at most 20,000 characters, only from the panel window, and never reads the clipboard or
-pastes (see [desktop.md](desktop.md#the-ipc-modules)). The fence also keeps the draft out of
-speech.
+bubble's own window). A fenced block is an ordinary code block.
 
 ### Status marks
 
@@ -427,17 +415,17 @@ never spoken. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test (under `bodies/ui/src/` unless noted)                                       | Pins                                                                                                                                                                                                                                                                                                                                             |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `companion-bubble.test.tsx`                                                      | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; draft Copy; `GreetingLine` timing, hold, Not now and offers; each answer said once; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
-| `companion-bubble-health.test.tsx`                                               | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                                                                           |
-| `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                   | which questions match; rows and the headline; the card                                                                                                                                                                                                                                                                                           |
-| `answer.test.tsx`                                                                | Markdown formatted, links as text, HTML as text, tables, draft Copy with exact text, code blocks without Copy, Copied for 2 s, Couldn't copy                                                                                                                                                                                                     |
-| `voice/speakable.test.ts`, `voice/spoken-stream.test.ts`                         | show-only blocks never read (fences, drafts, tables, quotes), lists read without markers, no cap, sentences handed over early, fences in pieces                                                                                                                                                                                                  |
-| `connector-confirm.test.tsx`, `drop-card.test.tsx`                               | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                                                                   |
-| `status-mark.test.tsx`                                                           | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                                          |
-| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, recording, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                                  |
-| `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                                  |
-| `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                                                |
-| the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                                               |
-| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the fake's capture recording, the public surface                                                                                                                                                                                                                                                              |
+| Test (under `bodies/ui/src/` unless noted)                                       | Pins                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `companion-bubble.test.tsx`                                                      | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold, Not now and offers; each answer said once; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
+| `companion-bubble-health.test.tsx`                                               | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                                                               |
+| `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                   | which questions match; rows and the headline; the card                                                                                                                                                                                                                                                                               |
+| `answer.test.tsx`                                                                | Markdown formatted, links as text, HTML as text, tables                                                                                                                                                                                                                                                                              |
+| `voice/speakable.test.ts`, `voice/spoken-stream.test.ts`                         | show-only blocks never read (fences, tables, quotes), lists read without markers, no cap, sentences handed over early, fences in pieces                                                                                                                                                                                              |
+| `connector-confirm.test.tsx`, `drop-card.test.tsx`                               | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                                                       |
+| `status-mark.test.tsx`                                                           | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                              |
+| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                  | the 96 px box, tags and their place, the paused, recording, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                      |
+| `bodies/desktop/src/renderer/src/dock.test.ts`                                   | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                      |
+| `home/home-view.test.tsx`                                                        | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                                    |
+| the other `home/*.test.tsx`                                                      | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                                   |
+| `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts` | the provider and its loud failure, the fake's capture recording, the public surface                                                                                                                                                                                                                                                  |

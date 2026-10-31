@@ -225,7 +225,7 @@ The Python brain replaces secrets with `[secret]` before text is saved:
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
 What reaches a speech engine is only the line being spoken, shaped in the panel: markdown
-stripped, and show-only blocks left out (fenced blocks such as a draft or code, tables, quoted
+stripped, and show-only blocks left out (fenced code blocks, tables, quoted
 (`>`) lines in any language) along with URLs. Scout's mind decides what it says: everything it
 writes outside a block is spoken, whether you typed or spoke, with no length cap; "Scout, stop",
 the stop button and the talk key cut it off at once. Never the screen, the window list, the
@@ -488,20 +488,6 @@ platform adapter, and the adapter handed to the rest of the app is already wrapp
 path added later is covered by construction rather than by remembering. Which reads pause covers is
 a mapped type over the adapter's own methods, so adding a method without deciding what pause does to
 it does not compile.
-
-## Drafts and the clipboard
-
-When you ask Scout to draft a reply, a message or a PR description, it reads what it needs the
-usual way (your selection, then the window's text, a picture only when the text is not enough) and
-writes the draft in the bubble.
-
-- **The clipboard is written only on Copy.** Pressing **Copy** under a draft puts that draft, and
-  nothing else, on the clipboard. Main does the write (`clipboard.writeText`); it takes only text,
-  at most 20,000 characters, and only from the bubble's window.
-- **The clipboard is never read** for this, and nothing is pasted or typed into any app: pasting is
-  yours.
-- Only the line around the draft is spoken; the draft is in a block, shown, never read aloud.
-- The draft is part of Scout's answer, so it is stored with the conversation like any answer.
 
 ## Dropping things on Scout
 

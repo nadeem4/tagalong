@@ -101,7 +101,6 @@ const bridge: HostBridge = {
     ipcRenderer.on(IPC.approvedEvent, listener);
     return () => void ipcRenderer.off(IPC.approvedEvent, listener);
   },
-  copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<SpendToday>,
   onBrainChanged: (handler: (what: string) => void) => {
     const listener = (_event: IpcRendererEvent, what: string): void => handler(what);

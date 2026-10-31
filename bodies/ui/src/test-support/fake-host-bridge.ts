@@ -64,8 +64,6 @@ export interface FakeHostBridge extends HostBridge {
   readonly restarts: readonly string[];
   readonly signIns: readonly string[];
   readonly removedConnections: readonly string[];
-  /** Every text put on the clipboard with Copy, in order. */
-  readonly copied: readonly string[];
 }
 
 /**
@@ -112,7 +110,6 @@ export function createFakeHostBridge(
   const restarts: string[] = [];
   const signIns: string[] = [];
   const removedConnections: string[] = [];
-  const copied: string[] = [];
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
 
@@ -283,11 +280,6 @@ export function createFakeHostBridge(
     },
     emitApproved(n) {
       for (const handler of [...approvedHandlers]) handler(n);
-    },
-    copied,
-    copyText(text) {
-      copied.push(text);
-      return Promise.resolve();
     },
     onBrainChanged(handler) {
       changedHandlers.add(handler);

@@ -5,7 +5,7 @@
  * props. Used by the desktop panel window.
  */
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pushable } from './shapes';
 import type {
@@ -179,11 +179,6 @@ export function CompanionBubble({
       return next.length === current.length ? current : next;
     });
   const [past, setPast] = useState<Exchange[]>([]);
-  // A draft's Copy, when this host can write the clipboard.
-  const copyText = useMemo(
-    () => (bridge.copyText === undefined ? undefined : (text: string) => bridge.copyText!(text)),
-    [bridge],
-  );
   const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
@@ -548,7 +543,7 @@ export function CompanionBubble({
       )}
       {reply.state === 'done' && reply.status === undefined && (
         <div className="bubble-answer">
-          <Answer text={reply.text} onCopy={copyText} />
+          <Answer text={reply.text} />
         </div>
       )}
       {reply.state === 'failed' && (
@@ -676,7 +671,7 @@ export function CompanionBubble({
                 {exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
-                  <Answer text={exchange.answer} onCopy={copyText} />
+                  <Answer text={exchange.answer} />
                 )}
               </div>
             ))}

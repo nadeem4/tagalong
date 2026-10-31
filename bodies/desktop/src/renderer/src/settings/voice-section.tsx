@@ -91,11 +91,11 @@ export function VoiceSection({
         {talks && <input type="hidden" name="voiceEnabled" value="on" />}
       </div>
       <Tip tip="voice">
-        Scout says what it writes: its answers, its hello and a watch that fires. Drafts, code and
-        long lists it puts in a block, which shows in the bubble and is not read. Under Who speaks,
-        the local voice runs on this computer and downloads its model (about 90 MB) the first time
-        it is used, speaking with the system voice until that is done; ElevenLabs needs your key;
-        the system voice needs nothing. Closing the bubble or the stop key silences it at once.
+        Scout says what it writes: its answers, its hello and a watch that fires. Code and long
+        lists it puts in a block, which shows in the bubble and is not read. Under Who speaks, the
+        local voice runs on this computer and downloads its model (about 90 MB) the first time it is
+        used, speaking with the system voice until that is done; ElevenLabs needs your key; the
+        system voice needs nothing. Closing the bubble or the stop key silences it at once.
       </Tip>
       <div className="tg-grid">
         <div>

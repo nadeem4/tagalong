@@ -59,7 +59,7 @@ its result.
   at most once every 10 minutes, never during calls or full screen.
 - Scout talks: you may not be looking at the screen, so Scout says its bubble lines aloud
   (answers, the hello, a remark, an expert that finished), in a calm, refined, dry British voice.
-  Scout decides what to say; drafts, code and long lists it puts in a block, shown and not read.
+  Scout decides what to say; code and long lists it puts in a block, shown and not read.
 - Talk to Scout: hold a key (or click the mic) and ask out loud. It should feel like talking to a
   person, not an agent: Scout answers in short spoken sentences, starts speaking on the first one,
   asks one question back at most and leaves detail in the bubble. Talking cuts Scout off. Scout

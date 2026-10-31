@@ -146,7 +146,7 @@ moment") and it passes the note on.
 **Scout talks.** Scout reads its answers aloud, so you can look away: the answer, a
 line it says on its own and its line about an expert that finished. Scout
 decides what to say: everything it writes is spoken, typed question or spoken, except what it
-puts in a block (a draft, code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
+puts in a block (code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
 92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
@@ -276,10 +276,6 @@ so on), a small window asks you. More in
 **Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
 small picture of each screen every five seconds, in memory only, for the last ten minutes. A red dot
 on Scout shows while it records. The body keeps the frames, but the brain has no tool that reads them yet, so Scout cannot recall from them.
-
-**Draft it for me.** Say "reply to this email, yes but Friday" or "write the PR description" and
-Scout reads what is in front of you and writes a short draft in the bubble with a **Copy** button.
-Copy puts the draft on your clipboard; you paste it. Scout never types or pastes into an app.
 
 **Drop it on Scout.** Drag a file, an image, a link or selected text onto Scout and it asks whether
 to explain it or hand it to an expert. Nothing is read until you press a button, and secrets files

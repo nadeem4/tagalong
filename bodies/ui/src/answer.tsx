@@ -1,9 +1,9 @@
 /**
- * How an answer reads in the bubble: Markdown rendered safely, links kept as text, and a
- * fenced `draft` block shown as a draft with Copy. Contains Answer and ANSWER_CSS.
+ * How an answer reads in the bubble: Markdown rendered safely, and links kept as text.
+ * Contains Answer and ANSWER_CSS.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { themeTokens as t } from './theme/tokens';
@@ -18,84 +18,17 @@ const LINK = ({ href, children }: { href?: string | undefined; children?: ReactN
   </span>
 );
 
-/** The text of a hast node and everything under it. */
-type HastLike = { type: string; value?: string; children?: HastLike[] };
-function textOf(node: HastLike): string {
-  if (node.type === 'text') return node.value ?? '';
-  return (node.children ?? []).map(textOf).join('');
-}
-
-/** How long Copy says Copied before it is Copy again. */
-const COPIED_MS = 2000;
-
-/**
- * A draft Scout wrote for the person: the text, framed, and Copy when the host can copy.
- * Copy only puts it on the clipboard; pasting it is the person's.
- */
-function DraftBlock({
-  text,
-  onCopy,
-}: {
-  text: string;
-  onCopy?: ((text: string) => Promise<void>) | undefined;
-}) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state === 'idle') return;
-    const timer = setTimeout(() => setState('idle'), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [state]);
-  const copy = (): void => {
-    onCopy?.(text).then(
-      () => setState('copied'),
-      () => setState('failed'),
-    );
-  };
-  return (
-    <div className="answer-draft">
-      <div className="answer-draft-text">{text}</div>
-      {onCopy !== undefined && (
-        <button type="button" className="answer-draft-copy" onClick={copy}>
-          {state === 'copied' ? 'Copied' : state === 'failed' ? "Couldn't copy" : 'Copy'}
-        </button>
-      )}
-    </div>
-  );
-}
+/** Links render as text; everything else is react-markdown's default. */
+const COMPONENTS: Components = { a: LINK };
 
 /**
  * An answer as people read it: the Markdown a model writes (bold, lists, headings, code,
- * tables) shown formatted, never as raw marks. HTML in an answer stays text. A fenced
- * `draft` block is a draft for the person, shown with Copy when `onCopy` is given.
+ * tables) shown formatted, never as raw marks. HTML in an answer stays text.
  */
-export function Answer({
-  text,
-  className,
-  onCopy,
-}: {
-  text: string;
-  className?: string;
-  onCopy?: ((text: string) => Promise<void>) | undefined;
-}) {
-  const components = useMemo<Components>(
-    () => ({
-      a: LINK,
-      pre: ({ node, children }) => {
-        const code = node?.children[0];
-        const classes =
-          code?.type === 'element' && code.tagName === 'code' ? code.properties.className : [];
-        if (Array.isArray(classes) && classes.includes('language-draft')) {
-          // The fence's closing newline is not part of the draft.
-          return <DraftBlock text={textOf(code as HastLike).replace(/\n$/, '')} onCopy={onCopy} />;
-        }
-        return <pre>{children}</pre>;
-      },
-    }),
-    [onCopy],
-  );
+export function Answer({ text, className }: { text: string; className?: string }) {
   return (
     <div className={className === undefined ? 'answer' : `answer ${className}`}>
-      <Markdown remarkPlugins={[remarkGfm]} components={components} skipHtml>
+      <Markdown remarkPlugins={[remarkGfm]} components={COMPONENTS} skipHtml>
         {text}
       </Markdown>
     </div>
@@ -122,14 +55,4 @@ export const ANSWER_CSS = `
 .answer th, .answer td { padding: 4px 8px; border: 1px solid #2E3558; text-align: left; }
 .answer a, .answer .answer-link { color: #7CB8F2; text-decoration: underline; }
 .answer hr { border: 0; border-top: 1px solid #2E3558; margin: 10px 0; }
-.answer .answer-draft {
-  margin: 0 0 8px; padding: 10px 12px; border-radius: 8px;
-  border: 1px solid ${t.color.fieldLine}; background: ${t.color.field};
-}
-.answer .answer-draft-text { white-space: pre-wrap; }
-.answer .answer-draft-copy {
-  margin-top: 8px; padding: 4px 12px; border: 0; border-radius: 6px; cursor: pointer;
-  background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: 13px; font-weight: 600;
-}
-.answer .answer-draft-copy:focus-visible { outline: 2px solid ${t.color.text}; outline-offset: 2px; }
 `;
