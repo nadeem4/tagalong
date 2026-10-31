@@ -1747,3 +1747,32 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
     await finish_quietly(session)
     await asyncio.sleep(0.05)
     assert out.frames == []
+
+
+class NoKeyModel(Gate):
+    ready = False
+
+
+async def test_say_without_key_ends_error_without_calling_model():
+    model = NoKeyModel(["never"])
+    session, sent = make(model)
+    result = session.say("desktop", say("hello"))
+    await asyncio.sleep(0.01)
+    ended = [p for m, p in sent if m == "turn" and p["state"] == "ended"]
+    assert states(sent) == ["started", "ended"]
+    assert ended[0]["turn"] == result.turn
+    assert ended[0]["reason"] == "error"
+    assert "reply" not in [m for m, _ in sent]
+    assert model.seen == []
+    assert session.history == []
+
+
+async def test_wake_without_key_does_nothing():
+    memory = Memory(":memory:")
+    session, sent = make(NoKeyModel([]), memory)
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    await settle()
+    assert states(sent) == []
+    assert session.history == []
+    assert not memory.get_job("j1").reported  # told at a later start, once a key is set

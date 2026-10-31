@@ -14,12 +14,21 @@ from brain.masking import Masker, SecretLogFilter
 from brain.voice.service import VoiceService
 
 
-def test_missing_api_key_exits(monkeypatch, tmp_path):
+def test_missing_api_key_starts_and_logs_one_line(monkeypatch, tmp_path, caplog):
+    class Stop(Exception):
+        pass
+
+    async def stop(*args):
+        raise Stop
+
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    with pytest.raises(SystemExit) as exit_info:
+    monkeypatch.setattr(main, "start_server", stop)
+    with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(Stop):
         asyncio.run(_run())
-    assert exit_info.value.code == 1
+    lines = [r.getMessage() for r in caplog.records if "key" in r.getMessage().lower()]
+    assert len(lines) == 1
+    assert "app" in lines[0] and ".env" not in lines[0]
 
 
 def test_env_file_settings_are_read(monkeypatch, tmp_path):

@@ -49,7 +49,7 @@ from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
 from brain.protocol import ReadAloudData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
-from brain.scheduler import Scheduler
+from brain.scheduler import Scheduler, WakeSkipped
 from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
@@ -215,9 +215,31 @@ class Session:
             self._inbox.append(content)
             self._speak(self._turn_id, self._turn_body, params)
             return SayResult(turn=self._turn_id, joined=True)
+        if not self._ready():
+            return SayResult(turn=self._end_unanswered(shown_on), joined=False)
         turn = self._start_turn(shown_on, content)
         self._speak(turn, shown_on, params)
         return SayResult(turn=turn, joined=False)
+
+    def _ready(self) -> bool:
+        return getattr(self._model, "ready", True)  # fakes and other models need no key
+
+    def _end_unanswered(self, body_id: str | None) -> str:
+        """No key: the turn starts and ends at once, no reply, no history. The app says why."""
+        turn_id = uuid.uuid4().hex
+        notify = self._bodies.notify
+        loop = asyncio.get_running_loop()
+        loop.call_soon(
+            notify,
+            "turn",
+            {"turn": turn_id, "body": body_id, "state": "started", "started_by": "user"},
+        )
+        loop.call_soon(
+            notify,
+            "turn",
+            {"turn": turn_id, "body": body_id, "state": "ended", "reason": "error"},
+        )
+        return turn_id
 
     def _speak(self, turn: str | None, shown_on: str | None, params: SayParams | None) -> None:
         """A turn is read aloud when the user spoke (`params.spoken`) or the body showing it asked
@@ -288,6 +310,8 @@ class Session:
         return self._task is not None and not self._task.done()
 
     def _start_wake(self, body_id: str | None, content: list) -> str:
+        if not self._ready():
+            raise WakeSkipped  # dropped quietly; unreported jobs are told at a later start
         turn = self._start_turn(body_id, content, "brain")
         self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
         return turn

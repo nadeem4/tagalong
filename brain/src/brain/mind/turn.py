@@ -39,6 +39,7 @@ class Final:
 
 class Model(Protocol):
     model_id: str
+    ready: bool  # False until a key is set; the session does not call a model that is not ready
 
     def stream(self, system: str, messages: list, tools: list) -> AsyncIterator[str | Final]:
         """Yield text deltas, then one Final."""
@@ -63,9 +64,20 @@ def _request(model_id: str, system: str, messages: list, tools: list) -> dict:
 
 
 class AnthropicModel:
-    def __init__(self, client, model_id: str):
-        self._client = client
+    """The client is built from the key on demand, so a key set from the app works at once and
+    the brain can start with none."""
+
+    def __init__(self, make_client: Callable[[str], Any], model_id: str, key: str | None = None):
+        self._make_client = make_client
+        self._client = make_client(key) if key else None
         self.model_id = model_id
+
+    @property
+    def ready(self) -> bool:
+        return self._client is not None
+
+    def set_key(self, key: str) -> None:
+        self._client = self._make_client(key)
 
     async def stream(self, system: str, messages: list, tools: list) -> AsyncIterator[str | Final]:
         kwargs = _request(self.model_id, system, messages, tools)

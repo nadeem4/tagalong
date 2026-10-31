@@ -49,19 +49,18 @@ async def _run() -> None:
     # The data dir says where .env is, and .env may hold the other TAGALONG_* settings.
     load_env_file(load_config().data_dir, os.environ)
     config = load_config()
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        log.error(
-            "ANTHROPIC_API_KEY is missing: put it in %s or the environment",
-            config.data_dir / ".env",
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:  # not fatal: the app asks for the key and sends it over a Home tool
+        log.warning(
+            "No Anthropic key yet: add it in the Tagalong app. Scout stays silent until then."
         )
-        sys.exit(1)
     try:
         memory = Memory(config.data_dir / "tagalong.db")
     except RuntimeError as err:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
     bodies = Bodies()
-    model = AnthropicModel(AsyncAnthropic(), config.model)
+    model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
     tokens = TokenFile(config.data_dir)
