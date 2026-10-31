@@ -404,10 +404,9 @@ the brain.
 
 ## Privacy notes
 
-The UI only sees what the bridge returns: keys never cross it (`hasKey` booleans only). Removing a
-chip keeps that part out of the ask. A dropped item is sent only by a drop card button. Health
-facts carry whether a key is stored, never the key. Status marks and the health card are shown,
-never spoken. See [privacy.md](privacy.md).
+The UI only sees what the bridge returns: keys never cross it. Removing a
+chip keeps that part out of the ask. A dropped item is sent only by a drop card button. Status
+marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 

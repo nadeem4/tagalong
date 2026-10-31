@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { EARS_IDS, MOUTH_IDS, Pushable } from './voice';
 
 describe('adapter ids', () => {
-  it('names the one ears and the three mouths', () => {
+  it('names the one ears and the two mouths', () => {
     expect(EARS_IDS).toEqual(['local']);
-    expect(MOUTH_IDS).toEqual(['kokoro', 'elevenlabs', 'system']);
+    expect(MOUTH_IDS).toEqual(['kokoro', 'system']);
   });
 });
 

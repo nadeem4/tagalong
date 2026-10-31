@@ -35,10 +35,10 @@ source of truth; each doc cites the files it describes. How to build and run fro
 
 ### Foundations
 
-| Doc                                                | Covers                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------ |
-| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, the secret store, secrets on the way out |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                     |
+| Doc                                                | Covers                                     |
+| -------------------------------------------------- | ------------------------------------------ |
+| [settings-and-secrets.md](settings-and-secrets.md) | The settings store, secrets on the way out |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted   |
 
 ### Working on the code
 

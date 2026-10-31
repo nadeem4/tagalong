@@ -1,17 +1,9 @@
-/** Tests for the voice service, the lazy local voice, ElevenLabs and the fake. */
+/** Tests for the voice service, the lazy local voice and the fake. */
 
 import { describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '../../shared/settings';
 import type { MouthId } from '@tagalong/ui/shapes';
-import { ELEVENLABS_MODEL, ELEVENLABS_TIMEOUT_MS, elevenLabsTts } from './elevenlabs';
-import {
-  LazyLocalVoice,
-  createVoiceService,
-  elevenLabsMouth,
-  fakeTts,
-  localMouth,
-  silentWav,
-} from './voice';
+import { LazyLocalVoice, createVoiceService, fakeTts, localMouth, silentWav } from './voice';
 import type { LocalSynth, Tts } from './voice';
 
 const SPEED = SETTINGS_DEFAULTS.voice.speed;
@@ -32,17 +24,13 @@ function localVoice(ready: boolean, spoken: string[]) {
 
 function service({
   env = {},
-  key = null as string | null,
-  voiceId = '',
   mouth = undefined as MouthId | undefined,
   ready = true,
   spoken = [] as string[],
-  elevenLabs = (apiKey: string, id: string) => tts(`eleven(${apiKey},${id})`, spoken),
 } = {}) {
   const local = localVoice(ready, spoken);
   const settings = () => ({
     ...SETTINGS_DEFAULTS.voice,
-    elevenLabsVoiceId: voiceId,
     ...(mouth !== undefined ? { mouth } : {}),
   });
   const voice = createVoiceService({
@@ -51,11 +39,6 @@ function service({
     local,
     mouths: {
       kokoro: localMouth(local),
-      elevenlabs: elevenLabsMouth(
-        async () => key,
-        () => settings().elevenLabsVoiceId,
-        elevenLabs,
-      ),
     },
   });
   return { voice, local, spoken };
@@ -89,39 +72,9 @@ describe('createVoiceService', () => {
     expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback', speed: SPEED });
   });
 
-  it('uses ElevenLabs only with both a key and a voice the person picked', async () => {
-    const keyOnly = service({ key: 'xi-key' });
-    await keyOnly.voice.speak('Hi.');
-    expect(keyOnly.spoken).toEqual(['kokoro:Hi.']);
-
-    const idOnly = service({ voiceId: 'voice-1' });
-    await idOnly.voice.speak('Hi.');
-    expect(idOnly.spoken).toEqual(['kokoro:Hi.']);
-
-    const both = service({ key: 'xi-key', voiceId: 'voice-1' });
-    await both.voice.speak('Hi.');
-    expect(both.spoken).toEqual(['eleven(xi-key,voice-1):Hi.']);
-  });
-
-  it('goes back to the local voice when ElevenLabs fails', async () => {
-    const { voice, spoken } = service({
-      key: 'xi-key',
-      voiceId: 'voice-1',
-      elevenLabs: () => ({
-        speak: async () => {
-          throw new Error('401');
-        },
-      }),
-    });
-    expect((await voice.speak('Hi.')).kind).toBe('audio');
-    expect(spoken).toEqual(['kokoro:Hi.']);
-  });
-
-  it('never downloads or calls a service under TAGALONG_FAKE_TTS', async () => {
+  it('never downloads or loads a voice under TAGALONG_FAKE_TTS', async () => {
     const { voice, local, spoken } = service({
       env: { TAGALONG_FAKE_TTS: '1' },
-      key: 'xi-key',
-      voiceId: 'voice-1',
       ready: false,
     });
     const result = await voice.speak('Hi.');
@@ -139,11 +92,6 @@ describe('createVoiceService', () => {
       local,
       mouths: {
         kokoro: localMouth(local),
-        elevenlabs: elevenLabsMouth(
-          async () => null,
-          () => '',
-          () => tts('eleven', spoken),
-        ),
       },
     });
     expect(await voice.speak('Hi.')).toEqual({ kind: 'off' });
@@ -164,11 +112,6 @@ describe('createVoiceService', () => {
       local,
       mouths: {
         kokoro: localMouth(local),
-        elevenlabs: elevenLabsMouth(
-          async () => null,
-          () => '',
-          () => local,
-        ),
       },
     });
     await voice.speak('Hi.', { voice: 'bm_fable', speed: 1.1 });
@@ -203,11 +146,6 @@ describe('createVoiceService', () => {
       local,
       mouths: {
         kokoro: localMouth(local),
-        elevenlabs: elevenLabsMouth(
-          async () => null,
-          () => '',
-          () => local,
-        ),
       },
     }).warmAtStart(true);
     expect(local.warm).not.toHaveBeenCalled();
@@ -234,11 +172,6 @@ describe('createVoiceService', () => {
       local,
       mouths: {
         kokoro: localMouth(local),
-        elevenlabs: elevenLabsMouth(
-          async () => null,
-          () => '',
-          () => tts('eleven', spoken),
-        ),
       },
     });
     expect((await voice.speak('One.')).kind).toBe('audio');
@@ -255,30 +188,6 @@ describe('createVoiceService', () => {
     });
     expect(spoken).toEqual([]);
     expect(local.warm).not.toHaveBeenCalled();
-  });
-
-  it('falls from a chosen ElevenLabs with no key to Kokoro', async () => {
-    const { voice, spoken } = service({ mouth: 'elevenlabs', voiceId: 'voice-1' });
-    await voice.speak('Hi.');
-    expect(spoken).toEqual(['kokoro:Hi.']);
-  });
-
-  it('falls to the system voice when the chosen voice and Kokoro both throw', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const { voice, local } = service({
-      key: 'xi-key',
-      voiceId: 'voice-1',
-      elevenLabs: () => ({
-        speak: async () => {
-          throw new Error('500');
-        },
-      }),
-    });
-    local.speak = async () => {
-      throw new Error('onnx failed');
-    };
-    expect(await voice.speak('Hi.')).toEqual({ kind: 'fallback', speed: SPEED });
-    warn.mockRestore();
   });
 });
 
@@ -326,58 +235,6 @@ describe('LazyLocalVoice', () => {
     expect(local.ready()).toBe(false);
     local.warm();
     await vi.waitFor(() => expect(local.ready()).toBe(true));
-  });
-});
-
-describe('elevenLabsTts', () => {
-  it('sends only the text, to the low-latency streaming model, with the key in a header', async () => {
-    const fetchFn = vi.fn(async () => new Response(new Uint8Array([7, 7]), { status: 200 }));
-    const result = await elevenLabsTts('xi-key', 'voice/1', fetchFn).speak('Hello there.', {
-      voice: 'bm_george',
-      speed: 0.95,
-    });
-    expect(result).toEqual({ audio: new Uint8Array([7, 7]), mime: 'audio/mpeg' });
-    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(
-      'https://api.elevenlabs.io/v1/text-to-speech/voice%2F1/stream?output_format=mp3_44100_128',
-    );
-    expect((init.headers as Record<string, string>)['xi-api-key']).toBe('xi-key');
-    expect(JSON.parse(String(init.body))).toEqual({
-      text: 'Hello there.',
-      model_id: ELEVENLABS_MODEL,
-      voice_settings: { speed: 0.95 },
-    });
-    expect(ELEVENLABS_MODEL).toBe('eleven_flash_v2_5');
-  });
-
-  it('throws on a refused request, so the caller can fall back', async () => {
-    const fetchFn = async () => new Response('nope', { status: 401 });
-    await expect(
-      elevenLabsTts('bad', 'v', fetchFn).speak('Hi.', SETTINGS_DEFAULTS.voice),
-    ).rejects.toThrow(/401/);
-  });
-
-  it('gives up on a request that hangs, so the caller can fall back', async () => {
-    const hanging = (_url: string | URL | Request, init?: RequestInit) =>
-      new Promise<Response>((_resolve, reject) =>
-        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
-      );
-    await expect(
-      elevenLabsTts('xi-key', 'v', hanging as typeof fetch, 20).speak(
-        'Hi.',
-        SETTINGS_DEFAULTS.voice,
-      ),
-    ).rejects.toThrow();
-    expect(ELEVENLABS_TIMEOUT_MS).toBe(15_000);
-  });
-});
-
-describe('elevenLabsTts speed', () => {
-  it('sends at most 1.2, ElevenLabs’ own cap, for a saved 1.3', async () => {
-    const fetchFn = vi.fn(async () => new Response(new Uint8Array([7]), { status: 200 }));
-    await elevenLabsTts('xi-key', 'v', fetchFn).speak('Hi.', { voice: 'bm_george', speed: 1.3 });
-    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(JSON.parse(String(init.body)).voice_settings.speed).toBe(1.2);
   });
 });
 

@@ -17,7 +17,6 @@ export interface SettingsFormValues {
   voiceEnabled?: boolean;
   voice?: string;
   voiceSpeed?: string;
-  elevenLabsVoiceId?: string;
   /** The microphone Talk to Scout listens on. Blank: the system default. */
   microphoneId?: string;
   mouth?: string;
@@ -36,13 +35,6 @@ export class SettingsFieldError extends Error {
     super(message);
     this.name = 'SettingsFieldError';
   }
-}
-
-/** The fields that live under Advanced: a refusal on one of them opens it. */
-const ADVANCED_FIELDS = new Set(['elevenLabsVoiceId']);
-
-export function isAdvancedField(field: string): boolean {
-  return ADVANCED_FIELDS.has(field) || field.startsWith('key:');
 }
 
 /**
@@ -71,7 +63,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
             enabled: values.voiceEnabled === true,
             voice: values.voice,
             speed: parseSpeed(values.voiceSpeed ?? ''),
-            elevenLabsVoiceId: (values.elevenLabsVoiceId ?? '').trim(),
             ...(values.microphoneId !== undefined && values.microphoneId !== ''
               ? { microphoneId: values.microphoneId }
               : {}),
@@ -147,8 +138,6 @@ export function keyCaps(accelerator: string, platform: string): string[] {
 export function voiceFacts(facts: VoiceAdapterFacts): string {
   return [
     facts.offline ? 'Works offline.' : 'Needs the internet.',
-    facts.needsKey ? 'Needs your key.' : '',
-    facts.costs ? 'Costs money.' : 'Free.',
     facts.screenshots ? 'Sends screenshots.' : '',
   ]
     .filter((part) => part !== '')

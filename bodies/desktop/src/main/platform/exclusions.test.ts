@@ -8,7 +8,7 @@ describe('secretFileRule', () => {
     expect(secretFileRule('.env')).toBe('.env');
     expect(secretFileRule('.env.local')).toBe('.env.*');
     expect(secretFileRule('ID_RSA')).toBe('id_rsa');
-    expect(secretFileRule('secrets.json')).toBe('secrets.*');
+    expect(secretFileRule('secrets.yaml')).toBe('secrets.*');
   });
 
   it('passes an ordinary file', () => {

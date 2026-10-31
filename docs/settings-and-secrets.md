@@ -3,22 +3,18 @@
 ## Purpose
 
 Settings are the person's choices, kept as one JSON file and validated by one schema in
-`bodies/desktop/src/shared/settings.ts`. The desktop owns the file; the Python brain has no settings of its own. Secrets
-(the ElevenLabs key) never sit in that file. They sit in the desktop's `SecretStore`, which is
-encrypted with the OS keychain. This doc also covers how secrets are hidden in what the desktop
-writes to disk.
+`bodies/desktop/src/shared/settings.ts`. The desktop owns the file; the Python brain has no settings of its own. The desktop keeps no secrets of its own. This
+doc also covers how secrets are hidden in what the desktop writes to disk.
 
 ## Where it lives
 
-| File                                                             | What it holds                                                                                                           |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/shared/settings.ts`                          | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey`                                   |
-| `bodies/desktop/src/main/settings-store.ts`                      | `SettingsStore` (`settings.json`), `SETTINGS_FILENAME`                                                                  |
-| `bodies/desktop/src/main/secret-store.ts`                        | The `SecretStore` interface, `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`), `ELEVENLABS_SECRET_KEY` |
-| `bodies/desktop/src/main/test-support/in-memory-secret-store.ts` | `InMemorySecretStore`, the test fake                                                                                    |
-| `bodies/desktop/src/main/hide-secrets.ts`                        | `hideSecrets`                                                                                                           |
-| `bodies/desktop/src/main/ipc/settings.ts`                        | `registerSettingsIpc`: host view, save, save the ElevenLabs key                                                         |
-| `bodies/desktop/src/main/index.ts`                               | Builds the stores in `userData`; `broadcast`, `applyHotkeys` deps                                                       |
+| File                                        | What it holds                                                                         |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `bodies/desktop/src/shared/settings.ts`     | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey` |
+| `bodies/desktop/src/main/settings-store.ts` | `SettingsStore` (`settings.json`), `SETTINGS_FILENAME`                                |
+| `bodies/desktop/src/main/hide-secrets.ts`   | `hideSecrets`                                                                         |
+| `bodies/desktop/src/main/ipc/settings.ts`   | `registerSettingsIpc`: host view and save                                             |
+| `bodies/desktop/src/main/index.ts`          | Builds the settings store in `userData`; `broadcast`, `applyHotkeys` deps             |
 
 ## How it works
 
@@ -34,11 +30,10 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 | `hotkeys`           | `ask` `CommandOrControl+Shift+Space`, `pauseSight` `CommandOrControl+Shift+Alt+P`, `stopVoice` `CommandOrControl+Shift+Alt+M`, `talk` `RightControl` | `pauseSight`, `stopVoice`, `talk` optional; `talk` is one of `TALK_KEYS` (`RightControl`, `RightAlt`, `RightShift`, `ScrollLock`)       |
 | `avatar`            | `{ x: null, y: null }`                                                                                                                               | null docks to the default edge                                                                                                          |
 | `captureExclusions` | `{ processNames: [], titlePatterns: [] }`                                                                                                            | Trimmed, non-blank entries; built-in blind spots are separate (`BLIND_SPOTS`)                                                           |
-| `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' }`                                                                          | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
+| `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95 }`                                                                                                 | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
 | `listening`         | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
 
-Those six are the whole schema. The schema has no secret
-fields (pinned by `settings.test.ts`, "carries no secret fields").
+Those five are the whole schema. The schema has no secret fields.
 
 ### Migrations of saved values
 
@@ -85,19 +80,9 @@ variables, not settings: see [brain.md](brain.md#run-it).
 
 ## Secrets
 
-### SecretStore
-
-`SecretStore` (`bodies/desktop/src/main/secret-store.ts`) is three async methods: `get(key)` (null
-when absent), `set(key, value)`, `delete(key)`. Callers never learn how secrets are protected.
-Tests use `InMemorySecretStore`.
-
-| Key                                           | Holds                    | Written by                      | Read by           |
-| --------------------------------------------- | ------------------------ | ------------------------------- | ----------------- |
-| `elevenlabs.apiKey` (`ELEVENLABS_SECRET_KEY`) | The ElevenLabs voice key | Desktop `IPC.saveElevenLabsKey` | Desktop main only |
-
 ### App secrets in the Python brain
 
-The Python brain does not use `SecretStore` for connected apps. Its secrets live in the data
+Connected apps' secrets live in the brain, not the desktop. They live in the data
 directory, never in the `apps` table:
 
 | Where                 | Holds                                                                                               |
@@ -109,22 +94,6 @@ directory, never in the `apps` table:
 rules, the startup migration and the missing-key error are in [connected apps](connected-apps.md).
 Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
 by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
-
-### safeStorage in the desktop
-
-`SafeStorageSecretStore` stores `{ key: base64(safeStorage.encryptString(value)) }` in
-`secrets.json` in `userData`, written with mode `0o600`. Only ciphertext is written.
-
-- `set` refuses when `safeStorage.isEncryptionAvailable()` is false: an API key readable in the
-  profile is worse than a Settings screen that says no.
-- `delete` rewrites the whole file.
-- `get` decrypts on every call. There is no cache.
-
-### How the key is entered and never read back
-
-The ElevenLabs key is typed in Settings and sent once with `saveElevenLabsKey(apiKey)`
-(`tagalong:secret:elevenlabs-key`). An empty key deletes the stored one. Nothing sends the key back
-to a renderer: `IPC.hostView` returns the boolean `elevenLabsKeyStored`, never the value.
 
 ### Secrets on the way out
 
@@ -151,12 +120,11 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 ### Desktop IPC
 
-| Channel                                                        | Handler                                                          |
-| -------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `IPC.hostView`                                                 | Settings, the local Scout, `elevenLabsKeyStored`, hotkey problem |
-| `IPC.saveSettings`                                             | Validates, stores and fans out the patch                         |
-| `IPC.saveElevenLabsKey` (`tagalong:secret:elevenlabs-key`)     | Stores or (empty) deletes the key                                |
-| `IPC.settingsChangedEvent` (`tagalong:settings-changed-event`) | Main to windows, after every save                                |
+| Channel                                                        | Handler                                   |
+| -------------------------------------------------------------- | ----------------------------------------- |
+| `IPC.hostView`                                                 | Settings, the local Scout, hotkey problem |
+| `IPC.saveSettings`                                             | Validates, stores and fans out the patch  |
+| `IPC.settingsChangedEvent` (`tagalong:settings-changed-event`) | Main to windows, after every save         |
 
 ## Constants and limits
 
@@ -164,12 +132,10 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 | ------------------------------------- | --------------- | ------------------------------------------- |
 | `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `bodies/desktop/src/shared/settings.ts`     |
 | `SETTINGS_FILENAME`                   | `settings.json` | `bodies/desktop/src/main/settings-store.ts` |
-| `SECRETS_FILENAME`                    | `secrets.json`  | `bodies/desktop/src/main/secret-store.ts`   |
-| `secrets.json` file mode              | `0o600`         | `bodies/desktop/src/main/secret-store.ts`   |
 
 ## Storage
 
-`settings.json` (with `.tmp`, `.bak`, `.corrupt`) and `secrets.json` sit in the desktop's data
+`settings.json` (with `.tmp`, `.bak`, `.corrupt`) sits in the desktop's data
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see
 [brain.md](brain.md#run-it)).
 
@@ -192,22 +158,17 @@ to the session, and ends a Scout turn that runs too long.
 - **A bad patch** throws before anything is written. The Settings form checks its own fields first
   and marks a refused one (`SettingsFieldError`,
   `bodies/desktop/src/renderer/src/settings-form.ts`).
-- **No OS encryption**: `SafeStorageSecretStore.set` throws `This machine has no OS encryption
-backend, so Tagalong will not store the key.` and nothing is written.
-- **An unreadable `secrets.json`** (bad JSON, or ciphertext the OS can no longer decrypt) throws from
-  `get`. The host view catches it and shows no key stored.
 
 ## Privacy notes
 
-The settings file holds no secrets. The key never reaches a renderer, a log line or a model. See
+The settings file holds no secrets, and `hideSecrets` keeps them out of the log. See
 [privacy.md](privacy.md).
 
 ## Tests that pin it
 
 | Test file                                        | Pins                                                                                    |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values  |
+| `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, retired fields dropped, patch never invents values                    |
 | `bodies/desktop/src/main/settings-store.test.ts` | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing |
-| `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, broadcast), key save and delete                       |
-| `bodies/desktop/src/main/secret-store.test.ts`   | Round trip, survives restart, no plain text on disk, refuses with no encryption         |
+| `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, broadcast)                                            |
 | `bodies/desktop/src/main/hide-secrets.test.ts`   | Each `hideSecrets` rule, ordinary text untouched                                        |

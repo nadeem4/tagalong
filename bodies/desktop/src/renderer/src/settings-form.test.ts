@@ -1,13 +1,7 @@
 /** Tests for buildSettingsPatch and the Settings form helpers. */
 import { describe, expect, it } from 'vitest';
 
-import {
-  SettingsFieldError,
-  buildSettingsPatch,
-  isAdvancedField,
-  keyCaps,
-  voiceFacts,
-} from './settings-form';
+import { SettingsFieldError, buildSettingsPatch, keyCaps, voiceFacts } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
@@ -94,8 +88,6 @@ describe('field errors', () => {
     }
     expect(caught).toBeInstanceOf(SettingsFieldError);
     expect(caught).toMatchObject({ field: 'voiceSpeed' });
-    expect(isAdvancedField('askHotkey')).toBe(false);
-    expect(isAdvancedField('voiceSpeed')).toBe(false);
   });
 });
 
@@ -111,15 +103,13 @@ describe('buildSettingsPatch voice', () => {
     voiceEnabled: true,
     voice: 'bm_fable',
     voiceSpeed: '1.05',
-    elevenLabsVoiceId: '  abc123  ',
   };
 
-  it('carries the switch, the voice, the speed and a trimmed ElevenLabs voice', () => {
+  it('carries the switch, the voice, and the speed', () => {
     expect(buildSettingsPatch({ ...values, ...voice }).voice).toEqual({
       enabled: true,
       voice: 'bm_fable',
       speed: 1.05,
-      elevenLabsVoiceId: 'abc123',
     });
   });
 
@@ -157,22 +147,14 @@ describe('buildSettingsPatch voice', () => {
       expect.objectContaining({ field: 'voiceSpeed' }),
     );
   });
-
-  it('opens Advanced for a refused ElevenLabs field', () => {
-    expect(isAdvancedField('elevenLabsVoiceId')).toBe(true);
-    expect(isAdvancedField('key:elevenlabs')).toBe(true);
-    expect(isAdvancedField('voiceSpeed')).toBe(false);
-  });
 });
 
 describe('voiceFacts', () => {
-  it('says plainly what an adapter needs and costs', () => {
-    const facts = { id: 'x', slot: 'mouth', label: 'X', screenshots: false } as const;
-    expect(voiceFacts({ ...facts, offline: true, needsKey: false, costs: false })).toBe(
-      'Works offline. Free.',
-    );
-    expect(voiceFacts({ ...facts, offline: false, needsKey: true, costs: true })).toBe(
-      'Needs the internet. Needs your key. Costs money.',
+  it('says plainly where an adapter runs and what it sends', () => {
+    const facts = { id: 'x', slot: 'mouth', label: 'X' } as const;
+    expect(voiceFacts({ ...facts, offline: true, screenshots: false })).toBe('Works offline.');
+    expect(voiceFacts({ ...facts, offline: false, screenshots: true })).toBe(
+      'Needs the internet. Sends screenshots.',
     );
   });
 });

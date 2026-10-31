@@ -13,7 +13,6 @@ const FACTS: HealthFacts = {
   voice: {
     enabled: true,
     mouth: 'kokoro',
-    elevenLabsKey: false,
     mouthReady: true,
     earsUsed: false,
     earsReady: false,

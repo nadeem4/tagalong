@@ -79,12 +79,13 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 ### H.7. "Scout, what's wrong?"
 
-1. **Setup:** in Settings → Voice pick ElevenLabs with no key stored; stop the brain.
+1. **Setup:** switch Always listening on with the listening model not downloaded; stop the brain.
 2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Voice row;
-   (c) say "are you OK?" with the talk key; (d) type "what's wrong with this code?", then
+   (c) type "are you OK?"; (d) type "what's wrong with this code?", then
    "what's broken?"; (e) press **Open logs folder** on the card.
-3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
-   row each for Connections, Voice ("The ElevenLabs voice has no key.") and Microphone; nothing is
+3. **Expected:** (a) at once, with no "thinking", a card starting "One thing needs you.", then a
+   row each for Connections ("Not checked.", the brain is stopped), Voice ("Speech model not
+   downloaded.") and Microphone ("A microphone is ready." with one plugged in); nothing is
    spoken; no key appears anywhere on the card. No row says "I" or "my". (b) Home opens at
    Settings › Voice. (c) the same card, and nothing is spoken: health is shown, never said.
    (d) Scout answers both as normal questions; no card. With everything fixed, the card says
@@ -573,7 +574,7 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
 any brain is fine. The first line downloads the
-voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bills your own account.
+voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APPDATA%\Tagalong\voice`.
 
 ### V.1. Scout reads an answer aloud
 
@@ -638,18 +639,6 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 2. **Expected:** the preview plays in the system voice and no Kokoro download starts, with no Save needed (the voice folder under `%APPDATA%\Tagalong` stays empty).
 3. **Action:** set the speed slider to its fastest, Save, and ask a question.
 4. **Expected:** the answer is spoken in the system voice at the saved speed, not at normal speed.
-5. **Action:** in Settings → Voice, set the speed to 1.3 with **The system voice**, then switch **Who speaks** to **ElevenLabs**.
-6. **Expected:** the slider stops at 1.2 and reads 1.20×; switching back to the system voice allows 1.3 again.
-
-### V.6. ElevenLabs (your own key)
-
-1. **Action:** in Settings → Voice pick **ElevenLabs, with your key** under **Who speaks**; in
-   Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your ElevenLabs
-   library; Save; ask a question. Then remove the key. Preview with ElevenLabs picked uses the
-   saved key and voice ID.
-2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
-   words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
-   With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.
 
 ### V.7. Read aloud: the mind decides what is said
 
@@ -1518,4 +1507,3 @@ Do not test these here.
   computer only.
 - **"Always allow" for connected apps.** Every change asks.
 - **macOS and Linux.** The app stops at launch on both; their installer configs are unverified.
-- **Voice cost.** ElevenLabs characters are not counted on the Spend card.

@@ -86,7 +86,7 @@ describe('offerFor', () => {
   });
 
   it('refuses a secrets file without reading it', () => {
-    for (const path of ['/repo/.env', 'C:\\Users\\a\\.ssh\\id_rsa', '/repo/secrets.json']) {
+    for (const path of ['/repo/.env', 'C:\\Users\\a\\.ssh\\id_rsa', '/repo/secrets.yaml']) {
       expect(offerFor({ paths: [path] })).toEqual({ refusal: SECRET_REFUSAL });
     }
   });

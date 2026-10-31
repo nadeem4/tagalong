@@ -8,7 +8,6 @@ import {
   TALK_KEYS,
   SettingsPatch,
 } from './settings';
-import { chosenMouth } from './voice';
 
 describe('Settings', () => {
   it('has exactly the live keys', () => {
@@ -166,18 +165,11 @@ describe('Settings.voice', () => {
     expect(Settings.safeParse(voiceWith({ ears: 'whisper' })).success).toBe(false);
   });
 
-  it('keeps an ElevenLabs voice speaking for a settings file from before the picker', () => {
-    const old = Settings.parse({ voice: { ...SETTINGS_DEFAULTS.voice, elevenLabsVoiceId: 'v1' } });
-    expect(old.voice).not.toHaveProperty('mouth');
-    expect(chosenMouth(old.voice)).toBe('elevenlabs');
-  });
-
   it('talks by default, in the calm British voice, a touch slower than normal', () => {
     expect(Settings.parse({}).voice).toEqual({
       enabled: true,
       voice: 'bm_george',
       speed: 0.95,
-      elevenLabsVoiceId: '',
     });
   });
 

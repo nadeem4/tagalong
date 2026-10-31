@@ -47,7 +47,6 @@ export const IPC = {
   contextEvent: 'tagalong:context-event',
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
-  saveElevenLabsKey: 'tagalong:secret:elevenlabs-key',
   openSettings: 'tagalong:settings:open',
   openLogsFolder: 'tagalong:logs:open',
   hidePanel: 'tagalong:panel:hide',
@@ -190,8 +189,6 @@ export interface HostView {
   hotkeyError?: string;
   /** `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
   platform: string;
-  /** Whether an ElevenLabs key is stored. The key itself never comes back out. */
-  elevenLabsKeyStored: boolean;
 }
 
 /** Where the browser add-on's folder is, and whether it has been built. */
@@ -234,8 +231,6 @@ export interface TagalongHostApi {
   toggleSightPause(): Promise<boolean>;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
-  /** Saves the ElevenLabs key for the voice. An empty key deletes the stored one. */
-  saveElevenLabsKey(apiKey: string): Promise<void>;
   /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
   openBubble(): Promise<void>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */

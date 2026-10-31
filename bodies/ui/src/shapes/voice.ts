@@ -30,7 +30,7 @@ export interface Mouth {
 
 export const EARS_IDS = ['local'] as const;
 
-export const MOUTH_IDS = ['kokoro', 'elevenlabs', 'system'] as const;
+export const MOUTH_IDS = ['kokoro', 'system'] as const;
 export type MouthId = (typeof MOUTH_IDS)[number];
 
 /**

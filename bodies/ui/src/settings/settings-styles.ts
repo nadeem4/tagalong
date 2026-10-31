@@ -114,7 +114,7 @@ export const SETTINGS_CSS = `
 .tg-footer { display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px; }
 .tg-footer p { flex-basis: 100%; margin: 0; color: ${t.color.textMuted}; font-size: ${t.fontSize.small}px; }
 
-/* The Settings page: sections, ⓘ notes, Advanced, keys, status and errors. */
+/* The Settings page: sections, ⓘ notes, status and errors. */
 .tg-settings [hidden] { display: none !important; }
 .tg-settings .tg-panel { display: flex; flex-direction: column; gap: 14px; }
 .tg-settings .tg-panel label { margin-bottom: 0; }
@@ -189,17 +189,6 @@ export const SETTINGS_CSS = `
 }
 .tg-picker__service[aria-pressed='true'] { border-color: ${t.color.gold}; }
 .tg-picker__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
-.tg-disclosure__heading { margin: 0; }
-.tg-disclosure {
-  display: flex; align-items: center; gap: ${t.space.lg}px; width: 100%; padding: 0; border: 0;
-  background: none; cursor: pointer; text-align: left; font-family: ${t.font.ui}; color: ${t.color.panelText};
-}
-.tg-disclosure__text { flex: 1; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
-.tg-disclosure__state { font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.link}; }
-.tg-disclosure__chevron { color: ${t.color.link}; }
-.tg-disclosure[aria-expanded='true'] .tg-disclosure__chevron { transform: rotate(180deg); }
-.tg-advanced { display: flex; flex-direction: column; gap: 28px; margin-top: ${t.space.xxxl}px; }
-.tg-group { display: flex; flex-direction: column; gap: ${t.space.lg}px; padding-top: ${t.space.xl}px; border-top: 1px solid ${t.color.panelLine}; }
 .tg-panel [aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-panel .tg-error, .tg-settings--embedded .tg-error { color: ${t.color.errInk}; }
 .tg-field-error { margin: ${t.space.xs}px 0 0; white-space: pre-line; }

@@ -31,7 +31,6 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/settings-store.ts`               | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
 | `src/main/hide-secrets.ts`                 | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
 | `src/main/front-window.ts`                 | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
-| `src/main/test-support/`                   | `InMemorySecretStore`, a volatile `SecretStore` for tests                                                                                                                   |
 | `src/main/fix-target.ts`                   | `fixPage` (the Fix it allowlist)                                                                                                                                            |
 | `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
 | `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
@@ -67,7 +66,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 1. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
    is ever handed the ungated adapter (see [sight.md](sight.md)).
-2. Opens `SafeStorageSecretStore(userData)`, `SettingsStore(userData)`,
+2. Opens `SettingsStore(userData)`,
    so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
    mark on `IPC.statusMarkEvent`).
@@ -85,7 +84,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
-  A["whenReady: start()"] --> B["gated platform, secrets, settings"]
+  A["whenReady: start()"] --> B["gated platform, settings"]
   B --> C["startBrain (retries every 2 s)"]
   C --> E["panel window, avatar window"]
   E --> F["talk key hook, applyHotkeys"]
@@ -311,15 +310,14 @@ the preload, so a dead channel cannot linger.
 | `memory.ts`      | `listMemories` (`memory:list`), `deleteMemory` (`memory:delete`)                                                                                                                                                             | brain tools `list_memories`, `forget`                                                                                                                                                                                                                                                                                                                |
 | `permissions.ts` | `listPermissions` (`permissions:list`), `setPermission` (`permissions:set`)                                                                                                                                                  | brain tools `list_permissions`, `set_permission`                                                                                                                                                                                                                                                                                                     |
 | `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`)                                                                                                                                                                            | brain tools `list_jobs`, `stop_job`                                                                                                                                                                                                                                                                                                                  |
-| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`), `saveElevenLabsKey` (`secret:elevenlabs-key`; an empty key deletes it)                                                                                           | Works from `SettingsStore`, with no brain; the ElevenLabs key goes to the secret store (see [settings-and-secrets.md](settings-and-secrets.md))                                                                                                                                                                                                      |
+| `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`)                                                                                                                                                                   | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
 | `voice.ts`       | `speak`, `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `getListening`, `setListening`, `setFollowUp`, `ensureEars`, `voiceModels`; `forwardEars` sends `earsEvent`, `earsProgressEvent`, `earsStatusEvent` | See [voice.md](voice.md)                                                                                                                                                                                                                                                                                                                             |
 | `browser.ts`     | `browserFolder` (`tagalong:browser:folder`), `showBrowserFolder` (`tagalong:browser:show-folder`)                                                                                                                            | No brain call. Finds the browser body's built folder (packaged: `resources/extension`; dev: `bodies/browser/dist`) for Settings' **Add Scout to your browser** section, and reveals it in the file manager                                                                                                                                           |
 | `handle.ts`      | none                                                                                                                                                                                                                         | `IpcHandle`, `IpcOn`, `IpcListener`, `fromWindow`                                                                                                                                                                                                                                                                                                    |
 | `fake-ipc.ts`    | none                                                                                                                                                                                                                         | The recording `handle` the module tests use                                                                                                                                                                                                                                                                                                          |
 
 `HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `appVersion`,
-`hotkeyError`, `platform` (`process.platform`) and
-`elevenLabsKeyStored`.
+`hotkeyError` and `platform` (`process.platform`).
 
 Channels handled directly in `index.ts`, because they need Electron itself (windows, dialogs, the
 shell, the screen):
@@ -588,7 +586,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 ## Interfaces
 
 - `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
-  `settings`, `secrets`, `avatar`, `panel`, `tray`,
+  `settings`, `avatar`, `panel`, `tray`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `voice`, `voiceWorker`,
   `listening`, `statusMarks`.
@@ -626,7 +624,6 @@ The desktop host writes:
 - Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, hotkeys, voice and the other settings
   in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
-- Keys through `SafeStorageSecretStore`. See [settings-and-secrets.md](settings-and-secrets.md).
 - Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
   [voice.md](voice.md).
 

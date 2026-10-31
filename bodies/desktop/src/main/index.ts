@@ -39,9 +39,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
-import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
+import { createVoiceService, localMouth } from './voice/voice';
 import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
@@ -63,7 +62,6 @@ import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
-import { ELEVENLABS_SECRET_KEY, SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
 import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
@@ -103,7 +101,6 @@ interface Desktop {
   settingsStore: SettingsStore;
   /** The settings the running app is using; refreshed whenever they are saved. */
   settings: Settings;
-  secrets: SafeStorageSecretStore;
   avatar: BrowserWindow | null;
   panel: BrowserWindow | null;
   tray: Tray;
@@ -208,7 +205,6 @@ async function start(): Promise<void> {
   // consult the pause impossible rather than merely discouraged.
   const platform = gateSight(createPlatform(), () => sightPause.paused);
   const dataDir = app.getPath('userData');
-  const secrets = new SafeStorageSecretStore(dataDir);
   const settingsStore = new SettingsStore(dataDir);
   const settings = settingsStore.get();
   // From the saved setting, before any window opens, so the mark on Scout shows from the
@@ -287,7 +283,6 @@ async function start(): Promise<void> {
     platform,
     settingsStore,
     settings,
-    secrets,
     avatar: null,
     panel: null,
     tray: createTray(),
@@ -319,11 +314,6 @@ async function start(): Promise<void> {
         local,
         mouths: {
           kokoro: localMouth(local),
-          elevenlabs: elevenLabsMouth(
-            () => secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null),
-            () => (desktop?.settings ?? settings).voice.elevenLabsVoiceId,
-            (apiKey, voiceId) => elevenLabsTts(apiKey, voiceId),
-          ),
         },
       });
     })(),
@@ -793,7 +783,6 @@ function registerIpc(): void {
   registerBrainLinkIpc(handle, { brain: required().brain });
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,
-    secrets: () => required().secrets,
     problem: () => {
       const current = required();
       return current.hotkeyError;

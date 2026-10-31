@@ -39,7 +39,7 @@ async function within<T, F>(work: () => Promise<T>, ms: number, fallback: F): Pr
   }
 }
 
-/** Reads every row at once. Never throws. Never reads a key: only whether one is stored. */
+/** Reads every row at once. Never throws. */
 export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
   const attempt = <T>(work: () => Promise<T>) =>
@@ -63,7 +63,6 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
         : {
             enabled: settings.voice.enabled,
             mouth: chosenMouth(settings.voice),
-            elevenLabsKey: view.elevenLabsKeyStored,
             mouthReady: models.mouth,
             // The ears matter once listening is on, or a microphone was picked for talking.
             earsUsed: settings.listening.always || picked !== undefined,

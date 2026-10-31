@@ -11,7 +11,7 @@ const ROWS: HealthRow[] = [
     id: 'voice',
     label: 'Voice',
     state: 'broken',
-    line: 'The ElevenLabs voice has no key.',
+    line: 'Speech model not downloaded.',
     fix: 'voice',
   },
   {
@@ -32,7 +32,7 @@ describe('HealthCard', () => {
     expect(items).toHaveLength(3);
     expect(items[0]).toHaveTextContent('Connections');
     expect(items[0]).toHaveTextContent('Ready.');
-    expect(items[1]).toHaveTextContent('The ElevenLabs voice has no key.');
+    expect(items[1]).toHaveTextContent('Speech model not downloaded.');
   });
 
   it('offers Fix it only on a broken row, and it opens that fix', () => {

@@ -81,9 +81,7 @@ its result.
   read-only work; changes still ask every time, and a hand-off runs without a card only for the
   expert the card named, read-only with no project.
 - Settings leads with how Scout thinks (its real brain and whether the Claude sign-in works), then
-  privacy, voice, shortcuts and the browser extension; the tuning knobs (summaries, API keys, the
-  ElevenLabs voice, sight detail, watches) sit under Advanced, closed by default, with a short line
-  visible and the longer story behind ⓘ.
+  privacy, voice, shortcuts and the browser extension, each with a short line visible and the longer story behind ⓘ.
 - The Chrome extension is a tools-only body, with no display: Scout can see and manage your tabs when
   you allow it, and you can ask Scout from a right-click on selected text or the address bar.
 
@@ -116,17 +114,16 @@ its result.
 - Scout can know your name: optional in setup ("Rather not" is remembered), editable in Settings → You. It
   uses it rarely (a hello, a moment that warrants it), and the invitation and the launch line
   greet you by it.
-- Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
-  bring-your-own-key voice that receives only the words spoken. Speech to text runs on the
+- Speech runs on the computer (Kokoro, downloaded on first use). Speech to text runs on the
   computer too (Moonshine, with Silero VAD and Smart Turn, downloaded on first use); the words show
   in the bubble as you talk, and the audio is never sent or stored.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
-  runs only on Allow once. Tokens live in the OS keychain.
+  runs only on Allow once. Tokens stay in the brain's data folder.
 - Spend: Home's Overview shows what Scout and the experts used today and this month (dollars for
   priced models, tokens for the Claude sign-in and unknown models). An optional daily budget pauses
   keep-an-eye comments and scheduled routines once it is spent; asking Scout always works.
-- Not built yet: speech to text through ElevenLabs, expert templates, macOS and
+- Not built yet: expert templates, macOS and
   Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 

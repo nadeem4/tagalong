@@ -1,7 +1,6 @@
 /**
  * The desktop's settings: the Settings schema, SETTINGS_DEFAULTS and SettingsPatch for the
- * settings file and `settings.set`. Only fields something still reads live here. Secrets are
- * never here: they live in the host's SecretStore.
+ * settings file and `settings.set`. Only fields something reads live here.
  */
 import { EARS_IDS, MOUTH_IDS } from '@tagalong/ui/shapes';
 import { z } from 'zod';
@@ -40,11 +39,9 @@ export const SETTINGS_DEFAULTS = {
   captureExclusions: { processNames: [] as string[], titlePatterns: [] as string[] },
   /**
    * Scout reads its bubble aloud, because the person may not be looking at the screen.
-   * On by default, in a calm British voice slightly slower than normal. The ElevenLabs
-   * voice id is empty until the person picks one from their own library: with a key and
-   * an id, ElevenLabs speaks instead of the local voice.
+   * On by default, in a calm British voice slightly slower than normal.
    */
-  voice: { enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' },
+  voice: { enabled: true, voice: 'bm_george', speed: 0.95 },
   /**
    * Whether Scout listens all the time. Off by default: only the person switches it on,
    * and it stays on across restarts until they switch it off. Scout never switches it on.
@@ -59,8 +56,6 @@ export type VoiceId = (typeof VOICE_IDS)[number];
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
 export const MIN_VOICE_SPEED = 0.7;
 export const MAX_VOICE_SPEED = 1.3;
-/** ElevenLabs' own cap on speed: its API refuses more, so its slider stops here. */
-export const MAX_ELEVENLABS_SPEED = 1.2;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
 const exclusionEntry = z.string().trim().min(1);
@@ -119,14 +114,9 @@ const settingsFields = {
     enabled: z.boolean(),
     voice: z.enum(VOICE_IDS),
     speed: z.number().min(MIN_VOICE_SPEED).max(MAX_VOICE_SPEED),
-    /** A voice from the person's ElevenLabs library. Empty: ElevenLabs is not used. */
-    elevenLabsVoiceId: z.string().trim(),
     /** The microphone Talk to Scout listens on. Absent: the system default microphone. */
     microphoneId: z.string().optional(),
-    /**
-     * Who says Scout's lines. When absent, `chosenMouth` decides: ElevenLabs when a voice
-     * id is set, otherwise Kokoro.
-     */
+    /** Who says Scout's lines. Absent: Kokoro, the local voice. */
     mouth: z.enum(MOUTH_IDS).optional(),
     /** Who listens. Absent: the local ears. */
     ears: z.enum(EARS_IDS).optional(),

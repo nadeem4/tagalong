@@ -1,6 +1,6 @@
 /**
  * Scout's voice in a renderer window: prepareLine and playLine play what main synthesised
- * (Kokoro or ElevenLabs) or fall back to the system voice, and onSystemVoice tells the ears
+ * (Kokoro) or fall back to the system voice, and onSystemVoice tells the ears
  * when the un-cancellable system voice speaks.
  */
 import type { SpeakPreview } from '../../shared/ipc';
@@ -116,7 +116,7 @@ function speakWithSystem(text: string, signal: AbortSignal, rate: number): Promi
 if (typeof speechSynthesis !== 'undefined') speechSynthesis.getVoices();
 
 /**
- * Gets one line ready in this window: main starts synthesising it (Kokoro or ElevenLabs)
+ * Gets one line ready in this window: main starts synthesising it (Kokoro)
  * now, and the function returned plays the audio here once it is in, or uses the system
  * voice when main says to. A line that is dropped unplayed is simply never played.
  * `preview` is Settings' ▶ Preview.

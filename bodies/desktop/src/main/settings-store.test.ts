@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS } from '../shared/settings';
 import { SETTINGS_FILENAME, SettingsStore } from './settings-store';
-import { InMemorySecretStore } from './test-support/in-memory-secret-store';
 
 let dataDir: string;
 let file: string;
@@ -122,17 +121,5 @@ describe('SettingsStore.set', () => {
     const store = new SettingsStore(dataDir);
     expect(() => store.set({ listening: { always: 'yes' as never } })).toThrow(/listening/);
     expect(store.get()).toEqual(SETTINGS_DEFAULTS);
-  });
-
-  it('keeps secrets out of the settings file on disk', async () => {
-    const store = new SettingsStore(dataDir);
-    const secrets = new InMemorySecretStore();
-
-    await secrets.set('elevenlabs.apiKey', 'sk-supersecret');
-    store.set({ avatar: { x: 1, y: 2 } });
-
-    const onDisk = readFileSync(file, 'utf8');
-    expect(onDisk).not.toContain('sk-supersecret');
-    expect(onDisk).not.toContain('apiKey');
   });
 });
