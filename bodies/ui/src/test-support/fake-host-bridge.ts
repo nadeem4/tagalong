@@ -13,6 +13,8 @@ import type {
   JobRow,
   PermissionRow,
   PreferenceRow,
+  KeyResult,
+  KeyStatus,
 } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
@@ -26,6 +28,13 @@ export interface FakeHostBridge extends HostBridge {
   memories: MemoryEntry[];
   /** Home's Permissions rows; setPermission edits them, a test may swap them. */
   permissions: PermissionRow[];
+  /** The brain's key facts, and how the next key check ends; a test swaps either. */
+  key: KeyStatus | 'offline';
+  keyResult: KeyResult;
+  /** Every key handed to setKey, every limit and every walkthrough step opened, in order. */
+  readonly keysSet: readonly string[];
+  readonly limitsSet: readonly number[];
+  readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'ask' | 'auto' }[];
   /** Home's Jobs rows; a test may swap them. */
@@ -98,6 +107,9 @@ export function createFakeHostBridge(
   const removedConnections: string[] = [];
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
+  const keysSet: string[] = [];
+  const limitsSet: number[] = [];
+  const walkthroughOpens: (number | undefined)[] = [];
 
   const fake: FakeHostBridge = {
     asks,
@@ -202,6 +214,28 @@ export function createFakeHostBridge(
     jobStops,
     usageSummary() {
       return Promise.resolve({ spentUsd: 0, limitUsd: null });
+    },
+    key: { hasKey: true, source: 'file', envPath: 'C:/tagalong/.env', dailyLimitUsd: 5 },
+    keyResult: 'ok',
+    keysSet,
+    limitsSet,
+    walkthroughOpens,
+    keyStatus() {
+      return fake.key === 'offline'
+        ? Promise.reject(new Error('brain offline'))
+        : Promise.resolve(fake.key);
+    },
+    setKey(key) {
+      keysSet.push(key);
+      return Promise.resolve(fake.keyResult);
+    },
+    setDailyLimit(usd) {
+      limitsSet.push(usd);
+      return Promise.resolve();
+    },
+    openWalkthrough(step) {
+      walkthroughOpens.push(step);
+      return Promise.resolve();
     },
     // A test that wants a health card replaces this; the default fails like a host that cannot say.
     checkHealth() {
