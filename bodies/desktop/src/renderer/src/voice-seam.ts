@@ -1,5 +1,5 @@
 /**
- * Puts `window.tagalongVoice` (ears, microphone, ears' models) on a window. The bubble
+ * Puts `window.tagalongVoice` (ears and microphone) on a window. The bubble
  * installs it before it renders.
  */
 import type { Ears } from '@tagalong/ui/shapes';
@@ -8,11 +8,10 @@ import { openMic } from './mic';
 import type { OpenMic } from './mic';
 import { RemoteEars } from './remote-ears';
 
-/** What any window can reach for voice: the ears, the microphone and the ears' models. */
+/** What any window can reach for voice: the ears and the microphone. */
 type TagalongVoice = {
   ears: Ears;
   openMic(deviceId?: string): Promise<OpenMic>;
-  ensureEars(onProgress: (fraction: number) => void): Promise<void>;
 };
 
 declare global {
@@ -34,9 +33,5 @@ export function installVoiceSeam(target: Window = window): void {
     listen: (mic) => remote.listen(mic),
     stop: () => remote.stop(),
   };
-  target.tagalongVoice = {
-    ears,
-    openMic,
-    ensureEars: (onProgress) => target.tagalongHost.ensureEars(onProgress),
-  };
+  target.tagalongVoice = { ears, openMic };
 }

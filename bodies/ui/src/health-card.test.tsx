@@ -11,7 +11,7 @@ const ROWS: HealthRow[] = [
     id: 'voice',
     label: 'Voice',
     state: 'broken',
-    line: 'Speech model not downloaded.',
+    line: 'The brain could not load its speech models.',
     fix: 'voice',
   },
   {
@@ -32,7 +32,7 @@ describe('HealthCard', () => {
     expect(items).toHaveLength(3);
     expect(items[0]).toHaveTextContent('Connections');
     expect(items[0]).toHaveTextContent('Ready.');
-    expect(items[1]).toHaveTextContent('Speech model not downloaded.');
+    expect(items[1]).toHaveTextContent('The brain could not load its speech models.');
   });
 
   it('offers Fix it only on a broken row, and it opens that fix', () => {

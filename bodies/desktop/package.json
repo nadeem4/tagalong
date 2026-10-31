@@ -19,11 +19,8 @@
     "package:dir": "node scripts/ensure-electron.mjs && electron-vite build && electron-builder --dir --publish never"
   },
   "dependencies": {
-    "@huggingface/transformers": "3.8.1",
     "@nut-tree-fork/nut-js": "4.2.6",
     "get-windows": "9.3.0",
-    "kokoro-js": "1.2.1",
-    "onnxruntime-node": "1.21.0",
     "uiohook-napi": "1.5.5"
   },
   "devDependencies": {

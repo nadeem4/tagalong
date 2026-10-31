@@ -1,39 +1,178 @@
 /**
- * IPC for Scout's voice and ears: speaking a line, the microphone's frames on their way to the
- * voice process, Always listening and the model check. Contains registerVoiceIpc and forwardEars.
+ * IPC for Scout's voice, which lives in the brain: the mic's frames on their way to it, Always
+ * listening, and what it sends back (heard words, voice status, spoken sentences). Contains
+ * createVoiceBridge and registerVoiceIpc.
  */
 
-import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/ui/shapes';
+import { BrainOffline } from '@tagalong/contract';
+import type { BrainClient } from '@tagalong/contract';
+import { addressedToScout, isStopListening, mightBeStop, STATUS_WORDS } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
-import type { SpeakPreview, VoiceModels } from '../../shared/ipc';
-import { EARS_FILES, filesPresent } from '../voice/ears/model-files';
-import { kokoroDownloaded } from '../voice/kokoro';
+import type { SpeakSample, VoiceModels } from '../../shared/ipc';
 import type { AlwaysListening } from '../always-listening';
 import type { StatusMarks } from '../status-marks';
-import type { VoiceWorker } from '../voice/worker/client';
-import type { VoiceService } from '../voice/voice';
+import { callJson } from '../brain/call-json';
 import type { IpcHandle, IpcOn } from './handle';
 
+type VoiceBrain = Pick<BrainClient, 'listen' | 'mic' | 'unlisten' | 'hush'>;
+
+const HEARD_EVENTS = {
+  speech_start: 'speechStart',
+  partial: 'partial',
+  final: 'final',
+  turn_end: 'turnEnd',
+} as const;
+
+interface BridgeDeps {
+  brain: VoiceBrain;
+  /** Sends to every open window. */
+  send: (channel: string, payload: unknown) => void;
+  /** Words addressed to Scout were heard: the bubble may come up. */
+  onSpoken?: () => void;
+  /** The follow-up window is open: a reply needs no name. */
+  followUp?: () => boolean;
+  /** The speech models loading, or the voice failing: shown on Scout. */
+  marks?: Pick<StatusMarks, 'set' | 'clear'>;
+}
+
+export interface VoiceBridge {
+  listen(mode: 'held' | 'always'): Promise<void>;
+  frame(samples: Float32Array): void;
+  stop(): void;
+  /** The brain is reachable again: an open listening session asks the new connection to listen. */
+  onOnline(): void;
+  /** Heard, voice and speech notifications from the brain; any other method is ignored. */
+  onNotification(method: string, params: unknown): void;
+  /** The health check: the brain's last word on its voice. */
+  models(): VoiceModels;
+}
+
+/** Float32 samples (-1..1) as 16-bit, clamped. */
+function toInt16(samples: Float32Array): Int16Array {
+  const out = new Int16Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    out[i] = Math.round(clamped < 0 ? clamped * 32768 : clamped * 32767);
+  }
+  return out;
+}
+
+export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
+  const { brain, send, marks } = deps;
+  /** The open listening session, if any, so a reconnect can ask again. */
+  let mode: 'held' | 'always' | null = null;
+  let voiceFailed = false;
+
+  const failed = (message: string): void => {
+    send(IPC.earsStatusEvent, { status: 'failed', message });
+  };
+
+  const request = async (wanted: 'held' | 'always'): Promise<void> => {
+    try {
+      await brain.listen(wanted);
+    } catch (error) {
+      mode = null;
+      failed(
+        error instanceof BrainOffline
+          ? STATUS_WORDS['brain-offline'].detail
+          : 'Listening could not start. Try again.',
+      );
+    }
+  };
+
+  const heard = (params: { event: keyof typeof HEARD_EVENTS; text?: string }): void => {
+    const event = HEARD_EVENTS[params.event];
+    const { text } = params;
+    const question =
+      (event === 'partial' || event === 'turnEnd') && text !== undefined
+        ? addressedToScout(text, { followUp: deps.followUp?.() === true })
+        : null;
+    // A partial "Scout, st" may still become "stop": not a question until it cannot.
+    const stop =
+      question !== null &&
+      (event === 'partial' ? mightBeStop(question) : isStopListening(question));
+    if (question !== null && !stop) deps.onSpoken?.();
+    send(IPC.earsEvent, text === undefined ? { event } : { event, text });
+  };
+
+  const voice = (params: {
+    status: 'loading' | 'ready' | 'failed';
+    message?: string;
+    progress?: number;
+  }): void => {
+    voiceFailed = params.status === 'failed';
+    if (params.status === 'failed') {
+      marks?.clear('ears-loading');
+      marks?.set({ id: 'ears-failed' });
+    } else if (params.status === 'ready') {
+      marks?.clear('ears-loading');
+      marks?.clear('ears-failed');
+    } else if (params.progress !== undefined) {
+      marks?.set({ id: 'ears-loading', percent: Math.round(params.progress * 100) });
+    } else {
+      marks?.set({ id: 'ears-loading' });
+    }
+    send(IPC.earsStatusEvent, {
+      status: params.status,
+      ...(params.message === undefined ? {} : { message: params.message }),
+      ...(params.progress === undefined ? {} : { progress: params.progress }),
+    });
+  };
+
+  return {
+    listen: async (wanted) => {
+      mode = wanted;
+      await request(wanted);
+    },
+    frame: (samples) => void brain.mic(toInt16(samples)),
+    stop: () => {
+      mode = null;
+      brain.unlisten();
+    },
+    onOnline: () => {
+      if (mode !== null) void request(mode);
+    },
+    onNotification: (method, params) => {
+      if (method === 'heard') heard(params as Parameters<typeof heard>[0]);
+      else if (method === 'voice') voice(params as Parameters<typeof voice>[0]);
+      else if (method === 'speech') {
+        const p = params as {
+          turn: string;
+          text?: string;
+          pcm?: string;
+          sample_rate?: number;
+          done?: true;
+        };
+        if (p.done === true) send(IPC.speechDone, { turn: p.turn });
+        else {
+          send(IPC.speechChunk, {
+            turn: p.turn,
+            ...(p.text === undefined ? {} : { text: p.text }),
+            ...(p.pcm === undefined ? {} : { pcm: p.pcm }),
+            ...(p.sample_rate === undefined ? {} : { sampleRate: p.sample_rate }),
+          });
+        }
+      }
+    },
+    // The brain's `voice` frames come from the ears alone; the mouth has no status to show.
+    models: () => ({ mouth: true, ears: !voiceFailed }),
+  };
+}
+
 interface VoiceIpcDeps {
-  voice: () => Pick<VoiceService, 'speak'>;
-  worker: () => Pick<VoiceWorker, 'send' | 'call'>;
+  bridge: VoiceBridge;
+  brain: VoiceBrain & Pick<BrainClient, 'call'>;
   /** Notes the window you are on, as the ask key does. */
   noteActiveWindow: () => Promise<unknown>;
   /** Always listening: only the person switches it, from the bubble. */
   listening: () => Pick<AlwaysListening, 'state' | 'set' | 'setFollowUp'>;
   on: IpcOn;
-  /** The voice models' folder, for the health check's look on disk. */
-  voiceDir?: () => string;
 }
 
 export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
-  // Only the line itself reaches a speech engine: never the screen or the conversation.
-  handle(IPC.speak, (_event, text: string, preview?: SpeakPreview) =>
-    deps.voice().speak(String(text), preview),
-  );
-
-  // Frames and stop wait for a listen still noting the window, so the voice process hears
-  // them in the order the panel sent them. A failed step does not hold up the next.
+  const { bridge } = deps;
+  // Frames and stop wait for a listen still noting the window, so the brain hears them in
+  // the order the panel sent them. A failed step does not hold up the next.
   let queue: Promise<void> = Promise.resolve();
   const inOrder = (step: () => void | Promise<void>): Promise<void> => {
     const next = queue.then(step);
@@ -58,20 +197,20 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
         : Promise.resolve();
     return inOrder(async () => {
       await noted;
-      deps.worker().send({ kind: 'ears.listen', mode });
+      await bridge.listen(mode);
     });
   });
 
-  // 16 kHz samples, a frame at a time. Handed to the voice process and never kept here.
+  // 16 kHz samples, a frame at a time. Handed to the brain and never kept here.
   deps.on(IPC.micFrame, (_event, samples: Float32Array) => {
     const frame = samples instanceof Float32Array ? samples : new Float32Array(samples);
-    inOrder(() => deps.worker().send({ kind: 'ears.frame', samples: frame })).catch(
-      (error: unknown) =>
-        console.warn('[main] a mic frame could not reach the voice process', error),
+    inOrder(() => bridge.frame(frame)).catch((error: unknown) =>
+      console.warn('[main] a mic frame could not reach the brain', error),
     );
   });
 
-  handle(IPC.earsStop, () => inOrder(() => deps.worker().send({ kind: 'ears.stop' })));
+  handle(IPC.earsStop, () => inOrder(() => bridge.stop()));
+  handle(IPC.hush, () => deps.brain.hush());
 
   handle(IPC.getListening, () => deps.listening().state);
   handle(IPC.setListening, (_event, on: unknown) => {
@@ -84,90 +223,25 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
     deps.listening().setFollowUp(open);
   });
 
-  // A download, not a listening step: it stays out of the ordering queue. Progress comes back
-  // through forwardEars as IPC.earsProgressEvent.
-  handle(IPC.ensureEars, async () => {
-    await deps.worker().call({ kind: 'call', method: 'ears.ensure' });
-  });
-
-  // The health check: a look on disk for each model, never a download or a voice process.
-  const voiceDir = deps.voiceDir;
-  if (voiceDir !== undefined) {
-    handle(IPC.voiceModels, (): VoiceModels => {
-      const dir = voiceDir();
-      return { mouth: kokoroDownloaded(dir), ears: filesPresent(dir, EARS_FILES) };
-    });
-  }
-}
-
-/**
- * What the ears say goes to the windows; a dead voice process is said plainly. `onSpoken`
- * hears words addressed to Scout, so the bubble can come up: never bare speech, never talk
- * that does not start with the name (or a word that sounds like it), unless the follow-up window
- * is open, and never "Scout, stop", which only switches listening off (nor a partial such as
- * "Scout, st" that may still become it). The download and an ears failure show on Scout as marks.
- */
-export function forwardEars(
-  worker: Pick<VoiceWorker, 'onMessage' | 'onExit'>,
-  send: (channel: string, payload: unknown) => void,
-  onSpoken?: () => void,
-  more: {
-    /** The follow-up window is open: a reply needs no name. */
-    followUp?: () => boolean;
-    /** The speech models downloading, or the ears failed: shown on Scout. */
-    marks?: Pick<StatusMarks, 'set' | 'clear'>;
-  } = {},
-): void {
-  const { marks } = more;
-  // The ears were in use in this voice process: only then is its exit an ears failure.
-  let earsUsed = false;
-  const failed = (): void => {
-    marks?.clear('ears-loading');
-    marks?.set({ id: 'ears-failed' });
-  };
-  worker.onMessage((message) => {
-    if (message.kind.startsWith('ears')) earsUsed = true;
-    if (message.kind === 'ears') {
-      const question =
-        (message.event === 'partial' || message.event === 'turnEnd') && message.text !== undefined
-          ? addressedToScout(message.text, { followUp: more.followUp?.() === true })
+  // Settings' Preview: the brain speaks one line and sends the audio back. Anything but audio
+  // (no voice running, brain offline) is null, and the form falls back to the system voice.
+  handle(
+    IPC.speakSample,
+    async (_event, text: string, voice: string, speed: number): Promise<SpeakSample | null> => {
+      try {
+        const sample = (await callJson(deps.brain, 'speak_sample', {
+          text: String(text),
+          voice,
+          speed,
+        })) as Partial<SpeakSample>;
+        return typeof sample.mime === 'string' && typeof sample.data === 'string'
+          ? { mime: sample.mime, data: sample.data }
           : null;
-      // A partial "Scout, st" may still become "stop": not a question until it cannot.
-      const stop =
-        question !== null &&
-        (message.event === 'partial' ? mightBeStop(question) : isStopListening(question));
-      if (onSpoken !== undefined && question !== null && !stop) onSpoken();
-      send(
-        IPC.earsEvent,
-        message.text === undefined
-          ? { event: message.event }
-          : { event: message.event, text: message.text },
-      );
-    } else if (message.kind === 'ears.progress') {
-      if (message.fraction >= 1) marks?.clear('ears-loading');
-      else marks?.set({ id: 'ears-loading', percent: Math.round(message.fraction * 100) });
-      send(IPC.earsProgressEvent, { fraction: message.fraction });
-    } else if (message.kind === 'ears.status') {
-      if (message.status === 'loading') marks?.set({ id: 'ears-loading' });
-      else if (message.status === 'failed') failed();
-      else {
-        marks?.clear('ears-loading');
-        marks?.clear('ears-failed');
+      } catch {
+        return null;
       }
-      send(
-        IPC.earsStatusEvent,
-        message.message === undefined
-          ? { status: message.status }
-          : { status: message.status, message: message.message },
-      );
-    }
-  });
-  worker.onExit(() => {
-    if (earsUsed) failed();
-    earsUsed = false;
-    send(IPC.earsStatusEvent, {
-      status: 'failed',
-      message: 'Listening stopped unexpectedly. Try again.',
-    });
-  });
+    },
+  );
+
+  handle(IPC.voiceModels, (): VoiceModels => bridge.models());
 }

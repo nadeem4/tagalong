@@ -12,11 +12,10 @@ import {
   TALK_KEY_LABELS,
 } from '../../../shared/settings';
 import { adaptersFor, chosenMouth } from '../../../shared/voice';
-import type { MouthId } from '@tagalong/ui/shapes';
 import type { Settings, VoiceId } from '../../../shared/settings';
 import { listMicrophones } from '../mic';
 import { voiceFacts } from '../settings-form';
-import { playLine } from '../voice-player';
+import { previewVoice } from '../voice-player';
 import { Info, Section, Tip, useInvalid } from './section';
 
 /** What ▶ Preview says, in the voice and at the speed the form shows. */
@@ -56,11 +55,10 @@ export function VoiceSection({
 
   const preview = (): void => {
     setPreviewing(true);
-    playLine(PREVIEW_LINE, new AbortController().signal, {
-      voice,
-      speed,
-      mouth: mouth as MouthId,
-    })
+    previewVoice(
+      { text: PREVIEW_LINE, mouth: mouth === 'system' ? 'system' : 'kokoro', voice, speed },
+      new AbortController().signal,
+    )
       .catch((error: unknown) => console.warn('[voice] preview failed', error))
       .finally(() => setPreviewing(false));
   };
@@ -87,11 +85,11 @@ export function VoiceSection({
         {talks && <input type="hidden" name="voiceEnabled" value="on" />}
       </div>
       <Tip tip="voice">
-        Scout says what it writes: its answers, its hello and a timer that fires. Code and long
-        lists it puts in a block, which shows in the bubble and is not read. Under Who speaks, the
-        local voice runs on this computer and downloads its model (about 90 MB) the first time it is
-        used, speaking with the system voice until that is done; the system voice needs nothing.
-        Closing the bubble or the stop key silences it at once.
+        Scout reads aloud the answers you ask for by voice. Code and long lists it puts in a block,
+        which shows in the bubble and is not read. Under Who speaks, Kokoro runs on the brain, which
+        downloads its model the first time it is needed; until it is ready Scout speaks with the
+        system voice. The system voice needs nothing. Closing the bubble or the stop key silences it
+        at once.
       </Tip>
       <div className="tg-grid">
         <div>
@@ -199,15 +197,15 @@ export function VoiceSection({
       <p className="tg-help">
         Hold the key on its own and speak; let go and Scout answers out loud. Pressing another key
         while you hold it (Right Ctrl+C, say) sends nothing. Tagalong watches only this key go down
-        and up; nothing you type is read or kept. Your speech is turned into text on this PC, and
-        the recording is never sent or kept.
+        and up; nothing you type is read or kept. Audio goes only to your own brain and is never
+        stored; with the brain on this computer it never leaves it.
       </p>
       <Tip tip="talk">
         Hold the key, or click the mic in the bubble, and say your question. Let go (or click again)
         and Scout answers in short spoken sentences, with any detail in the bubble. Talking while
         Scout speaks cuts it off. The microphone only listens while you hold the key or after you
-        click the mic: never on its own. The first time, Tagalong downloads its speech models (about
-        43 MB) that turn your voice into text on this PC.
+        click the mic: never on its own. The brain turns your voice into text, and downloads its
+        speech models the first time it needs them.
       </Tip>
     </Section>
   );

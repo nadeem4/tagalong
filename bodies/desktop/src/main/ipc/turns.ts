@@ -17,6 +17,10 @@ interface TurnIpcDeps {
   claimTurn: (turnId: string) => void;
   /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
   status: () => BrainStatus;
+  /** Stops Scout's speech everywhere: a cancelled turn does not hush its own. */
+  stopVoice: () => void;
+  /** Scout talks: on or off, which voice, how fast. Rides on each spoken ask. */
+  voice: () => { enabled: boolean; voice: string; speed: number };
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
   /**
@@ -56,11 +60,13 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
       const parts: Part[] = [];
       if (dropped !== null) parts.push(...droppedParts(dropped));
       const windowTitle = snapshot?.app?.windowTitle;
+      const voice = deps.voice();
+      const spoken = input.spoken === true && voice.enabled;
       const say: SayParams = {
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
-        ...(input.spoken === true ? { spoken: true } : {}),
+        ...(spoken ? { spoken: true, voice: voice.voice, speed: voice.speed } : {}),
       };
       try {
         const said = await deps.brain.say(say);
@@ -80,5 +86,6 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
 
   handle(IPC.interrupt, (_event, turnId: string) => {
     deps.brain.cancel(turnId);
+    deps.stopVoice();
   });
 }

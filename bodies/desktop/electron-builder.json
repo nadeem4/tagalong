@@ -7,7 +7,7 @@
   },
   "files": ["dist/**/*", "package.json"],
   "asar": true,
-  "asarUnpack": ["**/*.node", "**/node_modules/onnxruntime-node/bin/**", "**/node_modules/@img/**"],
+  "asarUnpack": ["**/*.node"],
   "npmRebuild": false,
   "publish": null,
   "extraResources": [

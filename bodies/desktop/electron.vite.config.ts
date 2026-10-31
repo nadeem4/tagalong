@@ -22,13 +22,13 @@ const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
  * They compile with `moduleResolution: bundler`, so their emitted relative imports carry
  * no file extension and Node's ESM loader cannot resolve them at runtime. Letting Rollup
  * inline them resolves those imports at build time, which is what an Electron app wants
- * anyway. Only their genuinely native dependencies stay external (get-windows,
- * onnxruntime-node and uiohook-napi, the talk key's hook, ship .node binaries Rollup cannot inline), and because
+ * anyway. Only their genuinely native dependencies stay external (get-windows and
+ * uiohook-napi, the talk key's hook, ship .node binaries Rollup cannot inline), and because
  * those are then resolved at runtime from this app, they are declared as its dependencies. Pure
  * JavaScript deps such as ws are inlined with everything else.
  */
 const WORKSPACE_PACKAGES = ['@tagalong/ui'];
-const NATIVE_DEPS = ['get-windows', 'onnxruntime-node', 'uiohook-napi'];
+const NATIVE_DEPS = ['get-windows', 'uiohook-napi'];
 
 export default defineConfig({
   main: {
@@ -48,9 +48,8 @@ export default defineConfig({
       // package.json `main` points at dist/main.js, so electron-vite owns dist/ and the
       // TypeScript project emits its declarations to out/ instead.
       outDir: 'dist',
-      // The voice models run in their own process, whose entry sits beside main.js.
       lib: {
-        entry: { main: 'src/main/index.ts', 'voice-worker': 'src/main/voice/worker/main.ts' },
+        entry: { main: 'src/main/index.ts' },
       },
       rollupOptions: {
         external: NATIVE_DEPS,

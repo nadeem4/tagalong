@@ -1,6 +1,6 @@
 /**
  * The contract between main and the preload: every IPC channel name (IPC) and the shapes
- * that cross it (HostView, CaptureNotice, SpeakResult and the rest), plus
+ * that cross it (HostView, CaptureNotice, SpeechChunk and the rest), plus
  * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
  */
 
@@ -12,9 +12,8 @@ import type {
   Pet,
   PetRemarkParams,
   StatusMark,
-  MouthId,
 } from '@tagalong/ui/shapes';
-import type { Settings, SettingsPatch, VoiceId } from './settings';
+import type { Settings, SettingsPatch } from './settings';
 import type { DropOffer, HostBridge } from '@tagalong/ui';
 import type { FixTarget } from '@tagalong/ui/shapes';
 
@@ -64,7 +63,10 @@ export const IPC = {
   openBubble: 'tagalong:bubble:open',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
-  speak: 'tagalong:voice:speak',
+  speakSample: 'tagalong:voice:speak-sample',
+  hush: 'tagalong:voice:hush',
+  speechChunk: 'tagalong:voice:speech-chunk',
+  speechDone: 'tagalong:voice:speech-done',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
   talkReleaseEvent: 'tagalong:voice:talk-release',
@@ -74,8 +76,6 @@ export const IPC = {
   earsStop: 'tagalong:voice:ears-stop',
   earsEvent: 'tagalong:voice:ears-event',
   earsStatusEvent: 'tagalong:voice:ears-status',
-  ensureEars: 'tagalong:voice:ensure-ears',
-  earsProgressEvent: 'tagalong:voice:ears-progress',
   getListening: 'tagalong:voice:get-listening',
   setListening: 'tagalong:voice:set-listening',
   setFollowUp: 'tagalong:voice:set-follow-up',
@@ -84,7 +84,7 @@ export const IPC = {
   // ends a move of the pet), and the card main hands the bubble for it.
   dropOnPet: 'tagalong:avatar:drop-on-pet',
   dropEvent: 'tagalong:panel:drop',
-  // The health check: whether the voice models are on disk.
+  // The health check: whether the brain's voice models work.
   voiceModels: 'tagalong:voice:models',
   // Status marks: the top one on Scout and in the bubble, read on mount and broadcast on change.
   getStatusMark: 'tagalong:status:get',
@@ -118,29 +118,27 @@ export interface ListeningState {
   followUp: boolean;
 }
 
-/** The ears' models: loading (the first time, a download), ready, or failed and why. */
+/** The brain's voice models: loading (the first time, a download), ready, or failed and why. */
 export interface EarsStatus {
   status: 'loading' | 'ready' | 'failed';
   message?: string;
+  /** 0..1 while a download runs. */
+  progress?: number;
 }
 
-/** Settings' ▶ Preview: the voice and speed the form shows, not yet saved. */
-export interface SpeakPreview {
-  voice?: VoiceId;
-  speed?: number;
-  /** Who speaks, as the picker shows it. */
-  mouth?: MouthId;
+/** One sentence of Scout's spoken reply, from the brain: audio (24 kHz int16, base64) or only text. */
+export interface SpeechChunk {
+  turn: string;
+  text?: string;
+  pcm?: string;
+  sampleRate?: number;
 }
 
-/**
- * What main hands back for one line: encoded audio to play, the word to use the system
- * voice instead, at `speed` (the local model is downloading, or every engine failed), or nothing at
- * all because Scout talks is switched off.
- */
-export type SpeakResult =
-  | { kind: 'audio'; audio: Uint8Array; mime: string }
-  | { kind: 'fallback'; speed: number }
-  | { kind: 'off' };
+/** A Settings preview line, spoken by the brain's voice: a WAV, base64. */
+export interface SpeakSample {
+  mime: string;
+  data: string;
+}
 
 /**
  * What the host announces the moment it looks at the screen — or refuses to.
@@ -166,11 +164,11 @@ export interface CaptureNotice {
   paused?: boolean;
 }
 
-/** Whether the voice models are on disk, for the health check: a look, never a download. */
+/** Whether the brain's voice models work, for the health check: its last word, never a download. */
 export interface VoiceModels {
-  /** The local voice (Kokoro). */
+  /** The brain's speaking voice (Kokoro). */
   mouth: boolean;
-  /** Every one of the ears' files. */
+  /** The brain's ears. */
   ears: boolean;
 }
 
@@ -261,8 +259,14 @@ export interface TagalongHostApi {
   /** The drag ended: remember where the pet was left. */
   dropAvatar(): Promise<void>;
   togglePanel(): Promise<void>;
-  /** Turns one line into audio in main. Only this text leaves the window. */
-  speak(text: string, preview?: SpeakPreview): Promise<SpeakResult>;
+  /** A preview line in the brain's voice; null when the brain cannot speak it. */
+  speakSample(text: string, voice: string, speed: number): Promise<SpeakSample | null>;
+  /** Scout stops speaking at once: tells the brain too. */
+  hush(): Promise<void>;
+  /** One sentence of a spoken reply, from the brain. */
+  onSpeechChunk(handler: (chunk: SpeechChunk) => void): () => void;
+  /** The brain has no more to say for this turn. */
+  onSpeechDone(handler: (turn: string) => void): () => void;
   /** Fires when the stop key is pressed: Scout stops speaking at once. */
   onStopVoice(handler: () => void): () => void;
   /** Fires when the talk key goes down (once per hold), with when it fired. */
@@ -281,8 +285,6 @@ export interface TagalongHostApi {
   onEarsEvent(handler: (event: EarsEvent, text?: string) => void): () => void;
   /** The ears' models loading, ready, or failed. */
   onEarsStatus(handler: (status: EarsStatus) => void): () => void;
-  /** Downloads the ears' model files if missing; `onProgress` hears 0..1, ending at 1. */
-  ensureEars(onProgress: (fraction: number) => void): Promise<void>;
   /** Always listening now, for a window that just opened: the mark on Scout. */
   getListening(): Promise<ListeningState>;
   /** Switches Always listening on or off, returning the state it moved to. */
@@ -298,7 +300,7 @@ export interface TagalongHostApi {
   dropOnPet(drop: PetDrop): Promise<void>;
   /** Main hands the bubble the card for what was dropped on Scout. */
   onDrop(handler: (offer: DropOffer) => void): () => void;
-  /** The health check: whether the voice models are on disk. Never downloads. */
+  /** The health check: whether the brain's voice models work. */
   voiceModels(): Promise<VoiceModels>;
   /** The top status mark now, for a window that just opened. */
   getStatusMark(): Promise<StatusMark | null>;

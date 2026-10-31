@@ -63,11 +63,15 @@ describe('healthRows', () => {
     expect(row(healthRows({ ...ALL_GOOD, connections: [] }), 'connections').state).toBe('ok');
   });
 
-  it('says the ears are not downloaded', () => {
+  it('says the ears failed to load', () => {
     const voice = { ...(ALL_GOOD.voice as Exclude<HealthFacts['voice'], 'unknown'>) };
     expect(
       row(healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }), 'voice'),
-    ).toMatchObject({ state: 'broken', line: 'Speech model not downloaded.', fix: 'voice' });
+    ).toMatchObject({
+      state: 'broken',
+      line: 'The brain could not load its speech models.',
+      fix: 'voice',
+    });
     // Ears nobody uses are not a problem.
     expect(
       row(

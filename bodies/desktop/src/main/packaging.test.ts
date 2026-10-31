@@ -62,11 +62,6 @@ describe('electron-builder config', () => {
     expect(config.asarUnpack).toContain('**/*.node');
   });
 
-  it('unpacks the DLLs the voice’s native modules load from beside their .node files', () => {
-    expect(config.asarUnpack).toContain('**/node_modules/onnxruntime-node/bin/**');
-    expect(config.asarUnpack).toContain('**/node_modules/@img/**');
-  });
-
   it('does not rebuild native modules: every one ships an N-API binary Electron loads as is', () => {
     expect(config.npmRebuild).toBe(false);
   });
@@ -89,21 +84,15 @@ describe('electron-builder config', () => {
 });
 
 describe('desktop runtime dependencies', () => {
-  it('lists only what the packaged app loads at runtime: the native modules and the voice', () => {
+  it('lists only what the packaged app loads at runtime: the native modules', () => {
     // The workspace packages are bundled into dist/main.js by electron-vite, so listing
     // them as dependencies would make electron-builder copy their whole trees again.
-    // The local voice (kokoro-js on transformers and onnxruntime-node) is loaded lazily at
-    // runtime, so it stays external too.
+    // The voice models live in the brain, so no speech library ships with the desktop.
     expect(Object.keys(manifest.dependencies).sort()).toEqual([
-      '@huggingface/transformers',
       '@nut-tree-fork/nut-js',
       'get-windows',
-      'kokoro-js',
-      'onnxruntime-node',
       'uiohook-napi',
     ]);
-    // The version @huggingface/transformers pins, so one onnxruntime runs in the voice process.
-    expect(manifest.dependencies['onnxruntime-node']).toBe('1.21.0');
   });
 
   it('keeps the talk key hook external, so its prebuilt binary loads from outside app.asar', () => {

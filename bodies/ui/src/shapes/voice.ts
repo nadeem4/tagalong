@@ -22,12 +22,6 @@ export interface Ears {
   on(event: EarsEvent, handler: (text?: string) => void): void;
 }
 
-/** Scout's answer to speech, streamed sentence by sentence, stoppable at once. */
-export interface Mouth {
-  speak(text: AsyncIterable<string>): void;
-  stop(): void;
-}
-
 export const EARS_IDS = ['local'] as const;
 
 export const MOUTH_IDS = ['kokoro', 'system'] as const;
