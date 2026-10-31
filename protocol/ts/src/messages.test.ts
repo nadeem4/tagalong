@@ -12,8 +12,14 @@ import {
   BackEventData,
   DownloadEventData,
   FocusEventData,
+  HeardParams,
+  ListenParams,
+  SayParams,
+  SpeechParams,
   TabEventData,
   TurnParams,
+  VoiceParams,
+  brainToBody,
   type BodyToBrainMethod,
   type BrainToBodyMethod,
 } from './messages.js';
@@ -25,13 +31,64 @@ const eventData = (name: string): unknown =>
 describe('method maps', () => {
   it('has literal body to brain method names', () => {
     expectTypeOf<BodyToBrainMethod>().toEqualTypeOf<
-      'hello' | 'tools' | 'say' | 'event' | 'call' | 'answer' | 'cancel'
+      | 'hello'
+      | 'tools'
+      | 'say'
+      | 'event'
+      | 'call'
+      | 'answer'
+      | 'cancel'
+      | 'listen'
+      | 'mic'
+      | 'unlisten'
+      | 'hush'
     >();
   });
   it('has literal brain to body method names', () => {
     expectTypeOf<BrainToBodyMethod>().toEqualTypeOf<
-      'use' | 'cancel' | 'reply' | 'turn' | 'tool' | 'ask' | 'changed' | 'approved'
+      | 'use'
+      | 'cancel'
+      | 'reply'
+      | 'turn'
+      | 'tool'
+      | 'ask'
+      | 'changed'
+      | 'approved'
+      | 'heard'
+      | 'voice'
+      | 'speech'
     >();
+  });
+});
+
+describe('voice messages', () => {
+  it('marks the voice notifications live and the rest not', () => {
+    for (const m of ['heard', 'voice', 'speech'] as const) {
+      expect('live' in brainToBody[m] && brainToBody[m].live).toBe(true);
+    }
+    expect('live' in brainToBody.reply).toBe(false);
+  });
+  it('bounds say speed and listen mode', () => {
+    expect(SayParams.safeParse({ text: 'a', speed: 0.5 }).success).toBe(true);
+    expect(SayParams.safeParse({ text: 'a', speed: 2 }).success).toBe(true);
+    expect(SayParams.safeParse({ text: 'a', speed: 3 }).success).toBe(false);
+    expect(ListenParams.safeParse({ mode: 'held' }).success).toBe(true);
+    expect(ListenParams.safeParse({ mode: 'x' }).success).toBe(false);
+  });
+  it('keeps speech either text or done, and pcm with its rate', () => {
+    expect(SpeechParams.safeParse({ turn: 't', done: true, text: 'x' }).success).toBe(false);
+    expect(SpeechParams.safeParse({ turn: 't' }).success).toBe(false);
+    expect(SpeechParams.safeParse({ turn: 't', text: 'x', pcm: 'AA==' }).success).toBe(false);
+    expect(SpeechParams.safeParse({ turn: 't', text: 'x', sample_rate: 24000 }).success).toBe(
+      false,
+    );
+    expect(
+      SpeechParams.safeParse({ turn: 't', text: 'x', pcm: 'AA==', sample_rate: 24000 }).success,
+    ).toBe(true);
+  });
+  it('bounds voice progress', () => {
+    expect(VoiceParams.safeParse({ status: 'loading', progress: 1.5 }).success).toBe(false);
+    expect(HeardParams.safeParse({ event: 'mumble' }).success).toBe(false);
   });
 });
 

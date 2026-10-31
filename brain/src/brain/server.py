@@ -2,13 +2,15 @@
 
 Each connection owns one queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
-Hello, tools, say, call, answer and cancel are handled; any other request answers
-method_not_found. `call` runs in its own task and replies through the peer queue.
+Hello, tools, say, call, answer and cancel are handled, and listen, mic, unlisten and hush
+go to the voice seam (Session.voice); any other request answers method_not_found.
+`call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
 """
 
 import asyncio
+import base64
 import json
 import logging
 from typing import Any
@@ -19,6 +21,7 @@ from websockets.exceptions import ConnectionClosed
 
 from brain.bodies import Bodies
 from brain.protocol import (
+    LIMITS,
     PROTOCOL,
     AnswerParams,
     CallParams,
@@ -28,6 +31,8 @@ from brain.protocol import (
     EventParams,
     HelloParams,
     HelloResult,
+    ListenParams,
+    MicParams,
     RpcError,
     SayParams,
     ToolsParams,
@@ -35,6 +40,7 @@ from brain.protocol import (
 from brain.sessions import Session
 
 MAX_FRAME = 28_000_000
+VOICE_METHODS = {"listen", "mic", "unlisten", "hush"}
 log = logging.getLogger("brain")
 
 
@@ -95,6 +101,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
     writer = asyncio.create_task(_writer(ws, peer))
     body_id: str | None = None
     calls: set[asyncio.Task] = set()
+    listening: set[str] = set()  # holds the body id once this connection has listened
     try:
         async for raw in ws:
             message = _parse(raw)
@@ -126,7 +133,12 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                     task.add_done_callback(calls.discard)
                 continue
             try:
-                reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
+                if method in VOICE_METHODS:
+                    if not bodies.is_current(body_id, peer):
+                        continue  # a replaced connection may still deliver queued frames
+                    reply = _voice(method, message, req_id, body_id, session, listening)
+                else:
+                    reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
             except Exception:
                 log.exception("handler failed for %s", method)
                 reply = _error(req_id, ErrorCode.internal_error, "Internal error")
@@ -138,7 +150,10 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
         for task in calls:
             task.cancel()  # nobody is left to read their replies
         if body_id is not None:
-            bodies.disconnect(body_id, peer)
+            was_current = bodies.disconnect(body_id, peer)
+            # A replaced connection must not tear down the listening its successor started.
+            if was_current and body_id in listening and session.voice is not None:
+                session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
         peer.close()
         await asyncio.gather(writer, return_exceptions=True)
 
@@ -195,6 +210,49 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
     except Exception as exc:
         reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
     peer.send(reply)
+
+
+def _voice(
+    method: str, message: dict, req_id: Any, body_id: str, session: Session, listening: set[str]
+) -> str | None:
+    """Route the voice methods to the seam. Without a voice, `listen` is unknown and the
+    notifications are ignored; a bad or untimely `mic` frame is dropped, never answered."""
+    voice = session.voice
+    if voice is None:
+        return _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")
+    raw = message.get("params")
+    is_request = "id" in message
+    if method == "listen":
+        if not is_request:
+            return None
+        try:
+            params = ListenParams.model_validate(raw)
+        except ValidationError as exc:
+            return _error(req_id, ErrorCode.invalid_params, str(exc))
+        voice.listen(body_id, params.mode)  # first: a raising hook must not mark it listening
+        listening.add(body_id)
+        return _result(req_id, {})
+    if method == "mic":
+        if is_request or body_id not in listening:
+            return None
+        try:
+            frame = MicParams.model_validate(raw)
+            if len(frame.pcm) > 4 * ((LIMITS["mic_frame"] + 2) // 3):
+                return None  # too big to decode
+            pcm = base64.b64decode(frame.pcm, validate=True)
+        except ValueError:  # a bad shape or bad base64
+            log.debug("dropped a bad mic frame")
+            return None
+        if len(pcm) > LIMITS["mic_frame"]:
+            return None
+        voice.mic(body_id, pcm)
+        return None
+    if method == "unlisten":
+        listening.discard(body_id)
+        voice.unlisten(body_id)
+    else:  # hush
+        voice.hush(body_id)
+    return _result(req_id, {}) if is_request else None
 
 
 def _dispatch(

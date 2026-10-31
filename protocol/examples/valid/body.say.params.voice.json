@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "say",
+  "params": { "text": "hey scout", "spoken": true, "voice": "bm_george", "speed": 1.1 }
+}

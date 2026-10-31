@@ -447,3 +447,39 @@ def test_known_tools_ignores_stale_peer_set_tools():
     bodies.connect(body("desktop"), [tool("b")], new, None)
     bodies.set_tools("desktop", old, [tool("zzz")])
     assert [t.name for t in bodies.known_tools()["desktop"]] == ["b"]
+
+
+def test_send_live_has_no_seq_and_skips_the_outbox():
+    bodies = Bodies()
+    a, b = FakePeer(), FakePeer()
+    bodies.connect(body("a"), [], a, None)
+    bodies.connect(body("b"), [], b, None)
+    assert bodies.send_live("a", "speech", {"turn": "t1", "done": True})
+    assert [json.loads(f) for f in a.frames] == [
+        {"jsonrpc": "2.0", "method": "speech", "params": {"turn": "t1", "done": True}}
+    ]
+    assert b.frames == []  # only the named body
+    assert bodies.connect(body("a"), [], FakePeer(), 0).backlog == []
+
+
+def test_send_live_never_replays_on_reconnect():
+    bodies = Bodies()
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.notify("m", {})
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
+    bodies.disconnect("a", peer)
+    joined = bodies.connect(body("a"), [], FakePeer(), 0)
+    assert joined.seq == 1 and not joined.resync
+    assert [json.loads(f)["method"] for f in joined.backlog] == ["m"]
+
+
+def test_send_live_to_an_offline_body_sends_nothing_and_says_so():
+    bodies = Bodies()
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.disconnect("a", peer)
+    assert not bodies.send_live("a", "heard", {"event": "partial"})
+    assert not bodies.send_live("nobody", "heard", {"event": "partial"})
+    assert peer.frames == []
+    assert bodies.connect(body("a"), [], FakePeer(), 0).backlog == []

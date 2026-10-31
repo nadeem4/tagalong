@@ -1,5 +1,5 @@
 /**
- * Params and result schema for each of the fifteen messages, plus the two method maps
+ * Params and result schema for each of the twenty-two messages, plus the two method maps
  * (body to brain, brain to body). The maps let a receiver, and the examples test, look
  * a schema up by method name. `protocol` is any integer so a newer body gets
  * version_mismatch from the handler instead of a schema failure.
@@ -44,6 +44,8 @@ export const SayParams = z
     parts: z.array(Part).optional(),
     context: z.unknown().optional(),
     spoken: z.boolean().optional(),
+    voice: z.string().optional(),
+    speed: z.number().min(0.5).max(2).optional(),
   })
   .refine((m) => m.text !== undefined || m.parts !== undefined, 'say needs text or parts');
 export type SayParams = z.infer<typeof SayParams>;
@@ -87,6 +89,17 @@ export type AnswerParams = z.infer<typeof AnswerParams>;
 
 export const CancelTurnParams = z.object({ turn: Id });
 export type CancelTurnParams = z.infer<typeof CancelTurnParams>;
+
+export const ListenParams = z.object({ mode: z.enum(['held', 'always']) });
+export type ListenParams = z.infer<typeof ListenParams>;
+
+// pcm is base64 of int16 little-endian, mono, 16 kHz.
+export const MicParams = z.object({ pcm: z.string().min(1) });
+export type MicParams = z.infer<typeof MicParams>;
+
+// unlisten and hush carry no fields.
+export const EmptyParams = z.object({});
+export type EmptyParams = z.infer<typeof EmptyParams>;
 
 // Brain -> body
 
@@ -186,9 +199,45 @@ export const ApprovedParams = z.object({
 });
 export type ApprovedParams = z.infer<typeof ApprovedParams>;
 
+// The voice notifications are live-only: no seq, never stored or replayed.
+export const HeardParams = z.object({
+  event: z.enum(['speech_start', 'partial', 'final', 'turn_end']),
+  text: z.string().optional(),
+});
+export type HeardParams = z.infer<typeof HeardParams>;
+
+export const VoiceParams = z.object({
+  status: z.enum(['loading', 'ready', 'failed']),
+  message: z.string().optional(),
+  progress: z.number().min(0).max(1).optional(),
+});
+export type VoiceParams = z.infer<typeof VoiceParams>;
+
+// One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
+// pcm and sample_rate come together; without them the body says `text` in its own voice.
+export const SpeechParams = z
+  .object({
+    turn: Id,
+    text: z.string().optional(),
+    pcm: z.string().optional(),
+    sample_rate: z.int().positive().optional(),
+    done: z.literal(true).optional(),
+  })
+  .refine(
+    (s) =>
+      s.done === undefined
+        ? s.text !== undefined
+        : s.text === undefined && s.pcm === undefined && s.sample_rate === undefined,
+    'a speech has text or done: true, never both',
+  )
+  .refine((s) => (s.pcm === undefined) === (s.sample_rate === undefined), 'pcm needs sample_rate');
+export type SpeechParams = z.infer<typeof SpeechParams>;
+
 export interface MethodSchemas {
   params: ZodType;
   result?: ZodType;
+  /** No seq: sent to the current connection only, never stored or replayed. */
+  live?: boolean;
 }
 
 export const bodyToBrain = {
@@ -199,6 +248,10 @@ export const bodyToBrain = {
   call: { params: CallParams, result: CallResult },
   answer: { params: AnswerParams, result: EmptyResult },
   cancel: { params: CancelTurnParams },
+  listen: { params: ListenParams, result: EmptyResult },
+  mic: { params: MicParams },
+  unlisten: { params: EmptyParams },
+  hush: { params: EmptyParams },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
@@ -210,6 +263,9 @@ export const brainToBody = {
   ask: { params: AskParams },
   changed: { params: ChangedParams },
   approved: { params: ApprovedParams },
+  heard: { params: HeardParams, live: true },
+  voice: { params: VoiceParams, live: true },
+  speech: { params: SpeechParams, live: true },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

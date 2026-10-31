@@ -670,3 +670,89 @@ describe('BrainClient as a shared body client', () => {
     expect(client.link).toBe('online');
   });
 });
+
+describe('voice', () => {
+  const speech = { turn: 't1', text: 'Hi.', pcm: 'AAA=', sample_rate: 24000 };
+
+  it('passes a live notification with no seq and leaves lastSeq alone', async () => {
+    const { s, notes } = await online();
+    s.receive(turn(5));
+    s.receive({ jsonrpc: '2.0', method: 'speech', params: speech });
+    s.receive({ jsonrpc: '2.0', method: 'heard', params: { event: 'final', text: 'hey' } });
+    s.receive({ jsonrpc: '2.0', method: 'voice', params: { status: 'ready' } });
+    s.receive(turn(6));
+    expect(notes.map(([m]) => m)).toEqual(['turn', 'speech', 'heard', 'voice', 'turn']);
+    // A replayed seq is still dropped, proving the live frames did not move it.
+    s.receive(turn(6));
+    expect(notes).toHaveLength(5);
+  });
+
+  it('drops a live notification that does not match its schema', async () => {
+    const { s, notes } = await online();
+    s.receive({ jsonrpc: '2.0', method: 'speech', params: { turn: 't1' } });
+    s.receive({ jsonrpc: '2.0', method: 'heard', params: { event: 'mumble' } });
+    expect(notes).toEqual([]);
+  });
+
+  it('mic sends little-endian int16 as base64 and survives a round trip', async () => {
+    const { client, s } = await online();
+    const pcm = Int16Array.of(0, 1, -1, 32767, -32768);
+    expect(client.mic(pcm)).toBe(true);
+    const frame = s.sent[1]!;
+    expect(frame.method).toBe('mic');
+    expect(frame.id).toBeUndefined();
+    const bytes = Uint8Array.from(atob(frame.params.pcm), (c) => c.charCodeAt(0));
+    expect(Array.from(bytes)).toEqual([0, 0, 1, 0, 255, 255, 255, 127, 0, 128]);
+    expect(Array.from(new Int16Array(bytes.buffer))).toEqual(Array.from(pcm));
+  });
+
+  it('mic, unlisten and hush are dropped while offline', () => {
+    const { client, sockets } = setup();
+    client.start();
+    expect(client.mic(Int16Array.of(1))).toBe(false);
+    client.unlisten();
+    client.hush();
+    expect(sockets[0]!.sent).toEqual([]);
+  });
+
+  it('unlisten and hush send empty notifications', async () => {
+    const { client, s } = await online();
+    client.unlisten();
+    client.hush();
+    expect(s.sent.slice(1)).toEqual([
+      { jsonrpc: '2.0', method: 'unlisten', params: {} },
+      { jsonrpc: '2.0', method: 'hush', params: {} },
+    ]);
+  });
+
+  it('listen sends a request and resolves on the empty result', async () => {
+    const { client, s } = await online();
+    const p = client.listen('held');
+    const req = s.sent[1]!;
+    expect(req).toMatchObject({ method: 'listen', params: { mode: 'held' } });
+    s.receive({ jsonrpc: '2.0', id: req.id, result: {} });
+    await expect(p).resolves.toBeUndefined();
+  });
+
+  it('listen rejects with the brain error when voice is unavailable', async () => {
+    const { client, s } = await online();
+    const p = client.listen('always');
+    s.receive({
+      jsonrpc: '2.0',
+      id: s.sent[1]!.id,
+      error: { code: -32601, message: 'Unknown method: listen' },
+    });
+    await expect(p).rejects.toMatchObject({ code: -32601 });
+  });
+
+  it('listen rejects BrainOffline when not online', async () => {
+    const { client } = setup();
+    await expect(client.listen('held')).rejects.toBeInstanceOf(BrainOffline);
+  });
+
+  it('say carries voice and speed', async () => {
+    const { client, s } = await online();
+    void client.say({ text: 'hi', spoken: true, voice: 'bm_george', speed: 1.2 });
+    expect(s.sent[1]!.params).toEqual({ text: 'hi', spoken: true, voice: 'bm_george', speed: 1.2 });
+  });
+});

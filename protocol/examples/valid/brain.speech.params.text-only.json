@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "speech",
+  "params": { "turn": "t1", "text": "That is a missing import." }
+}

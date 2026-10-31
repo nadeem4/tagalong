@@ -52,6 +52,7 @@ from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import brain_tools, expert_tools, home_tools, question_tools, timer_tools
+from brain.voice import VoiceHooks
 
 log = logging.getLogger("brain")
 
@@ -79,6 +80,8 @@ class Session:
         masker: Masker | None = None,
     ) -> None:
         self._model = model
+        # Set by main when voice is built; None answers `listen` with method_not_found.
+        self.voice: VoiceHooks | None = None
         self._budget = budget
         self._bodies = bodies
         self._step_cap = step_cap

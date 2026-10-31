@@ -1,0 +1,1 @@
+{ "jsonrpc": "2.0", "method": "heard", "params": { "event": "final", "text": "hey scout" } }
