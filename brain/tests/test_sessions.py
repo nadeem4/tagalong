@@ -1406,3 +1406,126 @@ async def test_tab_event_reaches_the_next_turns_system_prompt():
     system = model.systems[0]
     assert '; tab: "Docs" https://a.example' in system
     assert 'last download: "a.pdf" (complete)' in system
+
+
+# --- spoken turns: a `spoken` say's reply goes to the voice, for the body showing it (15c) ---
+
+
+class RecordingVoice:
+    def __init__(self):
+        self.calls = []
+
+    def spoken(self, turn, body_id, voice, speed):
+        self.calls.append(("spoken", turn, body_id, voice, speed))
+
+    def reply(self, turn, body_id, params):
+        self.calls.append(("reply", turn, body_id, params))
+
+    def turn_ended(self, turn):
+        self.calls.append(("ended", turn))
+
+
+def spoken_say(text="hi", **kw):
+    return SayParams(text=text, spoken=True, **kw)
+
+
+def kinds_of(voice):
+    return [c[0] for c in voice.calls]
+
+
+async def test_a_spoken_say_sends_its_reply_to_the_voice_with_its_body():
+    session, sent = make(Gate(["hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    result = session.say("desktop", spoken_say(voice="af_bella", speed=1.2))
+    await finish_quietly(session)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", "af_bella", 1.2)
+    replies = [c[3] for c in voice.calls if c[0] == "reply"]
+    assert replies == [
+        {"turn": result.turn, "body": "desktop", "delta": "hello"},
+        {"turn": result.turn, "body": "desktop", "done": True},
+    ]
+    assert kinds_of(voice)[-1] == "ended" and voice.calls[-1][1] == result.turn
+    assert [p["delta"] for m, p in sent if m == "reply" and "delta" in p] == [
+        "hello"
+    ]  # still shown
+
+
+async def test_a_spoken_say_from_a_display_less_body_speaks_on_the_displaying_body():
+    session, _ = make(Gate(["a", "b"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    session.say("browser", spoken_say("from the page"))
+    await finish_quietly(session)
+    assert voice.calls[0][2] == "desktop"
+    assert {c[2] for c in voice.calls if c[0] == "reply"} == {"desktop"}
+
+
+async def test_a_typed_say_never_reaches_the_voice():
+    session, _ = make(Gate(["hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    assert voice.calls == []
+
+
+async def test_a_spoken_say_joining_a_typed_turn_makes_it_spoken_from_then_on():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    first = session.say("desktop", say("typed"))
+    assert voice.calls == []
+    joined = session.say("desktop", spoken_say("spoken"))
+    assert joined.joined is True
+    assert voice.calls == [("spoken", first.turn, "desktop", None, None)]
+    gate.set()
+    await finish_quietly(session)
+    assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
+
+
+async def test_every_spoken_say_on_a_running_turn_reaches_the_voice():
+    """After a hush the voice drops the turn; a later joined spoken say must re-arm it, so the
+    session may not remember the turn as already spoken."""
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    first = session.say("desktop", spoken_say("one"))
+    session.say("desktop", spoken_say("two"))  # joins; the voice was hushed in between
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_a_cancelled_spoken_turn_still_ends_in_the_voice():
+    session, _ = make(Gate([asyncio.Event(), "never"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    result = session.say("desktop", spoken_say())
+    await asyncio.sleep(0)
+    session.cancel(result.turn)
+    await finish_quietly(session)
+    assert voice.calls[-1] == ("ended", result.turn)
+
+
+async def test_a_spoken_say_with_no_voice_behaves_as_before():
+    session, sent = make(Gate(["hello"]))
+    join(session, "desktop")
+    session.say("desktop", spoken_say())
+    await finish_quietly(session)
+    assert sent[-1][1]["reason"] == "done"
+
+
+async def test_a_spoken_say_with_no_displaying_body_is_not_spoken():
+    session, _ = make(Gate(["hello"]))
+    session.voice = voice = RecordingVoice()
+    join_headless(session)
+    session.say("browser", spoken_say())
+    await finish_quietly(session)
+    assert voice.calls == []

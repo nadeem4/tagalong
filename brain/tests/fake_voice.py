@@ -78,5 +78,32 @@ class FixedTurn:
         return self.scores.pop(0) if len(self.scores) > 1 else self.scores[0]
 
 
+class FakeTts:
+    """Speaks 100 quiet samples at 24 kHz for any text; records what it was asked, and on
+    which thread, so a test can tell the event loop was left free."""
+
+    def __init__(self, sleep: float = 0.0) -> None:
+        self.calls: list[tuple[str, str, float]] = []
+        self.threads: list[int] = []
+        self.sleep = sleep
+        self.active = 0
+        self.max_active = 0  # most synth calls ever running at once
+
+    def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
+        import threading
+        import time
+
+        self.threads.append(threading.get_ident())
+        self.calls.append((text, voice, speed))
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        try:
+            if self.sleep:
+                time.sleep(self.sleep)
+        finally:
+            self.active -= 1
+        return np.full(100, 7, dtype=np.int16), 24_000
+
+
 def parts(*scores: float, vad: LevelVad | None = None, fail_turn: bool = False) -> EarsParts:
     return EarsParts(vad or LevelVad(), WordStt(), FixedTurn(*scores, fail=fail_turn))

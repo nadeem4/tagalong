@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "agent-client-protocol==0.12.1",
     "anthropic>=2.3.0",
+    "kokoro-onnx>=0.6.1",
     "mcp==2.3.0",
     "moonshine-voice==0.1.5",
     "numpy>=2.5.4",

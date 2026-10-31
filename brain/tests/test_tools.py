@@ -1,5 +1,6 @@
 """Tests for the memory tools: schemas, dispatch, recall formatting and size cap."""
 
+import base64
 import datetime
 import json
 import re
@@ -22,6 +23,7 @@ from brain.tools import (
     home_tools,
     question_tools,
     timer_tools,
+    voice_tools,
 )
 
 
@@ -691,3 +693,47 @@ async def test_answer_expert_refusals_reach_the_model_as_text(qrun):
         await qrun("answer_expert", {"question": "q1", "answers": "x"})
     with pytest.raises(MemoryRefused, match="pass_question needs"):
         await qrun("pass_question", {})
+
+
+class SampleVoice:
+    async def sample(self, text, voice, speed):
+        return b"RIFF" + f"{text}|{voice}|{speed}".encode()
+
+
+def voice_handler(voice):
+    return {spec.name: handler for spec, handler in voice_tools(lambda: voice)}["speak_sample"]
+
+
+async def test_speak_sample_returns_a_wav_for_settings_preview():
+    out = json.loads(
+        await voice_handler(SampleVoice())({"text": "Hello", "voice": "af_bella", "speed": 1.1})
+    )
+    assert out["mime"] == "audio/wav"
+    assert base64.b64decode(out["data"]) == b"RIFFHello|af_bella|1.1"
+
+
+async def test_speak_sample_without_voice_is_an_error():
+    with pytest.raises(RpcError, match="Voice is not running") as err:
+        await voice_handler(None)({"text": "Hello"})
+    assert err.value.code == ErrorCode.tool_failed
+
+
+async def test_speak_sample_reports_a_voice_that_cannot_start_as_an_error():
+    class Broken:
+        async def sample(self, text, voice, speed):
+            raise RuntimeError("no model")
+
+    with pytest.raises(RpcError, match="could not start") as err:
+        await voice_handler(Broken())({"text": "Hello"})
+    assert err.value.code == ErrorCode.tool_failed
+
+
+async def test_speak_sample_refuses_a_long_text():
+    with pytest.raises(RpcError, match="500") as err:
+        await voice_handler(SampleVoice())({"text": "x" * 501})
+    assert err.value.code == ErrorCode.invalid_params
+
+
+def test_speak_sample_is_a_home_only_tool():
+    ((spec, _),) = voice_tools(lambda: None)
+    assert spec.name == "speak_sample" and set(spec.audience) == {"home"}

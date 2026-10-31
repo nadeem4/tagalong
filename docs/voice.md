@@ -9,10 +9,11 @@ configured brain still answers: a heard question goes to the brain as an ordinar
 `spoken: true`.
 
 > **Moving to the brain.** The brain now has its own ears (Silero, Moonshine, Smart Turn; see
-> [Brain ears](brain.md#brain-ears)). This document still describes what the desktop does today:
-> its voice utility process and `LocalEars` stay in use until the desktop is switched over, and
-> Kokoro speech moves to the brain after that. The pipeline in "The ears" below is the same one
-> the brain runs.
+> [Brain ears](brain.md#brain-ears)) and its own mouth (Kokoro; see
+> [Brain mouth](brain.md#brain-mouth)): it sends a spoken reply as `speech` frames and the
+> sentence rules in `speakable.py` are a port of the ones below. This document still describes
+> what the desktop does today: its voice utility process, `LocalEars` and Kokoro stay in use until
+> the desktop is switched over. The pipeline in "The ears" below is the same one the brain runs.
 
 ## Where it lives
 

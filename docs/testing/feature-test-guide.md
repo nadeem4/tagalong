@@ -1509,6 +1509,19 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    (c) one `[listening] paused: a full-screen window in front (<app>)` line and one
    `[listening] resumed` line, with the app's process name and never a window title.
 
+## Brain voice _(hand check, no body yet)_
+
+### V.1. The brain speaks a sentence with Kokoro
+
+The desktop does not use the brain's voice yet (a later slice switches it over), so this runs
+from a terminal.
+
+1. **Action:** in `brain/`, run `uv run python tests/voice_smoke.py` (the first run downloads
+   about 120 MB into `%USERPROFILE%\.tagalong\voice\tts\kokoro`).
+2. **Expected:** it prints the load time, then for each of two sentences the time it took, the
+   seconds of audio and the real-time factor; it writes `voice_smoke.wav`, which plays as the same
+   British voice (`bm_george`) saying both sentences, clearly, with no clipping.
+
 ## Not supported
 
 Do not test these here.

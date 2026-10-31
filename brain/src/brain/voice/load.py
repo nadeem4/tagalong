@@ -6,12 +6,13 @@ the brain never pays for them until somebody first listens.
 
 import asyncio
 import urllib.request
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
-from brain.voice import moonshine, silero, smart_turn
+from brain.voice import kokoro, moonshine, silero, smart_turn
 from brain.voice.ears import EarsParts
-from brain.voice.models import EARS_FILES, ensure_files
+from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
+from brain.voice.mouth import Tts
 from brain.voice.service import LoadEars
 
 CHUNK = 1 << 20
@@ -51,3 +52,13 @@ def ears_loader(data_dir: Path) -> LoadEars:
         return EarsParts(vad, stt, turn)
 
     return load_ears
+
+
+def tts_loader(data_dir: Path) -> Callable[[], Awaitable[Tts]]:
+    folder = data_dir / "voice"
+
+    async def load_tts() -> Tts:
+        await ensure_files(folder, KOKORO_FILES, fetch, lambda _f: None)
+        return await asyncio.to_thread(kokoro.load, folder)
+
+    return load_tts

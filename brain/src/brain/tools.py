@@ -1,12 +1,15 @@
 """The brain's own tools as specs plus handlers for a BrainSource.
 
 Scout's memory tools (remember, recall, forget), the Claude Code hand-off tools, and Home-only
-tools (audience {"home"}, never offered to the model) that return one JSON string. Refusals
+tools (audience {"home"}, never offered to the model) that return one JSON string, among them
+speak_sample for Settings' voice Preview. Refusals
 and bad arguments raise; run_turn turns any exception into an is_error tool result the model
 reads. Handlers that change what Home shows send `changed` through the notify they are given.
 """
 
+import base64
 import json
+import logging
 import math
 import re
 from collections.abc import Callable
@@ -20,10 +23,14 @@ from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import Handler, Toolbox, ToolSpec
+from brain.voice import VoiceHooks
+
+log = logging.getLogger("brain")
 
 Notify = Callable[[str, dict], None]
 LIST_MEMORIES_MAX = 200
 TIMER_NOTE_MAX = 500
+SAMPLE_MAX_CHARS = 500  # a Preview line, not a reading
 # One year; keeps now + timedelta far from datetime overflow.
 TIMER_MAX_MINUTES = 525600
 
@@ -562,4 +569,48 @@ def question_tools(questions: ScoutQuestions) -> list[tuple[ToolSpec, Handler]]:
             ),
             pass_question,
         ),
+    ]
+
+
+def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, Handler]]:
+    """Home-only: a spoken sample for Settings' Preview. The voice is a getter because the
+    session gets its voice after it is built."""
+
+    async def speak_sample(args: dict) -> str:
+        hooks = voice()
+        if hooks is None:
+            raise RpcError(ErrorCode.tool_failed, "Voice is not running on this brain.")
+        _need_text("speak_sample", args, "text")
+        if len(args["text"]) > SAMPLE_MAX_CHARS:
+            raise RpcError(
+                ErrorCode.invalid_params,
+                f"speak_sample text is at most {SAMPLE_MAX_CHARS} characters.",
+            )
+        try:
+            wav = await hooks.sample(args["text"], args.get("voice"), args.get("speed"))
+        except Exception as err:
+            log.warning("speak_sample failed", exc_info=True)
+            raise RpcError(ErrorCode.tool_failed, "The speaking voice could not start.") from err
+        # Home calls answer in text, so the WAV travels as base64 inside it.
+        return json.dumps({"mime": "audio/wav", "data": base64.b64encode(wav).decode("ascii")})
+
+    return [
+        (
+            ToolSpec(
+                "speak_sample",
+                "Say a short sample in the speaking voice, as a WAV, for Settings' Preview.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "voice": {"type": "string"},
+                        "speed": {"type": "number"},
+                    },
+                    "required": ["text"],
+                },
+                frozenset({"home"}),
+                effect="read",
+            ),
+            speak_sample,
+        )
     ]
