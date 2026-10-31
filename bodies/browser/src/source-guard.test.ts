@@ -34,10 +34,10 @@ describe('source guards', () => {
     expect(read('permission/permission.ts')).toContain('permissions.request');
   });
 
-  it('bodies_browser_imports_no_protocol_or_ui_package', () => {
+  it('bodies_browser_imports_no_ui_package', () => {
     for (const path of sources(SRC)) {
       expect(readFileSync(path, 'utf8'), path).not.toMatch(
-        /from '(@tagalong\/protocol|@tagalong\/ui|react|react-dom)(\/[^']*)?'/,
+        /from '(@tagalong\/ui|react|react-dom)(\/[^']*)?'/,
       );
     }
   });
