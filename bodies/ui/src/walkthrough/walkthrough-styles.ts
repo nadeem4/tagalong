@@ -81,6 +81,13 @@ export const WALKTHROUGH_CSS = `
 .wt-examples li:first-child { border-top: 0; }
 .wt-examples q { display: block; font-size: 15px; font-weight: ${t.fontWeight.semibold}; quotes: none; }
 
+.wt-code { display: inline-block; max-width: 100%; margin-top: 6px; padding: 4px 8px; border-radius: 6px; background: ${t.color.panelTile}; font-family: ui-monospace, Consolas, monospace; font-size: ${t.fontSize.small}px; overflow-wrap: anywhere; user-select: all; }
+.wt-note h3 { margin: 0; font-size: 14px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
+.wt-numbered { counter-reset: wt-n; }
+.wt-numbered li { counter-increment: wt-n; }
+.wt-numbered h3::before { content: counter(wt-n) '. '; }
+.wt input[type='number'] { width: 96px; }
+
 /* Controls */
 .wt label { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
 .wt input, .wt select {

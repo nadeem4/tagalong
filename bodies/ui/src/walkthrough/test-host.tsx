@@ -6,7 +6,7 @@
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { vi } from 'vitest';
-import type { KeyStatus } from '../host-bridge';
+import type { KeyResult, KeyStatus } from '../host-bridge';
 import { StepSaveContext } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -32,9 +32,9 @@ export function makeWalkthroughHost(
     keyStatus: vi.fn(() =>
       key === 'offline' ? Promise.reject(new Error('offline')) : Promise.resolve({ ...key }),
     ),
-    setKey: vi.fn(() => Promise.resolve('ok' as const)),
+    setKey: vi.fn((_key: string): Promise<KeyResult> => Promise.resolve('ok')),
     setDailyLimit: vi.fn(() => Promise.resolve()),
-    onBrainChanged: vi.fn(() => () => undefined),
+    onBrainChanged: vi.fn((_handler: (what: string) => void) => () => undefined),
     openWalkthrough: vi.fn(() => Promise.resolve()),
     expertStatus: vi.fn(() => Promise.resolve({ found: true, command: 'claude-agent-acp' })),
     finishWalkthrough: vi.fn(() => Promise.resolve()),
@@ -42,6 +42,10 @@ export function makeWalkthroughHost(
     saveSettings: vi.fn((_patch: unknown) => Promise.resolve()),
     previewVoice: vi.fn((_options: unknown) => Promise.resolve()),
     listMicrophones: vi.fn(() => Promise.resolve([{ id: 'mic-1', label: 'Desk microphone' }])),
+    browserFolder: vi.fn(() => Promise.resolve({ path: 'C:/app/browser/dist', exists: true })),
+    showBrowserFolder: vi.fn(() => Promise.resolve()),
+    copyText: vi.fn((_text: string) => Promise.resolve()),
+    openHome: vi.fn(() => Promise.resolve()),
   } satisfies WalkthroughHost;
 }
 

@@ -1,6 +1,6 @@
 /**
  * What the walkthrough needs from its host: the key calls it shares with Settings, the expert
- * check, finishing the tour, and the settings and voice calls steps 4 and 5 use. Contains
+ * check, finishing the tour, and the settings, voice, browser-folder and Home calls the steps use. Contains
  * WalkthroughHost and WalkthroughSettings.
  */
 
@@ -47,4 +47,10 @@ export type WalkthroughHost = Pick<
   saveSettings(patch: Partial<WalkthroughSettings>): Promise<unknown>;
   previewVoice(preview: VoicePreview): Promise<void>;
   listMicrophones(): Promise<{ id: string; label: string }[]>;
+  /** Where the browser add-on's folder is (step 7). */
+  browserFolder(): Promise<{ path: string; exists: boolean }>;
+  showBrowserFolder(): Promise<void>;
+  copyText(text: string): Promise<void>;
+  /** Opens Home (the finish card's Open Home). */
+  openHome(): Promise<void>;
 };

@@ -115,3 +115,49 @@ describe('Walkthrough', () => {
     await waitFor(() => expect(heading).toHaveFocus());
   });
 });
+
+describe('Walkthrough, the end', () => {
+  it('shows the placeholder-free steps 6 to 9', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 6);
+    await screen.findByText(/connector is installed/);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'Let Scout read your browser tabs' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'You stay in charge' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'Add your Anthropic API key' });
+    expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
+  });
+
+  it('Finish is off on step 9 until the key is set, and has no Skip for now', async () => {
+    open(makeWalkthroughHost(), 9);
+    await screen.findByText(/Saved on this computer in/);
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Skip for now' })).not.toBeInTheDocument();
+  });
+
+  it('Finish with a key opens the finish card; Close finishes once, Open Home opens Home first', async () => {
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    expect(host.finishWalkthrough).not.toHaveBeenCalled();
+    expect(screen.getByText('Ctrl+Shift+Space')).toBeInTheDocument();
+    expect(screen.getByText('Right Ctrl')).toBeInTheDocument();
+    const close = screen.getByRole('button', { name: 'Close' });
+    fireEvent.click(close);
+    fireEvent.click(close);
+    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(1));
+    expect(host.openHome).not.toHaveBeenCalled();
+  });
+
+  it('Open Home on the card opens Home and finishes the tour', async () => {
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
+    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(1));
+    expect(host.openHome).toHaveBeenCalledTimes(1);
+  });
+});
