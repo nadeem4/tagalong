@@ -8,12 +8,13 @@ import { useEffect } from 'react';
 import { KeyField } from '../key/key-field';
 import { useKeyStatus } from '../key/use-key-status';
 import type { KeyHost } from '../key/use-key-status';
+import type { WalkthroughHost } from './walkthrough-host';
 
 export function StepNine({
   host,
   onValid,
 }: {
-  host: KeyHost;
+  host: KeyHost & Pick<WalkthroughHost, 'openKeyPage'>;
   /** Called with whether Finish may be on; false while offline or until the key is good. */
   onValid: (valid: boolean) => void;
 }) {
@@ -35,7 +36,10 @@ export function StepNine({
       <div style={{ marginTop: 24, maxWidth: 520 }}>
         <KeyField host={host} onSaved={refresh} />
         <p className="wt-help">
-          In the Anthropic Console, open API keys and choose Create key. It starts with sk-ant-.
+          In the Anthropic Console, open API keys and choose Create key. It starts with sk-ant-.{' '}
+          <button type="button" className="wt-link" onClick={() => void host.openKeyPage()}>
+            Where do I get one?
+          </button>
         </p>
       </div>
       <div className="wt-note">
@@ -45,7 +49,7 @@ export function StepNine({
           file and never writes it to Scout’s history or logs.
         </p>
         {facts !== null && facts.source !== 'environment' && (
-          <p className="wt-help">Saved on this computer in {facts.envPath}</p>
+          <p className="wt-help">Saved on the machine running Scout’s brain in {facts.envPath}</p>
         )}
         {facts !== null && (
           <p className="wt-help">

@@ -42,6 +42,13 @@ describe('registerWalkthroughIpc', () => {
     expect(closed()).toBe(1);
   });
 
+  it('finish with close: false sets done and leaves the window open', async () => {
+    const { invoke, saved, closed } = setup();
+    await invoke(IPC.walkthroughFinish, { close: false });
+    expect(saved).toEqual([{ walkthrough: { done: true } }]);
+    expect(closed()).toBe(0);
+  });
+
   it('closing the window does not set done', async () => {
     // Closing is the window's own event; only finish writes done: true.
     const { invoke, saved } = setup();

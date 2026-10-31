@@ -817,7 +817,10 @@ function registerIpc(): void {
   });
   registerScoutIpc(handle);
   registerSpendIpc(handle, { brain: required().brain });
-  registerKeyIpc(handle, { brain: required().brain });
+  registerKeyIpc(handle, {
+    brain: required().brain,
+    openExternal: (url) => shell.openExternal(url),
+  });
   registerWalkthroughIpc(handle, {
     save: (patch) => {
       const saved = required().settingsStore.set(patch);

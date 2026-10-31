@@ -1,6 +1,6 @@
 /** Tests for step 8: the daily limit starts at the brain's value and saves only on Next. */
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StepEight } from './step-eight';
 import { makeWalkthroughHost, mountStep, NO_KEY } from './test-host';
@@ -22,6 +22,7 @@ describe('StepEight', () => {
     const host = makeWalkthroughHost();
     const step = mountStep(<StepEight host={host} />);
     await screen.findByDisplayValue('5');
+    await waitFor(() => expect(step.registered()).toBe(true));
     fireEvent.change(limit(), { target: { value: '8.5' } });
     expect(host.setDailyLimit).not.toHaveBeenCalled();
     await step.save();
@@ -42,6 +43,7 @@ describe('StepEight', () => {
     const host = makeWalkthroughHost();
     const step = mountStep(<StepEight host={host} />);
     await screen.findByDisplayValue('5');
+    await waitFor(() => expect(step.registered()).toBe(true));
     await step.save();
     expect(host.setDailyLimit).not.toHaveBeenCalled();
   });
@@ -50,6 +52,7 @@ describe('StepEight', () => {
     const host = makeWalkthroughHost();
     const step = mountStep(<StepEight host={host} />);
     await screen.findByDisplayValue('5');
+    await waitFor(() => expect(step.registered()).toBe(true));
     for (const bad of ['0', '-3', '', 'abc']) {
       fireEvent.change(limit(), { target: { value: bad } });
       const failure = await step.save().then(

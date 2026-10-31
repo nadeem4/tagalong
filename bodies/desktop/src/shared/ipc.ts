@@ -106,6 +106,7 @@ export const IPC = {
   approvedEvent: 'tagalong:approved-event',
   // The Anthropic key and the daily limit: thin calls to the brain. The key is never returned.
   keyStatus: 'tagalong:key:status',
+  keyOpenPage: 'tagalong:key:open-page',
   keySet: 'tagalong:key:set',
   limitSet: 'tagalong:limit:set',
   expertStatus: 'tagalong:expert:status',
@@ -320,8 +321,11 @@ export interface TagalongHostApi {
   onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
   /** Whether the expert's command is on the brain's PATH (the walkthrough's Claude Code step). */
   expertStatus(): Promise<ExpertStatus>;
+  /** Opens Anthropic's Console key page in the browser (a fixed address, chosen by main). */
+  openKeyPage(): Promise<void>;
   /** Finish or Skip: marks the walkthrough seen and closes its window. */
-  finishWalkthrough(): Promise<void>;
+  /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
+  finishWalkthrough(options?: { close?: boolean }): Promise<void>;
   /** Sets or clears one of the panel's own marks: the mic failing, or Say “Scout”. */
   setStatusMark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): Promise<void>;
 }

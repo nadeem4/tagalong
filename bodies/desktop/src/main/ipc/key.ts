@@ -13,7 +13,12 @@ import type { IpcHandle } from './handle';
 
 interface KeyIpcDeps {
   brain: BrainCall;
+  /** Opens an address in the user's browser (shell.openExternal). */
+  openExternal: (url: string) => Promise<void>;
 }
+
+// Fixed here, never taken from the renderer, so a compromised page cannot open anything else.
+const KEY_PAGE = 'https://console.anthropic.com/settings/keys';
 
 const RESULTS = ['ok', 'invalid', 'unreachable'] as const;
 
@@ -41,8 +46,9 @@ export async function readKeyStatus(brain: BrainCall): Promise<KeyStatus> {
   };
 }
 
-export function registerKeyIpc(handle: IpcHandle, { brain }: KeyIpcDeps): void {
+export function registerKeyIpc(handle: IpcHandle, { brain, openExternal }: KeyIpcDeps): void {
   handle(IPC.keyStatus, () => readKeyStatus(brain));
+  handle(IPC.keyOpenPage, () => openExternal(KEY_PAGE));
 
   // The key is a parameter, never a variable that outlives the call; errors are rebuilt
   // from fixed text so nothing the brain or the socket says can carry it back.

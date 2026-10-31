@@ -168,10 +168,11 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
   await launchWith({ hasKey: false, keyResults: ['invalid', 'ok'] });
   const tour = await windowFor('walkthrough');
   await tour.getByRole('button', { name: 'Skip tour' }).click();
-  await expect(tour.getByText(/Saved on this computer in/)).toBeVisible({ timeout: 30_000 });
+  await expect(tour.getByText(/Saved on the machine running/)).toBeVisible({ timeout: 30_000 });
 
   await pasteAndCheck(tour);
   await expect(tour.getByText('That key was not accepted.')).toBeVisible();
+  expect(brain!.keyAttempts).toBe(1);
   await expect(tour.getByLabel('API key')).toHaveValue(FAKE_KEY);
   await expect(tour.getByRole('button', { name: 'Finish' })).toBeDisabled();
 
@@ -189,6 +190,33 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
   await expect(home.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  // Actually change the key there: one more check reaches the brain, and still no key on disk.
+  await home.getByLabel('API key').fill(FAKE_KEY);
+  await home.getByRole('button', { name: 'Check key' }).click();
+  await expect.poll(() => brain!.keyAttempts).toBe(3);
+  expect(settingsFile()).not.toContain(FAKE_KEY);
+});
+
+test('Finish marks the tour seen at once, so closing the card with X never brings it back', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 9);
+  await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  await tour.getByRole('button', { name: 'Finish' }).click();
+  await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
+  await expect.poll(tourDone, { timeout: 15_000 }).toBe(true);
+
+  // The window's own X, not the card's Close button.
+  await app!.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().includes('walkthrough.html'))
+      ?.close(),
+  );
+  await closeApp(app);
+  await launch(brain!.addr, [], dataDir);
+  await windowFor('avatar');
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  expect(app!.windows().some((w) => w.url().includes('walkthrough.html'))).toBe(false);
 });
 
 test('brain offline at step 9 says so, then recovers when the brain starts', async () => {

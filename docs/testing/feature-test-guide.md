@@ -1631,13 +1631,15 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    not reach Anthropic. Try again." and Finish stays off.
 5. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
    Finish off; start the brain and Check turns on by itself. The step never says to edit a file;
-   it shows where the brain saved the key.
+   it shows where the machine running Scout's brain saved the key.
 6. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
    step 9 reads "Set by your environment" and Finish is on.
 7. **Action:** press **Finish**. **Expected:** the card "Scout is on your screen" shows the ask
-   and talk keys. **Close** (or **Open Home**) ends the tour: the pet appears and the tour does
-   not open at the next launch. Closing the window with the X instead brings the pet back and the
-   tour returns at the next launch.
+   and talk keys, and the tour is marked seen at once. **Close** (or **Open Home**) closes the
+   window and the pet appears; closing the card with the window's X does the same. Either way the
+   tour does not open at the next launch (closing part-way, before Finish, brings it back).
+8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
+   Anthropic Console API keys page.
 
 ## Not supported
 

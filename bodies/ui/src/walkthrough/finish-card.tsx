@@ -1,6 +1,6 @@
 /**
- * The card after Finish: where Scout is and the keys to use it. Close (or Open Home) is what
- * marks the tour seen, in the shell. Contains FinishCard. Words are the spec's last card.
+ * The card after Finish: where Scout is and the keys to use it. Finish already marked the tour
+ * seen; Close and Open Home only close the window. Contains FinishCard. Words are the spec's last card.
  */
 
 interface FinishCardProps {
@@ -9,9 +9,11 @@ interface FinishCardProps {
   talkKey: string;
   onOpenHome: () => void;
   onClose: () => void;
+  /** Why closing failed, if it did. */
+  error?: string;
 }
 
-export function FinishCard({ askKey, talkKey, onOpenHome, onClose }: FinishCardProps) {
+export function FinishCard({ askKey, talkKey, onOpenHome, onClose, error }: FinishCardProps) {
   return (
     <>
       <div className="wt-body">
@@ -27,6 +29,11 @@ export function FinishCard({ askKey, talkKey, onOpenHome, onClose }: FinishCardP
         </section>
       </div>
       <footer className="wt-footer">
+        {error ? (
+          <p className="wt-error" role="alert">
+            {error}
+          </p>
+        ) : null}
         <span className="wt-spacer" />
         <button type="button" className="wt-quiet" onClick={onOpenHome}>
           Open Home

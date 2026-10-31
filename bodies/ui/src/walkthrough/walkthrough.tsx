@@ -123,23 +123,37 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
       () => false,
     );
     const outcome = skipTour(hasKey);
-    if (outcome === 'close') await host.finishWalkthrough();
-    else go(outcome.goTo);
+    if (outcome !== 'close') return go(outcome.goTo);
+    try {
+      await host.finishWalkthrough();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    }
   }
 
+  // Finish marks the tour seen right away (the window stays for the card), so closing the card
+  // with the window's own X never brings the tour back.
   async function finish(): Promise<void> {
     setBusy(true);
-    setFinishKeysShown(await finishKeys(host));
-    setBusy(false);
+    try {
+      await host.finishWalkthrough({ close: false });
+      setFinishKeysShown(await finishKeys(host));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  // Close and Open Home both end the tour; a second click while the window closes does nothing.
+  // Close and Open Home only close now; a second click while the window closes does nothing.
   async function close(openHome: boolean): Promise<void> {
     if (closing.current) return;
     closing.current = true;
     try {
       if (openHome) await host.openHome().catch(() => undefined);
       await host.finishWalkthrough();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
       closing.current = false;
     }
@@ -158,6 +172,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
             talkKey={finishKeysShown.talk}
             onOpenHome={() => void close(true)}
             onClose={() => void close(false)}
+            error={error}
           />
         ) : (
           <>

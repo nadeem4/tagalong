@@ -29,7 +29,8 @@ const walkthroughHost: WalkthroughHost = {
   onBrainChanged: bridge.onBrainChanged,
   openWalkthrough: bridge.openWalkthrough,
   expertStatus: () => host.expertStatus(),
-  finishWalkthrough: () => host.finishWalkthrough(),
+  openKeyPage: () => host.openKeyPage(),
+  finishWalkthrough: (options) => host.finishWalkthrough(options),
   getSettings: async () => (await host.getHostView()).settings,
   // Main validates the patch; the steps send plain strings the form already limited.
   saveSettings: (patch) => host.saveSettings(patch as SettingsPatch),

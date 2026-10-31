@@ -68,6 +68,7 @@ export const WALKTHROUGH_CSS = `
 .wt-example { background: ${t.color.page}; color: ${t.color.text}; border: 1px solid ${t.color.fieldLine}; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .wt-example p { margin: 0; font-size: ${t.fontSize.small}px; line-height: 1.45; }
 .wt-chip { align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: #222845; color: #C9CEE0; font-size: ${t.fontSize.min}px; }
+.wt-link { background: none; border: 0; padding: 0; color: ${t.color.panelText}; font-size: inherit; text-decoration: underline; cursor: pointer; }
 .wt-fake-button { align-self: flex-end; padding: 4px 10px; border: 1px solid ${t.color.fieldLine}; border-radius: 6px; color: #C9CEE0; font-size: ${t.fontSize.small}px; }
 .wt-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; background: ${t.color.panelTile}; color: ${t.color.chipFreeInk}; font-size: ${t.fontSize.min}px; font-weight: ${t.fontWeight.semibold}; }
 .wt-tag--now { background: ${t.color.okFill}; color: ${t.color.okInk}; }

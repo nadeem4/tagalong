@@ -131,7 +131,7 @@ describe('Walkthrough, the end', () => {
 
   it('Finish is off on step 9 until the key is set, and has no Skip for now', async () => {
     open(makeWalkthroughHost(), 9);
-    await screen.findByText(/Saved on this computer in/);
+    await screen.findByText(/Saved on the machine running/);
     expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Skip for now' })).not.toBeInTheDocument();
   });
@@ -141,14 +141,30 @@ describe('Walkthrough, the end', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
-    expect(host.finishWalkthrough).not.toHaveBeenCalled();
+    // Finish marks the tour seen at once, without closing, so closing the card with X is safe.
+    expect(host.finishWalkthrough).toHaveBeenCalledTimes(1);
+    expect(host.finishWalkthrough).toHaveBeenCalledWith({ close: false });
     expect(screen.getByText('Ctrl+Shift+Space')).toBeInTheDocument();
     expect(screen.getByText('Right Ctrl')).toBeInTheDocument();
     const close = screen.getByRole('button', { name: 'Close' });
     fireEvent.click(close);
     fireEvent.click(close);
-    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(1));
+    // Once to mark the tour seen (no close), once to close; the double click closes once.
+    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(2));
+    expect(host.finishWalkthrough).toHaveBeenLastCalledWith();
     expect(host.openHome).not.toHaveBeenCalled();
+  });
+
+  it('a failure while closing shows an alert instead of an unhandled rejection', async () => {
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    host.finishWalkthrough.mockImplementation((options?: { close?: boolean }) =>
+      options?.close === false ? Promise.resolve() : Promise.reject(new Error('Could not close.')),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not close.');
   });
 
   it('Open Home on the card opens Home and finishes the tour', async () => {
@@ -157,7 +173,7 @@ describe('Walkthrough, the end', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
-    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(2));
     expect(host.openHome).toHaveBeenCalledTimes(1);
   });
 });

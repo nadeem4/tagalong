@@ -38,6 +38,7 @@ export function makeWalkthroughHost(
     openWalkthrough: vi.fn(() => Promise.resolve()),
     expertStatus: vi.fn(() => Promise.resolve({ found: true, command: 'claude-agent-acp' })),
     finishWalkthrough: vi.fn(() => Promise.resolve()),
+    openKeyPage: vi.fn(() => Promise.resolve()),
     getSettings: vi.fn(() => Promise.resolve(options.settings ?? SETTINGS)),
     saveSettings: vi.fn((_patch: unknown) => Promise.resolve()),
     previewVoice: vi.fn((_options: unknown) => Promise.resolve()),
@@ -50,12 +51,16 @@ export function makeWalkthroughHost(
 }
 
 /** Renders one step the way the shell does and returns what Next would call to save it. */
-export function mountStep(step: ReactElement): { save(): Promise<void> } {
+export function mountStep(step: ReactElement): {
+  save(): Promise<void>;
+  /** True once the step has registered its save (effects run after the first paint). */
+  registered(): boolean;
+} {
   let registered: (() => Promise<void>) | null = null;
   render(
     <StepSaveContext.Provider value={(save) => (registered = save)}>
       {step}
     </StepSaveContext.Provider>,
   );
-  return { save: async () => registered?.() };
+  return { save: async () => registered?.(), registered: () => registered !== null };
 }

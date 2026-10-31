@@ -52,8 +52,8 @@ async function paste() {
 describe('StepNine', () => {
   it('reports not valid until the key checks out, then valid', async () => {
     const { onValid } = mount(NO_KEY);
-    await screen.findByText(/Saved on this computer in/);
-    expect(lastValid(onValid)).toBe(false);
+    await screen.findByText(/Saved on the machine running/);
+    await waitFor(() => expect(lastValid(onValid)).toBe(false));
     await paste();
     fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
     await waitFor(() => expect(lastValid(onValid)).toBe(true));
@@ -62,18 +62,20 @@ describe('StepNine', () => {
   it('is valid when a key is already set', async () => {
     const { onValid } = mount(HAS_KEY);
     await screen.findByText('A key is already set.');
-    expect(lastValid(onValid)).toBe(true);
+    await waitFor(() => expect(lastValid(onValid)).toBe(true));
   });
 
   it('is valid when the key comes from the environment', async () => {
     const { onValid } = mount({ ...HAS_KEY, source: 'environment' });
     await screen.findByText('Set by your environment');
-    expect(lastValid(onValid)).toBe(true);
+    await waitFor(() => expect(lastValid(onValid)).toBe(true));
   });
 
   it('shows where the brain saves the key, and never says to edit .env', async () => {
     const { container } = render(<StepNine host={makeWalkthroughHost()} onValid={vi.fn()} />);
-    expect(await screen.findByText('Saved on this computer in C:/home/.env')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Saved on the machine running Scout’s brain in C:/home/.env'),
+    ).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\b(edit|open|add to|put .* in)\b[^.]*\.env/i);
     expect(screen.getByText(/keeps no copy/)).toBeInTheDocument();
     expect(screen.getByText(/daily limit of \$5/)).toBeInTheDocument();
@@ -113,21 +115,27 @@ describe('StepNine', () => {
   it('a brain that drops after the key was set turns Finish off and says so', async () => {
     const { set, emit, onValid } = mount(HAS_KEY);
     await screen.findByText('A key is already set.');
-    expect(lastValid(onValid)).toBe(true);
+    await waitFor(() => expect(lastValid(onValid)).toBe(true));
     set('offline');
     await emit('link');
-    await screen.findByText('Scout’s brain is not running.', {}, { timeout: 4000 });
+    await screen.findByText('Scout’s brain is not running.');
     await waitFor(() => expect(lastValid(onValid)).toBe(false));
     expect(screen.queryByText('That key was not accepted.')).not.toBeInTheDocument();
   });
 
   it('a changed "key" event refreshes the state', async () => {
     const { set, emit, onValid } = mount(NO_KEY);
-    await screen.findByText(/Saved on this computer in/);
+    await screen.findByText(/Saved on the machine running/);
     set(HAS_KEY);
     await emit('key');
     await screen.findByText('A key is already set.');
-    expect(lastValid(onValid)).toBe(true);
+    await waitFor(() => expect(lastValid(onValid)).toBe(true));
+  });
+
+  it('"Where do I get one?" opens the key page through the host', async () => {
+    const { host } = mount(NO_KEY);
+    fireEvent.click(await screen.findByRole('button', { name: 'Where do I get one?' }));
+    expect(host.openKeyPage).toHaveBeenCalledTimes(1);
   });
 
   it('a double press on Check sends one setKey', async () => {
