@@ -55,7 +55,7 @@ flowchart LR
 
 | Process                | Entry point                                    | What runs there                                                                                                                                                                                   |
 | ---------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main          | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory            |
+| Electron main          | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers                            |
 | Renderer windows       | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                                      |
 | Voice utility process  | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)                      |
 | Browser service worker | `bodies/browser/src/service-worker.ts`         | The browser body's one `BrainClient` socket to the brain; runs the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, the right-click and address-bar asks, and asks for permissions |
@@ -110,7 +110,7 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 `@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process, the
 voice process and the UI share: addressing, apps, context, memory, pet, status marks, turn events
 and voice ids. It has no React, so main can import it. The desktop's own files are
-`bodies/desktop/src/shared/{settings,blind-spots,voice}.ts` and `main/awareness/recall.ts`.
+`bodies/desktop/src/shared/{settings,blind-spots,voice}.ts`.
 
 The contract package's ESLint block replaces the shared purity options for its own files rather
 than adding to them, so for `protocol/ts` the lint list is exactly `electron`, `react`, `node:*`
@@ -125,9 +125,7 @@ electron-vite; only the native dependencies stay external (`get-windows`, `onnxr
 A body implements two things.
 
 **Perception.** The desktop reads the screen itself: the window list, captures, OCR and the
-selection (`bodies/desktop/src/main/platform`). It says what it can do in `DESKTOP_CAPABILITIES`
-(`bodies/desktop/src/main/context.ts`): `selection`, `activeWindow`, `clipboard`, `screenshot`,
-`displays`, `textLayer`, `recall`. Exclusions and the built-in blind spots are checked before
+selection (`bodies/desktop/src/main/platform`). Exclusions and the built-in blind spots are checked before
 anything is read; the details are in [sight.md](sight.md). The Python brain does not ask the
 desktop for reads yet.
 
@@ -166,12 +164,12 @@ pairing or TLS yet (single user).
 ## Boot and shutdown
 
 The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform adapter behind the
-sight pause, opens the secret store and settings, records the launch, builds rolling memory, then
+sight pause, opens the secret store and settings, records the launch, then
 calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
 retrying while it is down. The panel and the avatar are created next.
 
 On `before-quit` the desktop disposes the hotkeys, the talk key hook, the voice process, presence,
-rolling memory and the perception memory, records a clean close and closes the brain client.
+records a clean close and closes the brain client.
 
 ## Subsystem map
 
@@ -210,8 +208,8 @@ flowchart LR
 | [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file             | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                           |
 | [bubble.md](bubble.md)                             | The companion bubble, status marks, drops                                              | `bodies/ui/src`                                                                                                  |
 | [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
-| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, rolling memory                  | `bodies/desktop/src/main/platform`, `main/awareness`                                                             |
-| [memory.md](memory.md)                             | The memory store and the rolling memory                                                | `brain/src/brain/memory.py`, `bodies/desktop/src/main/awareness`                                                 |
+| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight                                  | `bodies/desktop/src/main/platform`                                                                               |
+| [memory.md](memory.md)                             | The memory store                                                                       | `brain/src/brain/memory.py`                                                                                      |
 | [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `brain/src/brain/apps.py`, `app_tools.py`                                                                        |
 | [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install               | `bodies/browser/src`                                                                                             |
 | [settings-and-secrets.md](settings-and-secrets.md) | Settings store, the secret store, hiding secrets in logs                               | `bodies/desktop/src/main/settings-store.ts`, `secret-store.ts`, `hide-secrets.ts`                                |

@@ -114,7 +114,7 @@ describe('reading the screen', () => {
     const source = readFileSync(new URL('../../main/brain/body-tools.ts', import.meta.url), 'utf8');
     const declared = [...source.matchAll(/^\s{4}name: '(\w+)',/gm)].map((m) => m[1]);
     expect(declared.filter((name) => name !== 'open_url').sort()).toEqual([...READS].sort());
-    for (const tool of ['look_at_screen', 'get_selection', 'recall_screen', 'open_url']) {
+    for (const tool of ['look_at_screen', 'get_selection', 'recall', 'open_url']) {
       expect(dockMood(look(turn, tool))).toBe('thinking');
     }
   });

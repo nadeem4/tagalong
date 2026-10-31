@@ -18,7 +18,7 @@ writes to disk.
 | `bodies/desktop/src/main/test-support/in-memory-secret-store.ts` | `InMemorySecretStore`, the test fake                                                                                    |
 | `bodies/desktop/src/main/hide-secrets.ts`                        | `hideSecrets`                                                                                                           |
 | `bodies/desktop/src/main/ipc/settings.ts`                        | `registerSettingsIpc`: host view, save, save the ElevenLabs key                                                         |
-| `bodies/desktop/src/main/index.ts`                               | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                   |
+| `bodies/desktop/src/main/index.ts`                               | Builds the stores in `userData`; `broadcast`, `applyHotkeys` deps                                                       |
 
 ## How it works
 
@@ -34,7 +34,6 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 | `hotkeys`           | `ask` `CommandOrControl+Shift+Space`, `pauseSight` `CommandOrControl+Shift+Alt+P`, `stopVoice` `CommandOrControl+Shift+Alt+M`, `talk` `RightControl` | `pauseSight`, `stopVoice`, `talk` optional; `talk` is one of `TALK_KEYS` (`RightControl`, `RightAlt`, `RightShift`, `ScrollLock`)       |
 | `avatar`            | `{ x: null, y: null }`                                                                                                                               | null docks to the default edge                                                                                                          |
 | `captureExclusions` | `{ processNames: [], titlePatterns: [] }`                                                                                                            | Trimmed, non-blank entries; built-in blind spots are separate (`BLIND_SPOTS`)                                                           |
-| `rollingMemory`     | `{ enabled: false, minutes: 10 }`                                                                                                                    | Minutes 1 to 30 (`MAX_ROLLING_MEMORY_MINUTES`)                                                                                          |
 | `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' }`                                                                          | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
 | `listening`         | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
 
@@ -74,9 +73,7 @@ The desktop's save path (`registerSettingsIpc` `save`) does the fan-out after `s
 1. `setSettings(saved)`: main's own copy.
 2. `applyHotkeys(saved)` when the patch has `hotkeys`: rebinds the global shortcuts and points the
    key hook at the talk key.
-3. `configureRolling(saved.rollingMemory)` when the patch has `rollingMemory`: starts, stops or
-   trims screen memory.
-4. `broadcast(saved)`: `IPC.settingsChangedEvent` to every open window. The bubble's panel listens
+3. `broadcast(saved)`: `IPC.settingsChangedEvent` to every open window. The bubble's panel listens
    (`onSettingsChanged`) for its keys and microphone.
 
 ### Settings that take effect without a restart
@@ -165,7 +162,6 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 | Constant                              | Value           | File                                        |
 | ------------------------------------- | --------------- | ------------------------------------------- |
-| `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `bodies/desktop/src/shared/settings.ts`     |
 | `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `bodies/desktop/src/shared/settings.ts`     |
 | `SETTINGS_FILENAME`                   | `settings.json` | `bodies/desktop/src/main/settings-store.ts` |
 | `SECRETS_FILENAME`                    | `secrets.json`  | `bodies/desktop/src/main/secret-store.ts`   |
@@ -212,6 +208,6 @@ The settings file holds no secrets. The key never reaches a renderer, a log line
 | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
 | `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values  |
 | `bodies/desktop/src/main/settings-store.test.ts` | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing |
-| `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, rolling memory, broadcast), key save and delete       |
+| `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, broadcast), key save and delete                       |
 | `bodies/desktop/src/main/secret-store.test.ts`   | Round trip, survives restart, no plain text on disk, refuses with no encryption         |
 | `bodies/desktop/src/main/hide-secrets.test.ts`   | Each `hideSecrets` rule, ordinary text untouched                                        |

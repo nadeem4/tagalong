@@ -1,6 +1,6 @@
 /**
  * Scout on the dock: Bean, the 3D figure, drawn from a pre-rendered clip per mood, with a small
- * tag (Seeing, Working), blinking, the sight-paused, recording and listening marks, and
+ * tag (Seeing, Working), blinking, the sight-paused and listening marks, and
  * the status tag. Contains DockPet, DockMood and BeanFigure. Used by the desktop avatar window.
  */
 
@@ -31,8 +31,6 @@ export interface DockPetProps {
   figure: BeanFigure;
   /** The person turned sight off: a mark that stays until they turn it back on. */
   sightPaused?: boolean;
-  /** Rolling memory holds the last minutes of the screen: never allowed to be invisible. */
-  recording?: boolean;
   /**
    * Always listening is on, or paused for a call or full screen: shown the whole time. While
    * on, `hearing` (speech heard, a quick pulse, no words read) and `follow-up` (a ring: one
@@ -92,15 +90,14 @@ function canBlinkIn(mood: DockMood): mood is BlinkMood {
 
 /**
  * The companion on the dock: Bean in a pose and a small tag for what it is doing (seeing,
- * working), a pose alone for thinking, reading and dozing, plus the sight-paused, recording
- * and listening marks, which show in every mood.
+ * working), a pose alone for thinking, reading and dozing, plus the sight-paused and
+ * listening marks, which show in every mood.
  */
 export function DockPet({
   pet,
   mood,
   figure,
   sightPaused = false,
-  recording = false,
   listening,
   blinkEveryMs,
   status,
@@ -152,10 +149,8 @@ export function DockPet({
   // pose (the gear) and the label still say what Bean is doing.
   const tag = isTagged(mood) && !sightPaused ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
-    recording && !sightPaused ? ', recording the screen' : ''
-  }${listening === undefined ? '' : `, ${LISTENING[listening].words}`}${
-    status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`
-  }`;
+    listening === undefined ? '' : `, ${LISTENING[listening].words}`
+  }${status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`}`;
   return (
     <span
       role="img"
@@ -223,22 +218,6 @@ export function DockPet({
         >
           Paused
         </span>
-      )}
-      {recording && !sightPaused && (
-        <span
-          data-testid="recording-dot"
-          title="Rolling memory is on — Tagalong keeps the last few minutes of your screen in memory"
-          style={{
-            position: 'absolute',
-            bottom: 8,
-            left: 16,
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: '#E5484D',
-            boxShadow: '0 0 0 1px #fff',
-          }}
-        />
       )}
       {status != null && <StatusMark mark={status} variant="tag" />}
       {listening !== undefined && (

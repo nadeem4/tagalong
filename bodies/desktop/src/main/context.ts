@@ -1,7 +1,7 @@
 /**
  * What the desktop can see, packaged for the brain: the ask's snapshot (selection and the window
- * in focus) and the answer to perception.capture. Contains DESKTOP_CAPABILITIES,
- * captureAskSnapshot, capturePatch and answerCapture.
+ * in focus) and the answer to perception.capture. Contains captureAskSnapshot,
+ * capturePatch and answerCapture.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -15,23 +15,6 @@ import { SightPausedError, isSightPaused } from './platform/sight-gate';
 
 /** What a capture returns: whichever fields it managed to read. */
 type ContextSnapshotPatch = Partial<ContextSnapshot>;
-
-/** What the desktop host tells the brain it can perceive. */
-export const DESKTOP_CAPABILITIES = [
-  'selection',
-  'activeWindow',
-  'clipboard',
-  'screenshot',
-  'displays',
-  // The text layer reads any window by id, including ones behind others and minimized
-  // ones. Advertised only now that `perception.readText` is answered: a capability the
-  // host cannot honour makes the brain call a method that fails, which reads to the user
-  // as a broken pet rather than a missing feature.
-  'textLayer',
-  // Advertised whether or not rolling memory is on: recall then answers that it
-  // is not recording, which the pet can repeat, and diff works regardless for watches.
-  'recall',
-] as const;
 
 /**
  * Long side of a captured screenshot, in pixels.

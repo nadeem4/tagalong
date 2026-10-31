@@ -39,7 +39,7 @@ export interface CompositeLayout {
  * The composite is a map, not a photograph: at a 1568 long side a three-monitor desktop
  * gives each monitor about 500 pixels, far too few to read. Its job is to let the pet see
  * how many screens there are and roughly what is on each, then fetch the one it wants at a
- * useful size with `look_at_display` or `look_closer`.
+ * useful size with `look_at_display`.
  *
  * Windows places the primary display at the origin and gives monitors to its left or above
  * it negative coordinates, so the bounding box is normalised before scaling — otherwise

@@ -26,10 +26,10 @@ describe('SettingsStore.get', () => {
   });
 
   it('reads values written by a previous run', () => {
-    writeFileSync(file, JSON.stringify({ rollingMemory: { enabled: true, minutes: 20 } }), 'utf8');
+    writeFileSync(file, JSON.stringify({ listening: { always: true } }), 'utf8');
     const settings = new SettingsStore(dataDir).get();
-    expect(settings.rollingMemory).toEqual({ enabled: true, minutes: 20 });
-    expect(settings.listening).toEqual(SETTINGS_DEFAULTS.listening);
+    expect(settings.listening).toEqual({ always: true });
+    expect(settings.avatar).toEqual(SETTINGS_DEFAULTS.avatar);
   });
 
   it('loads an old file, dropping the fields Tagalong no longer has', () => {
@@ -60,13 +60,13 @@ describe('SettingsStore.get', () => {
   it('falls back to the last good copy when the file is malformed', () => {
     const store = new SettingsStore(dataDir);
     store.set({ avatar: { x: 1, y: 2 } });
-    store.set({ rollingMemory: { enabled: true, minutes: 5 } });
+    store.set({ listening: { always: true } });
     writeFileSync(file, '{ not json', 'utf8');
     expect(store.get().avatar).toEqual({ x: 1, y: 2 });
   });
 
   it('falls back to the defaults when the file fails the schema and no backup exists', () => {
-    writeFileSync(file, JSON.stringify({ rollingMemory: { enabled: true, minutes: 999 } }), 'utf8');
+    writeFileSync(file, JSON.stringify({ listening: { always: 'yes' } }), 'utf8');
     expect(new SettingsStore(dataDir).get()).toEqual(SETTINGS_DEFAULTS);
   });
 
@@ -88,12 +88,12 @@ describe('SettingsStore.set', () => {
   it('merges a patch over current values and persists it', () => {
     const store = new SettingsStore(dataDir);
     store.set({ avatar: { x: 1, y: 2 } });
-    store.set({ rollingMemory: { enabled: true, minutes: 5 } });
+    store.set({ listening: { always: true } });
 
     expect(new SettingsStore(dataDir).get()).toEqual({
       ...SETTINGS_DEFAULTS,
       avatar: { x: 1, y: 2 },
-      rollingMemory: { enabled: true, minutes: 5 },
+      listening: { always: true },
     });
   });
 
@@ -111,18 +111,16 @@ describe('SettingsStore.set', () => {
   it('keeps the previous good file as a .bak and leaves no temp file', () => {
     const store = new SettingsStore(dataDir);
     store.set({ avatar: { x: 1, y: 2 } });
-    store.set({ rollingMemory: { enabled: true, minutes: 5 } });
-    expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).rollingMemory).toEqual(
-      SETTINGS_DEFAULTS.rollingMemory,
+    store.set({ listening: { always: true } });
+    expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).listening).toEqual(
+      SETTINGS_DEFAULTS.listening,
     );
     expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
   it('rejects an invalid patch without writing anything', () => {
     const store = new SettingsStore(dataDir);
-    expect(() => store.set({ rollingMemory: { enabled: true, minutes: 999 } })).toThrow(
-      /rollingMemory/,
-    );
+    expect(() => store.set({ listening: { always: 'yes' as never } })).toThrow(/listening/);
     expect(store.get()).toEqual(SETTINGS_DEFAULTS);
   });
 

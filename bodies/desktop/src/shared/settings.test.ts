@@ -1,7 +1,6 @@
 /** Tests for the Settings schema, its defaults and SettingsPatch. */
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_ROLLING_MEMORY_MINUTES,
   SETTINGS_DEFAULTS,
   Settings,
   TALK_KEY_LABELS,
@@ -18,7 +17,6 @@ describe('Settings', () => {
       'captureExclusions',
       'hotkeys',
       'listening',
-      'rollingMemory',
       'voice',
     ]);
   });
@@ -120,7 +118,7 @@ describe('SettingsPatch', () => {
   it('never invents fields that are omitted', () => {
     const patch = SettingsPatch.parse({ listening: { always: true } });
     expect(patch).not.toHaveProperty('captureExclusions');
-    expect(patch).not.toHaveProperty('rollingMemory');
+    expect(patch).not.toHaveProperty('voice');
   });
 });
 
@@ -154,31 +152,6 @@ describe('the pause hotkey setting', () => {
         hotkeys: { ask: 'CommandOrControl+Shift+Space', pauseSight: '' },
       }).success,
     ).toBe(false);
-  });
-});
-
-describe('Settings.rollingMemory', () => {
-  it('is off by default and holds ten minutes when turned on', () => {
-    expect(Settings.parse({}).rollingMemory).toEqual({ enabled: false, minutes: 10 });
-  });
-
-  it('accepts one to thirty minutes and nothing else', () => {
-    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 1 } }).success).toBe(true);
-    expect(
-      Settings.safeParse({ rollingMemory: { enabled: true, minutes: MAX_ROLLING_MEMORY_MINUTES } })
-        .success,
-    ).toBe(true);
-    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 0 } }).success).toBe(
-      false,
-    );
-    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 31 } }).success).toBe(
-      false,
-    );
-  });
-
-  it('rides in a patch alone', () => {
-    const patch = SettingsPatch.parse({ rollingMemory: { enabled: true, minutes: 5 } });
-    expect(patch).toEqual({ rollingMemory: { enabled: true, minutes: 5 } });
   });
 });
 

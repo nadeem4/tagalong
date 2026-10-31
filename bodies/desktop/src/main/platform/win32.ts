@@ -12,8 +12,6 @@ import { lookAtWindowWith } from './window-shot';
 import { OCR_MAX_LONG_SIDE, recognizeText } from './ocr';
 import type { LookAtWindowAnswer } from './window-shot';
 import { captureDisplaysWith } from './displays';
-import { captureRegionWith } from './region';
-import type { RegionCaptureParams } from './region';
 import type { DisplaysCapture } from './displays';
 import { readWindowTextWith } from './read-text';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
@@ -165,32 +163,6 @@ export class Win32Platform implements Platform {
           );
           return image === null ? '' : recognizeText(runPowerShellScript, image.base64);
         },
-      },
-      params,
-    );
-  }
-
-  async captureRegion(
-    params: RegionCaptureParams,
-    exclusions: CaptureExclusions,
-  ): Promise<CapturedImage | null> {
-    return captureRegionWith(
-      {
-        screen: {
-          getAllDisplays: () =>
-            screen.getAllDisplays().map((display) => ({
-              id: display.id,
-              bounds: display.bounds,
-              scaleFactor: display.scaleFactor,
-              primary: display.id === screen.getPrimaryDisplay().id,
-            })),
-          getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
-        },
-        desktopCapturer,
-        getActiveWindow: () => this.getActiveWindow(),
-        listWindows: async () => (await this.listWindows(exclusions)).windows,
-        exclusions,
-        log: (message) => console.log(`[platform:win32] ${message}`),
       },
       params,
     );

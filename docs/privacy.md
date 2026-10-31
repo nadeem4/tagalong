@@ -1,18 +1,18 @@
 # Privacy in detail
 
 What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
-How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions,
-rolling memory), [voice.md](voice.md) (microphone and speech),
+How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions),
+[voice.md](voice.md) (microphone and speech),
 [memory.md](memory.md), [brain.md](brain.md) (the Python brain's prompts, asks and
 experts), [connected-apps.md](connected-apps.md), [browser-body.md](browser-body.md) and
 [settings-and-secrets.md](settings-and-secrets.md).
 
 ## What is captured, and when
 
-Nothing on screen is read until you press a key, with two exceptions: the **front window's title**,
-which the desktop tells the brain when it changes (names only, never the window's text), and **rolling
-memory**, which you switch on yourself (below). Otherwise there is no screenshot and no window text
-read between one question and the next — each hotkey reads once, sends that, and stops.
+Nothing on screen is read until you press a key, with one exception: the **front window's title**,
+which the desktop tells the brain when it changes (names only, never the window's text). There is
+no screenshot and no window text read between one question and the next — each hotkey reads once,
+sends that, and stops.
 
 | You do                  | It reads                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------- |
@@ -26,7 +26,7 @@ window's text, take a screenshot of the window you were using or of one listed w
 others (never a minimized one, which has nothing drawn), fetch another monitor, zoom into part of one.
 Blind spots refuse every one. A screenshot, a window picture and a window read from a picture
 (OCR) are announced on Scout and in the tray tooltip like any capture; listing windows, reading a
-window's text layer, a close-up crop and a frame from screen memory are not announced (the full
+window's text layer and a close-up crop are not announced (the full
 table is under "Capture announcements" in [sight.md](sight.md#capture-announcements)). Those run
 only inside a turn you started, are shown in the panel as they happen, and obey everything below.
 
@@ -135,9 +135,8 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   the pet can see that something was withheld rather than being handed a gap it might guess at.
   Minimized windows do not blank their monitor: a vault in the taskbar is not on screen, and
   blanking a screen you are working on because something is hidden would be a bug, not caution.
-  The same check runs before a close-up crop (`look_closer`, and the sharp crop a "what changed"
-  check takes) and before a plain screenshot falls back to a whole screen: a screen with an
-  excluded window on it is never cropped or photographed. When Tagalong cannot tell which screen
+  The same check runs before a plain screenshot falls back to a whole screen: a screen with an
+  excluded window on it is never photographed. When Tagalong cannot tell which screen
   a picture is of, it takes none while anything at all is blocked.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 
@@ -417,28 +416,6 @@ day, for Home's **Spend** card and the daily budget.
 - **Stays on this computer.** Nothing about it is sent anywhere; prices come from a table built into
   the brain, so working out a cost makes no network call.
 
-## Rolling memory: what the buffer holds
-
-Off until you switch on **Remember the last few minutes of the screen** in Settings → Privacy. While
-it is on:
-
-- Every five seconds the desktop takes a **640-pixel picture of each screen**, the **list of open
-  windows** (titles and positions, never their text) and which window was in front. Building that
-  list walks the accessibility tree of each window that is not blocked, only to count roughly how
-  many characters of text it holds; the count is kept with the frame, the text never is.
-- It keeps the last **ten minutes** by default (you choose one to thirty) and drops anything older.
-- It lives **in memory only**. Nothing is written to disk — not a file, not the database, not a
-  cache — and the code that holds it imports no file APIs, which a test checks.
-- A frame is **skipped** while an app on your exclusion list is in front, and a screen showing one is
-  never stored. Excluded apps are never remembered.
-- **Pausing sight clears it.** Pressing the pause key stops recording and throws away every frame it
-  held, and the red dot on the pets disappears. Resume starts an empty buffer.
-- **Quitting clears it.** After a restart there is nothing to recall from before it; the pet says how
-  far back memory actually reaches.
-- **Turning it off clears it**, at once, without a restart.
-
-The body keeps these frames, but the brain has no tool that reads them yet, so none is sent to a model.
-
 ## What Scout remembers: see it, delete it
 
 Scout keeps what it learns about you (facts, preferences, and short summaries of long
@@ -453,12 +430,11 @@ conversations) in the database on this computer, until you delete it.
 
 ### How long things are kept
 
-| What                                             | Kept                            |
-| ------------------------------------------------ | ------------------------------- |
-| Facts and preferences                            | Until you delete them           |
-| Conversation summaries                           | Until deleted                   |
-| Conversations with Scout                         | Until deleted                   |
-| Rolling screen memory (RAM only, off by default) | 10 minutes by default (1 to 30) |
+| What                     | Kept                  |
+| ------------------------ | --------------------- |
+| Facts and preferences    | Until you delete them |
+| Conversation summaries   | Until deleted         |
+| Conversations with Scout | Until deleted         |
 
 ## Pausing sight
 

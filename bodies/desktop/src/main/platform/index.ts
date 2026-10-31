@@ -8,7 +8,6 @@ import type { CaptureExclusions } from '../../shared/settings';
 import type { ScreenInfo, WindowEntry } from '@tagalong/ui/shapes';
 
 import type { DisplaysCapture } from './displays';
-import type { RegionCaptureParams } from './region';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import type { LookAtWindowAnswer } from './window-shot';
 import type { WindowEnumerationFailure } from './window-list';
@@ -68,17 +67,6 @@ export interface Platform {
     /** `countText: false` skips the text count, for the focus watch, listening guard and list_windows: titles are all they need. */
     options?: { countText?: boolean },
   ): Promise<WindowInventory>;
-  /**
-   * A native-resolution crop of one display, for leaning in.
-   *
-   * Takes the exclusion list like its neighbours: the model can name any display id, so a
-   * crop runs the same per-display refusal as `captureDisplays` and returns null for a
-   * blocked display.
-   */
-  captureRegion(
-    params: RegionCaptureParams,
-    exclusions: CaptureExclusions,
-  ): Promise<CapturedImage | null>;
   /**
    * The text of one window, named by id or defaulting to the foreground one.
    *

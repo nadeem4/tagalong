@@ -44,8 +44,6 @@ function fakeImage(colour: Colour, width: number, height: number): DisplayImageP
     isEmpty: () => width === 0 || height === 0,
     getSize: () => ({ width, height }),
     resize: (size) => fakeImage(colour, size.width, size.height),
-    // The composite never crops; look_closer does, and it has its own tests in region.
-    crop: (rect) => fakeImage(colour, rect.width, rect.height),
     toPNG: () => Buffer.from(`${colour.r}-${colour.g}-${colour.b}@${width}x${height}`),
     toBitmap: () => createCanvas(width, height, colour).data,
   };

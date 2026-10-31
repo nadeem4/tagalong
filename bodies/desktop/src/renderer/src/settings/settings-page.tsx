@@ -126,8 +126,6 @@ export function SettingsPage() {
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
         elevenLabsVoiceId: field('elevenLabsVoiceId'),
-        rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
-        rollingMemoryMinutes: field('rollingMemoryMinutes'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
       // An empty box is left alone: removing the key is the Remove key button's job.

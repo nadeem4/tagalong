@@ -70,7 +70,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 2. Opens `SafeStorageSecretStore(userData)`, `SettingsStore(userData)`,
    so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
-   mark on `IPC.statusMarkEvent`), `RollingMemory` and `PerceptionMemory`.
+   mark on `IPC.statusMarkEvent`).
 4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
    throws and never blocks boot: if the brain is not running, the client retries every 2 s.
 5. Creates the `VoiceWorker` (a `utilityProcess.fork` of `voice-worker.js`, started lazily; see
@@ -142,7 +142,7 @@ running.
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
-  rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
+  exclusions). The brain's model, key and budget are in the brain's `.env`.
 - **Not wired yet.** Pets are a fixed local Scout; they come back when the brain plans them.
 
 `shutdown()` stops the client.
@@ -287,7 +287,6 @@ the bubble's settings card. After `SettingsStore` saves, it:
 
 - stores the result as `desktop.settings`;
 - calls `applyHotkeys` when the patch has `hotkeys`;
-- calls `rolling.configure` when it has `rollingMemory`;
 - broadcasts the saved settings on `IPC.settingsChangedEvent`, which open windows apply at once
   (the panel reads its talk key and microphone from it).
 
@@ -330,7 +329,6 @@ shell, the screen):
 | `getContext`                                         | returns `pendingSnapshot`                                                                                                                         |
 | `capture`                                            | `captureForPanel`: announces the capture, returns null when blocked or paused, otherwise a parsed `ContextSnapshot` (also sent on `contextEvent`) |
 | `getSightPaused`, `toggleSightPause`                 | the `SightPause` state, and flipping it                                                                                                           |
-| `getRecording`                                       | `rolling.recording`                                                                                                                               |
 | `getStatusMark`, `setStatusMark`                     | the top mark; `setPanelMark` accepts only `mic-busy`, `mic-failed`, `say-name`                                                                    |
 | `openBubble`, `togglePanel`, `hidePanel`, `fitPanel` | the panel (see [Focus rules](#focus-rules-and-showpanelquietly))                                                                                  |
 | `dragAvatar`, `dropAvatar`                           | move the pet by a finite step; save its position                                                                                                  |
@@ -339,7 +337,7 @@ shell, the screen):
 | `dropOnPet` (`drop.ts`, `registerDropIpc`)           | only from the avatar's window (`fromWindow`); names the item and opens the bubble on `IPC.dropEvent`                                              |
 
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
-`sightPauseEvent`, `recordingEvent`, `hotkeyProblemEvent`, `settingsChangedEvent`,
+`sightPauseEvent`, `hotkeyProblemEvent`, `settingsChangedEvent`,
 `statusMarkEvent`, `listeningEvent`, `homePageEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
 `talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`,
 `earsProgressEvent`.
@@ -464,7 +462,7 @@ data over the channels in `shared/ipc.ts`:
   `HostBridge` runs in both hosts. The panel page wraps it with three more bridge calls
   (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](bubble.md#the-health-check)).
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
-  the captured snapshot, the sight pause, recording, `getHostView`, `saveSettings`, keys,
+  the captured snapshot, the sight pause, `getHostView`, `saveSettings`, keys,
   Home, the panel's placement and fit, the avatar's drag, remark lines,
   voice and ears, Always listening, drops, the health facts and status marks.
 
@@ -483,7 +481,7 @@ on `tagalongHost`. See [voice.md](voice.md).
 
 Everything OS-specific sits behind `Platform` (`src/main/platform/index.ts`):
 `getActiveWindow`, `captureSelection`, `readClipboard`, `captureActiveWindowImage`,
-`captureDisplays`, `listWindows`, `captureRegion`, `readWindowText` and `lookAtWindow`.
+`captureDisplays`, `listWindows`, `readWindowText` and `lookAtWindow`.
 Each method that reads the screen takes the exclusion list, so a refusal happens
 inside the read. `createPlatform(platform = process.platform)` returns `Win32Platform` on
 `win32` and throws "Tagalong has no platform adapter for '…'. It runs on Windows only." anywhere
@@ -592,7 +590,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 - `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
   `settings`, `secrets`, `avatar`, `panel`, `tray`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
-  `talkKey`, `talkKeyError`, `sightPause`, `rolling`, `perceptionMemory`, `voice`, `voiceWorker`,
+  `talkKey`, `talkKeyError`, `sightPause`, `voice`, `voiceWorker`,
   `listening`, `statusMarks`.
 - `startBrain({ onNotification, onStatus, onResync, env?, openSocket? })` returns the `BrainClient`.
 - `HotkeyBindings { ask, pauseSight, stopVoice }`, `HotkeyOutcome`, `HotkeyAction`
@@ -632,9 +630,9 @@ The desktop host writes:
 - Voice models under `<userData>/voice` (`TAGALONG_VOICE_DIR` for the voice process). See
   [voice.md](voice.md).
 
-Everything else main holds (`pendingSnapshot`, the dropped item, rolling memory, status marks) is
+Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is
 in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the voice
-worker, the listening-guard and presence timers, drops rolling memory and perception memory, records
+worker, the listening-guard and presence timers, records
 the clean close and stops the brain client.
 
 ## Failure handling

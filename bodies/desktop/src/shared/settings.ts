@@ -7,12 +7,6 @@ import { EARS_IDS, MOUTH_IDS } from '@tagalong/ui/shapes';
 import { z } from 'zod';
 
 /**
- * Ceiling on rolling memory. Thirty minutes of frames from two displays is already tens of
- * megabytes of the screen in memory.
- */
-export const MAX_ROLLING_MEMORY_MINUTES = 30;
-
-/**
  * The keys Talk to Scout can be: one key, held alone. Never a combo: the desktop watches this
  * one key go down and up itself, since no global shortcut reports a release.
  */
@@ -44,11 +38,6 @@ export const SETTINGS_DEFAULTS = {
    * `BLIND_SPOTS`, built in, so clearing this list never takes them away.
    */
   captureExclusions: { processNames: [] as string[], titlePatterns: [] as string[] },
-  /**
-   * Off by default: remembering the screen is the most a pet ever holds about
-   * the user, and it is the user's call to start it. Ten minutes when they do.
-   */
-  rollingMemory: { enabled: false, minutes: 10 },
   /**
    * Scout reads its bubble aloud, because the person may not be looking at the screen.
    * On by default, in a calm British voice slightly slower than normal. The ElevenLabs
@@ -125,11 +114,6 @@ const settingsFields = {
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
   /** Windows where capture is refused outright. */
   captureExclusions: CaptureExclusions,
-  /** Whether the desktop keeps its last few minutes in memory, and how many. */
-  rollingMemory: z.object({
-    enabled: z.boolean(),
-    minutes: z.number().int().min(1).max(MAX_ROLLING_MEMORY_MINUTES),
-  }),
   /** Whether Scout speaks its bubble, in which voice and how fast. */
   voice: z.object({
     enabled: z.boolean(),
@@ -171,7 +155,6 @@ export const Settings = z.object({
     processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],
     titlePatterns: [...SETTINGS_DEFAULTS.captureExclusions.titlePatterns],
   }),
-  rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
 });

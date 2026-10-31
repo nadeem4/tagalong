@@ -30,9 +30,9 @@ describe('StatusMark, the tag on Scout', () => {
     expect(screen.getByTestId('status-mark')).toHaveAttribute('data-tone', 'muted');
   });
 
-  it('sits above the recording and listening dots in the bottom corners, not on them', () => {
+  it('sits above the listening dot in the bottom corner, not on it', () => {
     render(<StatusMark mark={{ id: 'mic-failed' }} variant="tag" />);
-    // The dots are 8 px, 8 px from the bottom of the 96 px dock: the tag starts above them.
+    // The dot is 8 px, 8 px from the bottom of the 96 px dock: the tag starts above it.
     expect(screen.getByTestId('status-mark').style.bottom).toBe('18px');
   });
 });

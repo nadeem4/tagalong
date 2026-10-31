@@ -25,7 +25,6 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Talk to Scout](#talk-to-scout)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
 - [Memory](#memory)
-- [Screen memory](#screen-memory)
 - [Window tools](#window-tools)
 - [Spend and the daily budget](#spend-and-the-daily-budget)
 - [The browser body](#the-browser-body)
@@ -489,13 +488,6 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
     30 seconds. Stopping the brain leaves no stray process.
 
 ## Settings
-
-### S.5. A refused value is named where it is
-
-1. **Setup:** Settings → Privacy, screen memory switched on.
-2. **Action:** type `40` in the memory minutes, Save.
-3. **Expected:** "Not saved. Rolling memory must keep between 1 and 30 minutes." The field is
-   outlined, focused and has the same sentence under it.
 
 ### S.6. A shortcut another app uses
 
@@ -1088,30 +1080,6 @@ database with `sqlite3` or DB Browser for SQLite.
    `SELECT COUNT(*) FROM messages WHERE summarized_at IS NOT NULL;`.
 3. **Expected:** one `summary` row describing the topic, and **16** summarised messages. A
    follow-up that depends on the start of the conversation is still answered correctly.
-
-## Screen memory
-
-The desktop keeps the last few minutes of frames while this is on. No brain tool reads them yet, so
-these steps check only the setting, the red dot and what is kept on disk.
-
-### SM.1. The settings and their defaults
-
-1. **Action:** Home → Settings → Privacy, then Advanced → **Screen memory**.
-2. **Expected:** **Remember the last few minutes of the screen** is **Off**. Under Advanced:
-   **Minutes of screen to remember** 10.
-
-### SM.2. Turning it on shows the red dot, without a restart
-
-1. **Action:** switch **Remember the last few minutes of the screen** on, Save. Do not restart.
-2. **Expected:** within a second a **small red dot** shows on Scout; its label says it is recording
-   the screen. No new file appears in `%APPDATA%\Tagalong`.
-
-### SM.3. Pause and quit throw it away
-
-1. **Action:** press `Ctrl+Shift+Alt+P`. **Expected:** the red dot goes and a **Paused** mark shows.
-   Press it again: the dot comes back.
-2. **Action:** quit Tagalong and look in `%APPDATA%\Tagalong`. **Expected:** no frame or image file.
-3. **Action:** switch it off and Save. **Expected:** the dot goes on save.
 
 ## Window tools
 

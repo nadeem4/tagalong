@@ -49,7 +49,6 @@ export const SIGHT_POLICY: { readonly [K in keyof Platform]: 'sight' | 'handed-o
   captureActiveWindowImage: 'sight',
   captureDisplays: 'sight',
   listWindows: 'sight',
-  captureRegion: 'sight',
   readWindowText: 'sight',
   lookAtWindow: 'sight',
   captureSelection: 'handed-over',

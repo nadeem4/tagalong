@@ -23,7 +23,6 @@ function openPlatform(): Platform {
     captureActiveWindowImage: async () => ({ base64: 'cG5n', width: 10, height: 10 }),
     captureDisplays: async () => ({ displays: [], composite: null }),
     listWindows: async () => ({ windows: [] }),
-    captureRegion: async () => ({ base64: 'cG5n', width: 10, height: 10 }),
     readWindowText: async () => ({
       windowId: 'w-1',
       text: 'hello',
@@ -49,12 +48,6 @@ function callOf(platform: Platform, method: keyof Platform): () => Promise<unkno
       return () => platform.captureDisplays(1568, NOTHING_EXCLUDED);
     case 'listWindows':
       return () => platform.listWindows(NOTHING_EXCLUDED);
-    case 'captureRegion':
-      return () =>
-        platform.captureRegion(
-          { displayId: 1, rect: { x: 0, y: 0, width: 10, height: 10 }, maxLongSide: 1568 },
-          NOTHING_EXCLUDED,
-        );
     case 'readWindowText':
       return () => platform.readWindowText({ maxChars: 8000 }, NOTHING_EXCLUDED);
     case 'lookAtWindow':
@@ -75,7 +68,6 @@ describe('SIGHT_POLICY', () => {
       [
         'captureActiveWindowImage',
         'captureDisplays',
-        'captureRegion',
         'captureSelection',
         'getActiveWindow',
         'listWindows',
@@ -93,7 +85,6 @@ describe('SIGHT_POLICY', () => {
         'captureActiveWindowImage',
         'captureDisplays',
         'listWindows',
-        'captureRegion',
         'readWindowText',
         'lookAtWindow',
       ].sort(),

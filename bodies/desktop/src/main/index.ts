@@ -32,12 +32,8 @@ import {
   startListeningGuard,
 } from './always-listening';
 import { watchPresence } from './presence';
-import { systemClock } from './awareness/clock';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
-import { nativeCodec } from './awareness/native-codec';
-import { PerceptionMemory } from './awareness/perception-memory';
-import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
@@ -125,10 +121,6 @@ interface Desktop {
   talkKeyError: string | null;
   /** Whether the user has sight turned off. Read by the platform gate on every read. */
   sightPause: SightPause;
-  /** The last few minutes of the screen, in memory, opt-in. */
-  rolling: RollingMemory;
-  /** Answers perception.recall and perception.diff. */
-  perceptionMemory: PerceptionMemory;
   /** Turns Scout's lines into audio for the panel to play. */
   voice: VoiceService;
   /** The process the voice models run in, Scout's voice and its ears; stopped on quit. */
@@ -206,9 +198,6 @@ app.on('before-quit', () => {
   stopListeningGuard();
   stopPresence();
   stopFocusWatch();
-  // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
-  desktop?.rolling.dispose();
-  desktop?.perceptionMemory.clear();
   desktop?.brain.stop();
 });
 
@@ -232,26 +221,6 @@ async function start(): Promise<void> {
   });
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
-
-  const rolling = new RollingMemory({
-    platform,
-    clock: systemClock,
-    exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
-    isPaused: () => sightPause.paused,
-    onRecordingChange: (recording) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.recordingEvent, recording);
-      }
-    },
-    log: (message) => console.log(`[rolling-memory] ${message}`),
-  });
-  const perceptionMemory = new PerceptionMemory({
-    rolling,
-    platform,
-    codec: nativeCodec,
-    clock: systemClock,
-    exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
-  });
 
   // The brain is a separate process the user runs; this only dials it and retries.
   const turnEvents = createTurnEvents(
@@ -338,8 +307,6 @@ async function start(): Promise<void> {
     }),
     talkKeyError: null,
     sightPause,
-    rolling,
-    perceptionMemory,
     voiceWorker,
     listening,
     statusMarks,
@@ -362,7 +329,6 @@ async function start(): Promise<void> {
     })(),
   };
 
-  rolling.configure(settings.rollingMemory);
   // Kokoro loads now only when an earlier run downloaded it, so Scout's first lines are
   // Kokoro rather than the system voice. A first download still waits for the first line.
   desktop.voice.warmAtStart(kokoroDownloaded(join(dataDir, 'voice')));
@@ -370,9 +336,6 @@ async function start(): Promise<void> {
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.
   sightPause.onChange((paused) => {
-    // A pause stops rolling memory and drops every frame either ring held.
-    rolling.pauseChanged(paused);
-    if (paused) perceptionMemory.clear();
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC.sightPauseEvent, paused);
     }
@@ -842,7 +805,6 @@ function registerIpc(): void {
     applyHotkeys: (settings) => {
       applyHotkeys(settings);
     },
-    configureRolling: (rollingMemory) => required().rolling.configure(rollingMemory),
     broadcast: (settings) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
@@ -870,7 +832,6 @@ function registerIpc(): void {
   // A window that opened after the last toggle has missed the event, and an avatar that
   // shows sight running while it is paused is the one lie this feature cannot afford.
   ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
-  ipcMain.handle(IPC.getRecording, () => required().rolling.recording);
   ipcMain.handle(IPC.getStatusMark, () => required().statusMarks.top());
   // Only the panel's own marks (the mic failing, Say “Scout”); setPanelMark refuses the rest.
   ipcMain.handle(IPC.setStatusMark, (_event, id: unknown, on: unknown) =>
