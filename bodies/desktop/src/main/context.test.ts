@@ -23,9 +23,6 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // still satisfies Platform, and returns an empty capture so a test that reaches it by
     // accident fails on missing displays rather than on a missing method.
     captureDisplays: async () => ({ displays: [], composite: null }),
-    // Nothing in this file crops; the stub returns null so a test reaching it
-    // by accident fails on a missing crop rather than on a missing method.
-    captureRegion: async () => null,
     // Nothing in this file reads window text; the stub keeps the fake a valid
     // Platform and answers with an empty read, so a test that reaches it by accident
     // fails on missing text rather than on a missing method.

@@ -481,7 +481,7 @@ on `tagalongHost`. See [voice.md](voice.md).
 
 Everything OS-specific sits behind `Platform` (`src/main/platform/index.ts`):
 `getActiveWindow`, `captureSelection`, `readClipboard`, `captureActiveWindowImage`,
-`captureDisplays`, `listWindows`, `captureRegion`, `readWindowText` and `lookAtWindow`.
+`captureDisplays`, `listWindows`, `readWindowText` and `lookAtWindow`.
 Each method that reads the screen takes the exclusion list, so a refusal happens
 inside the read. `createPlatform(platform = process.platform)` returns `Win32Platform` on
 `win32` and throws "Tagalong has no platform adapter for '…'. It runs on Windows only." anywhere

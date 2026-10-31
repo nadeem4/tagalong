@@ -135,9 +135,8 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   the pet can see that something was withheld rather than being handed a gap it might guess at.
   Minimized windows do not blank their monitor: a vault in the taskbar is not on screen, and
   blanking a screen you are working on because something is hidden would be a bug, not caution.
-  The same check runs before a close-up crop (`look_closer`, and the sharp crop a "what changed"
-  check takes) and before a plain screenshot falls back to a whole screen: a screen with an
-  excluded window on it is never cropped or photographed. When Tagalong cannot tell which screen
+  The same check runs before a plain screenshot falls back to a whole screen: a screen with an
+  excluded window on it is never photographed. When Tagalong cannot tell which screen
   a picture is of, it takes none while anything at all is blocked.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 

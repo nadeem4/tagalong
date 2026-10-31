@@ -12,21 +12,21 @@ The desktop host does the reading. Windows is the only platform.
 
 ## Where it lives
 
-| Area                           | Files                                                                                                                                                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform interface and factory | `bodies/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                                                                   |
-| Windows adapter                | `bodies/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                                                                   |
-| Sight pause gate               | `bodies/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `bodies/desktop/src/main/sight-pause.ts` (`SightPause`)                                                     |
-| PowerShell transport           | `bodies/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`)                                           |
-| Window list                    | `platform/window-list.ts` (`parseWindowList`, `placeOnDisplays`, `countableHandles`, `handleOf`, `screensOf`)                                                                                                   |
-| Window text                    | `platform/window-text.ts` (scripts, `parseWindowText`), `platform/text-layer.ts` (`TextLayerProvider`), `platform/read-text.ts` (`readWindowTextWith`)                                                          |
-| OCR                            | `platform/ocr.ts` (`recognizeText`, `OCR_SCRIPT`)                                                                                                                                                               |
-| Screenshots                    | `platform/capture.ts` (focused window, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/displays.ts` (every display, composite, `displayRefusals`), `platform/region.ts` (crop) |
-| Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                                                       |
-| Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                                                |
-| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`), `capture-notice.ts`                                                                                               |
-| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                                                             |
-| Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `shared/settings.ts`                                                                                                                                 |
+| Area                           | Files                                                                                                                                                                              |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Platform interface and factory | `bodies/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                                      |
+| Windows adapter                | `bodies/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                                      |
+| Sight pause gate               | `bodies/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `bodies/desktop/src/main/sight-pause.ts` (`SightPause`)                        |
+| PowerShell transport           | `bodies/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`)              |
+| Window list                    | `platform/window-list.ts` (`parseWindowList`, `placeOnDisplays`, `countableHandles`, `handleOf`, `screensOf`)                                                                      |
+| Window text                    | `platform/window-text.ts` (scripts, `parseWindowText`), `platform/text-layer.ts` (`TextLayerProvider`), `platform/read-text.ts` (`readWindowTextWith`)                             |
+| OCR                            | `platform/ocr.ts` (`recognizeText`, `OCR_SCRIPT`)                                                                                                                                  |
+| Screenshots                    | `platform/capture.ts` (focused window, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/displays.ts` (every display, composite, `displayRefusals`) |
+| Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                          |
+| Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                   |
+| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`), `capture-notice.ts`                                                                  |
+| Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                                |
+| Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `shared/settings.ts`                                                                                                    |
 
 ## How it works
 
@@ -34,7 +34,7 @@ The desktop host does the reading. Windows is the only platform.
 
 The Python brain does not ask for reads yet. On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the bubble's capture path call it from `context.ts`.
 
-The desktop answers `perception.capture` for `selection`, `activeWindow`, `clipboard`, `screenshot` and `displays`, and reads window text by id. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
+The desktop answers `perception.capture` for `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays` and `windows`, and reads window text by id. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
 
 ### The platform adapter
 
@@ -46,7 +46,6 @@ The desktop answers `perception.capture` for `selection`, `activeWindow`, `clipb
 | `captureActiveWindowImage(maxLongSide, exclusions)` | PNG of the focused window, or its screen as a fallback | `sight`       |
 | `captureDisplays(maxLongSide, exclusions)`          | every display plus a composite                         | `sight`       |
 | `listWindows(exclusions, { countText? })`           | every top-level window, no contents                    | `sight`       |
-| `captureRegion(params, exclusions)`                 | a native-resolution crop of one display                | `sight`       |
 | `readWindowText(params, exclusions)`                | one window's text                                      | `sight`       |
 | `lookAtWindow(params, exclusions)`                  | PNG of one listed window                               | `sight`       |
 | `captureSelection()`                                | the selection, by the clipboard trick                  | `handed-over` |
@@ -138,13 +137,12 @@ Callers that need titles only pass `countText: false`: the focus watch, the list
 
 ### Screenshots and captures
 
-| Capture                     | Function                                      | Size limit                                                       | Exclusion check                                                                    |
-| --------------------------- | --------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Focused window              | `captureActiveWindowImageWith` (`capture.ts`) | `MAX_SCREENSHOT_LONG_SIDE` = 1568 long side                      | caller checks the focused window first; the screen fallback runs `displayRefusals` |
-| One listed window           | `lookAtWindowWith` + `captureWindowImageWith` | 1568 (`CROP_LONG_SIDE` in the tool)                              | against the classified list before any pixel; minimized refused (nothing drawn)    |
-| Every display + composite   | `captureDisplaysWith` (`displays.ts`)         | 1568 per display and for the composite                           | `displayRefusals` per display, inside the capture                                  |
-| Region crop (`look_closer`) | `captureRegionWith` (`region.ts`)             | captured at the display's full pixel size, crop then fit to 1568 | `displayRefusals` for that display; null when refused                              |
-| OCR picture                 | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500                                      | the text read's own check                                                          |
+| Capture                   | Function                                      | Size limit                                  | Exclusion check                                                                    |
+| ------------------------- | --------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Focused window            | `captureActiveWindowImageWith` (`capture.ts`) | `MAX_SCREENSHOT_LONG_SIDE` = 1568 long side | caller checks the focused window first; the screen fallback runs `displayRefusals` |
+| One listed window         | `lookAtWindowWith` + `captureWindowImageWith` | 1568 (`CROP_LONG_SIDE` in the tool)         | against the classified list before any pixel; minimized refused (nothing drawn)    |
+| Every display + composite | `captureDisplaysWith` (`displays.ts`)         | 1568 per display and for the composite      | `displayRefusals` per display, inside the capture                                  |
+| OCR picture               | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500                 | the text read's own check                                                          |
 
 Rules shared by every picture:
 
@@ -181,14 +179,14 @@ unless the notice is paused or blocked.
 
 Which reads announce:
 
-| Path                                                                                         | Announced                                                    |
-| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Ask hotkey (`openPanelWithContext`)                                                          | yes, `screenshot: false`                                     |
-| Bubble capture (`IPC.capture`, `captureForPanel`), talk key                                  | yes, `screenshot` when asked for                             |
-| `perception.capture` (look_at_screen, get_selection, list_displays, look_at_display)         | yes, `screenshot` only when the targets include `screenshot` |
-| `perception.captureWindow` (look_at_window)                                                  | yes, `screenshot: true`                                      |
-| `perception.readText` read by OCR                                                            | yes, `screenshot: true`                                      |
-| `perception.readText` by UI Automation, `perception.listWindows`, `perception.captureRegion` | no notice                                                    |
+| Path                                                                                 | Announced                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Ask hotkey (`openPanelWithContext`)                                                  | yes, `screenshot: false`                                     |
+| Bubble capture (`IPC.capture`, `captureForPanel`), talk key                          | yes, `screenshot` when asked for                             |
+| `perception.capture` (look_at_screen, get_selection, list_displays, look_at_display) | yes, `screenshot` only when the targets include `screenshot` |
+| `perception.captureWindow` (look_at_window)                                          | yes, `screenshot: true`                                      |
+| `perception.readText` read by OCR                                                    | yes, `screenshot: true`                                      |
+| `perception.readText` by UI Automation, and `perception.listWindows`                 | no notice                                                    |
 
 ### Screen text, selection and OCR
 
@@ -390,19 +388,19 @@ The privacy reference for everything above is [privacy.md](privacy.md): what is 
 
 ## Tests that pin it
 
-| Behaviour                                                                                                                                    | Tests                                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                          | `bodies/desktop/src/main/platform/sight-gate.test.ts`                                                               |
-| Pause state and listeners                                                                                                                    | `bodies/desktop/src/main/sight-pause.test.ts`                                                                       |
-| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; looks past Tagalong's own windows; tool captures obey exclusions | `bodies/desktop/src/main/context.test.ts`                                                                           |
-| Notice wording and tooltip                                                                                                                   | `bodies/desktop/src/main/capture-notice.test.ts`                                                                    |
-| Display blanking (focused and unfocused, minimized ignored), composite placeholder, one `getSources` call                                    | `platform/displays.test.ts`, `platform/composite.test.ts`, `platform/canvas.test.ts`, `platform/label.test.ts`      |
-| Screenshot picking and resizing, never upscaling                                                                                             | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts`, `platform/region.test.ts` |
-| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                                                       |
-| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                             | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`                                |
-| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                     |
-| Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                        |
-| Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                        |
-| Exclusion matching, blind spots, secret files                                                                                                | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                                                         |
-| Inventory classification, text-layer notes                                                                                                   | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                                                   |
-| Real downscaled PNG, sight pause and sight settings end to end                                                                               | `bodies/desktop/e2e/smoke.spec.ts`                                                                                  |
+| Behaviour                                                                                                                                    | Tests                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                          | `bodies/desktop/src/main/platform/sight-gate.test.ts`                                                          |
+| Pause state and listeners                                                                                                                    | `bodies/desktop/src/main/sight-pause.test.ts`                                                                  |
+| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; looks past Tagalong's own windows; tool captures obey exclusions | `bodies/desktop/src/main/context.test.ts`                                                                      |
+| Notice wording and tooltip                                                                                                                   | `bodies/desktop/src/main/capture-notice.test.ts`                                                               |
+| Display blanking (focused and unfocused, minimized ignored), composite placeholder, one `getSources` call                                    | `platform/displays.test.ts`, `platform/composite.test.ts`, `platform/canvas.test.ts`, `platform/label.test.ts` |
+| Screenshot picking and resizing, never upscaling                                                                                             | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts`                       |
+| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                                                  |
+| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                             | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`                           |
+| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                |
+| Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                   |
+| Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                   |
+| Exclusion matching, blind spots, secret files                                                                                                | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                                                    |
+| Inventory classification, text-layer notes                                                                                                   | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                                              |
+| Real downscaled PNG, sight pause and sight settings end to end                                                                               | `bodies/desktop/e2e/smoke.spec.ts`                                                                             |

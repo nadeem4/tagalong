@@ -32,8 +32,6 @@ export interface DisplayImagePort {
   isEmpty(): boolean;
   getSize(): PixelSize;
   resize(size: PixelSize): DisplayImagePort;
-  /** The native-resolution crop behind look_closer. */
-  crop(rect: { x: number; y: number; width: number; height: number }): DisplayImagePort;
   toPNG(): Buffer;
   toBitmap(): Buffer;
 }
@@ -166,7 +164,7 @@ export interface DisplayRefusal {
 }
 
 /**
- * One decision for every capture of a whole display, a crop included: a display is refused
+ * One decision for every capture of a whole display: a display is refused
  * when a visible blocked window is on it, or when it holds the focused window and that
  * window is blocked.
  */
