@@ -443,6 +443,19 @@ question; `turns.ts` adds `voice` and `speed` from the saved settings to the `sa
 `voice.enabled`. A typed turn never carries `spoken`. When the turn completes, the bubble shows the
 "Hold <key> to reply" hint for a spoken question.
 
+### The browser body
+
+The browser extension is a second body that can hear. It listens only: it says `display: false`, so
+the brain speaks the answer on the desktop. The popup's **Ask by voice** button starts a held
+`listen`; an offscreen document (the one page that may hold the microphone in a Manifest V3
+extension) opens it at 16 kHz and posts the same 512-sample frames as the desktop's worklet; the
+service worker forwards them as `mic` frames; **Done talking** (or closing the popup) sends
+`unlisten`; the brain's `heard` `turn_end` carries the question, and the worker sends it as `say`
+with `spoken: true` and no `voice` or `speed`. Only one body listens at a time, as everywhere.
+Chrome's prompt cannot show from an offscreen page, so the first use opens a small page to allow
+the microphone. If the link drops, listening ends with an error and is not restarted. The full
+description is [browser-body.md](browser-body.md#voice).
+
 ## Interfaces
 
 ### IPC channels

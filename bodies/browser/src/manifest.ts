@@ -14,9 +14,10 @@ export const manifest = {
   action: { default_title: 'Tagalong', default_popup: 'popup/popup.html' },
   /**
    * Only what shows no browser warning: `storage` for the id and settings, `scripting` to read a
-   * page, `alarms` so a stopped worker wakes to reconnect.
+   * page, `alarms` so a stopped worker wakes to reconnect, `offscreen` for the page that holds the
+   * microphone while the person talks (the mic itself is asked from a page and shows no warning).
    */
-  permissions: ['alarms', 'scripting', 'storage'],
+  permissions: ['alarms', 'offscreen', 'scripting', 'storage'],
   /**
    * Everything else is asked for the first time a tool needs it, from a click on an extension
    * page (never the worker), and kept once granted.

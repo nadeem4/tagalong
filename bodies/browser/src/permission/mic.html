@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- Where the person allows the microphone. The hidden mic page cannot show Chrome's prompt, so
+     this page does, from a click; mic.ts has the logic. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tagalong microphone</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        margin: 20px;
+        max-width: 420px;
+        color: #1a1a1a;
+        background: #ffffff;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 16px;
+        line-height: 1.4;
+      }
+      button {
+        font: inherit;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          color: #f2f2f2;
+          background: #1c1c1c;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Let Scout hear you</h1>
+    <p>
+      Scout listens only while you hold the mic button in the Tagalong popup. Audio goes only to
+      your own brain and is never stored; with the brain on this computer it never leaves it.
+    </p>
+    <button id="allow" type="button">Allow microphone</button>
+    <p id="result" role="status"></p>
+    <script type="module" src="./mic.ts"></script>
+  </body>
+</html>

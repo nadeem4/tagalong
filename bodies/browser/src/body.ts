@@ -3,7 +3,15 @@
  * touches (storage, tabs, sockets) is passed in, so a test can run it without a real Chrome.
  * The service worker only wires the real pieces in and forwards events.
  */
-import { BrainClient, BrainOffline, type BrainSocket, type BrainStatus } from '@tagalong/contract';
+import {
+  BrainClient,
+  BrainOffline,
+  type BrainSocket,
+  type BrainStatus,
+  type HeardParams,
+  type SayParams,
+  type VoiceParams,
+} from '@tagalong/contract';
 import { browserName, detectBrowser, loadBodyId } from './identity';
 import type { ActionsApi, PageApi, PictureApi, SearchApi, StorageArea, TabsApi } from './layer/api';
 import { createTabReporter, downloadEvent } from './events';
@@ -14,6 +22,8 @@ import { browserSearchTool } from './tools/browser-search';
 import { pagePartsTool } from './tools/page-parts';
 import { tabActionsTool } from './tools/tab-actions';
 import { tabsTool } from './tools/tabs';
+import type { MicControl } from './voice/mic-control';
+import { createVoiceSession, type VoiceView } from './voice/voice-session';
 
 const SEQ_KEY = 'lastSeq';
 /** How long an ask waits for the link before it is dropped, and how often it looks. */
@@ -22,7 +32,7 @@ const SAY_POLL_MS = 100;
 const KEEPALIVE = { everyMs: 20_000, tool: 'spend_today' };
 
 /** What the popup shows: the link and who this body is. */
-export type WorkerStatus = { status: BrainStatus; id: string; name: string };
+export type WorkerStatus = { status: BrainStatus; id: string; name: string; voice: VoiceView };
 
 export interface BodyDeps {
   /** Settings and the body id. */
@@ -37,6 +47,10 @@ export interface BodyDeps {
   search: SearchApi;
   actions: ActionsApi;
   broker: PermissionBroker;
+  /** The offscreen page that owns the microphone while the person is talking. */
+  mic: MicControl;
+  /** The popup's voice view changed; the worker passes it on to an open popup. */
+  onVoiceView: (view: VoiceView) => void;
   /** Makes the id's 4 random chars; tests pin it. */
   random?: () => string;
   openSocket: (url: string) => BrainSocket;
@@ -61,6 +75,12 @@ interface BrowserBody {
    * is where the person sees that.
    */
   say(text: string, context?: { url: string; title: string }): Promise<void>;
+  /** The popup's mic button: listen, forward frames, and send what was heard as a spoken ask. */
+  voiceStart(): Promise<void>;
+  voiceStop(): void;
+  voiceFrame(pcm: Int16Array): void;
+  /** The mic page failed or went away; ends an active session with this plain line. */
+  voiceEnd(reason: string): void;
 }
 
 export function createBody(deps: BodyDeps): BrowserBody {
@@ -72,6 +92,19 @@ export function createBody(deps: BodyDeps): BrowserBody {
   const reportTab = createTabReporter({
     send: (event, data) => client?.event(event, data) ?? false,
     now: () => Date.now(),
+  });
+
+  // The browser shows no answers, so voice is listen only: the spoken ask goes to the brain and
+  // the reply is shown and spoken by the displaying body (the desktop).
+  const voice = createVoiceSession({
+    client: {
+      listen: (mode) => (client ? client.listen(mode) : Promise.reject(new BrainOffline())),
+      mic: (pcm) => client?.mic(pcm) ?? false,
+      unlisten: () => client?.unlisten(),
+    },
+    mic: deps.mic,
+    say: (text) => ask({ text, spoken: true }),
+    onChange: deps.onVoiceView,
   });
 
   async function build(): Promise<void> {
@@ -112,9 +145,17 @@ export function createBody(deps: BodyDeps): BrowserBody {
       tools: () => set.tools(),
       openSocket: deps.openSocket,
       onUse: (tool, input) => set.run(tool, input),
-      // The browser shows nothing from the brain yet, so these are heard and dropped.
-      onNotification: () => undefined,
-      onStatus: () => undefined,
+      // Only the ears' events matter here; the browser shows nothing else from the brain.
+      onNotification: (method, params) => {
+        if (method === 'heard')
+          voice.onHeard((params as HeardParams).event, (params as HeardParams).text);
+        if (method === 'voice')
+          voice.onVoice((params as VoiceParams).status, (params as VoiceParams).message);
+      },
+      // A listen does not survive the link: the brain stops hearing a body that disconnects.
+      onStatus: (status) => {
+        if (status !== 'online') voice.end("Scout's brain went away.");
+      },
       onResync: () => undefined,
     });
     client.start();
@@ -131,12 +172,27 @@ export function createBody(deps: BodyDeps): BrowserBody {
     await starting;
   }
 
+  async function ask(params: SayParams): Promise<void> {
+    // A woken worker has no client yet and a fresh one is still connecting, so wait for it.
+    await start();
+    const deadline = Date.now() + SAY_WAIT_MS;
+    while (client?.link !== 'online' && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, SAY_POLL_MS));
+    }
+    try {
+      await client?.say(params);
+    } catch (error) {
+      if (!(error instanceof BrainOffline)) throw error;
+    }
+  }
+
   return {
     start,
     stop() {
       client?.stop();
     },
     async restart() {
+      voice.end('Scout reconnected, so it stopped listening.');
       await starting;
       client?.stop();
       client = null;
@@ -144,25 +200,17 @@ export function createBody(deps: BodyDeps): BrowserBody {
     },
     info() {
       const status: BrainStatus = client?.link ?? 'offline';
-      return { status, id, name };
+      return { status, id, name, voice: voice.view() };
     },
     tabChanged: reportTab,
     downloadChanged(item) {
       const fact = downloadEvent(item);
       if (fact) client?.event('download', fact);
     },
-    async say(text, context) {
-      // A woken worker has no client yet and a fresh one is still connecting, so wait for it.
-      await start();
-      const deadline = Date.now() + SAY_WAIT_MS;
-      while (client?.link !== 'online' && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, SAY_POLL_MS));
-      }
-      try {
-        await client?.say(context === undefined ? { text } : { text, context });
-      } catch (error) {
-        if (!(error instanceof BrainOffline)) throw error;
-      }
-    },
+    say: (text, context) => ask(context === undefined ? { text } : { text, context }),
+    voiceStart: () => voice.start(),
+    voiceStop: () => voice.stop(),
+    voiceFrame: (pcm) => voice.frame(pcm),
+    voiceEnd: (reason) => voice.end(reason),
   };
 }

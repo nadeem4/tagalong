@@ -96,3 +96,12 @@ input {
   border: 0;
   cursor: pointer;
 }
+#mic {
+  margin: 4px 0 4px;
+}
+#mic[disabled] {
+  cursor: default;
+}
+#voice-line:empty {
+  display: none;
+}

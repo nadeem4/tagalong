@@ -18,27 +18,30 @@ The store listing, permission justifications and the public privacy policy are i
 
 ## Where it lives
 
-| Path (under `bodies/browser/`)       | What                                                                |
-| ------------------------------------ | ------------------------------------------------------------------- |
-| `src/service-worker.ts`              | Entry: wires the body to Chrome's APIs and the reconnect alarm      |
-| `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop |
-| `src/reconnect.ts`                   | The alarm's redial rule                                             |
-| `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                             |
-| `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`      |
-| `src/tools/page-parts.ts`            | The `page_parts` tool                                               |
-| `src/tools/browser-search.ts`        | The `browser_search` tool                                           |
-| `src/tools/tab-actions.ts`           | The `tab_actions` tool                                              |
-| `src/ask-scout.ts`                   | Turns a right-click or an address-bar entry into what you say       |
-| `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle             |
-| `src/permissions.ts`                 | The permission broker and its 25 s wait                             |
-| `src/permission/`                    | The permission window page                                          |
-| `src/popup/`                         | The toolbar popup page                                              |
-| `src/content/`                       | The page reader and the parts reader, injected into a tab on demand |
-| `src/layer/`                         | Thin wrappers over `chrome.*`, so tests can fake them               |
-| `src/manifest.ts`                    | Builds `manifest.json`                                              |
+| Path (under `bodies/browser/`)       | What                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `src/service-worker.ts`              | Entry: wires the body to Chrome's APIs and the reconnect alarm            |
+| `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop       |
+| `src/reconnect.ts`                   | The alarm's redial rule                                                   |
+| `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                                   |
+| `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`            |
+| `src/tools/page-parts.ts`            | The `page_parts` tool                                                     |
+| `src/tools/browser-search.ts`        | The `browser_search` tool                                                 |
+| `src/tools/tab-actions.ts`           | The `tab_actions` tool                                                    |
+| `src/ask-scout.ts`                   | Turns a right-click or an address-bar entry into what you say             |
+| `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle                   |
+| `src/permissions.ts`                 | The permission broker and its 25 s wait                                   |
+| `src/permission/`                    | The permission window page                                                |
+| `src/popup/`                         | The toolbar popup page                                                    |
+| `src/voice/`                         | The voice session (pure), the mic page's hold and the float to int16 step |
+| `src/offscreen/`                     | The hidden page that owns the microphone, and its worklet                 |
+| `src/permission/mic.*`               | The page where you allow the microphone                                   |
+| `src/content/`                       | The page reader and the parts reader, injected into a tab on demand       |
+| `src/layer/`                         | Thin wrappers over `chrome.*`, so tests can fake them                     |
+| `src/manifest.ts`                    | Builds `manifest.json`                                                    |
 
 The build (`pnpm --filter @tagalong/browser build`) writes `bodies/browser/dist`: `manifest.json`,
-`service-worker.js`, `page-reader.js`, `popup/popup.html`, `permission/permission.html` and
+`service-worker.js`, `page-reader.js`, `popup/popup.html`, `permission/permission.html`, `permission/mic.html`, `offscreen/offscreen.html` and
 `assets/`. That folder is what you load unpacked. The package imports `@tagalong/contract` (the
 `BrainClient`), never `@tagalong/ui`.
 
@@ -298,7 +301,9 @@ each action asks for the one browser permission it needs.
 
 ## Permissions
 
-The manifest asks only for `alarms`, `scripting` and `storage` at install. Everything else is
+The manifest asks only for `alarms`, `offscreen`, `scripting` and `storage` at install (none of
+them shows a warning). The microphone is not a manifest permission: you allow it once, on a page
+of its own (see Voice). Everything else is
 optional and asked for when a tool needs it. The permission window is where a tool's grant is made,
 because `chrome.permissions.request` needs a click; the one other grant is `contextMenus`, from the
 popup's button (below).
@@ -352,7 +357,65 @@ message `{type: 'status'}` and shows:
 - the **Name** of this browser;
 - a **Turn on right-click** button, shown until `contextMenus` is granted, with a line saying how to
   ask from the page;
+- an **Ask by voice** button with a line under it (see Voice);
 - an **Allowed** list of what you have granted, each with a remove button.
+
+## Voice
+
+You can ask Scout out loud from the popup. The browser only listens: it says `display: false`, so
+Scout's spoken answer plays on the desktop, together with the text in the bubble. With only the
+browser online the ask is refused, as for any ask (see "Only the browser is online").
+
+Audio goes only to your own brain and is never stored; with the brain on this computer it never
+leaves it. The microphone is open only while **Done talking** is showing.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+  P["Popup<br>Ask by voice"] -->|"voice-start"| W["Service worker<br>voice session"]
+  W -->|"listen held"| B["Python brain<br>ears"]
+  W -->|"creates"| O["Offscreen page<br>microphone, 16 kHz"]
+  O -->|"mic:frame"| W
+  W -->|"mic frames"| B
+  B -->|"heard"| W
+  W -->|"say, spoken: true"| B
+  B -->|"reply and speech"| D["Desktop<br>bubble and voice"]
+```
+
+How a question goes:
+
+1. Click **Ask by voice**. The first time, the popup opens a tab (`permission/mic.html`) with the
+   sentence above and an **Allow microphone** button, because only a page you click in can show
+   Chrome's prompt; the hidden page that holds the microphone cannot. Allow it, close the tab and
+   click again. Chrome remembers the grant for the extension.
+2. The worker sends `listen` (held) to the brain, then creates the offscreen document
+   (`offscreen/offscreen.html`, reason `USER_MEDIA`). It opens the microphone with an audio
+   context at 16 kHz and an AudioWorklet that cuts it into 512-sample frames, and posts each one to
+   the worker as `{type: 'mic:frame', pcm}` (the int16 samples as numbers). The worker sends them to
+   the brain as `mic` frames.
+3. The popup shows the brain's running words (`heard` `partial`). Click **Done talking**: the worker
+   closes the offscreen page and sends `unlisten`. The brain finishes the last words and sends
+   `heard` `turn_end` with the question.
+4. The worker sends the question as `say` with `spoken: true` (no `voice` or `speed`: the browser has
+   no voice settings, so the brain's defaults apply). If no `turn_end` arrives within 10 s the popup
+   returns to idle and sends nothing. An empty question sends nothing.
+
+The session is one pure module, `voice/voice-session.ts`, that the body drives; the popup shows its
+state: idle, listening, thinking (waiting for the question) or an error with a plain line. Errors
+are: the brain is not reachable, it cannot hear yet (it answered `listen` with an error, for example
+`method_not_found`), the speech models failed (the brain's `voice` `failed` line), the microphone
+could not start, or the link dropped.
+
+Limits to know:
+
+- **The popup is the microphone's switch.** Chrome closes a popup when you click elsewhere, and
+  closing it counts as done talking: the words so far are sent as the question. Keep the popup open
+  while you speak.
+- **No reconnect.** If the link to the brain drops while listening, the session ends with an error;
+  it is not restarted (the desktop re-listens, the browser does not).
+- **A worker restart ends it.** On start the worker closes any microphone page a dead worker left
+  behind, so the microphone never stays open for nobody.
+- One listening session at a time across bodies: a `listen` from the browser ends one on the desktop.
 
 ## Asking Scout from the page
 
@@ -447,6 +510,7 @@ browser either. Tools that need no approval, like `tabs` `list`, still work. The
   extension storage, and the last sequence number in session storage.
 - It sends what it read only to the brain at the address you set. The brain sends it on to the AI
   service you chose.
+- The microphone is open only while **Done talking** shows in the popup. Its audio is held in memory, goes only to your own brain over the websocket and is never stored; with the brain on this computer it never leaves it.
 - No analytics, no ads, no remote code.
 
 ## Events
@@ -479,7 +543,7 @@ offline, a fact is dropped, not queued.
 
 | Test file (under `bodies/browser/src/`) | What it pins                                                                                                                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `body.test.ts`                          | Hello (`display: false`, four tools), dispatch, restart, stop, keepalive, events, `say` cold wake and offline                                                                                                 |
+| `body.test.ts`                          | Hello (`display: false`, four tools), dispatch, restart, stop, keepalive, events, `say` cold wake and offline, voice start, frames, the spoken ask and a lost link                                            |
 | `ask-scout.test.ts`                     | Right-click and address-bar text and context, fenced and capped selection, stripped URL, gateAsk (no title without `tabs`; none of the context for the address bar), private windows, empty text asks nothing |
 | `service-worker.test.ts`                | The omnibox and right-click listeners exist at load; another menu item says nothing; a click on ours says the gated ask                                                                                       |
 | `tools/tab-actions.test.ts`             | Each action and its permission, web addresses only, defaults to the tab in front, plain failures                                                                                                              |
@@ -488,10 +552,13 @@ offline, a fact is dropped, not queued.
 | `reconnect.test.ts`                     | The alarm redials unless the body is online or outdated                                                                                                                                                       |
 | `identity.test.ts`                      | The id shape and the browser kind                                                                                                                                                                             |
 | `settings.test.ts`                      | Address and name validation                                                                                                                                                                                   |
-| `manifest.test.ts`                      | Permissions, optional permissions, omnibox keyword, CSP, popup path                                                                                                                                           |
+| `manifest.test.ts`                      | Permissions (including `offscreen`), optional permissions, omnibox keyword, CSP, popup path                                                                                                                   |
+| `voice/voice-session.test.ts`           | Start, frames, stop, one spoken ask on `turn_end`, no words, errors, a lost link                                                                                                                              |
+| `voice/mic-control.test.ts`             | The offscreen page exists only while listening; a stale one is remade                                                                                                                                         |
+| `voice/pcm.test.ts`                     | Float to int16: scaling, rounding, clamping                                                                                                                                                                   |
 | `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                                                                                                                       |
 | `permission/model.test.ts`              | The window's wording and buttons                                                                                                                                                                              |
-| `popup/model.test.ts`                   | The popup's status lines, allowed list and when the right-click button shows                                                                                                                                  |
+| `popup/model.test.ts`                   | The popup's status lines, allowed list, when the right-click button shows, the mic button's label and click, and its line                                                                                     |
 | `events.test.ts`                        | Stripped URLs, the 2 s throttle, no repeats, download names and states                                                                                                                                        |
 | `tools/tabs.test.ts`                    | List, read, picture (front tab only, same tab after the allow), asleep, locked, truncation                                                                                                                    |
 | `tools/page-parts.test.ts`              | Same needs as read, asleep and locked tabs, unknown part                                                                                                                                                      |

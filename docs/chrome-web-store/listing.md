@@ -37,7 +37,7 @@ What it does:
 How it works:
 - Ask Scout about your tabs ("what tabs do I have open?", "read this page").
 - The first time Scout needs something, a small window asks you. For a site you choose Allow on this site, Allow on all sites, or Not now; for anything else (tabs, history, bookmarks and so on) you choose Allow or Not now.
-- The toolbar button shows whether Scout's brain is reachable, lets you change its address, name this browser, and see or remove what you allowed.
+- The toolbar button shows whether Scout's brain is reachable, lets you change its address, name this browser, and see or remove what you allowed, and ask Scout out loud with the mic button (the microphone is open only while you talk).
 
 Setup: load the extension, then start the Tagalong brain. There is nothing to paste: the extension finds the brain at 127.0.0.1:47321, or at the address you set in the toolbar popup.
 
@@ -61,28 +61,29 @@ Privacy:
 > Lets Scout, the Tagalong companion, list the user's open tabs, read or picture a tab the user
 > allows, search the user's browser history and bookmarks, and open, close, switch, group,
 > bookmark or save tabs, when the user asks. It also tells Scout which tab is in front and when a
-> download ends, and lets the user ask Scout from a right-click or the address bar. It connects
+> download ends, and lets the user ask Scout from a right-click, the address bar or, out loud, the popup's mic button. It connects
 > only to the user's Tagalong brain.
 
 ### Permission justifications
 
 One entry per permission in the manifest.
 
-| Permission                   | Justification                                                                                                                                                                            |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alarms`                     | A 30-second alarm wakes the service worker after Chrome stops it, so the extension notices when the Tagalong brain starts again and reconnects.                                          |
-| `scripting`                  | Injects the bundled page reader into one tab only when Scout asks and the user allowed that site, to read its selection and main text. There is no standing content script.              |
-| `storage`                    | Keeps the brain's address, the browser's name and its random body id, in `chrome.storage.local`, and the last message number in `chrome.storage.session`. Never synced.                  |
-| `tabs` (optional)            | Asked on first use, from a click in a small window. Lets Scout see the title and address of open tabs, and sends the tab in front to Scout while connected. Never from a private window. |
-| `history` (optional)         | Asked, from a click, the first time Scout searches browsing history for you.                                                                                                             |
-| `bookmarks` (optional)       | Asked, from a click, the first time Scout searches your bookmarks or, on your request, adds one.                                                                                         |
-| `readingList` (optional)     | Asked, from a click, the first time Scout searches your reading list or, on your request, adds a page to it.                                                                             |
-| `downloads` (optional)       | Asked, from a click, the first time Scout searches your downloads. It also reports a finished download's file name.                                                                      |
-| `sessions` (optional)        | Asked, from a click, the first time Scout lists your recently closed tabs or, on your request, reopens the one closed last.                                                              |
-| `tabGroups` (optional)       | Asked, from a click, the first time you ask Scout to group tabs. Used only to put tabs you name into one group.                                                                          |
-| `search` (optional)          | Asked, from a click, the first time you ask Scout to search the web. Opens a search in a new tab with your default search engine; the extension does not read the results.               |
-| `contextMenus` (optional)    | Asked only when you press "Turn on right-click" in the toolbar popup. Adds one right-click item on selected text, "Ask Scout about this".                                                |
-| `<all_urls>` host (optional) | Off until the user picks Allow on this site or Allow on all sites in the permission window. Lets the extension read a tab of that site when Scout asks. It reads nothing until asked.    |
+| Permission                   | Justification                                                                                                                                                                                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alarms`                     | A 30-second alarm wakes the service worker after Chrome stops it, so the extension notices when the Tagalong brain starts again and reconnects.                                                                                                                       |
+| `offscreen`                  | Holds a hidden page that opens the microphone, only while the user is asking Scout by voice from the popup and has pressed the mic button; closed as soon as they press Done talking. Audio goes only over the websocket to the user's own brain and is never stored. |
+| `scripting`                  | Injects the bundled page reader into one tab only when Scout asks and the user allowed that site, to read its selection and main text. There is no standing content script.                                                                                           |
+| `storage`                    | Keeps the brain's address, the browser's name and its random body id, in `chrome.storage.local`, and the last message number in `chrome.storage.session`. Never synced.                                                                                               |
+| `tabs` (optional)            | Asked on first use, from a click in a small window. Lets Scout see the title and address of open tabs, and sends the tab in front to Scout while connected. Never from a private window.                                                                              |
+| `history` (optional)         | Asked, from a click, the first time Scout searches browsing history for you.                                                                                                                                                                                          |
+| `bookmarks` (optional)       | Asked, from a click, the first time Scout searches your bookmarks or, on your request, adds one.                                                                                                                                                                      |
+| `readingList` (optional)     | Asked, from a click, the first time Scout searches your reading list or, on your request, adds a page to it.                                                                                                                                                          |
+| `downloads` (optional)       | Asked, from a click, the first time Scout searches your downloads. It also reports a finished download's file name.                                                                                                                                                   |
+| `sessions` (optional)        | Asked, from a click, the first time Scout lists your recently closed tabs or, on your request, reopens the one closed last.                                                                                                                                           |
+| `tabGroups` (optional)       | Asked, from a click, the first time you ask Scout to group tabs. Used only to put tabs you name into one group.                                                                                                                                                       |
+| `search` (optional)          | Asked, from a click, the first time you ask Scout to search the web. Opens a search in a new tab with your default search engine; the extension does not read the results.                                                                                            |
+| `contextMenus` (optional)    | Asked only when you press "Turn on right-click" in the toolbar popup. Adds one right-click item on selected text, "Ask Scout about this".                                                                                                                             |
+| `<all_urls>` host (optional) | Off until the user picks Allow on this site or Allow on all sites in the permission window. Lets the extension read a tab of that site when Scout asks. It reads nothing until asked.                                                                                 |
 
 ### Remote code
 

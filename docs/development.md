@@ -77,16 +77,17 @@ tagalong/
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/body.ts, identity.ts      # the body: one BrainClient, tools, body id <browser>-<4 chars>
       src/tools/, permissions.ts    # the tabs tool and the permission broker
-      src/popup/, src/permission/   # the toolbar popup and the permission window
+      src/popup/, src/permission/   # the toolbar popup and the permission windows (incl. mic.html)
+      src/voice/, src/offscreen/    # ask by voice: the session, the mic page hold, the offscreen mic page
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
-| Package          | Responsibility                                                                                                                                                               |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `protocol/ts`    | `@tagalong/contract`: zod schemas for contract v1. Depends only on zod.                                                                                                      |
-| `bodies/ui`      | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context. `@tagalong/ui/shapes` is the React-free part. |
-| `bodies/desktop` | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.    |
-| `bodies/browser` | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup.                   |
+| Package          | Responsibility                                                                                                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `protocol/ts`    | `@tagalong/contract`: zod schemas for contract v1. Depends only on zod.                                                                                                                          |
+| `bodies/ui`      | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, and the `HostBridge` context. `@tagalong/ui/shapes` is the React-free part.                     |
+| `bodies/desktop` | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.                        |
+| `bodies/browser` | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup. It can listen by voice (listen only). |
 
 ## How to run
 
