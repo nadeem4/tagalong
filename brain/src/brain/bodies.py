@@ -117,12 +117,18 @@ class Bodies:
             return Joined(box.latest, True, [])
         return Joined(box.latest, False, missed)
 
-    def disconnect(self, body_id: str, peer: Peer) -> None:
+    def is_current(self, body_id: str, peer: Peer) -> bool:
         current = self._online.get(body_id)
-        if current is not None and current.peer is peer:
+        return current is not None and current.peer is peer
+
+    def disconnect(self, body_id: str, peer: Peer) -> bool:
+        """Drop the body if `peer` is its current connection; say whether it was."""
+        was_current = self.is_current(body_id, peer)
+        if was_current:
             del self._online[body_id]
             self._offline_at[body_id] = self._clock()
         self._fail_pending(peer)
+        return was_current
 
     def set_tools(self, body_id: str, peer: Peer, tools: list[Tool]) -> None:
         # A replaced connection may still deliver a frame; only the current peer counts.

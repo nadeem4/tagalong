@@ -938,6 +938,66 @@ async def test_a_disconnect_unlistens():
         await server.wait_closed()
 
 
+async def test_a_replaced_connection_closing_does_not_unlisten_the_new_one():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as a:
+            await call(a, hello())
+            await call(a, request("listen", {"mode": "held"}))
+            async with connect(url) as b:
+                await call(b, hello())
+                await call(b, request("listen", {"mode": "held"}))
+                await a.close()
+                await asyncio.sleep(0.2)
+                assert voice.calls.count(("listen", "desktop", "held")) == 2
+                assert ("unlisten", "desktop") not in voice.calls
+                await b.send(json.dumps(notification("mic", {"pcm": "AAA="})))
+                await settle(b)
+                assert [c[0] for c in voice.calls if c[0] == "mic"] == ["mic"]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_mic_at_the_frame_limit_is_accepted_and_one_over_is_dropped():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await call(ws, request("listen", {"mode": "held"}))
+            for size in (65_536, 65_537):
+                pcm = base64.b64encode(bytes(size)).decode()
+                await ws.send(json.dumps(notification("mic", {"pcm": pcm})))
+            await settle(ws)
+        assert [len(c[2]) for c in voice.calls if c[0] == "mic"] == [65_536]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_a_raising_listen_hook_leaves_the_body_not_listening():
+    class Raising(RecordingVoice):
+        def listen(self, body_id, mode):
+            raise RuntimeError("no model")
+
+    voice = Raising()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            reply = await call(ws, request("listen", {"mode": "held"}))
+            assert reply["error"]["code"] == -32603
+            await ws.send(json.dumps(notification("mic", {"pcm": "AAA="})))
+            await settle(ws)
+        assert [c for c in voice.calls if c[0] == "mic"] == []
+        assert ("unlisten", "desktop") not in voice.calls
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_without_a_voice_listen_is_method_not_found_and_notifications_are_ignored():
     server, url = await voice_env(None)
     try:

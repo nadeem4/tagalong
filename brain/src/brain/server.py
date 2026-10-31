@@ -134,6 +134,8 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                 continue
             try:
                 if method in VOICE_METHODS:
+                    if not bodies.is_current(body_id, peer):
+                        continue  # a replaced connection may still deliver queued frames
                     reply = _voice(method, message, req_id, body_id, session, listening)
                 else:
                     reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
@@ -148,8 +150,9 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
         for task in calls:
             task.cancel()  # nobody is left to read their replies
         if body_id is not None:
-            bodies.disconnect(body_id, peer)
-            if session.voice is not None:
+            was_current = bodies.disconnect(body_id, peer)
+            # A replaced connection must not tear down the listening its successor started.
+            if was_current and body_id in listening and session.voice is not None:
                 session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
         peer.close()
         await asyncio.gather(writer, return_exceptions=True)
@@ -226,14 +229,16 @@ def _voice(
             params = ListenParams.model_validate(raw)
         except ValidationError as exc:
             return _error(req_id, ErrorCode.invalid_params, str(exc))
+        voice.listen(body_id, params.mode)  # first: a raising hook must not mark it listening
         listening.add(body_id)
-        voice.listen(body_id, params.mode)
         return _result(req_id, {})
     if method == "mic":
         if is_request or body_id not in listening:
             return None
         try:
             frame = MicParams.model_validate(raw)
+            if len(frame.pcm) > 4 * ((LIMITS["mic_frame"] + 2) // 3):
+                return None  # too big to decode
             pcm = base64.b64decode(frame.pcm, validate=True)
         except ValueError:  # a bad shape or bad base64
             log.debug("dropped a bad mic frame")

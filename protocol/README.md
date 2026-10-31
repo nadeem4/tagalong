@@ -8,7 +8,7 @@ and the samples in `examples/` follow it, and a change here comes first. The sam
 
 - Bodies talk only to the brain, never to each other.
 - The contract carries facts and the model's own words, never canned lines. Every word Scout says comes from the model; a turn may end with no reply at all.
-- The twenty-two messages below do not change when a body, tool, expert or Home screen is added. New things arrive as tools, event names or `changed` names, never as new messages. (Fifteen carry the conversation; seven carry voice.)
+- The twenty-two messages below do not change when a body, tool, expert or Home screen is added. Beyond these twenty-two, new things arrive as tools, event names or `changed` names. (Fifteen carry the conversation; seven carry voice.)
 - Single user: no TLS, pairing or accounts in v1.
 
 ## Transport

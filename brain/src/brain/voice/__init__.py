@@ -1,8 +1,7 @@
 """The seam between the websocket server and the brain's voice models.
 
 The server routes `listen`, `mic`, `unlisten` and `hush` here and knows nothing about
-models; the real service arrives in a later slice. Every method must tolerate a body
-that never listened, because the server calls `unlisten` on every disconnect.
+models; the real service arrives in a later slice.
 """
 
 from typing import Literal, Protocol
