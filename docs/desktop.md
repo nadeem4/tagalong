@@ -577,7 +577,7 @@ by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate 
 | `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                  |
 | `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false` |
 | `mac`, `linux`         | `dmg`; `AppImage` and `deb`. Configured, not verified                                                                                                                                  |
-| `directories`          | output `release`, build resources `resources`                                                                                                                                          |
+| `directories`          | output `release`                                                                                                                                                                       |
 
 Node cannot `dlopen` from inside an asar archive; files under `app.asar.unpacked` are loaded from
 there by Electron's `require` redirect, which is why every `.node` file and the ONNX runtime's DLLs

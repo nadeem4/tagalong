@@ -16,7 +16,7 @@ const read = (path: string): unknown =>
 interface BuilderConfig {
   appId: string;
   productName: string;
-  directories: { output: string; buildResources: string };
+  directories: { output: string };
   files: string[];
   asar: boolean;
   asarUnpack: string[];
@@ -38,7 +38,7 @@ const manifest = read('../../package.json') as {
 };
 
 describe('electron-builder config', () => {
-  it('builds an x64 NSIS installer for Windows, the target judges will run', () => {
+  it('builds an x64 NSIS installer for Windows, the target users run', () => {
     expect(config.win.target).toContainEqual({ target: 'nsis', arch: ['x64'] });
   });
 
