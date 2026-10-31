@@ -6,7 +6,7 @@
  * pnpm skips get-windows' install script (it is in `pnpm.ignoredBuiltDependencies`, so no
  * install ever compiles anything), which also skips the step that downloads its prebuilt
  * N-API binary. Without that file the active-window lookup quietly answers "no window" and
- * a look falls back to the whole screen. This runs the same download the install script
+ * the ask names no window. This runs the same download the install script
  * would have, without `--fallback-to-build`, so it never needs a C++ toolchain.
  *
  * Usage: node scripts/fetch-native.mjs [platform] [arch]   (defaults: win32 x64)
@@ -47,7 +47,7 @@ const result = spawnSync(
 if (result.error !== undefined || result.status !== 0) {
   console.warn(
     'could not fetch the get-windows binding; the installer still builds, but the app ' +
-      'will not know the active window and a look will capture the whole screen',
+      'will not know the active window',
   );
 }
 process.exit(0);

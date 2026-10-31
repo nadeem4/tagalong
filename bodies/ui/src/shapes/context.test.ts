@@ -1,6 +1,6 @@
-/** Tests for the context snapshot and its displays, windows and dropped items. */
+/** Tests for the context snapshot, screens, windows and dropped items. */
 import { describe, expect, it } from 'vitest';
-import { ContextSnapshot, DisplaySnapshot, MAX_SELECTION_CHARS, WindowEntry } from './context';
+import { ContextSnapshot, MAX_SELECTION_CHARS, ScreenInfo, WindowEntry } from './context';
 
 const valid = {
   id: '9f1d6b64-2a5e-4f3a-9c11-8a2e7b4d5c60',
@@ -41,71 +41,53 @@ describe('ContextSnapshot', () => {
   });
 });
 
-const display = {
-  id: 2528732444,
-  bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-  scaleFactor: 1,
-  primary: true,
-  focused: true,
-};
-
 const png = { mime: 'image/png', base64: 'aGk=', width: 1568, height: 882 };
 
 const window_ = {
   id: 'w-1',
   processName: 'Code.exe',
-  title: 'displays.ts — tagalong',
+  title: 'sight.md - tagalong',
   displayId: 2528732444,
   state: 'background',
   browser: false,
 };
 
-describe('DisplaySnapshot', () => {
-  it('parses a display with no image, which is a display nothing could capture', () => {
-    const parsed = DisplaySnapshot.parse(display);
-    expect(parsed.image).toBeUndefined();
-    expect(parsed.blocked).toBeUndefined();
-  });
-
-  it('parses a display carrying its picture', () => {
-    expect(DisplaySnapshot.parse({ ...display, image: png }).image?.width).toBe(1568);
-  });
-
-  it('parses a blocked display and keeps the rule that refused it', () => {
-    const parsed = DisplaySnapshot.parse({
-      ...display,
-      blocked: { rule: 'processName', entry: '1Password.exe' },
-    });
-    expect(parsed.blocked?.entry).toBe('1Password.exe');
-  });
-
+describe('ScreenInfo', () => {
   it('accepts negative bounds, which is how Windows describes a monitor to the left', () => {
     expect(
-      DisplaySnapshot.safeParse({
-        ...display,
+      ScreenInfo.safeParse({
+        id: 2,
         bounds: { x: -1920, y: -200, width: 1920, height: 1080 },
+        primary: false,
       }).success,
     ).toBe(true);
   });
 
   it('rejects a display with no width', () => {
     expect(
-      DisplaySnapshot.safeParse({ ...display, bounds: { x: 0, y: 0, width: 0, height: 1080 } })
+      ScreenInfo.safeParse({ id: 2, bounds: { x: 0, y: 0, width: 0, height: 1080 }, primary: true })
         .success,
-    ).toBe(false);
-  });
-
-  it('rejects a scale factor of zero', () => {
-    expect(DisplaySnapshot.safeParse({ ...display, scaleFactor: 0 }).success).toBe(false);
-  });
-
-  it('rejects an exclusion rule it does not know', () => {
-    expect(
-      DisplaySnapshot.safeParse({ ...display, blocked: { rule: 'vibes', entry: 'x' } }).success,
     ).toBe(false);
   });
 });
 
+describe('ContextSnapshot.dropped', () => {
+  it.each(['text', 'link', 'file', 'image'] as const)('parses a dropped %s', (kind) => {
+    const dropped = kind === 'image' ? { kind, image: png } : { kind, text: 'hello' };
+    expect(ContextSnapshot.parse({ ...valid, dropped }).dropped?.kind).toBe(kind);
+  });
+
+  it('rejects a kind it does not know', () => {
+    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'video' } }).success).toBe(false);
+  });
+
+  it('rejects dropped text past the cap', () => {
+    const text = 'x'.repeat(MAX_SELECTION_CHARS + 1);
+    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'text', text } }).success).toBe(
+      false,
+    );
+  });
+});
 describe('WindowEntry', () => {
   it('parses a background window', () => {
     const parsed = WindowEntry.parse(window_);

@@ -134,10 +134,10 @@ Callers that need titles only pass `countText: false`: the focus watch, the list
 
 ### Screenshots and captures
 
-| Capture           | Function                                      | Size limit                                  | Exclusion check                                                                 |
-| ----------------- | --------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
-| One listed window | `lookAtWindowWith` + `captureWindowImageWith` | `MAX_SCREENSHOT_LONG_SIDE` = 1568 long side | against the classified list before any pixel; minimized refused (nothing drawn) |
-| OCR picture       | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500                 | the text read's own check                                                       |
+| Capture           | Function                                      | Size limit                           | Exclusion check                                                                 |
+| ----------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| One listed window | `lookAtWindowWith` + `captureWindowImageWith` | `LONG_SIDE` = 1568 (`body-tools.ts`) | against the classified list before any pixel; minimized refused (nothing drawn) |
+| OCR picture       | `captureWindowImageWith`                      | `OCR_MAX_LONG_SIDE` = 2,500          | the text read's own check                                                       |
 
 Rules shared by every picture:
 
@@ -161,7 +161,7 @@ Which reads announce:
 | Path                                                | Announced                |
 | --------------------------------------------------- | ------------------------ |
 | Ask hotkey (`openPanelWithContext`)                 | yes, `screenshot: false` |
-| Talk key (`captureForPanel`)                        | yes, `screenshot: false` |
+| Talk key (`noteActiveWindow`)                       | yes, `screenshot: false` |
 | `look_at_window`                                    | yes, `screenshot: true`  |
 | `read_window_text` read by OCR                      | yes, `screenshot: true`  |
 | `read_window_text` by UI Automation, `list_windows` | no notice                |
@@ -311,7 +311,8 @@ not block a drop.
 
 | Constant                    | Value     | File                                   |
 | --------------------------- | --------- | -------------------------------------- |
-| `MAX_SCREENSHOT_LONG_SIDE`  | 1568      | `bodies/desktop/src/main/context.ts`   |
+| `LONG_SIDE`                 | 1568      | `main/brain/body-tools.ts`             |
+| `MAX_SCREENSHOT_LONG_SIDE`  | 1568      | `bodies/desktop/src/main/drop.ts`      |
 | `OCR_MAX_LONG_SIDE`         | 2,500     | `platform/ocr.ts`                      |
 | `OCR_TIMEOUT_MS`            | 10,000    | `platform/ocr.ts`                      |
 | `WINDOW_HELPER_TIMEOUT_MS`  | 8,000     | `platform/win32.ts`                    |
@@ -334,9 +335,9 @@ not block a drop.
 
 - **Perception is best effort.** `attempt` logs and returns null for one failed read, so the rest
   of a capture survives. The sight pause is the exception and is re-thrown.
-- **Silent emptiness is named.** An empty window list carries `failure` and becomes a warning in
-  the window-list failure ("the window list helper returned nothing at all", and so on), so an
-  empty list is never rendered as "no windows".
+- **Silent emptiness is named.** An empty window list carries `failure`, and
+  `list_windows` turns it into a failed tool call ("the window list could not be read"), so an
+  empty list is never reported as "no windows".
 - **PowerShell never throws** to callers; text reads distinguish "the read never happened" from
   "the window published nothing".
 - **Model mistakes are answers.** Unknown window ids, closed windows and minimized windows come
@@ -367,4 +368,4 @@ The privacy reference for everything above is [privacy.md](privacy.md): what is 
 | Selection borrow and restore                                                                                                                            | `platform/selection.test.ts`                                                             |
 | Exclusion matching, blind spots, secret files                                                                                                           | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                              |
 | Inventory classification, text-layer notes                                                                                                              | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                        |
-| Sight pause round trip and sight settings end to end                                                                                                    | `bodies/desktop/e2e/smoke.spec.ts`                                                       |
+| A paused sight refuses a `list_windows` tool call, and sight settings, end to end                                                                       | `bodies/desktop/e2e/smoke.spec.ts`                                                       |

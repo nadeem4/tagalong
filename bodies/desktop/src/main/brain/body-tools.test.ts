@@ -118,6 +118,13 @@ describe('list_windows', () => {
     expect(listed.windows.map((w: { id: string }) => w.id)).toEqual(['w1', 'w2']);
     expect(listed.windows[1].state).toBe('minimized');
   });
+
+  it('fails instead of reporting an empty list when the enumeration broke', async () => {
+    const { run } = setup({ listWindows: async () => ({ windows: [], failure: 'no-output' }) });
+    await expect(run('list_windows', {})).rejects.toMatchObject({
+      message: 'the window list could not be read',
+    });
+  });
 });
 
 describe('read_window_text', () => {

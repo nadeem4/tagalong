@@ -221,6 +221,24 @@ test('pausing sight and resuming it round-trips through the host', async () => {
   expect(paused, 'the toggle should report the state it moved to').toBe(true);
   expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(true);
 
+  // While paused, the brain's list_windows tool call is refused with the pause's own words.
+  const reply = await panel.evaluate(
+    (petId) =>
+      new Promise<string>((resolve) => {
+        let text = '';
+        const off = window.tagalong.onTurnEvent((event) => {
+          if (event.type === 'turn.delta') text += event.text;
+          if (event.type === 'turn.completed') {
+            off();
+            resolve(text);
+          }
+        });
+        void window.tagalong.ask({ petId, text: 'what windows are open?' });
+      }),
+    (await panel.evaluate(() => window.tagalong.listPets()))[0]?.id ?? 'scout',
+  );
+  expect(reply).toContain('sight is paused');
+
   await panel.evaluate(() => window.tagalongHost.toggleSightPause());
   expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(false);
 });

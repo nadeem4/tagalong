@@ -13,15 +13,6 @@ import type { CaptureExclusions } from '../shared/settings';
 import type { ActiveWindowInfo, Platform } from './platform/index';
 import { isSightPaused } from './platform/sight-gate';
 
-/**
- * Long side of a captured screenshot, in pixels.
- *
- * 1568 is where the vision models stop gaining detail and start charging for it — beyond
- * it the image is downscaled on the far side anyway, so the extra pixels only cost upload
- * time and tokens.
- */
-export const MAX_SCREENSHOT_LONG_SIDE = 1568;
-
 /** What the ask's capture produced, and the rule that refused it if one did. */
 interface AskCapture {
   snapshot: ContextSnapshot;
@@ -73,11 +64,8 @@ async function unlessPaused<T>(
   }
 }
 
-/** A window as far as a capture needs it: what it is, and where it is when known. */
-type SeenWindow = Pick<ActiveWindowInfo, 'appName' | 'title'> & {
-  /** Present when the window came from the list rather than the foreground. */
-  listedId?: string;
-};
+/** A window as far as a capture needs it: what it is. */
+type SeenWindow = Pick<ActiveWindowInfo, 'appName' | 'title'>;
 
 /** Whether a window belongs to Tagalong itself: its bubble, its pet, its settings. */
 function isOwnWindow(appName: string): boolean {
@@ -85,11 +73,11 @@ function isOwnWindow(appName: string): boolean {
 }
 
 /**
- * The window the person means by "my screen".
+ * The window the person is working in.
  *
- * Usually the one in front. But while they type to Scout, Scout's own bubble is in front,
- * and a screenshot of that tells Scout only about itself. Then it is the topmost window
- * that is not Tagalong's and not minimized, from the list (which comes top first).
+ * Usually the one in front. But while they talk to Scout, Scout's own bubble may be in front,
+ * and naming that tells Scout only about itself. Then it is the topmost window that is not
+ * Tagalong's and not minimized, from the list (which comes top first).
  */
 async function windowInFocus(
   platform: Platform,
@@ -102,7 +90,7 @@ async function windowInFocus(
     (window) => window.state !== 'minimized' && !isOwnWindow(window.processName),
   );
   if (next === undefined) return null;
-  return { appName: next.processName, title: next.title, listedId: next.id };
+  return { appName: next.processName, title: next.title };
 }
 
 /**
@@ -113,13 +101,9 @@ async function windowInFocus(
  */
 function appOf(
   window: SeenWindow | null,
-  exclusions: CaptureExclusions,
+  blocked: CaptureBlock | null,
 ): { app?: ContextSnapshot['app'] } {
   if (window === null) return {};
-  const blocked = findCaptureBlock(
-    { processName: window.appName, title: window.title },
-    exclusions,
-  );
   if (blocked !== null) return { app: { name: window.appName, blocked } };
   return { app: { name: window.appName, ...(window.title ? { windowTitle: window.title } : {}) } };
 }
@@ -155,7 +139,7 @@ export async function captureAskSnapshot(
       capturedAt: new Date().toISOString(),
       host: 'desktop',
       ...(selection !== null && selection.length > 0 ? { selection } : {}),
-      ...appOf(window, options.exclusions),
+      ...appOf(window, selectionBlock),
     }),
     blocked: selectionBlock,
     paused: focused.paused,
@@ -180,5 +164,5 @@ export async function captureActiveWindow(
     window === null ? undefined : { processName: window.appName, title: window.title },
     options.exclusions,
   );
-  return { patch: appOf(window, options.exclusions), blocked, paused: focused.paused };
+  return { patch: appOf(window, blocked), blocked, paused: focused.paused };
 }

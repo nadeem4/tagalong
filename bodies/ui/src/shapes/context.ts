@@ -49,27 +49,16 @@ export const DisplayBounds = z.object({
 });
 export type DisplayBounds = z.infer<typeof DisplayBounds>;
 
-/** One monitor, as the host found it. */
-export const DisplaySnapshot = z.object({
-  id: z.number().int(),
-  bounds: DisplayBounds,
-  scaleFactor: z.number().positive(),
-  primary: z.boolean(),
-  /** True for the display holding the foreground window, if the OS reports one. */
-  focused: z.boolean(),
-  /** Present when an exclusion refused this display; its image is then a placeholder. */
-  blocked: CaptureBlock.optional(),
-  /** Absent when the capturer offered no usable source for this display. */
-  image: CapturedImage.optional(),
-});
-export type DisplaySnapshot = z.infer<typeof DisplaySnapshot>;
-
 /**
- * A display without its picture: enough to number the screens and say how big they are.
+ * One monitor: enough to number the screens and say how big they are.
  *
  * Listed in the host's own order, so a window list can be grouped as "Screen 1", "Screen 2".
  */
-export const ScreenInfo = DisplaySnapshot.pick({ id: true, bounds: true, primary: true });
+export const ScreenInfo = z.object({
+  id: z.number().int(),
+  bounds: DisplayBounds,
+  primary: z.boolean(),
+});
 export type ScreenInfo = z.infer<typeof ScreenInfo>;
 
 /**

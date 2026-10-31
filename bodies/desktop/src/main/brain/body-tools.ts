@@ -114,7 +114,9 @@ export function bodyTools(
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
 
   async function listWindows(): Promise<Part[]> {
-    const { windows, displays } = await platform.listWindows(exclusions());
+    const { windows, displays, failure } = await platform.listWindows(exclusions());
+    // An empty list from a broken enumeration must not read as "no windows are open".
+    if (failure !== undefined) throw failed('the window list could not be read');
     return text(JSON.stringify(displays === undefined ? { windows } : { windows, displays }));
   }
 

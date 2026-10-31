@@ -727,10 +727,10 @@ function openPanelNow(current: Desktop): void {
 }
 
 /**
- * The panel's own capture button. Null means refused, which is how the panel learns to
- * say capture is blocked here rather than silently staying blind.
+ * The talk key's window note: the window in focus, never the selection. Null means refused
+ * (blocked or paused), and the notice says which.
  */
-async function captureForPanel(current: Desktop): Promise<ContextSnapshot | null> {
+async function noteActiveWindow(current: Desktop): Promise<ContextSnapshot | null> {
   const { patch, blocked, paused } = await captureActiveWindow(current.platform, {
     exclusions: current.settings.captureExclusions,
   });
@@ -807,7 +807,7 @@ function registerIpc(): void {
     voice: () => required().voice,
     // The voice process starts on the first listen, if Scout has not spoken yet.
     worker: () => required().voiceWorker,
-    noteActiveWindow: () => captureForPanel(required()),
+    noteActiveWindow: () => noteActiveWindow(required()),
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
     voiceDir: () => join(app.getPath('userData'), 'voice'),

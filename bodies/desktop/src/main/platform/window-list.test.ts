@@ -387,7 +387,7 @@ describe('telling a failed enumeration from an empty desktop', () => {
 });
 
 describe('screensOf', () => {
-  it('lists every screen in the order the composite numbers them, without pictures', () => {
+  it('lists every screen in display order, without pictures', () => {
     const one = { id: 2528732444, bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
     const two = { id: 77, bounds: { x: 1920, y: 0, width: 2560, height: 1440 } };
     const screens = screensOf({

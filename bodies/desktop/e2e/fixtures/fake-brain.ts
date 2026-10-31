@@ -4,6 +4,8 @@
  * It answers hello, Home's permission, jobs, apps and approvals tools (`call`), then every say with the same short reply. A say that mentions "permission"
  * first opens one confirm ask and holds the turn until the desktop answers it, as the real
  * brain does. A say that mentions "offer" opens an offer ask (Yes, auto-approve / Keep asking).
+ * A say that mentions "windows" sends the body a `use` for list_windows and replies with
+ * the error text if the tool failed (how a paused sight shows up).
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included.
@@ -169,8 +171,17 @@ export async function startFakeBrain(): Promise<FakeBrain> {
         id?: string;
         method?: string;
         params?: { text?: string; ask?: string; option?: string };
+        result?: unknown;
+        error?: { code: number; message: string };
       };
-      if (msg.method === 'hello') {
+      if (msg.method === undefined && msg.id?.startsWith('use-') === true) {
+        // The body's answer to the list_windows `use` sent below: say what came back.
+        const turn = msg.id.slice('use-'.length);
+        const base = { turn, body: 'desktop' };
+        notify('reply', { ...base, delta: msg.error?.message ?? 'The windows were listed.' });
+        notify('reply', { ...base, done: true });
+        notify('turn', { ...base, state: 'ended', reason: 'done' });
+      } else if (msg.method === 'hello') {
         const result = { protocol: 1, session: 's1', tools: [], seq, resync: false };
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
       } else if (msg.method === 'say') {
@@ -186,7 +197,17 @@ export async function startFakeBrain(): Promise<FakeBrain> {
           notify('turn', { ...base, state: 'ended', reason: 'done' });
         };
         notify('turn', { ...base, state: 'started' });
-        if (msg.params?.text?.includes('permission')) {
+        if (msg.params?.text?.includes('windows')) {
+          // Runs the body's own list_windows tool; the answer comes back above.
+          socket.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: `use-${turn}`,
+              method: 'use',
+              params: { call: `c-${turn}`, tool: 'list_windows', input: {} },
+            }),
+          );
+        } else if (msg.params?.text?.includes('permission')) {
           const ask = `a${turns}`;
           held.set(ask, finish);
           notify('ask', {
