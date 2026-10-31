@@ -19,7 +19,7 @@ The brain is Python; the TypeScript apps are bodies.
 - Test: pnpm test (vitest, all packages); pnpm --filter @tagalong/desktop test:e2e for the Electron Playwright suites (they run on a fake brain, no real brain needed)
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
 - Brain: cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server)
-- Run: cd brain && uv run brain (leave it running), then pnpm dev:desktop; the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
+- Run: pnpm dev:desktop (the desktop starts the brain if none is running and stops only that one on quit; `cd brain && uv run brain` still runs on its own); the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
 - Experts: npm install -g @agentclientprotocol/claude-agent-acp (Node 22+), and Claude Code logged in (it runs on the user's login, not the API key)
 - Package: pnpm package:win
 

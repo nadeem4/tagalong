@@ -7,7 +7,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BrowserWindow,
@@ -39,6 +39,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
+import { realLaunch } from './brain/launch';
+import type { BrainProcess } from './brain/launch';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, localMouth } from './voice/voice';
 import { VoiceWorker } from './voice/worker/client';
@@ -187,6 +189,8 @@ app.on('window-all-closed', () => {});
 
 /** Stops the key hook that watches the talk key; nothing until it has started. */
 let stopTalkKey: () => void = () => {};
+/** The brain this app started, if any (see brain/launch.ts). */
+let brainProcess: Promise<BrainProcess> | null = null;
 
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
@@ -196,6 +200,8 @@ app.on('before-quit', () => {
   stopPresence();
   stopFocusWatch();
   desktop?.brain.stop();
+  // Only the brain this app started; a brain it found already running is left alone.
+  void brainProcess?.then((started) => started.stop());
 });
 
 async function start(): Promise<void> {
@@ -218,7 +224,10 @@ async function start(): Promise<void> {
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
 
-  // The brain is a separate process the user runs; this only dials it and retries.
+  // In dev, start the brain if none is running; the client below dials it and retries.
+  if (!app.isPackaged) {
+    brainProcess = realLaunch(resolve(app.getAppPath(), '..', '..', 'brain'));
+  }
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,
     () => brain.session,
