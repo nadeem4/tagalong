@@ -745,14 +745,7 @@ turn loop, not a guard (see [What a turn does](#what-a-turn-does)).
 
 ## Not built yet
 
-| Row   | Brings                                                        |
-| ----- | ------------------------------------------------------------- |
-| Next  | Learned approvals, the rest: the Approvals page in Home (LA3) |
-| Later | Live-state replay of open turns after `resync`                |
-
-Built (LA1): the approvals history and preferences, and their Home calls (see
-[Home tools](#home-tools)). Built (LA2): Scout approving under your preferences and offering them
-(see [Permissions and asks](#permissions-and-asks)).
+Live-state replay of open turns after `resync`.
 
 ## Tests
 
