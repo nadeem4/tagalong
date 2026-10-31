@@ -13,6 +13,7 @@ const CHROME = { brands: ['Chromium', 'Google Chrome'], userAgent: 'Mozilla/5.0 
 
 function setup(overrides: Partial<BodyDeps> = {}) {
   const sockets: FakeBrainSocket[] = [];
+  const micLog: string[] = [];
   const deps: BodyDeps = {
     storage: memoryStorage(),
     session: memoryStorage(),
@@ -55,6 +56,17 @@ function setup(overrides: Partial<BodyDeps> = {}) {
       addToReadingList: () => Promise.reject(new Error('unused')),
     },
     broker: { ensure: () => Promise.resolve() } as unknown as PermissionBroker,
+    mic: {
+      start: () => {
+        micLog.push('start');
+        return Promise.resolve();
+      },
+      stop: () => {
+        micLog.push('stop');
+        return Promise.resolve();
+      },
+    },
+    onVoiceView: () => undefined,
     random: () => 'ab12',
     openSocket: (url) => {
       const s = new FakeBrainSocket(url);
@@ -63,7 +75,7 @@ function setup(overrides: Partial<BodyDeps> = {}) {
     },
     ...overrides,
   };
-  return { body: createBody(deps), sockets, deps };
+  return { body: createBody(deps), sockets, deps, micLog };
 }
 
 async function online(s: FakeBrainSocket): Promise<void> {
@@ -300,5 +312,87 @@ describe('the browser body', () => {
     await settle();
     expect(sockets[0]!.sent).toHaveLength(before);
     expect(body.info().status).toBe('online');
+  });
+});
+
+describe('the browser body voice', () => {
+  /** Answers the listen request the body just sent, as the brain does. */
+  function answerListen(s: FakeBrainSocket): void {
+    s.receive({ jsonrpc: '2.0', id: s.request('listen')?.['id'], result: {} });
+  }
+
+  it('voice_start_listens_held_and_opens_the_mic', async () => {
+    const { body, sockets, micLog } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.voiceStart();
+    await settle();
+    expect(sockets[0]!.request('listen')?.['params']).toEqual({ mode: 'held' });
+    answerListen(sockets[0]!);
+    await settle();
+    expect(micLog).toEqual(['start']);
+    expect(body.info().voice.state).toBe('listening');
+  });
+
+  it('frames_reach_the_brain_as_mic_notifications', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.voiceStart();
+    await settle();
+    answerListen(sockets[0]!);
+    await settle();
+    body.voiceFrame(new Int16Array([1, 2]));
+    expect(sockets[0]!.request('mic')?.['params']).toEqual({ pcm: 'AQACAA==' });
+  });
+
+  it('a_heard_turn_end_is_sent_as_a_spoken_say', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.voiceStart();
+    await settle();
+    answerListen(sockets[0]!);
+    await settle();
+    body.voiceStop();
+    sockets[0]!.receive({
+      jsonrpc: '2.0',
+      method: 'heard',
+      params: { event: 'turn_end', text: 'what is this page' },
+    });
+    await settle();
+    expect(sockets[0]!.request('say')?.['params']).toEqual({
+      text: 'what is this page',
+      spoken: true,
+    });
+  });
+
+  it('the_link_dropping_mid_listen_ends_it_with_an_error', async () => {
+    const { body, sockets, micLog } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.voiceStart();
+    await settle();
+    answerListen(sockets[0]!);
+    await settle();
+    sockets[0]!.close();
+    await settle();
+    expect(body.info().voice.state).toBe('error');
+    expect(micLog).toContain('stop');
+  });
+
+  it('a_mic_failure_from_the_page_ends_it_with_its_line', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.voiceStart();
+    await settle();
+    answerListen(sockets[0]!);
+    await settle();
+    body.voiceEnd('The microphone is blocked.');
+    expect(body.info().voice).toMatchObject({
+      state: 'error',
+      error: 'The microphone is blocked.',
+    });
   });
 });

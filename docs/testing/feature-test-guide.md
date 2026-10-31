@@ -1362,6 +1362,37 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
    the desktop bubble once the desktop connects. Opening the browser never wakes Scout to greet.
    Tools with no approval, like `tabs` `list`, still work from the browser.
 
+### X.24. Ask by voice from the popup _(real brain, real Chrome)_
+
+Not covered by an automated test beyond the pure logic: the offscreen microphone page and Chrome's
+prompt need a real browser.
+
+1. **Setup:** the brain running with its voice models downloaded (talk to Scout once on the
+   desktop first), the desktop app running, the browser body connected.
+2. **Action:** open the toolbar popup and click **Ask by voice**.
+3. **Expected (first time):** a tab opens with the privacy sentence ("Audio goes only to your own
+   brain and is never stored; with the brain on this computer it never leaves it.") and an **Allow
+   microphone** button; the popup says to allow it and click again. Click **Allow microphone**,
+   accept Chrome's prompt, close the tab, reopen the popup and click **Ask by voice** again.
+4. **Expected:** the button reads **Done talking**, the line says it is listening, and the browser
+   shows its microphone indicator. Speak a question ("what is two plus two"); the running words
+   appear in the popup.
+5. **Action:** click **Done talking** (keep the popup open).
+6. **Expected:** the browser's microphone indicator goes out at once; the popup shows
+   `Asking: "..."`, then `Asked: "...". The answer shows on your desktop.` The answer appears in
+   the desktop bubble and is spoken by the desktop. The browser itself plays no sound.
+7. **Action:** click **Ask by voice**, say nothing, click **Done talking**.
+8. **Expected:** nothing is asked and the popup returns to idle.
+9. **Action:** click **Ask by voice**, then click elsewhere so the popup closes.
+10. **Expected:** the microphone indicator goes out; the words said so far are asked.
+11. **Action:** with the brain stopped, click **Ask by voice**; then start the brain, start a
+    listening session, and stop the brain mid-way.
+12. **Expected:** the first shows "Scout's brain is not reachable." and the microphone never opens;
+    the second ends with a plain error and the microphone indicator goes out.
+13. **Action:** with the desktop app quit and only the browser online, ask by voice.
+14. **Expected:** the browser plays nothing, and the only-the-browser-online behaviour of X.23
+    holds (nothing needing approval runs; no answer shows until the desktop connects).
+
 ## Installer
 
 ### I.1. Build the Windows installer

@@ -47,6 +47,12 @@ and nothing is sent from a private (incognito) window.
 The toolbar button opens a popup that lists what you have allowed. You can also remove any of it
 there, or on Chrome's extensions page.
 
+If you use **Ask by voice** in the popup, the extension also listens to your microphone, only while
+the popup's **Done talking** button is showing. You allow the microphone once, on a page of its own.
+The audio is held in memory and sent over the same websocket to your own Tagalong brain, where it is
+turned into text. Audio goes only to your own brain and is never stored; with the brain on this
+computer it never leaves it. The extension does not record or keep audio.
+
 ## Where it goes
 
 The extension sends what it read to the Tagalong brain, over one websocket, to the address you set

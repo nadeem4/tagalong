@@ -150,7 +150,10 @@ export default tseslint.config(
   },
   {
     // Runs on the audio thread, where the worklet's own globals are all there is.
-    files: ['bodies/desktop/src/renderer/src/mic-worklet.js'],
+    files: [
+      'bodies/desktop/src/renderer/src/mic-worklet.js',
+      'bodies/browser/src/offscreen/mic-worklet.js',
+    ],
     languageOptions: {
       globals: { ...globals.audioWorklet },
     },

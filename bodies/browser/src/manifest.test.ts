@@ -1,6 +1,6 @@
 /**
  * Tests for the manifest's permissions, popup, description and socket policy. They pin what the
- * browser store and the person see at install: only three permissions up front, the rest optional.
+ * browser store and the person see at install: only four quiet permissions up front, the rest optional.
  */
 import { describe, expect, it } from 'vitest';
 import { manifest } from './manifest';
@@ -12,8 +12,14 @@ describe('manifest', () => {
     expect(manifest.background).toEqual({ service_worker: 'service-worker.js', type: 'module' });
   });
 
-  it('requires_only_alarms_scripting_and_storage', () => {
-    expect([...manifest.permissions].sort()).toEqual(['alarms', 'scripting', 'storage']);
+  it('requires_only_alarms_offscreen_scripting_and_storage', () => {
+    // offscreen shows no warning; the microphone itself is asked from a page, never listed here.
+    expect([...manifest.permissions].sort()).toEqual([
+      'alarms',
+      'offscreen',
+      'scripting',
+      'storage',
+    ]);
   });
 
   it('lists_exactly_the_optional_permissions_the_broker_can_ask_for', () => {

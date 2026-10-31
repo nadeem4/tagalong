@@ -13,6 +13,7 @@ import {
   chromePrompt,
   chromeSearch,
   chromeSession,
+  chromeOffscreen,
   chromeStorage,
   chromeTabs,
   webSocket,
@@ -22,6 +23,9 @@ import type { WorkerQuery } from './popup/model';
 import { shouldRedial } from './reconnect';
 import { ADDR_KEY, NAME_KEY } from './settings';
 import { tabFactSender } from './tab-facts';
+import { createMicControl, type MicMessage } from './voice/mic-control';
+import { watchPopupPort } from './voice/popup-port';
+import type { VoiceView } from './voice/voice-session';
 
 /** Wakes a stopped worker so it notices the brain coming back. */
 const RECONNECT_ALARM = 'tagalong-reconnect';
@@ -30,6 +34,23 @@ const RECONNECT_ALARM = 'tagalong-reconnect';
 const brands = (
   (navigator as { userAgentData?: { brands?: { brand: string }[] } }).userAgentData?.brands ?? []
 ).map((b) => b.brand);
+
+const mic = createMicControl(chromeOffscreen);
+// A mic page left by a worker that died mid-listen would keep capturing for nobody.
+void mic.stop().catch(() => undefined);
+// ...and an open popup that was listening to the old worker must not stay stuck on "listening".
+sendVoiceView({
+  state: 'error',
+  text: '',
+  error: 'Listening stopped',
+  loading: false,
+  progress: 0,
+});
+
+function sendVoiceView(view: VoiceView): void {
+  // With no popup open the message has no receiver, which is fine.
+  void chrome.runtime.sendMessage({ type: 'voice-view', view }).catch(() => undefined);
+}
 
 const body = createBody({
   storage: chromeStorage,
@@ -42,6 +63,8 @@ const body = createBody({
   search: chromeSearch,
   actions: chromeActions,
   broker: new PermissionBroker(chromePermissions, chromePrompt),
+  mic,
+  onVoiceView: sendVoiceView,
   openSocket: webSocket,
 });
 
@@ -128,10 +151,29 @@ function addMenuItem(): void {
 addMenuItem();
 chrome.permissions.onAdded.addListener(addMenuItem);
 
-chrome.runtime.onMessage.addListener((message: Partial<WorkerQuery> | null, _sender, respond) => {
-  if (message?.type !== 'status') return false;
-  respond(body.info());
-  return false;
-});
+// The popup holds a port while it is open; when it goes (even by a crash) the listen ends.
+chrome.runtime.onConnect.addListener((port) => watchPopupPort(port, () => body.voiceStop()));
 
+chrome.runtime.onMessage.addListener(
+  (message: Partial<WorkerQuery> | MicMessage | null, _sender, respond) => {
+    switch (message?.type) {
+      case 'status':
+        respond(body.info());
+        break;
+      case 'voice-start':
+        void body.voiceStart();
+        break;
+      case 'voice-stop':
+        body.voiceStop();
+        break;
+      case 'mic:frame':
+        body.voiceFrame(Int16Array.from(message.pcm));
+        break;
+      case 'mic:failed':
+        body.voiceEnd('The microphone could not start. Check that it is allowed and not in use.');
+        break;
+    }
+    return false;
+  },
+);
 void body.start().catch(() => undefined);

@@ -33,7 +33,9 @@ export default defineConfig({
     modulePreload: false,
     rollupOptions: {
       input: {
+        offscreen: 'src/offscreen/offscreen.html',
         permission: 'src/permission/permission.html',
+        'permission-mic': 'src/permission/mic.html',
         popup: 'src/popup/popup.html',
         'service-worker': 'src/service-worker.ts',
       },

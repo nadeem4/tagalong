@@ -89,6 +89,13 @@ characters, marked as page text, not instructions). A right-click also sends the
 page title, and the address for an address-bar ask, come only with "see open tabs". No script runs in
 a page until you have allowed it.
 
+You can also ask Scout out loud from the toolbar popup. The browser's microphone opens only while
+the popup's **Done talking** button is showing (closing the popup counts as done talking), you
+allow the microphone once on a page of its own, and the audio streams in memory to your brain,
+exactly as the desktop's does. Audio goes only to your own brain and is never stored; with the
+brain on this computer it never leaves it. The browser only listens: the answer is spoken on the
+desktop.
+
 The body can only open websockets, to the brain (`127.0.0.1:47321` unless you change it in the
 popup). It keeps on this browser the brain's address, a name for the browser and its body id (local
 storage), and the number of the last message it received (session storage, which Chrome clears when
@@ -292,6 +299,8 @@ flowchart LR
   of a word is not cut off), each frame dropped as a newer one comes. Only the text goes on, to
   Scout's provider, exactly as if you had typed it, with the name of the window you are on (never
   the selected text).
+- **In the browser,** the same rule holds: the browser body's microphone is open only while you ask by voice from the popup, and its frames go to your own brain and nowhere else. See [browser-body.md](browser-body.md#voice).
+
 - The microphone is the one picked in Settings → Voice, or the system default. Windows' own
   microphone privacy setting applies.
 - There is no cloud speech to text: Scout's voice is made by your brain, and your voice is never sent to anyone else.

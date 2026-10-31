@@ -13,6 +13,7 @@ import {
   type PermissionsApi,
 } from '../permissions';
 import type { BrainSocket } from '@tagalong/contract';
+import type { OffscreenApi } from '../voice/mic-control';
 import type {
   ActionsApi,
   PageApi,
@@ -297,4 +298,17 @@ export const chromePrompt: PermissionPrompt = {
       );
     });
   },
+};
+
+/** The offscreen page that holds the microphone while the person talks. */
+export const chromeOffscreen: OffscreenApi = {
+  exists: async () =>
+    (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] })).length > 0,
+  create: () =>
+    chrome.offscreen.createDocument({
+      url: 'offscreen/offscreen.html',
+      reasons: ['USER_MEDIA'],
+      justification: 'Listen to the microphone only while the person is asking Scout by voice.',
+    }),
+  close: () => chrome.offscreen.closeDocument(),
 };

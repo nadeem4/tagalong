@@ -41,4 +41,15 @@ describe('source guards', () => {
       );
     }
   });
+
+  it('the_microphone_code_keeps_audio_in_memory_and_off_the_network', () => {
+    // Frames go to the worker as messages and out only over the brain websocket: no recorder, no
+    // file or storage write, no request of any kind.
+    const mic = [...sources(join(SRC, 'voice')), ...sources(join(SRC, 'offscreen'))];
+    for (const path of mic) {
+      expect(readFileSync(path, 'utf8'), path).not.toMatch(
+        /MediaRecorder|fetch\(|XMLHttpRequest|sendBeacon|localStorage|indexedDB|\.storage\./,
+      );
+    }
+  });
 });

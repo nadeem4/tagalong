@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Toolbar popup: brain status, address and name, and the list of what the person allowed.
+<!-- Toolbar popup: brain status, the mic button, address and name, and what the person allowed.
      The logic is in popup.ts; this file is only the markup. -->
 <html lang="en">
   <head>
@@ -11,6 +11,9 @@
   <body>
     <h1>Scout</h1>
     <p id="status" class="status" role="status">Connecting to Scout's brain...</p>
+
+    <button id="mic" type="button">Ask by voice</button>
+    <p id="voice-line" class="muted" role="status"></p>
 
     <label for="addr">Brain address</label>
     <input id="addr" type="text" spellcheck="false" autocomplete="off" />
