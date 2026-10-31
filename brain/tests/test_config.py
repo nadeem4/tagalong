@@ -4,11 +4,12 @@ The session id must survive a restart (same file, same value) and be created on 
 so every body sees one session across brain restarts.
 """
 
+import os
 from pathlib import Path
 
 import pytest
 
-from brain.config import load_config, load_env_file, session_id, split_command
+from brain.config import load_config, load_env_file, session_id, split_command, upsert_env_value
 
 
 def test_defaults():
@@ -180,3 +181,52 @@ def test_offer_settings_default_and_override(name, attr, default):
 def test_offer_settings_must_be_positive_integers(name, value):
     with pytest.raises(ValueError, match=name):
         load_config({name: value})
+
+
+def test_upsert_creates_folder_and_file(tmp_path):
+    env = {}
+    folder = tmp_path / "new" / "home"
+    upsert_env_value(folder, "A_KEY", "v1", env)
+    assert (folder / ".env").read_text() == "A_KEY=v1\n"
+    assert env == {"A_KEY": "v1"}
+
+
+def test_upsert_replaces_existing_line_keeps_comments_and_others(tmp_path):
+    path = tmp_path / ".env"
+    path.write_bytes(b"# note\r\nOTHER=1\r\nA_KEY=old\r\nLAST=z\r\n")
+    upsert_env_value(tmp_path, "A_KEY", "new", {})
+    assert path.read_bytes() == b"# note\r\nOTHER=1\r\nA_KEY=new\r\nLAST=z\r\n"
+
+
+def test_upsert_appends_with_the_files_line_ending(tmp_path):
+    path = tmp_path / ".env"
+    path.write_bytes(b"OTHER=1\r\n")
+    upsert_env_value(tmp_path, "A_KEY", "v", {})
+    assert path.read_bytes() == b"OTHER=1\r\nA_KEY=v\r\n"
+    path.write_bytes(b"OTHER=1")  # no final newline
+    upsert_env_value(tmp_path, "A_KEY", "v", {})
+    assert path.read_bytes() == b"OTHER=1\nA_KEY=v\n"
+
+
+def test_upsert_leaves_no_temp_file(tmp_path):
+    upsert_env_value(tmp_path, "A_KEY", "v", {})
+    assert [p.name for p in tmp_path.iterdir()] == [".env"]
+
+
+def test_upsert_failure_does_not_set_env(tmp_path, monkeypatch):
+    def broken(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "replace", broken)
+    env = {}
+    with pytest.raises(OSError):
+        upsert_env_value(tmp_path, "A_KEY", "v", env)
+    assert env == {}
+    assert not (tmp_path / ".env.tmp").exists()
+
+
+def test_upsert_value_with_equals_sign_round_trips_through_load_env_file(tmp_path):
+    upsert_env_value(tmp_path, "A_KEY", "abc=def==", {})
+    env = {}
+    load_env_file(tmp_path, env)
+    assert env["A_KEY"] == "abc=def=="

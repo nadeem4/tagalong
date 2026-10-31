@@ -4,6 +4,7 @@ The session id lives in a file so it survives restarts and every body sees one s
 It is informational: hello returns it and bodies never send it back.
 """
 
+import contextlib
 import math
 import os
 import shlex
@@ -175,6 +176,38 @@ def load_env_file(data_dir: Path, env: MutableMapping[str, str]) -> None:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
         env.setdefault(key, value)
+
+
+def upsert_env_value(
+    data_dir: Path, name: str, value: str, env: MutableMapping[str, str] = os.environ
+) -> None:
+    """Set one NAME=value line in data_dir/.env, keeping every other line, comment and line
+    ending. Written to a temp file and renamed over, so a crash never leaves half a file. The
+    running environment changes only after the file is saved."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    path = data_dir / ".env"
+    text = path.read_bytes().decode("utf-8") if path.exists() else ""
+    eol = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines(keepends=True)
+    new = f"{name}={value}"
+    for i, line in enumerate(lines):
+        if "=" in line and line.partition("=")[0].strip() == name:
+            lines[i] = new + line[len(line.rstrip("\r\n")) :]
+            break
+    else:
+        if lines and not lines[-1].endswith(("\n", "\r")):
+            lines[-1] += eol
+        lines.append(new + eol)
+    tmp = data_dir / ".env.tmp"
+    try:
+        tmp.write_bytes("".join(lines).encode("utf-8"))
+        with contextlib.suppress(OSError):  # best effort; Windows ignores most of it
+            tmp.chmod(0o600)
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+    env[name] = value
 
 
 def session_id(data_dir: Path) -> str:
