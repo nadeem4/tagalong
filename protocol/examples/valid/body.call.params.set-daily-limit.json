@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "call",
+  "params": { "tool": "set_daily_limit", "input": { "usd": 7.5 } }
+}
