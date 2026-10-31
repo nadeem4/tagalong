@@ -25,6 +25,7 @@ from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
+from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
 
@@ -42,10 +43,13 @@ def cached[T](fn: Callable[[], T], ttl: float, clock: Callable[[], float] = time
             box[:] = [now + ttl, fn()]
         return box[1]
 
+    get.clear = box.clear  # a new secret must be masked at once, not after the ttl
     return get
 
 
 async def _run() -> None:
+    # A key in the real environment wins over .env; remember that before .env is read.
+    from_environment = bool(os.environ.get("ANTHROPIC_API_KEY"))
     # The data dir says where .env is, and .env may hold the other TAGALONG_* settings.
     load_env_file(load_config().data_dir, os.environ)
     config = load_config()
@@ -65,8 +69,16 @@ async def _run() -> None:
     make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
-    masker = Masker(
-        cached(lambda: [*apps.secret_values(), os.environ.get("ANTHROPIC_API_KEY")], 1.0)
+    secrets = cached(lambda: [*apps.secret_values(), os.environ.get("ANTHROPIC_API_KEY")], 1.0)
+    masker = Masker(secrets)
+    keys = KeySettings(
+        config.data_dir,
+        model,
+        bodies.notify,
+        "environment" if from_environment else "file" if key else "none",
+        anthropic_check,
+        config.expert_cmd,
+        on_key=secrets.clear,
     )
     for handler in logging.getLogger().handlers:  # every logger reaches disk or the console here
         handler.addFilter(SecretLogFilter(masker))
@@ -82,6 +94,7 @@ async def _run() -> None:
         wakes_per_hour=config.wakes_per_hour,
         turn_timeout=config.turn_timeout,
         masker=masker,
+        keys=keys,
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),

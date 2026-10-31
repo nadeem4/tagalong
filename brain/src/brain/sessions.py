@@ -54,6 +54,7 @@ from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import (
+    KeySettings,
     brain_tools,
     expert_tools,
     home_tools,
@@ -87,6 +88,7 @@ class Session:
         offers: OfferSettings = DEFAULT_OFFER_SETTINGS,
         turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
         masker: Masker | None = None,
+        keys: KeySettings | None = None,
     ) -> None:
         self._model = model
         # Set by main when voice is built; None answers `listen` with method_not_found.
@@ -145,7 +147,7 @@ class Session:
         timers = Timers(memory, self.scheduler.emit, now)
         tools = (
             brain_tools(memory, notify)
-            + home_tools(budget, lambda: self.toolbox)
+            + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)

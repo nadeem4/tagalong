@@ -110,3 +110,11 @@ def test_ledger_format(tmp_path):
 
 def test_limit_property(tmp_path):
     assert make(tmp_path, limit=7.5).limit == 7.5
+
+
+def test_budget_limit_setter_changes_allows(tmp_path):
+    budget = Budget(tmp_path / "b.json", 1.0)
+    budget.spend(SimpleNamespace(input_tokens=0, output_tokens=100_000), "claude-opus-5-5")  # $2
+    assert budget.allows() is False
+    budget.limit = 5.0
+    assert budget.limit == 5.0 and budget.allows() is True

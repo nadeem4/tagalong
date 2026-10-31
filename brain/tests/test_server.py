@@ -7,6 +7,7 @@ behaviour and write ordering are exercised for real.
 import asyncio
 import base64
 import json
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -18,6 +19,14 @@ from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.server import start_server
 from brain.sessions import Session
+from brain.tools import KeySettings
+
+KEY = "sk-ant-example-not-a-real-key"
+
+
+async def fake_check(key):
+    return "invalid"
+
 
 DESKTOP = {"id": "desktop", "kind": "desktop", "name": "Desktop"}
 TOOL = {
@@ -44,10 +53,22 @@ def request(method, params, req_id=2):
     return {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
 
 
+class KeylessModel:
+    ready = False
+
+    def set_key(self, key):
+        self.ready = True
+
+
 @pytest.fixture
-async def env():
+async def env(tmp_path):
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    keys = KeySettings(
+        tmp_path, KeylessModel(), bodies.notify, "none", fake_check, ["claude-agent-acp"]
+    )
+    session = Session(
+        ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), keys=keys
+    )
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield bodies, url
@@ -652,13 +673,17 @@ async def test_hello_lists_home_tools_as_contract_records(env):
     names = sorted(t["name"] for t in tools)
     assert names == [
         "edit_preference",
+        "expert_status",
         "forget",
+        "key_status",
         "list_approvals",
         "list_jobs",
         "list_memories",
         "list_permissions",
         "list_preferences",
         "remove_preference",
+        "set_api_key",
+        "set_daily_limit",
         "set_permission",
         "speak_sample",
         "spend_today",
@@ -666,6 +691,20 @@ async def test_hello_lists_home_tools_as_contract_records(env):
     ]
     for t in tools:
         assert set(t) == {"name", "description", "input_schema", "effect"}
+
+
+async def test_call_params_not_logged_for_set_api_key(env, caplog):
+    caplog.set_level(logging.DEBUG)
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call_tool(ws, "set_api_key", {"key": KEY})
+        assert call_json(reply) == {"status": "invalid"}
+        # A malformed call (input not an object) must not echo the key back either.
+        bad = await call(ws, request("call", {"tool": "set_api_key", "input": KEY}, 10))
+    assert bad["error"]["message"] == "call needs a tool and an input object."
+    assert KEY not in json.dumps(bad)
+    assert KEY not in caplog.text
 
 
 async def call_tool(ws, tool, input=None, req_id=9, seen=None):
