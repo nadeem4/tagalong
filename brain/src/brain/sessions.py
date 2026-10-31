@@ -222,10 +222,13 @@ class Session:
     def _speak(self, turn: str | None, shown_on: str | None, params: SayParams | None) -> None:
         """A turn is read aloud when the user spoke (`params.spoken`) or the body showing it asked
         for read-aloud; on that body only, because speech never goes to a body that did not
-        display the turn. `params` is None for a turn the brain started."""
+        display the turn. A body that turned read-aloud off silences everything, spoken or not.
+        `params` is None for a turn the brain started."""
         if self.voice is None or shown_on is None or turn is None:
             return
         ask = self._read_aloud.get(shown_on)
+        if ask is not None and not ask.on:
+            return
         if not (params is not None and params.spoken) and not (ask and ask.on):
             return
         voice, speed = (ask.voice, ask.speed) if ask else (None, None)

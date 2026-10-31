@@ -772,6 +772,9 @@ follow-up) and sends the words as an ordinary `say` with `spoken: true`.
 Audio goes only to your own brain and is never stored; with the brain on this computer it never
 leaves it.
 
+`moonshine-voice` pulls in `sounddevice`, which needs PortAudio (`libportaudio2` on Linux) when a
+listen first loads the ears.
+
 | Piece           | Model                                        | Job                                                |
 | --------------- | -------------------------------------------- | -------------------------------------------------- |
 | `silero.py`     | Silero VAD v5 on onnxruntime                 | Speech or not, per 32 ms window                    |

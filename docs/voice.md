@@ -434,7 +434,8 @@ flowchart LR
 
 **Read aloud.** With Scout talks on, the brain speaks every turn this desktop displays: a heard
 question, a typed one, the hello, a wake's remark and `pet.remark` lines. With Scout talks off the
-brain speaks only a `say` with `spoken: true`.
+brain speaks nothing, not even a `say` with `spoken: true` (a browser voice question gets a
+text-only answer).
 
 ### How the brain learns a turn was spoken
 
@@ -487,7 +488,7 @@ From `IPC` in `bodies/desktop/src/shared/ipc.ts`. Handlers are in `main/ipc/voic
 | `tagalong:voice:talk`                            | main → panel   | `at: number`                                             | The talk key confirmed.                                                                                                                                      |
 | `tagalong:voice:talk-release` / `talk-cancel`    | main → panel   | none                                                     |                                                                                                                                                              |
 | `tagalong:voice:stop`                            | main → windows | none                                                     | The stop key, or a cancelled turn.                                                                                                                           |
-| `tagalong:voice:models`                          | invoke         | → `VoiceModels { mouth, ears }`                          | The health check: whether the brain's ears have failed.                                                                                                      |
+| `tagalong:voice:models`                          | invoke         | → `VoiceModels { ears }`                                 | The health check: whether the brain's ears have failed.                                                                                                      |
 | `tagalong:status:set`                            | invoke         | `(id, on)`                                               | Handled by `setPanelMark`. The panel can set only `mic-busy`, `mic-failed` and `say-name`.                                                                   |
 
 `earsListen`, `micFrame` and `earsStop` run through one promise chain (`inOrder`). Frames and a
@@ -498,7 +499,7 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 - `Ears { listen(mic), stop(), on(event, handler) }` (`bodies/ui/src/shapes/voice.ts`).
 - `SpeechChunk`, `SpeakSample { mime, data }`, `EarsStatus { status, message?, progress? }`,
-  `ListeningState { on, paused, followUp }`, `VoiceModels { mouth, ears }` (`shared/ipc.ts`).
+  `ListeningState { on, paused, followUp }`, `VoiceModels { ears }` (`shared/ipc.ts`).
 - `TagalongVoice { ears, openMic }` (`voice-seam.ts`).
 
 ### Settings fields

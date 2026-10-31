@@ -1564,14 +1564,25 @@ async def test_a_typed_say_is_silent_when_read_aloud_is_off_or_was_never_sent():
     assert voice.calls == []
 
 
-async def test_a_spoken_say_is_still_spoken_when_read_aloud_is_off():
+async def test_a_spoken_say_is_silent_when_read_aloud_is_off():
     session, _ = make(Gate(["hi"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     read_aloud(session, on=False)
-    result = session.say("desktop", spoken_say(voice="af_bella"))
+    session.say("desktop", spoken_say(voice="af_bella"))
     await finish_quietly(session)
-    assert voice.calls[0] == ("spoken", result.turn, "desktop", "af_bella", None)
+    assert voice.calls == []
+
+
+async def test_a_spoken_say_from_a_display_less_body_is_silent_when_read_aloud_is_off():
+    session, _ = make(Gate(["a", "b"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    read_aloud(session, on=False)
+    session.say("browser", spoken_say("from the page"))
+    await finish_quietly(session)
+    assert voice.calls == []
 
 
 async def test_a_wake_remark_is_spoken_when_the_body_asked_for_read_aloud():
@@ -1671,7 +1682,7 @@ async def test_the_system_voice_choice_rides_on_spoken_turns_and_read_aloud_turn
     session, _ = make(Gate(["a", "b", "c"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    read_aloud(session, on=False, system_voice=True)  # off, but a spoken say still uses it
+    read_aloud(session, on=True, system_voice=True)
     session.say("desktop", spoken_say())
     await finish_quietly(session)
     read_aloud(session, on=True, system_voice=True)
@@ -1680,7 +1691,7 @@ async def test_the_system_voice_choice_rides_on_spoken_turns_and_read_aloud_turn
     read_aloud(session, on=True, system_voice=False)
     session.say("desktop", say("typed"))
     await finish_quietly(session)
-    assert voice.system == [True, True, False]
+    assert voice.system == [True, True, False]  # one spoken say, then two read-aloud turns
 
 
 async def test_a_bad_read_aloud_event_is_ignored():
