@@ -99,7 +99,7 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 The Python brain in `brain/` (see [docs/brain.md](../brain.md)). It runs on its own, with no
 desktop app. You need `uv` and an Anthropic key.
 
-1. **Setup:** put `ANTHROPIC_API_KEY=sk-ant-...` on one line in `~/.tagalong/.env`. In one
+1. **Setup:** developer path: set `ANTHROPIC_API_KEY=sk-ant-...` in your environment. In one
    terminal run `cd brain && uv run brain`.
    **Expected:** it prints `brain listening on ws://127.0.0.1:47321`.
 2. **Action:** in a second terminal run
@@ -116,10 +116,23 @@ desktop app. You need `uv` and an Anthropic key.
    `{"jsonrpc":"2.0","method":"cancel","params":{"turn":"<the turn id>"}}`
    **Expected:** deltas stop, one `reply` with `done: true`, and `turn` `ended` with
    `reason: "cancelled"`. A new `say` after it works.
-5. **Action:** stop the brain. Remove the key from `~/.tagalong/.env` and from your
-   environment, then run `uv run brain` again.
-   **Expected:** one line saying `ANTHROPIC_API_KEY is missing` and where to put it; the process
-   exits with status 1 and never listens.
+5. **Action:** stop the brain. Remove the key from `~/.tagalong/.env` (if there) and from your
+   environment, then run `uv run brain` again, say hello and send a `say`.
+   **Expected:** the brain starts and listens, logging one line that says to add the key in the
+   app. The `say` gets a result, then `turn` `started` and `turn` `ended` with `reason: "error"`;
+   no `reply` and no words from Scout.
+   Then call `{"jsonrpc":"2.0","id":3,"method":"call","params":{"tool":"key_status","input":{}}}`.
+   **Expected:** text `{"has_key":false,"source":"none","env_path":"...","daily_limit_usd":5.0}`.
+   Call `set_api_key` with `{"key":"not-a-key"}`.
+   **Expected:** `{"status":"invalid"}` and no `.env` file. With the network off, a real-looking
+   key gives `{"status":"unreachable"}`. Call `set_api_key` with `{}` or `{"key":""}`.
+   **Expected:** an `invalid_params` error reading exactly `set_api_key needs a key.`
+   (Only with the user's own key, and only if they ask: a valid key gives `{"status":"ok"}`, a
+   `changed` notification with `what: "key"`, a new `ANTHROPIC_API_KEY=` line in
+   `~/.tagalong/.env` with the other lines untouched, and the next `say` is answered without a
+   restart.) Call `set_daily_limit` with `{"usd":0}`: `invalid_params`; with `{"usd":7.5}`:
+   `{"limit_usd":7.5}`, `TAGALONG_DAILY_BUDGET_USD=7.5` in `.env` and `spend_today` shows 7.5.
+   Call `expert_status`: `{"found":...,"command":"claude-agent-acp"}`.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
    result and its turn ends at once with `reason: "over_budget"` and no deltas. The brain log

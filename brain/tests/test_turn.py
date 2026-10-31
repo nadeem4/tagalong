@@ -8,6 +8,8 @@ import asyncio
 import datetime
 from types import SimpleNamespace
 
+import pytest
+
 from brain.guardrails import Budget
 from brain.guards import ALLOW, Guard, Guards, Hook, stop
 from brain.mind.turn import AnthropicModel, Call, Final, _request, run_turn
@@ -388,7 +390,47 @@ def test_request_has_the_constants():
 
 
 def test_anthropic_model_constructs():
-    assert AnthropicModel(object(), "claude-sonnet-5-5").model_id == "claude-sonnet-5-5"
+    model = AnthropicModel(lambda key: object(), "claude-sonnet-5-5")
+    assert model.model_id == "claude-sonnet-5-5"
+    assert model.ready is False
+
+
+async def test_set_key_is_used_by_next_stream():
+    built = []
+
+    class Stream:
+        text_stream = None
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def _no_text(self):
+            return
+            yield
+
+        async def get_final_message(self):
+            return SimpleNamespace(content=[], stop_reason="end_turn", usage=None, model="m")
+
+    def make_client(key):
+        built.append(key)
+        stream = Stream()
+        stream.text_stream = stream._no_text()
+        return SimpleNamespace(
+            beta=SimpleNamespace(messages=SimpleNamespace(stream=lambda **kw: stream))
+        )
+
+    model = AnthropicModel(make_client, "claude-sonnet-5-5")
+    assert built == []  # no key, no client
+    model.set_key("sk-ant-example-not-a-real-key")
+    assert model.ready is True
+    [item async for item in model.stream("s", [], [])]
+    assert built == ["sk-ant-example-not-a-real-key"]
+    model.set_key("sk-ant-example-second-key")
+    [item async for item in model.stream("s", [], [])]
+    assert built[-1] == "sk-ant-example-second-key"
 
 
 def dones(sent):
@@ -508,3 +550,9 @@ async def test_tool_result_blocks_pass_through():
 
     _, history, _, _ = await go([tool_step(("c1", "x")), text_step()], run_tool=tool)
     assert history[2]["content"][0]["content"] == [{"type": "text", "text": "hi"}]
+
+
+async def test_stream_without_a_key_raises_a_clear_error():
+    model = AnthropicModel(lambda key: object(), "claude-sonnet-5-5")
+    with pytest.raises(RuntimeError, match="no Anthropic key"):
+        [item async for item in model.stream("s", [], [])]

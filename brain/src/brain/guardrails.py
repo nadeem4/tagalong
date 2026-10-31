@@ -40,6 +40,10 @@ class Budget:
     def limit(self) -> float:
         return self._limit
 
+    @limit.setter
+    def limit(self, usd: float) -> None:
+        self._limit = usd
+
     def allows(self) -> bool:
         return self.spent < self._limit
 

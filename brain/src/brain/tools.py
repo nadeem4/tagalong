@@ -7,15 +7,22 @@ and bad arguments raise; run_turn turns any exception into an is_error tool resu
 reads. Handlers that change what Home shows send `changed` through the notify they are given.
 """
 
+import asyncio
 import base64
 import json
 import logging
 import math
 import re
-from collections.abc import Callable
-from dataclasses import asdict
+import shutil
+from collections.abc import Awaitable, Callable
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Literal, Protocol
 
+from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
+
+from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
@@ -431,8 +438,63 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
     ]
 
 
-def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[ToolSpec, Handler]]:
-    """Home-only tools about spending and permissions.
+KEY_NAME = "ANTHROPIC_API_KEY"
+LIMIT_NAME = "TAGALONG_DAILY_BUDGET_USD"
+KEY_MAX_CHARS = 256  # real keys are about 110; anything near this is not a key
+KeyCheck = Literal["ok", "invalid", "unreachable"]
+
+
+class KeyedModel(Protocol):
+    ready: bool
+
+    def set_key(self, key: str) -> None: ...
+
+
+@dataclass
+class KeySettings:
+    """What the key tools need from main: where .env lives, the model to switch, how a key is
+    checked, and where the key came from (a real environment variable always wins on restart)."""
+
+    data_dir: Path
+    model: KeyedModel
+    notify: Notify
+    source: Literal["environment", "file", "none"]
+    check: Callable[[str], Awaitable[KeyCheck]]
+    expert_cmd: list[str]
+    on_key: Callable[[], None] = lambda: None  # main drops its cached masker values here
+
+
+async def anthropic_check(key: str) -> KeyCheck:
+    """One free call on a throwaway client: 401/403 means the key is wrong, anything else (no
+    network, timeout, 5xx, 429) only means Anthropic could not be asked. Errors are not logged."""
+    try:
+        async with AsyncAnthropic(api_key=key, timeout=10, max_retries=0) as client:
+            await client.models.list(limit=1)
+    except (AuthenticationError, PermissionDeniedError):
+        return "invalid"
+    except Exception:
+        return "unreachable"
+    return "ok"
+
+
+def _clean_key(raw: object) -> str | None:
+    """Trim a pasted key (spaces, a newline, one pair of quotes); None if it is not a key.
+    Inner whitespace is refused so a key can never add a line to .env."""
+    if not isinstance(raw, str):
+        return None
+    key = raw.strip()
+    if len(key) >= 2 and key[0] == key[-1] and key[0] in "\"'":
+        key = key[1:-1].strip()
+    if not key or len(key) > KEY_MAX_CHARS or any(c.isspace() or not c.isprintable() for c in key):
+        return None
+    return key
+
+
+def home_tools(
+    budget: Budget, toolbox: Callable[[], Toolbox], keys: KeySettings | None = None
+) -> list[tuple[ToolSpec, Handler]]:
+    """Home-only tools about spending and permissions, plus the key and limit tools when main
+    gives key settings.
 
     The toolbox is passed as a getter because these tools are part of the toolbox's own
     source: it cannot exist before them.
@@ -468,7 +530,7 @@ def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[Too
 
     home = frozenset({"home"})
     empty = {"type": "object", "properties": {}}
-    return [
+    base = [
         (
             ToolSpec(
                 "spend_today",
@@ -505,6 +567,127 @@ def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[Too
                 effect="change",
             ),
             set_permission,
+        ),
+    ]
+    return base + (_key_tools(budget, keys) if keys is not None else [])
+
+
+def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handler]]:
+    """key_status, set_api_key, set_daily_limit and expert_status for the first-run setup."""
+    env_path = keys.data_dir / ".env"
+    lock = asyncio.Lock()  # one check and one .env write at a time
+
+    async def key_status(args: dict) -> str:
+        # Never any part of the key, not even its last characters.
+        return json.dumps(
+            {
+                "has_key": keys.model.ready,
+                "source": keys.source,
+                "env_path": str(env_path),
+                "daily_limit_usd": budget.limit,
+            }
+        )
+
+    async def set_api_key(args: dict) -> str:
+        # The raw args are checked by hand. A pydantic ValidationError would quote input_value,
+        # which is the key. Between the websocket and here: server._call validates CallParams
+        # (tool and input) and answers with fixed text; Session.call_home and Toolbox.run only
+        # pass the dict on, and their guards read the spec, not the values.
+        key = _clean_key(args.get("key") if isinstance(args, dict) else None)
+        if key is None:
+            raise RpcError(ErrorCode.invalid_params, "set_api_key needs a key.")
+        if keys.source == "environment":
+            raise RpcError(ErrorCode.invalid_params, "The key is set by the environment.")
+        async with lock:
+            status = await keys.check(key)
+            if status != "ok":
+                return json.dumps({"status": status})
+            try:
+                upsert_env_value(keys.data_dir, KEY_NAME, key)
+            except OSError as err:
+                raise RpcError(
+                    ErrorCode.tool_failed, f"Scout could not save the key to {env_path}."
+                ) from err
+            keys.model.set_key(key)
+            if keys.source == "none":
+                keys.source = "file"
+            keys.on_key()
+            keys.notify("changed", {"what": "key"})
+            return json.dumps({"status": "ok"})
+
+    async def set_daily_limit(args: dict) -> str:
+        usd = args.get("usd") if isinstance(args, dict) else None
+        if isinstance(usd, bool) or not isinstance(usd, int | float):
+            usd = None
+        if usd is None or not math.isfinite(usd) or usd <= 0:
+            raise RpcError(ErrorCode.invalid_params, "set_daily_limit needs a number above 0.")
+        try:
+            upsert_env_value(keys.data_dir, LIMIT_NAME, repr(float(usd)))
+        except OSError as err:
+            raise RpcError(
+                ErrorCode.tool_failed, f"Scout could not save the limit to {env_path}."
+            ) from err
+        budget.limit = float(usd)
+        keys.notify("changed", {"what": "settings"})
+        return json.dumps({"limit_usd": budget.limit})
+
+    async def expert_status(args: dict) -> str:
+        # Looks the command up on PATH and nothing more: it never starts the expert, and the
+        # Claude Code login cannot be seen from here.
+        found = bool(keys.expert_cmd) and shutil.which(keys.expert_cmd[0]) is not None
+        return json.dumps({"found": found, "command": " ".join(keys.expert_cmd)})
+
+    home = frozenset({"home"})
+    empty = {"type": "object", "properties": {}}
+    return [
+        (
+            ToolSpec(
+                "key_status",
+                "Whether Scout has an Anthropic key, where it came from and where it is saved.",
+                empty,
+                home,
+                effect="read",
+            ),
+            key_status,
+        ),
+        (
+            ToolSpec(
+                "set_api_key",
+                "Check an Anthropic key with one free call and, if it works, save it. Replies "
+                "ok, invalid or unreachable.",
+                {
+                    "type": "object",
+                    "properties": {"key": {"type": "string"}},
+                    "required": ["key"],
+                },
+                home,
+                effect="change",
+            ),
+            set_api_key,
+        ),
+        (
+            ToolSpec(
+                "set_daily_limit",
+                "Set the daily spending limit in USD.",
+                {
+                    "type": "object",
+                    "properties": {"usd": {"type": "number"}},
+                    "required": ["usd"],
+                },
+                home,
+                effect="change",
+            ),
+            set_daily_limit,
+        ),
+        (
+            ToolSpec(
+                "expert_status",
+                "Whether the configured expert command is installed.",
+                empty,
+                home,
+                effect="read",
+            ),
+            expert_status,
         ),
     ]
 

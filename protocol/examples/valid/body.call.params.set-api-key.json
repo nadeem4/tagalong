@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 6,
+  "method": "call",
+  "params": { "tool": "set_api_key", "input": { "key": "sk-ant-example-not-a-real-key" } }
+}

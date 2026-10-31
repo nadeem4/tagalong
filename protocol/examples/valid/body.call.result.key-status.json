@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "result": {
+    "output": [
+      {
+        "type": "text",
+        "text": "{\"has_key\":true,\"source\":\"file\",\"env_path\":\"C:/Users/you/.tagalong/.env\",\"daily_limit_usd\":5.0}"
+      }
+    ]
+  }
+}

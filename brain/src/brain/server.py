@@ -198,7 +198,13 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
     """Run a Home tool in its own task so a slow one never blocks the read loop, which must
     keep delivering `use` responses and answers."""
     try:
-        params = CallParams.model_validate(message.get("params"))
+        try:
+            params = CallParams.model_validate(message.get("params"))
+        except ValidationError:
+            # Fixed text: the pydantic error quotes the params, and set_api_key's hold a key.
+            raise RpcError(
+                ErrorCode.invalid_params, "call needs a tool and an input object."
+            ) from None
         text = await session.call_home(params.tool, params.input)
         reply = _result(req_id, CallResult(output=[{"type": "text", "text": text}]))
     except ValidationError as exc:

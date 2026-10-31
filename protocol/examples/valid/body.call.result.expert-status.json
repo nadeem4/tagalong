@@ -1,0 +1,7 @@
+{
+  "jsonrpc": "2.0",
+  "id": 8,
+  "result": {
+    "output": [{ "type": "text", "text": "{\"found\":true,\"command\":\"claude-agent-acp\"}" }]
+  }
+}

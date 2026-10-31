@@ -47,6 +47,10 @@ class _Group:
     hooks: list[_Hooks] = field(default_factory=list)  # parallel to events
 
 
+class WakeSkipped(Exception):
+    """Raised by the start callback when a wake cannot run (no key): dropped without a log."""
+
+
 class Scheduler:
     def __init__(
         self,
@@ -142,6 +146,9 @@ class Scheduler:
         text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))
         try:
             turn_id = self._start(body_id, [{"type": "text", "text": text}])
+        except WakeSkipped:
+            self._call([h[1] for h in group.hooks], "on_drop", f"{group.kind.name} wake")
+            return
         except Exception:
             log.exception("could not start a %s wake", group.kind.name)
             self._call([h[1] for h in group.hooks], "on_drop", f"{group.kind.name} wake")
