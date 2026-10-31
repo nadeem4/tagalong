@@ -4,7 +4,7 @@
  * now and the side list save nothing; only Finish and Skip tour mark the tour seen.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { BeanClipData } from '../theme/bean-clip';
 import { Footer } from './footer';
@@ -64,6 +64,20 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const save = useRef<Save | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const opened = useRef(false);
+
+  // A step change moves focus to the new headline, so a keyboard or screen reader follows it.
+  useEffect(() => {
+    if (!opened.current) {
+      opened.current = true;
+      return;
+    }
+    const heading = bodyRef.current?.querySelector('h1');
+    if (heading == null) return;
+    heading.tabIndex = -1;
+    heading.focus();
+  }, [current]);
 
   function go(step: number): void {
     setCurrent(step);
@@ -99,7 +113,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
       <style>{WALKTHROUGH_CSS}</style>
       <SidePanel scout={scout} current={current} reached={reached} onJump={go} />
       <main className="wt-page">
-        <div className="wt-body" key={current}>
+        <div className="wt-body" key={current} ref={bodyRef}>
           <StepSaveContext.Provider value={(next) => (save.current = next)}>
             {body(current, host)}
           </StepSaveContext.Provider>

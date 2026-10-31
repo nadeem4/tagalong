@@ -17,8 +17,8 @@ const TALK_KEYS: readonly { value: string; label: string }[] = [
 ];
 
 const VOICES: readonly { value: string; label: string }[] = [
-  { value: 'bm_george', label: 'George: calm and measured' },
-  { value: 'bm_fable', label: 'Fable: warmer, a storyteller' },
+  { value: 'bm_george', label: 'George, Calm and measured' },
+  { value: 'bm_fable', label: 'Fable, Warmer, a storyteller' },
 ];
 
 const SAMPLE = 'Hi, I’m Scout. This is how I sound.';
@@ -33,6 +33,7 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
   const [voice, setVoice] = useState(start.voice);
   const [speed, setSpeed] = useState(start.speed);
   const [mic, setMic] = useState(start.microphoneId ?? '');
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [mics, setMics] = useState<{ id: string; label: string }[]>([]);
 
   const { listMicrophones } = host;
@@ -74,7 +75,7 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
             </option>
           ))}
         </select>
-        <p className="wt-help">Hold it, speak, let go. Scout listens only while you hold it.</p>
+        <p className="wt-help">(hold it on its own)</p>
       </div>
       <div className="wt-row">
         <input
@@ -85,7 +86,10 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
           checked={enabled}
           onChange={(event) => setEnabled(event.target.checked)}
         />
-        <span>Scout talks</span>
+        <div>
+          <span>Scout talks</span>
+          <p className="wt-help">Reads answers aloud, so you can look away.</p>
+        </div>
       </div>
       <div>
         <label htmlFor="wt-mouth">Who speaks</label>
@@ -94,9 +98,13 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
           value={mouth}
           onChange={(event) => setMouth(event.target.value === 'system' ? 'system' : 'kokoro')}
         >
-          <option value="kokoro">Scout’s own voice</option>
-          <option value="system">Windows voice</option>
+          <option value="kokoro">Kokoro (on the brain)</option>
+          <option value="system">System voice</option>
         </select>
+        <p className="wt-help">
+          Made on your computer. The voice downloads the first time Scout speaks (about 92 MB);
+          until then Scout uses the Windows voice.
+        </p>
       </div>
       <div>
         <label htmlFor="wt-voice">Voice</label>
@@ -110,10 +118,16 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
         <button
           type="button"
           className="wt-quiet"
-          onClick={() => void host.previewVoice({ text: SAMPLE, mouth, voice, speed })}
+          onClick={() => {
+            setPreviewFailed(false);
+            host
+              .previewVoice({ text: SAMPLE, mouth, voice, speed })
+              .catch(() => setPreviewFailed(true));
+          }}
         >
           Preview
         </button>
+        {previewFailed && <p className="wt-help">The preview could not play.</p>}
       </div>
       <div>
         <label htmlFor="wt-speed">Speed {speed.toFixed(2)}x</label>
@@ -139,8 +153,9 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
         </select>
       </div>
       <p className="wt-help">
-        Scout’s voice downloads once, about 92 MB. The listening models download once too, about 43
-        MB.
+        Your voice is turned into text by your own brain and is never stored. With the brain on this
+        computer, it never leaves it. The listening models download the first time you talk (about
+        43 MB).
       </p>
     </div>
   );
@@ -150,9 +165,10 @@ export function StepFive({ host }: { host: WalkthroughHost }) {
   const { settings, failed } = useWalkthroughSettings(host);
   return (
     <section>
-      <h1>Talk to Scout</h1>
+      <h1>Talk to Scout, and hear it back</h1>
       <p className="wt-lead">
-        Hold the talk key and speak. Scout answers out loud if you want it to.
+        Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the
+        words show in the bubble too.
       </p>
       {settings !== null && <VoiceForm host={host} settings={settings} />}
       {failed && (

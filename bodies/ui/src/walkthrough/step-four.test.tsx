@@ -55,4 +55,20 @@ describe('StepFour', () => {
     }
     expect(screen.getByText(/Home, under Settings > Privacy/)).toBeInTheDocument();
   });
+
+  it('has no try-it hint, and shows the look-only example', async () => {
+    mountStep(<StepFour host={makeWalkthroughHost()} />);
+    await screen.findByText('Ctrl+Shift+Space');
+    expect(screen.queryByText(/Try it/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Press the ask key to see it/)).not.toBeInTheDocument();
+    for (const text of [
+      'Chrome · Pricing – Stripe',
+      '2.9% + 30¢',
+      'What would this cost on 400 orders a month?',
+      'Open full chat',
+      'Seeing',
+    ]) {
+      expect(screen.getByText(text, { exact: false })).toBeInTheDocument();
+    }
+  });
 });

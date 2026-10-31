@@ -61,7 +61,6 @@ function AskForm({
                   Change
                 </button>
               </div>
-              <p className="wt-help">Try it now: press the ask key.</p>
             </>
           )}
         </div>
@@ -88,7 +87,20 @@ export function StepFour({ host }: { host: WalkthroughHost }) {
         Press the ask key anywhere. Scout’s bubble opens with the text you selected and the window
         you’re on. Remove anything you’d rather not send.
       </p>
-      {settings !== null && <AskForm host={host} settings={settings} />}
+      <div className="wt-cols">
+        <div>{settings !== null && <AskForm host={host} settings={settings} />}</div>
+        <div aria-hidden="true">
+          <span className="wt-label">What it looks like</span>
+          <div className="wt-example">
+            <span className="wt-chip">Chrome · Pricing – Stripe</span>
+            <p>“2.9% + 30¢”</p>
+            <p>What would this cost on 400 orders a month?</p>
+            <span className="wt-fake-button">Open full chat</span>{' '}
+            <span className="wt-fake-button">Ask</span>
+            <p>Seeing</p>
+          </div>
+        </div>
+      </div>
       {failed && (
         <p className="wt-error" role="alert">
           Scout could not read your settings.

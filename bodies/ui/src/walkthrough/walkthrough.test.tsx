@@ -107,4 +107,11 @@ describe('Walkthrough', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('That shortcut is taken.');
     expect(sideButton('Asking')).toHaveAttribute('aria-current', 'step');
   });
+
+  it('moves focus to the new step headline when the step changes', async () => {
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const heading = await screen.findByRole('heading', { name: 'How it fits together' });
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
 });

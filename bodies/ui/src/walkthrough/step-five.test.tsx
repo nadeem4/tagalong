@@ -1,6 +1,6 @@
 /** Tests for step 5: talk key, Scout talks, voice, speed and preview; saved only on Next. */
 
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StepFive } from './step-five';
 import { makeWalkthroughHost, mountStep } from './test-host';
@@ -80,5 +80,41 @@ describe('StepFive', () => {
     await screen.findByLabelText('Talk key');
     await saver.save();
     expect(host.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('shows the spec copy word for word', async () => {
+    mount();
+    await screen.findByLabelText('Talk key');
+    expect(
+      screen.getByRole('heading', { name: 'Talk to Scout, and hear it back' }),
+    ).toBeInTheDocument();
+    for (const text of [
+      'Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the words show in the bubble too.',
+      'Reads answers aloud, so you can look away.',
+      'Made on your computer. The voice downloads the first time Scout speaks (about 92 MB); until then Scout uses the Windows voice.',
+      'Your voice is turned into text by your own brain and is never stored. With the brain on this computer, it never leaves it. The listening models download the first time you talk (about 43 MB).',
+      '(hold it on its own)',
+    ]) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+    const voices = within(screen.getByLabelText('Voice'))
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(voices).toEqual(['George, Calm and measured', 'Fable, Warmer, a storyteller']);
+    const speakers = within(screen.getByLabelText('Who speaks'))
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(speakers).toEqual(['Kokoro (on the brain)', 'System voice']);
+    expect(screen.queryByText(/Try it/)).not.toBeInTheDocument();
+  });
+
+  it('says so when the preview cannot play', async () => {
+    const host = makeWalkthroughHost();
+    host.previewVoice.mockRejectedValueOnce(new Error('no audio'));
+    mount(host);
+    await screen.findByLabelText('Talk key');
+    fireEvent.click(screen.getByRole('button', { name: /Preview/ }));
+    expect(await screen.findByText('The preview could not play.')).toBeInTheDocument();
+    await waitFor(() => expect(host.previewVoice).toHaveBeenCalledTimes(1));
   });
 });
