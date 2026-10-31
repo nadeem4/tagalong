@@ -153,6 +153,15 @@ class Bodies:
         if body_id in self._online:
             self._online[body_id].peer.send(frame)
 
+    def send_live(self, body_id: str, method: str, params: dict) -> bool:
+        # Live-only: no seq, not in the outbox, never replayed. Stale audio must not come back
+        # after a reconnect, so an offline body simply misses it.
+        current = self._online.get(body_id)
+        if current is None:
+            return False
+        current.peer.send(json.dumps({"jsonrpc": "2.0", "method": method, "params": params}))
+        return True
+
     def online_ids(self) -> list[str]:
         return list(self._online)
 

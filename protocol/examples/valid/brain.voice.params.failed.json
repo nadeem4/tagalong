@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "method": "voice",
+  "params": {
+    "status": "failed",
+    "message": "Voice models need a first download; the brain is offline."
+  }
+}

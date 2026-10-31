@@ -8,7 +8,7 @@ and the samples in `examples/` follow it, and a change here comes first. The sam
 
 - Bodies talk only to the brain, never to each other.
 - The contract carries facts and the model's own words, never canned lines. Every word Scout says comes from the model; a turn may end with no reply at all.
-- The fifteen messages below do not change when a body, tool, expert or Home screen is added. New things arrive as tools, event names or `changed` names, never as new messages.
+- The twenty-two messages below do not change when a body, tool, expert or Home screen is added. New things arrive as tools, event names or `changed` names, never as new messages. (Fifteen carry the conversation; seven carry voice.)
 - Single user: no TLS, pairing or accounts in v1.
 
 ## Transport
@@ -46,8 +46,9 @@ Body  { id, kind, name, display? }
 | One part's decoded `data`         | 5 MB                                                         | `over_limit` |
 | All parts in one message, decoded | 20 MB                                                        | `over_limit` |
 | Replay window                     | the last 500 notifications or 24 hours, whichever is smaller | `resync`     |
+| One `mic` frame's decoded `pcm`   | 64 KB                                                        | dropped      |
 
-The same caps apply to `output` parts returned from `use` and `call`.
+The same caps apply to `output` parts returned from `use` and `call`. An oversize or malformed `mic` frame is dropped, never answered.
 
 ## Messages
 
@@ -55,19 +56,23 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Body → brain
 
-| Method   | Kind         | Params                                               | Result                                              |
-| -------- | ------------ | ---------------------------------------------------- | --------------------------------------------------- |
-| `hello`  | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }` | `{ protocol, session, tools: Tool[], seq, resync }` |
-| `tools`  | request      | `{ tools: Tool[] }`                                  | `{}`                                                |
-| `say`    | request      | `{ text?, parts?: Part[], context?, spoken? }`       | `{ turn, joined }`                                  |
-| `event`  | notification | `{ name, data? }`                                    |                                                     |
-| `call`   | request      | `{ tool, input }`                                    | `{ output: Part[] }`                                |
-| `answer` | request      | `{ ask, option, text? }`                             | `{}`                                                |
-| `cancel` | notification | `{ turn }`                                           |                                                     |
+| Method     | Kind         | Params                                                         | Result                                              |
+| ---------- | ------------ | -------------------------------------------------------------- | --------------------------------------------------- |
+| `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`           | `{ protocol, session, tools: Tool[], seq, resync }` |
+| `tools`    | request      | `{ tools: Tool[] }`                                            | `{}`                                                |
+| `say`      | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed? }` | `{ turn, joined }`                                  |
+| `event`    | notification | `{ name, data? }`                                              |                                                     |
+| `call`     | request      | `{ tool, input }`                                              | `{ output: Part[] }`                                |
+| `answer`   | request      | `{ ask, option, text? }`                                       | `{}`                                                |
+| `cancel`   | notification | `{ turn }`                                                     |                                                     |
+| `listen`   | request      | `{ mode: "held" \| "always" }`                                 | `{}`                                                |
+| `mic`      | notification | `{ pcm }`                                                      |                                                     |
+| `unlisten` | notification | `{}`                                                           |                                                     |
+| `hush`     | notification | `{}`                                                           |                                                     |
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; the Home tools, listed in the Home tools table of docs/brain.md), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
-- **say.** The user said something. At least one of `text` or `parts` is present. `context` is free-form (active window, selection) and goes to the model as-is; each body documents its own context in its doc, never here. `spoken: true` means the user spoke, so the body will speak the reply itself (voice stays in the desktop body in v1; the brain only sees text). The result returns the `turn` id at once; the reply streams as notifications. If a turn is already running (from any body), the message joins it instead of starting a new one: the result carries that turn's id and `joined: true`, and the model sees the new message at its next step. If the daily budget is spent, the turn still starts and ends at once with `reason: "over_budget"`, so every body learns it the same way. A `say` from a body with `display: false` still starts or joins the turn, but the turn's `body` is the displaying body the user last talked to if it is online, otherwise the first online body that displays, otherwise `null`; the sender does not become the body the user last talked to.
+- **say.** The user said something. At least one of `text` or `parts` is present. `context` is free-form (active window, selection) and goes to the model as-is; each body documents its own context in its doc, never here. `spoken: true` means the user spoke, so the reply is read aloud (see Voice). `voice` (a voice id) and `speed` (0.5 to 2) are optional and only matter on a spoken `say`. The result returns the `turn` id at once; the reply streams as notifications. If a turn is already running (from any body), the message joins it instead of starting a new one: the result carries that turn's id and `joined: true`, and the model sees the new message at its next step. If the daily budget is spent, the turn still starts and ends at once with `reason: "over_budget"`, so every body learns it the same way. A `say` from a body with `display: false` still starts or joins the turn, but the turn's `body` is the displaying body the user last talked to if it is online, otherwise the first online body that displays, otherwise `null`; the sender does not become the body the user last talked to.
 - **event.** A fact the body noticed (window changed, user idle). Names are free-form and documented per body. The brain decides whether it matters; most events get no reaction. Two names are shared by every body: `back {idle_seconds}` (the user returned after at least 5 minutes idle) and `focus {app, title}` (the front window changed; throttled; an empty `app` clears it, sent when the body may not report the front window). The browser body also sends `tab {title, url}` (the owner switched tabs; URL without query or fragment; throttled) and `download {name, state}` (state is `complete` or `interrupted`); the brain keeps the latest of each and never wakes for them. A body coming online is not an event: the brain learns it from the connection itself.
 - **call.** The body runs one of the brain's tools directly (Home reading settings, for example). Unknown tool gets `unknown_tool`.
 - **answer.** The user answered an ask. `option` is one of the ask's `options` strings; `text` is optional free text. An ask that is already closed or never existed gets `not_found`; an `option` not in the list gets `invalid_params`, unless the ask accepts typed answers (an expert's question) and `text` is non-empty: then any `option` is taken and the typed text is the answer.
@@ -85,6 +90,9 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 | `ask`      | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
 | `changed`  | notification | `{ seq, what }`                                                                                                                               |                      |
 | `approved` | notification | `{ seq, tool, text, preference }`                                                                                                             |                      |
+| `heard`    | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                           |                      |
+| `voice`    | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                |                      |
+| `speech`   | notification | `{ turn, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                     |                      |
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.
@@ -95,16 +103,30 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 - **changed.** Something the bodies display changed (`settings`, `memory`, `permissions`, `approvals`, an expert's name). `what` is free-form, never a fixed list. Bodies refetch through `call`.
 - **approved.** Scout let a tool run because a saved preference covered it. `tool` is the tool name, `text` the one-line summary of what ran, `preference` the preference sentence that applied. The bubble can show it so the person sees why no ask appeared. The brain sends it every time its side-check approves an ask, for Scout's brain, body and connected-app tools and for Claude Code's permission asks, always once and never "always".
 
+## Voice
+
+The brain hears and speaks; a body only handles sound. Audio rides in the same JSON text frames as everything else (base64), so there is one frame type and no binary transport. The seven voice messages are live-only: they carry no `seq`, are never stored in the outbox and never replayed, and go only to the current connection, so a reconnect cannot bring back old audio.
+
+- **pcm.** Base64 of little-endian int16 samples, mono. `mic.pcm` is 16 kHz; `speech.pcm` is at its `sample_rate`. A `mic` frame decodes to at most 64 KB (see Limits); an oversize or malformed frame is dropped silently, never answered.
+- **listen.** The body starts streaming its mic. `mode` is `held` (the user holds a key) or `always`. A new `listen` replaces the body's earlier one. A brain without voice answers `method_not_found`; the body treats that as "voice unavailable" and falls back to typing and its own system voice.
+- **mic.** One audio frame. Frames from a body that has not sent `listen`, or that has sent `unlisten`, are dropped with no error.
+- **unlisten.** The mic closed. In `held` mode the brain finishes what it already has first. A disconnect counts as `unlisten`.
+- **hush.** The user cut Scout off: the brain stops speaking the current reply for this body. The text reply still shows.
+- **heard.** What the brain heard, sent to the listening body: `speech_start`, `partial` (running text), `final` (text of one stretch of speech), `turn_end` (the person finished). The body decides what to send as a spoken `say`.
+- **voice.** The state of the brain's voice models, sent to the listening body. `loading` may carry `progress` (0 to 1) while models download, `failed` carries a plain `message`. The body keeps working while it loads or after it fails; the next `listen` retries.
+- **speech.** Scout's reply read aloud, sentence by sentence, sent to the body that shows the turn (`turn.body`). `pcm` and `sample_rate` come together; a `speech` with `text` and no `pcm` means "say this with your own voice" (used while the brain's voice loads). `{ turn, done: true }` ends that turn's speech.
+- **Privacy.** Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.
+
 ## Sessions and turns
 
 - There is one session across all bodies, and it survives a brain restart. A second body joins the same conversation; `hello` returns its id. The id is informational in v1: bodies never send it back.
 - One turn runs at a time. A turn starts with `say`, or with the brain itself (a scheduled routine, for example), which waits until no turn is running. A `say` during a running turn joins it (see `say`). Every notification about a turn carries its `turn` id.
-- Every brain → body notification goes to every connected body. `use` and its `cancel` go only to the body that owns the tool.
+- Every brain → body notification goes to every connected body, except `use` and its `cancel` (only to the body that owns the tool) and the voice notifications (only to the listening or displaying body).
 - Two connections with the same body id: the newer `hello` wins and the brain closes the older connection. Running `use` calls on the old connection fail with `body_offline`.
 
 ## Seq, outbox and replay
 
-- Every brain → body notification except `cancel` carries `seq`: an integer that rises by one per notification in that body's outbox, starting at 1. Bodies process notifications in `seq` order.
+- Every brain → body notification except `cancel` and the live-only voice notifications (`heard`, `voice`, `speech`) carries `seq`: an integer that rises by one per notification in that body's outbox, starting at 1. Bodies process notifications in `seq` order.
 - The brain keeps an outbox per body id (the replay window in Limits). A body that reconnects sends `last_seq` in `hello`.
 - If every notification after `last_seq` is still in the outbox, the brain answers `hello` with `resync: false` and then sends them in order before anything new.
 - If some are gone (too old, too many, the brain restarted, or `last_seq` is higher than the brain's latest `seq`), the brain answers `resync: true`. The body drops what it was showing for open turns and asks. The brain then sends only what is still live: an `ask` (`open`) for every open ask and a `turn` (`started`) for every turn that has not ended. These are new notifications with fresh `seq` numbers after the one in the `hello` result.
@@ -144,6 +166,7 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 
 - **`body`** (`{ id, kind, name }`): sent in hello as given; its id prefixes the client's request ids.
 - **`seqStore`** (`{ load(): Promise<number | null>, save(seq) }`): where the body keeps the last seq it saw, so a restart sends `last_seq`. Without it the client keeps `last_seq` in memory only. The browser keeps it in `chrome.storage.session`, which survives a worker restart but not a browser restart.
+- **Voice calls.** `listen(mode)` resolves when the brain accepts and rejects with its error (`method_not_found` when it has no voice). `mic(pcm: Int16Array)` returns whether the frame was sent, `unlisten()` and `hush()` are fire and forget; all are dropped while offline. `heard`, `voice` and `speech` reach `onNotification` without touching `last_seq`.
 - **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
 
 ## Examples

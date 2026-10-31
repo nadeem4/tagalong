@@ -1,6 +1,7 @@
 /**
  * A body's end of contract v1, shared by the desktop and the browser: one websocket to the
- * brain, hello first, then say, cancel and the brain's notifications and `use` requests.
+ * brain, hello first, then say, cancel, the voice calls and the brain's notifications and
+ * `use` requests.
  * It owns reconnecting, replay (last_seq) and an optional keepalive; what the notifications
  * mean is the caller's job. Imports only sibling contract files, so it stays zod-only.
  */
@@ -11,6 +12,8 @@ import {
   SayResult,
   UseParams,
   brainToBody,
+  type ListenParams,
+  type MethodSchemas,
   type SayParams,
 } from './messages.js';
 
@@ -121,6 +124,44 @@ export class BrainClient {
   cancel(turn: string): void {
     if (this.status !== 'online') return;
     this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method: 'cancel', params: { turn } }));
+  }
+
+  /** Starts the brain hearing this body's mic. Rejects with the brain's error if it has no voice. */
+  listen(mode: ListenParams['mode']): Promise<void> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    return this.request('listen', { mode }).then(() => undefined);
+  }
+
+  /** One 16 kHz mono mic frame. Live-only: dropped unless online, returns whether it was sent. */
+  mic(pcm: Int16Array): boolean {
+    if (this.status !== 'online' || this.socket === null) return false;
+    // Explicit little-endian, whatever the host byte order.
+    const bytes = new Uint8Array(pcm.length * 2);
+    const view = new DataView(bytes.buffer);
+    pcm.forEach((v, i) => view.setInt16(i * 2, v, true));
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    this.socket.send(
+      JSON.stringify({ jsonrpc: '2.0', method: 'mic', params: { pcm: btoa(binary) } }),
+    );
+    return true;
+  }
+
+  /** The mic closed. Dropped unless online; the brain also stops on disconnect. */
+  unlisten(): void {
+    this.notify('unlisten');
+  }
+
+  /** Barge-in: stop speaking the current reply. Dropped unless online. */
+  hush(): void {
+    this.notify('hush');
+  }
+
+  private notify(method: string): void {
+    if (this.status !== 'online') return;
+    this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method, params: {} }));
   }
 
   /**
@@ -302,9 +343,14 @@ export class BrainClient {
   private notification(method: string, params: unknown): void {
     // `cancel` carries no seq and nothing here is cancellable yet.
     if (method === 'cancel' || !(method in brainToBody)) return;
-    const schema = brainToBody[method as keyof typeof brainToBody].params;
-    const parsed = schema.safeParse(params);
+    const entry: MethodSchemas = brainToBody[method as keyof typeof brainToBody];
+    const parsed = entry.params.safeParse(params);
     if (!parsed.success) return;
+    if (entry.live) {
+      // Audio and voice status belong to this connection only: no seq, no replay bookkeeping.
+      this.options.onNotification(method, parsed.data);
+      return;
+    }
     const { seq } = parsed.data as { seq: number };
     if (this.lastSeq !== null && seq <= this.lastSeq) return;
     this.lastSeq = seq;

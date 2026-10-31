@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "speech",
+  "params": {
+    "turn": "t1",
+    "text": "That is a missing import.",
+    "pcm": "AAABAP//AIA=",
+    "sample_rate": 24000
+  }
+}

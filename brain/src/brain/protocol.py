@@ -24,6 +24,7 @@ LIMITS = {
     "message_bytes": 20_000_000,
     "replay_count": 500,
     "replay_ms": 86_400_000,
+    "mic_frame": 65_536,  # decoded bytes of one mic frame
 }
 
 
@@ -170,6 +171,8 @@ class SayParams(Model):
     parts: list[Part] | None = None
     context: Any = None
     spoken: bool | None = None
+    voice: str | None = None
+    speed: Annotated[float, Field(ge=0.5, le=2)] | None = None
 
     @model_validator(mode="after")
     def _needs_text_or_parts(self) -> "SayParams":
@@ -228,6 +231,19 @@ class AnswerParams(Model):
 
 class CancelTurnParams(Model):
     turn: Id
+
+
+class ListenParams(Model):
+    mode: Literal["held", "always"]
+
+
+class MicParams(Model):
+    pcm: Annotated[str, Field(min_length=1)]  # base64 int16 little-endian, mono, 16 kHz
+
+
+# unlisten and hush carry no fields.
+class EmptyParams(Model):
+    pass
 
 
 # Brain -> body
@@ -334,6 +350,39 @@ class ApprovedParams(Model):
     preference: str
 
 
+# The voice notifications are live-only: no seq, never stored or replayed.
+class HeardParams(Model):
+    event: Literal["speech_start", "partial", "final", "turn_end"]
+    text: str | None = None
+
+
+class VoiceParams(Model):
+    status: Literal["loading", "ready", "failed"]
+    message: str | None = None
+    progress: Annotated[float, Field(ge=0, le=1)] | None = None
+
+
+# One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
+# `pcm` and `sample_rate` come together; without them the body says `text` in its own voice.
+class SpeechParams(Model):
+    turn: Id
+    text: str | None = None
+    pcm: str | None = None
+    sample_rate: Annotated[int, Field(gt=0)] | None = None
+    done: Literal[True] | None = None
+
+    @model_validator(mode="after")
+    def _shape(self) -> "SpeechParams":
+        if self.done is not None:
+            if self.text is not None or self.pcm is not None or self.sample_rate is not None:
+                raise ValueError("a speech done carries nothing else")
+        elif self.text is None:
+            raise ValueError("a speech has text or done: true")
+        if (self.pcm is None) != (self.sample_rate is None):
+            raise ValueError("pcm and sample_rate come together")
+        return self
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -345,6 +394,10 @@ BODY_TO_BRAIN: MethodMap = {
     "call": (CallParams, CallResult),
     "answer": (AnswerParams, EmptyResult),
     "cancel": (CancelTurnParams, None),
+    "listen": (ListenParams, EmptyResult),
+    "mic": (MicParams, None),
+    "unlisten": (EmptyParams, None),
+    "hush": (EmptyParams, None),
 }
 
 BRAIN_TO_BODY: MethodMap = {
@@ -356,4 +409,7 @@ BRAIN_TO_BODY: MethodMap = {
     "ask": (AskParams, None),
     "changed": (ChangedParams, None),
     "approved": (ApprovedParams, None),
+    "heard": (HeardParams, None),
+    "voice": (VoiceParams, None),
+    "speech": (SpeechParams, None),
 }

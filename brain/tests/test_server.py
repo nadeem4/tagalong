@@ -5,6 +5,7 @@ behaviour and write ordering are exercised for real.
 """
 
 import asyncio
+import base64
 import json
 from types import SimpleNamespace
 
@@ -798,6 +799,155 @@ async def test_answer_text_reaches_the_ask():
             async with asyncio.timeout(5):
                 answer = await task
             assert (answer.option, answer.text) == ("mine", "typed")
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+class RecordingVoice:
+    """A VoiceHooks that notes every call, so the server tests need no models."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+
+    def listen(self, body_id, mode):
+        self.calls.append(("listen", body_id, mode))
+
+    def mic(self, body_id, pcm):
+        self.calls.append(("mic", body_id, pcm))
+
+    def unlisten(self, body_id):
+        self.calls.append(("unlisten", body_id))
+
+    def hush(self, body_id):
+        self.calls.append(("hush", body_id))
+
+
+def notification(method, params):
+    return {"jsonrpc": "2.0", "method": method, "params": params}
+
+
+async def voice_env(voice=None):
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session.voice = voice
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+
+
+async def settle(ws):
+    # A request after the notifications: its answer proves the earlier frames were handled.
+    return (await call(ws, request("tools", {"tools": []}, req_id=99)))["result"]
+
+
+async def test_listen_validates_answers_empty_and_calls_the_hook():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            assert (await call(ws, request("listen", {"mode": "held"})))["result"] == {}
+            bad = await call(ws, request("listen", {"mode": "x"}, req_id=3))
+            assert bad["error"]["code"] == -32602
+        # The bad listen never reached the hook.
+        assert [c for c in voice.calls if c[0] == "listen"] == [("listen", "desktop", "held")]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_mic_decodes_base64_for_a_listening_body():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await call(ws, request("listen", {"mode": "always"}))
+            await ws.send(json.dumps(notification("mic", {"pcm": "AAABAP//AIA="})))
+            await settle(ws)
+        assert ("mic", "desktop", bytes([0, 0, 1, 0, 255, 255, 0, 128])) in voice.calls
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_bad_mic_frames_are_dropped_and_the_connection_stays_open():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await call(ws, request("listen", {"mode": "held"}))
+            big = base64.b64encode(bytes(65_537)).decode()
+            for params in ({"pcm": "!!not base64"}, {"pcm": big}, {"pcm": ""}, {}, "x"):
+                await ws.send(json.dumps(notification("mic", params)))
+            await ws.send(json.dumps(request("mic", {"pcm": "AAA="}, req_id=8)))  # a request
+            assert await settle(ws) == {}
+        assert [c for c in voice.calls if c[0] == "mic"] == []
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_mic_without_listen_or_after_unlisten_is_dropped():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await ws.send(json.dumps(notification("mic", {"pcm": "AAA="})))  # never listened
+            await call(ws, request("listen", {"mode": "held"}))
+            await ws.send(json.dumps(notification("unlisten", {})))
+            await ws.send(json.dumps(notification("mic", {"pcm": "AAA="})))  # after unlisten
+            await settle(ws)
+        assert [c for c in voice.calls if c[0] == "mic"] == []
+        assert ("unlisten", "desktop") in voice.calls
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_hush_reaches_the_hook():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await ws.send(json.dumps(notification("hush", {})))
+            await settle(ws)
+        assert ("hush", "desktop") in voice.calls
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_a_disconnect_unlistens():
+    voice = RecordingVoice()
+    server, url = await voice_env(voice)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await call(ws, request("listen", {"mode": "held"}))
+        for _ in range(50):
+            if ("unlisten", "desktop") in voice.calls:
+                break
+            await asyncio.sleep(0.01)
+        assert ("unlisten", "desktop") in voice.calls
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_without_a_voice_listen_is_method_not_found_and_notifications_are_ignored():
+    server, url = await voice_env(None)
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            reply = await call(ws, request("listen", {"mode": "held"}))
+            assert reply["error"]["code"] == -32601
+            for method, params in (("mic", {"pcm": "AAA="}), ("unlisten", {}), ("hush", {})):
+                await ws.send(json.dumps(notification(method, params)))
+            assert await settle(ws) == {}
     finally:
         server.close()
         await server.wait_closed()

@@ -83,6 +83,7 @@ the total can run a little low.
 | `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                                                         |
 | `brain/src/brain/bodies.py`         | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
 | `brain/src/brain/server.py`         | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
+| `brain/src/brain/voice/__init__.py` | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to (`Session.voice`)                                                                                                                                                                                       |
 | `brain/src/brain/main.py`           | The `uv run brain` entry point                                                                                                                                                                                                                                                             |
 
 ## What a connection does
@@ -102,6 +103,19 @@ the total can run a little low.
   (`Session._display_target`). `answer` is described under
   [Permissions and asks](#permissions-and-asks) and `call` under [Home tools](#home-tools). `event` goes to `Session.body_event` (a bad shape is dropped); unknown notifications are ignored. An
   unknown request gets `method_not_found`.
+- Voice methods go to the voice seam, `Session.voice` (a `VoiceHooks` in `brain/voice/`). It is
+  `None` until the voice service is wired in a later slice, so today `listen` gets
+  `method_not_found` and `mic`, `unlisten` and `hush` are ignored.
+
+  | Method     | Server does                                                                                                                                                                 |
+  | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `listen`   | Validates `mode` (bad gets `invalid_params`), marks this connection as listening, calls `voice.listen`, answers `{}`                                                        |
+  | `mic`      | Decodes base64 and calls `voice.mic`. Dropped silently, never answered, when the connection has not listened, the `pcm` is empty or not base64, or it decodes to over 64 KB |
+  | `unlisten` | Clears the listening mark and calls `voice.unlisten`                                                                                                                        |
+  | `hush`     | Calls `voice.hush`                                                                                                                                                          |
+
+  A disconnect calls `voice.unlisten` for that body.
+
 - Bad JSON or a binary frame gets `parse_error`. Anything that is not a JSON-RPC object gets
   `invalid_request`. After `hello` the connection stays open; before it, it closes.
 - A newer connection with the same body id closes the older one. Its `tools` frames are
@@ -185,6 +199,9 @@ flowchart LR
   notifications in order, with nothing else in between.
 - If something was dropped, or `last_seq` is ahead of the brain, the result says `resync: true`
   and nothing is replayed. Replaying live asks and turns is not built yet.
+- The voice notifications (`heard`, `voice`, `speech`) are live-only. `Bodies.send_live(body_id,
+method, params)` writes one frame with no `seq` straight to the body's current connection and
+  returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio.
 - Writes go through one queue per connection. `send` never waits and never raises, so one slow
   body cannot stop the others.
 

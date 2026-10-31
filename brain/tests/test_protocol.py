@@ -94,6 +94,7 @@ def test_constants():
         "message_bytes": 20_000_000,
         "replay_count": 500,
         "replay_ms": 86_400_000,
+        "mic_frame": 65_536,
     }
 
 
@@ -273,3 +274,40 @@ def test_approved_notification_shape():
     model.model_validate({**ok, "extra": 1})  # unknown keys are ignored, like every model
     with pytest.raises(ValidationError):
         model.model_validate({k: v for k, v in ok.items() if k != "preference"})
+
+
+def test_voice_methods_are_in_the_maps():
+    assert {"listen", "mic", "unlisten", "hush"} <= set(BODY_TO_BRAIN)
+    assert {"heard", "voice", "speech"} <= set(BRAIN_TO_BODY)
+    assert BODY_TO_BRAIN["listen"][1] is not None
+    assert BODY_TO_BRAIN["mic"][1] is None
+
+
+@pytest.mark.parametrize(
+    ("origin", "method", "params"),
+    [
+        ("body", "listen", {"mode": "x"}),
+        ("body", "mic", {"pcm": ""}),
+        ("body", "say", {"text": "hi", "speed": 3}),
+        ("body", "say", {"text": "hi", "speed": 0.4}),
+        ("body", "say", {"text": "hi", "voice": None}),
+        ("brain", "heard", {"event": "mumble"}),
+        ("brain", "voice", {"status": "loading", "progress": 1.5}),
+        ("brain", "voice", {"status": "loading", "progress": None}),
+        ("brain", "speech", {"text": "hi"}),
+        ("brain", "speech", {"turn": "t", "done": True, "text": "hi"}),
+        ("brain", "speech", {"turn": "t", "text": "hi", "pcm": "AAA="}),
+        ("brain", "speech", {"turn": "t", "text": "hi", "sample_rate": 24000}),
+        ("brain", "speech", {"turn": "t"}),
+    ],
+)
+def test_voice_params_rejected(origin, method, params):
+    with pytest.raises(ValidationError):
+        MAPS[origin][method][0].model_validate(params)
+
+
+def test_say_voice_and_speed_edges():
+    say = BODY_TO_BRAIN["say"][0]
+    assert say.model_validate({"text": "hi", "speed": 0.5, "voice": "v"}).speed == 0.5
+    assert say.model_validate({"text": "hi", "speed": 2}).speed == 2
+    assert say.model_validate({"text": "hi"}).voice is None
