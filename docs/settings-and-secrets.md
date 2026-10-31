@@ -138,7 +138,7 @@ Tool permissions (Ask or Auto per tool, shown in Home → Settings → Permissio
 here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
 brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
 
-Guard limits are not settings here either. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
+The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit (USD)** calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
 environment or its `.env` (see [brain.md](brain.md#run-it) and
