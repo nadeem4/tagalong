@@ -1,7 +1,7 @@
-"""The seam between the websocket server and the brain's voice models.
+"""The seam between the brain and its voice models.
 
-The server routes `listen`, `mic`, `unlisten` and `hush` here and knows nothing about
-models; the real service arrives in a later slice.
+The server routes `listen`, `mic`, `unlisten` and `hush` here; the session reports spoken turns
+(`spoken`, `reply`, `turn_ended`); Home asks for a `sample`. Neither knows about models.
 """
 
 from typing import Literal, Protocol
@@ -15,3 +15,11 @@ class VoiceHooks(Protocol):
     def unlisten(self, body_id: str) -> None: ...
 
     def hush(self, body_id: str) -> None: ...
+
+    def spoken(self, turn: str, body_id: str, voice: str | None, speed: float | None) -> None: ...
+
+    def reply(self, turn: str, body_id: str | None, params: dict) -> None: ...
+
+    def turn_ended(self, turn: str) -> None: ...
+
+    async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes: ...

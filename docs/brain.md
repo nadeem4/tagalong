@@ -83,15 +83,11 @@ the total can run a little low.
 | `brain/src/brain/mind/turn.py`                           | The thinking loop and the Anthropic streaming call                                                                                                                                                                                                                                         |
 | `brain/src/brain/bodies.py`                              | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
 | `brain/src/brain/server.py`                              | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
-| `brain/src/brain/voice/__init__.py`                      | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to (`Session.voice`)                                                                                                                                                                                       |
+| `brain/src/brain/voice/__init__.py`                      | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                              |
 | `brain/src/brain/voice/ears.py`                          | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                      |
-| `brain/src/brain/voice/service.py`                       | `VoiceService`: one listening session at a time, buffers frames while models load, runs `Ears` in a thread, sends `heard` and `voice` live-only                                                                                                                                            |
-| `brain/src/brain/voice/models.py`                        | Pinned model files (`EARS_FILES`) and `ensure_files`, the checked download                                                                                                                                                                                                                 |
-| `brain/src/brain/voice/{silero,moonshine,smart_turn}.py` | The real model adapters (imported lazily); `smart_turn.features` is the numpy Whisper log-mel code                                                                                                                                                                                         |
-| `brain/src/brain/voice/load.py`                          | `ears_loader`: downloads the files and loads the three models; only `main.py` imports it                                                                                                                                                                                                   |
+| `brain/src/brain/voice/load.py`                          | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                          |
 | `brain/src/brain/main.py`                                | The `uv run brain` entry point                                                                                                                                                                                                                                                             |
 
-## What a connection does
 
 - The first message must be `hello`. Anything else, including bad JSON, gets an error and the
   connection closes.
@@ -353,15 +349,16 @@ so there is one gate and no second path.
 - **Changed.** `remember` and `forget` send `changed {what: "memory"}`; `set_permission` sends
   `changed {what: "permissions"}`. Every body gets it, so Home refetches.
 
-| Tool               | Input                        | Result text (JSON)                                                                                                          |
-| ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                         | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
-| `forget`           | `{"id": int}`                | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
-| `spend_today`      | `{}`                         | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
-| `list_permissions` | `{}`                         | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
-| `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
-| `list_jobs`        | `{}`                         | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
-| `stop_job`         | `{"job": str}`               | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
+| Tool               | Input                          | Result text (JSON)                                                                                                          |
+| ------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                           | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
+| `forget`           | `{"id": int}`                  | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
+| `spend_today`      | `{}`                           | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
+| `list_permissions` | `{}`                           | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
+| `set_permission`   | `{"tool": str, "mode": str}`   | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
+| `speak_sample`     | `{"text", "voice?", "speed?"}` | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                            |
+| `list_jobs`        | `{}`                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
+| `stop_job`         | `{"job": str}`                 | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -791,13 +788,12 @@ leaves it.
   turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as
   "over". A stretch of speech with no pause is closed after about 30 s.
 - **`VoiceService`** implements `VoiceHooks`. `listen` starts a session for that body (replacing
-  any earlier one, from any body, which goes silent: one listening session at a time); `mic` converts int16 to float32 and queues it; one worker
+  any earlier one, which goes silent); `mic` converts int16 to float32 and queues it; one worker
   task per session feeds 512-sample frames to `Ears` with `asyncio.to_thread`, so a slow decode
-  never stalls the websocket. Downloads time out after 30 s, and Moonshine's load progress is handed
-  back to the event loop before it reaches a body. `unlisten` on a held
+  never stalls the websocket. Only one session uses the models at a time. `unlisten` on a held
   session flushes the queue and sends the last words and one `turn_end`; on an always session it
-  stops at once and sends nothing. `hush` does nothing yet (the mouth arrives later). A disconnect
-  calls `unlisten`, so a gone body never keeps a session.
+  stops at once and sends nothing. `hush` goes to the mouth (see [Brain mouth](#brain-mouth)). A
+  disconnect calls `unlisten`, so a gone body never keeps a session.
 - **Events** go out with `Bodies.send_live`: no `seq`, never stored or replayed. `heard
 {event, text?}`; `voice {status: loading | ready | failed, message?, progress?}`. `loading`
   with `progress` is sent only while something is downloaded (at most every 2%), then `ready`.
@@ -809,9 +805,9 @@ leaves it.
   pinned to a commit with a SHA-256, written to `.part` then renamed, one retry on a bad hash)
   and `moonshine/` (about 45 MB, fetched by `moonshine-voice` into that folder). The first
   `listen` on a new computer downloads about 56 MB.
-- **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx`, used for speech in a later slice, supports
-  3.10 to 3.13). Dependencies: `moonshine-voice`, `onnxruntime`, `numpy`. Linux wheels exist for all
-  three, so the CI brain job resolves them from `uv.lock`.
+- **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx` supports 3.10 to 3.13). Dependencies:
+  `moonshine-voice`, `onnxruntime`, `numpy`, `kokoro-onnx`. Linux wheels exist for all of them, so
+  the CI brain job resolves them from `uv.lock`.
 
 ### Speed check on Windows (slice 15b)
 
@@ -827,6 +823,52 @@ Measured on the development machine (Windows 11, Python 3.12, CPU only):
 Moonshine does its own splitting into lines, so the stream is reset between our stretches
 (`stop` then `start`). Moonshine at about 80% of real time is the tightest part: it is fed only
 while someone speaks, but a slower computer will lag.
+
+## Brain mouth
+
+A spoken reply is read aloud on the body that shows it. The desktop still speaks with its own
+voice process until a later slice switches it over.
+
+- **Which turns.** A `say` with `spoken: true` makes its turn spoken (a spoken `say` that joins a
+  running typed turn makes it spoken from then on). `Session` passes that turn's `reply`
+  notifications to `Session.voice.reply`, plus `spoken` when the turn starts and `turn_ended`
+  when it ends (also when cancelled). The body is the turn's displaying body, never the sender
+  of a display-less body, and a turn with no displaying body is not spoken. A typed turn never
+  reaches the voice. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
+  (default 1.0); an unknown voice id speaks with `bm_george`.
+- **Sentences.** `voice/speakable.py` (a port of the desktop's `speakable.ts` and
+  `spoken-stream.ts`) turns the streamed reply into sentences: fenced code, table rows, `>` quotes
+  and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. The
+  first complete sentence goes out at once. Short sentences (under 40 characters) that are
+  already waiting are said together, because the voice clips a very short line.
+- **`Mouth`** (`voice/mouth.py`) keeps one task per spoken turn. It synthesises each sentence
+  with `asyncio.to_thread`, so a slow voice never stalls the websocket or the ears, and sends
+  `speech {turn, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
+  base64). After the last sentence it sends `speech {turn, done: true}`.
+- **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
+  ready (first run downloads about 120 MB), and when it fails to load, sentences go out as `speech
+{turn, text}` with no `pcm`, so the body says them with its system voice; the body also gets
+  `voice {status: loading}`, then `ready` or `failed {message}`. A failed load is tried again on
+  the next spoken turn.
+- **Hush.** `hush` from a body stops every turn spoken on that body: queued sentences are
+  dropped, later deltas of those turns are ignored and no more `speech` is sent (not even
+  `done`). The text reply still shows. Other bodies' turns go on.
+- **The spoken note.** For a spoken `say` the user content gets one extra text block, after the
+  content: "This reply will be read aloud ... you may open with one short sentence in your own
+  words first." That sentence is the spoken ack; code never says it, there is no canned line and no
+  earcon. It sits in the user content rather than the system prompt so the cached system prompt is
+  the same for typed and spoken turns. It is an instruction to the model and not guaranteed.
+- **Settings Preview.** The Home tool `speak_sample {text, voice?, speed?}` returns a text part
+  holding the JSON `{"mime": "audio/wav", "data": <base64>}` (Home calls answer in text); with
+  voice off it returns a plain sentence saying so.
+- **Models.** Kokoro v1.0 int8 (about 88 MB) and its voices file (about 27 MB), pinned to the
+  `kokoro-onnx` release `model-files-v1.0` with a size and SHA-256, in
+  `<TAGALONG_HOME>/voice/tts/kokoro/`, downloaded with the same checked, shared download as the
+  ears. `kokoro-onnx` and `espeakng-loader` are imported only when the voice loads. No new
+  setting.
+- **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT.wav]` runs the
+  real voice once and prints load time, time per sentence and the real-time factor (not part of
+  `pytest`).
 
 ## Not built yet
 

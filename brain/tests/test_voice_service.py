@@ -3,7 +3,7 @@
 import asyncio
 
 import numpy as np
-from fake_voice import LOUD, parts
+from fake_voice import LOUD, FakeTts, parts
 
 from brain.voice.models import ModelIntegrityError
 from brain.voice.service import MAX_BUFFER_SECONDS, VoiceService
@@ -46,7 +46,10 @@ def service(sent, *, load=None, p=None):
             return await load(on_progress, calls["n"])
         return made
 
-    svc = VoiceService(sent, load_ears)
+    async def load_tts():
+        return FakeTts()
+
+    svc = VoiceService(sent, load_ears, load_tts)
     return svc, made, calls
 
 
@@ -315,3 +318,33 @@ async def test_the_buffer_while_loading_keeps_only_the_newest_seconds():
     svc.unlisten("d")
     await until(lambda: any(e.startswith("turn_end") for e in sent.heard()))
     assert sent.heard()[-1].startswith("turn_end:")
+
+
+# --- the mouth: spoken turns, hush and samples go through the same service (15c) ---
+
+SENTENCE = "The build finished and every single test passed."
+
+
+async def test_a_spoken_reply_is_sent_as_speech_and_hush_stops_it():
+    sent = Sent()
+    svc, _, _ = service(sent)
+    svc.spoken("w", "d", None, None)
+    svc.reply("w", "d", {"delta": SENTENCE + " "})
+    svc.reply("w", "d", {"done": True})
+    await settle()  # the first turn loads the voice, so its sentence goes out as text
+    svc.spoken("t", "d", None, None)
+    svc.reply("t", "d", {"delta": SENTENCE + " "})
+    await settle()
+    speech = [p for b, m, p in sent.frames if m == "speech" and p["turn"] == "t"]
+    assert [("pcm" in p) for p in speech] == [True]
+    svc.hush("d")
+    svc.reply("t", "d", {"delta": "More words here. "})
+    svc.turn_ended("t")
+    await settle()
+    after = [p for b, m, p in sent.frames if m == "speech" and p["turn"] == "t"]
+    assert after == speech
+
+
+async def test_sample_returns_a_wav():
+    svc, _, _ = service(Sent())
+    assert (await svc.sample("Hello.", None, None))[:4] == b"RIFF"

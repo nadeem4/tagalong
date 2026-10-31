@@ -58,7 +58,7 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
         seen["voice"] = session.voice
         raise Stop
 
-    for name in ("moonshine_voice", "onnxruntime"):
+    for name in ("moonshine_voice", "onnxruntime", "kokoro_onnx"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
@@ -66,7 +66,8 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
     with pytest.raises(Stop):
         asyncio.run(_run())
     assert isinstance(seen["voice"], VoiceService)
-    assert "moonshine_voice" not in sys.modules and "onnxruntime" not in sys.modules
+    for name in ("moonshine_voice", "onnxruntime", "kokoro_onnx"):
+        assert name not in sys.modules
 
 
 def test_memory_open_failure_exits(monkeypatch, tmp_path):

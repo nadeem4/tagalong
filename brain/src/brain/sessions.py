@@ -51,7 +51,14 @@ from brain.scheduler import Scheduler
 from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools, expert_tools, home_tools, question_tools, timer_tools
+from brain.tools import (
+    brain_tools,
+    expert_tools,
+    home_tools,
+    question_tools,
+    timer_tools,
+    voice_tools,
+)
 from brain.voice import VoiceHooks
 
 log = logging.getLogger("brain")
@@ -137,6 +144,7 @@ class Session:
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox)
+            + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
@@ -182,6 +190,8 @@ class Session:
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
         self._last_body: str | None = None  # where a wake turn goes first
+        self._turn_body: str | None = None  # the body showing the running turn
+        self._spoken: set[str] = set()  # running turns whose reply is read aloud
         bodies.on_connect = self._on_connect
         for job in memory.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
@@ -198,8 +208,20 @@ class Session:
         # A finished task whose callback has not run yet is a dead turn: start a new one.
         if self._busy():
             self._inbox.append(content)
+            self._speak(self._turn_id, self._turn_body, params)
             return SayResult(turn=self._turn_id, joined=True)
-        return SayResult(turn=self._start_turn(shown_on, content), joined=False)
+        turn = self._start_turn(shown_on, content)
+        self._speak(turn, shown_on, params)
+        return SayResult(turn=turn, joined=False)
+
+    def _speak(self, turn: str | None, shown_on: str | None, params: SayParams) -> None:
+        """A spoken say makes its turn spoken, on the body that shows it: speech never goes to
+        a body that did not display the turn."""
+        if not params.spoken or self.voice is None or shown_on is None or turn is None:
+            return
+        if turn not in self._spoken:
+            self._spoken.add(turn)
+            self.voice.spoken(turn, shown_on, params.voice, params.speed)
 
     def _display_target(self) -> str | None:
         shown = self._bodies.display_ids()
@@ -238,6 +260,7 @@ class Session:
     ) -> str:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
+        self._turn_body = body_id
         if self._inbox:  # says from the finished turn come before this newer one
             self._append_user([b for s in self._inbox for b in s])
             self._inbox.clear()
@@ -251,6 +274,12 @@ class Session:
             "turn",
             {"turn": turn_id, "body": body_id, "state": "started", "started_by": started_by},
         )
+
+        def spoken_notify(method: str, params: dict) -> None:
+            notify(method, params)
+            if method == "reply" and turn_id in self._spoken and self.voice is not None:
+                self.voice.reply(turn_id, body_id, params)
+
         task = asyncio.create_task(
             run_turn(
                 turn_id=turn_id,
@@ -268,7 +297,7 @@ class Session:
                 tools=self.toolbox.model_tools,
                 run_tool=self.toolbox.run,
                 inbox=self._inbox,
-                notify=notify,
+                notify=spoken_notify,
                 budget=self._budget,
                 step_cap=self._step_cap,
                 guards=self.guards,
@@ -323,6 +352,10 @@ class Session:
             self._turn_id = None
             self._task = None
         self._persist()
+        if turn_id in self._spoken:
+            self._spoken.discard(turn_id)
+            if self.voice is not None:
+                self.voice.turn_ended(turn_id)
         self._bodies.notify(
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )

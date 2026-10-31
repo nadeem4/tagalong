@@ -139,6 +139,13 @@ def part_blocks(parts: list[Part]) -> list[dict[str, Any]]:
     return blocks
 
 
+SPOKEN_NOTE = (
+    "This reply will be read aloud, so write plain spoken sentences (no tables or code unless "
+    "asked). If the work will take a while, you may open with one short sentence in your own "
+    "words first."
+)
+
+
 def user_content(params: SayParams) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     if params.text:
@@ -153,4 +160,8 @@ def user_content(params: SayParams) -> list[dict[str, Any]]:
         )
     if not blocks:
         raise ValueError("say has no content")
+    if params.spoken:
+        # Here, not in the system prompt, so the cached system prompt is the same for typed and
+        # spoken turns. An instruction to the model; code never speaks this line itself.
+        blocks.append(_text(SPOKEN_NOTE))
     return blocks

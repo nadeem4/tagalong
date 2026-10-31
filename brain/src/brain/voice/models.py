@@ -45,6 +45,25 @@ EARS_FILES = [
 ]
 
 
+# Kokoro (int8) from the kokoro-onnx release tagged `model-files-v1.0`.
+_KOKORO = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+
+KOKORO_FILES = [
+    ModelFile(
+        f"{_KOKORO}/kokoro-v1.0.int8.onnx",
+        "tts/kokoro/kokoro-v1.0.int8.onnx",
+        92_361_271,
+        "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb",
+    ),
+    ModelFile(
+        f"{_KOKORO}/voices-v1.0.bin",
+        "tts/kokoro/voices-v1.0.bin",
+        28_214_398,
+        "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+    ),
+]
+
+
 def _sha256_of(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:

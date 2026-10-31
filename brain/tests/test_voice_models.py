@@ -8,6 +8,7 @@ import pytest
 
 from brain.voice.models import (
     EARS_FILES,
+    KOKORO_FILES,
     ModelFile,
     ModelIntegrityError,
     ensure_files,
@@ -45,6 +46,15 @@ def test_ears_files_are_pinned_to_a_commit():
     assert len(EARS_FILES) == 2
     for f in EARS_FILES:
         assert re.search(r"/resolve/[0-9a-f]{40}/", f.url), f.url
+        assert re.fullmatch(r"[0-9a-f]{64}", f.sha256)
+        assert f.bytes > 0
+
+
+def test_kokoro_files_are_pinned_to_a_release():
+    assert len(KOKORO_FILES) == 2
+    for f in KOKORO_FILES:
+        assert re.search(r"/releases/download/[\w.-]+/", f.url), f.url
+        assert "resolve/main" not in f.url
         assert re.fullmatch(r"[0-9a-f]{64}", f.sha256)
         assert f.bytes > 0
 

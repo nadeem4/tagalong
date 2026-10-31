@@ -16,6 +16,7 @@ import numpy as np
 
 from brain.voice.ears import FRAME, Ears, EarsParts
 from brain.voice.models import ModelIntegrityError
+from brain.voice.mouth import Mouth, Tts
 
 log = logging.getLogger("brain")
 
@@ -23,6 +24,7 @@ MAX_BUFFER_SECONDS = 30  # frames kept while the models load; the oldest go firs
 _FINISH = None  # queue marker: no more audio
 
 LoadEars = Callable[[Callable[[float], None]], Awaitable[EarsParts]]
+LoadTts = Callable[[], Awaitable[Tts]]
 
 
 class _Sender(Protocol):
@@ -70,11 +72,12 @@ class _Session:
 
 
 class VoiceService:
-    """Implements VoiceHooks for the ears. `hush` does nothing until the mouth exists."""
+    """Implements VoiceHooks: the ears are here, the speaking is delegated to the Mouth."""
 
-    def __init__(self, bodies: _Sender, load_ears: LoadEars) -> None:
+    def __init__(self, bodies: _Sender, load_ears: LoadEars, load_tts: LoadTts) -> None:
         self._bodies = bodies
         self._load_ears = load_ears
+        self._mouth = Mouth(bodies, load_tts)
         self._sessions: dict[str, _Session] = {}
         self._parts: EarsParts | None = None
         self._loading: asyncio.Task | None = None
@@ -105,7 +108,19 @@ class VoiceService:
             session.silence()
 
     def hush(self, body_id: str) -> None:
-        return
+        self._mouth.hush(body_id)
+
+    def spoken(self, turn: str, body_id: str, voice: str | None, speed: float | None) -> None:
+        self._mouth.spoken(turn, body_id, voice, speed)
+
+    def reply(self, turn: str, body_id: str | None, params: dict) -> None:
+        self._mouth.reply(turn, params)
+
+    def turn_ended(self, turn: str) -> None:
+        self._mouth.end_turn(turn)
+
+    async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
+        return await self._mouth.sample(text, voice, speed)
 
     def _send(self, session: _Session, method: str, params: dict) -> None:
         if session.live:

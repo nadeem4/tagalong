@@ -660,6 +660,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "list_preferences",
         "remove_preference",
         "set_permission",
+        "speak_sample",
         "spend_today",
         "stop_job",
     ]
