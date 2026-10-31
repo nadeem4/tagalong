@@ -1,4 +1,4 @@
-/** Tests for the turn IPC: ask and interrupt go to the brain; the old watch and remark buttons do nothing. */
+/** Tests for the turn IPC: ask and interrupt go to the brain. */
 
 import { describe, expect, it } from 'vitest';
 import type { SayParams } from '@tagalong/contract';
@@ -107,11 +107,5 @@ describe('registerTurnIpc', () => {
     const { invoke, cancelled } = setup();
     await invoke(IPC.interrupt, 't1');
     expect(cancelled).toEqual(['t1']);
-  });
-
-  it("a remark's Not now does nothing", async () => {
-    const { invoke, said, cancelled } = setup();
-    await invoke(IPC.remarkNotNow);
-    expect([said, cancelled]).toEqual([[], []]);
   });
 });

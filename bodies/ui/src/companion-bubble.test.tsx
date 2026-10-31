@@ -360,23 +360,6 @@ describe('GreetingLine', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onDone).toHaveBeenCalledOnce();
   });
-
-  it('a remark carries Not now, which quiets Scout and closes the line', () => {
-    const onDone = vi.fn();
-    const onNotNow = vi.fn();
-    render(
-      <GreetingLine
-        petName="Scout"
-        text="That build broke on a missing import."
-        onDone={onDone}
-        onNotNow={onNotNow}
-      />,
-    );
-    expect(screen.queryByRole('button', { name: /hand/i })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
-    expect(onNotNow).toHaveBeenCalledOnce();
-    expect(onDone).toHaveBeenCalledOnce();
-  });
 });
 
 describe('CompanionBubble voice', () => {

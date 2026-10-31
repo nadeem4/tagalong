@@ -169,7 +169,6 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.remarkEvent, listener);
     return () => void ipcRenderer.off(IPC.remarkEvent, listener);
   },
-  remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
   openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,
   openLogsFolder: () => ipcRenderer.invoke(IPC.openLogsFolder) as Promise<void>,
   openHome: () => ipcRenderer.invoke(IPC.openHome) as Promise<void>,
