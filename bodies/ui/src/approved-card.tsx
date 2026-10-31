@@ -7,7 +7,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useHostBridge } from './host-bridge';
 
-export interface ApprovedNote {
+interface ApprovedNote {
   tool: string;
   text: string;
   preference: string;
@@ -47,7 +47,7 @@ export function ApprovedReport({ onHide }: { onHide: () => void }) {
   );
 }
 
-export function ApprovedCard({ note, onDone }: { note: ApprovedNote; onDone: () => void }) {
+function ApprovedCard({ note, onDone }: { note: ApprovedNote; onDone: () => void }) {
   const done = useEffectEvent(onDone);
   // A newer approval replaces the note and restarts the hold.
   useEffect(() => {

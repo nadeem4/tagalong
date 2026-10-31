@@ -31,7 +31,7 @@ export interface TextLayerProvider {
 }
 
 /** Runs a script and resolves with whatever it printed. */
-export type RunScript = (script: string, timeoutMs: number) => Promise<string>;
+type RunScript = (script: string, timeoutMs: number) => Promise<string>;
 
 /** How long the counting pass may take in total, across every window in it. */
 const COUNT_PASS_TIMEOUT_MS = 5_000;

@@ -10,7 +10,8 @@ import { findCaptureBlock, normalizeProcessName } from './platform/exclusions';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import type { CaptureBlock, PerceptionTarget } from '@tagalong/ui/shapes';
 import type { CaptureExclusions } from '../shared/settings';
-import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';
+import type { DisplaysCapture } from './platform/displays';
+import type { ActiveWindowInfo, Platform } from './platform/index';
 import { SightPausedError, isSightPaused } from './platform/sight-gate';
 
 /** What a capture returns: whichever fields it managed to read. */
@@ -26,7 +27,7 @@ type ContextSnapshotPatch = Partial<ContextSnapshot>;
 export const MAX_SCREENSHOT_LONG_SIDE = 1568;
 
 /** What the ask's capture produced, and the rule that refused it if one did. */
-export interface AskCapture {
+interface AskCapture {
   snapshot: ContextSnapshot;
   blocked: CaptureBlock | null;
   /**
@@ -39,7 +40,7 @@ export interface AskCapture {
   paused: boolean;
 }
 
-export interface PatchCapture {
+interface PatchCapture {
   patch: ContextSnapshotPatch;
   blocked: CaptureBlock | null;
   /** True when sight is paused. Distinct from `blocked`, and from an empty patch. */

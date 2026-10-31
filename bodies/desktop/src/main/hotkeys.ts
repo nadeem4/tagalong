@@ -35,16 +35,16 @@ export interface HotkeyOutcome {
 }
 
 /** What each hotkey is bound to, as the user has it in Settings. */
-export interface HotkeyBindings {
+interface HotkeyBindings {
   ask: string;
   pauseSight: string;
   stopVoice: string;
 }
 
 /** Every action a key triggers: the global shortcuts, and the talk key the hook watches. */
-export type HotkeyAction = keyof HotkeyBindings | 'talk';
+type HotkeyAction = keyof HotkeyBindings | 'talk';
 
-export interface RegisterHotkeyOptions {
+interface RegisterHotkeyOptions {
   accelerator: string;
   action: keyof HotkeyBindings;
   onTrigger: () => void;
@@ -125,7 +125,7 @@ export function registerHotkey(options: RegisterHotkeyOptions): HotkeyOutcome {
   }
 }
 
-export interface HotkeyManagerOptions {
+interface HotkeyManagerOptions {
   onAsk: () => void;
   onPauseSight: () => void;
   onStopVoice: () => void;

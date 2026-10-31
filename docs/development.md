@@ -104,7 +104,7 @@ Prerequisites:
   - `npm install -g pnpm@10` — installs into the user-level npm prefix and needs no elevation.
 - Git
 
-No C++ toolchain is needed. `better-sqlite3` and `get-windows` ship prebuilt binaries, and their
+No C++ toolchain is needed. `get-windows` and the other native modules ship prebuilt binaries, and their
 install scripts are listed under `pnpm.ignoredBuiltDependencies`, so nothing compiles on install.
 
 Commands, run from the repository root:
@@ -174,8 +174,8 @@ the browser body are not measured: the Playwright suites cover them.
   folder, Start menu and desktop shortcuts, and Tagalong starts when it finishes. Build it on Windows
   with `pnpm package:win` from the root. It is unsigned; signing needs a certificate and the
   `CSC_LINK` / `CSC_KEY_PASSWORD` variables electron-builder reads, which a personal build can skip.
-- **Native modules are not rebuilt.** `better-sqlite3` 13 and nut-js's `libnut` ship N-API binaries,
-  which load in Electron unchanged (checked: the packaged app opens SQLite 3.53.4 on Electron 44), so
+- **Native modules are not rebuilt.** nut-js's `libnut` and the other native modules ship N-API binaries,
+  which load in Electron unchanged, so
   `npmRebuild` is off and no C++ toolchain is ever needed. Every `.node` file is unpacked out of
   `app.asar`, where Node cannot load it. `get-windows`' Windows binary is downloaded by
   `scripts/fetch-native.mjs`, because pnpm skips the install script that normally fetches it.

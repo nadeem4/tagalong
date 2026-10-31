@@ -489,10 +489,10 @@ def test_token_file_roundtrip(tmp_path):
     tokens.set("linear", "s3cret")
     assert TokenFile(tmp_path).get("linear") == "s3cret"  # survives reopen
     tokens.set("other", "x")
-    tokens.delete("linear")
+    tokens.clear_app("linear")
     assert tokens.get("linear") is None
     assert tokens.get("other") == "x"
-    tokens.delete("nope")  # deleting an absent token is fine
+    tokens.clear_app("nope")  # clearing an absent app is fine
 
 
 def test_token_never_reaches_the_apps_table(tmp_path, mem):

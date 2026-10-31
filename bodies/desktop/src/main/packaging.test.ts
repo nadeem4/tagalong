@@ -97,7 +97,6 @@ describe('desktop runtime dependencies', () => {
     expect(Object.keys(manifest.dependencies).sort()).toEqual([
       '@huggingface/transformers',
       '@nut-tree-fork/nut-js',
-      'better-sqlite3',
       'get-windows',
       'kokoro-js',
       'onnxruntime-node',

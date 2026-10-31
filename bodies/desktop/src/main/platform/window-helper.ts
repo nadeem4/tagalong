@@ -15,7 +15,7 @@
  * a 150 % laptop, a 100 % monitor came back at x 2880 and 3840 wide instead of x 1920 and
  * 2560. Best effort: if it cannot be set, single-scale desks still come out right.
  */
-export const PER_MONITOR_AWARE = String.raw`
+const PER_MONITOR_AWARE = String.raw`
 try {
   Add-Type -Namespace Tagalong -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);'
   [void][Tagalong.Dpi]::SetProcessDpiAwarenessContext([IntPtr]-4)

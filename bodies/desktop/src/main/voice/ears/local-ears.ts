@@ -35,8 +35,8 @@ export const PAUSE_FRAMES = 8;
 /** About 2 s more of quiet ends the turn whatever the model says. */
 export const GIVE_UP_FRAMES = 63;
 /** Live words about three times a second. */
-export const PARTIAL_EVERY_FRAMES = 10;
-export const TURN_THRESHOLD = 0.5;
+const PARTIAL_EVERY_FRAMES = 10;
+const TURN_THRESHOLD = 0.5;
 /** Speech that never goes quiet (noise) is closed as a stretch after about 30 s. */
 export const MAX_STRETCH_FRAMES = 938;
 /** Silero hears speech a frame or three late: the 256 ms before it is fed in too. */

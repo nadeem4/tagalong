@@ -26,7 +26,7 @@ export const TALK_KEYCODES: { readonly [K in TalkKey]: number } = {
   ScrollLock: 70,
 };
 
-export interface TalkKeyHandlers {
+interface TalkKeyHandlers {
   /** The talk key went down. */
   onPress: () => void;
   /** The talk key came up with nothing else pressed while it was held. */
@@ -93,7 +93,7 @@ export class TalkKeyWatch {
   }
 }
 
-export interface StartedTalkKey {
+interface StartedTalkKey {
   /** Why the talk key could not start, for the hotkey-problem path; null when it is watched. */
   error: string | null;
   /** Stops the hook, for quit. Safe when it never started. */

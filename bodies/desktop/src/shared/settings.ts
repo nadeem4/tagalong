@@ -50,7 +50,7 @@ export const SETTINGS_DEFAULTS = {
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
-export const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
+const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
 export type VoiceId = (typeof VOICE_IDS)[number];
 
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */

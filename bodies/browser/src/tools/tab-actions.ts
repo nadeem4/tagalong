@@ -10,7 +10,7 @@ import { PERMISSION_WAIT_MS, type OptionalPermission } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 import type { Needs } from './tabs';
 
-export interface TabActionsDeps {
+interface TabActionsDeps {
   actions: ActionsApi;
   tabs: TabsApi;
   needs: Needs;

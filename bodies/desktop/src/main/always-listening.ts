@@ -12,8 +12,6 @@ import type { Settings, SettingsPatch } from '../shared/settings';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import type { ListeningState } from '../shared/ipc';
 
-export type { ListeningState };
-
 export class AlwaysListening {
   #state: ListeningState;
   readonly #listeners = new Set<(state: ListeningState) => void>();

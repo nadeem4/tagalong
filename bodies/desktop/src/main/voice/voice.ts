@@ -33,8 +33,6 @@ export interface LocalVoice extends Tts {
   warm(): void;
 }
 
-export type { SpeakResult };
-
 /** The slice of a loaded Kokoro model this host uses. */
 export interface LocalSynth {
   generate(
@@ -116,13 +114,13 @@ export const fakeTts: Tts = {
 };
 
 /** One mouth adapter main can run. `null` from `speak`: not ready yet (a model still loading). */
-export interface MouthEngine {
+interface MouthEngine {
   usable(): Promise<boolean>;
   speak(text: string, options: SpeakOptions): Promise<SpokenAudio | null>;
 }
 
 /** The registry: every mouth main can run. The system voice is the window's, not main's. */
-export type MouthEngines = Readonly<Record<Exclude<MouthId, 'system'>, MouthEngine>>;
+type MouthEngines = Readonly<Record<Exclude<MouthId, 'system'>, MouthEngine>>;
 
 /** Kokoro: always usable; while it loads, the line goes on to the next voice. */
 export function localMouth(local: LocalVoice): MouthEngine {
@@ -138,7 +136,7 @@ export function localMouth(local: LocalVoice): MouthEngine {
   };
 }
 
-export interface VoiceServiceOptions {
+interface VoiceServiceOptions {
   env: Readonly<Record<string, string | undefined>>;
   settings: () => Settings['voice'];
   /** Kokoro, for the warm-up at start. */

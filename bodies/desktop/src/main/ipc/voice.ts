@@ -14,7 +14,7 @@ import type { VoiceWorker } from '../voice/worker/client';
 import type { VoiceService } from '../voice/voice';
 import type { IpcHandle, IpcOn } from './handle';
 
-export interface VoiceIpcDeps {
+interface VoiceIpcDeps {
   voice: () => Pick<VoiceService, 'speak'>;
   worker: () => Pick<VoiceWorker, 'send' | 'call'>;
   /** Notes the window you are on, as the ask key does. */

@@ -234,11 +234,6 @@ class TokenFile:
     def set(self, app_id: str, token: str) -> None:
         self._write({**self._read(), app_id: token})
 
-    def delete(self, app_id: str) -> None:
-        data = self._read()
-        if data.pop(app_id, None) is not None:
-            self._write(data)
-
     def items(self) -> dict[str, str]:
         return {k: v for k, v in self._read().items() if isinstance(v, str)}
 

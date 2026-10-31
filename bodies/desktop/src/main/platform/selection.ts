@@ -23,7 +23,7 @@ export interface ClipboardPort {
  */
 export const COPY_SETTLE_MS = 150;
 
-export interface SelectionCaptureDeps {
+interface SelectionCaptureDeps {
   clipboard: ClipboardPort;
   /**
    * Presses Ctrl+C in whatever app is in front. This is the only keyboard automation in

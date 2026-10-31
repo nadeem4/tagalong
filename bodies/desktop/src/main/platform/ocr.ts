@@ -11,7 +11,7 @@
 export const NO_RECOGNISER = '#no-recogniser';
 
 /** How long one recognition may take. Measured well under a second for a full window. */
-export const OCR_TIMEOUT_MS = 10_000;
+const OCR_TIMEOUT_MS = 10_000;
 
 /**
  * The longest side a picture may have. Windows' recogniser refuses larger images
@@ -38,7 +38,7 @@ foreach ($line in $result.Lines) { $line.Text }
 `;
 
 /** Runs a script with data on its stdin and resolves with what it printed. */
-export type RunWithInput = (script: string, timeoutMs: number, input: string) => Promise<string>;
+type RunWithInput = (script: string, timeoutMs: number, input: string) => Promise<string>;
 
 /** The recognised lines, or nothing when there is no recogniser or the run failed. */
 export function parseOcr(stdout: string): string {

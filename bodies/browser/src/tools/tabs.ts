@@ -15,7 +15,7 @@ export interface Needs {
   ensure(need: Need, reason: string, waitMs?: number): Promise<void>;
 }
 
-export interface TabsDeps {
+interface TabsDeps {
   tabs: TabsApi;
   page: PageApi;
   picture: PictureApi;

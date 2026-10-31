@@ -11,7 +11,7 @@ export const AWAY_AFTER_MS = 5 * 60_000;
 /** How often the idle time is read. */
 export const PRESENCE_POLL_MS = 15_000;
 
-export interface Presence {
+interface Presence {
   /** The screen locked: away at once. */
   lock(): void;
   /** The screen unlocked: back at once. */
@@ -48,7 +48,7 @@ export function startPresence(options: {
 }
 
 /** The slice of Electron's `powerMonitor` presence reads. */
-export interface PowerMonitorLike {
+interface PowerMonitorLike {
   /** Whole seconds since the last input. */
   getSystemIdleTime(): number;
   on(event: 'lock-screen' | 'unlock-screen', listener: () => void): unknown;

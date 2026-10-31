@@ -8,7 +8,7 @@ import { STATUS_WORDS, statusTag } from './shapes';
 import type { FixTarget, StatusMark as Mark } from './shapes';
 import { themeTokens as t } from './theme/tokens';
 
-export interface StatusMarkProps {
+interface StatusMarkProps {
   mark: Mark;
   variant: 'tag' | 'row';
   /** The row's Fix it; the tag never has one (Scout is the button, its bubble has the row). */

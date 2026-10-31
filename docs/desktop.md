@@ -525,8 +525,8 @@ Review rule for call sites: never put speech, screen or file text in a warning's
   ESM loader could not resolve them at runtime; Rollup resolves them at build time instead.
   `rollupOptions.external: NATIVE_DEPS` keeps the native modules out of the bundle even when a
   workspace package imports them:
-  `NATIVE_DEPS = ['better-sqlite3', 'get-windows', 'onnxruntime-node', 'uiohook-napi']`. Pure
-  JavaScript dependencies of the workspace packages (`ws`, the provider SDKs) are inlined. The
+  `NATIVE_DEPS = ['get-windows', 'onnxruntime-node', 'uiohook-napi']`. Pure
+  JavaScript dependencies of the workspace packages (`ws`) are inlined. The
   build defines `process.env.WS_NO_BUFFER_UTIL` and `WS_NO_UTF_8_VALIDATE` as `"1"`: Vite would
   otherwise replace `ws`'s absent optional addons with an empty object, and the main process would
   die with "bufferUtil.unmask is not a function" on the first masked frame.
@@ -540,7 +540,7 @@ Review rule for call sites: never put speech, screen or file text in a warning's
 
 The workspace packages are `devDependencies` of `bodies/desktop`. Its `dependencies` are exactly what
 the packaged app loads at runtime: `@huggingface/transformers` 3.8.1, `@nut-tree-fork/nut-js`
-4.2.6, `better-sqlite3` 13.0.3, `get-windows` 9.3.0, `kokoro-js` 1.2.1, `onnxruntime-node` 1.21.0
+4.2.6, `get-windows` 9.3.0, `kokoro-js` 1.2.1, `onnxruntime-node` 1.21.0
 (the version `@huggingface/transformers` pins, so one ONNX runtime serves every voice model) and
 `uiohook-napi` 1.5.5 (the talk key's hook). electron-builder copies the `dependencies` tree into
 the installer, so listing the workspace packages there would ship their trees twice.

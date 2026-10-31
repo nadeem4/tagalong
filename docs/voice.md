@@ -746,7 +746,7 @@ See `settings-and-secrets.md` for the whole schema.
 
 | Constant                                 | Value                                                    | Where                                             |
 | ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
-| `EARS_SAMPLE_RATE` / `EARS_FRAME`        | 16,000 Hz / 512 samples (32 ms)                          | `protocol/voice.ts`, repeated in `mic-worklet.js` |
+| `EARS_SAMPLE_RATE` / `EARS_FRAME`        | 16,000 Hz / 512 samples (32 ms)                          | `shared/voice.ts`, repeated in `mic-worklet.js` |
 | `PAUSE_FRAMES`                           | 8 frames (256 ms)                                        | `local-ears.ts`                                   |
 | `GIVE_UP_FRAMES`                         | 63 frames (about 2 s more; turn ends at 71 quiet frames) | `local-ears.ts`                                   |
 | `PARTIAL_EVERY_FRAMES`                   | 10 speech frames (about 3 a second)                      | `local-ears.ts`                                   |

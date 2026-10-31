@@ -59,7 +59,7 @@ function isRawWindow(value: unknown): value is RawWindow {
  */
 export type WindowEnumerationFailure = 'no-output' | 'unparseable' | 'no-windows';
 
-export interface WindowListOutcome {
+interface WindowListOutcome {
   windows: EnumeratedWindow[];
   /** Absent when the enumeration actually worked. */
   failure?: WindowEnumerationFailure;
@@ -111,11 +111,11 @@ export function parseWindowList(stdout: string): WindowListOutcome {
 }
 
 /** An observed window that still carries the bounds used to place it on a display. */
-export interface EnumeratedWindow extends ObservedWindow {
+interface EnumeratedWindow extends ObservedWindow {
   readonly bounds: WindowBounds;
 }
 
-export interface DisplayLookup {
+interface DisplayLookup {
   /**
    * Screen pixels to DIPs: Electron's `screen.screenToDipRect`, which knows each monitor's
    * scale. The helper reports physical pixels and Electron's displays are in DIPs; compared

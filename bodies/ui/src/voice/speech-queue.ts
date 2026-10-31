@@ -7,9 +7,9 @@ import { SHORT_LINE, mergeShortLines } from './speakable';
 import { SpokenStream } from './spoken-stream';
 
 /** One line's audio, being got ready: playing it resolves when it is said or the signal aborts it. */
-export type PreparedLine = (signal: AbortSignal) => Promise<void>;
+type PreparedLine = (signal: AbortSignal) => Promise<void>;
 
-export interface SpeechQueueOptions {
+interface SpeechQueueOptions {
   /** Starts getting one line's audio at once, and returns how to play it. */
   prepare: (text: string) => PreparedLine;
   /** Fires when Scout starts and stops speaking, for the speaking indicator. */

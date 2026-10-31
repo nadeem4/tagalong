@@ -195,7 +195,7 @@ export interface HostBridge {
 
 const HostBridgeContext = createContext<HostBridge | null>(null);
 
-export interface HostBridgeProviderProps {
+interface HostBridgeProviderProps {
   bridge: HostBridge;
   children: ReactNode;
 }

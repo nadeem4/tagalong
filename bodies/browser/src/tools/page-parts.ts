@@ -7,7 +7,7 @@ import type { PageApi, TabsApi } from '../layer/api';
 import { failed, invalid, type BrowserTool } from './registry';
 import { resolveReadableTab, type Needs } from './tabs';
 
-export interface PagePartsDeps {
+interface PagePartsDeps {
   tabs: TabsApi;
   page: PageApi;
   needs: Needs;

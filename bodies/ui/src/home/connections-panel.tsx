@@ -38,7 +38,7 @@ const TRANSPORT_WORDS: Record<AppInfo['transport'], string> = {
 };
 
 /** `npx -y "my server" C:/x` as a command and its arguments; quotes keep spaces. */
-export function splitCommand(line: string): string[] {
+function splitCommand(line: string): string[] {
   return [...line.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '');
 }
 

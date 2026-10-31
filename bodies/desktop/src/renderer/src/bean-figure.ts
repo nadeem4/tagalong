@@ -6,7 +6,7 @@
 import type { BeanFigure } from '@tagalong/ui';
 
 /** manifest.json as pack.py writes it. */
-export interface BeanManifest {
+interface BeanManifest {
   fps: number;
   clips: Readonly<Record<string, { file: string; frames: number; loop: boolean }>>;
 }

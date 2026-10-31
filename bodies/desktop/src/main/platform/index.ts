@@ -97,7 +97,6 @@ export function createPlatform(platform: NodeJS.Platform = process.platform): Pl
   throw new Error(`Tagalong has no platform adapter for '${platform}'. It runs on Windows only.`);
 }
 
-export type { Win32Platform };
 /**
  * The window inventory, and whether producing it actually worked.
  *
@@ -111,7 +110,3 @@ export interface WindowInventory {
   displays?: ScreenInfo[];
   failure?: WindowEnumerationFailure;
 }
-
-export type { CapturedDisplay, DisplayInfo, DisplaysCapture } from './displays';
-export type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
-export type { TextLayerProvider } from './text-layer';

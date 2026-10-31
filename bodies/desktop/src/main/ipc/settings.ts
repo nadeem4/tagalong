@@ -10,7 +10,7 @@ import type { HostView } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 import { localScout } from './scout';
 
-export interface SettingsIpcDeps {
+interface SettingsIpcDeps {
   /** The desktop's own settings file. */
   settingsStore: () => { get(): Settings; set(patch: SettingsPatch): Settings };
   /** Why a hotkey failed, for Settings to say. */

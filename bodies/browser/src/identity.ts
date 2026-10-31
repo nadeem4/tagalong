@@ -5,7 +5,7 @@
  */
 import type { StorageArea } from './layer/api';
 
-export type BrowserKind = 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'arc' | 'chromium';
+type BrowserKind = 'chrome' | 'edge' | 'brave' | 'opera' | 'vivaldi' | 'arc' | 'chromium';
 
 const NAMES: Record<BrowserKind, string> = {
   chrome: 'Chrome',

@@ -146,7 +146,7 @@ export function offerFor(item: unknown): DropOffer | null {
   return null;
 }
 
-export type DropRead = { ok: true; dropped: Dropped } | { ok: false; error: string };
+type DropRead = { ok: true; dropped: Dropped } | { ok: false; error: string };
 
 /**
  * Reads the one item the person chose to send: a text file's text, an image as a PNG,
@@ -205,7 +205,7 @@ export function dropDesk(fs: DropFs, now: () => number = Date.now) {
   };
 }
 
-export interface DropIpcDeps {
+interface DropIpcDeps {
   desk: Pick<ReturnType<typeof dropDesk>, 'offer'>;
   /** Whether the call came from the figure's window, the only one things are dropped on. */
   fromAvatar: (event: unknown) => boolean;

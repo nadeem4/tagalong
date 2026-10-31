@@ -6,7 +6,7 @@
 import type { CaptureBlock } from '@tagalong/ui/shapes';
 import type { CaptureNotice } from '../shared/ipc';
 
-export interface CaptureNoticeInput {
+interface CaptureNoticeInput {
   at: Date;
   /** True when a screenshot was attempted, whether or not it was allowed. */
   screenshot: boolean;

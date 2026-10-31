@@ -7,7 +7,7 @@ import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
 
 /** How often the front window is read. */
-export const FOCUS_POLL_MS = 5_000;
+const FOCUS_POLL_MS = 5_000;
 
 /** Sends one body event; true when the brain got it (false when it was offline). */
 type Send = (name: string, data: unknown) => boolean;

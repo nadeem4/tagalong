@@ -6,14 +6,14 @@ import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 
 /** The sections in the order the page shows them; the standalone window's nav links to each. */
-export const SECTIONS = [
+const SECTIONS = [
   { id: 'privacy', title: 'Privacy' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Add Scout to your browser' },
 ] as const;
 
-export type SectionId = (typeof SECTIONS)[number]['id'];
+type SectionId = (typeof SECTIONS)[number]['id'];
 
 /**
  * What every section reads from the page: which ⓘ note is open (one at a time), and the
