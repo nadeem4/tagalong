@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
  * JSON files hashed at that commit and checked against their git blob id) and are written
  * here as constants: they are never fetched at run time. Bumping a model means new hashes.
  */
-export interface ModelFile {
+interface ModelFile {
   url: string;
   path: string;
   bytes: number;

@@ -9,7 +9,7 @@ export interface BrowserTool {
   run(input: Record<string, unknown>): Promise<Part[]>;
 }
 
-export interface Toolset {
+interface Toolset {
   tools(): Tool[];
   run(name: string, input: Record<string, unknown>): Promise<Part[]>;
 }

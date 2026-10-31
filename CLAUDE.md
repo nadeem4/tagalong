@@ -3,15 +3,15 @@
 A desktop screen companion for Windows: Scout sits on your screen and helps with what you are working on.
 Product intent: PRODUCT.md. Visual design: DESIGN.md. Engineering reference: docs/ (start at docs/README.md).
 
-## Direction (read first)
+## Architecture
 
-The brain is being rewritten in Python; the TypeScript apps stay as bodies.
+The brain is Python; the TypeScript apps are bodies.
 
-- Today: a Python brain (brain/) talks to TypeScript bodies (bodies/desktop, bodies/browser) over the contract in protocol/README.md.
+- A Python brain (brain/) talks to TypeScript bodies (bodies/desktop, bodies/browser) over the contract in protocol/README.md.
 - Bodies talk only to the brain. Single user: no TLS, pairing or multi-user work yet.
 - The plan, decisions and build order live in Notion (links in CLAUDE.local.md). Read it before working on the brain.
-- New brain work goes into the Python brain.
-- When the rewrite changes commands or layout, update this file in the same PR.
+- Brain work goes into the Python brain.
+- When commands or layout change, update this file in the same PR.
 
 ## Commands
 
@@ -25,10 +25,10 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 
 ## Layout
 
-- protocol/README.md: contract v1 between the Python brain and the bodies (source of truth for the rewrite)
+- protocol/README.md: contract v1 between the Python brain and the bodies (source of truth)
 - protocol/examples: sample frames shared by the TypeScript and Python tests
 - protocol/ts: `@tagalong/contract`, zod schemas for contract v1
-- brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types; `server.py` is the websocket server, `sessions.py` the one conversation, `memory.py` the memory store, `tools.py` the brain's own tools, `toolbox.py` the tool gate, `apps.py`, `app_oauth.py` and `app_tools.py` connected apps (MCP), their browser sign-in and their tools, `asks.py` permission asks, `side_check.py` Scout approving an ask under a preference, `offers.py` Scout offering a preference, `guardrails.py` the budget, `guards.py` the guard runner, `masking.py` the Masker, save guard and log filter (secrets become `[secret]` before they are saved), `builtin_guards.py` the built-in guards, `events.py` and `scheduler.py` the event kinds and the wakes (Scout speaks first), `timers.py` Scout's timers, `questions.py` an expert's question to Scout first, `mind/` Scout's soul, `events.md` (per-kind notes), `approvals.md` (side-check and offer wording), prompt, thinking loop and `resume.py` (rebuilds history from the saved chat); see docs/brain.md)
+- brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types; `main.py` starts the websocket server (`server.py`), `config.py` reads its settings from the environment and `.env`, `bodies.py` tracks connected bodies and their outboxes, `sessions.py` the one conversation, `memory.py` the memory store, `tools.py` the brain's own tools, `toolbox.py` the tool gate, `apps.py`, `app_oauth.py` and `app_tools.py` connected apps (MCP), their browser sign-in and their tools, `asks.py` permission asks, `approvals.py` the log of how each ask ended, `experts.py` one Claude Code session over ACP, `jobs.py` the hand-offs to Claude Code, `side_check.py` Scout approving an ask under a preference, `offers.py` Scout offering a preference, `guardrails.py` the budget, `guards.py` the guard runner, `masking.py` the Masker, save guard and log filter (secrets become `[secret]` before they are saved), `builtin_guards.py` the built-in guards, `events.py` and `scheduler.py` the event kinds and the wakes (Scout speaks first), `timers.py` Scout's timers, `questions.py` an expert's question to Scout first, `mind/` Scout's soul, `events.md` (per-kind notes), `approvals.md` (side-check and offer wording), prompt, thinking loop (`turn.py`: history stays valid even when a turn is cancelled) and `resume.py` (rebuilds history from the saved chat); see docs/brain.md)
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
 - bodies/desktop: Electron body (dials the Python brain)
 - bodies/browser: browser body (Chromium)

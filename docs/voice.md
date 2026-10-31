@@ -345,9 +345,6 @@ Addressing in always mode (`#addressed`):
   three words or more, no follow-up window was open, and no released question was waiting, it
   calls `onUnaddressed()` without the words.
 
-With `needsName: false`, used by setup, every non-empty turn goes to `onHeard` whole, and "stop"
-is just words.
-
 #### PushToTalk
 
 `bodies/ui/src/voice/push-to-talk.ts`. This turns key presses, releases and mic-button clicks
@@ -453,9 +450,6 @@ stateDiagram-v2
 - **No hook.** If the hook will not load or start, there is one `[talk-key]` warning and a `talk`
   outcome with the error on the hotkey-problem path (see `desktop.md`). There is no fallback key,
   the mic button still works, and nothing crashes. The hook stops on quit.
-- **Settings migration.** `withoutRetiredTalkKey`, in `bodies/desktop/src/shared/settings.ts`,
-  preprocesses `hotkeys`. A `talk` value that is a string but not one of `TALK_KEYS`, such as an
-  accelerator combo, loads as `RightControl`. A valid talk key is kept.
 
 The stop key (`hotkeys.stopVoice`, default `CommandOrControl+Shift+Alt+M`) is a normal global
 shortcut. It broadcasts `IPC.stopVoiceEvent`, and the panel calls `hush()` and `mouth.stop()`.
@@ -489,11 +483,9 @@ transcript.
   Privacy, or "Scout, stop" through the panel. `listeningOff` in the settings IPC also sets it off.
 - **Follow-up flag.** `followUp` can be true only while `on && !paused`. Pausing or switching off
   clears it.
-- **Saving.** `saveListening` saves `on` with `settings.set { listening: { always } }`, or straight
-  to the settings file when the engine is not running. Saves run one at a time, and a save that
-  finishes saves again if the choice changed meanwhile. A failed save is retried at the next
-  change. `paused` is never saved.
-- **Pausing.** `listeningPaused` is `blocked || !petsShown || setupOpen`. `blocked` comes from
+- **Saving.** `saveListening` saves `on` with `settings.set { listening: { always } }` when it
+  changes. A failed save is logged and the next change tries again. `paused` is never saved.
+- **Pausing.** `listeningPaused` is `blocked || !petsShown`. `blocked` comes from
   `startListeningGuard`. The avatar's `show` and `hide` events set `petsShown`, so listening pauses
   while the pets are hidden and the mark on Scout is always in sight while the mic is open.
 - **The guard.** While listening is on, `startListeningGuard` lists the windows every
@@ -744,30 +736,30 @@ See `settings-and-secrets.md` for the whole schema.
 
 ## Constants and limits
 
-| Constant                                 | Value                                                    | Where                                             |
-| ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
-| `EARS_SAMPLE_RATE` / `EARS_FRAME`        | 16,000 Hz / 512 samples (32 ms)                          | `protocol/voice.ts`, repeated in `mic-worklet.js` |
-| `PAUSE_FRAMES`                           | 8 frames (256 ms)                                        | `local-ears.ts`                                   |
-| `GIVE_UP_FRAMES`                         | 63 frames (about 2 s more; turn ends at 71 quiet frames) | `local-ears.ts`                                   |
-| `PARTIAL_EVERY_FRAMES`                   | 10 speech frames (about 3 a second)                      | `local-ears.ts`                                   |
-| `TURN_THRESHOLD`                         | 0.5                                                      | `local-ears.ts`                                   |
-| `MAX_STRETCH_FRAMES`                     | 938 frames (about 30 s)                                  | `local-ears.ts`                                   |
-| `PRE_ROLL_FRAMES`                        | 8 frames (256 ms)                                        | `local-ears.ts`                                   |
-| `TURN_SAMPLES` (Smart Turn window)       | 8 s (128,000 samples)                                    | `local-ears.ts`, `smart-turn.ts`                  |
-| Silero speech threshold / context        | 0.5 / 64 samples                                         | `ort-ears.ts`                                     |
-| `MAX_BUFFERED_FRAMES`                    | 940 (about 30 s)                                         | `ears-host.ts`                                    |
-| Mic `MAX_WAITING`                        | 940 frames                                               | `mic.ts`                                          |
-| `MAX_LISTEN_MS`                          | 30,000 ms                                                | `talk.ts`                                         |
-| `TALK_CONFIRM_MS`                        | 250 ms                                                   | `talk-key.ts`                                     |
-| `FRESH_PRESS_MS`                         | 1,100 ms                                                 | `push-to-talk.ts`                                 |
-| `FOLLOW_UP_MS`                           | 20,000 ms                                                | `addressing.ts`                                   |
-| Ears retry                               | 30 s, doubling, max 5 min                                | `listen-controller.ts`                            |
-| `LISTENING_GUARD_MS`                     | 2,000 ms                                                 | `always-listening.ts`                             |
-| `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms                                      | `status-marks.ts`                                 |
-| Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                            |
-| `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                    |
-| Download attempts per file               | 2                                                        | `model-files.ts`                                  |
-| Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                  |
+| Constant                                 | Value                                                    | Where                                           |
+| ---------------------------------------- | -------------------------------------------------------- | ----------------------------------------------- |
+| `EARS_SAMPLE_RATE` / `EARS_FRAME`        | 16,000 Hz / 512 samples (32 ms)                          | `shared/voice.ts`, repeated in `mic-worklet.js` |
+| `PAUSE_FRAMES`                           | 8 frames (256 ms)                                        | `local-ears.ts`                                 |
+| `GIVE_UP_FRAMES`                         | 63 frames (about 2 s more; turn ends at 71 quiet frames) | `local-ears.ts`                                 |
+| `PARTIAL_EVERY_FRAMES`                   | 10 speech frames (about 3 a second)                      | `local-ears.ts`                                 |
+| `TURN_THRESHOLD`                         | 0.5                                                      | `local-ears.ts`                                 |
+| `MAX_STRETCH_FRAMES`                     | 938 frames (about 30 s)                                  | `local-ears.ts`                                 |
+| `PRE_ROLL_FRAMES`                        | 8 frames (256 ms)                                        | `local-ears.ts`                                 |
+| `TURN_SAMPLES` (Smart Turn window)       | 8 s (128,000 samples)                                    | `local-ears.ts`, `smart-turn.ts`                |
+| Silero speech threshold / context        | 0.5 / 64 samples                                         | `ort-ears.ts`                                   |
+| `MAX_BUFFERED_FRAMES`                    | 940 (about 30 s)                                         | `ears-host.ts`                                  |
+| Mic `MAX_WAITING`                        | 940 frames                                               | `mic.ts`                                        |
+| `MAX_LISTEN_MS`                          | 30,000 ms                                                | `talk.ts`                                       |
+| `TALK_CONFIRM_MS`                        | 250 ms                                                   | `talk-key.ts`                                   |
+| `FRESH_PRESS_MS`                         | 1,100 ms                                                 | `push-to-talk.ts`                               |
+| `FOLLOW_UP_MS`                           | 20,000 ms                                                | `addressing.ts`                                 |
+| Ears retry                               | 30 s, doubling, max 5 min                                | `listen-controller.ts`                          |
+| `LISTENING_GUARD_MS`                     | 2,000 ms                                                 | `always-listening.ts`                           |
+| `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms                                      | `status-marks.ts`                               |
+| Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                          |
+| `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                  |
+| Download attempts per file               | 2                                                        | `model-files.ts`                                |
+| Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                |
 
 ## Storage
 
@@ -825,23 +817,23 @@ The full statement is in `privacy.md`.
 
 ## Tests that pin it
 
-| Test                                                                                                                      | Pins                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/main/voice/ears/local-ears.test.ts`                                                                   | Turn and stretch logic: partials, Smart Turn waits and give-up, a failing end-of-turn model, stop in both modes, the max stretch, the pre-roll, and exactly one held `turnEnd`.                       |
-| `bodies/desktop/src/main/voice/ears/model-files.test.ts`                                                                  | Pinned commits and hashes, progress ending at 1, no `.part` left on failure, one refetch then `ModelIntegrityError`, corrupt files on disk replaced, `sharedEnsureFiles` joining and checking once.   |
-| `bodies/desktop/src/main/voice/ears/ort-ears.test.ts`, `kokoro.test.ts`, `model-cache.test.ts`                            | Loaders read only the voice folder with remote fetching off. Kokoro never loads when its files fail the check.                                                                                        |
-| `bodies/desktop/src/main/voice/ears/fake-ears.test.ts`                                                                    | The fake transcripts in both modes.                                                                                                                                                                   |
-| `bodies/desktop/src/main/voice/worker/ears-host.test.ts`                                                                  | Frames buffered while loading, one session at a time, superseded and skipped sessions, the held drain after stop, and the failure lines and reload.                                                   |
-| `bodies/desktop/src/main/voice/worker/client.test.ts`, `handler.test.ts`, `worker-local-voice.test.ts`                    | Lazy fork, id matching, every pending call rejected on exit, `kokoro.ready`.                                                                                                                          |
-| `bodies/desktop/src/main/voice/voice.test.ts`                                                                             | The mouth order and fall-through, off and preview, `warmAtStart`, the system voice choice never loading Kokoro, the fake.                                                                             |
-| `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                            |
-| `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, `forwardEars` addressing (follow-up, "stop", `mightBeStop`), marks, the voice-process exit.                                                                 |
-| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                           |
-| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, barge-in once per turn, the follow-up window, deafness, retry back-off, `needsName: false`. |
-| `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                                 |
-| `bodies/ui/src/voice/speech-queue.test.ts`, `spoken-stream.test.ts`                                                       | Sentence splitting, show-only blocks, list markers, short-line merging, one line ahead, stop dropping the prepared line.                                                                              |
-| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `mouthOrder`, `chosenMouth`, `Pushable`, the talk-key migration to `RightControl`.                                                                  |
-| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                               |
-| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`, `voice-player.test.ts`                       | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`, system voice choice and its start and stop events.                                                                           |
-| `bodies/desktop/e2e/smoke.spec.ts`                                                                                        | Talking to Scout through the real voice process on `FakeEars` and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint.                                                               |
-| `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched, a "Scout, …" turn answered, then off again.                                                                                                    |
+| Test                                                                                                                      | Pins                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bodies/desktop/src/main/voice/ears/local-ears.test.ts`                                                                   | Turn and stretch logic: partials, Smart Turn waits and give-up, a failing end-of-turn model, stop in both modes, the max stretch, the pre-roll, and exactly one held `turnEnd`.                     |
+| `bodies/desktop/src/main/voice/ears/model-files.test.ts`                                                                  | Pinned commits and hashes, progress ending at 1, no `.part` left on failure, one refetch then `ModelIntegrityError`, corrupt files on disk replaced, `sharedEnsureFiles` joining and checking once. |
+| `bodies/desktop/src/main/voice/ears/ort-ears.test.ts`, `kokoro.test.ts`, `model-cache.test.ts`                            | Loaders read only the voice folder with remote fetching off. Kokoro never loads when its files fail the check.                                                                                      |
+| `bodies/desktop/src/main/voice/ears/fake-ears.test.ts`                                                                    | The fake transcripts in both modes.                                                                                                                                                                 |
+| `bodies/desktop/src/main/voice/worker/ears-host.test.ts`                                                                  | Frames buffered while loading, one session at a time, superseded and skipped sessions, the held drain after stop, and the failure lines and reload.                                                 |
+| `bodies/desktop/src/main/voice/worker/client.test.ts`, `handler.test.ts`, `worker-local-voice.test.ts`                    | Lazy fork, id matching, every pending call rejected on exit, `kokoro.ready`.                                                                                                                        |
+| `bodies/desktop/src/main/voice/voice.test.ts`                                                                             | The mouth order and fall-through, off and preview, `warmAtStart`, the system voice choice never loading Kokoro, the fake.                                                                           |
+| `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                          |
+| `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, `forwardEars` addressing (follow-up, "stop", `mightBeStop`), marks, the voice-process exit.                                                               |
+| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                         |
+| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, barge-in once per turn, the follow-up window, deafness, retry back-off.                   |
+| `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                               |
+| `bodies/ui/src/voice/speech-queue.test.ts`, `spoken-stream.test.ts`                                                       | Sentence splitting, show-only blocks, list markers, short-line merging, one line ahead, stop dropping the prepared line.                                                                            |
+| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `mouthOrder`, `chosenMouth`, `Pushable`.                                                                                                          |
+| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                             |
+| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`, `voice-player.test.ts`                       | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`, system voice choice and its start and stop events.                                                                         |
+| `bodies/desktop/e2e/smoke.spec.ts`                                                                                        | Talking to Scout through the real voice process on `FakeEars` and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint.                                                             |
+| `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched, a "Scout, …" turn answered, then off again.                                                                                                  |

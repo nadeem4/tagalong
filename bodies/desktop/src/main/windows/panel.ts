@@ -12,13 +12,13 @@ import { moveWindow } from './move';
 import { panelPosition } from './position';
 import { IPC } from '../../shared/ipc';
 
-export const PANEL_WIDTH = 420;
+const PANEL_WIDTH = 420;
 /** The full chat's height. The bubble asks for its own, which is usually far less. */
-export const PANEL_HEIGHT = 520;
+const PANEL_HEIGHT = 520;
 /** The bubble's first height, before it has measured itself. */
 const BUBBLE_HEIGHT = 180;
 
-export interface PanelWindowOptions {
+interface PanelWindowOptions {
   /** Focus loss must not close the panel mid-answer, so the caller says when a turn is live. */
   isStreaming: () => boolean;
   /** The pet's window: focus moving there (a click or a drag on the pet) keeps the bubble. */

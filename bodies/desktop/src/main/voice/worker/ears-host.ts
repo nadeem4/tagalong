@@ -12,7 +12,7 @@ import type { EarsParts } from '../ears/local-ears';
 import type { FromWorker, ToWorker } from './messages';
 
 /** Frames kept while the models load: about 30 s, then the oldest go. */
-export const MAX_BUFFERED_FRAMES = 940;
+const MAX_BUFFERED_FRAMES = 940;
 
 /** What the panel says when the models cannot be fetched (offline, the first time). */
 export const EARS_DOWNLOAD_FAILED = 'Speech models didn’t download. Check the internet connection.';

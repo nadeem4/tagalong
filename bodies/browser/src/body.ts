@@ -42,7 +42,7 @@ export interface BodyDeps {
   openSocket: (url: string) => BrainSocket;
 }
 
-export interface BrowserBody {
+interface BrowserBody {
   /** Dials the brain; does nothing more while a client is already connecting or online. */
   start(): Promise<void>;
   /** Closes the link and ends the keepalive; start() dials again. */

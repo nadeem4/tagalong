@@ -26,7 +26,7 @@ export interface HealthFacts {
   microphone: { count: number; pickedMissing: boolean } | 'unknown';
 }
 
-export type HealthCheckId = 'connections' | 'voice' | 'microphone';
+type HealthCheckId = 'connections' | 'voice' | 'microphone';
 
 /** `info` and `unknown` rows are never counted as needing the person. */
 export interface HealthRow {

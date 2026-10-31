@@ -9,7 +9,7 @@
  */
 import type { DockMood } from '@tagalong/ui';
 
-export interface DockState {
+interface DockState {
   seeing: boolean;
   /** The person's own turns: Scout thinking. */
   turns: ReadonlySet<string>;
@@ -124,7 +124,7 @@ export function dockMood(state: DockState): DockMood {
 }
 
 /** How far the pointer moves before a press on the pet becomes a drag instead of a click. */
-export const DRAG_THRESHOLD = 4;
+const DRAG_THRESHOLD = 4;
 
 export interface Point {
   x: number;

@@ -165,11 +165,6 @@ class Scheduler:
                 except Exception:
                     log.exception("%s failed for a %s", name, label)
 
-    def next_due(self) -> float | None:
-        if not self._groups:
-            return None
-        return max(0.0, min(self._remaining(g) for g in self._groups))
-
     def latest(self, kind: str) -> dict[str, Event]:
         return dict(self._latest.get(kind, {}))
 

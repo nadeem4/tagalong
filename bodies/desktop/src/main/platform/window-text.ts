@@ -19,7 +19,7 @@
 export const WINDOW_TEXT_WALK_MS = 2_500;
 
 /** Per-window budget for the counting pass, which visits many windows in one call. */
-export const WINDOW_COUNT_WALK_MS = 400;
+const WINDOW_COUNT_WALK_MS = 400;
 
 /**
  * Guards the one place a value reaches PowerShell.
@@ -42,7 +42,7 @@ function safeHandle(handle: number): number {
  * that element and never from the desktop root, so a read cannot quietly widen into an
  * enumeration of everything on screen.
  */
-export const WALK_PRELUDE = String.raw`
+const WALK_PRELUDE = String.raw`
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $textCond = New-Object System.Windows.Automation.OrCondition(
@@ -148,7 +148,7 @@ interface RawNode {
  * thing entirely, and collapsing the two makes the pet report an empty window when the
  * truth is that the read never happened.
  */
-export type WindowTextFailure = 'no-output' | 'unparseable';
+type WindowTextFailure = 'no-output' | 'unparseable';
 
 export interface WindowTextReading {
   text: string;

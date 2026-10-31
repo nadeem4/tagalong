@@ -104,7 +104,7 @@ describe('buildInventory', () => {
     expect(entry).not.toHaveProperty('displayId');
   });
 
-  it('carries the full-screen mark, so a pet keeping an eye stays quiet over a film', () => {
+  it('carries the full-screen mark, so listening can wait over a film', () => {
     const [entry] = buildInventory([observed({ fullScreen: true })], NOTHING_EXCLUDED);
     expect(entry?.fullScreen).toBe(true);
     const [plain] = buildInventory([observed()], NOTHING_EXCLUDED);

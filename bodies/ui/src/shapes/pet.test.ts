@@ -1,4 +1,4 @@
-/** Tests for the Pet schema: only what the body draws, and the keys it drops. */
+/** Tests for the Pet schema: only what the body draws. */
 import { describe, expect, it } from 'vitest';
 import { Pet } from './pet';
 
@@ -11,19 +11,6 @@ describe('Pet', () => {
 
   it('has exactly the keys the body draws: id, name, avatar', () => {
     expect(Object.keys(Pet.shape).sort()).toEqual(['avatar', 'id', 'name']);
-  });
-
-  it('still parses an older saved pet, dropping the brain fields it carried', () => {
-    const parsed = Pet.parse({
-      ...valid,
-      roleId: 'companion',
-      model: 'claude-sonnet-5',
-      providerId: 'anthropic',
-      watchModel: 'nano',
-      toolGrants: { remember: 'off' },
-      persona: 'You are Scout.',
-    });
-    expect(parsed).toEqual(valid);
   });
 
   it('rejects an empty name', () => {

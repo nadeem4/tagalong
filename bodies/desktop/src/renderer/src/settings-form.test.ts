@@ -12,7 +12,7 @@ const values: SettingsFormValues = {
 };
 
 describe('buildSettingsPatch removed fields', () => {
-  it('never emits a key the Settings schema no longer has', () => {
+  it('never emits a key the Settings schema does not have', () => {
     const patch = buildSettingsPatch({
       ...values,
       voiceEnabled: true,

@@ -36,7 +36,7 @@ export interface DisplayImagePort {
   toBitmap(): Buffer;
 }
 
-export interface DisplaySource {
+interface DisplaySource {
   name: string;
   /** Electron's own snake_case spelling, matched against `String(display.id)`. */
   display_id: string;
@@ -70,7 +70,7 @@ export interface DisplaysCaptureDeps {
   log?: (message: string) => void;
 }
 
-export interface CapturedDisplay {
+interface CapturedDisplay {
   id: number;
   bounds: WindowBounds;
   scaleFactor: number;
@@ -152,12 +152,12 @@ function refusalsByDisplay(windows: readonly WindowEntry[]): Map<number, Capture
 }
 
 /** The ports deciding whether a display may be photographed. */
-export type DisplayRefusalDeps = Pick<
+type DisplayRefusalDeps = Pick<
   DisplaysCaptureDeps,
   'getActiveWindow' | 'listWindows' | 'exclusions'
 > & { screen: Pick<DisplaysCaptureDeps['screen'], 'getDisplayMatching'> };
 
-export interface DisplayRefusal {
+interface DisplayRefusal {
   (displayId: number): { focused: boolean; refusal: CaptureBlock | null };
   /** A refusal on any display, for a screen that cannot be placed on one. */
   any?: CaptureBlock | null;

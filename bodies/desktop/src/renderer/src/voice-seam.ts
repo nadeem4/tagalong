@@ -9,7 +9,7 @@ import type { OpenMic } from './mic';
 import { RemoteEars } from './remote-ears';
 
 /** What any window can reach for voice: the ears, the microphone and the ears' models. */
-export type TagalongVoice = {
+type TagalongVoice = {
   ears: Ears;
   openMic(deviceId?: string): Promise<OpenMic>;
   ensureEars(onProgress: (fraction: number) => void): Promise<void>;

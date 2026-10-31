@@ -176,8 +176,8 @@ make one out.
 what it remembers in Home, or say "Scout, forget that".
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
-bubble shows a health card: its sign-in, your experts, your connections, its voice, your
-and microphone, each with a plain line, starting "Two things need you." or
+bubble shows a health card: your connections, its voice and your
+microphone, each with a plain line, starting "Two things need you." or
 "Everything's working." (shown, never said aloud). **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
 

@@ -9,7 +9,7 @@ import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';
 
-export interface SpendIpcDeps {
+interface SpendIpcDeps {
   /** The brain's tools: today's spend comes from it. */
   brain: BrainCall;
 }

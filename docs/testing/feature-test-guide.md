@@ -1376,7 +1376,7 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 2. **Action:** `pnpm package:win` from the repository root.
 3. **Expected:** it ends without errors and `bodies\desktop\release\Tagalong-Setup-0.1.0-x64.exe`
    exists. In `bodies\desktop\release\win-unpacked\resources` there are `app.asar`,
-   `app.asar.unpacked` (holding `better-sqlite3`'s and `get-windows`' Windows binaries) and
+   `app.asar.unpacked` (holding `get-windows`' and the other native modules' Windows binaries) and
    `extension`.
 
 ### I.2. Install on a fresh Windows machine
@@ -1390,12 +1390,10 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
 ### I.3. Native modules work in the installed app
 
-1. **Action:** (a) ask Scout "remember that my favourite colour is teal", quit, start from the Start
-   menu, ask "what is my favourite colour?". (b) Put Notepad beside a browser, click into Notepad,
-   select some text and press `Ctrl+Shift+Space`, then ask "which app am I in?".
-2. **Expected:** (a) "teal": SQLite (`better-sqlite3`) loaded. (b) The bubble names Notepad and
-   shows the selection: the active-window binding (`get-windows`) and the selection helper (`libnut`)
-   loaded.
+1. **Action:** Put Notepad beside a browser, click into Notepad, select some text and press
+   `Ctrl+Shift+Space`, then ask "which app am I in?".
+2. **Expected:** The bubble names Notepad and shows the selection: the active-window binding
+   (`get-windows`) and the selection helper (`libnut`) loaded.
 
 ### I.4. Uninstall keeps your data; reinstall picks it up
 

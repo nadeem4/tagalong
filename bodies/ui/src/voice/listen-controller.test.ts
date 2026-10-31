@@ -1,4 +1,4 @@
-/** Tests for ListenController: held, always, and always without the name. */
+/** Tests for ListenController: held and always. */
 
 import { describe, expect, it, vi } from 'vitest';
 import type { Ears, EarsEvent, ListenMode, MicStream } from '../shapes';
@@ -717,29 +717,6 @@ describe('ListenController, always', () => {
   });
 });
 
-describe('ListenController, always without the name', () => {
-  it('hands over every turn whole: no "Scout" needed, and "stop" is just words', async () => {
-    const { controller, ears, calls } = setup(undefined, { needsName: false });
-    controller.setAlways(true);
-    await tick();
-    ears.say('turnEnd', 'Claude');
-    ears.say('turnEnd', 'stop');
-    ears.say('turnEnd', '  ');
-    expect(calls.heard.mock.calls).toEqual([['Claude'], ['stop']]);
-    expect(calls.stop).not.toHaveBeenCalled();
-  });
-
-  it('cuts Scout off once, on the first words of a turn', async () => {
-    const { controller, ears, calls } = setup(undefined, { needsName: false });
-    controller.setAlways(true);
-    await tick();
-    ears.say('partial', '');
-    ears.say('partial', 'Cla');
-    ears.say('partial', 'Claude');
-    expect(calls.speechStart).toHaveBeenCalledOnce();
-  });
-});
-
 describe('ListenController, the follow-up window', () => {
   async function inWindow(more: Partial<ListenControllerOptions> = {}) {
     const timers = fakeTimers();
@@ -838,17 +815,13 @@ describe('ListenController, a question without the name', () => {
     expect(onUnaddressed).toHaveBeenCalledOnce();
   });
 
-  it('is quiet in the follow-up window, and when no name is needed', async () => {
+  it('is quiet in the follow-up window', async () => {
     const onUnaddressed = vi.fn();
     const first = setup(undefined, { onUnaddressed });
     first.controller.setAlways(true);
     await tick();
     first.controller.openFollowUp();
     first.ears.say('turnEnd', 'what is this error');
-    const second = setup(undefined, { onUnaddressed, needsName: false });
-    second.controller.setAlways(true);
-    await tick();
-    second.ears.say('turnEnd', 'what is this error');
     expect(onUnaddressed).not.toHaveBeenCalled();
   });
 });

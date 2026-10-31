@@ -13,7 +13,7 @@
  */
 
 /** The reading a set of notes is derived from. */
-export interface TextLayerReading {
+interface TextLayerReading {
   processName: string;
   state: 'foreground' | 'background' | 'minimized';
   browser: boolean;

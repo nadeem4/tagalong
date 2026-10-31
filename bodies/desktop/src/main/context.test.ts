@@ -6,7 +6,8 @@ import { ContextSnapshot } from '@tagalong/ui/shapes';
 import type { CaptureExclusions } from '../shared/settings';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import { answerCapture, captureAskSnapshot, capturePatch } from './context';
-import type { DisplaysCapture, Platform } from './platform/index';
+import type { DisplaysCapture } from './platform/displays';
+import type { Platform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 
 function fakePlatform(overrides: Partial<Platform> = {}): Platform {

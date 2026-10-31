@@ -19,7 +19,7 @@ export const AppSetEnabledParams = z.object({ id: z.string().min(1), enabled: z.
 /** For the brain's remove_app, restart_app and sign_in_app. */
 export const AppIdParams = z.object({ id: z.string().min(1) });
 
-export interface ConnectionIpcDeps {
+interface ConnectionIpcDeps {
   /** Runs the brain's Home tools; rejects with BrainOffline while the brain is down. */
   brain: BrainCall;
   /** The person's click on a card: the brain's `answer` for that ask. */

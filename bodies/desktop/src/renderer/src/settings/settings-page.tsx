@@ -114,7 +114,7 @@ export function SettingsPage() {
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
-      // "Watches at once must be…" beside that very field.
+      // "Speaking speed must be…" beside that very field.
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof SettingsFieldError) {
         setInvalid({ field: error.field, message });

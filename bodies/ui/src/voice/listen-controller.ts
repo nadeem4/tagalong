@@ -37,11 +37,6 @@ export interface ListenControllerOptions {
   /** The follow-up window opened (true) or closed (false). */
   onFollowUp?(open: boolean): void;
   /**
-   * Always listening: false hands over every turn whole, no "Scout" needed and "stop" is
-   * just words. Default true.
-   */
-  needsName?: boolean;
-  /**
    * The first wait before always listening retries after the ears failed; it doubles, up to
    * five minutes. Default 30 s.
    */
@@ -83,8 +78,7 @@ interface Session {
  * on (`setAlways`) it stays open, except during a call or full screen, or with the pets hidden
  * (`setPaused`), and while the system voice speaks (`setDeaf`). The talk key still asks
  * without the name then: the always session ends for the held question and comes back after
- * it. Nothing heard after a session ends reaches the bubble. Setup listens all the time
- * without the name (`needsName: false`): every turn is an answer.
+ * it. Nothing heard after a session ends reaches the bubble.
  */
 export class ListenController {
   readonly #options: ListenControllerOptions;
@@ -269,12 +263,8 @@ export class ListenController {
    */
   #addressed(session: Session, text: string, partial = false): string | null {
     if (this.#taken || this.#released.size > 0) return null;
-    const question =
-      this.#options.needsName === false
-        ? text.trim() || null
-        : addressedToScout(text, { followUp: this.#followUp !== null });
-    if (partial && this.#options.needsName !== false && question !== null && mightBeStop(question))
-      return null;
+    const question = addressedToScout(text, { followUp: this.#followUp !== null });
+    if (partial && question !== null && mightBeStop(question)) return null;
     if (question !== null && !session.barged) {
       session.barged = true;
       this.#options.onSpeechStart();
@@ -308,7 +298,7 @@ export class ListenController {
         const barged = session.barged;
         const question = this.#addressed(session, text);
         session.barged = false;
-        const named = this.#options.needsName !== false && addressedToScout(text) !== null;
+        const named = addressedToScout(text) !== null;
         const followUp = this.#followUp !== null;
         // One reply is all the window takes, whatever it was.
         if (question !== null) this.closeFollowUp();
@@ -319,7 +309,7 @@ export class ListenController {
             this.#options.onUnaddressed?.();
           return;
         }
-        if (this.#options.needsName !== false && isStopListening(question)) {
+        if (isStopListening(question)) {
           // A plain "stop" in the window only ends the window; "Scout, stop" switches off.
           if (named) this.#options.onStopListening();
           // A stop that cut Scout off is never asked: the bubble lets go.

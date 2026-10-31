@@ -210,7 +210,7 @@ describe('HeardInbox', () => {
 
   it('holds a question heard while no bubble listens, and asks it once one does', () => {
     // A hello line, a remark or a routine line is up in the bubble's place, or Scout is
-    // still waking: the question used to be thrown away with nothing to say so.
+    // still waking: the question is held, not thrown away.
     const inbox = new HeardInbox();
     expect(inbox.deliver('what is on my calendar')).toBe(false);
     const asked: string[] = [];

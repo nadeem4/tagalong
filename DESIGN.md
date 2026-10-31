@@ -247,16 +247,6 @@ components:
     textColor: '{colors.panel-text}'
     rounded: '{rounded.card}'
     padding: '16px 20px'
-  home-entry:
-    backgroundColor: 'transparent'
-    textColor: '{colors.panel-text}'
-    rounded: '{rounded.row}'
-    padding: '8px'
-  home-entry-open:
-    backgroundColor: '{colors.panel-tile}'
-    textColor: '{colors.panel-text}'
-    rounded: '{rounded.row}'
-    padding: '8px'
   home-template:
     backgroundColor: '{colors.card-white}'
     textColor: '{colors.panel-text}'

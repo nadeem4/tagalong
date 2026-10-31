@@ -11,8 +11,6 @@
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 
-export const FAKE_REPLY = 'This is the fake brain.';
-
 export interface FakeBrain {
   /** "127.0.0.1:port", what TAGALONG_BRAIN_ADDR wants. */
   addr: string;

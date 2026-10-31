@@ -152,7 +152,7 @@ describe('HomeView', () => {
     expect(screen.queryByRole('region', { name: 'Jobs' })).toBeNull();
   });
 
-  it('leaves out the pages that only the old brain fed', async () => {
+  it('has no pages for features that are not built', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     for (const gone of [

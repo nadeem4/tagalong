@@ -208,7 +208,7 @@ describe('PerceptionTarget', () => {
     }
   });
 
-  it('no longer knows pageText, which no body produces', () => {
+  it('does not know pageText, which no body produces', () => {
     expect(PerceptionTarget.safeParse('pageText').success).toBe(false);
   });
 });

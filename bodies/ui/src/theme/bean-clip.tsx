@@ -15,7 +15,7 @@ export interface BeanClipData {
   loop: boolean;
 }
 
-export interface BeanClipProps {
+interface BeanClipProps {
   clip: BeanClipData;
   /** Reduced motion: no stepping, frame 0 of a loop or the held last frame of a one-shot. */
   still?: boolean;

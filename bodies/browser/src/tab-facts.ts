@@ -4,7 +4,7 @@
  */
 import type { PermissionsApi } from './permissions';
 
-export interface TabFact {
+interface TabFact {
   title: string;
   url: string;
 }

@@ -8,7 +8,7 @@ import type { OptionalPermission } from '../permissions';
 import { failed, invalid, type BrowserTool } from './registry';
 import type { Needs } from './tabs';
 
-export interface BrowserSearchDeps {
+interface BrowserSearchDeps {
   search: SearchApi;
   needs: Needs;
   bodyName: string;

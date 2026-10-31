@@ -66,8 +66,7 @@ A secret is never in the row. All of them are in `app-tokens.json` in the data d
 
 At connect time the brain puts these back (env into the process environment, the url parts onto the
 url) and nowhere else. If a key is missing the app ends as `error` with `<name> needs its secret
-added again.`. Rows saved by an older build are migrated once at startup: the secrets move to the
-file first, then the row is rewritten clean, so they connect as before.
+added again.`.
 
 ### Connecting
 
@@ -227,8 +226,8 @@ than the brain's; TLS, pairing and multi-user.
   hostless url), the store, and the manager against a real fake server over stdio and http (connect,
   call, hang, exit, drop, restart, process cleanup).
 - `brain/tests/test_app_tools.py`: classification, names, results and `AppSource`.
-- `brain/tests/test_apps.py` also pins the secret split, the merge at connect, the startup
-  migration and clearing every key on remove.
+- `brain/tests/test_apps.py` also pins the secret split, the merge at connect and
+  clearing every key on remove.
 - `brain/tests/test_app_oauth.py`: token storage, the loopback listener, and sign-in against a
   fake OAuth server.
 - `bodies/ui/src/home/connections-panel.test.tsx`: the Sign in button, Waiting for the browser, the

@@ -32,14 +32,14 @@ export interface CaptureSource {
   thumbnail: CaptureImagePort;
 }
 
-export interface DesktopCapturerPort {
+interface DesktopCapturerPort {
   getSources(options: {
     types: Array<'window' | 'screen'>;
     thumbnailSize: PixelSize;
   }): Promise<CaptureSource[]>;
 }
 
-export interface ScreenPort {
+interface ScreenPort {
   getDisplayMatching(bounds: WindowBounds): { id: number };
 }
 

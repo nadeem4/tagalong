@@ -34,6 +34,11 @@ def make(memory=None, clock=None):
     return Timers(memory, emit, clock), memory, clock, events, starts
 
 
+def _timer(mem, id):
+    # The timer with this id, read through the public list; None once it is gone.
+    return next((t for t in mem.list_timers() if t.id == id), None)
+
+
 def test_fire_due_emits_a_timer_event_with_the_note_and_deletes_a_one_off():
     timers, mem, _clock, events, starts = make()
     t = mem.add_timer("stretch", T0 - timedelta(seconds=1))
@@ -44,20 +49,20 @@ def test_fire_due_emits_a_timer_event_with_the_note_and_deletes_a_one_off():
     assert e.facts == {"id": t.id, "note": "stretch", "repeat_minutes": 0}
     assert e.key == f"timer:{t.id}"
     # Marked fired, still stored until the wake turn starts.
-    assert mem.get_timer(t.id).fired
+    assert _timer(mem, t.id).fired
     starts[0]()
-    assert mem.get_timer(t.id) is None
+    assert _timer(mem, t.id) is None
 
 
 def test_one_off_is_deleted_only_when_its_wake_starts():
     timers, mem, _c, events, starts = make()
     t = mem.add_timer("x", T0)
     timers.fire_due()
-    assert mem.get_timer(t.id) is not None
+    assert _timer(mem, t.id) is not None
     timers.fire_due()  # fired rows are not due again
     assert len(events) == 1
     starts[0]()
-    assert mem.get_timer(t.id) is None
+    assert _timer(mem, t.id) is None
 
 
 def test_fired_one_off_is_re_emitted_after_restart():
@@ -83,7 +88,7 @@ def test_repeating_timer_fires_and_reschedules_from_now():
     timers.fire_due()
     assert events[0].facts["repeat_minutes"] == 10
     assert starts[0] is None
-    got = mem.get_timer(t.id)
+    got = _timer(mem, t.id)
     assert got.next_at == T0 + timedelta(seconds=600)
     assert not got.fired
 
@@ -93,7 +98,7 @@ def test_missed_repeats_fire_once_at_start():
     t = mem.add_timer("water", T0 - timedelta(hours=5), repeat_s=600)
     timers.start()
     assert len(events) == 1
-    assert mem.get_timer(t.id).next_at == T0 + timedelta(minutes=10)
+    assert _timer(mem, t.id).next_at == T0 + timedelta(minutes=10)
 
 
 def test_missed_one_off_fires_once_at_start():

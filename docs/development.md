@@ -104,7 +104,7 @@ Prerequisites:
   - `npm install -g pnpm@10` — installs into the user-level npm prefix and needs no elevation.
 - Git
 
-No C++ toolchain is needed. `better-sqlite3` and `get-windows` ship prebuilt binaries, and their
+No C++ toolchain is needed. `get-windows` and the other native modules ship prebuilt binaries, and their
 install scripts are listed under `pnpm.ignoredBuiltDependencies`, so nothing compiles on install.
 
 Commands, run from the repository root:
@@ -174,8 +174,8 @@ the browser body are not measured: the Playwright suites cover them.
   folder, Start menu and desktop shortcuts, and Tagalong starts when it finishes. Build it on Windows
   with `pnpm package:win` from the root. It is unsigned; signing needs a certificate and the
   `CSC_LINK` / `CSC_KEY_PASSWORD` variables electron-builder reads, which a personal build can skip.
-- **Native modules are not rebuilt.** `better-sqlite3` 13 and nut-js's `libnut` ship N-API binaries,
-  which load in Electron unchanged (checked: the packaged app opens SQLite 3.53.4 on Electron 44), so
+- **Native modules are not rebuilt.** nut-js's `libnut` and the other native modules ship N-API binaries,
+  which load in Electron unchanged, so
   `npmRebuild` is off and no C++ toolchain is ever needed. Every `.node` file is unpacked out of
   `app.asar`, where Node cannot load it. `get-windows`' Windows binary is downloaded by
   `scripts/fetch-native.mjs`, because pnpm skips the install script that normally fetches it.
@@ -236,9 +236,7 @@ The suites run offline on fakes. The desktop answers turns only through a brain,
 say that mentions "permission" or "hand off", opens the asks `asks.spec.ts` and `jobs.spec.ts` need), and pass
 its address as `TAGALONG_BRAIN_ADDR`.
 `brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
-`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
-`test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
-the feature back): the tool-call round trip.
+`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`.
 A quit that does not finish in 45 s is
 killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
 cannot hold the single-instance lock or the data folder. When an e2e suite
@@ -377,13 +375,17 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local`: there is no dotenv dependency, and no code in `protocol/` or `bodies/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Two environment variables are read by the desktop, both straight from the process environment. **Set them in the
-shell you launch from**, as shown above.
+The desktop reads the variables below straight from the process environment. **Set them in the
+shell you launch from**, as shown above. The brain's variables (its key, model, budget and limits) are
+listed in `.env.example` and described in [brain.md](brain.md).
 
-| Variable              | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_TTS=1` | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                                         |
-| `TAGALONG_FAKE_STT=1` | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
+| Variable                | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`   | **Read** (`brain/start.ts`). Host:port the desktop dials for the brain; default `127.0.0.1:47321`. The brain reads the same name for where it listens.                                                                                                                                                                                                                                                     |
+| `TAGALONG_VOICE_DIR`    | **Read** (`voice/worker/main.ts`). Folder of the voice models. Main sets it for the voice process (to `<data folder>/voice`); you never set it.                                                                                                                                                                                                                                                            |
+| `ELECTRON_RENDERER_URL` | **Read** (`windows/page.ts`). The dev server's address, set by `electron-vite` under `pnpm dev:desktop`; the packaged app loads its files instead.                                                                                                                                                                                                                                                         |
+| `TAGALONG_FAKE_TTS=1`   | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                                         |
+| `TAGALONG_FAKE_STT=1`   | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
 
 ## Conventions
 

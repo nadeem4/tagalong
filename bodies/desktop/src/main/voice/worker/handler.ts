@@ -7,7 +7,7 @@ import type { LazyLocalVoice } from '../voice';
 import type { EarsMessage } from './ears-host';
 import type { FromWorker, ToWorker } from './messages';
 
-export interface WorkerDeps {
+interface WorkerDeps {
   kokoro: Pick<LazyLocalVoice, 'warm' | 'loaded' | 'speak'>;
   ears: (message: EarsMessage) => void;
   /** Pre-downloads the ears' model files, reporting the share done. */

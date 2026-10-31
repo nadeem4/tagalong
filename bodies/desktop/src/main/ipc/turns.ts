@@ -11,7 +11,7 @@ import { BrainOffline } from '@tagalong/contract';
 import type { BrainClient, BrainStatus } from '@tagalong/contract';
 import type { IpcHandle } from './handle';
 
-export interface TurnIpcDeps {
+interface TurnIpcDeps {
   brain: Pick<BrainClient, 'say' | 'cancel'>;
   /** Makes a turn the question joined visible, when the brain started it on its own. */
   claimTurn: (turnId: string) => void;

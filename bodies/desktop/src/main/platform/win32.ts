@@ -118,7 +118,7 @@ export class Win32Platform implements Platform {
     const placed = placeOnDisplays(outcome.windows, screen);
     // Counting is a second pass rather than part of enumeration, so an excluded window is
     // never walked: the exclusion list decides who is countable before anyone looks.
-    // Keeping an eye needs titles only, so it skips the walk of every window's text.
+    // The focus watch needs titles only, so it skips the walk of every window's text.
     const counts =
       options.countText === false
         ? new Map<number, number>()

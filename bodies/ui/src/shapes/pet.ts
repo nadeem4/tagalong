@@ -4,10 +4,7 @@
  */
 import { z } from 'zod';
 
-/**
- * One pet. Parsing drops unknown keys, so a pet saved by an older version, with fields
- * since removed, still parses.
- */
+/** One pet. */
 export const Pet = z.object({
   id: z.string().min(1),
   name: z.string().min(1),

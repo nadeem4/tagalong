@@ -12,10 +12,7 @@ import { bodyTools } from './body-tools';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
-export type StartBrainOptions = Pick<
-  BrainClientOptions,
-  'onNotification' | 'onStatus' | 'onResync'
-> & {
+type StartBrainOptions = Pick<BrainClientOptions, 'onNotification' | 'onStatus' | 'onResync'> & {
   platform: Platform;
   exclusions: () => CaptureExclusions;
   onCapture: (notice: CaptureNotice) => void;

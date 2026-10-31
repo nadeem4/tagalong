@@ -20,7 +20,7 @@ import { playLine } from '../voice-player';
 import { Info, Section, Tip, useInvalid } from './section';
 
 /** What ▶ Preview says, in the voice and at the speed the form shows. */
-const PREVIEW_LINE = 'Certainly. I shall keep an eye on things and let you know what I find.';
+const PREVIEW_LINE = 'Certainly. I shall let you know what I find.';
 
 const MOUTHS = adaptersFor('mouth');
 const EARS = adaptersFor('ears');
@@ -87,7 +87,7 @@ export function VoiceSection({
         {talks && <input type="hidden" name="voiceEnabled" value="on" />}
       </div>
       <Tip tip="voice">
-        Scout says what it writes: its answers, its hello and a watch that fires. Code and long
+        Scout says what it writes: its answers, its hello and a timer that fires. Code and long
         lists it puts in a block, which shows in the bubble and is not read. Under Who speaks, the
         local voice runs on this computer and downloads its model (about 90 MB) the first time it is
         used, speaking with the system voice until that is done; the system voice needs nothing.

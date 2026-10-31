@@ -45,7 +45,7 @@ const GLYPHS: Record<string, string[]> = {
   D: ['##.', '#.#', '#.#', '#.#', '##.'],
 };
 
-export interface LabelSize {
+interface LabelSize {
   width: number;
   height: number;
 }

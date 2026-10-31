@@ -1,7 +1,6 @@
 # The Python brain
 
-The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
-was built row by row and replaced the old TypeScript brain. Today bodies can connect, declare their tools,
+The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). Bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
 back. Scout can use the tools bodies declare, and asks the user first before a tool that changes
 something (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`

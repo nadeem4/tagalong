@@ -102,7 +102,7 @@ async def test_unknown_preference_id_is_a_pass(mem):
 
 async def test_builtin_default_cannot_be_approved_under(mem):
     other = pref(mem)
-    default = mem.default_preference()
+    default = mem.list_preferences()[0]
     assert await check(mem, Model(approve(default.id))).decide(facts()) is None
     assert await check(mem, Model(approve(other.id))).decide(facts()) == other
 
@@ -113,7 +113,7 @@ def named(mem, tool="Read", sentence="Fine to read files in the repo"):
 
 async def test_side_check_locked_without_a_naming_preference_makes_no_model_call(mem):
     p = pref(mem)  # general: names no tool
-    mem.remove_preference(mem.default_preference().id)
+    mem.remove_preference(mem.list_preferences()[0].id)
     model = Model(approve(p.id))
     assert await check(mem, model).decide(facts(locked=True)) is None
     assert model.calls == 0
@@ -121,7 +121,7 @@ async def test_side_check_locked_without_a_naming_preference_makes_no_model_call
 
 async def test_side_check_locked_with_general_preference_and_default_present_is_none(mem):
     p = pref(mem)
-    assert mem.default_preference() is not None
+    assert any(p.builtin for p in mem.list_preferences())
     model = Model(approve(p.id))
     assert await check(mem, model).decide(facts(locked=True)) is None
     assert model.calls == 0

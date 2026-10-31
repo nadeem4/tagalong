@@ -22,13 +22,13 @@ const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
  * They compile with `moduleResolution: bundler`, so their emitted relative imports carry
  * no file extension and Node's ESM loader cannot resolve them at runtime. Letting Rollup
  * inline them resolves those imports at build time, which is what an Electron app wants
- * anyway. Only their genuinely native dependencies stay external (better-sqlite3,
- * get-windows, onnxruntime-node and uiohook-napi, the talk key's hook, ship .node binaries Rollup cannot inline), and because
+ * anyway. Only their genuinely native dependencies stay external (get-windows,
+ * onnxruntime-node and uiohook-napi, the talk key's hook, ship .node binaries Rollup cannot inline), and because
  * those are then resolved at runtime from this app, they are declared as its dependencies. Pure
- * JavaScript deps such as ws and the Anthropic SDK are inlined with everything else.
+ * JavaScript deps such as ws are inlined with everything else.
  */
 const WORKSPACE_PACKAGES = ['@tagalong/ui'];
-const NATIVE_DEPS = ['better-sqlite3', 'get-windows', 'onnxruntime-node', 'uiohook-napi'];
+const NATIVE_DEPS = ['get-windows', 'onnxruntime-node', 'uiohook-napi'];
 
 export default defineConfig({
   main: {

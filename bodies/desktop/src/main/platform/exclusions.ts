@@ -11,7 +11,7 @@ import type { CaptureExclusions } from '../../shared/settings';
  * The little a host knows about the focused window when it asks whether it may capture.
  * Both fields are optional because hosts differ and Windows sometimes reports neither.
  */
-export interface ActiveWindow {
+interface ActiveWindow {
   readonly processName?: string;
   readonly title?: string;
 }

@@ -12,8 +12,6 @@ import type { Settings, SettingsPatch } from '../shared/settings';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import type { ListeningState } from '../shared/ipc';
 
-export type { ListeningState };
-
 export class AlwaysListening {
   #state: ListeningState;
   readonly #listeners = new Set<(state: ListeningState) => void>();
@@ -60,7 +58,7 @@ export class AlwaysListening {
 }
 
 /**
- * A call or a full-screen window in front: listening waits, as keeping an eye does. It is the
+ * A call or a full-screen window in front: listening waits. It is the
  * front window that counts, so a Teams window in front pauses listening even with no call.
  */
 export function listeningBlocked(windows: readonly WindowEntry[]): boolean {

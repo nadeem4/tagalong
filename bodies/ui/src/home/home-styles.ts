@@ -37,8 +37,6 @@ export const HOME_CSS = `
   flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
   gap: ${t.space.xxl}px; padding: ${t.space.xxxl}px 32px;
 }
-.home-page { display: contents; }
-.home-page[hidden] { display: none; }
 .home-title { margin: 0; font-size: 20px; font-weight: ${t.fontWeight.semibold}; }
 .home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: ${t.space.xl}px; }
 .home-card {
@@ -70,84 +68,12 @@ export const HOME_CSS = `
   list-style: none; margin: 0; padding: ${t.space.md}px ${t.space.lg}px;
   display: flex; flex-direction: column; gap: ${t.space.xxs}px;
 }
-.home-entry {
-  display: flex; align-items: flex-start; gap: ${t.space.lg}px; width: 100%;
-  padding: ${t.space.md}px; border: 2px solid transparent; border-radius: ${t.radius.row}px;
-  background: transparent; cursor: pointer; text-align: left;
-  font-family: ${t.font.ui}; color: ${t.color.panelText};
-}
-.home-entry:hover, .home-entry[aria-expanded='true'] { background: ${t.color.panelTile}; }
-.home-entry__tile {
-  flex: none; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-.home-entry__tile > span { flex: none; transform: translate(1px, -3px); }
 .home-entry__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .home-entry__title { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
-.home-entry__meta {
-  display: flex; align-items: center; gap: ${t.space.sm}px;
-  font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted};
-}
 .home-entry__preview {
   font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted};
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.home-thread {
-  display: flex; flex-direction: column; gap: ${t.space.lg}px;
-  margin: ${t.space.xs}px ${t.space.md}px ${t.space.lg}px ${t.space.xxxl * 2 + t.space.xs}px;
-  padding: ${t.space.xs}px 0 ${t.space.xs}px ${t.space.xl}px;
-  border-left: 2px solid ${t.color.panelLine};
-}
-.home-said { margin: 0; font-size: ${t.fontSize.body}px; }
-.home-said__who {
-  display: block; margin-bottom: ${t.space.xs}px;
-  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted};
-}
-.home-said p { margin: 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.home-learned { display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xxl}px; min-height: 0; }
-.home-learned__night { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.5; }
-.home-learned__body { display: flex; gap: ${t.space.xl}px; min-height: 0; flex-wrap: wrap; }
-.home-learned__pages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
-.home-learned__page {
-  width: 100%; padding: ${t.space.sm}px ${t.space.md}px; border: 0; border-radius: ${t.radius.row}px;
-  background: transparent; cursor: pointer; text-align: left;
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; color: ${t.color.panelText};
-}
-.home-learned__page:hover, .home-learned__page[aria-pressed='true'] { background: ${t.color.panelTile}; }
-.home-learned__open { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: ${t.space.md}px; }
-.home-learned__text {
-  min-height: 220px; resize: vertical; padding: ${t.space.md}px;
-  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px;
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; line-height: 1.5; color: ${t.color.panelText};
-}
-.home-learned__actions { display: flex; align-items: center; gap: ${t.space.md}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
-.home-learned__changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; font-size: ${t.fontSize.body}px; }
-.home-learned__changes li { display: flex; flex-direction: column; gap: ${t.space.xxs}px; align-items: flex-start; }
-.home-learned__waiting { display: block; padding: 0 ${t.space.md}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
-.home-learned__version {
-  margin: 0; padding: ${t.space.sm}px ${t.space.md}px; max-height: 240px; overflow: auto; align-self: stretch;
-  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px;
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
-}
-.home-ask__details {
-  align-self: stretch; max-height: 160px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere;
-  font-size: ${t.fontSize.small}px; line-height: 1.5; color: ${t.color.panelMuted};
-}
-.home-quiet {
-  align-self: flex-start; height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px;
-  border-radius: ${t.radius.field}px; border: 1px solid ${t.color.panelMuted};
-  background: transparent; color: ${t.color.panelText}; cursor: pointer;
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold};
-}
-.home-link {
-  padding: 0; border: 0; background: none; cursor: pointer; text-decoration: underline;
-  font: inherit; color: ${t.color.link};
-}
-.home-entry .tg-chip { flex: none; align-self: center; }
-.home-switch { display: flex; align-items: flex-start; gap: ${t.space.xl}px; margin: 0 0 ${t.space.lg}px; }
-.home-switch > span { flex: 1; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
-.home-switch .tg-note { margin: 0; }
-.home-switch__label { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
 .home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
 .home-conns__list { list-style: none; margin: 0 0 ${t.space.lg}px; padding: 0; display: flex; flex-direction: column; }
 .home-conn {

@@ -32,31 +32,10 @@ describe('Settings', () => {
     expect(s.avatar).toEqual({ x: null, y: null });
   });
 
-  it('drops the retired look and see-everything keys from an older settings file', () => {
-    // Scout takes screenshots and reads other windows itself now, so those keys bind
-    // nothing. An older file still parses; the keys simply fall away.
-    const s = Settings.parse({
-      hotkeys: { ask: 'Alt+Space', look: 'Alt+S', seeEverything: 'Alt+Shift+S' },
-    });
-    expect(s.hotkeys).toEqual({ ask: 'Alt+Space' });
-  });
-
-  it('drops every retired field of an older settings file, and a patch ignores them too', () => {
-    const old = {
-      providerId: 'anthropic',
-      defaultModel: 'claude-opus-5',
-      defaultPetId: 'ink',
-      hiddenPets: ['bolt'],
-      onboarding: { done: true },
-      enginePort: 47321,
-      userName: 'Ada',
-      keepAnEye: true,
-      sightDetail: 'all',
-      budget: { dailyUsd: 1 },
-    };
-    expect(Object.keys(Settings.parse(old))).not.toContain('userName');
-    expect(Settings.parse(old)).toEqual(Settings.parse({}));
-    expect(SettingsPatch.parse(old)).toEqual({});
+  it('drops keys the schema does not know', () => {
+    const extra = { hotkeys: { ask: 'Alt+Space', unknown: 'Alt+S' }, unknown: 1 };
+    expect(Settings.parse(extra)).toEqual(Settings.parse({ hotkeys: { ask: 'Alt+Space' } }));
+    expect(SettingsPatch.parse({ unknown: 1 })).toEqual({});
   });
 
   it('keeps explicit values', () => {
@@ -209,15 +188,6 @@ describe('Settings.hotkeys.talk', () => {
     expect(hotkeys.talk).not.toBe(hotkeys.ask);
   });
 
-  it('moves any saved accelerator, the old default or a custom combo, to Right Ctrl', () => {
-    for (const talk of ['CommandOrControl+Shift+Alt+Space', 'Alt+T']) {
-      expect(Settings.parse({ hotkeys: { ask: 'A', talk } }).hotkeys).toEqual({
-        ask: 'A',
-        talk: 'RightControl',
-      });
-    }
-  });
-
   it('keeps a single talk key the person picked', () => {
     expect(TALK_KEYS).toContain('RightShift');
     expect(Settings.parse({ hotkeys: { ask: 'A', talk: 'RightShift' } }).hotkeys.talk).toBe(
@@ -234,7 +204,7 @@ describe('Settings.hotkeys.talk', () => {
     expect(SettingsPatch.safeParse({ hotkeys: { ask: 'A', talk: 'Alt+T' } }).success).toBe(false);
   });
 
-  it('is optional, so a settings file from before it still parses', () => {
+  it('is optional, so a settings file without it still parses', () => {
     expect(Settings.parse({ hotkeys: { ask: 'A' } }).hotkeys.talk).toBeUndefined();
   });
 });
@@ -244,7 +214,7 @@ describe('Settings.voice.microphoneId', () => {
     expect(Settings.parse({}).voice.microphoneId).toBeUndefined();
   });
 
-  it('keeps a picked microphone, and a voice from before it still parses', () => {
+  it('keeps a picked microphone, and a voice without it still parses', () => {
     const voice = { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic' };
     expect(Settings.parse({ voice }).voice.microphoneId).toBe('usb-mic');
     expect(SettingsPatch.parse({ voice: { ...SETTINGS_DEFAULTS.voice } }).voice).toEqual(

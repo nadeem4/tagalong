@@ -17,7 +17,7 @@ export function stripUrl(url: string): string {
   }
 }
 
-export interface TabReporterOptions {
+interface TabReporterOptions {
   /** Returns false when the fact could not go out (offline), so the next change tries again. */
   send: (name: string, data: unknown) => boolean;
   now: () => number;

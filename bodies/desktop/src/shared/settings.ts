@@ -50,7 +50,7 @@ export const SETTINGS_DEFAULTS = {
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
-export const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
+const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
 export type VoiceId = (typeof VOICE_IDS)[number];
 
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
@@ -88,7 +88,7 @@ export type CaptureExclusions = z.infer<typeof CaptureExclusions>;
  * Keeping the validators separate from the defaults is what makes settings.set safe.
  */
 const settingsFields = {
-  /** The global shortcuts. Unknown keys in older files (such as `look`) are dropped on parse. */
+  /** The global shortcuts. Unknown keys are dropped on parse. */
   hotkeys: z.object({
     ask: z.string().min(1),
     /**
@@ -125,21 +125,9 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
 };
 
-/**
- * The talk key was once an accelerator combo. A file still holding one, the old default or a
- * custom combo, gets Right Ctrl; a single talk key the person picked stays.
- */
-function withoutRetiredTalkKey(value: unknown): unknown {
-  const talk = (value as { talk?: unknown } | null | undefined)?.talk;
-  if (typeof talk !== 'string' || (TALK_KEYS as readonly string[]).includes(talk)) return value;
-  return { ...(value as object), talk: TALK_KEY_RIGHT_CTRL };
-}
-
-/** Unknown keys in an older settings.json are dropped on parse, so retired fields vanish. */
+/** Unknown keys in settings.json are dropped on parse. */
 export const Settings = z.object({
-  hotkeys: z
-    .preprocess(withoutRetiredTalkKey, settingsFields.hotkeys)
-    .prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
+  hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
   avatar: settingsFields.avatar.prefault({ ...SETTINGS_DEFAULTS.avatar }),
   captureExclusions: settingsFields.captureExclusions.prefault({
     processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],

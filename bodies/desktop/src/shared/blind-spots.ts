@@ -9,7 +9,7 @@
  * title only while that tab is open) are still hidden on the way out by the brain.
  * Contains BLIND_SPOTS, SECRET_FILES and BUILT_IN_EXCLUSIONS.
  */
-export interface BlindSpot {
+interface BlindSpot {
   label: string;
   reason: string;
   /** Matched against the whole process name, case-insensitively, `.exe` or not. */

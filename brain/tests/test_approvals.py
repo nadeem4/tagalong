@@ -201,9 +201,9 @@ async def test_list_preferences_shape(mem):
 
 
 async def test_remove_default_is_allowed(mem):
-    default = mem.default_preference()
+    default = mem.list_preferences()[0]
     await tools(mem, [])["remove_preference"][1]({"id": default.id})
-    assert mem.default_preference() is None
+    assert not any(p.builtin for p in mem.list_preferences())
 
 
 async def test_edit_preference_rewrites_and_notifies(mem):

@@ -23,7 +23,7 @@ import { onSystemVoice } from './voice-player';
 /** A question is never longer than this: the microphone closes on its own after it. */
 const MAX_LISTEN_MS = 30_000;
 
-export interface TalkOptions {
+interface TalkOptions {
   /** The talk key as a person reads it. */
   keyLabel: string;
   /** The microphone picked in Settings; empty or absent for the system default. */

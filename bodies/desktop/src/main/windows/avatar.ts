@@ -9,7 +9,7 @@ import { PRELOAD_PATH, loadPage } from './page';
 import { AVATAR_SIZE, resolveAvatarPosition } from './position';
 import type { Point, RememberedPosition } from './position';
 
-export interface AvatarWindowOptions {
+interface AvatarWindowOptions {
   position: RememberedPosition;
   /** Called after the user drags the pet, so settings can remember where they left it. */
   onMoved: (position: Point) => void;

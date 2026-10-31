@@ -43,7 +43,7 @@ export function powerShellArgs(encoded: string): string[] {
 }
 
 /** Starts PowerShell with an already-encoded script. */
-export function spawnPowerShell(encoded: string): HelperChild {
+function spawnPowerShell(encoded: string): HelperChild {
   return spawn(POWERSHELL_EXE, powerShellArgs(encoded), { windowsHide: true });
 }
 

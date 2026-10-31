@@ -248,7 +248,7 @@ export interface TagalongHostApi {
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;
-  /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
+  /** Main hands the bubble one line Scout says on its own (a wake). */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */
   onPanelSide(handler: (side: 'left' | 'right') => void): () => void;

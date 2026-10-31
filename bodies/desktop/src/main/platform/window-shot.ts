@@ -15,7 +15,7 @@ export interface LookAtWindowAnswer {
   notes?: string[];
 }
 
-export interface LookAtWindowDeps {
+interface LookAtWindowDeps {
   /** The inventory, already classified against the blind spots and the exclusion list. */
   listWindows: () => Promise<readonly WindowEntry[]>;
   captureWindowImage: (handle: number, maxLongSide: number) => Promise<CapturedImage | null>;

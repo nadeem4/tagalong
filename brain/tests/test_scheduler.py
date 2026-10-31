@@ -93,6 +93,14 @@ def ev(kind="ping", key=None, **facts) -> Event:
     return Event(kind, facts, key)
 
 
+def _nothing_wakes_later(rig: Rig) -> None:
+    # A day on, a pump still starts nothing: no group is left waiting.
+    before = len(rig.starts)
+    rig.t = T0 + timedelta(days=1)
+    rig.scheduler.pump()
+    assert len(rig.starts) == before
+
+
 def test_emit_starts_a_wake_on_the_last_body_when_idle():
     rig = Rig(online=("desktop", "extension"))
     rig.scheduler.emit(ev(a="1"))
@@ -167,14 +175,6 @@ def test_events_within_the_batch_window_merge_into_one_wake():
     rig.scheduler.pump()
     assert len(rig.starts) == 1
     assert "first" in rig.text() and "second" in rig.text()
-
-
-def test_next_due_reports_the_remaining_batch_time():
-    rig = Rig()
-    assert rig.scheduler.next_due() is None
-    rig.scheduler.emit(ev("slow"))
-    rig.t = T0 + timedelta(seconds=10)
-    assert rig.scheduler.next_due() == 20.0
 
 
 def test_events_arriving_while_blocked_join_the_waiting_group():
@@ -277,7 +277,6 @@ def test_per_kind_cap_holds_the_next_wake_until_the_window_frees():
         rig.t = T0 + timedelta(seconds=seconds)
         rig.scheduler.emit(ev("a", n=str(seconds)))
     assert len(rig.starts) == 2
-    assert rig.scheduler.next_due() == 3600 - 120
     rig.t = T0 + timedelta(seconds=3599)
     rig.scheduler.pump()
     assert len(rig.starts) == 2
@@ -310,7 +309,12 @@ def test_global_cap_counts_every_capped_kind():
     assert len(rig.starts) == 3
     rig.scheduler.emit(ev("b"))
     assert len(rig.starts) == 3
-    assert rig.scheduler.next_due() == 3600
+    rig.t = T0 + timedelta(seconds=3599)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 3
+    rig.t = T0 + timedelta(seconds=3600)
+    rig.scheduler.pump()
+    assert len(rig.starts) == 4
 
 
 def test_exempt_kind_ignores_both_caps_and_is_not_counted():
@@ -332,7 +336,7 @@ def test_budget_spent_drops_waking_events_and_skips_on_start(caplog):
     assert rig.starts == []
     assert told == []
     assert "ping" in caplog.text
-    assert rig.scheduler.next_due() is None
+    _nothing_wakes_later(rig)
 
 
 def test_context_only_events_survive_a_spent_budget():
@@ -372,7 +376,7 @@ def test_failed_start_is_logged_not_raised_and_never_marked_told(caplog):
         rig.scheduler.emit(ev("ping"), on_start=lambda: told.append(1))
     assert told == []
     assert "cannot start" in caplog.text
-    assert rig.scheduler.next_due() is None  # dropped: a broken start must not loop
+    _nothing_wakes_later(rig)  # dropped: a broken start must not loop
 
 
 async def test_failed_start_still_rearms_the_timer_for_other_groups():
@@ -490,7 +494,7 @@ def test_pump_drops_events_when_the_emit_guard_stops_with_over_budget():
     rig = Rig(guards=guards)
     rig.scheduler.emit(ev("ping"))
     assert rig.starts == []
-    assert rig.scheduler.next_due() is None
+    _nothing_wakes_later(rig)
 
 
 def test_pump_keeps_events_when_the_emit_guard_stops_with_another_code():

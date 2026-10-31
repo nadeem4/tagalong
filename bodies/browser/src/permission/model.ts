@@ -10,7 +10,7 @@ import {
   type OptionalPermission,
 } from '../permissions';
 
-export type PermissionRequest = { id: string; need: Need; reason: string };
+type PermissionRequest = { id: string; need: Need; reason: string };
 export type Scope = 'site' | 'all' | 'once' | 'no';
 
 function validOrigin(origin: string): boolean {
