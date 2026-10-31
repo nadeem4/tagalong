@@ -253,7 +253,7 @@ review: `home.png` and `connections.png`.
 
 ## Running the desktop app
 
-One command is enough: the desktop starts the brain if none is running (see Commands in CLAUDE.md):
+One command is enough: it builds the shared packages (`@tagalong/contract`, `@tagalong/ui`, the browser add-on) so the renderer never loads a stale `dist`, and the desktop starts the brain if none is running (see Commands in CLAUDE.md):
 
 ```powershell
 cd brain; uv sync; cd ..

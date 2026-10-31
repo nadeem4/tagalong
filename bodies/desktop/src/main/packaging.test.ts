@@ -113,10 +113,13 @@ describe('desktop runtime dependencies', () => {
 });
 
 describe('root dev script', () => {
-  it('dev_desktop_builds_the_browser_body_first', () => {
+  // The renderer imports @tagalong/ui from its dist, so a stale build crashes it.
+  it('dev_desktop_builds_the_browser_body_and_shared_packages_first', () => {
     const root = read('../../../../package.json') as { scripts: Record<string, string> };
-    expect(root.scripts['dev:desktop']?.startsWith('pnpm --filter @tagalong/browser build')).toBe(
-      true,
-    );
+    const [build, dev] = (root.scripts['dev:desktop'] ?? '').split(' && ');
+    expect(build).toContain('--filter @tagalong/browser...');
+    expect(build).toContain('--filter @tagalong/ui...');
+    expect(build).toMatch(/ build$/);
+    expect(dev).toBe('pnpm --filter @tagalong/desktop dev');
   });
 });
