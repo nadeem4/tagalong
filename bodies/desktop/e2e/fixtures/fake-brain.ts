@@ -28,6 +28,10 @@ export interface FakeBrainOptions {
   hasKey?: boolean;
   /** What each `set_api_key` answers, in order; the last one repeats. Default: ok. */
   keyResults?: ('ok' | 'invalid' | 'unreachable')[];
+  /** The key comes from the brain's environment: `key_status` says so (needs `hasKey`). */
+  environment?: boolean;
+  /** Listen here instead of on a free port, so a spec can start the brain after the app. */
+  port?: number;
 }
 
 export interface FakeBrain {
@@ -156,7 +160,7 @@ const APPROVALS = [
 
 export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
-  const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  const server = new WebSocketServer({ host: '127.0.0.1', port: options.port ?? 0 });
   await new Promise<void>((resolve) => server.once('listening', resolve));
   // Seq is the brain's, not the connection's: it keeps rising across a reconnect.
   let seq = 0;
@@ -396,7 +400,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'key_status') {
           value = {
             has_key: hasKey,
-            source: hasKey ? 'file' : 'none',
+            source: hasKey ? (options.environment === true ? 'environment' : 'file') : 'none',
             env_path: 'C:/Users/test/Tagalong/.env',
             daily_limit_usd: dailyLimitUsd,
           };
