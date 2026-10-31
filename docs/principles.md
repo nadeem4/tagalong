@@ -1,6 +1,6 @@
 # Principles
 
-The rules the Python-brain rewrite follows: who does what, what code decides versus what the model decides, and what we refuse to carry over. The wire details are in [../protocol/README.md](../protocol/README.md).
+The rules the Python brain and its bodies follow: who does what, and what code decides versus what the model decides. The wire details are in [../protocol/README.md](../protocol/README.md).
 
 ## Architecture: one brain, many bodies
 
@@ -36,8 +36,7 @@ Never-do is enforced by absence: if no body offers a tool (for example mouse con
 
 ## No technical debt
 
-- The brain is written fresh with TDD. The old core and its tests are not ported or used as a spec.
-- Fresh contract, fresh database, empty memory. No migration of old data.
-- The desktop and extension keep their senses; every screen, IPC module and setting for a feature that is not built is deleted, not hidden. Electron stops starting the engine.
-- Docs, repo skills and CI are rewritten for the new layout; nothing describes code that no longer exists.
+- The brain is written with TDD.
+- No screen, IPC module or setting exists for a feature that is not built: unbuilt features are deleted, not hidden.
+- Docs describe only code that exists.
 - Never overengineer. Single user for now: no TLS, pairing or multi-user work.

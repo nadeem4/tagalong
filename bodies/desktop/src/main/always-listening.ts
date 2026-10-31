@@ -60,7 +60,7 @@ export class AlwaysListening {
 }
 
 /**
- * A call or a full-screen window in front: listening waits, as keeping an eye does. It is the
+ * A call or a full-screen window in front: listening waits. It is the
  * front window that counts, so a Teams window in front pauses listening even with no call.
  */
 export function listeningBlocked(windows: readonly WindowEntry[]): boolean {

@@ -234,7 +234,7 @@ describe('Settings.hotkeys.talk', () => {
     expect(SettingsPatch.safeParse({ hotkeys: { ask: 'A', talk: 'Alt+T' } }).success).toBe(false);
   });
 
-  it('is optional, so a settings file from before it still parses', () => {
+  it('is optional, so a settings file without it still parses', () => {
     expect(Settings.parse({ hotkeys: { ask: 'A' } }).hotkeys.talk).toBeUndefined();
   });
 });
@@ -244,7 +244,7 @@ describe('Settings.voice.microphoneId', () => {
     expect(Settings.parse({}).voice.microphoneId).toBeUndefined();
   });
 
-  it('keeps a picked microphone, and a voice from before it still parses', () => {
+  it('keeps a picked microphone, and a voice without it still parses', () => {
     const voice = { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic' };
     expect(Settings.parse({ voice }).voice.microphoneId).toBe('usb-mic');
     expect(SettingsPatch.parse({ voice: { ...SETTINGS_DEFAULTS.voice } }).voice).toEqual(

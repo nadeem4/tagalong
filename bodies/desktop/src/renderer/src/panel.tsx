@@ -71,7 +71,7 @@ function Panel() {
   const [petName, setPetName] = useState('Scout');
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
-  // A line Scout says on its own, from keeping an eye on things.
+  // A line Scout says on its own (a wake).
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
   // Something dropped on Scout: its card, until a button on it is pressed.
   const [drop, setDrop] = useState<DropOffer | null>(null);

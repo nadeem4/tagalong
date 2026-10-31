@@ -348,7 +348,7 @@ async function start(): Promise<void> {
       },
     }),
   );
-  // A call or a full-screen window in front pauses listening, as it does keeping an eye, and
+  // A call or a full-screen window in front pauses listening, and
   // so do the pets being hidden (none shown yet: the avatar is made below).
   pauseListening = (change) => {
     listeningWhy = { ...listeningWhy, ...change };

@@ -88,7 +88,7 @@ export type CaptureExclusions = z.infer<typeof CaptureExclusions>;
  * Keeping the validators separate from the defaults is what makes settings.set safe.
  */
 const settingsFields = {
-  /** The global shortcuts. Unknown keys in older files (such as `look`) are dropped on parse. */
+  /** The global shortcuts. Unknown keys are dropped on parse. */
   hotkeys: z.object({
     ask: z.string().min(1),
     /**
@@ -126,8 +126,8 @@ const settingsFields = {
 };
 
 /**
- * The talk key was once an accelerator combo. A file still holding one, the old default or a
- * custom combo, gets Right Ctrl; a single talk key the person picked stays.
+ * A talk key saved as an accelerator combo (not a single key from TALK_KEYS) becomes Right Ctrl; a
+ * single talk key the person picked stays.
  */
 function withoutRetiredTalkKey(value: unknown): unknown {
   const talk = (value as { talk?: unknown } | null | undefined)?.talk;
@@ -135,7 +135,7 @@ function withoutRetiredTalkKey(value: unknown): unknown {
   return { ...(value as object), talk: TALK_KEY_RIGHT_CTRL };
 }
 
-/** Unknown keys in an older settings.json are dropped on parse, so retired fields vanish. */
+/** Unknown keys in settings.json are dropped on parse. */
 export const Settings = z.object({
   hotkeys: z
     .preprocess(withoutRetiredTalkKey, settingsFields.hotkeys)

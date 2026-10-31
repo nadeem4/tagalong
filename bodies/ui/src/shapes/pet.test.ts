@@ -13,7 +13,7 @@ describe('Pet', () => {
     expect(Object.keys(Pet.shape).sort()).toEqual(['avatar', 'id', 'name']);
   });
 
-  it('still parses an older saved pet, dropping the brain fields it carried', () => {
+  it('ignores brain fields it does not have', () => {
     const parsed = Pet.parse({
       ...valid,
       roleId: 'companion',

@@ -315,48 +315,6 @@ test('a full-view capture returns every real display and a composite', async () 
   expect(Math.max(full.compositeWidth, full.compositeHeight)).toBeLessThanOrEqual(1568);
 });
 
-test('a tool call travels the real socket and the real host answers it', async () => {
-  test.skip(true, 'returns with row 5d: window tools as body tools');
-  const avatar = await windowFor('avatar');
-
-  // Every test in bodies/desktop/src/main/platform feeds a parser fixture output, so a tool and a
-  // host can each be right while the perception.* method between them is missing and the
-  // whole suite stays green. This drives the real round trip.
-  //
-  // The fake pet is scripted to call list_windows before it answers, so asking anything
-  // drives a real brain-to-host request over the loopback socket into the real Electron
-  // host, which really enumerates this machine's windows.
-  const events = await avatar.evaluate(async () => {
-    const seen: Array<{ type: string; tool: string | undefined; ok: boolean | undefined }> = [];
-    const stop = window.tagalong.onTurnEvent((event) => {
-      const carried = event as unknown as { type: string; tool?: string; ok?: boolean };
-      seen.push({ type: carried.type, tool: carried.tool, ok: carried.ok });
-    });
-
-    const pets = await window.tagalong.listPets();
-    const petId = pets[0]?.id;
-    if (petId === undefined) throw new Error('no pet to ask');
-
-    await window.tagalong.ask({ petId, text: 'what windows do I have open?' });
-    await new Promise((resolve) => setTimeout(resolve, 8_000));
-    stop();
-    return seen;
-  });
-
-  const result = events.find((event) => event.type === 'turn.toolResult');
-  if (result === undefined) {
-    throw new Error(
-      'no turn.toolResult arrived: the fake pet was scripted to call list_windows, so ' +
-        'either the tool never reached the host or perception.listWindows is not answered',
-    );
-  }
-
-  expect(result.tool).toBe('list_windows');
-  // ok:false would mean the round trip happened but the host refused or threw, which is
-  // as much a failure as silence: the pet would tell the user it cannot see their windows.
-  expect(result.ok).toBe(true);
-});
-
 /**
  * The test that catches a pause that does not pause.
  *

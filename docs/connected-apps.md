@@ -67,7 +67,7 @@ A secret is never in the row. All of them are in `app-tokens.json` in the data d
 At connect time the brain puts these back (env into the process environment, the url parts onto the
 url) and nowhere else. If a key is missing the app ends as `error` with `<name> needs its secret
 added again.`. Rows saved by an older build are migrated once at startup: the secrets move to the
-file first, then the row is rewritten clean, so they connect as before.
+file first, then the row is rewritten clean, so they connect.
 
 ### Connecting
 

@@ -1,4 +1,4 @@
-/** Tests for SettingsStore: defaults, patches, old files and corrupt files. */
+/** Tests for SettingsStore: defaults, patches, unknown fields and corrupt files. */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,7 +31,7 @@ describe('SettingsStore.get', () => {
     expect(settings.avatar).toEqual(SETTINGS_DEFAULTS.avatar);
   });
 
-  it('loads an old file, dropping the fields Tagalong no longer has', () => {
+  it('drops saved fields the settings do not have', () => {
     writeFileSync(
       file,
       JSON.stringify({

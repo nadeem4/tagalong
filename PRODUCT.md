@@ -37,8 +37,7 @@ trust it with their screen.
 
 ## Positioning
 
-Not a chat window you go to: a companion that sits with you. Scout keeps an eye on window titles,
-reads or photographs a window only when it matters, speaks up rarely, and never takes over your
+Not a chat window you go to: a companion that sits with you. Scout reads or photographs a window only when it matters, speaks up rarely, and never takes over your
 mouse or keyboard. Experts do the heavy lifting in the background; Home shows every hand-off and
 its result.
 
@@ -51,11 +50,8 @@ its result.
   to talk to Scout.
 - "What do you see?" is answered per screen from the window list, without a screenshot. Scout
   reads one window, or photographs it, only when you ask about it.
-- Ask "tell me when the build finishes" and Scout starts a watch that stops on its own. It
+- Ask "tell me when the build finishes" and Scout sets a timer that checks and tells you. It
   zooms in on small text and looks at another monitor when asked.
-- Keep an eye on things: every few seconds Scout looks at window titles only. After you settle on
-  something new, or a title looks like an error, it may read that window and say one short line,
-  at most once every 10 minutes, never during calls or full screen.
 - Scout talks: you may not be looking at the screen, so Scout says its bubble lines aloud
   (answers, the hello, a remark, an expert that finished), in a calm, refined, dry British voice.
   Scout decides what to say; code and long lists it puts in a block, shown and not read.
@@ -71,65 +67,37 @@ its result.
   those need no name. The bubble offers the key to reply.
 - The bubble's header has Always listening (off by default) and Seeing (sight on or paused);
   Settings has both, plus who speaks and who listens.
-- Home, the control centre: Overview, Scout (how it thinks), Experts, Routines, Connections,
-  Activity (every hand-off and its thread), Settings.
-- Routines: when + what + where the result goes. A schedule (daily, weekdays, chosen days at a
-  time) or a trigger (Tagalong opens, an app or site appears, an expert finishes, a watch fires);
-  the instruction runs as a Scout turn; the result goes to the bubble, voice or a Windows
-  notification, and always to Activity. Set one up in Home → Routines from a template, or ask Scout,
-  which shows a routine card that saves nothing until Save. Saving is consent for the routine's
-  read-only work; changes still ask every time, and a hand-off runs without a card only for the
-  expert the card named, read-only with no project.
-- Settings leads with how Scout thinks (its real brain and whether the Claude sign-in works), then
-  privacy, voice, shortcuts and the browser extension, each with a short line visible and the longer story behind ⓘ.
+- Home, the control centre: Overview, Jobs, Connections, Approvals, what Scout remembers,
+  Settings.
+- Settings: privacy, voice, shortcuts and the browser extension, each with a short line visible and the longer story behind ⓘ.
 - The Chrome extension is a tools-only body, with no display: Scout can see and manage your tabs when
   you allow it, and you can ask Scout from a right-click on selected text or the address bar.
 
 ## Capabilities and Constraints
 
-- Scout thinks with the Claude sign-in when available, or an API key for Anthropic or OpenRouter.
-  A cheaper model can be set for summaries, greetings and remarks.
-- Experts are added from Home; Claude Code is the first kind. Add expert starts from a template
-  (Coder, Debugger, Designer, Researcher, or Blank) with standing instructions you can read and
-  change. Each task asks which project to work in, guessed from the screen.
+- Scout thinks with an Anthropic API key set in the brain's environment.
+- Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
+  hands it a task for a folder on this computer; Home's Jobs page shows each one.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,
   authenticator apps, remote desktop) are never seen, titles included; your own exclusions add to
   them.
 - Everything is stored locally. Screenshots are not kept by default.
-- A new install is set up by Scout itself in one window: no Next button, each question asked
-  aloud and in its bubble, answered by voice, typing or a tap; the step chips go back, and closing
-  resumes at the same step. It first asks "Talk or type?": "Talk to me" is setup's permission to
-  use the microphone, and it listens for your answers only from then on, with the speech model
-  ready before the mic opens. No microphone, a refused permission or a model that will not
-  download is said plainly, and setup carries on by typing. It asks your name plainly and says
-  why ("Rather not" means it is never asked again), checks the real Claude sign-in (suggests it,
-  waits for a sign-in, or offers install or an API key, which is tested once with one tiny
-  request), plays a sample voice line, teaches the one key beside an Always listening switch
-  (off by default; Scout never switches it on itself), then lands in the corner and invites one real question. Each later launch it says
-  one short line that fits what happened: the time of day, days away with the hand-offs and
-  routines that finished, a crash and what it cut short, or an update and what is new. When it
-  cannot think (signed out, no Claude Code, no key) it says nothing: a status tag on Scout and a
-  quiet row with Fix it say why. The body never speaks as Scout; only the mind does. It fades, reads no screen for this, and
-  Settings turns it off.
-- Scout can know your name: optional in setup ("Rather not" is remembered), editable in Settings → You. It
-  uses it rarely (a hello, a moment that warrants it), and the invitation and the launch line
-  greet you by it.
+- There is no setup window. Start the brain, then Tagalong; Scout appears on the screen. The
+  brain's model and key live in its `.env`. The body never speaks as Scout; only the mind does.
 - Speech runs on the computer (Kokoro, downloaded on first use). Speech to text runs on the
   computer too (Moonshine, with Silero VAD and Smart Turn, downloaded on first use); the words show
   in the bubble as you talk, and the audio is never sent or stored.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens stay in the brain's data folder.
-- Spend: Home's Overview shows what Scout and the experts used today and this month (dollars for
-  priced models, tokens for the Claude sign-in and unknown models). An optional daily budget pauses
-  keep-an-eye comments and scheduled routines once it is spent; asking Scout always works.
-- Not built yet: expert templates, macOS and
-  Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
+- Spend: Home's Overview shows what Scout spent today against a daily limit. At the limit Scout
+  pauses for the day.
+- Not built yet: macOS and Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 
 ## Brand Commitments
 
-- Name: **Tagalong**. The companion: **Scout** (a default the user can rename).
+- Name: **Tagalong**. The companion: **Scout**.
 - Voice: **warm and playful**. A companion with personality, friendly and a little fun, never
   childish. Anything about privacy, keys, cost or errors stays plain and exact.
 - Look: Scout is **Bean**, a soft clay-like 3D figure, moving on the dock and still everywhere else;
@@ -137,7 +105,7 @@ its result.
 
 ## Evidence on Hand
 
-- Working Windows build with Scout, sight, keep an eye, voice, experts (Claude Code), connected
+- Working Windows build with Scout, sight, voice, experts (Claude Code), connected
   apps (MCP), Home and the Chrome extension.
 - No users, testimonials, metrics or press yet. Do not invent any.
 

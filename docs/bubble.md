@@ -181,7 +181,7 @@ hear/see me". "What's wrong with this code" or "are you working?" stay with Scou
 
 On a match, when the bridge has `checkHealth`, the bubble interrupts any running turn and shows
 `HealthCard` instead of asking: no turn, no tool and no model call. `healthRows(facts)` turns
-`HealthFacts` (`brain`, `connections`, `voice`, `microphone`, each
+`HealthFacts` (`connections`, `voice`, `microphone`, each
 possibly `'unknown'`) into one row per check, `ok`, `broken`, `info` or `unknown` (`Not
 checked.`); `healthHeadline` counts the broken rows ("Everything’s working.", "Two things need
 you."). The headline is kept as the exchange's answer; nothing is said aloud. A check that fails

@@ -12,9 +12,9 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | Doc                                            | Covers                                                                                                                               |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | [architecture.md](architecture.md)             | Processes, packages and import rules, host contracts, the host transport, the life of one turn, boot and shutdown, the subsystem map |
-| [../protocol/README.md](../protocol/README.md) | Contract v1 between the Python brain and the bodies: the rewrite's source of truth                                                   |
+| [../protocol/README.md](../protocol/README.md) | Contract v1 between the Python brain and the bodies: the source of truth                                                             |
 | [brain.md](brain.md)                           | The Python brain: how to run it, its files, hello and tools, the outbox and replay, what is not built yet                            |
-| [principles.md](principles.md)                 | The rules the rewrite follows: one brain and many bodies, what code does versus what the model decides, no technical debt            |
+| [principles.md](principles.md)                 | The rules the code follows: one brain and many bodies, what code does versus what the model decides, no technical debt               |
 
 ### Hosts
 
