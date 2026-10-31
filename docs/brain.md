@@ -101,7 +101,7 @@ the total can run a little low.
   but the turn's `body` is the displaying body the user last talked to if it is online, else the
   first online body that displays, else `null`; the sender does not become the last body
   (`Session._display_target`). `answer` is described under
-  [Permissions and asks](#permissions-and-asks) and `call` under [Home tools](#home-tools). `event`, `progress` and unknown notifications are ignored. An
+  [Permissions and asks](#permissions-and-asks) and `call` under [Home tools](#home-tools). `event` and unknown notifications are ignored. An
   unknown request gets `method_not_found`.
 - Bad JSON or a binary frame gets `parse_error`. Anything that is not a JSON-RPC object gets
   `invalid_request`. After `hello` the connection stays open; before it, it closes.

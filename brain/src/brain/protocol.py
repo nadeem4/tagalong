@@ -230,11 +230,6 @@ class CancelTurnParams(Model):
     turn: Id
 
 
-class ProgressParams(Model):
-    call: Id
-    text: str
-
-
 # Brain -> body
 
 
@@ -350,7 +345,6 @@ BODY_TO_BRAIN: MethodMap = {
     "call": (CallParams, CallResult),
     "answer": (AnswerParams, EmptyResult),
     "cancel": (CancelTurnParams, None),
-    "progress": (ProgressParams, None),
 }
 
 BRAIN_TO_BODY: MethodMap = {

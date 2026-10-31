@@ -25,7 +25,7 @@ const eventData = (name: string): unknown =>
 describe('method maps', () => {
   it('has literal body to brain method names', () => {
     expectTypeOf<BodyToBrainMethod>().toEqualTypeOf<
-      'hello' | 'tools' | 'say' | 'event' | 'call' | 'answer' | 'cancel' | 'progress'
+      'hello' | 'tools' | 'say' | 'event' | 'call' | 'answer' | 'cancel'
     >();
   });
   it('has literal brain to body method names', () => {

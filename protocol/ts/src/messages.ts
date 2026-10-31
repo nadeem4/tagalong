@@ -88,9 +88,6 @@ export type AnswerParams = z.infer<typeof AnswerParams>;
 export const CancelTurnParams = z.object({ turn: Id });
 export type CancelTurnParams = z.infer<typeof CancelTurnParams>;
 
-export const ProgressParams = z.object({ call: Id, text: z.string() });
-export type ProgressParams = z.infer<typeof ProgressParams>;
-
 // Brain -> body
 
 export const UseParams = z.object({ call: Id, tool: z.string(), input: Input });
@@ -202,7 +199,6 @@ export const bodyToBrain = {
   call: { params: CallParams, result: CallResult },
   answer: { params: AnswerParams, result: EmptyResult },
   cancel: { params: CancelTurnParams },
-  progress: { params: ProgressParams },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
