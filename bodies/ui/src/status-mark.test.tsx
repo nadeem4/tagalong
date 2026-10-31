@@ -47,6 +47,14 @@ describe('StatusMark, the row in the bubble', () => {
     expect(onFix).toHaveBeenCalledExactlyOnceWith('voice');
   });
 
+  it('says Add key, in Scout’s own app words, when the brain has no key', () => {
+    const onFix = vi.fn();
+    render(<StatusMark mark={{ id: 'no-key' }} variant="row" onFix={onFix} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Add your Anthropic key to start.');
+    fireEvent.click(screen.getByRole('button', { name: 'Add key' }));
+    expect(onFix).toHaveBeenCalledWith('key');
+  });
+
   it('has no Fix it for a hint, or for a problem with no handler', () => {
     const { unmount } = render(
       <StatusMark mark={{ id: 'listening-on' }} variant="row" onFix={vi.fn()} />,

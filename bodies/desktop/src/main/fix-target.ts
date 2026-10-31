@@ -9,7 +9,8 @@ import type { FixTarget } from '@tagalong/ui/shapes';
  * Where each Fix it lands: a Settings section (`settings#<section id>`) or a Home page. The
  * allowlist: a window names a target, never a page, so it cannot open anything else.
  */
-const PAGES: Record<FixTarget, string> = {
+// `key` is not a page: it opens the walkthrough's key step, which the renderer asks for itself.
+const PAGES: Record<Exclude<FixTarget, 'key'>, string> = {
   voice: 'settings#voice',
   connections: 'connections',
 };
@@ -18,7 +19,7 @@ const PAGES: Record<FixTarget, string> = {
 export function fixPage(target: unknown): string {
   if (target === undefined) return 'settings';
   if (typeof target === 'string' && Object.hasOwn(PAGES, target)) {
-    return PAGES[target as FixTarget];
+    return PAGES[target as Exclude<FixTarget, 'key'>];
   }
   throw new Error(`Tagalong has no fix called ${String(target)}`);
 }

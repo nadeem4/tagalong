@@ -133,6 +133,7 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
       .catch(() => undefined);
   }, [host, companion]);
 
+  const bridge = useHostBridge();
   const name = companion?.name ?? 'Scout';
   return (
     <>
@@ -148,6 +149,13 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
             {status.text}
           </p>
           <p>Looks at your screen when you ask it something. Never at its blind spots.</p>
+          <button
+            type="button"
+            className="tg-btn-quiet"
+            onClick={() => void bridge.openWalkthrough(1)}
+          >
+            Show the tour again
+          </button>
         </section>
       </div>
       <WhereThingsRun />

@@ -1,6 +1,6 @@
 /**
  * IPC for the Anthropic key: key:status, key:set, limit:set and expert:status, each a thin call
- * to the brain's tool of the same job. Contains registerKeyIpc. The pasted key is forwarded
+ * to the brain's tool of the same job. Contains registerKeyIpc and readKeyStatus. The pasted key is forwarded
  * once; it is never kept, logged, returned or put in a thrown error.
  */
 
@@ -17,29 +17,32 @@ interface KeyIpcDeps {
 
 const RESULTS = ['ok', 'invalid', 'unreachable'] as const;
 
+/** The brain's key facts (never the key itself). Throws when the brain is offline or odd. */
+export async function readKeyStatus(brain: BrainCall): Promise<KeyStatus> {
+  const status = (await callJson(brain, 'key_status')) as {
+    has_key?: unknown;
+    source?: unknown;
+    env_path?: unknown;
+    daily_limit_usd?: unknown;
+  } | null;
+  if (
+    typeof status?.has_key !== 'boolean' ||
+    (status.source !== 'environment' && status.source !== 'file' && status.source !== 'none') ||
+    typeof status.env_path !== 'string' ||
+    typeof status.daily_limit_usd !== 'number'
+  ) {
+    throw new Error('brain sent bad key status');
+  }
+  return {
+    hasKey: status.has_key,
+    source: status.source,
+    envPath: status.env_path,
+    dailyLimitUsd: status.daily_limit_usd,
+  };
+}
+
 export function registerKeyIpc(handle: IpcHandle, { brain }: KeyIpcDeps): void {
-  handle(IPC.keyStatus, async (): Promise<KeyStatus> => {
-    const status = (await callJson(brain, 'key_status')) as {
-      has_key?: unknown;
-      source?: unknown;
-      env_path?: unknown;
-      daily_limit_usd?: unknown;
-    } | null;
-    if (
-      typeof status?.has_key !== 'boolean' ||
-      (status.source !== 'environment' && status.source !== 'file' && status.source !== 'none') ||
-      typeof status.env_path !== 'string' ||
-      typeof status.daily_limit_usd !== 'number'
-    ) {
-      throw new Error('brain sent bad key status');
-    }
-    return {
-      hasKey: status.has_key,
-      source: status.source,
-      envPath: status.env_path,
-      dailyLimitUsd: status.daily_limit_usd,
-    };
-  });
+  handle(IPC.keyStatus, () => readKeyStatus(brain));
 
   // The key is a parameter, never a variable that outlives the call; errors are rebuilt
   // from fixed text so nothing the brain or the socket says can carry it back.
@@ -51,8 +54,11 @@ export function registerKeyIpc(handle: IpcHandle, { brain }: KeyIpcDeps): void {
       return status;
     } catch (error) {
       if (error instanceof BrainOffline) return 'offline';
+      // No `cause` on purpose: a chained error could carry the pasted key into a log.
+      /* eslint-disable preserve-caught-error */
       if (error instanceof RpcError) throw new Error(error.message);
       throw new Error('Scout could not check the key.');
+      /* eslint-enable preserve-caught-error */
     }
   });
 

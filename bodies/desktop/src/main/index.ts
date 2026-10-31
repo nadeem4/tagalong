@@ -21,7 +21,7 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
+import { StatusMarks, markBrainLink, markKey, markListening, setPanelMark } from './status-marks';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
@@ -74,7 +74,7 @@ import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSpendIpc } from './ipc/spend';
-import { registerKeyIpc } from './ipc/key';
+import { readKeyStatus, registerKeyIpc } from './ipc/key';
 import { registerWalkthroughIpc } from './ipc/walkthrough';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
@@ -229,6 +229,15 @@ async function start(): Promise<void> {
   claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
+  // The Add key mark follows the brain's own answer; an unreadable answer leaves it as it is.
+  const refreshKeyMark = async (): Promise<void> => {
+    if (desktop === null) return;
+    try {
+      markKey(statusMarks, (await readKeyStatus(desktop.brain)).hasKey);
+    } catch {
+      // Offline or odd: the brain-offline mark already says so.
+    }
+  };
   const brain = startBrain({
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
@@ -239,6 +248,7 @@ async function start(): Promise<void> {
       if (method === 'changed') {
         const { what } = params as { what: string };
         forwardConnectionsChanged(what, forwardToRenderers);
+        if (what === 'key') void refreshKeyMark();
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }
@@ -265,6 +275,7 @@ async function start(): Promise<void> {
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
         desktop?.voiceBridge.onOnline();
+        void refreshKeyMark();
         // The brain forgets nothing across a reconnect, but a restarted brain knows no setting.
         if (desktop !== null) sendReadAloud(desktop.settings);
       }

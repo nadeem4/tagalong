@@ -10,6 +10,7 @@ import { z } from 'zod';
 export const StatusId = z.enum([
   'brain-offline',
   'brain-outdated',
+  'no-key',
   'ears-failed',
   'mic-busy',
   'mic-failed',
@@ -27,7 +28,8 @@ export interface StatusMark {
 }
 
 /** Where a Fix it button lands: a Settings section, or a Home page. */
-export type FixTarget = 'voice' | 'connections';
+/** `key` opens the walkthrough's key step (step 9), not a Settings section. */
+export type FixTarget = 'voice' | 'connections' | 'key';
 
 /**
  * tag: the 1-2 words on Scout. detail: the tooltip, the aria label and the bubble row. A mark
@@ -41,6 +43,7 @@ export const STATUS_WORDS: Readonly<
     tag: 'Update',
     detail: 'Update Tagalong to talk to this brain.',
   },
+  'no-key': { tag: 'Add key', detail: 'Add your Anthropic key to start.', fix: 'key' },
   'ears-failed': {
     tag: 'Can’t listen',
     detail: 'Can’t listen: the speech models didn’t load. It retries on its own.',

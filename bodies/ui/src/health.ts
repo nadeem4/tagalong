@@ -11,6 +11,8 @@ import type { ConnectionStatus, FixTarget } from './shapes';
  * call failed.
  */
 export interface HealthFacts {
+  /** Whether the brain has an Anthropic key (never the key itself). */
+  key: { hasKey: boolean } | 'unknown';
   connections: readonly { name: string; status: ConnectionStatus }[] | 'unknown';
   voice:
     | {
@@ -23,7 +25,7 @@ export interface HealthFacts {
   microphone: { count: number; pickedMissing: boolean } | 'unknown';
 }
 
-type HealthCheckId = 'connections' | 'voice' | 'microphone';
+type HealthCheckId = 'key' | 'connections' | 'voice' | 'microphone';
 
 /** `info` and `unknown` rows are never counted as needing the person. */
 export interface HealthRow {
@@ -37,6 +39,7 @@ export interface HealthRow {
 const UNKNOWN = 'Not checked.';
 
 const LABELS: Record<HealthCheckId, string> = {
+  key: 'Anthropic key',
   connections: 'Connections',
   voice: 'Voice',
   microphone: 'Microphone',
@@ -54,6 +57,12 @@ const make = (
   line,
   ...(fix !== undefined && (state === 'broken' || state === 'info') ? { fix } : {}),
 });
+
+function keyRow(key: HealthFacts['key']): HealthRow {
+  if (key === 'unknown') return make('key', 'unknown', UNKNOWN);
+  if (!key.hasKey) return make('key', 'broken', 'Add your Anthropic key to start.', 'key');
+  return make('key', 'ok', 'Anthropic key is set.');
+}
 
 function connectionsRow(connections: HealthFacts['connections']): HealthRow {
   if (connections === 'unknown') return make('connections', 'unknown', UNKNOWN);
@@ -94,6 +103,7 @@ function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
 /** One row per check, in the card's order. Pure: no call, no model. */
 export function healthRows(facts: HealthFacts): HealthRow[] {
   return [
+    keyRow(facts.key),
     connectionsRow(facts.connections),
     voiceRow(facts.voice),
     microphoneRow(facts.microphone),

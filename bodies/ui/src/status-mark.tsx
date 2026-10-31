@@ -66,7 +66,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
       <span style={{ flex: 1 }}>{detail}</span>
       {fix !== undefined && onFix !== undefined && (
         <button type="button" className="bubble-quiet" onClick={() => onFix(fix)}>
-          Fix it
+          {fix === 'key' ? 'Add key' : 'Fix it'}
         </button>
       )}
     </p>
