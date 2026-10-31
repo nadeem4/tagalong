@@ -8,13 +8,13 @@ doc also covers how secrets are hidden in what the desktop writes to disk.
 
 ## Where it lives
 
-| File                                        | What it holds                                                                         |
-| ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/shared/settings.ts`     | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `withoutRetiredTalkKey` |
-| `bodies/desktop/src/main/settings-store.ts` | `SettingsStore` (`settings.json`), `SETTINGS_FILENAME`                                |
-| `bodies/desktop/src/main/hide-secrets.ts`   | `hideSecrets`                                                                         |
-| `bodies/desktop/src/main/ipc/settings.ts`   | `registerSettingsIpc`: host view and save                                             |
-| `bodies/desktop/src/main/index.ts`          | Builds the settings store in `userData`; `broadcast`, `applyHotkeys` deps             |
+| File                                        | What it holds                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------- |
+| `bodies/desktop/src/shared/settings.ts`     | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds              |
+| `bodies/desktop/src/main/settings-store.ts` | `SettingsStore` (`settings.json`), `SETTINGS_FILENAME`                    |
+| `bodies/desktop/src/main/hide-secrets.ts`   | `hideSecrets`                                                             |
+| `bodies/desktop/src/main/ipc/settings.ts`   | `registerSettingsIpc`: host view and save                                 |
+| `bodies/desktop/src/main/index.ts`          | Builds the settings store in `userData`; `broadcast`, `applyHotkeys` deps |
 
 ## How it works
 
@@ -35,15 +35,10 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 
 Those five are the whole schema. The schema has no secret fields.
 
-### Migrations of saved values
+### Unknown keys
 
-There is no version number in `settings.json`. Older files are cleaned on read, and the next save
-writes the cleaned form:
-
-| Cleaner                 | What it does                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| Unknown keys stripped   | Drops every key the schema does not know                                                          |
-| `withoutRetiredTalkKey` | A `hotkeys.talk` that is not one of `TALK_KEYS` (an old accelerator combo) becomes `RightControl` |
+There is no version number in `settings.json`. Parsing drops every key the schema does not know,
+and the next save writes the cleaned form.
 
 ### How settings are stored
 
@@ -168,7 +163,7 @@ The settings file holds no secrets, and `hideSecrets` keeps them out of the log.
 
 | Test file                                        | Pins                                                                                    |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, retired fields dropped, patch never invents values                    |
+| `bodies/desktop/src/shared/settings.test.ts`     | Defaults, bounds, unknown fields dropped, patch never invents values                    |
 | `bodies/desktop/src/main/settings-store.test.ts` | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing |
 | `bodies/desktop/src/main/ipc/settings.test.ts`   | Host view, save fan-out (hotkeys, broadcast)                                            |
 | `bodies/desktop/src/main/hide-secrets.test.ts`   | Each `hideSecrets` rule, ordinary text untouched                                        |

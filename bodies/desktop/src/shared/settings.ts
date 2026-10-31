@@ -125,21 +125,9 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
 };
 
-/**
- * A talk key saved as an accelerator combo (not a single key from TALK_KEYS) becomes Right Ctrl; a
- * single talk key the person picked stays.
- */
-function withoutRetiredTalkKey(value: unknown): unknown {
-  const talk = (value as { talk?: unknown } | null | undefined)?.talk;
-  if (typeof talk !== 'string' || (TALK_KEYS as readonly string[]).includes(talk)) return value;
-  return { ...(value as object), talk: TALK_KEY_RIGHT_CTRL };
-}
-
 /** Unknown keys in settings.json are dropped on parse. */
 export const Settings = z.object({
-  hotkeys: z
-    .preprocess(withoutRetiredTalkKey, settingsFields.hotkeys)
-    .prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
+  hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
   avatar: settingsFields.avatar.prefault({ ...SETTINGS_DEFAULTS.avatar }),
   captureExclusions: settingsFields.captureExclusions.prefault({
     processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],

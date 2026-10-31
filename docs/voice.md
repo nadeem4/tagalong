@@ -345,7 +345,7 @@ Addressing in always mode (`#addressed`):
   three words or more, no follow-up window was open, and no released question was waiting, it
   calls `onUnaddressed()` without the words.
 
-With `needsName: false`, used by setup, every non-empty turn goes to `onHeard` whole, and "stop"
+With `needsName: false`, every non-empty turn goes to `onHeard` whole, and "stop"
 is just words.
 
 #### PushToTalk
@@ -453,9 +453,6 @@ stateDiagram-v2
 - **No hook.** If the hook will not load or start, there is one `[talk-key]` warning and a `talk`
   outcome with the error on the hotkey-problem path (see `desktop.md`). There is no fallback key,
   the mic button still works, and nothing crashes. The hook stops on quit.
-- **Settings migration.** `withoutRetiredTalkKey`, in `bodies/desktop/src/shared/settings.ts`,
-  preprocesses `hotkeys`. A `talk` value that is a string but not one of `TALK_KEYS`, such as an
-  accelerator combo, loads as `RightControl`. A valid talk key is kept.
 
 The stop key (`hotkeys.stopVoice`, default `CommandOrControl+Shift+Alt+M`) is a normal global
 shortcut. It broadcasts `IPC.stopVoiceEvent`, and the panel calls `hush()` and `mouth.stop()`.
@@ -489,11 +486,9 @@ transcript.
   Privacy, or "Scout, stop" through the panel. `listeningOff` in the settings IPC also sets it off.
 - **Follow-up flag.** `followUp` can be true only while `on && !paused`. Pausing or switching off
   clears it.
-- **Saving.** `saveListening` saves `on` with `settings.set { listening: { always } }`, or straight
-  to the settings file when the engine is not running. Saves run one at a time, and a save that
-  finishes saves again if the choice changed meanwhile. A failed save is retried at the next
-  change. `paused` is never saved.
-- **Pausing.** `listeningPaused` is `blocked || !petsShown || setupOpen`. `blocked` comes from
+- **Saving.** `saveListening` saves `on` with `settings.set { listening: { always } }` when it
+  changes. A failed save is logged and the next change tries again. `paused` is never saved.
+- **Pausing.** `listeningPaused` is `blocked || !petsShown`. `blocked` comes from
   `startListeningGuard`. The avatar's `show` and `hide` events set `petsShown`, so listening pauses
   while the pets are hidden and the mark on Scout is always in sight while the mic is open.
 - **The guard.** While listening is on, `startListeningGuard` lists the windows every
@@ -744,30 +739,30 @@ See `settings-and-secrets.md` for the whole schema.
 
 ## Constants and limits
 
-| Constant                                 | Value                                                    | Where                                             |
-| ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------- |
+| Constant                                 | Value                                                    | Where                                           |
+| ---------------------------------------- | -------------------------------------------------------- | ----------------------------------------------- |
 | `EARS_SAMPLE_RATE` / `EARS_FRAME`        | 16,000 Hz / 512 samples (32 ms)                          | `shared/voice.ts`, repeated in `mic-worklet.js` |
-| `PAUSE_FRAMES`                           | 8 frames (256 ms)                                        | `local-ears.ts`                                   |
-| `GIVE_UP_FRAMES`                         | 63 frames (about 2 s more; turn ends at 71 quiet frames) | `local-ears.ts`                                   |
-| `PARTIAL_EVERY_FRAMES`                   | 10 speech frames (about 3 a second)                      | `local-ears.ts`                                   |
-| `TURN_THRESHOLD`                         | 0.5                                                      | `local-ears.ts`                                   |
-| `MAX_STRETCH_FRAMES`                     | 938 frames (about 30 s)                                  | `local-ears.ts`                                   |
-| `PRE_ROLL_FRAMES`                        | 8 frames (256 ms)                                        | `local-ears.ts`                                   |
-| `TURN_SAMPLES` (Smart Turn window)       | 8 s (128,000 samples)                                    | `local-ears.ts`, `smart-turn.ts`                  |
-| Silero speech threshold / context        | 0.5 / 64 samples                                         | `ort-ears.ts`                                     |
-| `MAX_BUFFERED_FRAMES`                    | 940 (about 30 s)                                         | `ears-host.ts`                                    |
-| Mic `MAX_WAITING`                        | 940 frames                                               | `mic.ts`                                          |
-| `MAX_LISTEN_MS`                          | 30,000 ms                                                | `talk.ts`                                         |
-| `TALK_CONFIRM_MS`                        | 250 ms                                                   | `talk-key.ts`                                     |
-| `FRESH_PRESS_MS`                         | 1,100 ms                                                 | `push-to-talk.ts`                                 |
-| `FOLLOW_UP_MS`                           | 20,000 ms                                                | `addressing.ts`                                   |
-| Ears retry                               | 30 s, doubling, max 5 min                                | `listen-controller.ts`                            |
-| `LISTENING_GUARD_MS`                     | 2,000 ms                                                 | `always-listening.ts`                             |
-| `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms                                      | `status-marks.ts`                                 |
-| Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                            |
-| `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                    |
-| Download attempts per file               | 2                                                        | `model-files.ts`                                  |
-| Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                  |
+| `PAUSE_FRAMES`                           | 8 frames (256 ms)                                        | `local-ears.ts`                                 |
+| `GIVE_UP_FRAMES`                         | 63 frames (about 2 s more; turn ends at 71 quiet frames) | `local-ears.ts`                                 |
+| `PARTIAL_EVERY_FRAMES`                   | 10 speech frames (about 3 a second)                      | `local-ears.ts`                                 |
+| `TURN_THRESHOLD`                         | 0.5                                                      | `local-ears.ts`                                 |
+| `MAX_STRETCH_FRAMES`                     | 938 frames (about 30 s)                                  | `local-ears.ts`                                 |
+| `PRE_ROLL_FRAMES`                        | 8 frames (256 ms)                                        | `local-ears.ts`                                 |
+| `TURN_SAMPLES` (Smart Turn window)       | 8 s (128,000 samples)                                    | `local-ears.ts`, `smart-turn.ts`                |
+| Silero speech threshold / context        | 0.5 / 64 samples                                         | `ort-ears.ts`                                   |
+| `MAX_BUFFERED_FRAMES`                    | 940 (about 30 s)                                         | `ears-host.ts`                                  |
+| Mic `MAX_WAITING`                        | 940 frames                                               | `mic.ts`                                        |
+| `MAX_LISTEN_MS`                          | 30,000 ms                                                | `talk.ts`                                       |
+| `TALK_CONFIRM_MS`                        | 250 ms                                                   | `talk-key.ts`                                   |
+| `FRESH_PRESS_MS`                         | 1,100 ms                                                 | `push-to-talk.ts`                               |
+| `FOLLOW_UP_MS`                           | 20,000 ms                                                | `addressing.ts`                                 |
+| Ears retry                               | 30 s, doubling, max 5 min                                | `listen-controller.ts`                          |
+| `LISTENING_GUARD_MS`                     | 2,000 ms                                                 | `always-listening.ts`                           |
+| `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms                                      | `status-marks.ts`                               |
+| Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                          |
+| `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                  |
+| Download attempts per file               | 2                                                        | `model-files.ts`                                |
+| Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                |
 
 ## Storage
 

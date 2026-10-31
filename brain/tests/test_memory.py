@@ -507,8 +507,8 @@ def test_add_and_list_timers_soonest_first(mem):
     assert soon.repeat_s == 600 and late.repeat_s is None and not soon.fired
     assert soon.next_at == _t(9)
     assert [t.note for t in mem.list_timers()] == ["soon", "late"]
-    assert mem.get_timer(late.id) == late
-    assert mem.get_timer(999) is None
+    assert _timer(mem, late.id) == late
+    assert _timer(mem, 999) is None
 
 
 def test_due_timers_returns_only_those_at_or_before_now(mem):
@@ -535,10 +535,15 @@ def test_delete_timer_returns_false_for_unknown_id(mem):
     assert mem.list_timers() == []
 
 
+def _timer(mem, id):
+    # The timer with this id, read through the public list; None once it is gone.
+    return next((t for t in mem.list_timers() if t.id == id), None)
+
+
 def test_set_timer_next_moves_a_timer(mem):
     t = mem.add_timer("x", _t(9), repeat_s=300)
     mem.set_timer_next(t.id, _t(11))
-    assert mem.get_timer(t.id).next_at == _t(11)
+    assert _timer(mem, t.id).next_at == _t(11)
     assert mem.due_timers(_t(10)) == []
 
 
@@ -548,7 +553,7 @@ def test_fired_timers_are_excluded_from_due_and_listed_separately(mem):
     mem.mark_timer_fired(a.id)
     assert [t.note for t in mem.due_timers(_t(9))] == ["b"]
     assert [t.id for t in mem.fired_timers()] == [a.id]
-    assert mem.get_timer(a.id).fired is True
+    assert _timer(mem, a.id).fired is True
 
 
 def test_an_older_database_migrates_forward(tmp_path):
@@ -582,17 +587,16 @@ def test_fresh_db_has_only_the_risky_default(mem):
     assert len(prefs) == 1
     assert prefs[0].builtin is True
     assert prefs[0].sentence == "Always ask me before risky actions"
-    assert mem.default_preference() == prefs[0]
     assert mem.has_user_preferences() is False
 
 
 def test_default_is_not_reseeded_after_removal(tmp_path):
     m = Memory(tmp_path / "d.db")
-    assert m.remove_preference(m.default_preference().id) is True
+    assert m.remove_preference(m.list_preferences()[0].id) is True
     m.close()
     m = Memory(tmp_path / "d.db")
     assert m.list_preferences() == []
-    assert m.default_preference() is None
+    assert not any(p.builtin for p in m.list_preferences())
     m.close()
 
 
@@ -668,7 +672,7 @@ def test_migration_is_one_step_after_timers(tmp_path):
     m = Memory(path)
     v = m._db.execute("PRAGMA user_version").fetchone()[0]
     assert v == n + 1 == len(memory.MIGRATIONS)
-    assert m.default_preference() is not None
+    assert any(p.builtin for p in m.list_preferences())
     m.close()
 
 
@@ -704,13 +708,3 @@ def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
     m = Memory(path)
     assert m.list_approvals("all", 10, None)[0].preference_sentence is None
     m.close()
-
-
-def test_update_app_config_replaces_only_config(mem):
-    from brain.apps import AppRow
-
-    mem.add_app(AppRow("a", "A", "stdio", {"command": "x", "args": [], "env": {}}, "none", False))
-    mem.update_app_config("a", {"command": "y", "args": [], "env": {"K": "${K}"}})
-    [row] = mem.list_apps()
-    assert row.config["command"] == "y" and row.config["env"] == {"K": "${K}"}
-    assert (row.name, row.transport, row.auth, row.enabled) == ("A", "stdio", "none", False)

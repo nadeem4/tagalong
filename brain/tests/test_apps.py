@@ -256,7 +256,7 @@ async def test_connects_and_lists_tools(make):
     await rig.up("fake")
     names = {t.name for t in rig.apps.tools("fake")}
     assert {"echo", "read_note", "delete_note", "slow", "big", "add_tool"} == names
-    assert rig.apps.status("fake").tool_count == 6
+    assert len(rig.apps.tools("fake")) == 6
     result = await rig.apps.call("fake", "echo", {"text": "hi"})
     assert result.content[0].text == "hi"
 
@@ -353,7 +353,7 @@ async def test_tool_list_changed_relists(make):
     await rig.apps.start()
     await rig.up("fake")
     await rig.apps.call("fake", "add_tool", {})
-    await until(lambda: rig.apps.status("fake").tool_count == 7)
+    await until(lambda: len(rig.apps.tools("fake")) == 7)
     assert "extra" in {t.name for t in rig.apps.tools("fake")}
 
 
@@ -421,7 +421,7 @@ async def test_http_app_connects_and_stops(make):
         rig = make([AppRow("web", "web", "http", {"url": url}, "none", True)])
         await rig.apps.start()
         await rig.up("web")
-        assert rig.apps.status("web").tool_count == 6
+        assert len(rig.apps.tools("web")) == 6
         result = await rig.apps.call("web", "echo", {"text": "net"})
         assert result.content[0].text == "net"
         await rig.apps.stop("web")
@@ -657,76 +657,3 @@ async def test_missing_secret_key_says_add_it_again(make, tmp_path):
     await rig.apps.start()
     await rig.up("fake", "error")
     assert rig.apps.status("fake").error == "Fake needs its secret added again."
-
-
-def _raw_config(path, app_id):
-    db = sqlite3.connect(path)
-    try:
-        return db.execute("SELECT config FROM apps WHERE id=?", (app_id,)).fetchone()[0]
-    finally:
-        db.close()
-
-
-async def test_migration_rewrites_an_old_row_and_leaves_no_secret_in_the_table(tmp_path):
-    from brain.memory import Memory
-
-    mem = Memory(tmp_path / "m.db")
-    pidfile = tmp_path / "pid.txt"
-    old = stdio_row(env={"FAKE_PIDFILE": str(pidfile), "REF": "${HOME_X:-d}"})
-    mem.add_app(old)
-    mem.add_app(
-        AppRow("web", "web", "http", {"url": "https://h.example/m?api_key=SECRET9"}, "none", False)
-    )
-    tokens = TokenFile(tmp_path)
-    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
-    assert apps.migrate_secrets() == 2
-    mem.close()
-    raw = _raw_config(tmp_path / "m.db", "fake") + _raw_config(tmp_path / "m.db", "web")
-    assert str(pidfile) not in raw and "SECRET9" not in raw
-    mem = Memory(tmp_path / "m.db")
-    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
-    await apps.start()
-    try:
-        await until(lambda: apps.status("fake").state == "connected")
-        assert pidfile.exists()
-    finally:
-        await apps.shutdown()
-        mem.close()
-
-
-def test_migration_is_idempotent(tmp_path):
-    from brain.memory import Memory
-
-    mem = Memory(tmp_path / "m.db")
-    mem.add_app(stdio_row(env={"K": "v1"}))
-    apps = Apps(mem, lambda m, p: None, {}, tokens=TokenFile(tmp_path))
-    assert apps.migrate_secrets() == 1
-    before = mem.list_apps()
-    assert apps.migrate_secrets() == 0
-    assert mem.list_apps() == before
-    mem.close()
-
-
-def test_migration_survives_a_failing_row_and_logs_only_the_app(tmp_path, caplog):
-    from brain.memory import Memory
-
-    mem = Memory(tmp_path / "m.db")
-    mem.add_app(stdio_row(env={"K": "super-secret-value"}))
-    mem.add_app(
-        AppRow("web", "web", "http", {"url": "https://h.example/m?api_key=SECRET9"}, "none", False)
-    )
-    tokens = TokenFile(tmp_path)
-    real_set = tokens.set
-
-    def flaky(key, value):
-        if key.startswith("fake"):
-            raise OSError("disk full")
-        real_set(key, value)
-
-    tokens.set = flaky
-    apps = Apps(mem, lambda m, p: None, {}, tokens=tokens)
-    with caplog.at_level("ERROR", logger="brain"):
-        assert apps.migrate_secrets() == 1
-    assert "fake" in caplog.text
-    assert "super-secret-value" not in caplog.text and "SECRET9" not in caplog.text
-    mem.close()

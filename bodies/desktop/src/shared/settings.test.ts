@@ -209,15 +209,6 @@ describe('Settings.hotkeys.talk', () => {
     expect(hotkeys.talk).not.toBe(hotkeys.ask);
   });
 
-  it('moves any saved accelerator, the old default or a custom combo, to Right Ctrl', () => {
-    for (const talk of ['CommandOrControl+Shift+Alt+Space', 'Alt+T']) {
-      expect(Settings.parse({ hotkeys: { ask: 'A', talk } }).hotkeys).toEqual({
-        ask: 'A',
-        talk: 'RightControl',
-      });
-    }
-  });
-
   it('keeps a single talk key the person picked', () => {
     expect(TALK_KEYS).toContain('RightShift');
     expect(Settings.parse({ hotkeys: { ask: 'A', talk: 'RightShift' } }).hotkeys.talk).toBe(

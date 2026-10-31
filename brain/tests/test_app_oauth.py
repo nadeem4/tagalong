@@ -320,7 +320,7 @@ async def test_sign_in_saves_tokens_and_connects(rig):
     assert parse_qs(urlparse(opened[0]).query)["code_challenge_method"] == ["S256"]
     saved = await FileTokenStorage(rig.data, "notes").get_tokens()
     assert saved and saved.access_token == "good-token"
-    assert rig.apps.status("notes").tool_count == 6
+    assert len(rig.apps.tools("notes")) == 6
 
 
 async def test_saved_tokens_connect_after_restart_without_a_browser(rig):

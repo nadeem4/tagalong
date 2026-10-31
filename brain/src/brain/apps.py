@@ -249,7 +249,6 @@ class TokenFile:
 class AppStatus:
     state: str  # off | connecting | connected | needs-sign-in | error
     error: str = ""
-    tool_count: int = 0
 
 
 @dataclass
@@ -308,28 +307,8 @@ class Apps:
 
     async def start(self) -> None:
         """Begin connecting every enabled app in the background and return at once."""
-        self.migrate_secrets()
         for row in self._memory.list_apps():
             self._launch(row)
-
-    def migrate_secrets(self) -> int:
-        """Move literal secrets of stored rows into the token file; returns how many rows moved."""
-        if self._tokens is None:
-            return 0
-        count = 0
-        for row in self._memory.list_apps():
-            try:
-                clean, secrets = split_secrets(row.id, row.config, row.transport)
-                if not secrets:
-                    continue
-                for key, value in secrets.items():  # file first: a crash between keeps the secret
-                    self._tokens.set(key, value)
-                self._memory.update_app_config(row.id, clean)
-            except Exception as e:  # boot goes on; name only the app, never the config
-                log.error("could not move the secrets of app %s (%s)", row.id, type(e).__name__)
-                continue
-            count += 1
-        return count
 
     async def restart(self, app_id: str) -> None:
         await self._relaunch(app_id)
@@ -409,7 +388,7 @@ class Apps:
         slot = self._slots.get(app_id)
         if slot is None:
             return AppStatus("off")
-        return AppStatus(slot.state, slot.error, len(slot.tools))
+        return AppStatus(slot.state, slot.error)
 
     def ids(self) -> list[str]:
         return list(self._slots)

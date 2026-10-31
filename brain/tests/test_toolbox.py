@@ -1018,7 +1018,7 @@ async def test_chain_error_in_an_ask_guard_refuses_the_tool():
 
 async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_the_person(mem):
     preference(mem)
-    mem.remove_preference(mem.default_preference().id)
+    mem.remove_preference(mem.list_preferences()[0].id)
     check = SideCheck(_ApprovingModel(mem.list_preferences()[0].id), _OpenBudget(), mem)
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     task = asyncio.create_task(box.run(call_with_text("t")))
@@ -1032,7 +1032,7 @@ async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_p
     pref = mem.add_preference(
         sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
     )
-    mem.remove_preference(mem.default_preference().id)
+    mem.remove_preference(mem.list_preferences()[0].id)
     check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     assert await box.run(call_with_text("t")) == "ran t"

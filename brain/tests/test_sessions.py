@@ -1294,7 +1294,7 @@ async def test_session_shares_one_guards_with_scheduler_and_loop():
     session.jobs._on_finished(end_job(memory))
     await settle()
     brain_started = [p for m, p in sent if m == "turn" and p.get("started_by") == "brain"]
-    assert brain_started == [] and session.scheduler.next_due() is None
+    assert brain_started == [] and session.scheduler._groups == []
 
 
 # --- the person hears what an expert did while they were away (G3) ---

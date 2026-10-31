@@ -369,9 +369,6 @@ class Memory:
             (row.id, row.name, row.transport, json.dumps(row.config), row.auth, int(row.enabled)),
         )
 
-    def update_app_config(self, app_id: str, config: dict) -> None:
-        self._db.execute("UPDATE apps SET config=? WHERE id=?", (json.dumps(config), app_id))
-
     def set_app_enabled(self, app_id: str, enabled: bool) -> None:
         self._db.execute("UPDATE apps SET enabled=? WHERE id=?", (int(enabled), app_id))
 
@@ -451,10 +448,6 @@ class Memory:
     def list_timers(self) -> list[Timer]:
         """Soonest first."""
         return self._timers()
-
-    def get_timer(self, id: int) -> Timer | None:
-        rows = self._timers("WHERE id=?", (id,))
-        return rows[0] if rows else None
 
     def delete_timer(self, id: int) -> bool:
         return self._db.execute("DELETE FROM timers WHERE id=?", (id,)).rowcount > 0
@@ -567,10 +560,6 @@ class Memory:
     def has_preference_for(self, group_key: str) -> bool:
         row = self._db.execute("SELECT 1 FROM preferences WHERE group_key=?", (group_key,))
         return bool(row.fetchone())
-
-    def default_preference(self) -> Preference | None:
-        rows = self._preferences("WHERE builtin=1")
-        return rows[0] if rows else None
 
     def add_offer(self, group_key: str, at: str, outcome: str) -> None:
         self._db.execute(
