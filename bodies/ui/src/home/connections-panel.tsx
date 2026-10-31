@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { AppAddParams, AppInfo } from '../shapes';
+import { failure } from '../failure';
 import { useHostBridge } from '../host-bridge';
 
 type Status = { text: string; error: boolean } | null;
@@ -53,12 +54,6 @@ function envLines(text: string): Record<string, string> | string {
     env[line.slice(0, at).trim()] = line.slice(at + 1).trim();
   }
   return env;
-}
-
-/** A failed call's own words: Electron wraps them in "Error invoking remote method '…': Error: ". */
-export function failure(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, '');
 }
 
 /**

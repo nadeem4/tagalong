@@ -60,6 +60,10 @@ test('no key shows the no-key state in the bubble and on the dock', async () => 
   const panel = await windowFor('panel');
   await expect(panel.getByText('Add your Anthropic key to start.')).toBeAttached();
   await expect(panel.getByRole('button', { name: 'Add key' })).toBeAttached();
+  // The button opens the walkthrough at its key step.
+  await panel.getByRole('button', { name: 'Add key' }).dispatchEvent('click');
+  const tour = await windowFor('walkthrough');
+  expect(tour.url()).toContain('step=9');
 });
 
 test('invalid key shows not accepted and the field stays', async () => {

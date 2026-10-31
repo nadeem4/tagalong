@@ -6,6 +6,7 @@
 
 import { useRef, useState } from 'react';
 import type { KeyResult } from '../host-bridge';
+import { failure } from '../failure';
 import { useKeyStatus } from './use-key-status';
 import type { KeyHost } from './use-key-status';
 
@@ -26,8 +27,15 @@ export function KeyField({ host, onSaved }: { host: KeyHost; onSaved?: () => voi
   const [value, setValue] = useState('');
   const [shown, setShown] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
-  const [failure, setFailure] = useState('');
+  const [failureText, setFailure] = useState('');
   const [checking, setChecking] = useState(false);
+  // A fresh status means the brain answered: an earlier "offline" result no longer holds.
+  const [seenStatus, setSeenStatus] = useState(status);
+  if (status !== seenStatus) {
+    setSeenStatus(status);
+    if (status !== null && status !== 'offline')
+      setOutcome((now) => (now === 'offline' ? null : now));
+  }
   // A ref, not state: a second press in the same tick must see the first one already running.
   const busy = useRef(false);
 
@@ -50,7 +58,7 @@ export function KeyField({ host, onSaved }: { host: KeyHost; onSaved?: () => voi
         onSaved?.();
       }
     } catch (error) {
-      setFailure(error instanceof Error ? error.message : 'Scout could not save the key.');
+      setFailure(error instanceof Error ? failure(error) : 'Scout could not save the key.');
       setOutcome('failed');
     } finally {
       busy.current = false;
@@ -101,7 +109,7 @@ export function KeyField({ host, onSaved }: { host: KeyHost; onSaved?: () => voi
               : outcome === 'unreachable'
                 ? COPY.unreachable
                 : outcome === 'failed'
-                  ? failure
+                  ? failureText
                   : already
                     ? COPY.already
                     : outcome === 'ok'
@@ -145,7 +153,7 @@ export function LimitField({
       setMessage({ text: 'Daily limit saved.', error: false });
     } catch (error) {
       setMessage({
-        text: error instanceof Error ? error.message : 'Scout could not change the limit.',
+        text: error instanceof Error ? failure(error) : 'Scout could not change the limit.',
         error: true,
       });
     }

@@ -26,7 +26,9 @@ function makeHost(
   return {
     setKey,
     keyStatus: vi.fn(() =>
-      status === 'offline' ? Promise.reject(new Error('brain offline')) : Promise.resolve(status),
+      status === 'offline'
+        ? Promise.reject(new Error('brain offline'))
+        : Promise.resolve({ ...status }),
     ),
     onBrainChanged: (handler: (what: string) => void) => {
       changed.add(handler);
@@ -93,6 +95,17 @@ describe('KeyField', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
     expect(await screen.findByText('Scout’s brain is not running.')).toBeInTheDocument();
     expect(screen.queryByText('That key was not accepted.')).not.toBeInTheDocument();
+  });
+
+  it('after an offline result, a fresh status lets Check work again', async () => {
+    const host = makeHost({ result: 'offline' });
+    render(<KeyField host={host} />);
+    await paste(FAKE_KEY);
+    fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
+    expect(await screen.findByText('Scout’s brain is not running.')).toBeInTheDocument();
+    act(() => host.emit('link'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check key' })).toBeEnabled());
+    expect(screen.queryByText('Scout’s brain is not running.')).not.toBeInTheDocument();
   });
 
   it('a second press while checking is ignored (setKey called once)', async () => {
@@ -170,6 +183,19 @@ describe('KeyField', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
     expect(await screen.findByText('Scout could not save the key.')).toBeInTheDocument();
   });
+
+  it('strips Electron’s wrapper from a rejected call', async () => {
+    const host = makeHost();
+    host.setKey.mockRejectedValueOnce(
+      new Error(
+        "Error invoking remote method 'tagalong:key:set': Error: Scout could not save the key.",
+      ),
+    );
+    render(<KeyField host={host} />);
+    await paste(FAKE_KEY);
+    fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
+    expect(await screen.findByText('Scout could not save the key.')).toBeInTheDocument();
+  });
 });
 
 describe('LimitField', () => {
@@ -183,6 +209,19 @@ describe('LimitField', () => {
     }
     expect(setDailyLimit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Enter an amount above $0.');
+  });
+
+  it('strips Electron’s wrapper from a rejected limit', async () => {
+    const setDailyLimit = vi.fn(() =>
+      Promise.reject(
+        new Error(
+          "Error invoking remote method 'tagalong:limit:set': Error: Enter an amount above $0.",
+        ),
+      ),
+    );
+    render(<LimitField host={{ setDailyLimit }} limitUsd={5} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Enter an amount above \$0\.$/);
   });
 
   it('saves a valid amount', async () => {

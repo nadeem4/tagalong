@@ -85,6 +85,14 @@ describe('registerKeyIpc', () => {
     expect(calls).toEqual([['set_daily_limit', { usd: 8 }]]);
   });
 
+  it('limit:set refuses an amount that is not finite and above 0, without calling the brain', async () => {
+    const { invoke, calls } = setup(() => text({}));
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, '5']) {
+      await expect(invoke(IPC.limitSet, bad)).rejects.toThrow('Enter an amount above $0.');
+    }
+    expect(calls).toEqual([]);
+  });
+
   it('expert:status maps expert_status', async () => {
     const { invoke, calls } = setup(() => text({ found: true, command: 'claude-agent-acp' }));
     expect(await invoke(IPC.expertStatus)).toEqual({ found: true, command: 'claude-agent-acp' });

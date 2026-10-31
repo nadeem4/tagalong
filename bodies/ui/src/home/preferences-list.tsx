@@ -5,7 +5,7 @@
  */
 import { useState } from 'react';
 import type { PreferenceRow } from '../host-bridge';
-import { failure } from './connections-panel';
+import { failure } from '../failure';
 
 interface Props {
   /** Null until a read succeeds: then nothing is claimed, not even "none yet". */

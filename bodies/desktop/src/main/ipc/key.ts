@@ -63,6 +63,9 @@ export function registerKeyIpc(handle: IpcHandle, { brain }: KeyIpcDeps): void {
   });
 
   handle(IPC.limitSet, async (_event: unknown, usd: number): Promise<void> => {
+    if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) {
+      throw new Error('Enter an amount above $0.');
+    }
     await brain.call('set_daily_limit', { usd });
   });
 
