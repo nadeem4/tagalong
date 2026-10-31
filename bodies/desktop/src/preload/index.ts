@@ -29,6 +29,8 @@ import type {
   PreferenceRow,
   PermissionRow,
   SpendToday,
+  KeyStatus,
+  KeyResult,
 } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import type { PreloadBridge } from '../shared/ipc';
@@ -37,6 +39,7 @@ import type {
   BrowserFolder,
   CaptureNotice,
   EarsStatus,
+  ExpertStatus,
   HostView,
   ListeningState,
   SpeakSample,
@@ -99,6 +102,11 @@ const bridge: PreloadBridge = {
     return () => void ipcRenderer.off(IPC.approvedEvent, listener);
   },
   usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<SpendToday>,
+  keyStatus: () => ipcRenderer.invoke(IPC.keyStatus) as Promise<KeyStatus>,
+  setKey: (key: string) => ipcRenderer.invoke(IPC.keySet, key) as Promise<KeyResult>,
+  setDailyLimit: (usd: number) => ipcRenderer.invoke(IPC.limitSet, usd) as Promise<void>,
+  openWalkthrough: (step?: number) =>
+    ipcRenderer.invoke(IPC.walkthroughOpen, { step }) as Promise<void>,
   onBrainChanged: (handler: (what: string) => void) => {
     const listener = (_event: IpcRendererEvent, what: string): void => handler(what);
     ipcRenderer.on(IPC.brainChangedEvent, listener);
@@ -238,6 +246,8 @@ const host: TagalongHostApi = {
     return () => void ipcRenderer.off(IPC.dropEvent, listener);
   },
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
+  expertStatus: () => ipcRenderer.invoke(IPC.expertStatus) as Promise<ExpertStatus>,
+  finishWalkthrough: () => ipcRenderer.invoke(IPC.walkthroughFinish) as Promise<void>,
   getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
   setStatusMark: (id, on) => ipcRenderer.invoke(IPC.setStatusMark, id, on) as Promise<void>,
   onStatusMark: (handler) => {

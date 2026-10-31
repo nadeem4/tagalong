@@ -47,6 +47,8 @@ export const SETTINGS_DEFAULTS = {
    * and it stays on across restarts until they switch it off. Scout never switches it on.
    */
   listening: { always: false },
+  /** Whether the first-run walkthrough was finished or skipped. Closing it does not count. */
+  walkthrough: { done: false },
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -123,6 +125,8 @@ const settingsFields = {
   }),
   /** Whether Scout listens all the time, hearing only turns that start with its name. */
   listening: z.object({ always: z.boolean() }),
+  /** Set by Finish or Skip tour only. */
+  walkthrough: z.object({ done: z.boolean() }),
 };
 
 /** Unknown keys in settings.json are dropped on parse. */
@@ -135,6 +139,7 @@ export const Settings = z.object({
   }),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
+  walkthrough: settingsFields.walkthrough.prefault({ ...SETTINGS_DEFAULTS.walkthrough }),
 });
 export type Settings = z.infer<typeof Settings>;
 

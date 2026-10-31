@@ -24,6 +24,26 @@ export interface SpendToday {
 }
 
 /**
+ * What the brain says of its Anthropic key: whether it has one and where it came from. Never any
+ * part of the key. `envPath` is where the brain saves a key it is given.
+ */
+export interface KeyStatus {
+  hasKey: boolean;
+  source: 'environment' | 'file' | 'none';
+  envPath: string;
+  dailyLimitUsd: number;
+}
+
+/** How a key check ended; `offline` is the body's own word for "no brain connected". */
+export type KeyResult = 'ok' | 'invalid' | 'unreachable' | 'offline';
+
+/** Whether the expert's command is on the brain's PATH. */
+export interface ExpertStatus {
+  found: boolean;
+  command: string;
+}
+
+/**
  * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
  * (`auto`). A locked tool asks until set to auto on Home; an offline body's tool cannot be changed yet.
  */
@@ -142,6 +162,14 @@ export interface HostBridge {
    */
   listMemories(): Promise<MemoryEntry[]>;
   deleteMemory(id: string): Promise<boolean>;
+  /** The brain's key facts (never the key); rejects while the brain is away. */
+  keyStatus(): Promise<KeyStatus>;
+  /** Hands the pasted key to the brain once and keeps no copy; resolves how the check ended. */
+  setKey(key: string): Promise<KeyResult>;
+  /** Sets the daily spend limit in dollars (finite, above 0). */
+  setDailyLimit(usd: number): Promise<void>;
+  /** Opens the first-run walkthrough, at a step when one is named (9 is the key). */
+  openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
   usageSummary(): Promise<SpendToday>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */

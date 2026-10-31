@@ -15,6 +15,9 @@ import type {
 } from '@tagalong/ui/shapes';
 import type { Settings, SettingsPatch } from './settings';
 import type { DropOffer, HostBridge } from '@tagalong/ui';
+import type { ExpertStatus, KeyResult, KeyStatus } from '@tagalong/ui';
+
+export type { ExpertStatus, KeyResult, KeyStatus };
 import type { FixTarget } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
@@ -101,6 +104,14 @@ export const IPC = {
   editPreference: 'tagalong:approvals:preferences:edit',
   // Scout approved an ask under a preference: pushed to every window.
   approvedEvent: 'tagalong:approved-event',
+  // The Anthropic key and the daily limit: thin calls to the brain. The key is never returned.
+  keyStatus: 'tagalong:key:status',
+  keySet: 'tagalong:key:set',
+  limitSet: 'tagalong:limit:set',
+  expertStatus: 'tagalong:expert:status',
+  // The first-run walkthrough: open it (at a step) or finish it.
+  walkthroughOpen: 'tagalong:walkthrough:open',
+  walkthroughFinish: 'tagalong:walkthrough:finish',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */
@@ -307,6 +318,10 @@ export interface TagalongHostApi {
   getStatusMark(): Promise<StatusMark | null>;
   /** Fires with the new top status mark, or null when none is left. */
   onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
+  /** Whether the expert's command is on the brain's PATH (the walkthrough's Claude Code step). */
+  expertStatus(): Promise<ExpertStatus>;
+  /** Finish or Skip: marks the walkthrough seen and closes its window. */
+  finishWalkthrough(): Promise<void>;
   /** Sets or clears one of the panel's own marks: the mic failing, or Say “Scout”. */
   setStatusMark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): Promise<void>;
 }
