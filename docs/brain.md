@@ -24,21 +24,21 @@ the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it 
 `<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
 variable still works and is the developer path.
 
-| Variable                       | Default            | Meaning                                                                                                 |
-| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                    |
-| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                      |
-| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                 |
-| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                              |
-| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                            |
-| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)   |
-| `TAGALONG_EXPERT_CMD`          | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line)                               |
-| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`             | Longest an expert run may take, in seconds                                                              |
-| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                |
-| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more) |
-| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                             |
-| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)        |
-| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset         |
+| Variable                       | Default            | Meaning                                                                                                                                  |
+| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                     |
+| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                       |
+| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                  |
+| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                                                               |
+| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                             |
+| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
+| `TAGALONG_EXPERT_CMD`          | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line)                                                                |
+| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`             | Longest an expert run may take, in seconds                                                                                               |
+| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
+| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
+| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                              |
+| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                         |
+| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -376,12 +376,12 @@ so there is one gate and no second path.
 
 The first-run setup adds four more Home tools (never offered to Scout):
 
-| Tool              | Input             | Result text (JSON)                                                                                                                             |
-| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                           |
-| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment                                                                                 |
-| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                  |
-| `expert_status`   | `{}`              | `{"found": bool, "command": str}`: whether the first word of `TAGALONG_EXPERT_CMD` is on `PATH`; it does not start the expert or see the login |
+| Tool              | Input             | Result text (JSON)                                                                                                                                                          |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
+| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
+| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
+| `expert_status`   | `{}`              | `{"found": bool, "command": str}`: whether the first word of `TAGALONG_EXPERT_CMD` is on `PATH`; it does not start the expert or see the login                              |
 
 - **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
   newline, one pair of quotes); a missing, non-string, empty, over-256-character or
