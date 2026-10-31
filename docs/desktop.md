@@ -664,7 +664,7 @@ the clean close and stops the brain client.
 
 Main holds the one brain connection, so the brain's address never needs to reach a window. Every capture
 is announced on the avatar and in the tray tooltip. The log file keeps only kept text with secrets
-hidden. The clipboard is touched only by the selection copy, which puts it back. A dropped item is named on drop and read only
+hidden. Main reads the clipboard only when a turn asks for it (`readClipboard`); the selection copy saves and restores it; Settings' Copy buttons write a path or address to it. A dropped item is named on drop and read only
 when a button on its card asks. See [privacy.md](privacy.md).
 
 ## Tests that pin it
