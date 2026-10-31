@@ -16,6 +16,7 @@ from anthropic import AuthenticationError
 
 from brain import tools
 from brain.guardrails import Budget
+from brain.masking import Masker, SecretLogFilter
 from brain.protocol import ErrorCode, RpcError
 from brain.tools import KeySettings, anthropic_check, home_tools
 
@@ -150,6 +151,15 @@ async def test_set_api_key_write_failure_is_tool_failed_and_not_kept(rig, monkey
     assert not rig.model.ready and rig.sent == []
 
 
+async def test_set_api_key_when_environment_sets_it_is_refused_and_writes_nothing(tmp_path):
+    r = Rig(tmp_path, "environment")
+    with pytest.raises(RpcError) as err:
+        await r.run("set_api_key", {"key": KEY})
+    assert err.value.code == ErrorCode.invalid_params
+    assert str(err.value) == "The key is set by the environment."
+    assert r.checked == [] and not (tmp_path / ".env").exists() and not r.model.ready
+
+
 async def test_set_api_key_serialises_concurrent_calls(rig, tmp_path):
     await asyncio.gather(
         rig.run("set_api_key", {"key": KEY}), rig.run("set_api_key", {"key": KEY + "2"})
@@ -161,6 +171,7 @@ async def test_set_api_key_serialises_concurrent_calls(rig, tmp_path):
 
 async def test_key_never_in_any_reply_or_log(tmp_path, monkeypatch, caplog):
     caplog.set_level(logging.DEBUG)
+    caplog.handler.addFilter(SecretLogFilter(Masker(lambda: [KEY])))
     seen = []
     for status in ("ok", "invalid", "unreachable"):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)

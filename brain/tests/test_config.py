@@ -230,3 +230,16 @@ def test_upsert_value_with_equals_sign_round_trips_through_load_env_file(tmp_pat
     env = {}
     load_env_file(tmp_path, env)
     assert env["A_KEY"] == "abc=def=="
+
+
+def test_empty_environment_value_is_filled_from_the_file(tmp_path):
+    (tmp_path / ".env").write_text("A_KEY=from-file\nB_KEY=b\n")
+    env = {"A_KEY": "", "B_KEY": "real"}
+    load_env_file(tmp_path, env)
+    assert env == {"A_KEY": "from-file", "B_KEY": "real"}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes")
+def test_upsert_creates_the_file_owner_only(tmp_path):
+    upsert_env_value(tmp_path, "A_KEY", "v", {})
+    assert (tmp_path / ".env").stat().st_mode & 0o777 == 0o600

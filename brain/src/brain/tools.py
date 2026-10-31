@@ -596,6 +596,8 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
         key = _clean_key(args.get("key") if isinstance(args, dict) else None)
         if key is None:
             raise RpcError(ErrorCode.invalid_params, "set_api_key needs a key.")
+        if keys.source == "environment":
+            raise RpcError(ErrorCode.invalid_params, "The key is set by the environment.")
         async with lock:
             status = await keys.check(key)
             if status != "ok":

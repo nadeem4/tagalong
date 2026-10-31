@@ -80,6 +80,8 @@ class AnthropicModel:
         self._client = self._make_client(key)
 
     async def stream(self, system: str, messages: list, tools: list) -> AsyncIterator[str | Final]:
+        if self._client is None:
+            raise RuntimeError("no Anthropic key yet")
         kwargs = _request(self.model_id, system, messages, tools)
         async with self._client.beta.messages.stream(**kwargs) as stream:
             async for text in stream.text_stream:

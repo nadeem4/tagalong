@@ -2,6 +2,7 @@
 
 import asyncio
 import io
+import json
 import logging
 import os
 import sys
@@ -183,3 +184,96 @@ def test_memory_closed_on_shutdown(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError):
         asyncio.run(_run())
     assert closed == [True]
+
+
+def _key_source(monkeypatch, tmp_path, env_key, file_key):
+    class Stop(Exception):
+        pass
+
+    seen = {}
+
+    async def stop(host, port, bodies, session_id, session):
+        seen["status"] = json.loads(await session.call_home("key_status", {}))
+        seen["session"] = session
+        raise Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    if env_key is None:
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    else:
+        monkeypatch.setenv("ANTHROPIC_API_KEY", env_key)
+    if file_key:
+        (tmp_path / ".env").write_text(f"ANTHROPIC_API_KEY={file_key}\n")
+    monkeypatch.setattr(main, "start_server", stop)
+    try:
+        with pytest.raises(Stop):
+            asyncio.run(_run())
+    finally:
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+    return seen["status"]
+
+
+def test_key_source_is_environment_when_the_variable_is_set(monkeypatch, tmp_path):
+    status = _key_source(monkeypatch, tmp_path, "sk-ant-example-env-key", "sk-ant-example-file-key")
+    assert status["source"] == "environment" and status["has_key"] is True
+
+
+def test_key_source_is_file_when_only_env_file_has_it(monkeypatch, tmp_path):
+    status = _key_source(monkeypatch, tmp_path, None, "sk-ant-example-file-key")
+    assert status["source"] == "file" and status["has_key"] is True
+
+
+def test_empty_environment_key_counts_as_missing_so_the_file_loads(monkeypatch, tmp_path):
+    status = _key_source(monkeypatch, tmp_path, "", "sk-ant-example-file-key")
+    assert status["source"] == "file" and status["has_key"] is True
+
+
+def test_no_key_anywhere_is_source_none(monkeypatch, tmp_path):
+    status = _key_source(monkeypatch, tmp_path, None, None)
+    assert status["source"] == "none" and status["has_key"] is False
+
+
+def test_cached_clear_makes_the_next_call_read_again():
+    reads = []
+    cached = main.cached(lambda: reads.append(1) or ["v"], 100.0, lambda: 0.0)
+    cached()
+    cached()
+    assert len(reads) == 1
+    cached.clear()
+    cached()
+    assert len(reads) == 2
+
+
+def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
+    cleared = []
+    real = main.cached
+
+    def spy(fn, ttl, clock=None):
+        get = real(fn, ttl) if clock is None else real(fn, ttl, clock)
+        original = get.clear
+        get.clear = lambda: (cleared.append(1), original())[1]
+        return get
+
+    monkeypatch.setattr(main, "cached", spy)
+
+    async def check(key):
+        return "ok"
+
+    monkeypatch.setattr(main, "anthropic_check", check)
+
+    class Stop(Exception):
+        pass
+
+    async def stop(host, port, bodies, session_id, session):
+        await session.call_home("set_api_key", {"key": "sk-ant-example-new-key"})
+        raise Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(main, "start_server", stop)
+    try:
+        with pytest.raises(Stop):
+            asyncio.run(_run())
+    finally:
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+    assert cleared == [1]

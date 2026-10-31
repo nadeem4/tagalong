@@ -38,7 +38,7 @@ variable still works and is the developer path.
 | `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more) |
 | `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                             |
 | `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)        |
-| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real environment variable wins over `.env`         |
+| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset         |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -379,7 +379,7 @@ The first-run setup adds four more Home tools (never offered to Scout):
 | Tool              | Input             | Result text (JSON)                                                                                                                             |
 | ----------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                           |
-| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else                                                                                 |
+| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment                                                                                 |
 | `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                  |
 | `expert_status`   | `{}`              | `{"found": bool, "command": str}`: whether the first word of `TAGALONG_EXPERT_CMD` is on `PATH`; it does not start the expert or see the login |
 
