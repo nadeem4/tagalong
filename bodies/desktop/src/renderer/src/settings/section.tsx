@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 
 /** The sections in the order the page shows them; the standalone window's nav links to each. */
 const SECTIONS = [
+  { id: 'key', title: 'Anthropic key' },
   { id: 'privacy', title: 'Privacy' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },

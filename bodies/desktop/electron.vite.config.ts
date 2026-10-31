@@ -82,6 +82,7 @@ export default defineConfig({
           avatar: 'src/renderer/avatar.html',
           panel: 'src/renderer/panel.html',
           home: 'src/renderer/home.html',
+          walkthrough: 'src/renderer/walkthrough.html',
         },
       },
     },

@@ -18,6 +18,19 @@ afterEach(() => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
+describe('SettingsStore walkthrough', () => {
+  it('a corrupt file falls back to not done', () => {
+    writeFileSync(file, '{ not json', 'utf8');
+    expect(new SettingsStore(dataDir).get().walkthrough).toEqual({ done: false });
+  });
+
+  it('keeps done across a save', () => {
+    const store = new SettingsStore(dataDir);
+    store.set({ walkthrough: { done: true } });
+    expect(new SettingsStore(dataDir).get().walkthrough.done).toBe(true);
+  });
+});
+
 describe('SettingsStore.get', () => {
   it('yields every default when the file is missing', () => {
     const store = new SettingsStore(dataDir);

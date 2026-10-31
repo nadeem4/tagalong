@@ -5,6 +5,7 @@ import { healthHeadline, healthRows } from './health';
 import type { HealthFacts, HealthRow } from './health';
 
 const ALL_GOOD: HealthFacts = {
+  key: { hasKey: true },
   connections: [{ name: 'GitHub', status: 'connected' }],
   voice: {
     enabled: true,
@@ -23,11 +24,12 @@ const row = (rows: HealthRow[], id: HealthRow['id']): HealthRow => {
 describe('healthRows', () => {
   it('gives one row per check, in order, all ok, and says everything works', () => {
     const rows = healthRows(ALL_GOOD);
-    expect(rows.map((each) => each.id)).toEqual(['connections', 'voice', 'microphone']);
+    expect(rows.map((each) => each.id)).toEqual(['key', 'connections', 'voice', 'microphone']);
     expect(rows.every((each) => each.state === 'ok')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
     expect(healthHeadline(rows)).toBe('Everything’s working.');
     expect(rows.map((each) => each.line)).toEqual([
+      'Anthropic key is set.',
       'All apps connected.',
       'Ready.',
       'A microphone is ready.',
@@ -93,6 +95,26 @@ describe('healthRows', () => {
     ).toMatchObject({ state: 'broken', line: 'The one you picked is unplugged.', fix: 'voice' });
   });
 
+  it('no key is a broken row with a fix target that opens step 9', () => {
+    const rows = healthRows({ ...ALL_GOOD, key: { hasKey: false } });
+    expect(row(rows, 'key')).toMatchObject({
+      state: 'broken',
+      line: 'Add your Anthropic key to start.',
+      fix: 'key',
+    });
+    expect(healthHeadline(rows)).toBe('One thing needs you.');
+  });
+
+  it('has key is ok', () => {
+    expect(row(healthRows(ALL_GOOD), 'key')).toMatchObject({ state: 'ok' });
+  });
+
+  it('unknown key is not counted', () => {
+    const rows = healthRows({ ...ALL_GOOD, key: 'unknown' });
+    expect(row(rows, 'key')).toMatchObject({ state: 'unknown', line: 'Not checked.' });
+    expect(healthHeadline(rows)).toBe('Everything’s working.');
+  });
+
   it('has_no_browser_extension_row', () => {
     const ids: string[] = healthRows(ALL_GOOD).map((each) => each.id);
     expect(ids).not.toContain('extension');
@@ -100,6 +122,7 @@ describe('healthRows', () => {
 
   it('turns a fact it could not read into an unknown row, not a problem', () => {
     const rows = healthRows({
+      key: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',

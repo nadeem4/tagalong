@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { BrowserWindow } from 'electron';
 
 /** One HTML entry per window, all built by the renderer half of electron-vite. */
-type RendererPage = 'avatar' | 'panel' | 'home';
+type RendererPage = 'avatar' | 'panel' | 'home' | 'walkthrough';
 
 /**
  * The compiled preload. It is a .cjs because a sandboxed preload can only be CommonJS,
@@ -16,11 +16,18 @@ type RendererPage = 'avatar' | 'panel' | 'home';
 export const PRELOAD_PATH = fileURLToPath(new URL('./preload/index.cjs', import.meta.url));
 
 /** Dev serves the pages from vite; a packaged app loads them off disk. */
-export function loadPage(window: BrowserWindow, page: RendererPage): void {
+export function loadPage(
+  window: BrowserWindow,
+  page: RendererPage,
+  query: Record<string, string> = {},
+): void {
   const devServer = process.env['ELECTRON_RENDERER_URL'];
   if (devServer !== undefined && devServer !== '') {
-    void window.loadURL(`${devServer}/${page}.html`);
+    const search = new URLSearchParams(query).toString();
+    void window.loadURL(`${devServer}/${page}.html${search === '' ? '' : `?${search}`}`);
     return;
   }
-  void window.loadFile(fileURLToPath(new URL(`./renderer/${page}.html`, import.meta.url)));
+  void window.loadFile(fileURLToPath(new URL(`./renderer/${page}.html`, import.meta.url)), {
+    query,
+  });
 }

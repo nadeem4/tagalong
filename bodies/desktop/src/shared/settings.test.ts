@@ -17,6 +17,7 @@ describe('Settings', () => {
       'hotkeys',
       'listening',
       'voice',
+      'walkthrough',
     ]);
   });
 
@@ -73,6 +74,27 @@ describe('Settings.captureExclusions', () => {
       Settings.safeParse({ captureExclusions: { processNames: [], titlePatterns: ['  '] } })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('Settings.walkthrough', () => {
+  it('walkthrough defaults to not done', () => {
+    expect(Settings.parse({}).walkthrough).toEqual({ done: false });
+    expect(SETTINGS_DEFAULTS.walkthrough).toEqual({ done: false });
+  });
+
+  it('a settings file without walkthrough loads as not done', () => {
+    expect(Settings.parse({ listening: { always: true } }).walkthrough.done).toBe(false);
+  });
+
+  it('patch can set done true and false', () => {
+    expect(SettingsPatch.parse({ walkthrough: { done: true } })).toEqual({
+      walkthrough: { done: true },
+    });
+    expect(SettingsPatch.parse({ walkthrough: { done: false } })).toEqual({
+      walkthrough: { done: false },
+    });
+    expect(SettingsPatch.safeParse({ walkthrough: { done: 'yes' } }).success).toBe(false);
   });
 });
 

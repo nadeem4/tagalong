@@ -159,3 +159,12 @@ describe('openLogsFolder', () => {
     expect(open).toHaveBeenCalledWith(logs);
   });
 });
+
+describe('key:set arguments', () => {
+  it('redacts key:set arguments in console and file output', () => {
+    const key = 'sk-ant-example-not-a-real-key';
+    // An error that quoted the key, and a call logged with the key as an argument.
+    expect(logLine('error', [`key:set failed for ${key}`], NOW)).not.toContain(key);
+    expect(logLine('error', ['key:set', key, { key }], NOW)).not.toContain(key);
+  });
+});

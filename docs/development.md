@@ -278,7 +278,7 @@ you normally never call it yourself.
 
 ### Choosing Scout's brain
 
-The Python brain picks Scout's model and holds its keys, in the brain's `.env` (see [brain.md](brain.md)). The desktop has no provider or model picker, no API key rows and no sign-in check.
+The Python brain picks Scout's model and holds its keys (see [brain.md](brain.md)). You enter your Anthropic key in the app: the first-run walkthrough asks for it, and **Settings → Anthropic key** changes it and the daily limit. A real `ANTHROPIC_API_KEY` in the environment still works and wins (the developer path). The desktop has no provider or model picker and no sign-in check.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the

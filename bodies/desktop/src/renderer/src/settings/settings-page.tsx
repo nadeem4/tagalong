@@ -7,6 +7,7 @@ import type { FormEvent } from 'react';
 import { SETTINGS_CSS } from '@tagalong/ui';
 import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
+import { KeySection } from './key-section';
 import { PrivacySection } from './privacy-section';
 import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
@@ -15,7 +16,7 @@ import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on
+ * Sections in page order: the Anthropic key, Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on
  * save.
  */
 export function SettingsPage() {
@@ -144,6 +145,7 @@ export function SettingsPage() {
               Save
             </button>
           </div>
+          <KeySection />
           <PrivacySection settings={settings} platform={view.platform} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />

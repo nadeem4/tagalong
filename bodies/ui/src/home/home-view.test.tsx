@@ -49,6 +49,13 @@ describe('HomeView', () => {
     ).toEqual(['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers', 'Settings']);
   });
 
+  it('Show the tour again opens the walkthrough at step 1', async () => {
+    const bridge = createFakeHostBridge({ pets: [SCOUT] });
+    renderHome(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show the tour again' }));
+    expect(bridge.walkthroughOpens).toEqual([1]);
+  });
+
   it('home nav has an Approvals item that opens the page', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));

@@ -13,6 +13,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
 import { stripLoaded } from './bean-strip';
 import { closeApp } from './fixtures/close-app';
+import { seedSettings } from './fixtures/seed-settings';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,7 +36,7 @@ test.beforeAll(async () => {
   app = await electron.launch({
     // A fresh profile every run, so a developer's own pets and settings never change what this
     // suite sees.
-    args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-smoke-'))}`],
+    args: ['.', `--user-data-dir=${seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-smoke-')))}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.

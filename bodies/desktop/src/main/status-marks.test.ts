@@ -8,6 +8,7 @@ import {
   SAY_NAME_MARK_MS,
   StatusMarks,
   markBrainLink,
+  markKey,
   markListening,
   setPanelMark,
 } from './status-marks';
@@ -135,6 +136,23 @@ describe('setPanelMark', () => {
     expect(() => setPanelMark(marks, 'brain-offline', false)).toThrow();
     expect(() => setPanelMark(marks, 'nope', true)).toThrow();
     expect(() => setPanelMark(marks, 'mic-busy', 'yes')).toThrow();
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
+  });
+});
+
+describe('markKey', () => {
+  it('shows Add key while the brain has no key, and clears it once there is one', () => {
+    const marks = new StatusMarks();
+    markKey(marks, false);
+    expect(marks.top()).toEqual({ id: 'no-key' });
+    markKey(marks, true);
+    expect(marks.top()).toBeNull();
+  });
+
+  it('lets Offline outrank Add key', () => {
+    const marks = new StatusMarks();
+    markKey(marks, false);
+    markBrainLink(marks, 'offline');
     expect(marks.top()).toEqual({ id: 'brain-offline' });
   });
 });

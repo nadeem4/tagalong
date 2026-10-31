@@ -9,6 +9,7 @@ import type { HostBridge } from './host-bridge';
 import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 const FACTS: HealthFacts = {
+  key: { hasKey: true },
   connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
   voice: {
     enabled: true,

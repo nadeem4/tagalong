@@ -1,5 +1,5 @@
 /**
- * "Scout, what's wrong?": gatherHealth reads the health card's rows (connections, voice,
+ * "Scout, what's wrong?": gatherHealth reads the health card's rows (key, connections, voice,
  * microphone) from host calls that already exist, each within a time budget, with no model
  * call. Used by the bubble (panel.tsx).
  */
@@ -13,6 +13,8 @@ export interface HealthDeps {
   listConnections(): Promise<AppsList>;
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
+  /** Only whether a key is set: never the key. */
+  keyStatus(): Promise<{ hasKey: boolean }>;
   /** How long each read may take before it fails. */
   testBudgetMs: number;
 }
@@ -43,15 +45,17 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
   const attempt = <T>(work: () => Promise<T>) =>
     within(work, deps.testBudgetMs, 'unknown' as const);
-  const [view, connections, microphones, models] = await Promise.all([
+  const [view, connections, microphones, models, key] = await Promise.all([
     attempt(() => deps.getHostView()),
     attempt(() => deps.listConnections()),
     attempt(() => deps.listMicrophones()),
     attempt(() => deps.voiceModels()),
+    attempt(() => deps.keyStatus()),
   ]);
   const settings = view === 'unknown' ? null : view.settings;
   const picked = settings?.voice.microphoneId;
   return {
+    key: key === 'unknown' ? 'unknown' : { hasKey: key.hasKey },
     connections:
       connections === 'unknown'
         ? 'unknown'

@@ -1,7 +1,7 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening, setPanelMark and markBrainLink.
+ * StatusMarks, markListening, setPanelMark, markBrainLink and markKey.
  */
 
 import { topStatus } from '@tagalong/ui/shapes';
@@ -96,6 +96,12 @@ export function setPanelMark(marks: StatusMarks, id: unknown, on: unknown): void
   const mark = id as 'mic-busy' | 'mic-failed' | 'say-name';
   if (!on) marks.clear(mark);
   else marks.set({ id: mark }, mark === 'say-name' ? SAY_NAME_MARK_MS : undefined);
+}
+
+/** Add key while the brain has no key; the brain's own `key_status` is the only source. */
+export function markKey(marks: StatusMarks, hasKey: boolean): void {
+  if (hasKey) marks.clear('no-key');
+  else marks.set({ id: 'no-key' });
 }
 
 /** Whether the brain can be reached: Offline while it is down, Update when it is too new. */

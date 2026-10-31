@@ -35,6 +35,7 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
       }),
     listMicrophones: () => Promise.resolve([{ id: 'mic-1', label: 'Desk mic' }]),
     voiceModels: () => Promise.resolve({ ears: false }),
+    keyStatus: () => Promise.resolve({ hasKey: false }),
     testBudgetMs: 5_000,
     ...patch,
   };
@@ -44,6 +45,7 @@ describe('gatherHealth', () => {
   it('reads every check from the host’s own calls', async () => {
     const facts = await gatherHealth(deps());
     expect(facts).toEqual({
+      key: { hasKey: false },
       connections: [{ name: 'GitHub', status: 'needs-sign-in' }],
       voice: {
         enabled: true,
@@ -80,9 +82,11 @@ describe('gatherHealth', () => {
       listConnections: fail,
       listMicrophones: fail,
       voiceModels: fail,
+      keyStatus: fail,
       testBudgetMs: 5_000,
     });
     expect(facts).toEqual({
+      key: 'unknown',
       connections: 'unknown',
       voice: 'unknown',
       microphone: 'unknown',
@@ -98,11 +102,13 @@ describe('gatherHealth', () => {
           listConnections: hang,
           listMicrophones: hang,
           voiceModels: hang,
+          keyStatus: hang,
           testBudgetMs: 5_000,
         }),
       );
       await vi.advanceTimersByTimeAsync(5_000);
       expect(await pending).toEqual({
+        key: 'unknown',
         connections: 'unknown',
         voice: 'unknown',
         microphone: 'unknown',

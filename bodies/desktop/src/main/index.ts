@@ -21,7 +21,7 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import { StatusMarks, markBrainLink, markListening, setPanelMark } from './status-marks';
+import { StatusMarks, markBrainLink, markKey, markListening, setPanelMark } from './status-marks';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
@@ -63,6 +63,7 @@ import {
 } from './windows/panel';
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
+import { createWalkthroughWindow } from './windows/walkthrough';
 import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connections';
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
@@ -73,6 +74,8 @@ import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSpendIpc } from './ipc/spend';
+import { readKeyStatus, registerKeyIpc } from './ipc/key';
+import { registerWalkthroughIpc } from './ipc/walkthrough';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
@@ -96,6 +99,8 @@ interface Desktop {
   tray: Tray;
   /** Home, while it is open. */
   homeWindow: BrowserWindow | null;
+  /** The first-run walkthrough, while it is open. */
+  walkthroughWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
   pendingSnapshot: ContextSnapshot | null;
   /** Turn ids in flight: the panel must not vanish on focus loss mid-answer. */
@@ -224,6 +229,15 @@ async function start(): Promise<void> {
   claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
+  // The Add key mark follows the brain's own answer; an unreadable answer leaves it as it is.
+  const refreshKeyMark = async (): Promise<void> => {
+    if (desktop === null) return;
+    try {
+      markKey(statusMarks, (await readKeyStatus(desktop.brain)).hasKey);
+    } catch {
+      // Offline or odd: the brain-offline mark already says so.
+    }
+  };
   const brain = startBrain({
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
@@ -234,6 +248,7 @@ async function start(): Promise<void> {
       if (method === 'changed') {
         const { what } = params as { what: string };
         forwardConnectionsChanged(what, forwardToRenderers);
+        if (what === 'key') void refreshKeyMark();
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }
@@ -260,6 +275,7 @@ async function start(): Promise<void> {
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
         desktop?.voiceBridge.onOnline();
+        void refreshKeyMark();
         // The brain forgets nothing across a reconnect, but a restarted brain knows no setting.
         if (desktop !== null) sendReadAloud(desktop.settings);
       }
@@ -280,6 +296,7 @@ async function start(): Promise<void> {
     panel: null,
     tray: createTray(),
     homeWindow: null,
+    walkthroughWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
     hotkeys: new HotkeyManager({
@@ -653,6 +670,27 @@ function openHome(page?: string): void {
 }
 
 /**
+ * Opens the walkthrough, or brings the open one forward. A step named for an open window
+ * reloads it there. Closing it does not mark it seen (only Finish and Skip do).
+ */
+function openWalkthrough(step?: number): void {
+  if (desktop === null) return;
+  const open = desktop.walkthroughWindow;
+  if (open !== null && !open.isDestroyed()) {
+    if (step !== undefined) {
+      void open.loadURL(open.webContents.getURL().split('?')[0] + `?step=${String(step)}`);
+    }
+    open.focus();
+    return;
+  }
+  const window = createWalkthroughWindow(step);
+  window.on('closed', () => {
+    if (desktop !== null) desktop.walkthroughWindow = null;
+  });
+  desktop.walkthroughWindow = window;
+}
+
+/**
  * Settings is a page of Home.
  */
 function openSettingsPage(target?: unknown): void {
@@ -754,6 +792,21 @@ function registerIpc(): void {
   });
   registerScoutIpc(handle);
   registerSpendIpc(handle, { brain: required().brain });
+  registerKeyIpc(handle, { brain: required().brain });
+  registerWalkthroughIpc(handle, {
+    save: (patch) => {
+      const saved = required().settingsStore.set(patch);
+      required().settings = saved;
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
+      }
+    },
+    open: (step) => openWalkthrough(step),
+    close: () => {
+      const open = required().walkthroughWindow;
+      if (open !== null && !open.isDestroyed()) open.close();
+    },
+  });
   registerConnectionIpc(handle, {
     brain: required().brain,
     answer: (ask, decision) => required().brain.answer(ask, decision),

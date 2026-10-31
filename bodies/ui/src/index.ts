@@ -4,7 +4,7 @@
  * the Settings styles, Scout's voice helpers and the fake bridge for host tests. Never imports electron or opens a socket: hosts hand it a
  * HostBridge.
  */
-export { HostBridgeProvider } from './host-bridge';
+export { HostBridgeProvider, useHostBridge } from './host-bridge';
 export type {
   AskInput,
   BrainLink,
@@ -15,6 +15,9 @@ export type {
   PreferenceRow,
   PermissionRow,
   SpendToday,
+  KeyStatus,
+  KeyResult,
+  ExpertStatus,
 } from './host-bridge';
 
 export { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -34,6 +37,11 @@ export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
+
+/** The Anthropic key field and the daily-limit field, shared by Settings and the walkthrough. */
+export { KeyField, LimitField } from './key/key-field';
+export { useKeyStatus } from './key/use-key-status';
+export type { KeyHost } from './key/use-key-status';
 
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';

@@ -11,6 +11,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it types `window.tagalongHost` below.
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
+import { seedSettings } from './fixtures/seed-settings';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,7 +22,10 @@ test.beforeAll(async () => {
   brain = await startFakeBrain();
   app = await electron.launch({
     // A fresh profile: Always listening is off at launch, as on a new install.
-    args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-listening-'))}`],
+    args: [
+      '.',
+      `--user-data-dir=${seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-listening-')))}`,
+    ],
     cwd: appDir,
     env: {
       ...process.env,

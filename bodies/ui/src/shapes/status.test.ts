@@ -19,8 +19,13 @@ describe('STATUS_WORDS', () => {
     }
   });
 
-  it('has no sign-in or key marks: the brain owns its own login', () => {
-    expect(StatusId.options.filter((id) => /sign|key/.test(id))).toEqual([]);
+  it('has no sign-in marks: the brain owns its own login; the only key mark is no-key', () => {
+    expect(StatusId.options.filter((id) => /sign|key/.test(id))).toEqual(['no-key']);
+    expect(STATUS_WORDS['no-key']).toEqual({
+      tag: 'Add key',
+      detail: 'Add your Anthropic key to start.',
+      fix: 'key',
+    });
     expect(STATUS_WORDS['listening-on'].fix).toBeUndefined();
   });
 
@@ -65,6 +70,7 @@ describe('topStatus', () => {
     expect(StatusId.options).toEqual([
       'brain-offline',
       'brain-outdated',
+      'no-key',
       'ears-failed',
       'mic-busy',
       'mic-failed',

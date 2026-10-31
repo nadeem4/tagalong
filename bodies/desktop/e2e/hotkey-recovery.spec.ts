@@ -4,7 +4,7 @@
  * hotkeys still work. No unit test can see this: every hotkey test injects a fake
  * registrar.
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
 import { freePort } from './fixtures/free-port';
+import { seedSettings } from './fixtures/seed-settings';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -29,13 +30,7 @@ test.beforeAll(async () => {
   // it, so this app can run without fighting the smoke suite, and a deliberately broken
   // setting must never touch the directory a developer actually uses.
   dataDir = mkdtempSync(join(tmpdir(), 'tagalong-hotkey-'));
-  writeFileSync(
-    join(dataDir, 'settings.json'),
-    JSON.stringify({
-      hotkeys: { ask: BAD, pauseSight: GOOD_PAUSE },
-    }),
-    'utf8',
-  );
+  seedSettings(dataDir, { hotkeys: { ask: BAD, pauseSight: GOOD_PAUSE } });
 
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],

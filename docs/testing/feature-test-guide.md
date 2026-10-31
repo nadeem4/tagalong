@@ -34,6 +34,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [What Scout remembers _(real brain)_](#what-scout-remembers-_real-brain_)
 - [Permissions _(real brain)_](#permissions-_real-brain_)
 - [Log file](#log-file)
+- [Anthropic key in the app](#anthropic-key-in-the-app)
 - [Not supported](#not-supported)
 
 ## Configuration
@@ -170,7 +171,8 @@ desktop app. You need `uv` and an Anthropic key.
 
 ## The desktop on the Python brain
 
-The desktop talks to the Python brain. Needs `uv` and an Anthropic key in `~/.tagalong/.env`.
+The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered in the app; see
+[Anthropic key in the app](#anthropic-key-in-the-app)).
 
 1. **Setup:** in one terminal run `cd brain && uv run brain`. In another run `pnpm dev:desktop`.
    **Expected:** Scout appears. No "Scout's brain is not running." mark.
@@ -1538,6 +1540,41 @@ from a terminal.
 2. **Expected:** it prints the load time, then for each of two sentences the time it took, the
    seconds of audio and the real-time factor; it writes `voice_smoke.wav`, which plays as the same
    British voice (`bm_george`) saying both sentences, clearly, with no clipping.
+
+## Anthropic key in the app
+
+Run on the desktop with a brain that has no key (a fresh data folder, no `ANTHROPIC_API_KEY` in
+the environment). The e2e suite `key-settings.spec.ts` covers the same states on the fake brain
+with a fake key; the real check against Anthropic is done by hand here.
+
+### K.1. No key: Scout says nothing, the app says what to do
+
+1. **Action:** start Tagalong with no key set. **Expected:** the dock tag reads **Add key**; open
+   the bubble: its status row says "Add your Anthropic key to start." with an **Add key** button.
+   Ask a question: Scout gives no answer line, only the app's own words.
+2. **Action:** press **Add key**. **Expected:** the walkthrough window opens (for now a plain page
+   naming step 9).
+3. **Action:** open **Home → Settings** and find the **Anthropic key** section. **Expected:** the
+   field is masked; **Show** reveals it; **Check key** stays off while the field is empty.
+
+### K.2. Change key
+
+1. **Action:** paste a wrong key and press **Check key** (or Enter). **Expected:** "That key was
+   not accepted." and the field keeps what you typed.
+2. **Action:** paste a real key and press **Check key**. **Expected:** the field empties, the
+   section reads "A key is already set.", the **Add key** tag leaves the dock, and Scout answers
+   again. The key text appears nowhere on screen or in the log file.
+3. **Action:** with the network off, check a key. **Expected:** "Scout could not reach Anthropic.
+   Try again." and the button reads **Try again**. Stop the brain: "Scout's brain is not running."
+4. **Action:** set the **Daily limit (USD)** to 0, then to 8. **Expected:** 0 is refused ("Enter an
+   amount above $0."); 8 reads "Daily limit saved." and Home's Spend card shows the new limit.
+5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
+   **Expected:** the section reads "Set by your environment" and the field is disabled.
+
+### K.3. Show the tour again
+
+1. **Action:** **Home → Overview → Show the tour again**. **Expected:** the walkthrough window
+   opens at step 1 (a placeholder for now). Closing it with the X does not mark the tour seen.
 
 ## Not supported
 
