@@ -8,7 +8,9 @@
  * the error text if the tool failed (how a paused sight shows up).
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
- * recorded for the test, free text included.
+ * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`,
+ * `set_daily_limit`, `expert_status`) follow `FakeBrainOptions`; the brain counts key attempts
+ * and keeps no key.
  *
  * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
  * live words, then the question once `unlisten` arrives; always: the whole question). A say
@@ -20,6 +22,14 @@
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 
+/** How the fake brain behaves about the Anthropic key. */
+export interface FakeBrainOptions {
+  /** Whether the brain starts with a key (default true, so other suites see no key state). */
+  hasKey?: boolean;
+  /** What each `set_api_key` answers, in order; the last one repeats. Default: ok. */
+  keyResults?: ('ok' | 'invalid' | 'unreachable')[];
+}
+
 export interface FakeBrain {
   /** "127.0.0.1:port", what TAGALONG_BRAIN_ADDR wants. */
   addr: string;
@@ -27,6 +37,10 @@ export interface FakeBrain {
   answers: { ask: string; option: string; text?: string }[];
   /** Every `set_permission` call Home made, in order. */
   permissionSets: { tool: string; mode: string }[];
+  /** How many times `set_api_key` was called (the key itself is never recorded). */
+  keyAttempts: number;
+  /** Every amount Settings sent to `set_daily_limit`, in order. */
+  limits: number[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every preference id Home sent to `remove_preference`, in order. */
@@ -140,7 +154,7 @@ const APPROVALS = [
   },
 ];
 
-export async function startFakeBrain(): Promise<FakeBrain> {
+export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -150,6 +164,11 @@ export async function startFakeBrain(): Promise<FakeBrain> {
   const answers: FakeBrain['answers'] = [];
   const permissionSets: { tool: string; mode: string }[] = [];
   const stops: string[] = [];
+  const limits: number[] = [];
+  let hasKey = options.hasKey ?? true;
+  let dailyLimitUsd = 5;
+  const keyResults = [...(options.keyResults ?? ['ok'])];
+  const keyCalls = { attempts: 0 };
   const removedPreferences: number[] = [];
   const preferences: Record<string, unknown>[] = [
     { ...DEFAULT_PREFERENCE },
@@ -355,7 +374,14 @@ export async function startFakeBrain(): Promise<FakeBrain> {
         // Home's tools: the permission pair and the jobs pair, kept in memory like the real brain.
         const params = msg.params as {
           tool?: string;
-          input?: { tool?: string; mode?: string; job?: string; id?: number; filter?: string };
+          input?: {
+            tool?: string;
+            mode?: string;
+            job?: string;
+            id?: number;
+            filter?: string;
+            usd?: number;
+          };
         };
         let value: unknown = {};
         if (params.tool === 'list_jobs') value = { jobs };
@@ -367,6 +393,27 @@ export async function startFakeBrain(): Promise<FakeBrain> {
             row.ended_at = '2026-10-27T10:00:30Z';
           }
           notify('changed', { what: 'jobs' });
+        } else if (params.tool === 'key_status') {
+          value = {
+            has_key: hasKey,
+            source: hasKey ? 'file' : 'none',
+            env_path: 'C:/Users/test/Tagalong/.env',
+            daily_limit_usd: dailyLimitUsd,
+          };
+        } else if (params.tool === 'set_api_key') {
+          keyCalls.attempts += 1;
+          const status = keyResults.length > 1 ? keyResults.shift() : keyResults[0];
+          value = { status };
+          if (status === 'ok') {
+            hasKey = true;
+            notify('changed', { what: 'key' });
+          }
+        } else if (params.tool === 'set_daily_limit') {
+          dailyLimitUsd = Number(params.input?.usd);
+          limits.push(dailyLimitUsd);
+          notify('changed', { what: 'settings' });
+        } else if (params.tool === 'expert_status') {
+          value = { found: true, command: 'claude-agent-acp' };
         } else if (params.tool === 'list_apps') value = { apps: APPS };
         else if (params.tool === 'list_approvals') {
           const filter = params.input?.filter;
@@ -422,6 +469,10 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     addr: `127.0.0.1:${(server.address() as AddressInfo).port}`,
     answers,
     permissionSets,
+    get keyAttempts() {
+      return keyCalls.attempts;
+    },
+    limits,
     stops,
     removedPreferences,
     voice,

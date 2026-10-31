@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { seedSettings } from './fixtures/seed-settings';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
 import { closeApp } from './fixtures/close-app';
@@ -26,7 +27,7 @@ test.afterAll(async () => {
 });
 
 test('brain offline: app opens and shows the offline mark', async () => {
-  dataDir = mkdtempSync(join(tmpdir(), 'tagalong-offline-'));
+  dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-offline-')));
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,

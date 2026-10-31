@@ -12,6 +12,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` that types `window.tagalongHost`.
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
+import { seedSettings } from './fixtures/seed-settings';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,7 +23,7 @@ let dataDir: string;
 
 test.beforeAll(async () => {
   brain = await startFakeBrain();
-  dataDir = mkdtempSync(join(tmpdir(), 'tagalong-approvals-'));
+  dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-approvals-')));
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
