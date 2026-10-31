@@ -219,9 +219,10 @@ class Session:
         a body that did not display the turn."""
         if not params.spoken or self.voice is None or shown_on is None or turn is None:
             return
-        if turn not in self._spoken:
-            self._spoken.add(turn)
-            self.voice.spoken(turn, shown_on, params.voice, params.speed)
+        self._spoken.add(turn)
+        # Every time: the voice drops a hushed turn, and a later spoken say must re-arm it. It
+        # ignores a say for a turn it is already speaking.
+        self.voice.spoken(turn, shown_on, params.voice, params.speed)
 
     def _display_target(self) -> str | None:
         shown = self._bodies.display_ids()

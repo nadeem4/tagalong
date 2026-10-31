@@ -30,6 +30,7 @@ log = logging.getLogger("brain")
 Notify = Callable[[str, dict], None]
 LIST_MEMORIES_MAX = 200
 TIMER_NOTE_MAX = 500
+SAMPLE_MAX_CHARS = 500  # a Preview line, not a reading
 # One year; keeps now + timedelta far from datetime overflow.
 TIMER_MAX_MINUTES = 525600
 
@@ -578,13 +579,18 @@ def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, 
     async def speak_sample(args: dict) -> str:
         hooks = voice()
         if hooks is None:
-            return "Voice is not running on this brain."
+            raise RpcError(ErrorCode.tool_failed, "Voice is not running on this brain.")
         _need_text("speak_sample", args, "text")
+        if len(args["text"]) > SAMPLE_MAX_CHARS:
+            raise RpcError(
+                ErrorCode.invalid_params,
+                f"speak_sample text is at most {SAMPLE_MAX_CHARS} characters.",
+            )
         try:
             wav = await hooks.sample(args["text"], args.get("voice"), args.get("speed"))
-        except Exception:
+        except Exception as err:
             log.warning("speak_sample failed", exc_info=True)
-            return "The speaking voice could not start."
+            raise RpcError(ErrorCode.tool_failed, "The speaking voice could not start.") from err
         # Home calls answer in text, so the WAV travels as base64 inside it.
         return json.dumps({"mime": "audio/wav", "data": base64.b64encode(wav).decode("ascii")})
 

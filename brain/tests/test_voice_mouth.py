@@ -119,17 +119,16 @@ async def test_text_only_while_the_voice_loads_then_audio_once_ready():
     m.reply("t", {"delta": f"{ONE} "})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False]
-    assert sent.voice() == [{"status": "loading"}]
     gate.set()
     await settle()
     m.reply("t", {"delta": f"{TWO} "})
     m.reply("t", {"done": True})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False, True, False]
-    assert sent.voice()[-1] == {"status": "ready"}
+    assert not [1 for _, method, _ in sent.frames if method == "voice"]  # that is the ears' channel
 
 
-async def test_a_failed_load_stays_text_only_and_is_told_once_then_retried_next_turn():
+async def test_a_failed_load_stays_text_only_and_is_retried_next_turn():
     sent = Sent()
     attempts = {"n": 0}
 
@@ -143,12 +142,58 @@ async def test_a_failed_load_stays_text_only_and_is_told_once_then_retried_next_
     m.reply("t", {"done": True})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False, False, False]
-    assert [v["status"] for v in sent.voice()] == ["loading", "failed"]
+    assert sent.voice() == []
     assert attempts["n"] == 1
     m.spoken("u", "d", None, None)
     m.reply("u", {"delta": f"{ONE} "})
     await settle()
     assert attempts["n"] == 2
+
+
+async def test_two_turns_never_synthesise_at_once():
+    sent = Sent()
+    m, tts = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    m.spoken("a", "d", None, None)
+    m.spoken("b", "e", None, None)
+    for turn in ("a", "b"):
+        m.reply(turn, {"delta": f"{ONE} {TWO} "})
+        m.reply(turn, {"done": True})
+    sample = asyncio.create_task(m.sample("Hello there", None, None))
+    await asyncio.sleep(0.5)
+    await sample
+    assert tts.max_active == 1
+
+
+async def test_a_turn_hushed_then_spoken_again_speaks_again():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} "})
+    await asyncio.sleep(0.01)
+    m.hush("d")
+    m.spoken("t", "d", None, None)  # a joined spoken say after the barge-in
+    m.reply("t", {"delta": "Back again with more words. "})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.3)
+    texts = [p.get("text") for p in sent.speech()]
+    assert "Back again with more words." in texts
+    assert sent.speech()[-1] == {"turn": "t", "done": True}
+
+
+async def test_spoken_twice_on_a_live_turn_is_one_turn():
+    sent = Sent()
+    m, tts = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"done": True})
+    await settle()
+    assert [p.get("done") for p in sent.speech() if "text" not in p].count(True) == 1
 
 
 async def test_hush_stops_that_bodys_speech_only():

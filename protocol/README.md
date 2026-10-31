@@ -113,8 +113,8 @@ The brain hears and speaks; a body only handles sound. Audio rides in the same J
 - **unlisten.** The mic closed. In `held` mode the brain finishes what it already has first. A disconnect counts as `unlisten`.
 - **hush.** The user cut Scout off: the brain stops speaking the current reply for this body. The text reply still shows.
 - **heard.** What the brain heard, sent to the listening body: `speech_start`, `partial` (running text), `final` (text of one stretch of speech), `turn_end` (the person finished). The body decides what to send as a spoken `say`.
-- **voice.** The state of the brain's voice models, sent to the listening body. `loading` may carry `progress` (0 to 1) while models download, `failed` carries a plain `message`. The body keeps working while it loads or after it fails; the next `listen` retries.
-- **speech.** Scout's reply read aloud, sentence by sentence, sent to the body that shows the turn (`turn.body`). `pcm` and `sample_rate` come together; a `speech` with `text` and no `pcm` means "say this with your own voice" (used while the brain's voice loads). `{ turn, done: true }` ends that turn's speech.
+- **voice.** The state of the brain's listening models (the ears only), sent to the listening body. `loading` may carry `progress` (0 to 1) while models download, `failed` carries a plain `message`. The body keeps working while it loads or after it fails; the next `listen` retries.
+- **speech.** Scout's reply read aloud, sentence by sentence, sent to the body that shows the turn (`turn.body`). `pcm` and `sample_rate` come together; a `speech` with `text` and no `pcm` means "say this with your own voice" (used while the brain's voice loads or after it fails; the brain sends no `voice` frame for the speaking voice). `{ turn, done: true }` ends that turn's speech.
 - **Privacy.** Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.
 
 ## Sessions and turns

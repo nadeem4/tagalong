@@ -53,15 +53,16 @@ class Mouth:
         self._tts: Tts | None = None
         self._loading: asyncio.Task | None = None
         self._failed = False  # until the next spoken turn, which tries again
-        self._told: set[str] = set()  # bodies sent `loading` for the load under way
+        self._synth = asyncio.Lock()  # the phonemizer is not thread-safe: one synth at a time
         self._turns: dict[str, _Turn] = {}
 
     def spoken(
         self, turn: str, body_id: str | None, voice: str | None, speed: float | None
     ) -> None:
         """The turn's reply will be read aloud on `body_id`, the body showing it."""
-        if body_id is None or turn in self._turns:
-            return
+        live = self._turns.get(turn)
+        if body_id is None or (live is not None and not live.hushed):
+            return  # already speaking this turn; a hushed one is replaced below
         self._failed = False
         st = _Turn(body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED)
         st.task = asyncio.get_running_loop().create_task(self._run(turn, st))
@@ -98,9 +99,10 @@ class Mouth:
         if self._tts is None:
             raise RuntimeError("the speaking voice is not available")
         tts = self._tts
-        samples, rate = await asyncio.to_thread(
-            tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
-        )
+        async with self._synth:
+            samples, rate = await asyncio.to_thread(
+                tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
+            )
         return _wav(samples, rate)
 
     def _finish(self, st: _Turn) -> None:
@@ -124,30 +126,29 @@ class Mouth:
                 await self._say(turn, st, line)
             self._send(st, {"turn": turn, "done": True})
         finally:
-            self._turns.pop(turn, None)
+            if self._turns.get(turn) is st:  # a re-armed turn of the same id is not ours
+                del self._turns[turn]
 
     async def _say(self, turn: str, st: _Turn, line: str) -> None:
         frame: dict = {"turn": turn, "text": line}
-        tts = self._tts_now(st.body_id)
+        tts = self._tts_now()
         if tts is not None:
             try:
-                samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
+                async with self._synth:
+                    samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
                 pcm = samples.astype("<i2").tobytes()
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:
                 log.warning("speech synthesis failed", exc_info=True)  # the body says it instead
         self._send(st, frame)
 
-    def _tts_now(self, body_id: str) -> Tts | None:
-        """The voice if it is ready. Otherwise start loading it (once) and say so to this body."""
+    def _tts_now(self) -> Tts | None:
+        """The voice if it is ready. Otherwise start loading it (once): the sentence goes out as
+        text only, which already tells the body to use its own voice."""
         if self._tts is not None:
             return self._tts
-        if self._failed:
-            return None
-        self._start_load()
-        if body_id not in self._told:
-            self._told.add(body_id)
-            self._bodies.send_live(body_id, "voice", {"status": "loading"})
+        if not self._failed:
+            self._start_load()
         return None
 
     def _start_load(self) -> asyncio.Task:
@@ -159,17 +160,9 @@ class Mouth:
     async def _load(self) -> None:
         try:
             self._tts = await self._load_tts()
-            outcome: dict = {"status": "ready"}
         except Exception:
             log.warning("the speaking voice failed to load", exc_info=True)
             self._failed = True
-            outcome = {
-                "status": "failed",
-                "message": "The speaking voice could not start; using the system voice.",
-            }
-        told, self._told = self._told, set()
-        for body_id in told:
-            self._bodies.send_live(body_id, "voice", outcome)
 
     def _send(self, st: _Turn, params: dict) -> None:
         if not st.hushed:

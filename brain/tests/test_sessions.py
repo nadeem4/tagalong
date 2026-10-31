@@ -1488,6 +1488,21 @@ async def test_a_spoken_say_joining_a_typed_turn_makes_it_spoken_from_then_on():
     assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
 
 
+async def test_every_spoken_say_on_a_running_turn_reaches_the_voice():
+    """After a hush the voice drops the turn; a later joined spoken say must re-arm it, so the
+    session may not remember the turn as already spoken."""
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    first = session.say("desktop", spoken_say("one"))
+    session.say("desktop", spoken_say("two"))  # joins; the voice was hushed in between
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
+    gate.set()
+    await finish_quietly(session)
+
+
 async def test_a_cancelled_spoken_turn_still_ends_in_the_voice():
     session, _ = make(Gate([asyncio.Event(), "never"]))
     session.voice = voice = RecordingVoice()

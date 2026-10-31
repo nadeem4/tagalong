@@ -86,6 +86,8 @@ class FakeTts:
         self.calls: list[tuple[str, str, float]] = []
         self.threads: list[int] = []
         self.sleep = sleep
+        self.active = 0
+        self.max_active = 0  # most synth calls ever running at once
 
     def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
         import threading
@@ -93,8 +95,13 @@ class FakeTts:
 
         self.threads.append(threading.get_ident())
         self.calls.append((text, voice, speed))
-        if self.sleep:
-            time.sleep(self.sleep)
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        try:
+            if self.sleep:
+                time.sleep(self.sleep)
+        finally:
+            self.active -= 1
         return np.full(100, 7, dtype=np.int16), 24_000
 
 

@@ -712,17 +712,26 @@ async def test_speak_sample_returns_a_wav_for_settings_preview():
     assert base64.b64decode(out["data"]) == b"RIFFHello|af_bella|1.1"
 
 
-async def test_speak_sample_without_voice_says_so():
-    out = await voice_handler(None)({"text": "Hello"})
-    assert out == "Voice is not running on this brain."
+async def test_speak_sample_without_voice_is_an_error():
+    with pytest.raises(RpcError, match="Voice is not running") as err:
+        await voice_handler(None)({"text": "Hello"})
+    assert err.value.code == ErrorCode.tool_failed
 
 
-async def test_speak_sample_reports_a_voice_that_cannot_start():
+async def test_speak_sample_reports_a_voice_that_cannot_start_as_an_error():
     class Broken:
         async def sample(self, text, voice, speed):
             raise RuntimeError("no model")
 
-    assert await voice_handler(Broken())({"text": "Hello"}) == "The speaking voice could not start."
+    with pytest.raises(RpcError, match="could not start") as err:
+        await voice_handler(Broken())({"text": "Hello"})
+    assert err.value.code == ErrorCode.tool_failed
+
+
+async def test_speak_sample_refuses_a_long_text():
+    with pytest.raises(RpcError, match="500") as err:
+        await voice_handler(SampleVoice())({"text": "x" * 501})
+    assert err.value.code == ErrorCode.invalid_params
 
 
 def test_speak_sample_is_a_home_only_tool():
