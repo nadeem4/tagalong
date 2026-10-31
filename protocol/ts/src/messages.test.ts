@@ -14,6 +14,7 @@ import {
   FocusEventData,
   HeardParams,
   ListenParams,
+  ReadAloudEventData,
   SayParams,
   SpeechParams,
   TabEventData,
@@ -119,6 +120,22 @@ describe('tab and download event data', () => {
   it('rejects a bad download state and a tab without a url', () => {
     expect(DownloadEventData.safeParse({ name: 'a', state: 'started' }).success).toBe(false);
     expect(TabEventData.safeParse({ title: 'x' }).success).toBe(false);
+  });
+});
+
+describe('read_aloud event data', () => {
+  it('parses the example and bounds speed', () => {
+    expect(ReadAloudEventData.parse(eventData('read_aloud'))).toEqual({
+      on: true,
+      voice: 'bm_george',
+      speed: 1.1,
+      system_voice: false,
+    });
+    expect(ReadAloudEventData.safeParse({ on: false }).success).toBe(true);
+    expect(ReadAloudEventData.safeParse({ on: true, system_voice: true }).success).toBe(true);
+    expect(ReadAloudEventData.safeParse({ on: true, system_voice: 1 }).success).toBe(false);
+    expect(ReadAloudEventData.safeParse({}).success).toBe(false);
+    expect(ReadAloudEventData.safeParse({ on: true, speed: 3 }).success).toBe(false);
   });
 });
 

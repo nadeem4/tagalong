@@ -16,7 +16,14 @@ class VoiceHooks(Protocol):
 
     def hush(self, body_id: str) -> None: ...
 
-    def spoken(self, turn: str, body_id: str, voice: str | None, speed: float | None) -> None: ...
+    def spoken(
+        self,
+        turn: str,
+        body_id: str,
+        voice: str | None,
+        speed: float | None,
+        system_voice: bool = False,
+    ) -> None: ...
 
     def reply(self, turn: str, body_id: str | None, params: dict) -> None: ...
 

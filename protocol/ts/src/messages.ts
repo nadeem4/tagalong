@@ -68,6 +68,15 @@ export type BackEventData = z.infer<typeof BackEventData>;
 export const FocusEventData = z.object({ app: z.string(), title: z.string() });
 export type FocusEventData = z.infer<typeof FocusEventData>;
 
+// Data of the `read_aloud` event: this body wants every turn it shows read aloud.
+export const ReadAloudEventData = z.object({
+  on: z.boolean(),
+  voice: z.string().optional(),
+  speed: z.number().min(0.5).max(2).optional(),
+  system_voice: z.boolean().optional(),
+});
+export type ReadAloudEventData = z.infer<typeof ReadAloudEventData>;
+
 // Data of the browser body's `tab` and `download` events.
 export const TabEventData = z.object({ title: z.string(), url: z.string() });
 export type TabEventData = z.infer<typeof TabEventData>;

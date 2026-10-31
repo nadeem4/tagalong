@@ -142,9 +142,10 @@ Claude Code asks for permission or has a question, Scout gets it first and answe
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
 moment") and it passes the note on.
 
-**Scout talks.** Scout reads its answers aloud, so you can look away. For now it speaks the
-answer to a question you asked out loud (typed questions and the lines it says on its own are
-shown, not spoken yet). Scout decides what to say: what it puts in a block (code, a long list)
+**Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
+on it speaks the answer to a question you asked out loud, the answer to a typed question, its
+hello and the lines it says on its own (wakes, remarks). Choosing the Windows voice in settings
+skips Kokoro and its model download. Scout decides what to say: what it puts in a block (code, a long list)
 is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about

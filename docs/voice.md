@@ -73,7 +73,7 @@ Contract v1 (see [protocol/README.md](../protocol/README.md)):
 | `mic { pcm }`                                | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                          |
 | `unlisten`                                   | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                              |
 | `hush`                                       | body to brain | Notification: stop speaking now.                                                                                                                       |
-| `say { ..., spoken: true, voice, speed }`    | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. A typed question is not spoken.                                           |
+| `say { ..., spoken: true, voice, speed }`    | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                  |
 | `heard { event, text? }`                     | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                        |
 | `voice { status, message?, progress? }`      | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                       |
 | `speech { turn, text?, pcm?, sample_rate? }` | brain to body | One sentence: `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                |
@@ -432,16 +432,25 @@ flowchart LR
   WAV (`playWav`). If the brain has no voice, is offline, or the mouth is "System voice", it
   falls back to the system voice.
 
-**Only a spoken question is spoken.** The brain speaks only the answer to a `say` with
-`spoken: true`. A typed question, the hello, a wake's remark and `pet.remark` lines are shown but
-not read aloud.
+**Read aloud.** With Scout talks on, the brain speaks every turn this desktop displays: a heard
+question, a typed one, the hello, a wake's remark and `pet.remark` lines. With Scout talks off the
+brain speaks nothing, not even a `say` with `spoken: true` (a browser voice question gets a
+text-only answer).
 
 ### How the brain learns a turn was spoken
 
-`CompanionBubble.submit(text, context, asSpoken = true)` asks with `spoken: true` for a heard
-question; `turns.ts` adds `voice` and `speed` from the saved settings to the `say`, and only when
-`voice.enabled`. A typed turn never carries `spoken`. When the turn completes, the bubble shows the
-"Hold <key> to reply" hint for a spoken question.
+Two ways. A heard question is a `say` with `spoken: true`: `CompanionBubble.submit(text, context,
+asSpoken = true)` asks it, and `turns.ts` adds `voice` and `speed` from the saved settings, only
+when `voice.enabled`. When the turn completes, the bubble shows the "Hold <key> to reply" hint for
+a spoken question.
+
+Everything else rides on the `read_aloud` body event, `{on, voice, speed, system_voice}` (see
+`readAloudEvent` in `body-events.ts`). `on` is Scout talks, `voice` and `speed` come from the saved
+settings, and `system_voice` is true when Settings picked "System voice". The desktop sends it each
+time the brain comes online and each time the voice setting is saved. The brain keeps the latest per
+body across reconnects (the desktop resends it on every connect) and speaks any turn that body displays while
+`on` is true. With `system_voice` the brain sends text-only `speech` frames and never loads or
+downloads Kokoro.
 
 ### The browser body
 
@@ -479,7 +488,7 @@ From `IPC` in `bodies/desktop/src/shared/ipc.ts`. Handlers are in `main/ipc/voic
 | `tagalong:voice:talk`                            | main → panel   | `at: number`                                             | The talk key confirmed.                                                                                                                                      |
 | `tagalong:voice:talk-release` / `talk-cancel`    | main → panel   | none                                                     |                                                                                                                                                              |
 | `tagalong:voice:stop`                            | main → windows | none                                                     | The stop key, or a cancelled turn.                                                                                                                           |
-| `tagalong:voice:models`                          | invoke         | → `VoiceModels { mouth, ears }`                          | The health check: whether the brain's ears have failed.                                                                                                      |
+| `tagalong:voice:models`                          | invoke         | → `VoiceModels { ears }`                                 | The health check: whether the brain's ears have failed.                                                                                                      |
 | `tagalong:status:set`                            | invoke         | `(id, on)`                                               | Handled by `setPanelMark`. The panel can set only `mic-busy`, `mic-failed` and `say-name`.                                                                   |
 
 `earsListen`, `micFrame` and `earsStop` run through one promise chain (`inOrder`). Frames and a
@@ -490,7 +499,7 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 - `Ears { listen(mic), stop(), on(event, handler) }` (`bodies/ui/src/shapes/voice.ts`).
 - `SpeechChunk`, `SpeakSample { mime, data }`, `EarsStatus { status, message?, progress? }`,
-  `ListeningState { on, paused, followUp }`, `VoiceModels { mouth, ears }` (`shared/ipc.ts`).
+  `ListeningState { on, paused, followUp }`, `VoiceModels { ears }` (`shared/ipc.ts`).
 - `TagalongVoice { ears, openMic }` (`voice-seam.ts`).
 
 ### Settings fields

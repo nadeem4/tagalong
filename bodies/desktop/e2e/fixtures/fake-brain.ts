@@ -13,7 +13,9 @@
  * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
  * live words, then the question once `unlisten` arrives; always: the whole question). A say
  * asked `spoken` is followed by `speech` frames, one sentence with a tiny silent clip, then
- * `speech {done}`. Listen, unlisten, hush and mic counts are recorded for the test.
+ * `speech {done}`; so is every say once the desktop sent `read_aloud {on: true}` (text only when
+ * it also said `system_voice`). Listen, unlisten, hush, mic counts and read_aloud events are
+ * recorded for the test.
  */
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
@@ -30,7 +32,16 @@ export interface FakeBrain {
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
   /** What the desktop asked of the brain's ears and mouth, in order. */
-  voice: { listens: string[]; unlistens: number; hushes: number; mics: number; spokenSays: number };
+  voice: {
+    listens: string[];
+    unlistens: number;
+    hushes: number;
+    mics: number;
+    /** Turns the brain spoke: a spoken say, or any say once the body asked for read-aloud. */
+    spokenSays: number;
+    /** Every `read_aloud` event the desktop sent, in order. */
+    readAloud: Record<string, unknown>[];
+  };
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   close(): Promise<void>;
@@ -150,6 +161,7 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     hushes: 0,
     mics: 0,
     spokenSays: 0,
+    readAloud: [],
   };
   // 3 s of silence at the mouth's 24 kHz: long enough for a test to see the panel speaking
   // and press Stop before it ends on its own.
@@ -185,6 +197,8 @@ export async function startFakeBrain(): Promise<FakeBrain> {
     // The ears' side of this connection: the mode asked for and the frames since.
     let mode: string | null = null;
     let frames = 0;
+    // The body's last `read_aloud` event on this connection: what makes a typed say spoken.
+    let readAloud: { on?: boolean; system_voice?: boolean } = {};
     // Voice frames are live-only: no seq, never replayed.
     const live = (method: string, params: Record<string, unknown>) =>
       socket.send(JSON.stringify({ jsonrpc: '2.0', method, params }));
@@ -193,7 +207,15 @@ export async function startFakeBrain(): Promise<FakeBrain> {
       const msg = JSON.parse(String(raw)) as {
         id?: string;
         method?: string;
-        params?: { text?: string; ask?: string; option?: string; spoken?: boolean; mode?: string };
+        params?: {
+          text?: string;
+          ask?: string;
+          option?: string;
+          spoken?: boolean;
+          mode?: string;
+          name?: string;
+          data?: unknown;
+        };
         result?: unknown;
         error?: { code: number; message: string };
       };
@@ -233,13 +255,18 @@ export async function startFakeBrain(): Promise<FakeBrain> {
         mode = null;
       } else if (msg.method === 'hush') {
         voice.hushes += 1;
+      } else if (msg.method === 'event') {
+        if (msg.params?.name === 'read_aloud') {
+          readAloud = (msg.params.data ?? {}) as typeof readAloud;
+          voice.readAloud.push({ ...readAloud });
+        }
       } else if (msg.method === 'say') {
         const turn = `t${++turns}`;
         socket.send(
           JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { turn, joined: false } }),
         );
         const base = { turn, body: 'desktop' };
-        const spoken = msg.params?.spoken === true;
+        const spoken = msg.params?.spoken === true || readAloud.on === true;
         const finish = () => {
           notify('reply', { ...base, delta: 'This is the ' });
           notify('reply', { ...base, delta: 'fake brain.' });
@@ -247,12 +274,10 @@ export async function startFakeBrain(): Promise<FakeBrain> {
           notify('turn', { ...base, state: 'ended', reason: 'done' });
           if (spoken) {
             voice.spokenSays += 1;
-            live('speech', {
-              turn,
-              text: 'This is the fake brain.',
-              pcm: SILENCE,
-              sample_rate: 24000,
-            });
+            // The system voice gets text only: the real brain never loads its own voice for it.
+            const audio =
+              readAloud.system_voice === true ? {} : { pcm: SILENCE, sample_rate: 24000 };
+            live('speech', { turn, text: 'This is the fake brain.', ...audio });
             live('speech', { turn, done: true });
           }
         };

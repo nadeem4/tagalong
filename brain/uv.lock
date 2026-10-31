@@ -91,11 +91,11 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = "==0.12.1" },
     { name = "anthropic", specifier = ">=2.3.0" },
-    { name = "kokoro-onnx", specifier = ">=0.6.1" },
+    { name = "kokoro-onnx", specifier = "==0.6.1" },
     { name = "mcp", specifier = "==2.3.0" },
     { name = "moonshine-voice", specifier = "==0.1.5" },
-    { name = "numpy", specifier = ">=2.5.4" },
-    { name = "onnxruntime", specifier = ">=1.31.1" },
+    { name = "numpy", specifier = "==2.5.4" },
+    { name = "onnxruntime", specifier = "==1.31.1" },
     { name = "pydantic", specifier = ">=2.14.1" },
     { name = "websockets", specifier = ">=17.3" },
 ]

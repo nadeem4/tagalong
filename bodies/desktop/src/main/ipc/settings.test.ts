@@ -23,6 +23,7 @@ function setup({ problem = null as string | null } = {}) {
     version: () => '1.2.3',
     setSettings: vi.fn(),
     applyHotkeys: vi.fn(),
+    applyVoice: vi.fn(),
     broadcast: vi.fn(),
   };
   registerSettingsIpc(ipc.handle, deps);
@@ -65,5 +66,14 @@ describe('registerSettingsIpc: saveSettings', () => {
     const patch: SettingsPatch = { hotkeys: SETTINGS_DEFAULTS.hotkeys };
     const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
     expect(deps.applyHotkeys).toHaveBeenCalledWith(saved);
+  });
+
+  it('tells the brain the voice setting now, only when the voice setting was saved', async () => {
+    const { invoke, deps } = setup();
+    await invoke(IPC.saveSettings, { listening: { always: true } } satisfies SettingsPatch);
+    expect(deps.applyVoice).not.toHaveBeenCalled();
+    const patch: SettingsPatch = { voice: { ...SETTINGS_DEFAULTS.voice, enabled: false } };
+    const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
+    expect(deps.applyVoice).toHaveBeenCalledWith(saved);
   });
 });

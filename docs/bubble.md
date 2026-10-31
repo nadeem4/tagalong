@@ -117,8 +117,8 @@ stateDiagram-v2
   the next question continues.
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
   `stopReason` shows `stopStatus` as a quiet line ("Declined" for `refusal`, "Stopped: too many
-  steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`, and a typed
-  question's answer is not read aloud.
+  steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`. With Scout talks
+  on the brain reads a typed question's answer aloud too (the `read_aloud` event, docs/voice.md).
 - `turn.error` for `mine`, or a rejected `ask`, shows a `role="alert"` line (the error message, or
   "Tagalong could not reach its brain.").
 - **Stop** (while running) calls `interrupt(mine)`.

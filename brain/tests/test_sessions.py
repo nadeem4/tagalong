@@ -1414,9 +1414,11 @@ async def test_tab_event_reaches_the_next_turns_system_prompt():
 class RecordingVoice:
     def __init__(self):
         self.calls = []
+        self.system = []  # the system_voice flag of each `spoken` call
 
-    def spoken(self, turn, body_id, voice, speed):
+    def spoken(self, turn, body_id, voice, speed, system_voice=False):
         self.calls.append(("spoken", turn, body_id, voice, speed))
+        self.system.append(system_voice)
 
     def reply(self, turn, body_id, params):
         self.calls.append(("reply", turn, body_id, params))
@@ -1529,3 +1531,219 @@ async def test_a_spoken_say_with_no_displaying_body_is_not_spoken():
     session.say("browser", spoken_say())
     await finish_quietly(session)
     assert voice.calls == []
+
+
+# --- read aloud: a body that asked for it hears every turn it shows, not only spoken ones (15f) ---
+
+
+def read_aloud(session, on=True, body_id="desktop", **kw):
+    session.body_event(body_id, "read_aloud", {"on": on, **kw})
+
+
+async def test_a_typed_say_is_spoken_when_the_body_asked_for_read_aloud():
+    session, _ = make(Gate(["hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session, voice="af_bella", speed=1.2)
+    result = session.say("desktop", say("typed"))
+    await finish_quietly(session)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", "af_bella", 1.2)
+    assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
+
+
+async def test_a_typed_say_is_silent_when_read_aloud_is_off_or_was_never_sent():
+    session, _ = make(Gate(["a", "b", "c"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    session.say("desktop", say("never asked"))
+    await finish_quietly(session)
+    read_aloud(session)
+    read_aloud(session, on=False)
+    session.say("desktop", say("switched off"))
+    await finish_quietly(session)
+    assert voice.calls == []
+
+
+async def test_a_spoken_say_is_silent_when_read_aloud_is_off():
+    session, _ = make(Gate(["hi"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session, on=False)
+    session.say("desktop", spoken_say(voice="af_bella"))
+    await finish_quietly(session)
+    assert voice.calls == []
+
+
+async def test_a_spoken_say_from_a_display_less_body_is_silent_when_read_aloud_is_off():
+    session, _ = make(Gate(["a", "b"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    read_aloud(session, on=False)
+    session.say("browser", spoken_say("from the page"))
+    await finish_quietly(session)
+    assert voice.calls == []
+
+
+async def test_a_wake_remark_is_spoken_when_the_body_asked_for_read_aloud():
+    session, sent = make(Gate(["welcome back"]), kinds=None)
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session, voice="bm_george")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await idle(session)
+    started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert started[0]["started_by"] == "brain"
+    assert voice.calls[0] == ("spoken", started[0]["turn"], "desktop", "bm_george", None)
+    assert "reply" in kinds_of(voice)
+
+
+async def test_a_wake_remark_is_silent_when_read_aloud_is_off():
+    session, _ = make(Gate(["welcome back"]), kinds=None)
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await idle(session)
+    assert voice.calls == []
+
+
+async def test_read_aloud_survives_the_body_reconnecting():
+    session, _ = make(Gate(["a", "b"]))
+    session.voice = voice = RecordingVoice()
+    peer = QuietPeer()
+    body = Body(id="desktop", kind="desktop", name="desktop")
+    session._bodies.connect(body, [], peer, None)
+    read_aloud(session, speed=1.5)
+    session._bodies.disconnect("desktop", peer)
+    session._bodies.connect(body, [], QuietPeer(), None)
+    result = session.say("desktop", say("after the reconnect"))
+    await finish_quietly(session)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", None, 1.5)
+
+
+async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
+    """The desktop sends read_aloud after it connects, so a turn a connect wake started may be
+    running already; it must be read aloud, once."""
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    result = session.say("desktop", say("typed"))
+    read_aloud(session, speed=1.1)
+    read_aloud(session, speed=1.1)  # a repeat must not speak it again
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", result.turn, "desktop", None, 1.1)]
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_read_aloud_arriving_mid_turn_ignores_a_turn_on_another_body():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    session.say("browser", say("typed"))  # shown on the desktop
+    read_aloud(session, body_id="browser")
+    assert voice.calls == []
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_a_typed_say_joining_a_turn_after_a_hush_speaks_again_under_read_aloud():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session)
+    first = session.say("desktop", say("one"))
+    session.say("desktop", say("two"))  # joins; the voice was hushed in between
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_read_aloud_follows_the_body_that_shows_the_turn():
+    session, _ = make(Gate(["a", "b"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    read_aloud(session, body_id="desktop")
+    read_aloud(session, body_id="browser")  # shows nothing, so its wish speaks nowhere
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert {c[2] for c in voice.calls if c[0] == "spoken"} == {"desktop"}
+
+
+async def test_the_system_voice_choice_rides_on_spoken_turns_and_read_aloud_turns():
+    session, _ = make(Gate(["a", "b", "c"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session, on=True, system_voice=True)
+    session.say("desktop", spoken_say())
+    await finish_quietly(session)
+    read_aloud(session, on=True, system_voice=True)
+    session.say("desktop", say("typed"))
+    await finish_quietly(session)
+    read_aloud(session, on=True, system_voice=False)
+    session.say("desktop", say("typed"))
+    await finish_quietly(session)
+    assert voice.system == [True, True, False]  # one spoken say, then two read-aloud turns
+
+
+async def test_a_bad_read_aloud_event_is_ignored():
+    session, _ = make(Gate(["a"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    session.body_event("desktop", "read_aloud", {"on": "yes", "speed": 9})
+    session.body_event("desktop", "read_aloud", None)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    assert voice.calls == []
+
+
+async def test_a_hushed_read_aloud_turn_says_nothing_more():
+    from fake_voice import FakeTts
+
+    from brain.voice.mouth import Mouth
+
+    class Sent:
+        frames: list = []
+
+        def send_live(self, body_id, method, params):
+            self.frames.append((body_id, method, params))
+            return True
+
+    class MouthVoice:  # the seam, backed by a real mouth
+        def __init__(self, mouth):
+            self.mouth = mouth
+
+        def spoken(self, turn, body_id, voice, speed, system_voice=False):
+            self.mouth.spoken(turn, body_id, voice, speed, system_voice)
+
+        def reply(self, turn, body_id, params):
+            self.mouth.reply(turn, params)
+
+        def turn_ended(self, turn):
+            self.mouth.end_turn(turn)
+
+    out = Sent()
+
+    async def load_tts():
+        return FakeTts()
+
+    mouth = Mouth(out, load_tts)
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "A whole sentence to be read out loud."]))
+    session.voice = MouthVoice(mouth)
+    join(session, "desktop")
+    read_aloud(session)
+    session.say("desktop", say("typed"))
+    mouth.hush("desktop")  # barge-in before the reply starts
+    gate.set()
+    await finish_quietly(session)
+    await asyncio.sleep(0.05)
+    assert out.frames == []

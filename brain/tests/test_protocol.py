@@ -22,6 +22,7 @@ from brain.protocol import (
     ErrorCode,
     ErrorObject,
     FocusData,
+    ReadAloudData,
     TabData,
     Tool,
 )
@@ -250,6 +251,16 @@ def test_tab_and_download_data_parse_the_examples():
     assert (download.name, download.state) == ("report.pdf", "complete")
     with pytest.raises(ValidationError):
         DownloadData.model_validate({**event_data("download"), "state": "started"})
+
+
+def test_read_aloud_data_parses_the_example_and_bounds_speed():
+    data = ReadAloudData.model_validate(event_data("read_aloud"))
+    assert (data.on, data.voice, data.speed, data.system_voice) == (True, "bm_george", 1.1, False)
+    assert ReadAloudData.model_validate({"on": False}).voice is None
+    assert ReadAloudData.model_validate({"on": True, "system_voice": True}).system_voice is True
+    for bad in ({}, {"on": "yes"}, {"on": True, "speed": 3}, {"on": True, "system_voice": 1}):
+        with pytest.raises(ValidationError):
+            ReadAloudData.model_validate(bad)
 
 
 def test_negative_idle_seconds_is_rejected():

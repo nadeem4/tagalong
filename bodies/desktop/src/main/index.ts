@@ -31,7 +31,12 @@ import { realLaunch } from './brain/launch';
 import type { BrainProcess } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
-import { createBackSender, frontWindow, startFocusWatch } from './brain/body-events';
+import {
+  createBackSender,
+  frontWindow,
+  readAloudEvent,
+  startFocusWatch,
+} from './brain/body-events';
 import type { BrainStatus } from '@tagalong/contract';
 import type { BrainClient } from '@tagalong/contract';
 import {
@@ -253,7 +258,11 @@ async function start(): Promise<void> {
       brainStatus = status;
       markBrainLink(statusMarks, status);
       // A listening session open when the link dropped asks the new connection to listen.
-      if (status === 'online') desktop?.voiceBridge.onOnline();
+      if (status === 'online') {
+        desktop?.voiceBridge.onOnline();
+        // The brain forgets nothing across a reconnect, but a restarted brain knows no setting.
+        if (desktop !== null) sendReadAloud(desktop.settings);
+      }
       watchOffline(status);
       // Home's "Where things run" shows the link; it reads it again when it changes.
       for (const window of BrowserWindow.getAllWindows()) {
@@ -436,8 +445,15 @@ function showRemark(params: unknown): void {
   }
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
-  // The panel says the remark aloud like any bubble line: shortened, one at a time, and
-  // silent when Scout talks is off. Speech lives in the panel, which owns the queue and stop.
+  // The brain reads the remark aloud itself when Scout talks is on (see sendReadAloud).
+}
+
+/**
+ * Tells the brain what Scout's voice setting asks for: read what the bubble shows aloud, in
+ * which voice, or stay silent. Sent on every connect and whenever the setting is saved.
+ */
+function sendReadAloud(settings: Settings): void {
+  desktop?.brain.event('read_aloud', readAloudEvent(settings.voice));
 }
 
 /**
@@ -761,6 +777,7 @@ function registerIpc(): void {
     applyHotkeys: (settings) => {
       applyHotkeys(settings);
     },
+    applyVoice: (settings) => sendReadAloud(settings),
     broadcast: (settings) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
