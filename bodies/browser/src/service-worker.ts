@@ -24,6 +24,8 @@ import { shouldRedial } from './reconnect';
 import { ADDR_KEY, NAME_KEY } from './settings';
 import { tabFactSender } from './tab-facts';
 import { createMicControl, type MicMessage } from './voice/mic-control';
+import { watchPopupPort } from './voice/popup-port';
+import type { VoiceView } from './voice/voice-session';
 
 /** Wakes a stopped worker so it notices the brain coming back. */
 const RECONNECT_ALARM = 'tagalong-reconnect';
@@ -36,6 +38,19 @@ const brands = (
 const mic = createMicControl(chromeOffscreen);
 // A mic page left by a worker that died mid-listen would keep capturing for nobody.
 void mic.stop().catch(() => undefined);
+// ...and an open popup that was listening to the old worker must not stay stuck on "listening".
+sendVoiceView({
+  state: 'error',
+  text: '',
+  error: 'Listening stopped',
+  loading: false,
+  progress: 0,
+});
+
+function sendVoiceView(view: VoiceView): void {
+  // With no popup open the message has no receiver, which is fine.
+  void chrome.runtime.sendMessage({ type: 'voice-view', view }).catch(() => undefined);
+}
 
 const body = createBody({
   storage: chromeStorage,
@@ -49,9 +64,7 @@ const body = createBody({
   actions: chromeActions,
   broker: new PermissionBroker(chromePermissions, chromePrompt),
   mic,
-  // An open popup shows the view; with none open the message has no receiver, which is fine.
-  onVoiceView: (view) =>
-    void chrome.runtime.sendMessage({ type: 'voice-view', view }).catch(() => undefined),
+  onVoiceView: sendVoiceView,
   openSocket: webSocket,
 });
 
@@ -137,6 +150,9 @@ function addMenuItem(): void {
 // Keep this call, and the onClicked listener it registers, synchronous at load so a woken worker gets the click.
 addMenuItem();
 chrome.permissions.onAdded.addListener(addMenuItem);
+
+// The popup holds a port while it is open; when it goes (even by a crash) the listen ends.
+chrome.runtime.onConnect.addListener((port) => watchPopupPort(port, () => body.voiceStop()));
 
 chrome.runtime.onMessage.addListener(
   (message: Partial<WorkerQuery> | MicMessage | null, _sender, respond) => {

@@ -18,27 +18,27 @@ The store listing, permission justifications and the public privacy policy are i
 
 ## Where it lives
 
-| Path (under `bodies/browser/`)       | What                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------- |
-| `src/service-worker.ts`              | Entry: wires the body to Chrome's APIs and the reconnect alarm            |
-| `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop       |
-| `src/reconnect.ts`                   | The alarm's redial rule                                                   |
-| `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                                   |
-| `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`            |
-| `src/tools/page-parts.ts`            | The `page_parts` tool                                                     |
-| `src/tools/browser-search.ts`        | The `browser_search` tool                                                 |
-| `src/tools/tab-actions.ts`           | The `tab_actions` tool                                                    |
-| `src/ask-scout.ts`                   | Turns a right-click or an address-bar entry into what you say             |
-| `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle                   |
-| `src/permissions.ts`                 | The permission broker and its 25 s wait                                   |
-| `src/permission/`                    | The permission window page                                                |
-| `src/popup/`                         | The toolbar popup page                                                    |
-| `src/voice/`                         | The voice session (pure), the mic page's hold and the float to int16 step |
-| `src/offscreen/`                     | The hidden page that owns the microphone, and its worklet                 |
-| `src/permission/mic.*`               | The page where you allow the microphone                                   |
-| `src/content/`                       | The page reader and the parts reader, injected into a tab on demand       |
-| `src/layer/`                         | Thin wrappers over `chrome.*`, so tests can fake them                     |
-| `src/manifest.ts`                    | Builds `manifest.json`                                                    |
+| Path (under `bodies/browser/`)       | What                                                                                      |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `src/service-worker.ts`              | Entry: wires the body to Chrome's APIs and the reconnect alarm                            |
+| `src/body.ts`                        | Owns one `BrainClient`, the hello, the tool dispatch, restart, stop                       |
+| `src/reconnect.ts`                   | The alarm's redial rule                                                                   |
+| `src/identity.ts`, `src/settings.ts` | The body id and name, the brain address                                                   |
+| `src/tools/tabs.ts`                  | The `tabs` tool (list, read, picture) and `resolveReadableTab`                            |
+| `src/tools/page-parts.ts`            | The `page_parts` tool                                                                     |
+| `src/tools/browser-search.ts`        | The `browser_search` tool                                                                 |
+| `src/tools/tab-actions.ts`           | The `tab_actions` tool                                                                    |
+| `src/ask-scout.ts`                   | Turns a right-click or an address-bar entry into what you say                             |
+| `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle                                   |
+| `src/permissions.ts`                 | The permission broker and its 25 s wait                                                   |
+| `src/permission/`                    | The permission window page                                                                |
+| `src/popup/`                         | The toolbar popup page                                                                    |
+| `src/voice/`                         | The voice session (pure), the mic page's hold, the popup port and the float to int16 step |
+| `src/offscreen/`                     | The hidden page that owns the microphone, and its worklet                                 |
+| `src/permission/mic.*`               | The page where you allow the microphone                                                   |
+| `src/content/`                       | The page reader and the parts reader, injected into a tab on demand                       |
+| `src/layer/`                         | Thin wrappers over `chrome.*`, so tests can fake them                                     |
+| `src/manifest.ts`                    | Builds `manifest.json`                                                                    |
 
 The build (`pnpm --filter @tagalong/browser build`) writes `bodies/browser/dist`: `manifest.json`,
 `service-worker.js`, `page-reader.js`, `popup/popup.html`, `permission/permission.html`, `permission/mic.html`, `offscreen/offscreen.html` and
@@ -397,8 +397,12 @@ How a question goes:
    closes the offscreen page and sends `unlisten`. The brain finishes the last words and sends
    `heard` `turn_end` with the question.
 4. The worker sends the question as `say` with `spoken: true` (no `voice` or `speed`: the browser has
-   no voice settings, so the brain's defaults apply). If no `turn_end` arrives within 10 s the popup
-   returns to idle and sends nothing. An empty question sends nothing.
+   no voice settings of its own). The desktop's voice settings decide how the answer sounds, because
+   the answer is spoken on the desktop. If no `turn_end` arrives within 10 s of being done talking the
+   popup returns to idle and sends nothing. On the first use the brain downloads its speech models
+   (about 56 MB): while it reports `voice` `loading` the popup shows "Getting Scout's ears ready (N%)"
+   and the 10 s wait starts only when the brain reports `ready`, so a slow first download does not
+   lose the question. An empty question sends nothing.
 
 The session is one pure module, `voice/voice-session.ts`, that the body drives; the popup shows its
 state: idle, listening, thinking (waiting for the question) or an error with a plain line. Errors
@@ -410,12 +414,15 @@ Limits to know:
 
 - **The popup is the microphone's switch.** Chrome closes a popup when you click elsewhere, and
   closing it counts as done talking: the words so far are sent as the question. Keep the popup open
-  while you speak.
+  while you speak. The popup holds a port (`popup`) to the worker while it is open; the worker stops
+  listening when that port closes, which also covers a popup that crashes.
 - **No reconnect.** If the link to the brain drops while listening, the session ends with an error;
   it is not restarted (the desktop re-listens, the browser does not).
 - **A worker restart ends it.** On start the worker closes any microphone page a dead worker left
-  behind, so the microphone never stays open for nobody.
-- One listening session at a time across bodies: a `listen` from the browser ends one on the desktop.
+  behind, so the microphone never stays open for nobody, and an open popup is told "Listening
+  stopped".
+- One listening session at a time across bodies: a `listen` from the browser ends one on the
+  desktop, and starting a listen on the desktop silently ends the browser's.
 
 ## Asking Scout from the page
 
@@ -553,7 +560,8 @@ offline, a fact is dropped, not queued.
 | `identity.test.ts`                      | The id shape and the browser kind                                                                                                                                                                             |
 | `settings.test.ts`                      | Address and name validation                                                                                                                                                                                   |
 | `manifest.test.ts`                      | Permissions (including `offscreen`), optional permissions, omnibox keyword, CSP, popup path                                                                                                                   |
-| `voice/voice-session.test.ts`           | Start, frames, stop, one spoken ask on `turn_end`, no words, errors, a lost link                                                                                                                              |
+| `voice/voice-session.test.ts`           | Start, frames, stop, one spoken ask on `turn_end`, no words, errors, a lost link, a slow ears download                                                                                                        |
+| `voice/popup-port.test.ts`              | A closed popup port ends the listen; other ports are ignored                                                                                                                                                  |
 | `voice/mic-control.test.ts`             | The offscreen page exists only while listening; a stale one is remade                                                                                                                                         |
 | `voice/pcm.test.ts`                     | Float to int16: scaling, rounding, clamping                                                                                                                                                                   |
 | `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                                                                                                                       |

@@ -107,6 +107,32 @@ describe('voice session', () => {
     expect(session.view().state).toBe('idle');
   });
 
+  it('a_late_turn_end_while_the_ears_download_still_sends_the_question', async () => {
+    const { session, said } = setup();
+    await session.start();
+    session.onVoice('loading', undefined, 0.3);
+    expect(session.view()).toMatchObject({ loading: true, progress: 0.3 });
+    session.stop();
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(session.view().state).toBe('thinking');
+    session.onHeard('turn_end', 'what is this page');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(said).toEqual(['what is this page']);
+  });
+
+  it('the_wait_starts_when_the_ears_are_ready', async () => {
+    const { session } = setup();
+    await session.start();
+    session.onVoice('loading', undefined, 0.5);
+    session.stop();
+    session.onVoice('ready');
+    expect(session.view().loading).toBe(false);
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(session.view().state).toBe('thinking');
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(session.view().state).toBe('idle');
+  });
+
   it('a_brain_that_is_offline_is_an_error_not_a_throw', async () => {
     const { session, calls } = setup({ listen: () => Promise.reject(new BrainOffline()) });
     await session.start();

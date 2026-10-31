@@ -14,6 +14,8 @@ async function capture(): Promise<void> {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   // 16 kHz context: Chrome resamples the mic, so frames already match what the brain hears.
   const context = new AudioContext({ sampleRate: 16_000 });
+  // A context made without a click on this page can start suspended, which would pass no audio.
+  await context.resume();
   await context.audioWorklet.addModule(new URL('./mic-worklet.js', import.meta.url).href);
   const node = new AudioWorkletNode(context, 'tagalong-mic');
   node.port.onmessage = (event: MessageEvent<Float32Array>) =>

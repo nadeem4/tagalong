@@ -12,6 +12,9 @@ export interface VoiceView {
   state: VoiceState;
   text: string;
   error: string;
+  /** The brain is still downloading its ears (first use); progress is 0 to 1. */
+  loading: boolean;
+  progress: number;
 }
 
 export interface VoiceDeps {
@@ -35,14 +38,14 @@ export interface VoiceSession {
   /** The person is done talking; the brain's turn_end carries the words. */
   stop(): void;
   onHeard(event: string, text?: string): void;
-  onVoice(status: string, message?: string): void;
+  onVoice(status: string, message?: string, progress?: number): void;
   /** The link or the mic went away: ends an active session with a plain reason. */
   end(reason: string): void;
   view(): VoiceView;
 }
 
 export function createVoiceSession(deps: VoiceDeps): VoiceSession {
-  let current: VoiceView = { state: 'idle', text: '', error: '' };
+  let current: VoiceView = { state: 'idle', text: '', error: '', loading: false, progress: 0 };
   let waiting: ReturnType<typeof setTimeout> | undefined;
   // True while the spoken question is on its way, so a second turn_end cannot send it twice.
   let sending = false;
@@ -50,6 +53,12 @@ export function createVoiceSession(deps: VoiceDeps): VoiceSession {
   function set(next: Partial<VoiceView>): void {
     current = { ...current, ...next };
     deps.onChange(current);
+  }
+
+  // The first use downloads the ears, which can outlast the wait, so the timer waits for them.
+  function startWait(): void {
+    clearTimeout(waiting);
+    waiting = setTimeout(() => set({ state: 'idle' }), TURN_END_WAIT_MS);
   }
 
   function release(): void {
@@ -70,7 +79,7 @@ export function createVoiceSession(deps: VoiceDeps): VoiceSession {
 
     async start() {
       if (active()) return;
-      set({ state: 'listening', text: '', error: '' });
+      set({ state: 'listening', text: '', error: '', loading: false, progress: 0 });
       try {
         await deps.client.listen('held');
       } catch (error) {
@@ -102,7 +111,7 @@ export function createVoiceSession(deps: VoiceDeps): VoiceSession {
       if (current.state !== 'listening') return;
       release();
       set({ state: 'thinking' });
-      waiting = setTimeout(() => set({ state: 'idle' }), TURN_END_WAIT_MS);
+      if (!current.loading) startWait();
     },
 
     onHeard(event, text = '') {
@@ -130,9 +139,14 @@ export function createVoiceSession(deps: VoiceDeps): VoiceSession {
         });
     },
 
-    onVoice(status, message) {
+    onVoice(status, message, progress) {
       if (!active()) return;
-      if (status === 'failed') fail(message ?? "Scout's ears could not start.");
+      if (status === 'loading') set({ loading: true, progress: progress ?? current.progress });
+      else if (status === 'ready') {
+        const wasLoading = current.loading;
+        set({ loading: false, progress: 0 });
+        if (wasLoading && current.state === 'thinking') startWait();
+      } else if (status === 'failed') fail(message ?? "Scout's ears could not start.");
     },
 
     end(reason) {

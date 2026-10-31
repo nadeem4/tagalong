@@ -65,6 +65,8 @@ const view = (state: VoiceView['state'], text = '', error = ''): VoiceView => ({
   state,
   text,
   error,
+  loading: false,
+  progress: 0,
 });
 
 describe('the mic button', () => {
@@ -94,6 +96,12 @@ describe('voiceLine', () => {
     expect(voiceLine(view('listening'))).toBe('Listening. Click Done talking when you finish.');
     expect(voiceLine(view('listening', 'what is'))).toBe('what is');
     expect(voiceLine(view('thinking'))).toBe('Working out what you said...');
+    expect(voiceLine({ ...view('thinking'), loading: true, progress: 0.426 })).toBe(
+      "Getting Scout's ears ready (43%)",
+    );
+    expect(voiceLine({ ...view('listening'), loading: true })).toBe(
+      "Getting Scout's ears ready (0%)",
+    );
     expect(voiceLine(view('idle', 'what is this'))).toBe(
       'Asked: "what is this". The answer shows on your desktop.',
     );

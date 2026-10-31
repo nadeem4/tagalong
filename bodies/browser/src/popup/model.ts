@@ -80,6 +80,9 @@ export function micClick(
 /** The line under the button. */
 export function voiceLine(view: VoiceView): string {
   if (view.state === 'error') return view.error;
+  if (view.loading && (view.state === 'listening' || view.state === 'thinking')) {
+    return `Getting Scout's ears ready (${Math.round(view.progress * 100)}%)`;
+  }
   if (view.state === 'listening') {
     return view.text === '' ? 'Listening. Click Done talking when you finish.' : view.text;
   }

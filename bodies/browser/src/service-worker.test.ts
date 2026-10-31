@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // A fake body, so the tests can see what the worker says to Scout.
 const say = vi.hoisted(() => vi.fn(async (_text: string, _context?: unknown) => undefined));
+const voiceStop = vi.hoisted(() => vi.fn());
 vi.mock('./body', () => ({
   createBody: () => ({
     start: async () => undefined,
@@ -15,6 +16,7 @@ vi.mock('./body', () => ({
     tabChanged: () => undefined,
     downloadChanged: () => undefined,
     say,
+    voiceStop,
   }),
 }));
 
@@ -30,7 +32,14 @@ function fakeChrome() {
     return { listeners, addListener: (f: Listener) => void listeners.push(f) };
   };
   const chrome = {
-    runtime: { onInstalled: event(), onStartup: event(), onMessage: event(), lastError: undefined },
+    runtime: {
+      onInstalled: event(),
+      onStartup: event(),
+      onMessage: event(),
+      onConnect: event(),
+      sendMessage: vi.fn(() => Promise.resolve()),
+      lastError: undefined,
+    },
     alarms: { onAlarm: event(), create: vi.fn(() => Promise.resolve()) },
     storage: {
       onChanged: event(),
@@ -54,7 +63,10 @@ function fakeChrome() {
   return chrome;
 }
 
-beforeEach(() => say.mockClear());
+beforeEach(() => {
+  say.mockClear();
+  voiceStop.mockClear();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -72,6 +84,28 @@ describe('the service worker', () => {
       expect.objectContaining({ id: 'ask-scout', contexts: ['selection'] }),
       expect.any(Function),
     );
+  });
+
+  it('a_closed_popup_port_stops_the_listen', async () => {
+    const chrome = fakeChrome();
+    vi.stubGlobal('chrome', chrome);
+    await import('./service-worker');
+    let gone: () => void = () => undefined;
+    const onConnect = chrome.runtime.onConnect.listeners[0] as unknown as (port: unknown) => void;
+    onConnect({ name: 'popup', onDisconnect: { addListener: (f: () => void) => (gone = f) } });
+    expect(voiceStop).not.toHaveBeenCalled();
+    gone();
+    expect(voiceStop).toHaveBeenCalledTimes(1);
+  });
+
+  it('a_restarted_worker_tells_an_open_popup_listening_stopped', async () => {
+    const chrome = fakeChrome();
+    vi.stubGlobal('chrome', chrome);
+    await import('./service-worker');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'voice-view',
+      view: expect.objectContaining({ state: 'error', error: 'Listening stopped' }),
+    });
   });
 
   it('a_click_on_another_menu_item_asks_nothing', async () => {

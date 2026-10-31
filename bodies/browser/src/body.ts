@@ -150,7 +150,11 @@ export function createBody(deps: BodyDeps): BrowserBody {
         if (method === 'heard')
           voice.onHeard((params as HeardParams).event, (params as HeardParams).text);
         if (method === 'voice')
-          voice.onVoice((params as VoiceParams).status, (params as VoiceParams).message);
+          voice.onVoice(
+            (params as VoiceParams).status,
+            (params as VoiceParams).message,
+            (params as VoiceParams).progress,
+          );
       },
       // A listen does not survive the link: the brain stops hearing a body that disconnects.
       onStatus: (status) => {

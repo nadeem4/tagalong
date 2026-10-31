@@ -19,6 +19,7 @@ import {
   type GrantRow,
   type WorkerQuery,
 } from './model';
+import { POPUP_PORT } from '../voice/popup-port';
 import type { VoiceView } from '../voice/voice-session';
 
 const statusEl = document.getElementById('status') as HTMLElement;
@@ -31,7 +32,7 @@ const rightClickEl = document.getElementById('right-click') as HTMLButtonElement
 const micEl = document.getElementById('mic') as HTMLButtonElement;
 const voiceEl = document.getElementById('voice-line') as HTMLElement;
 
-let voice: VoiceView = { state: 'idle', text: '', error: '' };
+let voice: VoiceView = { state: 'idle', text: '', error: '', loading: false, progress: 0 };
 
 function showVoice(view: VoiceView): void {
   voice = view;
@@ -138,8 +139,8 @@ async function init(): Promise<void> {
   chrome.runtime.onMessage.addListener((message: { type?: string; view?: VoiceView }) => {
     if (message.type === 'voice-view' && message.view) showVoice(message.view);
   });
-  // The mic is open only while the popup is: closing it counts as done talking.
-  addEventListener('pagehide', () => tell({ type: 'voice-stop' }));
+  // The mic is open only while the popup is: the worker sees this port close and stops listening.
+  chrome.runtime.connect({ name: POPUP_PORT });
 
   await Promise.all([showStatus(), showGrants()]);
 }
