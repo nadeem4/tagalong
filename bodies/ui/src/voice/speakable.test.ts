@@ -38,13 +38,6 @@ describe('toSpeakable', () => {
     expect(toSpeakable('Here is the fix.\n```ts\nconst a = 1;\n```')).toBe('Here is the fix.');
   });
 
-  it('never reads a draft block', () => {
-    const spoken = toSpeakable(
-      "Here's a draft. Copy it and paste it in.\n\n```draft\nHi Sam,\n\nYes, Friday works.\n```",
-    );
-    expect(spoken).toBe("Here's a draft. Copy it and paste it in.");
-  });
-
   it('never reads a table row', () => {
     expect(toSpeakable('Two prices:\n| a | 1 |\n| b | 2 |')).toBe('Two prices:');
   });

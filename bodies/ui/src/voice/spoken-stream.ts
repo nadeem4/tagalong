@@ -25,7 +25,7 @@ const MAYBE_LIST = /^[ \t]*(?:[-*+•]|\d+[.)]?)?$/;
 /**
  * A spoken answer, said sentence by sentence while it streams: the first complete sentence
  * goes to the voice at once rather than after the whole reply. Everything is said except
- * show-only blocks: fenced blocks (a draft, code), table rows and quoted (`>`) lines, each
+ * show-only blocks: fenced blocks (code), table rows and quoted (`>`) lines, each
  * judged by how its line starts, so none of its sentences is read. A list item is read
  * without its marker. Markdown is stripped from the rest; nothing is cut or added.
  */

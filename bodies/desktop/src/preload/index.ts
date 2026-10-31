@@ -101,7 +101,6 @@ const bridge: HostBridge = {
     ipcRenderer.on(IPC.approvedEvent, listener);
     return () => void ipcRenderer.off(IPC.approvedEvent, listener);
   },
-  copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<SpendToday>,
   onBrainChanged: (handler: (what: string) => void) => {
     const listener = (_event: IpcRendererEvent, what: string): void => handler(what);
@@ -170,7 +169,6 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.remarkEvent, listener);
     return () => void ipcRenderer.off(IPC.remarkEvent, listener);
   },
-  remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
   openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,
   openLogsFolder: () => ipcRenderer.invoke(IPC.openLogsFolder) as Promise<void>,
   openHome: () => ipcRenderer.invoke(IPC.openHome) as Promise<void>,

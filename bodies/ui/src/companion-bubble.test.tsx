@@ -322,31 +322,6 @@ describe('CompanionBubble, attached to the pet', () => {
   });
 });
 
-describe('CompanionBubble, a draft', () => {
-  const DRAFT_REPLY =
-    "Here's a draft. Copy it and paste it in.\n\n```draft\nYes, Friday works.\n```";
-
-  it("copies Scout's draft through the host on Copy", async () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge, { snapshot: SNAPSHOT });
-    await act(async () => ask('reply yes but Friday'));
-    act(() => bridge.emit(done('turn-1', DRAFT_REPLY)));
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Copy' })));
-    expect(bridge.copied).toEqual(['Yes, Friday works.']);
-    expect(screen.getByRole('button', { name: 'Copied' })).toBeVisible();
-  });
-
-  it('shows the draft with no Copy when the host cannot copy', async () => {
-    const bridge = createFakeHostBridge();
-    delete (bridge as { copyText?: unknown }).copyText;
-    renderBubble(bridge, { snapshot: SNAPSHOT });
-    await act(async () => ask('reply yes but Friday'));
-    act(() => bridge.emit(done('turn-1', DRAFT_REPLY)));
-    expect(screen.getByText('Yes, Friday works.')).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull();
-  });
-});
-
 describe('GreetingLine', () => {
   afterEach(() => vi.useRealTimers());
 
@@ -383,23 +358,6 @@ describe('GreetingLine', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ask Scout something' }));
     expect(onOpen).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onDone).toHaveBeenCalledOnce();
-  });
-
-  it('a remark carries Not now, which quiets Scout and closes the line', () => {
-    const onDone = vi.fn();
-    const onNotNow = vi.fn();
-    render(
-      <GreetingLine
-        petName="Scout"
-        text="That build broke on a missing import."
-        onDone={onDone}
-        onNotNow={onNotNow}
-      />,
-    );
-    expect(screen.queryByRole('button', { name: /hand/i })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
-    expect(onNotNow).toHaveBeenCalledOnce();
     expect(onDone).toHaveBeenCalledOnce();
   });
 });

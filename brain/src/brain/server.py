@@ -248,7 +248,7 @@ def _dispatch(
             return None
         session.body_event(body_id, event.name, event.data)
         return None
-    # progress and unknown notifications are dropped by the caller.
+    # Unknown notifications are dropped by the caller.
     return _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")
 
 

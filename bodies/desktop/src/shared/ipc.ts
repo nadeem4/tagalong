@@ -53,7 +53,6 @@ export const IPC = {
   hidePanel: 'tagalong:panel:hide',
   fitPanel: 'tagalong:panel:fit',
   remarkEvent: 'tagalong:panel:remark',
-  remarkNotNow: 'tagalong:remark:not-now',
   panelSideEvent: 'tagalong:panel:side',
   dragAvatar: 'tagalong:avatar:drag',
   dropAvatar: 'tagalong:avatar:drop',
@@ -85,8 +84,6 @@ export const IPC = {
   setListening: 'tagalong:voice:set-listening',
   setFollowUp: 'tagalong:voice:set-follow-up',
   listeningEvent: 'tagalong:voice:listening',
-  // Draft it for me: a draft's Copy, from the bubble only. Writes the clipboard, never reads it.
-  copyText: 'tagalong:clipboard:copy-text',
   // Drop it on Scout: a file, link or text dropped on the figure (not dropAvatar, which
   // ends a move of the pet), and the card main hands the bubble for it.
   dropOnPet: 'tagalong:avatar:drop-on-pet',
@@ -264,8 +261,6 @@ export interface TagalongHostApi {
   fitPanel(height: number): Promise<void>;
   /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
-  /** "Not now" on a remark: Scout stays quiet for an hour. */
-  remarkNotNow(): Promise<void>;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */
   onPanelSide(handler: (side: 'left' | 'right') => void): () => void;
   /** Moves the pet by a drag's step; the bubble follows. */

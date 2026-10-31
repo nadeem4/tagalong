@@ -594,9 +594,9 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.2. Blocks are shown, not read
 
-1. **Action:** type "write a two-line email saying yes to Friday, then show me a code sample".
-2. **Expected:** Scout says its own words around the draft and the code, in full; nothing inside
-   the draft block or the code block is read, and Scout never says "The rest is in the bubble." or
+1. **Action:** type "show me a short TypeScript code sample".
+2. **Expected:** Scout says its own words around the code, in full; nothing inside
+   the code block is read, and Scout never says "The rest is in the bubble." or
    "The answer is in the bubble." Then ask "give me three numbered steps to make tea": a short list
    written outside a block is read item by item, without the numbers. Typed or spoken, the same
    answer is said the same way.
@@ -665,13 +665,13 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
    (a PDF or an arXiv page, well over 300 words) and a short paragraph of plain text to hand.
 2. **Action:** (a) select the short paragraph and type "read this to me" in the bubble. (b) Type
    "summarise this". (c) Put the research paper in front and type "read this to me". (d) Ask
-   "draft a reply saying I'll review it Friday". (e) Say "Scout, stop" (Always listening on), press
+   "show me a short code sample". (e) Say "Scout, stop" (Always listening on), press
    the bars, or hold the talk key partway through a reading.
 3. **Expected:** (a) the typed request reads the paragraph in full, every sentence, with no cap
    and no "The rest is in the bubble."; the same holds when you say it with the talk key. (b) Scout
    speaks a summary in its own words, not the text. (c) for the paper Scout does not recite it all:
    it gives the gist first and asks what to dig into (the wording varies; there is no fixed opener).
-   (d) the draft shows in a block with Copy and is not read; only Scout's line around it is said.
+   (d) the code shows in a block and is not read; only Scout's line around it is said.
    (e) each of these cuts speech at once. With Scout talks off, everything shows in the bubble and
    nothing is spoken.
 

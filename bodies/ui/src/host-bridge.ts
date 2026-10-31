@@ -149,11 +149,6 @@ export interface HostBridge {
    */
   listMemories?(): Promise<MemoryEntry[]>;
   deleteMemory?(id: string): Promise<boolean>;
-  /**
-   * Draft it for me: puts a draft on the clipboard, on the person's Copy click only. It
-   * never reads the clipboard and never pastes. Optional: without it a draft has no Copy.
-   */
-  copyText?(text: string): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
   usageSummary?(): Promise<SpendToday>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */

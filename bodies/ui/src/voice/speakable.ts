@@ -9,7 +9,7 @@ export const SHORT_LINE = 40;
 
 /**
  * Turns a bubble line into what Scout says aloud, all of it: the mind chose what to write,
- * so nothing is cut. Show-only blocks are left out (a fenced block, a draft or code; a table
+ * so nothing is cut. Show-only blocks are left out (a fenced code block; a table
  * row; a quoted `>` line, which mostly holds a translation the English voice would mangle),
  * as are bare URLs. A list item is read with its marker stripped. Nothing is added: an answer
  * that is all blocks says nothing.

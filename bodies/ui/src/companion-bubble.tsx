@@ -5,7 +5,7 @@
  * props. Used by the desktop panel window.
  */
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pushable } from './shapes';
 import type {
@@ -179,11 +179,6 @@ export function CompanionBubble({
       return next.length === current.length ? current : next;
     });
   const [past, setPast] = useState<Exchange[]>([]);
-  // A draft's Copy, when this host can write the clipboard.
-  const copyText = useMemo(
-    () => (bridge.copyText === undefined ? undefined : (text: string) => bridge.copyText!(text)),
-    [bridge],
-  );
   const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
@@ -548,7 +543,7 @@ export function CompanionBubble({
       )}
       {reply.state === 'done' && reply.status === undefined && (
         <div className="bubble-answer">
-          <Answer text={reply.text} onCopy={copyText} />
+          <Answer text={reply.text} />
         </div>
       )}
       {reply.state === 'failed' && (
@@ -676,7 +671,7 @@ export function CompanionBubble({
                 {exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
-                  <Answer text={exchange.answer} onCopy={copyText} />
+                  <Answer text={exchange.answer} />
                 )}
               </div>
             ))}
@@ -756,8 +751,6 @@ export interface GreetingLineProps {
   tail?: 'left' | 'right';
   /** How long it stays when nobody touches it. */
   holdMs?: number;
-  /** A remark Scout made on its own: Not now quiets it for an hour and closes the line. */
-  onNotNow?: () => void;
 }
 
 /** How long the fade out takes before the line is gone. */
@@ -765,7 +758,7 @@ const LEAVE_MS = 300;
 
 /**
  * One quiet line beside the pet that fades after a few seconds: the hello on a later launch,
- * or a remark from keeping an eye on things, which adds Not now.
+ * or a remark from keeping an eye on things.
  * Pointing at it or tabbing into it keeps it there; clicking it opens the bubble to ask.
  */
 export function GreetingLine({
@@ -775,7 +768,6 @@ export function GreetingLine({
   onOpen,
   tail,
   holdMs = 7_000,
-  onNotNow,
   status,
   onFix,
 }: GreetingLineProps) {
@@ -825,22 +817,6 @@ export function GreetingLine({
             ×
           </button>
         </div>
-        {onNotNow !== undefined && (
-          <div className="bubble-row">
-            {onNotNow !== undefined && (
-              <button
-                type="button"
-                className="bubble-quiet"
-                onClick={() => {
-                  onNotNow();
-                  onDone();
-                }}
-              >
-                Not now
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </Speech>
   );

@@ -55,16 +55,15 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Body → brain
 
-| Method     | Kind         | Params                                               | Result                                              |
-| ---------- | ------------ | ---------------------------------------------------- | --------------------------------------------------- |
-| `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }` | `{ protocol, session, tools: Tool[], seq, resync }` |
-| `tools`    | request      | `{ tools: Tool[] }`                                  | `{}`                                                |
-| `say`      | request      | `{ text?, parts?: Part[], context?, spoken? }`       | `{ turn, joined }`                                  |
-| `event`    | notification | `{ name, data? }`                                    |                                                     |
-| `call`     | request      | `{ tool, input }`                                    | `{ output: Part[] }`                                |
-| `answer`   | request      | `{ ask, option, text? }`                             | `{}`                                                |
-| `cancel`   | notification | `{ turn }`                                           |                                                     |
-| `progress` | notification | `{ call, text }`                                     |                                                     |
+| Method   | Kind         | Params                                               | Result                                              |
+| -------- | ------------ | ---------------------------------------------------- | --------------------------------------------------- |
+| `hello`  | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }` | `{ protocol, session, tools: Tool[], seq, resync }` |
+| `tools`  | request      | `{ tools: Tool[] }`                                  | `{}`                                                |
+| `say`    | request      | `{ text?, parts?: Part[], context?, spoken? }`       | `{ turn, joined }`                                  |
+| `event`  | notification | `{ name, data? }`                                    |                                                     |
+| `call`   | request      | `{ tool, input }`                                    | `{ output: Part[] }`                                |
+| `answer` | request      | `{ ask, option, text? }`                             | `{}`                                                |
+| `cancel` | notification | `{ turn }`                                           |                                                     |
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; today the Home tools `list_memories`, `forget`, `spend_today`, `list_permissions`, `set_permission`, `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
@@ -73,7 +72,6 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 - **call.** The body runs one of the brain's tools directly (Home reading settings, for example). Unknown tool gets `unknown_tool`.
 - **answer.** The user answered an ask. `option` is one of the ask's `options` strings; `text` is optional free text. An ask that is already closed or never existed gets `not_found`; an `option` not in the list gets `invalid_params`, unless the ask accepts typed answers (an expert's question) and `text` is non-empty: then any `option` is taken and the typed text is the answer.
 - **cancel.** Stop this turn. The brain ends it with `turn { state: "ended", reason: "cancelled" }`. A turn that has already ended or never existed is ignored.
-- **progress.** A short status line for a `use` that is still running (`call` is the `use` call id). The brain may show it to the model or the user; it never replaces the result. An unknown call id is ignored.
 
 ### Brain → body
 

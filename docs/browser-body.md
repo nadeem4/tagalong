@@ -500,7 +500,7 @@ offline, a fact is dropped, not queued.
 | `content/read-page.test.ts`             | The page text, selection and the cut at 40,000 characters                                                                                                                                                     |
 | `content/page-parts.test.ts`            | Links, tables, headings, forms by label and type only, the cut at 40,000 characters                                                                                                                           |
 | `content/injected-weight.test.ts`       | The injected reader stays small                                                                                                                                                                               |
-| `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them and asks for `contextMenus`); no protocol or ui import                                                                           |
+| `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them and asks for `contextMenus`); no ui import                                                                                       |
 
 Run them with `pnpm --filter @tagalong/browser test`. Manual steps are in
 [testing/feature-test-guide.md](testing/feature-test-guide.md#the-browser-body).

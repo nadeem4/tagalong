@@ -14,7 +14,6 @@ import {
   Menu,
   Tray,
   app,
-  clipboard,
   dialog,
   ipcMain,
   powerMonitor,
@@ -81,10 +80,9 @@ import {
 } from './windows/panel';
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
-import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
-import { forwardAppsChanged, registerConnectionIpc } from './ipc/connections';
+import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connections';
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
-import type { IpcHandle } from './ipc/handle';
+import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
@@ -276,7 +274,7 @@ async function start(): Promise<void> {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {
         const { what } = params as { what: string };
-        forwardAppsChanged(what, forwardToRenderers);
+        forwardConnectionsChanged(what, forwardToRenderers);
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }
@@ -859,10 +857,6 @@ function registerIpc(): void {
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
     voiceDir: () => join(app.getPath('userData'), 'voice'),
-  });
-  registerClipboardIpc(handle, {
-    writeText: (text) => clipboard.writeText(text),
-    fromPanel: fromWindow(() => required().panel),
   });
   registerBrowserIpc(handle, {
     packaged: app.isPackaged,

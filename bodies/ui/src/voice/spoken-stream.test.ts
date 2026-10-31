@@ -38,14 +38,14 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['Here’s the fix.', 'That should do it.']);
   });
 
-  it('never says a draft, only the line about Copy, even when it arrives in pieces', () => {
+  it('never says a fenced block, even when it arrives in pieces', () => {
     const { said, stream: s } = stream();
-    s.push("Here's a draft. Copy it and paste it in.\n``");
-    s.push('`draft\nHi Sam. Yes, Friday works.\n');
+    s.push("Here's the fix.\n``");
+    s.push('`ts\nconst a = 1; const b = 2.\n');
     s.push('Thanks!\n``');
     s.push('`');
     s.end();
-    expect(said).toEqual(["Here's a draft.", 'Copy it and paste it in.']);
+    expect(said).toEqual(["Here's the fix."]);
   });
 
   it('reads a list the mind wrote outside a block, markers and markdown stripped', () => {
