@@ -9,7 +9,6 @@ const ALL_GOOD: HealthFacts = {
   voice: {
     enabled: true,
     mouth: 'kokoro',
-    elevenLabsKey: false,
     mouthReady: true,
     earsUsed: true,
     earsReady: true,
@@ -64,11 +63,8 @@ describe('healthRows', () => {
     expect(row(healthRows({ ...ALL_GOOD, connections: [] }), 'connections').state).toBe('ok');
   });
 
-  it('says the ElevenLabs voice has no key, and the ears are not downloaded', () => {
+  it('says the ears are not downloaded', () => {
     const voice = { ...(ALL_GOOD.voice as Exclude<HealthFacts['voice'], 'unknown'>) };
-    expect(
-      row(healthRows({ ...ALL_GOOD, voice: { ...voice, mouth: 'elevenlabs' } }), 'voice'),
-    ).toMatchObject({ state: 'broken', line: 'The ElevenLabs voice has no key.', fix: 'voice' });
     expect(
       row(healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }), 'voice'),
     ).toMatchObject({ state: 'broken', line: 'Speech model not downloaded.', fix: 'voice' });

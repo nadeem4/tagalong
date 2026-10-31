@@ -1,5 +1,5 @@
 /**
- * Scout's mouth in main: picks who says a line (ElevenLabs or Kokoro), falls through on failure,
+ * Scout's mouth in main: picks who says a line (Kokoro or the system voice), falls through on failure,
  * and returns audio for the bubble to play, or tells the bubble to use the window's own system
  * voice. Contains createVoiceService, LazyLocalVoice, the mouths and fakeTts.
  */
@@ -21,7 +21,7 @@ export interface SpokenAudio {
   mime: string;
 }
 
-/** Anything that turns a line into audio: Kokoro, ElevenLabs, or the fake. */
+/** Anything that turns a line into audio: Kokoro or the fake. */
 export interface Tts {
   speak(text: string, options: SpeakOptions): Promise<SpokenAudio>;
 }
@@ -135,21 +135,6 @@ export function localMouth(local: LocalVoice): MouthEngine {
       }
       return local.speak(text, how);
     },
-  };
-}
-
-/** ElevenLabs: usable only with the person's key and a voice they picked. */
-export function elevenLabsMouth(
-  key: () => Promise<string | null>,
-  voiceId: () => string,
-  make: (apiKey: string, voiceId: string) => Tts,
-): MouthEngine {
-  return {
-    usable: async () => {
-      const apiKey = await key();
-      return apiKey !== null && apiKey !== '' && voiceId() !== '';
-    },
-    speak: async (text, how) => make((await key()) ?? '', voiceId()).speak(text, how),
   };
 }
 

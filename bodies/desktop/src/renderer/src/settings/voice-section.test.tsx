@@ -1,5 +1,5 @@
 /**
- * Tests for the Voice section's speed slider: ElevenLabs tops out at 1.2, the others at 1.3.
+ * Tests for the Voice section's speed slider: every voice goes up to 1.3.
  * Static render only (no DOM in this suite); switching voices live is a manual check.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -20,11 +20,7 @@ function slider(voice: Partial<Settings['voice']>): { max: string; value: string
 }
 
 describe('VoiceSection speed slider', () => {
-  it('stops at 1.2 for ElevenLabs and shows the cap for a saved 1.3', () => {
-    expect(slider({ mouth: 'elevenlabs', speed: 1.3 })).toEqual({ max: '1.2', value: '1.2' });
-  });
-
-  it('keeps 1.3 for the other voices', () => {
+  it('keeps a saved 1.3 for each voice', () => {
     expect(slider({ mouth: 'kokoro', speed: 1.3 })).toEqual({ max: '1.3', value: '1.3' });
     expect(slider({ mouth: 'system', speed: 1.3 })).toEqual({ max: '1.3', value: '1.3' });
   });

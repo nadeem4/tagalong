@@ -478,18 +478,9 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
 
   // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
-  for (const section of ['Privacy', 'Shortcuts', 'Advanced']) {
+  for (const section of ['Privacy', 'Shortcuts']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
-  // Advanced is closed until asked for; it holds the ElevenLabs voice (the screen-memory
-  // minutes are in Privacy, so only the ElevenLabs heading proves the body opened).
-  const advanced = home.getByRole('button', { name: /Advanced/ });
-  const elevenLabs = home.getByRole('heading', { name: 'ElevenLabs voice (optional)' });
-  await expect(advanced).toHaveAttribute('aria-expanded', 'false');
-  await expect(elevenLabs).toBeHidden();
-  await advanced.click();
-  await expect(advanced).toHaveAttribute('aria-expanded', 'true');
-  await expect(elevenLabs).toBeVisible();
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();

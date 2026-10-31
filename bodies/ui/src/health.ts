@@ -8,7 +8,7 @@ import type { ConnectionStatus, FixTarget, MouthId } from './shapes';
 
 /**
  * What the health check read, from calls the host already makes. Each is `unknown` when its
- * call failed. Never a key or a secret: only whether one is stored.
+ * call failed.
  */
 export interface HealthFacts {
   connections: readonly { name: string; status: ConnectionStatus }[] | 'unknown';
@@ -16,8 +16,6 @@ export interface HealthFacts {
     | {
         enabled: boolean;
         mouth: MouthId;
-        /** Whether an ElevenLabs key is stored. */
-        elevenLabsKey: boolean;
         /** Whether the local voice's model is downloaded. */
         mouthReady: boolean;
         /** Whether listening or Talk to Scout is in use, so the ears matter. */
@@ -80,9 +78,6 @@ function connectionsRow(connections: HealthFacts['connections']): HealthRow {
 function voiceRow(voice: HealthFacts['voice']): HealthRow {
   if (voice === 'unknown') return make('voice', 'unknown', UNKNOWN);
   const problems: string[] = [];
-  if (voice.enabled && voice.mouth === 'elevenlabs' && !voice.elevenLabsKey) {
-    problems.push('The ElevenLabs voice has no key.');
-  }
   if (voice.earsUsed && !voice.earsReady) problems.push('Speech model not downloaded.');
   if (problems.length > 0) return make('voice', 'broken', problems.join(' '), 'voice');
   if (!voice.enabled) return make('voice', 'info', 'Voice is off.', 'voice');

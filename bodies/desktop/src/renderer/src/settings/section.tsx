@@ -11,7 +11,6 @@ export const SECTIONS = [
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Add Scout to your browser' },
-  { id: 'advanced', title: 'Advanced' },
 ] as const;
 
 export type SectionId = (typeof SECTIONS)[number]['id'];
@@ -38,7 +37,7 @@ export function Section({
   info,
   children,
 }: {
-  id: Exclude<SectionId, 'advanced'>;
+  id: SectionId;
   info?: { tip: string; label: string };
   children: ReactNode;
 }) {

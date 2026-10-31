@@ -5,10 +5,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { SETTINGS_CSS } from '@tagalong/ui';
-import { SettingsFieldError, buildSettingsPatch, isAdvancedField } from '../settings-form';
-import { AdvancedSection } from './advanced-section';
+import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
-import { ElevenLabsSection } from './elevenlabs-section';
 import { PrivacySection } from './privacy-section';
 import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
@@ -17,13 +15,10 @@ import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: Privacy, Voice, Shortcuts, the browser, then
- * Advanced (the ElevenLabs voice), closed by default. Main re-registers hotkeys on save.
+ * Sections in page order: Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on save.
  */
 export function SettingsPage() {
   const [view, setView] = useState<HostView | null>(null);
-  const [elevenLabsKey, setElevenLabsKey] = useState('');
-  const [advanced, setAdvanced] = useState(false);
   const [browserFolder, setBrowserFolder] = useState<BrowserFolder | null>(null);
   const [tip, setTip] = useState<string | null>(null);
   const [invalid, setInvalid] = useState<SettingsUi['invalid']>(null);
@@ -66,7 +61,7 @@ export function SettingsPage() {
     [],
   );
 
-  // A refused field is focused once it is on screen, Advanced opened if need be.
+  // A refused field is focused once it is on screen.
   useEffect(() => {
     if (invalid !== null) document.getElementById(`f-${invalid.field}`)?.focus();
   }, [invalid]);
@@ -91,21 +86,6 @@ export function SettingsPage() {
 
   const { settings } = view;
 
-  const removeElevenLabsKey = async (): Promise<void> => {
-    try {
-      // An empty key deletes the stored one.
-      await window.tagalongHost.saveElevenLabsKey('');
-      setView((current) =>
-        current === null ? current : { ...current, elevenLabsKeyStored: false },
-      );
-      setStatus('ElevenLabs key removed.');
-      setStatusIsError(false);
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
-      setStatusIsError(true);
-    }
-  };
-
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (view === null) return;
@@ -125,31 +105,17 @@ export function SettingsPage() {
         voiceEnabled: form.get('voiceEnabled') !== null,
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
-        elevenLabsVoiceId: field('elevenLabsVoiceId'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
-      // An empty box is left alone: removing the key is the Remove key button's job.
-      const typed = elevenLabsKey.trim();
-      if (typed.length > 0) await window.tagalongHost.saveElevenLabsKey(typed);
-      setElevenLabsKey('');
-      setView((current) =>
-        current === null
-          ? current
-          : {
-              ...current,
-              settings: saved,
-              elevenLabsKeyStored: current.elevenLabsKeyStored || typed.length > 0,
-            },
-      );
+      setView((current) => (current === null ? current : { ...current, settings: saved }));
       setInvalid(null);
       setStatus('Saved. Scout uses it from the next ask.');
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
-      // "Watches at once must be…" beside that very field, Advanced opened if it is there.
+      // "Watches at once must be…" beside that very field.
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof SettingsFieldError) {
-        if (isAdvancedField(error.field)) setAdvanced(true);
         setInvalid({ field: error.field, message });
       } else {
         setInvalid(null);
@@ -181,15 +147,6 @@ export function SettingsPage() {
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
-          <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
-            <ElevenLabsSection
-              settings={settings}
-              keyStored={view.elevenLabsKeyStored}
-              typed={elevenLabsKey}
-              onType={setElevenLabsKey}
-              onRemove={() => void removeElevenLabsKey()}
-            />
-          </AdvancedSection>
           <div className="tg-footer">
             <button type="submit" className="tg-btn">
               Save

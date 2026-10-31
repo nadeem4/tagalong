@@ -11,7 +11,6 @@ function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> =
     pets: [{ id: 'scout', name: 'Scout', avatar: '🦊' }],
     appVersion: '0.0.0',
     platform: 'win32',
-    elevenLabsKeyStored: false,
     ...patch,
   };
 }
@@ -49,7 +48,6 @@ describe('gatherHealth', () => {
       voice: {
         enabled: true,
         mouth: 'kokoro',
-        elevenLabsKey: false,
         mouthReady: true,
         earsUsed: false,
         earsReady: false,
@@ -135,20 +133,5 @@ describe('gatherHealth', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('never carries a key, only whether one is stored', async () => {
-    const facts = await gatherHealth(
-      deps({
-        getHostView: () =>
-          Promise.resolve(
-            view(
-              { elevenLabsKeyStored: true },
-              { voice: { ...Settings.parse({}).voice, mouth: 'elevenlabs' } },
-            ),
-          ),
-      }),
-    );
-    expect(facts.voice).toMatchObject({ mouth: 'elevenlabs', elevenLabsKey: true });
   });
 });

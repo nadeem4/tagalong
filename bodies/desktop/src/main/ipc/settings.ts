@@ -1,21 +1,18 @@
 /**
- * IPC for Settings: the host view every window reads, saving settings and the voice key. Reads and
+ * IPC for Settings: the host view every window reads, and saving settings. Reads and
  * writes the desktop's own settings file; the brain has no settings. Contains
  * registerSettingsIpc.
  */
 
-import type { SecretStore } from '../secret-store';
 import type { Settings, SettingsPatch } from '../../shared/settings';
 import { IPC } from '../../shared/ipc';
 import type { HostView } from '../../shared/ipc';
-import { ELEVENLABS_SECRET_KEY } from '../secret-store';
 import type { IpcHandle } from './handle';
 import { localScout } from './scout';
 
 export interface SettingsIpcDeps {
   /** The desktop's own settings file. */
   settingsStore: () => { get(): Settings; set(patch: SettingsPatch): Settings };
-  secrets: () => SecretStore;
   /** Why a hotkey failed, for Settings to say. */
   problem: () => string | null;
   version: () => string;
@@ -25,17 +22,14 @@ export interface SettingsIpcDeps {
   broadcast: (settings: Settings) => void;
 }
 
-/** Settings and the ElevenLabs key. */
+/** Settings. */
 export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): void {
   const readSettings = (): Promise<Settings> => Promise.resolve(deps.settingsStore().get());
 
   handle(IPC.hostView, async (): Promise<HostView> => {
-    const secrets = deps.secrets();
     const settings = await readSettings();
     const problem = deps.problem();
-    const elevenLabsKey = await secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
     return {
-      elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
       settings,
       pets: [localScout()],
       appVersion: deps.version(),
@@ -57,11 +51,4 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
   };
 
   handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch));
-
-  // An empty key deletes the stored one.
-  handle(IPC.saveElevenLabsKey, async (_event, apiKey: string) => {
-    const secrets = deps.secrets();
-    if (apiKey.length === 0) await secrets.delete(ELEVENLABS_SECRET_KEY);
-    else await secrets.set(ELEVENLABS_SECRET_KEY, apiKey);
-  });
 }

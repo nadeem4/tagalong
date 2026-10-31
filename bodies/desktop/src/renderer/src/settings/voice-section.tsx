@@ -1,11 +1,9 @@
 /**
  * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
- * fast. Preview plays the form's choice before it is saved. ElevenLabs' key and voice are under
- * Advanced. Then Talk to Scout: the key you hold to speak, and which microphone listens.
+ * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold to speak, and which microphone listens.
  */
 import { useEffect, useState } from 'react';
 import {
-  MAX_ELEVENLABS_SPEED,
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
   SETTINGS_DEFAULTS,
@@ -54,15 +52,12 @@ export function VoiceSection({
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
   const speedField = useInvalid('voiceSpeed');
-  // ElevenLabs refuses more than its cap, so its slider stops there and shows a higher saved speed as the cap.
-  const maxSpeed = mouth === 'elevenlabs' ? MAX_ELEVENLABS_SPEED : MAX_VOICE_SPEED;
-  const shownSpeed = Math.min(speed, maxSpeed);
 
   const preview = (): void => {
     setPreviewing(true);
     playLine(PREVIEW_LINE, new AbortController().signal, {
       voice,
-      speed: shownSpeed,
+      speed,
       mouth: mouth as MouthId,
     })
       .catch((error: unknown) => console.warn('[voice] preview failed', error))
@@ -94,8 +89,8 @@ export function VoiceSection({
         Scout says what it writes: its answers, its hello and a watch that fires. Code and long
         lists it puts in a block, which shows in the bubble and is not read. Under Who speaks, the
         local voice runs on this computer and downloads its model (about 90 MB) the first time it is
-        used, speaking with the system voice until that is done; ElevenLabs needs your key; the
-        system voice needs nothing. Closing the bubble or the stop key silences it at once.
+        used, speaking with the system voice until that is done; the system voice needs nothing.
+        Closing the bubble or the stop key silences it at once.
       </Tip>
       <div className="tg-grid">
         <div>
@@ -150,14 +145,14 @@ export function VoiceSection({
           </div>
         </div>
         <div>
-          <label htmlFor={speedField.props.id}>Speed: {shownSpeed.toFixed(2)}×</label>
+          <label htmlFor={speedField.props.id}>Speed: {speed.toFixed(2)}×</label>
           <input
             name="voiceSpeed"
             type="range"
             min={MIN_VOICE_SPEED}
-            max={maxSpeed}
+            max={MAX_VOICE_SPEED}
             step={0.05}
-            value={shownSpeed}
+            value={speed}
             onChange={(event) => setSpeed(Number(event.target.value))}
             {...speedField.props}
           />

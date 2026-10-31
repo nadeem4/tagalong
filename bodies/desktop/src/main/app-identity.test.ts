@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Electron derives `app.getName()` from `productName` in the app's package.json, falling
  * back to `name`. `app.getPath('userData')` is then %APPDATA%\<that name>, which is where
- * settings, the SQLite database and the safeStorage secrets live.
+ * settings, the SQLite database and the voice models live.
  *
  * Our `name` is the scoped workspace id `@tagalong/desktop`. Electron strips the characters
  * a directory cannot hold, so without `productName` every user's data lands in

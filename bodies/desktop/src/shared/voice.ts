@@ -19,8 +19,6 @@ export interface VoiceAdapterFacts {
   slot: 'ears' | 'mouth';
   label: string;
   offline: boolean;
-  needsKey: boolean;
-  costs: boolean;
   screenshots: boolean;
 }
 
@@ -30,8 +28,6 @@ export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
     slot: 'ears',
     label: 'On this computer',
     offline: true,
-    needsKey: false,
-    costs: false,
     screenshots: false,
   },
   {
@@ -39,17 +35,6 @@ export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
     slot: 'mouth',
     label: 'Kokoro, on this computer',
     offline: true,
-    needsKey: false,
-    costs: false,
-    screenshots: false,
-  },
-  {
-    id: 'elevenlabs',
-    slot: 'mouth',
-    label: 'ElevenLabs, with your key',
-    offline: false,
-    needsKey: true,
-    costs: true,
     screenshots: false,
   },
   {
@@ -57,8 +42,6 @@ export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
     slot: 'mouth',
     label: 'The system voice',
     offline: true,
-    needsKey: false,
-    costs: false,
     screenshots: false,
   },
 ];
@@ -72,13 +55,7 @@ export function mouthOrder(chosen: MouthId): MouthId[] {
   return [...new Set<MouthId>([chosen, LOCAL_MOUTH, 'system'])];
 }
 
-/**
- * The mouth the person picked. When `mouth` is unset, a set ElevenLabs voice id means
- * ElevenLabs, otherwise the local voice.
- */
-export function chosenMouth(voice: {
-  mouth?: MouthId | undefined;
-  elevenLabsVoiceId: string;
-}): MouthId {
-  return voice.mouth ?? (voice.elevenLabsVoiceId !== '' ? 'elevenlabs' : LOCAL_MOUTH);
+/** The mouth the person picked; the local voice until they pick another. */
+export function chosenMouth(voice: { mouth?: MouthId | undefined }): MouthId {
+  return voice.mouth ?? LOCAL_MOUTH;
 }

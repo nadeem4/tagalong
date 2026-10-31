@@ -146,8 +146,6 @@ const host: TagalongHostApi = {
   },
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
-  saveElevenLabsKey: (apiKey: string) =>
-    ipcRenderer.invoke(IPC.saveElevenLabsKey, apiKey) as Promise<void>,
   openBubble: () => ipcRenderer.invoke(IPC.openBubble) as Promise<void>,
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
   onPanelSide: (handler) => {
