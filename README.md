@@ -40,7 +40,7 @@ Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
 The desktop talks to the Python brain and starts it for you when none is running (you need `uv`
-and an Anthropic key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)). The brain
+and an Anthropic key, which the first-run walkthrough asks for; see [docs/brain.md](docs/brain.md)). The brain
 runs on Python 3.12 or 3.13; `uv` fetches one if you have neither.
 
 ```powershell
@@ -104,7 +104,7 @@ its bodies fit together.
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                                                                                                                                                                                                                                                   |                                                                     |
 | Scout talks: answers read aloud in a calm British voice, made by your own brain                                                                                                                                                                                                                                                                             |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text by your own brain. Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.                                                                                                                               |                                                                     |
-| Scout thinks with your Anthropic key, set in the brain's `.env`                                                                                                                                                                                                                                                                                             | An "always allow" for changes in connected apps                     |
+| Scout thinks with your Anthropic key, entered in the app (Settings → Anthropic key)                                                                                                                                                                                                                                                                         | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                                                                                                                                                                                                                                        |                                                                     |
 | Timers: Scout sets its own reminders and repeating checks, and speaks first when a job ends or you come back                                                                                                                                                                                                                                                |                                                                     |
 | Spend: Home shows what Scout spent today against a daily limit (`TAGALONG_DAILY_BUDGET_USD`, default 5); at the limit Scout pauses for the day                                                                                                                                                                                                              |                                                                     |
@@ -117,7 +117,7 @@ its bodies fit together.
 
 ## First run
 
-There is no setup window. Start Tagalong (it starts the brain if none is running); Scout appears on your screen. The brain's model and key are in its `.env`; hotkeys, listening and the rest are under **Home → Settings**.
+There is no setup window. Start Tagalong (it starts the brain if none is running); Scout appears on your screen. The first-run walkthrough asks for your Anthropic key (change it later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 
@@ -241,9 +241,10 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 
 ## Providers and keys
 
-Scout thinks through the Python brain. It needs `ANTHROPIC_API_KEY` in its environment or in `<TAGALONG_HOME>/.env` (see
-`.env.example`). Experts run on your Claude Code sign-in instead. Keys never pass through the
-desktop.
+Scout thinks through the Python brain. It needs your Anthropic key: the walkthrough asks for it, and Settings → Anthropic key changes it
+and the daily limit. For developers, a real `ANTHROPIC_API_KEY` in the environment still works and
+wins (Settings then shows "Set by your environment"; see `.env.example`). Experts run on your Claude Code sign-in instead. The desktop passes your key
+to the brain once and keeps no copy.
 
 ## The browser body
 
@@ -298,7 +299,7 @@ such as `.env` are refused.
 - When you talk to Scout, your speech is turned into text by your brain. Audio goes only to your own
   brain and is never stored; with the brain on this computer it never leaves it. Only the text goes
   to Scout's provider, like a typed question.
-- The Python brain reads its provider key (`ANTHROPIC_API_KEY`) from the environment or the `.env` file in its data folder; it is never saved to the database or logs.
+- The Python brain keeps the Anthropic key you enter in the app in its own data folder (a real `ANTHROPIC_API_KEY` in the environment wins, for developers); the desktop never stores it, and it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
   applications. It changes things only through apps you connect, and only after you press
@@ -315,7 +316,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Problem                                                  | What to do                                                                                                                                              |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                                    |
-| Scout says it has no API key                             | Put `ANTHROPIC_API_KEY` in the brain's `.env` file and restart the brain.                                                                               |
+| Scout says it has no API key                             | Open **Home → Settings → Anthropic key** and enter your key.                                                                                            |
 | Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                        |
 | A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).                   |
 | Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                                 |
