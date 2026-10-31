@@ -43,7 +43,7 @@ source (`pnpm dev:desktop` starts the brain if none is running; or start it with
 Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A saved key or brain is
 used from the next question, with no restart.
 
-**The default for this guide: the Python brain.** Start it with `cd brain && uv run brain`; it holds the
+**The default for this guide: the Python brain.** `pnpm dev:desktop` starts it if none is running, or run `cd brain && uv run brain` yourself; it holds the
 model and its keys (see [brain.md](../brain.md)). The desktop has no provider, model or sign-in settings.
 
 **Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
@@ -212,7 +212,7 @@ run it on its own for those.
 
 1. **Setup:** make sure nothing listens on `127.0.0.1:47321`, then run `pnpm dev:desktop` alone.
    **Expected:** a `uv` process (and its `python` child) appears, Scout appears, and no "Scout's
-   brain is not running." mark stays. An ask works. `[brain]` lines show in the terminal.
+   brain is not running." mark stays. An ask works. The brain's output shows in the terminal.
 2. **Action:** quit the app from the tray.
    **Expected:** the `uv` and `python` processes the app started are gone.
 3. **Action:** start `cd brain && uv run brain` yourself, then `pnpm dev:desktop`. Quit the app.

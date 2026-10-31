@@ -20,7 +20,7 @@ export interface LaunchOptions {
   probe: (addr: string) => Promise<boolean>;
   exists: (path: string) => boolean;
   spawn: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
-  log: { info: (line: string) => void; warn: (line: string) => void };
+  log: { warn: (line: string) => void };
 }
 
 export interface BrainProcess {
@@ -53,14 +53,6 @@ export function probeAddr(addr: string): Promise<boolean> {
   });
 }
 
-function pipeLines(stream: NodeJS.EventEmitter, write: (line: string) => void): void {
-  stream.on('data', (chunk: Buffer) => {
-    for (const line of chunk.toString().split(/\r?\n/)) {
-      if (line.trim() !== '') write(`[brain] ${line}`);
-    }
-  });
-}
-
 export function realLaunch(
   brainDir: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -72,7 +64,7 @@ export function realLaunch(
     probe: probeAddr,
     exists: existsSync,
     spawn: nodeSpawn,
-    log: { info: (line) => console.log(line), warn: (line) => console.warn(line) },
+    log: { warn: (line) => console.warn(line) },
   });
 }
 
@@ -87,13 +79,12 @@ export async function launchBrain(options: LaunchOptions): Promise<BrainProcess>
   const child = spawn('uv', ['run', 'brain'], {
     cwd: brainDir,
     env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    // The brain's own output goes to the dev terminal, not into tagalong.log as warnings.
+    stdio: ['ignore', 'inherit', 'inherit'],
     windowsHide: true,
   });
   let running = true;
-  pipeLines(child.stdout as NodeJS.EventEmitter, log.info);
-  pipeLines(child.stderr as NodeJS.EventEmitter, log.warn);
-  child.once('error', (error) => {
+  child.on('error', (error) => {
     running = false;
     log.warn(`could not start the brain (${error.message}); the desktop keeps retrying`);
   });
@@ -108,8 +99,12 @@ export async function launchBrain(options: LaunchOptions): Promise<BrainProcess>
       if (!running) return;
       running = false;
       // uv starts python as a child; /t takes the whole tree down with it.
-      if (platform === 'win32') spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {});
-      else child.kill();
+      if (platform === 'win32') {
+        spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }).on(
+          'error',
+          () => undefined,
+        );
+      } else child.kill();
     },
   };
 }

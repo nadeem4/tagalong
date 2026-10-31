@@ -6,7 +6,7 @@
 (contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
 global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
 brain directly. In development the desktop starts the brain itself when none is running (see
-[The brain in the main process](#the-brain-in-the-main-process)); you can still run it on its own
+[The brain in the main process](#the-brain-in-the-main-process)); or run it yourself
 with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
@@ -103,8 +103,7 @@ running.
 Before dialing, an unpackaged desktop runs `launchBrain` (`brain/launch.ts`). If the address is
 local (`127.0.0.1`, `localhost` or `::1`), the repo's `brain/` folder has a `pyproject.toml`, and a
 TCP connect to the address is refused, it spawns `uv run brain` there with the environment passed
-through, and pipes the child's output into the log (`[brain]` lines; stderr goes to
-`tagalong.log`). If something already answers, or the address is remote, it spawns nothing. On
+through; the child writes to the dev terminal, not to `tagalong.log`. If something already answers, or the address is remote, it spawns nothing. On
 quit it stops only the child it started (on Windows `taskkill /pid <pid> /t /f`, so uv's Python
 child dies too). If `uv` is missing or the child exits, it logs one line and does not respawn; the
 client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.

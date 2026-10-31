@@ -19,7 +19,6 @@ class FakeChild extends EventEmitter {
 function setup(over: Partial<LaunchOptions> = {}) {
   const spawned: { cmd: string; args: string[]; opts: SpawnOptions }[] = [];
   const children: FakeChild[] = [];
-  const out: string[] = [];
   const err: string[] = [];
   const options: LaunchOptions = {
     env: {},
@@ -33,10 +32,10 @@ function setup(over: Partial<LaunchOptions> = {}) {
       children.push(child);
       return child as never;
     },
-    log: { info: (line) => out.push(line), warn: (line) => err.push(line) },
+    log: { warn: (line) => err.push(line) },
     ...over,
   };
-  return { options, spawned, children, out, err };
+  return { options, spawned, children, err };
 }
 
 describe('isLocal', () => {
@@ -99,13 +98,10 @@ describe('launchBrain', () => {
     expect(spawned).toEqual([]);
   });
 
-  it('pipes the child output into the log', async () => {
-    const { options, children, out, err } = setup();
+  it('lets the child write to the terminal instead of the log', async () => {
+    const { options, spawned } = setup();
     await launchBrain(options);
-    children[0]?.stdout.emit('data', Buffer.from('listening\nready\n'));
-    children[0]?.stderr.emit('data', Buffer.from('oops\n'));
-    expect(out).toEqual(['[brain] listening', '[brain] ready']);
-    expect(err).toEqual(['[brain] oops']);
+    expect(spawned[0]?.opts.stdio).toEqual(['ignore', 'inherit', 'inherit']);
   });
 
   it('logs one line when spawning fails, and does not respawn', async () => {
@@ -128,7 +124,11 @@ describe('launchBrain', () => {
     const { options, spawned } = setup();
     const handle = await launchBrain(options);
     handle.stop();
-    expect(spawned[1]).toMatchObject({ cmd: 'taskkill', args: ['/pid', '4242', '/t', '/f'] });
+    expect(spawned[1]).toMatchObject({
+      cmd: 'taskkill',
+      args: ['/pid', '4242', '/t', '/f'],
+      opts: { windowsHide: true },
+    });
   });
 
   it('stop kills the child directly elsewhere', async () => {

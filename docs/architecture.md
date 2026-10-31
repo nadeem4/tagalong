@@ -17,7 +17,7 @@ A body is a thin shell around it. It perceives (selection, windows, screenshots,
 offers tools and presents (the figure, the bubble, the voice). A body reaches the brain only
 through contract v1 ([protocol/README.md](../protocol/README.md)), over a loopback WebSocket. The
 desktop app (`bodies/desktop`) dials it from its main process (`bodies/desktop/src/main/brain/start.ts`,
-`startBrain`; start the brain with `cd brain && uv run brain`). So does the browser body
+`startBrain`; in dev it starts the brain if none is running, or run `cd brain && uv run brain` yourself). So does the browser body
 (`bodies/browser`), a tools-only body that gives Scout the `tabs`, `page_parts`, `browser_search`
 and `tab_actions` tools and lets you ask Scout from a right-click or the address bar; see
 [browser-body.md](browser-body.md).
