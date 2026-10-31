@@ -8,6 +8,12 @@ side it covers Kokoro and the system voice. Speech to text runs on this computer
 configured brain still answers: a heard question goes to the brain as an ordinary ask with
 `spoken: true`.
 
+> **Moving to the brain.** The brain now has its own ears (Silero, Moonshine, Smart Turn; see
+> [Brain ears](brain.md#brain-ears)). This document still describes what the desktop does today:
+> its voice utility process and `LocalEars` stay in use until the desktop is switched over, and
+> Kokoro speech moves to the brain after that. The pipeline in "The ears" below is the same one
+> the brain runs.
+
 ## Where it lives
 
 | Area                           | Files                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

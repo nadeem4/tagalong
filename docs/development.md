@@ -137,7 +137,8 @@ pnpm package:dir      # an unpacked app in release/, for checking what gets pack
 
 ### The Python brain
 
-Needs [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. From `brain/`:
+Needs [uv](https://docs.astral.sh/uv/) and Python 3.12 or 3.13 (the voice libraries do not
+support 3.14 yet; uv fetches a matching Python itself). From `brain/`:
 
 ```bash
 uv sync                    # install dependencies into brain/.venv

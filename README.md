@@ -40,7 +40,8 @@ Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
 The desktop talks to the Python brain and starts it for you when none is running (you need `uv`
-and an Anthropic key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)).
+and an Anthropic key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)). The brain
+runs on Python 3.12 or 3.13; `uv` fetches one if you have neither.
 
 ```powershell
 cd brain
