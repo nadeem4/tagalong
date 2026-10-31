@@ -1610,6 +1610,49 @@ async def test_read_aloud_survives_the_body_reconnecting():
     assert voice.calls[0] == ("spoken", result.turn, "desktop", None, 1.5)
 
 
+async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
+    """The desktop sends read_aloud after it connects, so a turn a connect wake started may be
+    running already; it must be read aloud, once."""
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    result = session.say("desktop", say("typed"))
+    read_aloud(session, speed=1.1)
+    read_aloud(session, speed=1.1)  # a repeat must not speak it again
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", result.turn, "desktop", None, 1.1)]
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_read_aloud_arriving_mid_turn_ignores_a_turn_on_another_body():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "hello"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    join_headless(session)
+    session.say("browser", say("typed"))  # shown on the desktop
+    read_aloud(session, body_id="browser")
+    assert voice.calls == []
+    gate.set()
+    await finish_quietly(session)
+
+
+async def test_a_typed_say_joining_a_turn_after_a_hush_speaks_again_under_read_aloud():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "one", "two"]))
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session)
+    first = session.say("desktop", say("one"))
+    session.say("desktop", say("two"))  # joins; the voice was hushed in between
+    spoken = [c for c in voice.calls if c[0] == "spoken"]
+    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
+    gate.set()
+    await finish_quietly(session)
+
+
 async def test_read_aloud_follows_the_body_that_shows_the_turn():
     session, _ = make(Gate(["a", "b"]))
     session.voice = voice = RecordingVoice()

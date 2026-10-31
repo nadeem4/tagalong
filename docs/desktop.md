@@ -22,7 +22,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
 | `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; stops only that child on quit                                               |
 | `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
-| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`: the `back` and `focus` events sent to the brain                                                                       |
+| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`: the `back`, `focus` and `read_aloud` events sent to the brain                                       |
 | `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
 | `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
@@ -118,7 +118,7 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
   `desktop__open_url`, and it always asks first (`confirm`: there is no Always allow button; only its Home switch can unlock it).
 
-- **Body events.** `brain/body-events.ts` sends two facts with `event`; the brain decides whether
+- **Body events.** `brain/body-events.ts` sends facts with `event` (`back`, `focus`, and the `read_aloud` setting from `readAloudEvent`); the brain decides whether
   they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
   returns after being away at least 5 minutes (`AWAY_AFTER_MS`, a screen lock counts), with whole
   seconds; the away starts when the idle did (the system idle time at the `away` is subtracted), so

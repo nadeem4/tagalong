@@ -250,6 +250,14 @@ class Session:
             except ValidationError:
                 return
             self._read_aloud[body_id] = ask
+            # It arrives after the connect, so a wake the connect started may be running already.
+            if (
+                ask.on
+                and self._busy()
+                and self._turn_body == body_id
+                and self._turn_id not in self._spoken
+            ):
+                self._speak(self._turn_id, body_id, None)
             return
         event = from_body(body_id, name, data)
         if event is not None:

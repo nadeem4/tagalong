@@ -446,8 +446,8 @@ a spoken question.
 Everything else rides on the `read_aloud` body event, `{on, voice, speed, system_voice}` (see
 `readAloudEvent` in `body-events.ts`). `on` is Scout talks, `voice` and `speed` come from the saved
 settings, and `system_voice` is true when Settings picked "System voice". The desktop sends it each
-time the brain comes online (the brain forgets it when a body disconnects) and each time the voice
-setting is saved. The brain keeps the latest per body and speaks any turn that body displays while
+time the brain comes online and each time the voice setting is saved. The brain keeps the latest per
+body across reconnects (the desktop resends it on every connect) and speaks any turn that body displays while
 `on` is true. With `system_voice` the brain sends text-only `speech` frames and never loads or
 downloads Kokoro.
 
