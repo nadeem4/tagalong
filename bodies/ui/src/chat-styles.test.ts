@@ -41,4 +41,19 @@ describe('CHAT_CSS chat window', () => {
   it('keeps the context chips at least 8px from their edge', () => {
     expect(minPadding(CHAT_CSS, '.bubble-chip')).toBeGreaterThanOrEqual(8);
   });
+
+  it('puts the chat approval card on the card surface with 16px inside', () => {
+    expect(minPadding(CHAT_CSS, '.bubble--chat .card')).toBeGreaterThanOrEqual(16);
+    expect(ruleOf(CHAT_CSS, '.bubble--chat .card')).toContain('border: 1px solid');
+  });
+
+  it('keeps the Stop button padded and the cursor gold', () => {
+    expect(minPadding(CHAT_CSS, '.bubble-stop')).toBeGreaterThanOrEqual(8);
+    expect(CHAT_CSS).toContain('.bubble-streaming');
+    expect(CHAT_CSS).toContain('::after');
+  });
+
+  it('dims the field while a turn runs', () => {
+    expect(ruleOf(CHAT_CSS, ".bubble-field input[aria-busy='true']")).toContain('opacity');
+  });
 });

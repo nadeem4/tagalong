@@ -78,4 +78,22 @@ export const CHAT_CSS = `
   background: #222845; font-size: 14px; line-height: 21px; white-space: pre-wrap;
 }
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
+
+/* A turn in progress: the thinking row with Stop beside it, then a gold cursor on the text. */
+.bubble-live { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bubble-thinking { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #C9CEE0; }
+.bubble-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: ${t.color.gold}; }
+.bubble-stop { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px 0 8px; }
+.bubble-stop i { width: 8px; height: 8px; border-radius: 2px; background: #C9CEE0; display: block; }
+.bubble--chat .bubble-answer { max-height: none; overflow: visible; }
+.bubble-streaming .answer > :last-child::after {
+  content: ''; display: inline-block; width: 2px; height: 16px; margin-left: 2px; border-radius: 1px;
+  background: ${t.color.gold}; vertical-align: -3px;
+}
+.bubble-field input[aria-busy='true'] { opacity: 0.55; }
+
+/* The approval card in the chat: the card surface, 16px inside. */
+.bubble--chat .card {
+  padding: 16px; border: 1px solid ${t.color.fieldLine}; border-radius: 10px; background: ${t.color.sidebar};
+}
 `;

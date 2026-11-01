@@ -519,15 +519,25 @@ export function CompanionBubble({
   const turnAnswer = (
     <>
       {reply.state === 'running' && (
-        <div className="bubble-answer" aria-live="polite">
-          {reply.text === '' ? (
-            <p className="bubble-text">{petName} is thinking…</p>
-          ) : (
-            <Answer text={reply.text} />
-          )}
-          <button type="button" className="bubble-quiet" onClick={stop}>
-            Stop
-          </button>
+        <div
+          className={reply.text === '' ? 'bubble-answer' : 'bubble-answer bubble-streaming'}
+          aria-live="polite"
+        >
+          {reply.text !== '' && <Answer text={reply.text} />}
+          <div className="bubble-live">
+            {reply.text === '' ? (
+              <span className="bubble-thinking">
+                <span className="bubble-dot" aria-hidden="true" />
+                {petName} is thinking…
+              </span>
+            ) : (
+              <span />
+            )}
+            <button type="button" className="bubble-quiet bubble-stop" onClick={stop}>
+              <i aria-hidden="true" />
+              Stop
+            </button>
+          </div>
         </div>
       )}
       {reply.state === 'done' && reply.status !== undefined && (
@@ -626,7 +636,7 @@ export function CompanionBubble({
         aria-label={label}
         value={draft}
         autoFocus
-        disabled={reply.state === 'running'}
+        aria-busy={reply.state === 'running' ? 'true' : undefined}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter') send();

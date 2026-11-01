@@ -577,6 +577,73 @@ describe('CompanionBubble, the chat window', () => {
   });
 });
 
+describe('CompanionBubble, a turn in the chat window', () => {
+  const start = (bridge: FakeHostBridge) =>
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+    });
+
+  it('thinking shows a gold dot and Scout is thinking, with Stop on the same row', async () => {
+    const bridge = createFakeHostBridge();
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded />
+      </HostBridgeProvider>,
+    );
+    await act(async () => ask2('Message Scout', 'why?'));
+    start(bridge);
+    const row = screen.getByText('Scout is thinking…').closest('.bubble-live');
+    expect(row).not.toBeNull();
+    expect(row?.querySelector('.bubble-dot')).not.toBeNull();
+    const stop = screen.getByRole('button', { name: 'Stop' });
+    expect(row?.contains(stop)).toBe(true);
+    expect(stop.querySelector('i')).not.toBeNull();
+    fireEvent.click(stop);
+    expect(bridge.interrupts).toEqual(['turn-1']);
+    expect(container.querySelector('.bubble-streaming')).toBeNull();
+  });
+
+  it('shows a streaming cursor while text arrives and not once done', async () => {
+    const bridge = createFakeHostBridge();
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded />
+      </HostBridgeProvider>,
+    );
+    await act(async () => ask2('Message Scout', 'why?'));
+    start(bridge);
+    act(() => bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'Because ' }));
+    expect(container.querySelector('.bubble-streaming')).not.toBeNull();
+    act(() => bridge.emit(done('turn-1', 'Because.')));
+    expect(container.querySelector('.bubble-streaming')).toBeNull();
+  });
+
+  it('dims the field while a turn runs, keeps it focusable, and restores it after', async () => {
+    const bridge = createFakeHostBridge();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded />
+      </HostBridgeProvider>,
+    );
+    const field = screen.getByLabelText('Message Scout');
+    expect(field).not.toHaveAttribute('aria-busy', 'true');
+    await act(async () => ask2('Message Scout', 'why?'));
+    start(bridge);
+    expect(field).toHaveAttribute('aria-busy', 'true');
+    expect(field).not.toBeDisabled();
+    fireEvent.change(field, { target: { value: 'again' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(bridge.asks).toHaveLength(1);
+    act(() => bridge.emit(done('turn-1', 'Because.')));
+    expect(field).not.toHaveAttribute('aria-busy', 'true');
+  });
+});
+
 describe('CompanionBubble voice', () => {
   it.each([
     ['refusal', 'Declined'],
