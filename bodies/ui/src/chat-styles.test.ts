@@ -56,4 +56,11 @@ describe('CHAT_CSS chat window', () => {
   it('dims the field while a turn runs', () => {
     expect(ruleOf(CHAT_CSS, ".bubble-field input[aria-busy='true']")).toContain('opacity');
   });
+
+  it('rings the field in the focus variable, 2px, with at least 12px inside', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble--chat .bubble-field input:focus-visible')).toContain(
+      'outline: 2px solid var(--tg-focus)',
+    );
+    expect(minPadding(CHAT_CSS, '.bubble--chat .bubble-field input')).toBeGreaterThanOrEqual(12);
+  });
 });

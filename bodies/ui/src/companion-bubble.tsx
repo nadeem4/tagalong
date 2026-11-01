@@ -21,6 +21,7 @@ import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
 import { CloseIcon, CollapseIcon } from './chat-icons';
 import { ScoutMark } from './scout-mark';
+import { Keycap } from './controls';
 import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { DropCard, type DropOffer } from './drop-card';
@@ -628,12 +629,17 @@ export function CompanionBubble({
       )}
     </>
   );
-  const field = (label: string) => (
+  // Replying to Scout's own line, not asking cold.
+  const replying = scoutLine !== null || past[past.length - 1]?.question === null;
+  const field = (label: string, inChat = false) => (
     <label className="bubble-field">
-      <span>{label}</span>
+      <span className={inChat ? 'bubble-sr' : undefined}>{label}</span>
       {/* Named outright: the mic button inside the label would join its name in Chromium. */}
       <input
         aria-label={label}
+        placeholder={
+          inChat ? (replying ? `Reply to ${petName}` : `Ask ${petName} anything`) : undefined
+        }
         value={draft}
         autoFocus
         aria-busy={reply.state === 'running' ? 'true' : undefined}
@@ -689,7 +695,15 @@ export function CompanionBubble({
             aria-label={`Conversation with ${petName}`}
           >
             {past.length === 0 && question === null && scoutLine === null && (
-              <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
+              <div className="bubble-empty">
+                <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={48} />
+                <p>Ask {petName} anything about what is on your screen.</p>
+                {talk !== undefined && (
+                  <span className="bubble-empty-key">
+                    Hold <Keycap>{talk.keyLabel}</Keycap> to talk
+                  </span>
+                )}
+              </div>
             )}
             {past.map((exchange, index) => (
               <div key={index} className="bubble-exchange">
@@ -717,7 +731,7 @@ export function CompanionBubble({
             {statusRow}
             {talkStatus}
             {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
-            {field(`Message ${petName}`)}
+            {field(`Message ${petName}`, true)}
           </footer>
         </div>
       </Speech>

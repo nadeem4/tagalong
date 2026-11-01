@@ -644,6 +644,66 @@ describe('CompanionBubble, a turn in the chat window', () => {
   });
 });
 
+describe('CompanionBubble, the chat footer and empty state', () => {
+  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
+  const talk = (keyLabel: string) => ({
+    state: 'idle' as const,
+    onHeard: () => () => undefined,
+    note: null,
+    keyLabel,
+    onMic: () => undefined,
+  });
+  const chat = (props: Partial<Parameters<typeof CompanionBubble>[0]> = {}) =>
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" expanded {...props} />
+      </HostBridgeProvider>,
+    );
+
+  it('puts the status row above the field', () => {
+    const { container } = chat({ talk: { ...talk('Right Ctrl'), note: 'Nothing heard' } });
+    const foot = container.querySelector('.bubble-foot');
+    const field = foot?.querySelector('.bubble-field');
+    const status = foot?.querySelector('[role="status"]');
+    expect(status).not.toBeNull();
+    expect(status!.compareDocumentPosition(field!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('asks for a reply after a remark', () => {
+    chat({ remark: 'Your 3pm moved.' });
+    expect(screen.getByLabelText('Message Scout')).toHaveAttribute('placeholder', 'Reply to Scout');
+  });
+
+  it('keeps the default placeholder with no remark', () => {
+    chat();
+    expect(screen.getByLabelText('Message Scout')).toHaveAttribute(
+      'placeholder',
+      'Ask Scout anything',
+    );
+  });
+
+  it('shows the Bean and the same sentence in the empty chat', () => {
+    const { container } = chat({ scout: IDLE });
+    expect(screen.getByText('Ask Scout anything about what is on your screen.')).toBeVisible();
+    expect(container.querySelector('.bubble-empty .scout-mark')).toHaveStyle({ width: '48px' });
+  });
+
+  it('shows the real talk key as a keycap', () => {
+    const { container, unmount } = chat({ talk: talk('Right Ctrl') });
+    expect(container.querySelector('.bubble-empty kbd')).toHaveTextContent('Right Ctrl');
+    expect(container.querySelector('.bubble-empty')).toHaveTextContent('Hold Right Ctrl to talk');
+    unmount();
+    const second = chat({ talk: talk('F9') });
+    expect(second.container.querySelector('.bubble-empty kbd')).toHaveTextContent('F9');
+  });
+
+  it('shows no talk hint without a talk prop', () => {
+    const { container } = chat();
+    expect(container.querySelector('.bubble-empty kbd')).toBeNull();
+    expect(container.querySelector('.bubble-empty')).not.toHaveTextContent('to talk');
+  });
+});
+
 describe('CompanionBubble voice', () => {
   it.each([
     ['refusal', 'Declined'],

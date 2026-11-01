@@ -92,6 +92,19 @@ export const CHAT_CSS = `
 }
 .bubble-field input[aria-busy='true'] { opacity: 0.55; }
 
+/* The footer field: 12px inside, the mic within it, a 2px focus ring. */
+.bubble--chat .bubble-field input { padding: 12px 48px 12px 14px; border-color: ${t.color.fieldLine}; }
+.bubble--chat .bubble-field input:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 0; }
+.bubble--chat .bubble-field input::placeholder { color: ${t.color.textMuted}; }
+
+/* The empty chat: Bean, the one sentence, and the real talk key. */
+.bubble-empty {
+  margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 24px 40px; text-align: center;
+}
+.bubble-empty p { margin: 0; max-width: 260px; font-size: 14px; line-height: 21px; color: #C9CEE0; }
+.bubble-empty-key { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: ${t.color.textMuted}; }
+
 /* The approval card in the chat: the card surface, 16px inside. */
 .bubble--chat .card {
   padding: 16px; border: 1px solid ${t.color.fieldLine}; border-radius: 10px; background: ${t.color.sidebar};
