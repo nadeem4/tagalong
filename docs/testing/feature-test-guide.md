@@ -1735,6 +1735,14 @@ Brain tests only; nothing here installs anything.
    `find_experts` and say whether each is buildable here.
 3. Go offline and ask again. Within a day the cached list is served as normal; after a day (or with `fetched_at` in `cache/*.json` moved back) it is still served but flagged stale.
 
+### Private Node download
+
+1. `cd brain && uv run pytest tests/test_setup_node.py -q` passes (fakes and a loopback server).
+2. By hand with a real brain, once a later slice can trigger it: delete `<TAGALONG_HOME>/runtime/node`,
+   trigger the setup, and confirm the progress runs to done and `runtime/node` holds `node` and
+   npm. Run it again: nothing is downloaded. Your own `node --version` and PATH are unchanged.
+3. Cut the network mid-download: no `runtime/node.part` is left and any earlier Node still works.
+
 ## Not supported
 
 Do not test these here.
