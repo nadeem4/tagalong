@@ -15,6 +15,13 @@ export const themeTokens = {
     fieldLine: '#2E3558',
     gold: '#F2C14E',
     goldInk: '#12162B',
+    /** Focus ring: navy on light surfaces, gold on navy ones. */
+    focusOnLight: '#12162B',
+    focusOnNavy: '#F2C14E',
+    /** Keycaps (a shortcut key drawn as a key). */
+    keycapFill: '#FFFFFF',
+    keycapLine: '#C9CEDC',
+    keycapInk: '#12162B',
     chipFree: '#E6E9F2',
     chipFreeInk: '#4A5168',
     // The light page.
@@ -37,6 +44,8 @@ export const themeTokens = {
   font: {
     ui: "'Onest', system-ui, sans-serif",
     pixel: "'Pixelify Sans', 'Onest', sans-serif",
+    /** The name "Scout": Onest, never the pixel font (its c reads as o). */
+    wordmark: "'Onest', system-ui, sans-serif",
   },
   fontSize: {
     /** The smallest functional text. Nothing goes below it. */
@@ -48,7 +57,7 @@ export const themeTokens = {
     panelHeading: 15,
     title: 20,
   },
-  fontWeight: { semibold: 600, bold: 700 },
+  fontWeight: { semibold: 600, bold: 700, wordmark: 600 },
   space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24 },
   radius: { field: 8, row: 10, tile: 10, chip: 10, small: 8 },
   size: {
@@ -58,6 +67,10 @@ export const themeTokens = {
     focusRing: 2,
     focusOffset: 2,
     emptyTextWidth: 300,
+    toggleW: 44,
+    toggleH: 24,
+    /** Height of buttons, selects and fields in the shared controls. */
+    control: 36,
   },
   letterSpacing: { pixel: 1, title: 0.5 },
 } as const;

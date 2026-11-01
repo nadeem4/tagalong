@@ -18,7 +18,7 @@ export const HOME_CSS = `
 }
 .home-nav__who { display: flex; align-items: center; gap: ${t.space.lg}px; padding: 0 ${t.space.sm}px ${t.space.xl}px; }
 .home-nav__who span:last-child { display: flex; flex-direction: column; gap: 2px; }
-.home-nav__who strong { font-family: ${t.font.pixel}; font-size: 18px; letter-spacing: 0.5px; }
+.home-nav__who strong { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; font-size: 18px; }
 .home-nav__who small { font-size: ${t.fontSize.small}px; color: #7CB8F2; }
 .home-nav__tile {
   width: 56px; height: 56px; flex: none; display: flex; align-items: center; justify-content: center;

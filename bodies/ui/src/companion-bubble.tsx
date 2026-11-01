@@ -808,7 +808,7 @@ const BUBBLE_CSS = `
   flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 12px 10px 16px; border-bottom: 1px solid #262C4A; background: ${t.color.sidebar};
 }
-.bubble-head strong { font-family: ${t.font.pixel}; font-size: 16px; letter-spacing: 0.5px; }
+.bubble-head strong { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; font-size: 16px; }
 .bubble-head .bubble-quiet { align-self: center; }
 .bubble-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
 .bubble-exchange { display: flex; flex-direction: column; gap: 8px; }

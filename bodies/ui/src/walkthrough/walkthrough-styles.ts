@@ -27,7 +27,7 @@ export const WALKTHROUGH_CSS = `
   height: 140px; border-radius: ${t.radius.row + 2}px; background: #222845; overflow: hidden;
   display: grid; place-items: end center;
 }
-.wt-name { margin: 10px 0 0; font-family: ${t.font.pixel}; font-weight: ${t.fontWeight.bold}; font-size: 18px; letter-spacing: ${t.letterSpacing.title}px; }
+.wt-name { margin: 10px 0 0; font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; font-size: 18px; }
 .wt-role { margin: 2px 0 0; font-size: ${t.fontSize.small}px; color: #7CB8F2; }
 .wt-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .wt-steps button {
