@@ -11,6 +11,9 @@ chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
 elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
+FAKE_ACP_LOAD=1 advertises and serves session/load; FAKE_ACP_AUTH (JSON list of
+{id, name, description?}) sets auth_methods, and new_session/authenticate then fail with
+auth-required unless FAKE_ACP_LOGGED_IN=1.
 """
 
 import asyncio
@@ -49,11 +52,33 @@ class FakeAgent:
     async def initialize(self, protocol_version, client_capabilities=None, **kw):
         if os.environ.get("FAKE_ACP_HANG_INIT"):
             await asyncio.Event().wait()  # an adapter that never answers the handshake
+        auth = json.loads(os.environ.get("FAKE_ACP_AUTH", "[]"))
         return schema.InitializeResponse(
-            protocol_version=1, agent_info=schema.Implementation(name="fake-acp", version="0")
+            protocol_version=1,
+            agent_info=schema.Implementation(name="fake-acp", version="0"),
+            agent_capabilities=schema.AgentCapabilities(
+                load_session=bool(os.environ.get("FAKE_ACP_LOAD"))
+            ),
+            auth_methods=[schema.AuthMethodAgent(**m) for m in auth],
         )
 
+    def _needs_login(self) -> bool:
+        return bool(os.environ.get("FAKE_ACP_AUTH")) and not os.environ.get("FAKE_ACP_LOGGED_IN")
+
+    async def authenticate(self, method_id, **kw):
+        if self._needs_login():
+            raise acp.RequestError.auth_required()
+        return schema.AuthenticateResponse()
+
+    async def load_session(self, cwd, session_id, **kw):
+        # Method-not-found without the flag, like an adapter that cannot resume a session.
+        if not os.environ.get("FAKE_ACP_LOAD"):
+            raise acp.RequestError.method_not_found("session/load")
+        return schema.LoadSessionResponse()
+
     async def new_session(self, cwd, **kw):
+        if self._needs_login():
+            raise acp.RequestError.auth_required()
         modes = schema.SessionModeState(
             current_mode_id="default",
             available_modes=[schema.SessionMode(id=i, name=n, description=d) for i, n, d in MODES],

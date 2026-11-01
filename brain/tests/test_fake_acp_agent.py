@@ -271,3 +271,70 @@ async def test_a_late_cancel_does_not_cancel_the_next_prompt(tmp_path):
         result = await conn.prompt(prompt=prompt_blocks("two"), session_id=session.session_id)
         assert result.stop_reason == "end_turn"
         assert client.texts() == ["again", "again"]
+
+
+@asynccontextmanager
+async def running_with_env(tmp_path: Path, **extra: str):
+    # Raw spawn, no initialize: the capability tests read the handshake themselves.
+    log = tmp_path / "log.jsonl"
+    env = {"FAKE_ACP_LOG": str(log), **extra}
+    async with acp.spawn_agent_process(
+        Recorder(), sys.executable, str(AGENT), env=env, use_unstable_protocol=True
+    ) as (conn, _process):
+        yield conn, log
+
+
+async def test_initialize_advertises_load_session_only_with_fake_acp_load(tmp_path):
+    async with running_with_env(tmp_path) as (conn, _log):
+        assert not (await conn.initialize(protocol_version=1)).agent_capabilities.load_session
+    async with running_with_env(tmp_path, FAKE_ACP_LOAD="1") as (conn, _log):
+        assert (await conn.initialize(protocol_version=1)).agent_capabilities.load_session
+
+
+async def test_load_session_is_logged_and_returns(tmp_path):
+    async with running_with_env(tmp_path, FAKE_ACP_LOAD="1") as (conn, log):
+        await conn.initialize(protocol_version=1)
+        await conn.load_session(cwd=str(tmp_path), session_id="sess-9", mcp_servers=[])
+    frames = [f for f in logged(log) if f.get("method") == "session/load"]
+    assert frames[0]["params"]["sessionId"] == "sess-9"
+
+
+async def test_load_session_without_the_flag_is_method_not_found(tmp_path):
+    async with running_with_env(tmp_path) as (conn, _log):
+        await conn.initialize(protocol_version=1)
+        with pytest.raises(acp.RequestError) as caught:
+            await conn.load_session(cwd=str(tmp_path), session_id="sess-9", mcp_servers=[])
+    assert caught.value.code == -32601
+
+
+AUTH = json.dumps([{"id": "claude-login", "name": "Log in", "description": "Browser login"}])
+
+
+async def test_auth_methods_are_advertised_from_fake_acp_auth(tmp_path):
+    async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH) as (conn, _log):
+        methods = (await conn.initialize(protocol_version=1)).auth_methods
+    assert [(m.id, m.name, m.description) for m in methods] == [
+        ("claude-login", "Log in", "Browser login")
+    ]
+
+
+async def test_new_session_needs_login_when_auth_methods_are_set_and_not_logged_in(tmp_path):
+    async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH) as (conn, _log):
+        await conn.initialize(protocol_version=1)
+        with pytest.raises(acp.RequestError) as caught:
+            await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+    assert caught.value.code == -32000
+    async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH, FAKE_ACP_LOGGED_IN="1") as (c, _l):
+        await c.initialize(protocol_version=1)
+        assert (await c.new_session(cwd=str(tmp_path), mcp_servers=[])).session_id
+
+
+async def test_authenticate_succeeds_only_when_logged_in(tmp_path):
+    async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH) as (conn, _log):
+        await conn.initialize(protocol_version=1)
+        with pytest.raises(acp.RequestError) as caught:
+            await conn.authenticate(method_id="claude-login")
+    assert caught.value.code == -32000
+    async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH, FAKE_ACP_LOGGED_IN="1") as (c, _l):
+        await c.initialize(protocol_version=1)
+        await c.authenticate(method_id="claude-login")
