@@ -34,6 +34,7 @@ export function makeWalkthroughHost(
     ),
     setKey: vi.fn((_key: string): Promise<KeyResult> => Promise.resolve('ok')),
     setDailyLimit: vi.fn(() => Promise.resolve()),
+    usageSummary: vi.fn(() => Promise.resolve({ spentUsd: 0.42, limitUsd: 5 })),
     onBrainChanged: vi.fn((_handler: (what: string) => void) => () => undefined),
     openWalkthrough: vi.fn(() => Promise.resolve()),
     expertStatus: vi.fn(() => Promise.resolve({ found: true, command: 'claude-agent-acp' })),

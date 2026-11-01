@@ -112,4 +112,32 @@ describe('StepEight', () => {
     expect(preview).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByRole('button', { name: 'Allow once' })).not.toBeInTheDocument();
   });
+
+  it('shows Spent today beside the limit', async () => {
+    mountStep(<StepEight host={makeWalkthroughHost()} />);
+    expect(await screen.findByText('Spent today: $0.42')).toBeInTheDocument();
+  });
+
+  it('Next still saves only the limit, never reading spend again', async () => {
+    const host = makeWalkthroughHost();
+    const step = mountStep(<StepEight host={host} />);
+    await screen.findByText('Spent today: $0.42');
+    await waitFor(() => expect(step.registered()).toBe(true));
+    fireEvent.change(limit(), { target: { value: '8' } });
+    await step.save();
+    expect(host.setDailyLimit).toHaveBeenCalledTimes(1);
+    expect(host.usageSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('an unreadable spend does not block Next', async () => {
+    const host = makeWalkthroughHost();
+    host.usageSummary.mockImplementation(() => Promise.reject(new Error('offline')));
+    const step = mountStep(<StepEight host={host} />);
+    await screen.findByDisplayValue('5');
+    await waitFor(() => expect(step.registered()).toBe(true));
+    fireEvent.change(limit(), { target: { value: '9' } });
+    await step.save();
+    expect(host.setDailyLimit).toHaveBeenCalledWith(9);
+    expect(screen.queryByText(/Spent today/)).not.toBeInTheDocument();
+  });
 });

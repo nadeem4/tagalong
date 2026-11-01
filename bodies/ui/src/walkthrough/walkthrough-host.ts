@@ -1,5 +1,5 @@
 /**
- * What the walkthrough needs from its host: the key calls it shares with Settings, the expert
+ * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, the expert
  * check, finishing the tour, and the settings, voice, browser-folder and Home calls the steps use. Contains
  * WalkthroughHost and WalkthroughSettings.
  */
@@ -37,7 +37,7 @@ export interface VoicePreview {
 
 export type WalkthroughHost = Pick<
   HostBridge,
-  'keyStatus' | 'setKey' | 'setDailyLimit' | 'onBrainChanged' | 'openWalkthrough'
+  'keyStatus' | 'setKey' | 'setDailyLimit' | 'onBrainChanged' | 'openWalkthrough' | 'usageSummary'
 > & {
   expertStatus(): Promise<ExpertStatus>;
   /** Marks the tour seen and closes its window. Only Finish and Skip (with a key) call it. */
