@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppInfo } from '../shapes';
 import { useHostBridge, type BrainLink } from '../host-bridge';
-import { STATUS_DOT, STATUS_WORDS } from './connections-panel';
+import { STATUS_DOT, STATUS_WORDS } from './connection-row';
 
 // Link states reuse the apps' dots; words say it too, so colour never carries it alone.
 const LINK: Record<BrainLink['status'], { words: string; dot: string }> = {

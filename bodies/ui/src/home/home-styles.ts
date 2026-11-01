@@ -95,9 +95,14 @@ export const HOME_CSS = `
   padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine};
 }
 .home-conn__head { display: flex; align-items: center; gap: ${t.space.lg}px; }
+.home-conn__initial {
+  width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: ${t.radius.row}px; background: ${t.color.panelTile}; font-weight: ${t.fontWeight.semibold};
+}
+.home-conn__head .home-entry__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-conn__head .tg-chip { flex: none; }
 .home-conn__head .tg-error { font-weight: 400; }
-.home-conn__actions { display: flex; align-items: center; gap: ${t.space.md}px; }
+.home-conn__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__advanced { margin-top: ${t.space.xl}px; }
