@@ -55,9 +55,11 @@ export {
   Button,
   Keycap,
   Shortcut,
+  LevelMeter,
+  MicTest,
   CONTROLS_CSS,
 } from './controls';
-export type { ButtonVariant } from './controls';
+export type { ButtonVariant, MicWatcher } from './controls';
 
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
