@@ -132,7 +132,7 @@ stateDiagram-v2
 and `Selected text`. Removing one leaves that part out of the ask (`without`). A new snapshot
 brings every chip back.
 
-**The header.** The mic button sits inside the question box. **Always listening** and **Seeing**
+**The header.** The bubble's surface is `on-navy` (and injects `CONTROLS_CSS`), so focus rings are gold. In the compact bubble the header row holds only the switches, the speaking indicator and ×; the context chips sit in their own row below it, so they never crowd the close button. The mic button sits inside the question box (the box pads 44px on the right for it). **Always listening** and **Seeing**
 are `role="switch"` buttons with `aria-checked`; Seeing calls `toggleSightPause` (the same pause as
 the hotkey and the tray). The question box has its own `aria-label` ("Ask Scout", "Message Scout")
 so the mic button inside its label never joins its name. A speaking indicator (three bars scaled

@@ -520,6 +520,19 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
 
 ## Settings
 
+### S.5. One Save, switches and keycaps
+
+1. **Action:** open Home → Settings.
+2. **Expected:** there is one **Save**, at the top beside the heading and none at the bottom. Each
+   section is a card like the other Home tabs, on the same page width. Seeing, Always listening and
+   Scout talks are On/Off switches (Space or Enter flips them). The three shortcuts show as keycaps
+   (Ctrl, Shift, Space), never "CommandOrControl".
+3. **Action:** change a voice setting, a shortcut and press **Check key** or **Set limit** before
+   pressing Save.
+4. **Expected:** Check key and Set limit work on their own and do not save the page; Save then saves
+   the voice and shortcut edits once. With the key set in the environment the key field is disabled
+   and reads "Set by your environment".
+
 ### S.6. A shortcut another app uses
 
 1. **Setup:** another app holding Ctrl+Shift+Space (or type an accelerator Windows refuses).

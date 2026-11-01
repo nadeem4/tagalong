@@ -157,6 +157,15 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   const panel = await windowFor('panel');
   const mic = panel.getByRole('button', { name: 'Talk to Scout' });
   await mic.waitFor({ state: 'visible', timeout: 30_000 });
+  // The mic sits inside the ask field's box, not over its text.
+  const fieldBox = await panel.getByRole('textbox', { name: 'Ask Scout' }).boundingBox();
+  const micBox = await mic.boundingBox();
+  expect(fieldBox).not.toBeNull();
+  expect(micBox).not.toBeNull();
+  expect(micBox!.x).toBeGreaterThanOrEqual(fieldBox!.x);
+  expect(micBox!.x + micBox!.width).toBeLessThanOrEqual(fieldBox!.x + fieldBox!.width);
+  expect(micBox!.y).toBeGreaterThanOrEqual(fieldBox!.y);
+  expect(micBox!.y + micBox!.height).toBeLessThanOrEqual(fieldBox!.y + fieldBox!.height);
   await mic.click();
   await expect(panel.getByRole('button', { name: 'Stop listening' })).toBeVisible();
   await expect(panel.getByText(/Listening/)).toBeVisible();
@@ -348,6 +357,20 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   for (const section of ['Privacy', 'Shortcuts']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
+
+  // One Save, at the top; the shortcuts are keycaps; a switch answers the keyboard.
+  await expect(home.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
+  await expect(home.getByRole('region', { name: 'Shortcuts' }).locator('kbd').first()).toHaveText(
+    'Ctrl',
+  );
+  await expect(home.getByText('CommandOrControl', { exact: false }).first()).toBeHidden();
+  const seeing = home.getByRole('switch', { name: 'Seeing' });
+  const seeingBefore = await seeing.getAttribute('aria-checked');
+  await seeing.focus();
+  await home.keyboard.press('Space');
+  await expect(seeing).not.toHaveAttribute('aria-checked', seeingBefore ?? '');
+  await home.keyboard.press('Space');
+  await expect(seeing).toHaveAttribute('aria-checked', seeingBefore ?? '');
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();

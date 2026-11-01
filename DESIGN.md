@@ -301,7 +301,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Primary
 
-- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the hand-off working dot, text selection and the focus ring in Settings and Home. Ink on gold is always **Gold Ink** (gold-ink).
+- **Gold** (gold): the primary button fill (`Button` primary, `bubble-primary`), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the hand-off working dot, text selection and the focus ring in Settings and Home. Ink on gold is always **Gold Ink** (gold-ink).
 
 ### Secondary
 
@@ -368,7 +368,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 - **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the listening dot 8px up and 16px in from the bottom corner, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
-- **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
+- **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the same 920px page as every other tab.
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
 
@@ -421,7 +421,7 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 
 ### Settings controls
 
-Scoped under `.tg-settings`. **Primary** (`tg-btn`): Gold, 40px, 8px, Onest 600 14px, 16px padding. **Quiet** (`tg-btn-quiet`): transparent with a 1px border (Panel Muted on light pages, Field Line on navy). **Fields:** Control Fill (white) in the shared controls, Panel Tile fill in Settings, 1px Panel Line border, 8px, 40px, 14px; invalid gets a 2px Err Ink border. **Chips:** 11px 600 pills at 10px radius, neutral, ok, warn or err, always with a word. **Switches** (`role="switch"`): 32px, min 64px, Panel Muted outline; on is Gold. **Choices:** 2px Panel Line border, Gold when checked. Embedded in Home, each section is a white card with a 12px radius and 24px by 28px padding. Alerts use the warn and err fills; ⓘ buttons are 24px round.
+Scoped under `.tg-settings`. **Save** is the shared primary `Button`, once, at the top right beside the page heading; the status line sits under it. **Quiet** (`tg-btn-quiet`): transparent with a 1px border (Panel Muted on light pages, Field Line on navy). **Fields:** Control Fill (white) in the shared controls, Panel Tile fill in Settings, 1px Panel Line border, 8px, 40px, 14px; invalid gets a 2px Err Ink border. **Chips:** 11px 600 pills at 10px radius, neutral, ok, warn or err, always with a word. **Switches** are the shared `Toggle`; Voice's pickers and speed are the shared `Select` and `Slider`, each carried into Save by a hidden field of the same name. Shortcuts show as keycaps above their accelerator field. **Choices:** 2px Panel Line border, Gold when checked. Embedded in Home, each section is a white card with a 12px radius and 20px by 24px padding, the same box as every Home card. Alerts use the warn and err fills; ⓘ buttons are 24px round.
 
 ### Shared controls
 
