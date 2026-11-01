@@ -13,7 +13,8 @@ wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": s
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
 FAKE_ACP_LOAD=1 advertises and serves session/load; FAKE_ACP_AUTH (JSON list of
 {id, name, description?}) sets auth_methods, and new_session/authenticate then fail with
-auth-required unless FAKE_ACP_LOGGED_IN=1.
+auth-required unless FAKE_ACP_LOGGED_IN=1. FAKE_ACP_AUTH='[]' means login
+is required with no methods advertised (claude-acp without auth.terminal).
 """
 
 import asyncio
