@@ -29,6 +29,8 @@ describe('ui package surface', () => {
         'Button',
         'Keycap',
         'Shortcut',
+        'LevelMeter',
+        'MicTest',
         'CONTROLS_CSS',
         'PushToTalk',
         'ListenController',

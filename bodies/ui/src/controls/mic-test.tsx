@@ -39,7 +39,6 @@ export function MicTest({
 
   useEffect(() => {
     if (!on) return;
-    setLevel(0);
     const watching = watch(deviceId, setLevel, (reason) => {
       setFailure(reason);
       setOn(false);
@@ -61,6 +60,7 @@ export function MicTest({
           variant="secondary"
           onClick={() => {
             setFailure(null);
+            setLevel(0);
             setOn(!on);
           }}
         >
