@@ -1,11 +1,12 @@
 /**
  * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
  * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold
- * to speak, and which microphone listens. The pickers and the speed are the shared controls, which
+ * to speak, and which microphone listens, with a local level test. The pickers and the speed are the shared controls, which
  * have no form name, so each value rides in a hidden input that buildSettingsPatch reads.
  */
 import { useEffect, useState } from 'react';
-import { Button, Select, Slider, Toggle } from '@tagalong/ui';
+import { Button, MicTest, Select, Slider, Toggle } from '@tagalong/ui';
+import type { MicWatcher } from '@tagalong/ui';
 import {
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
@@ -15,10 +16,18 @@ import {
 } from '../../../shared/settings';
 import { adaptersFor, chosenMouth } from '../../../shared/voice';
 import type { Settings, VoiceId } from '../../../shared/settings';
-import { listMicrophones } from '../mic';
+import { listMicrophones, openMic } from '../mic';
+import { watchLevel } from '../mic-level';
 import { voiceFacts } from '../settings-form';
 import { previewVoice } from '../voice-player';
 import { Info, Section, Tip, useInvalid } from './section';
+
+/**
+ * The level meter's own short-lived mic, not the talk key's. Talking happens in another window,
+ * which this one cannot see, so the test stops whenever this window loses focus instead.
+ */
+const watchMicLevel: MicWatcher = (deviceId, onLevel, onError) =>
+  watchLevel(() => openMic(deviceId), onLevel, onError);
 
 /** What ▶ Preview says, in the voice and at the speed the form shows. */
 const PREVIEW_LINE = 'Certainly. I shall let you know what I find.';
@@ -180,6 +189,11 @@ export function VoiceSection({
           <input type="hidden" name="microphoneId" value={microphone} />
         </div>
       </div>
+      <MicTest
+        watch={watchMicLevel}
+        deviceId={microphone === '' ? undefined : microphone}
+        stopOnBlur
+      />
       <p className="tg-help">
         Hold the key on its own and speak; let go and Scout answers out loud. Pressing another key
         while you hold it (Right Ctrl+C, say) sends nothing. Tagalong watches only this key go down
