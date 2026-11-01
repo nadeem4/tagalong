@@ -5,6 +5,7 @@
  * Contains Footer.
  */
 
+import { Button } from '../controls';
 import { STEPS } from './steps';
 
 interface FooterProps {
@@ -34,9 +35,9 @@ export function Footer({
   return (
     <footer className="wt-footer">
       {step > 1 && (
-        <button type="button" className="wt-back" disabled={busy} onClick={onBack}>
+        <Button variant="secondary" className="wt-back" disabled={busy} onClick={onBack}>
           Back
-        </button>
+        </Button>
       )}
       {error !== '' && (
         <p className="wt-error" role="alert">

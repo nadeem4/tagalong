@@ -126,7 +126,7 @@ test('existing user with a key sees it once, can skip the key step, then never a
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Finish' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
-  await tour.getByRole('button', { name: 'Close' }).click();
+  await tour.getByRole('button', { name: 'Done' }).click();
   await expectClosedAndDone();
   await expect.poll(() => visible('avatar')).toBe(true);
 
@@ -191,7 +191,7 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
   await expect(tour.getByLabel('API key')).toHaveValue('');
   expect(brain!.keyAttempts).toBe(2);
   await tour.getByRole('button', { name: 'Finish' }).click();
-  await tour.getByRole('button', { name: 'Close' }).click();
+  await tour.getByRole('button', { name: 'Done' }).click();
   await expectClosedAndDone();
   expect(settingsFile()).not.toContain(FAKE_KEY);
 
@@ -216,7 +216,7 @@ test('Finish marks the tour seen at once, so closing the card with X never bring
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await expect.poll(tourDone, { timeout: 15_000 }).toBe(true);
 
-  // The window's own X, not the card's Close button.
+  // The window's own X, not the card's Done button.
   await app!.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
@@ -321,6 +321,60 @@ test('a small work area still keeps the footer in view and nothing wider than th
       .toEqual({ footerInView: true, noSideScroll: true });
     if (step < 9) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
+});
+
+test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 8);
+  await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
+  await tour.getByRole('button', { name: 'Next' }).click();
+  await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  await tour.getByRole('button', { name: 'Finish' }).click();
+  await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
+  await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
+});
+
+test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish on step 9 in view', async () => {
+  await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
+  const tour = await windowFor('walkthrough');
+  // 1366x768 at 150% leaves about 910x512 DIPs.
+  await app!.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().includes('walkthrough.html'))
+      ?.setContentSize(910, 512),
+  );
+  // Skip is on every step but the last, so check it on step 8 and Finish on step 9.
+  await nextTo(tour, 8);
+  await expect(tour.getByRole('button', { name: 'Skip' })).toBeInViewport();
+  await tour.getByRole('button', { name: 'Next' }).click();
+  await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  await expect(tour.getByRole('button', { name: 'Finish' })).toBeInViewport();
+});
+
+test('the voice step works from the keyboard: switch, slider and select', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 5);
+  const talks = tour.getByRole('switch', { name: 'Scout talks' });
+  await expect(talks).toHaveAttribute('aria-checked', 'true');
+  await talks.focus();
+  await tour.keyboard.press('Space');
+  await expect(talks).toHaveAttribute('aria-checked', 'false');
+  await tour.keyboard.press('Enter');
+  await expect(talks).toHaveAttribute('aria-checked', 'true');
+
+  const speed = tour.getByLabel('Speed');
+  await speed.focus();
+  const before = Number(await speed.inputValue());
+  await tour.keyboard.press('ArrowRight');
+  expect(Number(await speed.inputValue())).toBeGreaterThan(before);
+
+  const talk = tour.getByLabel('Talk key');
+  await expect(talk).toHaveValue('RightControl');
+  await talk.focus();
+  await tour.keyboard.press('ArrowDown');
+  await expect(talk).not.toHaveValue('RightControl');
 });
 
 async function fitOf(tour: Page) {

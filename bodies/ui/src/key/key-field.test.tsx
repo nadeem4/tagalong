@@ -253,6 +253,15 @@ describe('LimitField', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Enter an amount above $0.');
   });
 
+  it('Enter in the field saves the limit', async () => {
+    const setDailyLimit = vi.fn((_usd: number) => Promise.resolve());
+    render(<LimitField host={{ setDailyLimit }} limitUsd={5} />);
+    const field = screen.getByLabelText('Daily limit (USD)');
+    fireEvent.change(field, { target: { value: '9' } });
+    fireEvent.keyDown(field, { key: 'Enter' });
+    await waitFor(() => expect(setDailyLimit).toHaveBeenCalledWith(9));
+  });
+
   it('strips Electron’s wrapper from a rejected limit', async () => {
     const setDailyLimit = vi.fn(() =>
       Promise.reject(
@@ -279,6 +288,6 @@ describe('LimitField', () => {
     const host = { setDailyLimit: () => Promise.resolve() };
     const { rerender } = render(<LimitField host={host} limitUsd={5} />);
     rerender(<LimitField host={host} limitUsd={8} />);
-    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue(8);
+    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('8');
   });
 });

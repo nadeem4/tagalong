@@ -38,6 +38,11 @@ describe('Slider', () => {
     expect(screen.getByText('5x')).toBeInTheDocument();
   });
 
+  it('sets --fill from where the value sits between min and max', () => {
+    const { input } = setup(5);
+    expect(input.style.getPropertyValue('--fill')).toBe('50%');
+  });
+
   it('shows the plain number without a formatter', () => {
     setup(3);
     expect(screen.getByText('3')).toBeInTheDocument();

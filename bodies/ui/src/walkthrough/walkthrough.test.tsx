@@ -129,7 +129,9 @@ describe('Walkthrough, the end', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Let Scout read your browser tabs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await screen.findByRole('heading', { name: 'You stay in charge' });
+    await screen.findByRole('heading', { name: 'Scout asks first, and you set the limit' });
+    // Dense steps scroll inside the content panel, with the footer outside it.
+    expect((await screen.findByLabelText('Daily limit (USD)')).closest('.wt-body')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Add your Anthropic API key' });
     expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
@@ -142,7 +144,7 @@ describe('Walkthrough, the end', () => {
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
-  it('Finish with a key opens the finish card; Close finishes once, Open Home opens Home first', async () => {
+  it('Finish with a key opens the finish card; Done finishes once, Open Home opens Home first', async () => {
     const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
@@ -150,9 +152,8 @@ describe('Walkthrough, the end', () => {
     // Finish marks the tour seen at once, without closing, so closing the card with X is safe.
     expect(host.finishWalkthrough).toHaveBeenCalledTimes(1);
     expect(host.finishWalkthrough).toHaveBeenCalledWith({ close: false });
-    expect(screen.getByText('Ctrl+Shift+Space')).toBeInTheDocument();
-    expect(screen.getByText('Right Ctrl')).toBeInTheDocument();
-    const close = screen.getByRole('button', { name: 'Close' });
+    expect(screen.getAllByText(/^(Ctrl|Shift|Space|Right Ctrl)$/)).toHaveLength(4);
+    const close = screen.getByRole('button', { name: 'Done' });
     fireEvent.click(close);
     fireEvent.click(close);
     // Once to mark the tour seen (no close), once to close; the double click closes once.
@@ -169,7 +170,7 @@ describe('Walkthrough, the end', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not close.');
   });
 

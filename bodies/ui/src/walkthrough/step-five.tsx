@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Button, Select, Slider, Toggle } from '../controls';
 import { useStepSave, useWalkthroughSettings } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -64,94 +65,80 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
     if (patch.hotkeys !== undefined || patch.voice !== undefined) await host.saveSettings(patch);
   });
 
+  const micOptions = [
+    { value: '', label: 'System default' },
+    ...mics.map((m) => ({ value: m.id, label: m.label })),
+  ];
+
   return (
     <div className="wt-form">
       <div>
-        <label htmlFor="wt-talk">Talk key</label>
-        <select id="wt-talk" value={talk} onChange={(event) => setTalk(event.target.value)}>
-          {TALK_KEYS.map((key) => (
-            <option key={key.value} value={key.value}>
-              {key.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          id="wt-talk"
+          label="Talk key"
+          value={talk}
+          onChange={setTalk}
+          options={[...TALK_KEYS]}
+        />
         <p className="wt-help">(hold it on its own)</p>
       </div>
-      <div className="wt-row">
-        <input
-          id="wt-talks"
-          type="checkbox"
-          role="switch"
-          aria-label="Scout talks"
-          checked={enabled}
-          onChange={(event) => setEnabled(event.target.checked)}
-        />
+      <div className="wt-row wt-switchrow">
         <div>
-          <span>Scout talks</span>
+          <span className="wt-strong">Scout talks</span>
           <p className="wt-help">Reads answers aloud, so you can look away.</p>
         </div>
+        <Toggle id="wt-talks" label="Scout talks" checked={enabled} onChange={setEnabled} />
       </div>
       <div>
-        <label htmlFor="wt-mouth">Who speaks</label>
-        <select
+        <Select
           id="wt-mouth"
+          label="Who speaks"
           value={mouth}
-          onChange={(event) => setMouth(event.target.value === 'system' ? 'system' : 'kokoro')}
-        >
-          <option value="kokoro">Kokoro (on the brain)</option>
-          <option value="system">System voice</option>
-        </select>
+          onChange={(next) => setMouth(next === 'system' ? 'system' : 'kokoro')}
+          options={[
+            { value: 'kokoro', label: 'Kokoro (on the brain)' },
+            { value: 'system', label: 'System voice' },
+          ]}
+        />
         <p className="wt-help">
           Made on your computer. The voice downloads the first time Scout speaks (about 92 MB);
           until then Scout uses the Windows voice.
         </p>
       </div>
       <div>
-        <label htmlFor="wt-voice">Voice</label>
-        <select id="wt-voice" value={voice} onChange={(event) => setVoice(event.target.value)}>
-          {VOICES.map((v) => (
-            <option key={v.value} value={v.value}>
-              {v.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className="wt-quiet"
-          onClick={() => {
-            setPreviewFailed(false);
-            host
-              .previewVoice({ text: SAMPLE, mouth, voice, speed })
-              .catch(() => setPreviewFailed(true));
-          }}
-        >
-          Preview
-        </button>
+        <div className="wt-pair">
+          <Select
+            id="wt-voice"
+            label="Voice"
+            value={voice}
+            onChange={setVoice}
+            options={[...VOICES]}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPreviewFailed(false);
+              host
+                .previewVoice({ text: SAMPLE, mouth, voice, speed })
+                .catch(() => setPreviewFailed(true));
+            }}
+          >
+            Preview
+          </Button>
+        </div>
         {previewFailed && <p className="wt-help">The preview could not play.</p>}
       </div>
-      <div>
-        <label htmlFor="wt-speed">Speed {speed.toFixed(2)}x</label>
-        <input
-          id="wt-speed"
-          type="range"
-          min={0.7}
-          max={1.3}
-          step={0.05}
-          value={speed}
-          onChange={(event) => setSpeed(Number(event.target.value))}
-        />
-      </div>
-      <div>
-        <label htmlFor="wt-mic">Microphone</label>
-        <select id="wt-mic" value={mic} onChange={(event) => setMic(event.target.value)}>
-          <option value="">System default</option>
-          {mics.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Slider
+        id="wt-speed"
+        label="Speed"
+        value={speed}
+        min={0.7}
+        max={1.3}
+        step={0.05}
+        onChange={setSpeed}
+        format={(n) => `${n.toFixed(2)}x`}
+      />
+      <Select id="wt-mic" label="Microphone" value={mic} onChange={setMic} options={micOptions} />
       <p className="wt-help">
         Your voice is turned into text by your own brain and is never stored. With the brain on this
         computer, it never leaves it. The listening models download the first time you talk (about
@@ -165,6 +152,7 @@ export function StepFive({ host }: { host: WalkthroughHost }) {
   const { settings, failed } = useWalkthroughSettings(host);
   return (
     <section>
+      <span className="wt-label">Voice</span>
       <h1>Talk to Scout, and hear it back</h1>
       <p className="wt-lead">
         Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the

@@ -48,20 +48,23 @@ describe('StepSix', () => {
     );
   });
 
-  it('lists the experts still to come', async () => {
+  it('heading is about bigger jobs and shows the hand-off preview', async () => {
     render(<StepSix host={makeWalkthroughHost()} />);
     await screen.findByText(/is installed/);
-    for (const text of [
-      'Gemini CLI',
-      'Codex',
-      'Other coding agents',
-      'Model APIs and tool servers',
-    ]) {
-      expect(screen.getByText(text, { exact: false })).toBeInTheDocument();
-    }
-    expect(screen.getAllByText('Coming soon')).toHaveLength(3);
-    expect(screen.getByText('Later')).toBeInTheDocument();
+    expect(screen.getByText('Bigger jobs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'For bigger jobs, Scout calls in an expert' }),
+    ).toBeVisible();
     expect(screen.getByText('Hand this to Claude Code?')).toBeInTheDocument();
-    expect(screen.queryByText(/Try it/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('says more experts are coming, without a list of future ones', async () => {
+    render(<StepSix host={makeWalkthroughHost()} />);
+    await screen.findByText(/is installed/);
+    expect(screen.getByText('More experts are coming.')).toBeInTheDocument();
+    for (const gone of ['Gemini CLI', 'Codex', 'Coming soon', 'Later']) {
+      expect(screen.queryByText(gone, { exact: false })).not.toBeInTheDocument();
+    }
   });
 });

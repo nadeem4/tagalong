@@ -1,20 +1,14 @@
 /**
  * Walkthrough step 6: experts do the heavy work. Asks the brain whether Claude Code's connector
- * is installed (never whether the login works) and lists the experts still to come. Contains
- * StepSix. Words are the spec's step copy.
+ * is installed (never whether the login works), walks through a hand-off and previews the card.
+ * Contains StepSix. Words are the spec's step copy.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Button } from '../controls';
 import type { WalkthroughHost } from './walkthrough-host';
 
 const INSTALL = 'npm install -g @agentclientprotocol/claude-agent-acp';
-
-const COMING: readonly { name: string; note: string; when: 'Coming soon' | 'Later' }[] = [
-  { name: 'Gemini CLI', note: 'Google’s coding agent', when: 'Coming soon' },
-  { name: 'Codex', note: 'OpenAI’s coding agent', when: 'Coming soon' },
-  { name: 'Other coding agents', note: '', when: 'Coming soon' },
-  { name: 'Model APIs and tool servers', note: 'Experts that aren’t coding agents', when: 'Later' },
-];
 
 type Check = 'checking' | 'found' | 'missing' | 'offline';
 
@@ -39,7 +33,8 @@ export function StepSix({ host }: { host: Pick<WalkthroughHost, 'expertStatus'> 
 
   return (
     <section>
-      <h1>Experts do the heavy work</h1>
+      <span className="wt-label">Bigger jobs</span>
+      <h1>For bigger jobs, Scout calls in an expert</h1>
       <p className="wt-lead">
         When something needs real work, Scout writes a brief and hands it to an expert. You read it
         and press Send; the expert works in the background, and Scout tells you when it’s done.
@@ -47,6 +42,7 @@ export function StepSix({ host }: { host: Pick<WalkthroughHost, 'expertStatus'> 
       </p>
       <div className="wt-cols">
         <div>
+          <span className="wt-label">Your expert</span>
           <div className="wt-card" role="status">
             <h3>Claude Code</h3>
             {check === 'found' && (
@@ -63,51 +59,47 @@ export function StepSix({ host }: { host: Pick<WalkthroughHost, 'expertStatus'> 
               <p className="wt-help">Scout’s brain is not running, so it can’t check.</p>
             )}
             {check !== 'found' && (
-              <button
-                type="button"
-                className="wt-quiet"
+              <Button
+                variant="quiet"
+                className="wt-after"
                 disabled={check === 'checking'}
                 onClick={again}
               >
                 Check again
-              </button>
+              </Button>
             )}
           </div>
           <p className="wt-help" style={{ marginTop: 12 }}>
             Claude Code runs on your own Claude login, not the API key you’ll add at the end. Follow
             each job in Home &gt; Jobs.
           </p>
-          <div style={{ marginTop: 24 }}>
-            <span className="wt-label">Coming next</span>
-            <ul className="wt-rows">
-              {COMING.map((expert) => (
-                <li key={expert.name}>
-                  <span>
-                    {expert.name}
-                    {expert.note !== '' && <span className="wt-help"> {expert.note}</span>}
-                  </span>
-                  <span className="wt-tag">{expert.when}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="wt-help">
-              Each expert you add shows up here and in Home, and Scout picks the right one for the
-              job.
-            </p>
-          </div>
+          <span className="wt-label wt-sub-label">How a hand-off goes</span>
+          <ol className="wt-steplist">
+            <li>Scout writes a short brief.</li>
+            <li>You read it and press Send.</li>
+            <li>Scout tells you when it’s done.</li>
+          </ol>
         </div>
         <div aria-hidden="true">
-          <span className="wt-label">What it looks like</span>
-          <div className="wt-example">
-            <span className="wt-chip">Hand this to Claude Code?</span>
-            <p>Folder ~\shop-api</p>
-            <p>Fix the empty-cart crash in billing.ts and add a test.</p>
-            <span className="wt-fake-button">Edit</span>{' '}
-            <span className="wt-fake-button">Send</span>
-            <p>Working</p>
+          <span className="wt-label">What you’ll be asked</span>
+          <div className="wt-handoff">
+            <h3>Hand this to Claude Code?</h3>
+            <p className="wt-handoff__row">
+              <span>Folder</span>
+              <code>~\shop-api</code>
+            </p>
+            <p className="wt-handoff__row">
+              <span>Task</span>
+              <span>Fix the empty-cart crash in billing.ts and add a test.</span>
+            </p>
+            <div className="wt-handoff__actions">
+              <span className="wt-handoff__cancel">Cancel</span>
+              <span className="wt-handoff__send">Send</span>
+            </div>
           </div>
         </div>
       </div>
+      <p className="wt-note">More experts are coming.</p>
     </section>
   );
 }

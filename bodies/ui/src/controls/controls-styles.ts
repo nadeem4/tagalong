@@ -81,7 +81,8 @@ export const CONTROLS_CSS = `
   appearance: none; width: 100%; height: ${t.size.toggleH}px; margin: 0; background: transparent; cursor: pointer;
 }
 .tg-slider input[type='range']::-webkit-slider-runnable-track {
-  height: 6px; border-radius: 3px; background: var(--tg-ctl-line);
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, ${t.color.gold} var(--fill), var(--tg-ctl-line) var(--fill));
 }
 .tg-slider input[type='range']::-webkit-slider-thumb {
   appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
@@ -100,7 +101,13 @@ export const CONTROLS_CSS = `
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
 .tg-money .tg-money__row input[type='text'][aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
-.tg-money .tg-button { width: ${t.size.control}px; padding: 0; }
+.tg-money .tg-button {
+  width: ${t.size.control}px; padding: 0; color: var(--tg-ctl-ink); border-color: var(--tg-ctl-muted);
+}
+.tg-sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
 .tg-button {
   display: inline-flex; align-items: center; justify-content: center; gap: ${t.space.sm}px;

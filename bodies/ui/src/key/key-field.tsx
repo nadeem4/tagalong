@@ -7,6 +7,7 @@
 import { useRef, useState } from 'react';
 import type { KeyResult } from '../host-bridge';
 import { Button } from '../controls/button';
+import { MoneyField } from '../controls/money-field';
 import { failure } from '../failure';
 import { useKeyStatus } from './use-key-status';
 import type { KeyHost } from './use-key-status';
@@ -181,26 +182,17 @@ export function LimitField({
 
   return (
     <div className="tg-limitfield">
-      <label htmlFor="tg-daily-limit">
-        <span>Daily limit (USD)</span>
-        <input
-          id="tg-daily-limit"
-          type="number"
-          min="0"
-          step="any"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            void save();
-          }}
-        />
-      </label>
+      <MoneyField
+        id="tg-daily-limit"
+        label="Daily limit (USD)"
+        value={text}
+        onChange={setText}
+        onCommit={() => void save()}
+      />
       <div className="tg-inline">
-        <button type="button" className="tg-btn-quiet" onClick={() => void save()}>
+        <Button variant="quiet" onClick={() => void save()}>
           Set limit
-        </button>
+        </Button>
       </div>
       {message !== null && (
         <p
