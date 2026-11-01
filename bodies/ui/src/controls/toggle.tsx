@@ -8,12 +8,14 @@ export function Toggle({
   label,
   disabled = false,
   id,
+  describedBy,
 }: {
   checked: boolean;
   onChange(next: boolean): void;
   label: string;
   disabled?: boolean;
   id?: string;
+  describedBy?: string | undefined;
 }) {
   return (
     <button
@@ -23,6 +25,7 @@ export function Toggle({
       className="tg-toggle"
       aria-checked={checked}
       aria-label={label}
+      aria-describedby={describedBy}
       aria-disabled={disabled}
       disabled={disabled}
       onClick={() => onChange(!checked)}

@@ -3,10 +3,10 @@
  * blind spots, listed from BLIND_SPOTS and never switchable.
  */
 import { useEffect, useState } from 'react';
+import { Shortcut, Toggle } from '@tagalong/ui';
 import { BLIND_SPOTS } from '../../../shared/blind-spots';
 import { SETTINGS_DEFAULTS } from '../../../shared/settings';
 import type { Settings } from '../../../shared/settings';
-import { keyCaps } from '../settings-form';
 import { Info, Section, Tip } from './section';
 
 /**
@@ -37,21 +37,16 @@ function LiveSwitches() {
             on, or until Tagalong restarts.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          className="tg-switch"
-          aria-checked={seeing}
-          aria-labelledby="seeing-label"
-          onClick={() =>
+        <Toggle
+          label="Seeing"
+          checked={seeing}
+          onChange={() =>
             void window.tagalongHost
               .toggleSightPause()
               .then((p) => setSeeing(!p))
               .catch((error: unknown) => console.warn('[settings] could not switch Seeing', error))
           }
-        >
-          {seeing ? 'On' : 'Off'}
-        </button>
+        />
       </div>
       <hr className="tg-divider" />
       <div className="tg-setting">
@@ -66,13 +61,10 @@ function LiveSwitches() {
             never stored; with the brain on this computer it never leaves it.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          className="tg-switch"
-          aria-checked={listening}
-          aria-labelledby="always-listening-label"
-          onClick={() =>
+        <Toggle
+          label="Always listening"
+          checked={listening}
+          onChange={() =>
             void window.tagalongHost
               .setListening(!listening)
               .then((state) => setListening(state.on))
@@ -80,16 +72,14 @@ function LiveSwitches() {
                 console.warn('[settings] could not switch Always listening', error),
               )
           }
-        >
-          {listening ? 'On' : 'Off'}
-        </button>
+        />
       </div>
       <hr className="tg-divider" />
     </>
   );
 }
 
-export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
+export function PrivacySection({ settings }: { settings: Settings }) {
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
@@ -114,13 +104,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         switched off.
       </Tip>
       <p className="tg-help">
-        Press{' '}
-        {keyCaps(pauseKey, platform).map((part) => (
-          <kbd key={part} className="tg-kbd">
-            {part}
-          </kbd>
-        ))}{' '}
-        to turn all looking off and on.
+        Press <Shortcut accelerator={pauseKey} /> to turn all looking off and on.
       </p>
     </Section>
   );

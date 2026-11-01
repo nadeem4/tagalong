@@ -1,7 +1,7 @@
 /** Tests for buildSettingsPatch and the Settings form helpers. */
 import { describe, expect, it } from 'vitest';
 
-import { SettingsFieldError, buildSettingsPatch, keyCaps, voiceFacts } from './settings-form';
+import { SettingsFieldError, buildSettingsPatch, voiceFacts } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
@@ -88,13 +88,6 @@ describe('field errors', () => {
     }
     expect(caught).toBeInstanceOf(SettingsFieldError);
     expect(caught).toMatchObject({ field: 'voiceSpeed' });
-  });
-});
-
-describe('keyCaps', () => {
-  it('shows an accelerator as the keys to press on this computer', () => {
-    expect(keyCaps('CommandOrControl+Shift+Alt+P', 'win32')).toEqual(['Ctrl', 'Shift', 'Alt', 'P']);
-    expect(keyCaps('CommandOrControl+Shift+Space', 'darwin')).toEqual(['Cmd', 'Shift', 'Space']);
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * Turns the Settings form into a settings patch, kept apart from React so it is tested in plain
  * Node. Contains SettingsFormValues, buildSettingsPatch and its field checks, SettingsFieldError,
- * and helpers the sections share (key caps, voice facts).
+ * and a helper the sections share (voice facts).
  */
 import { MAX_VOICE_SPEED, MIN_VOICE_SPEED, SettingsPatch } from '../../shared/settings';
 import type { SettingsPatch as SettingsPatchType } from '../../shared/settings';
@@ -126,12 +126,6 @@ function parseSpeed(raw: string): number {
     );
   }
   return speed;
-}
-
-/** An accelerator as the keys to press: `CommandOrControl` is Cmd on a Mac, Ctrl elsewhere. */
-export function keyCaps(accelerator: string, platform: string): string[] {
-  const command = platform === 'darwin' ? 'Cmd' : 'Ctrl';
-  return accelerator.split('+').map((part) => (part === 'CommandOrControl' ? command : part));
 }
 
 /** An adapter's facts as one plain line under the picker. */

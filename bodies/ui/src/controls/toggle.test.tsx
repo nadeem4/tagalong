@@ -25,6 +25,11 @@ describe('Toggle', () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
+  it('can be described by a note elsewhere on the page', () => {
+    render(<Toggle checked onChange={() => {}} label="Voice" describedBy="note" />);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-describedby', 'note');
+  });
+
   it('disabled ignores clicks and is aria-disabled', () => {
     const onChange = vi.fn();
     render(<Toggle checked onChange={onChange} label="Voice" disabled />);

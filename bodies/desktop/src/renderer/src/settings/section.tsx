@@ -1,6 +1,6 @@
 /**
  * Building blocks every Settings section uses: SECTIONS (ids and titles, in page order),
- * Section, the ⓘ Info button and its Tip, and the context that marks the field a save refused.
+ * Section (the same card as every Home panel), the ⓘ Info button and its Tip, and the context that marks the field a save refused.
  */
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
@@ -44,7 +44,7 @@ export function Section({
 }) {
   const title = SECTIONS.find((section) => section.id === id)?.title ?? id;
   return (
-    <section id={id} className="tg-panel" aria-labelledby={`${id}-heading`}>
+    <section id={id} className="tg-panel home-card" aria-labelledby={`${id}-heading`}>
       <div className="tg-titlerow">
         <h2 id={`${id}-heading`} className="tg-px tg-panel__heading">
           {title}

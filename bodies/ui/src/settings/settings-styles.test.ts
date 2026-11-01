@@ -22,4 +22,10 @@ describe('SETTINGS_CSS', () => {
     const colours = SETTINGS_CSS.match(/#[0-9a-fA-F]{6}\b/g) ?? [];
     expect(colours.filter((colour) => !palette.has(colour))).toEqual([]);
   });
+
+  it('lets Home set the page width and has no footer or old switch left', () => {
+    expect(SETTINGS_CSS).not.toContain('max-width: 820px');
+    expect(SETTINGS_CSS).not.toContain('.tg-footer');
+    expect(SETTINGS_CSS).not.toContain('.tg-switch');
+  });
 });
