@@ -155,16 +155,19 @@ async def test_npx_install_runs_npm_with_the_private_node_prefix_and_explicit_en
     expert = await go(tmp_path, npx_entry(), machine(), npm)
     argv, env, cwd = npm.calls[0]
     prefix = tools_dir(tmp_path, "claude-acp")
+    staged = tools_dir(tmp_path, "claude-acp.part")  # swapped into place only on success
     assert argv[0] == str(node_dir(tmp_path) / "node.exe")
     assert argv[1].endswith("npm-cli.js")
-    assert argv[2:] == ["install", "--prefix", str(prefix), f"{PKG}@0.99.1"]
-    assert cwd == prefix
+    assert argv[2:] == ["install", "--prefix", str(staged), f"{PKG}@0.99.1"]
+    assert cwd == staged
+    assert not staged.exists() and prefix.is_dir()
     assert env["PATH"].startswith(str(node_dir(tmp_path)) + os.pathsep)  # child only
     assert ensure.calls == [22]
     js = prefix / "node_modules" / "@agentclientprotocol" / "claude-agent-acp" / "dist" / "index.js"
     assert expert.command == [argv[0], str(js), "--acp"]
     assert (expert.id, expert.name, expert.version) == ("claude-acp", "Claude Agent", "0.99.1")
     assert expert.source == "registry" and expert.logged_in is None
+    assert expert.node == "private"
     assert ExpertStore(tmp_path).get("claude-acp") == expert
 
 
@@ -179,13 +182,14 @@ async def test_system_node_new_enough_is_used_and_no_download_happens(tmp_path, 
     await go(tmp_path, npx_entry(), machine(node), npm)
     assert ensure.calls == []
     assert npm.calls[0][0][0] == node.path
+    assert ExpertStore(tmp_path).get("claude-acp").node == "system"
 
 
-async def test_old_system_node_triggers_ensure_node_with_the_entrys_floor(tmp_path, ensure):
+async def test_old_system_node_triggers_ensure_node_with_the_floor_of_22(tmp_path, ensure):
     npm = Npm()
     node = system_node(tmp_path, "18.20.0")
-    await go(tmp_path, npx_entry({"node": "24"}), machine(node), npm)
-    assert ensure.calls == [24]
+    await go(tmp_path, npx_entry({"node": "24"}), machine(node), npm)  # the entry's say is ignored
+    assert ensure.calls == [22]
     assert npm.calls[0][0][0] == str(node_dir(tmp_path) / "node.exe")
 
 
@@ -212,6 +216,57 @@ async def test_npm_failure_keeps_no_half_record_and_removes_the_prefix_dir(tmp_p
     assert err.value.kind == "npm_failed" and "network" in err.value.detail
     assert ExpertStore(tmp_path).list() == []
     assert not tools_dir(tmp_path, "claude-acp").exists()
+    assert not tools_dir(tmp_path, "claude-acp.part").exists()
+
+
+async def test_npm_gets_a_minimal_env_without_keys_or_npm_config(tmp_path, ensure, monkeypatch):
+    for name, value in {
+        "ANTHROPIC_API_KEY": "sk-secret",
+        "CLAUDE_CODE_USE_BEDROCK": "1",
+        "OPENAI_API_KEY": "sk-o",
+        "GEMINI_API_KEY": "g",
+        "GOOGLE_API_KEY": "g2",
+        "CODEX_HOME": "c",
+        "npm_config_global": "true",
+        "NPM_CONFIG_PREFIX": "/elsewhere",
+        "SOMETHING_ELSE": "x",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("PATH", "/usr/bin")
+    monkeypatch.setenv("TEMP", "/tmp/t")
+    npm = Npm()
+    await go(tmp_path, npx_entry(), machine(), npm)
+    env = npm.calls[0][1]
+    assert not [k for k in env if k.upper().startswith(("ANTHROPIC", "CLAUDE_CODE_USE", "OPENAI"))]
+    assert not [k for k in env if k.upper().startswith(("GEMINI", "GOOGLE", "CODEX"))]
+    assert "SOMETHING_ELSE" not in env
+    assert "npm_config_global" not in env and "NPM_CONFIG_PREFIX" not in env
+    assert env["PATH"] == str(node_dir(tmp_path)) + os.pathsep + "/usr/bin"
+    assert env["TEMP"] == "/tmp/t"
+    assert env["npm_config_update_notifier"] == "false"
+
+
+async def test_a_failed_reinstall_keeps_the_old_install_and_record(tmp_path, ensure):
+    await go(tmp_path, npx_entry(), machine(), Npm())
+    old = tools_dir(tmp_path, "claude-acp")
+    (old / "marker").write_text("v1")
+    with pytest.raises(InstallError):
+        await go(tmp_path, replace(npx_entry(), version="0.99.2"), machine(), Npm(code=1))
+    assert (old / "marker").read_text() == "v1"
+    assert ExpertStore(tmp_path).get("claude-acp").version == "0.99.1"
+    assert not tools_dir(tmp_path, "claude-acp.part").exists()
+
+
+async def test_a_good_reinstall_swaps_in_the_new_files_and_record(tmp_path, ensure):
+    await go(tmp_path, npx_entry(), machine(), Npm())
+    old = tools_dir(tmp_path, "claude-acp")
+    (old / "marker").write_text("v1")
+    expert = await go(tmp_path, replace(npx_entry(), version="0.99.2"), machine(), Npm())
+    assert not (old / "marker").exists()
+    assert expert.command[1].startswith(str(old))  # resolved against the final prefix
+    assert Path(expert.command[1]).is_file()
+    assert ExpertStore(tmp_path).get("claude-acp").version == "0.99.2"
+    assert sorted(p.name for p in old.parent.iterdir() if p.name != "claude-acp") == []
 
 
 async def test_a_package_with_no_bin_fails_cleanly(tmp_path, ensure):
@@ -239,6 +294,7 @@ async def test_a_cancelled_install_also_cleans_up(tmp_path, ensure):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not tools_dir(tmp_path, "claude-acp").exists()
+    assert not tools_dir(tmp_path, "claude-acp.part").exists()
     assert ExpertStore(tmp_path).list() == []
 
 
@@ -381,7 +437,7 @@ def make_tools(tmp_path, npm, mach=None):
     async def inspect_fn():
         return mach or machine()
 
-    tools = expert_setup_tools(
+    tools, stop = expert_setup_tools(
         tmp_path,
         Registry(tmp_path, Net()),
         inspect_fn,
@@ -392,30 +448,94 @@ def make_tools(tmp_path, npm, mach=None):
         emitted.append,
         lambda m, p: notes.append((m, p)),
     )
-    return {s.name: (s, h) for s, h in tools}, emitted, notes
+    return {s.name: (s, h) for s, h in tools}, emitted, notes, stop
 
 
-async def test_install_tool_returns_the_expert_and_emits_progress_without_waking(tmp_path, ensure):
-    tools, emitted, notes = make_tools(tmp_path, Npm())
+async def settled(emitted: list[Event], kind="setup_done"):
+    for _ in range(400):
+        if any(e.kind == kind for e in emitted):
+            return next(e for e in emitted if e.kind == kind)
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"no {kind} event")
+
+
+class Hang(Npm):
+    def __init__(self):
+        super().__init__()
+        self.started = asyncio.Event()
+
+    async def __call__(self, argv, env, cwd):
+        await super().__call__(argv, env, cwd)
+        self.started.set()
+        await asyncio.Event().wait()
+
+
+async def test_install_tool_returns_at_once_and_the_install_finishes_in_the_background(
+    tmp_path, ensure
+):
+    tools, emitted, notes, stop = make_tools(tmp_path, Npm())
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert out["id"] == "claude-acp" and out["command"][-1].endswith("index.js")
-    assert {e.kind for e in emitted} == {"setup_progress"}
-    assert all(e.key == "claude-acp" for e in emitted)
-    assert emitted[0].facts["expert"] == "claude-acp" and "stage" in emitted[0].facts
+    assert out == {"started": "claude-acp"}
+    done = await settled(emitted)
+    assert done.facts["expert"] == "claude-acp" and done.facts["ok"] is True
+    assert json.loads(done.facts["installed"])["id"] == "claude-acp"
+    assert done.key == "claude-acp"
+    assert ExpertStore(tmp_path).get("claude-acp") is not None
+    progress = [e for e in emitted if e.kind == "setup_progress"]
+    assert progress and all(e.key == "claude-acp" for e in progress)
+    assert progress[0].facts["expert"] == "claude-acp" and "stage" in progress[0].facts
     assert ("changed", {"what": "setup"}) in notes
+    await stop()
 
 
-async def test_install_tool_reports_failure_as_facts(tmp_path, ensure):
-    tools, _, _ = make_tools(tmp_path, Npm(code=1))
+async def test_setup_done_is_a_waking_kind_with_a_note():
+    from brain.events import EVENT_KINDS, load_notes
+
+    assert EVENT_KINDS["setup_done"].wakes
+    assert EVENT_KINDS["setup_done"].batch_seconds is None
+    assert load_notes()["setup_done"].strip()
+    assert not EVENT_KINDS["setup_progress"].wakes
+
+
+async def test_install_failure_arrives_as_setup_done_facts(tmp_path, ensure):
+    tools, emitted, _, stop = make_tools(tmp_path, Npm(code=1))
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert out["error"] == "npm_failed" and "detail" in out
+    assert out == {"started": "claude-acp"}
+    done = await settled(emitted)
+    assert done.facts["ok"] is False and done.facts["error"] == "npm_failed"
+    assert "detail" in done.facts
     assert ExpertStore(tmp_path).list() == []
+    await stop()
 
 
 async def test_install_tool_knows_an_unknown_id(tmp_path, ensure):
-    tools, _, _ = make_tools(tmp_path, Npm())
+    tools, _, _, _ = make_tools(tmp_path, Npm())
     out = json.loads(await tools["install_expert"][1]({"id": "nope"}))
     assert out == {"error": "unknown_expert", "detail": "nope"}
+
+
+async def test_one_install_per_expert_at_a_time(tmp_path, ensure):
+    hang = Hang()
+    tools, emitted, _, stop = make_tools(tmp_path, hang)
+    handler = tools["install_expert"][1]
+    assert json.loads(await handler({"id": "claude-acp"})) == {"started": "claude-acp"}
+    await asyncio.wait_for(hang.started.wait(), 5)
+    again = json.loads(await handler({"id": "claude-acp"}))
+    assert again["error"] == "already_installing"
+    await stop()
+
+
+async def test_brain_shutdown_cancels_a_running_install_and_cleans_up(tmp_path, ensure):
+    hang = Hang()
+    tools, emitted, _, stop = make_tools(tmp_path, hang)
+    await tools["install_expert"][1]({"id": "claude-acp"})
+    await asyncio.wait_for(hang.started.wait(), 5)
+    assert tools_dir(tmp_path, "claude-acp.part").exists()
+    await stop()
+    assert not tools_dir(tmp_path, "claude-acp.part").exists()
+    assert not tools_dir(tmp_path, "claude-acp").exists()
+    assert ExpertStore(tmp_path).list() == []
+    assert not [e for e in emitted if e.kind == "setup_done"]  # nobody is left to tell
 
 
 class StubAsks:
@@ -428,24 +548,63 @@ class StubAsks:
 
     async def permission(self, call, spec_name, locked):
         self.asked.append(call.input)
+        self.locked = locked
         return self.answer
 
 
 async def test_install_tool_needs_the_allow_card_and_shows_the_node_download(tmp_path, ensure):
-    tools, _, _ = make_tools(tmp_path, Npm())
+    tools, emitted, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
-    # Never auto: not by default, not by effect, and no stored mode is needed to ask.
+    # Only the person can allow it: no Always, no stored mode, no preference.
     assert spec.effect == "change" and spec.default_mode is None and not spec.self_asks
-    assert resolve_mode(spec, None) == "ask"
+    assert spec.locked and spec.person_only
+    assert resolve_mode(spec, None) == "ask" and resolve_mode(spec, "auto") == "ask"
     asks = StubAsks()
     box = RealToolbox([BrainSource([(spec, handler)])], lambda: {}, lambda n, m: None, asks)
     await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert asks.asked[0]["node_download"] is not None
     assert asks.asked[0]["expert"] == "claude-acp"
+    assert asks.locked  # the card offers no Always
+    await settled(emitted)
+    await stop()
+
+
+async def test_a_preference_and_a_stored_auto_still_reach_the_person(tmp_path, ensure):
+    from brain.builtin_guards import anyone_online, person_ask, side_check_guard, tool_mode
+    from brain.guards import Guards
+
+    class Side:
+        def __init__(self):
+            self.asked = 0
+
+        async def decide(self, facts):
+            self.asked += 1
+            return "any-pref"
+
+    class Approvals:
+        def scout_approved(self, *a, **k):
+            raise AssertionError("Scout must not approve an install")
+
+    tools, emitted, _, stop = make_tools(tmp_path, Npm())
+    spec, handler = tools["install_expert"]
+    side = Side()
+    asks = StubAsks()
+    modes = lambda: {"install_expert": "auto"}  # noqa: E731
+    guards = Guards()
+    for g in (tool_mode(modes), anyone_online(asks), side_check_guard(side, Approvals())):
+        guards.add(g)
+    guards.add(person_ask())
+    box = RealToolbox(
+        [BrainSource([(spec, handler)])], modes, lambda n, m: None, asks, guards=guards
+    )
+    await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
+    assert asks.asked and side.asked == 0
+    await settled(emitted)
+    await stop()
 
 
 async def test_a_refused_card_installs_nothing(tmp_path, ensure):
-    tools, _, _ = make_tools(tmp_path, Npm())
+    tools, _, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
     box = RealToolbox(
         [BrainSource([(spec, handler)])], lambda: {}, lambda n, m: None, StubAsks("deny")
@@ -454,3 +613,4 @@ async def test_a_refused_card_installs_nothing(tmp_path, ensure):
         await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert ExpertStore(tmp_path).list() == []
     assert not (tmp_path / "tools").exists()
+    await stop()

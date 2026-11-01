@@ -91,6 +91,17 @@ async def _run() -> None:
         handler.addFilter(SecretLogFilter(masker))
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
+    expert_tools, stop_installs = expert_setup_tools(
+        config.data_dir,
+        registry,
+        inspect_machine,
+        ExpertStore(config.data_dir),
+        partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
+        http_fetch,
+        real_get_json,
+        lambda event: session.scheduler.emit(event),  # session exists by the first install
+        bodies.notify,
+    )
     session = Session(
         model,
         budget,
@@ -104,18 +115,7 @@ async def _run() -> None:
         turn_timeout=config.turn_timeout,
         masker=masker,
         keys=keys,
-        extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
-        + expert_setup_tools(
-            config.data_dir,
-            registry,
-            inspect_machine,
-            ExpertStore(config.data_dir),
-            partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
-            http_fetch,
-            real_get_json,
-            lambda event: session.scheduler.emit(event),  # session exists by the first install
-            bodies.notify,
-        ),
+        extra_tools=setup_tools(config.data_dir, registry, inspect_machine) + expert_tools,
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),
@@ -134,6 +134,7 @@ async def _run() -> None:
     finally:
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
+        await stop_installs()  # cancel running installs; each removes what it staged
         await session.jobs.shutdown()
         await apps.shutdown()
         memory.close()

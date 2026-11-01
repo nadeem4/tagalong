@@ -22,6 +22,9 @@ class InstalledExpert:
     command: list[str]
     source: Literal["registry", "custom"]
     logged_in: bool | None  # None: not checked yet
+    # Which Node the command runs on, so a later change of the system Node can be re-checked;
+    # None for an expert that needs no Node (a binary, a custom command).
+    node: Literal["private", "system"] | None = None
 
 
 def _row(raw: dict) -> InstalledExpert:
@@ -32,6 +35,8 @@ def _row(raw: dict) -> InstalledExpert:
         raise ValueError("bad command")
     if not isinstance(raw["id"], str):
         raise ValueError("bad id")
+    if raw.get("node") not in ("private", "system", None):
+        raise ValueError("bad node")
     return InstalledExpert(
         raw["id"],
         str(raw["name"]),
@@ -39,6 +44,7 @@ def _row(raw: dict) -> InstalledExpert:
         list(command),
         raw["source"],
         raw["logged_in"],
+        raw.get("node"),
     )
 
 

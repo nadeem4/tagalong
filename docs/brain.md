@@ -514,27 +514,39 @@ words what the person reads (guidance in `mind/soul.md`).
 - `tools.py`: Scout's tools `inspect_machine` (which also lists the installed experts),
   `find_experts` and `find_apps(query)`, all read-only and automatic, never offered to Home.
 - `store.py`: `ExpertStore`, the installed experts in `experts.json` (id, name, version, the
-  command to start it, `registry` or `custom`, and whether it is logged in). Re-read on every call
+  command to start it, `registry` or `custom`, whether it is logged in, and which Node the
+  command runs on, `private` or `system`, so a later change of the system Node can be re-checked;
+  none for a binary or custom expert). Re-read on every call
   because the CLI writes the same file; writes are atomic; a corrupt file is kept as
   `experts.json.bad` and read as empty.
 - `install.py`, `expert_tools.py`: the `install_expert(id)` tool installs one expert from the ACP
-  registry into `tools/<id>/`. It is a normal change tool, so it always opens the Allow card
-  unless the person chose Always for it; a preference in Scout's prompt never skips the card.
-  The card's input is built by code (`ToolSpec.card`): the expert, its version, the folder, and
-  `node_download` (the Node version and folder, or `null` when a system Node is new enough). An
-  `npx` entry runs `npm install --prefix tools/<id> <package>@<version>` with a system Node that
-  is new enough (and has its own npm), else Tagalong's own Node (floor: the entry's `requires`
-  `node`, default 22). The command runs with a copy of the environment (the chosen Node first on
-  PATH for the child only); the system environment is never changed and nothing is global.
-  The stored command is `[node, <the package's bin js>, <registry args>]`. A `binary` entry is
-  streamed, checked against its listed sha256 (none listed is refused) and extracted with
-  `safe_extract`. `uvx` and hosted entries are `unsupported`; an entry with no build for this
-  computer is `no_build`. A registry id must be a plain folder name. Any failure or cancel removes
-  `tools/<id>/` and its `.part` and records nothing; failures are `InstallError(kind, detail)`
+  registry into `tools/<id>/`. Only the person can allow it: the tool is `locked` (no Always
+  button) and `person_only` (a new `ToolSpec` flag), so a stored Auto never opens it, `set_mode`
+  refuses it and the side-check never sees the ask; a preference in Scout's prompt cannot skip
+  the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
+  folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
+  enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
+  background, outside the turn, one per expert id at a time (a second ask for the same id returns
+  `already_installing`). It emits non-waking `setup_progress` events (`expert`, `stage`,
+  `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
+  `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. Brain
+  shutdown cancels running installs, each of which cleans up what it staged.
+  An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` with a system
+  Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
+  every npx expert. npm gets a minimal environment of its own (PATH with the chosen Node first,
+  the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
+  the system environment is never changed and nothing is global. A command that is cancelled or
+  times out is killed with its whole process tree. The stored command is
+  `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`
+  entry is streamed to `tools/<id>.dl`, checked against its listed sha256 (none listed is
+  refused) and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
+  into `tools/<id>/` only on success, and then the record is written: a reinstall keeps the old
+  files and record until then, and a failure or cancel removes only what was staged.
+  `uvx` and hosted entries are `unsupported`; an entry with no build for this computer is
+  `no_build`. A registry id must be a plain folder name. Failures are `InstallError(kind, detail)`
   facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
-  `unsafe_archive`, `download_failed`) returned to Scout as JSON. Progress goes out as a
-  non-waking `setup_progress` event (`expert`, `stage`, `percent`) plus `changed {what: "setup"}`.
-  Login is not part of this slice yet.
+  `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`. Login is not part
+  of this slice yet.
 
 ## Experts
 
@@ -634,6 +646,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `tab`            | none         | none         | Which browser tab is in front (context, no wake)                                                                                |
 | `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |
 | `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                         |
+| `setup_done`     | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                      |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a

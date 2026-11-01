@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from brain.experts import kill_tree
 from brain.setup.paths import node_dir
 
 PROBE_TIMEOUT_S = 10.0
@@ -47,9 +48,9 @@ async def real_run_cmd(
     )
     try:
         out, err = await asyncio.wait_for(proc.communicate(), timeout)
-    except TimeoutError:
-        proc.kill()
-        await proc.wait()
+    except BaseException:
+        # A timeout, a cancel or anything else: npm and the scripts it started die with it.
+        await asyncio.shield(kill_tree(proc))
         raise
     return CmdResult(
         proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")

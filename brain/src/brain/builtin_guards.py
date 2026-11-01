@@ -90,6 +90,8 @@ def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["ask", "auto"]
     """The mode a tool runs in; Home's permission list uses this too, so both always agree."""
     if spec.self_asks:
         return "auto"
+    if spec.person_only:
+        return "ask"  # a stored auto never opens it
     if stored in ("ask", "auto"):
         return stored  # for a locked tool too: the Home switch is its explicit unlock
     if spec.locked:
@@ -121,7 +123,7 @@ def anyone_online(asks) -> Guard:
 
 def side_check_guard(side_check, approvals) -> Guard:
     async def check(ctx: AskCtx) -> Verdict:
-        if not ctx.can_approve:
+        if not ctx.can_approve or ctx.person_only:
             return ALLOW
         from brain.side_check import AskFacts  # side_check imports this module
 

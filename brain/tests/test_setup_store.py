@@ -82,3 +82,11 @@ def test_remove_drops_one_and_leaves_no_part_file(tmp_path):
     store.remove("claude-acp")
     assert [e.id for e in store.list()] == ["gemini"]
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_which_node_the_command_uses_is_recorded(tmp_path):
+    store = ExpertStore(tmp_path)
+    store.add(expert(node="private"))
+    assert store.get("claude-acp").node == "private"
+    store.add(expert("other"))  # an expert with no Node (a binary, a custom one)
+    assert store.get("other").node is None

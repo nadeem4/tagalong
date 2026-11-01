@@ -3,6 +3,7 @@
 They guard the model_call hook; side-check and offer calls are never counted as turn steps.
 """
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from brain.builtin_guards import daily_budget, spend_guards, step_cap, tool_mode, wake_caps
@@ -246,3 +247,11 @@ def test_wake_caps_ignore_kinds_without_a_cap():
 def test_wake_caps_wait_is_zero_after_the_window_ages_out():
     wakes = [(NOW - timedelta(hours=2), "timer"), (NOW - timedelta(hours=1), "timer")]
     assert wake_caps(1).check(_wake_ctx(wakes)).kind == "allow"
+
+
+async def test_side_check_guard_never_decides_a_person_only_ask():
+    side = StubSideCheck("pref")
+    ctx = replace(ask_ctx(), person_only=True)
+    v = await side_check_guard(side, StubApprovals()).check(ctx)
+    assert (v.kind, v.once) == ("allow", False)  # falls through to the person
+    assert side.facts == []

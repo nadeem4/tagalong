@@ -181,7 +181,9 @@ Installing an expert happens only after you press Allow on a card that names the
 version, the folder it goes into and any Node download. For an `npx` expert the brain runs
 `npm install` (npm contacts `registry.npmjs.org`) into `tools/<expert>/`; for a binary expert it
 downloads the archive named in the registry and checks its published checksum. Nothing is
-installed globally and no PATH is edited. A saved preference never skips that card.
+installed globally and no PATH is edited. npm runs with a minimal environment of its own, so it
+never sees your API keys. Only you can allow an install: a saved preference never skips that card,
+and there is no Always allow for it.
 
 ## Connected apps: what goes to them
 

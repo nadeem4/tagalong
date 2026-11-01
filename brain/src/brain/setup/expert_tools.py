@@ -1,10 +1,12 @@
 """Scout's tools that change the machine: install an expert (and, later, log it in).
 
 Each asks the person through the normal Allow card, with facts built here so the card names
-what will be downloaded. A preference never skips the card. Results are JSON facts; Scout words
-them.
+what will be downloaded. Only the person can allow it: no preference, no Always. An install
+runs in the background, outside the turn: the tool returns at once and the end arrives as a
+`setup_done` event of facts. Scout words them.
 """
 
+import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict
@@ -34,7 +36,10 @@ def expert_setup_tools(
     get_json: GetJson,
     emit: Callable[[Event], None],
     notify: Callable[[str, dict], None],
-) -> list[tuple[ToolSpec, Handler]]:
+) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
+    """The tools, and a `stop` that cancels running installs (each cleans up) at shutdown."""
+    running: dict[str, asyncio.Task] = {}
+
     async def entry_for(args: dict) -> RegistryEntry | None:
         wanted = args.get("id")
         found = await registry.acp_agents()
@@ -53,14 +58,7 @@ def expert_setup_tools(
             # Facts only, as the error text Scout reads; nothing was asked or installed.
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
 
-    async def install(args: dict) -> str:
-        try:
-            entry = await entry_for(args)
-        except RegistryUnavailable as err:
-            return failure("registry_unavailable", str(err))
-        if entry is None:
-            return failure("unknown_expert", str(args.get("id")))
-
+    async def run_install(entry: RegistryEntry) -> None:
         def progress(step: dict) -> None:
             facts = {"expert": entry.id, **{k: v for k, v in step.items() if v is not None}}
             emit(Event("setup_progress", facts, key=entry.id))
@@ -70,25 +68,48 @@ def expert_setup_tools(
             expert = await install_expert(
                 entry, home, await inspect_fn(), run, fetch, get_json, store, progress
             )
+            facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
         except InstallError as err:
-            notify("changed", {"what": "setup"})
-            return failure(err.kind, err.detail)
-        return json.dumps(asdict(expert))
+            facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
+        except Exception as err:  # the person is told something, never left waiting
+            facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
+        # A cancel (shutdown) skips this: nobody is left to tell.
+        emit(Event("setup_done", facts, key=entry.id))
+        notify("changed", {"what": "setup"})
 
-    return [
-        (
-            ToolSpec(
-                "install_expert",
-                "Install one expert (coding agent) from the registry, by its id from "
-                "find_experts. Downloads into Tagalong's own folder, never the system. The "
-                "owner sees an Allow card naming everything it will download.",
-                _ID_SCHEMA,
-                effect="change",  # never auto by default: installing always asks
-                card=card,
-            ),
-            install,
-        )
-    ]
+    async def install(args: dict) -> str:
+        try:
+            entry = await entry_for(args)
+        except RegistryUnavailable as err:
+            return failure("registry_unavailable", str(err))
+        if entry is None:
+            return failure("unknown_expert", str(args.get("id")))
+        if entry.id in running:
+            return failure("already_installing", entry.id)
+        task = asyncio.ensure_future(run_install(entry))
+        running[entry.id] = task
+        task.add_done_callback(lambda _: running.pop(entry.id, None))
+        return json.dumps({"started": entry.id})
+
+    async def stop() -> None:
+        tasks = list(running.values())
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    spec = ToolSpec(
+        "install_expert",
+        "Install one expert (coding agent) from the registry, by its id from find_experts. "
+        "Downloads into Tagalong's own folder, never the system. The owner sees an Allow card "
+        "naming everything it will download. It returns at once with {started}; the end comes "
+        "later as a setup_done event.",
+        _ID_SCHEMA,
+        effect="change",
+        locked=True,  # the card has no Always button
+        person_only=True,  # only the person allows it, every time
+        card=card,
+    )
+    return [(spec, install)], stop
 
 
 def _facts(err: Exception) -> tuple[str, str]:

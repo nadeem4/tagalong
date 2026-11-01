@@ -47,6 +47,9 @@ class ToolSpec:
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
     locked: bool = False  # asks until the person sets it to auto; no "Always" button
     self_asks: bool = False  # runs its own ask with the user, so the gate adds none
+    # Only the person may allow it, every time: no stored Auto, no Scout approval under a
+    # preference. Set it with `locked` (which also hides the Always button).
+    person_only: bool = False
     # Facts built by code for the Allow card (and the approvals log) instead of the model's raw
     # input, e.g. what an install will download. The handler still gets the model's input.
     card: Callable[[dict], Awaitable[dict]] | None = None
@@ -186,6 +189,8 @@ class Toolbox:
             raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
         if spec.self_asks:
             raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
+        if spec.person_only:
+            raise RpcError(ErrorCode.invalid_params, f"{name} always needs your yes.")
         self._save_mode(name, mode)
 
     def known_specs(self) -> list[ToolSpec]:
@@ -252,6 +257,7 @@ class Toolbox:
             spec.locked,
             call.turn,
             lambda: self._asks.permission(call, spec.name, spec.locked),
+            person_only=spec.person_only,
         )
         verdict = await self._guards.run(Hook.ask, ctx)
         if verdict.kind in ("block", "stop"):
