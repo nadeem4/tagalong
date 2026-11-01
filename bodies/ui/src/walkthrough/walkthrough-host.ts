@@ -40,7 +40,7 @@ export type WalkthroughHost = Pick<
   'keyStatus' | 'setKey' | 'setDailyLimit' | 'onBrainChanged' | 'openWalkthrough'
 > & {
   expertStatus(): Promise<ExpertStatus>;
-  /** Marks the tour seen and closes its window. Only Finish and Skip tour call it. */
+  /** Marks the tour seen and closes its window. Only Finish and Skip (with a key) call it. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;
   /** Opens the Anthropic Console key page in the browser. */

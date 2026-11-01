@@ -1,4 +1,4 @@
-/** Tests for STEPS and skipTour: nine steps, only the key unskippable, Skip tour needs a key to close. */
+/** Tests for STEPS and skipTour: nine steps, only the key unskippable, Skip needs a key to close. */
 
 import { describe, expect, it } from 'vitest';
 import { STEPS, skipTour } from './steps';
@@ -7,6 +7,13 @@ describe('STEPS', () => {
   it('has nine steps numbered 1 to 9, and only the last cannot be skipped', () => {
     expect(STEPS.map((step) => step.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(STEPS.filter((step) => !step.skippable).map((step) => step.id)).toEqual([9]);
+  });
+});
+
+describe('side list names', () => {
+  it('names step 6 Bigger jobs and keeps its id', () => {
+    expect(STEPS.find((step) => step.id === 6)?.title).toBe('Bigger jobs');
+    expect(STEPS.find((step) => step.id === 2)?.title).toBe('How it works');
   });
 });
 

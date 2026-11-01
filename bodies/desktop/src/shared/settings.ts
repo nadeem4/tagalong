@@ -125,7 +125,7 @@ const settingsFields = {
   }),
   /** Whether Scout listens all the time, hearing only turns that start with its name. */
   listening: z.object({ always: z.boolean() }),
-  /** Set by Finish or Skip tour only. */
+  /** Set by Finish or Skip (with a key) only. */
   walkthrough: z.object({ done: z.boolean() }),
 };
 

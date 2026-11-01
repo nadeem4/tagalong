@@ -46,7 +46,7 @@ export function createWalkthroughGate(deps: GateDeps) {
     }
     tour = deps.create(step, () => {
       tour = null;
-      // Finish, Skip tour and closing part-way all bring the pet back, if it was there.
+      // Finish, Skip and closing part-way all bring the pet back, if it was there.
       if (petWasShowing) deps.pet.show();
     });
     deps.pet.hide();

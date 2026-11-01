@@ -1,53 +1,37 @@
 /**
- * Walkthrough step 1: the whole idea, one companion for all your AI tools. Contains StepOne.
- * Words are the spec's step copy.
+ * Walkthrough step 1: the pitch, one companion for everything you do, shown as a day with
+ * Scout (three of the five moments). Static, no host calls. Contains StepOne.
  */
+
+import { MOMENTS } from './moments';
+
+/** Morning, mid-day, anywhere: the first, second and last moment. */
+const DAY = MOMENTS.filter((_, index) => index === 0 || index === 1 || index === 4);
 
 export function StepOne() {
   return (
     <section>
-      <h1>One companion for all your AI tools</h1>
+      <span className="wt-label">Welcome</span>
+      <h1>One companion for everything you do</h1>
       <p className="wt-lead">
-        No more copying from one AI tool, pasting into another and carrying the answer back. Scout
-        sits on your screen, sees what you’re working on when you let it, and hands real work to the
-        right expert. The result comes back to where you are.
+        Scout lives on your screen. Ask it anything, any time, and it works with whatever you
+        already have open.
       </p>
-      <div className="wt-cols">
-        <ul className="wt-facts">
-          <li>
-            <h3>Scout stays with you</h3>
-            <p>
-              On your screen and in your browser. It looks at the window you’re on when you ask, and
-              you can talk to it out loud.
-            </p>
-          </li>
-          <li>
-            <h3>Experts do the heavy work</h3>
-            <p>
-              Scout writes the brief and hands it over. Claude Code is the first expert; Gemini CLI,
-              Codex and others are coming.
-            </p>
-          </li>
-          <li>
-            <h3>Your apps come along</h3>
-            <p>
-              Connect Notion, GitHub, Linear or any MCP server, and Scout and the experts can use
-              them.
-            </p>
-          </li>
+      <div className="wt-day">
+        <span className="wt-label">A day with Scout</span>
+        <ul>
+          {DAY.map((moment) => (
+            <li key={moment.ask}>
+              <span className="wt-where">{moment.where}</span>
+              <q>{moment.ask}</q>
+              <p className="wt-help">{moment.outcome}</p>
+            </li>
+          ))}
         </ul>
-        <div aria-hidden="true">
-          <span className="wt-label">Back where you are</span>
-          <div className="wt-example">
-            <span className="wt-chip">Claude Code · finished</span>
-            <p>Fixed the empty-cart crash in billing.ts and added a test.</p>
-            <span className="wt-fake-button">See the job</span>
-          </div>
-        </div>
       </div>
-      <p className="wt-note">
-        This takes about four minutes. The last step needs an Anthropic API key, so keep your
-        Anthropic account handy.
+      <p className="wt-note wt-note--plain">
+        It takes about two minutes. The last step needs an Anthropic API key, so keep your account
+        handy.
       </p>
     </section>
   );

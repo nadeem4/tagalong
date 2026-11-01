@@ -1,6 +1,6 @@
 /**
  * How a step with choices saves them: it registers its save here, and the footer's Next calls
- * it. Nothing is written before Next, so Back and Skip for now lose and change nothing.
+ * it. Nothing is written before Next, so Back and Skip lose and change nothing.
  * Contains StepSaveContext, useStepSave and useWalkthroughSettings.
  */
 
