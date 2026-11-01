@@ -26,9 +26,9 @@ the way.
 
 ## Product Purpose
 
-Tagalong puts **Scout**, one AI companion, on your screen. Scout sees what you are working on,
+Tagalong is **one companion for everything you do**: **Scout** sits on your screen. Scout sees what you are working on,
 answers, and when something needs real work it writes a brief and hands it to the right
-**expert** (Claude Code first; other AI tools later), then brings the answer back. It removes the
+**expert** (Claude Code first; more experts later), then brings the answer back. It removes the
 copy, switch app, paste, ask, switch back loop. Scout never does the expert's work itself, and
 never hands anything over without you pressing Send.
 

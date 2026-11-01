@@ -336,7 +336,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 ## Typography
 
 **Display Font:** Pixelify Sans (with Onest, sans-serif)
-**Body Font:** Onest (with system-ui, sans-serif)
+**Body Font:** Onest (with system-ui, sans-serif), set on `body` in the renderer sheet so no window falls back to the browser default
 **Mono:** ui-monospace, Cascadia Mono, Consolas
 
 Every window bundles its faces from `@fontsource` (Latin subset), nothing fetched: Home Onest 400/600 and Pixelify Sans 400/600/700; the bubble Onest 400/600 and Pixelify Sans 700; the dock Onest 600 for its tags.
@@ -346,7 +346,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 ### Hierarchy
 
 - **Page title** (Onest 600, 20px): each Home page's heading.
-- **Companion name** (Pixelify 700, 18px, 0.5px): Scout's name in Home's nav; the chat header uses the same face at 16px.
+- **Wordmark** (Onest 600, 18px): "Scout" in Home's nav and the walkthrough side; the chat header uses 16px. Never the pixel face (its c reads as o). Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
 - **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
 - **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("JOBS", "SPEND").
 - **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
@@ -416,6 +416,19 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 ### Settings controls
 
 Scoped under `.tg-settings`. **Primary** (`tg-btn`): Gold, 40px, 8px, Onest 600 14px, 16px padding. **Quiet** (`tg-btn-quiet`): transparent with a 1px border (Panel Muted on light pages, Field Line on navy). **Fields:** Panel Tile fill, 1px Panel Line border, 8px, 40px, 14px; invalid gets a 2px Err Ink border. **Chips:** 11px 600 pills at 10px radius, neutral, ok, warn or err, always with a word. **Switches** (`role="switch"`): 32px, min 64px, Panel Muted outline; on is Gold. **Choices:** 2px Panel Line border, Gold when checked. Embedded in Home, each section is a white card with a 12px radius and 24px by 28px padding. Alerts use the warn and err fills; ⓘ buttons are 24px round.
+
+### Shared controls
+
+Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected next to each host sheet. A control learns its surface from CSS variables, not props: `:root` is the light page, `.on-navy` the navy chrome (`--tg-focus`, `--tg-ctl-*`).
+
+- **Focus ring:** 2px, offset 2px; navy (`focusOnLight`) on light surfaces, Gold (`focusOnNavy`) under `.on-navy`. Hover and disabled states are real on every control.
+- **Toggle** (`Toggle`): `role="switch"` with `aria-checked`, a 44x24 pill with the word On or Off and a round knob; on is Gold. A native button, so Space and Enter work.
+- **Select** (`Select`): a native select with a drawn chevron and its label above; 36px.
+- **Slider** (`Slider`): a native range (arrows, Home and End work) with the label above and the value beside it.
+- **Money field** (`MoneyField`): a `$` text field with minus and plus buttons (step 1, never below 0); typed text is not clamped, the caller validates; Enter commits.
+- **Keycap and Shortcut:** one `kbd` per key; an Electron accelerator is shown as Ctrl, Shift, Space, never `CommandOrControl`.
+- **Button** (`Button`): primary (Gold), secondary, quiet and danger; type=button by default.
+- **Key field** (`KeyField`): label above; Show sits inside the input on the right, Check key (secondary) beside it, a polite status line under it. States: empty, checking, valid (ok border) and invalid (2px Err Ink border, `aria-invalid`).
 
 ## Motion
 
