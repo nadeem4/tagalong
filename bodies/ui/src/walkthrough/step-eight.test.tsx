@@ -13,6 +13,12 @@ describe('StepEight', () => {
     await screen.findByDisplayValue('12');
   });
 
+  it('does not repeat the heading as a visible label', async () => {
+    mountStep(<StepEight host={makeWalkthroughHost()} />);
+    await screen.findByDisplayValue('5');
+    expect(screen.getByText('Daily limit (USD)')).toHaveClass('tg-sr-only');
+  });
+
   it('shows the default $5', async () => {
     mountStep(<StepEight host={makeWalkthroughHost()} />);
     await screen.findByDisplayValue('5');

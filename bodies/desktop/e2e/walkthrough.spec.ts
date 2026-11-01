@@ -335,7 +335,7 @@ test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', a
   await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
 });
 
-test('150 percent scale on a 1366x768 work area still shows Finish and Skip', async () => {
+test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish on step 9 in view', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');
   // 1366x768 at 150% leaves about 910x512 DIPs.

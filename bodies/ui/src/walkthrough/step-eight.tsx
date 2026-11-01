@@ -37,6 +37,7 @@ function LimitForm({
       <MoneyField
         id="wt-limit"
         label="Daily limit (USD)"
+        hideLabel
         value={text}
         onChange={setText}
         invalid={parseLimit(text) === null}

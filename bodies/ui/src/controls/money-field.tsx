@@ -18,6 +18,7 @@ export function MoneyField({
   onChange,
   onCommit,
   invalid = false,
+  hideLabel = false,
 }: {
   id: string;
   label: string;
@@ -25,10 +26,14 @@ export function MoneyField({
   onChange(text: string): void;
   onCommit?: () => void;
   invalid?: boolean;
+  /** Keep the label for assistive tech and tests when a heading above already says it. */
+  hideLabel?: boolean;
 }) {
   return (
     <div className="tg-money">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className={hideLabel ? 'tg-sr-only' : undefined}>
+        {label}
+      </label>
       <div className="tg-money__row">
         <span className="tg-money__prefix" aria-hidden="true">
           $
@@ -47,10 +52,10 @@ export function MoneyField({
             onCommit?.();
           }}
         />
-        <Button variant="quiet" aria-label="Decrease" onClick={() => onChange(step(value, -1))}>
+        <Button variant="secondary" aria-label="Decrease" onClick={() => onChange(step(value, -1))}>
           −
         </Button>
-        <Button variant="quiet" aria-label="Increase" onClick={() => onChange(step(value, 1))}>
+        <Button variant="secondary" aria-label="Increase" onClick={() => onChange(step(value, 1))}>
           +
         </Button>
       </div>

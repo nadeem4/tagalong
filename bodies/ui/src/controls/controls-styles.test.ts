@@ -48,4 +48,18 @@ describe('CONTROLS_CSS', () => {
   it('uses the control fill token for light controls', () => {
     expect(CONTROLS_CSS).toContain(`--tg-ctl-bg: ${t.color.controlFill}`);
   });
+
+  it('gives the money stepper buttons AA ink and border on both surfaces', () => {
+    const rule = CONTROLS_CSS.match(/\.tg-money \.tg-button\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rule).toContain('color: var(--tg-ctl-ink)');
+    expect(rule).toContain('border-color: var(--tg-ctl-muted)');
+  });
+
+  it('fills the slider track with gold up to the thumb', () => {
+    expect(CONTROLS_CSS).toMatch(/slider-runnable-track\s*\{[^}]*gradient[^}]*var\(--fill\)/);
+  });
+
+  it('has a visually hidden class', () => {
+    expect(CONTROLS_CSS).toContain('.tg-sr-only {');
+  });
 });

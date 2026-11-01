@@ -20,6 +20,11 @@ function mount(step: number, extra: Partial<Parameters<typeof Footer>[0]> = {}) 
 }
 
 describe('Footer', () => {
+  it('draws Back as the shared secondary button', () => {
+    mount(3);
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveClass('tg-button--secondary');
+  });
+
   it('shows Back, Skip and Next only (no third button)', () => {
     mount(3);
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([

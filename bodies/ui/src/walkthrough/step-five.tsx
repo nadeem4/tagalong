@@ -106,25 +106,26 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
         </p>
       </div>
       <div>
-        <Select
-          id="wt-voice"
-          label="Voice"
-          value={voice}
-          onChange={setVoice}
-          options={[...VOICES]}
-        />
-        <Button
-          variant="quiet"
-          className="wt-after"
-          onClick={() => {
-            setPreviewFailed(false);
-            host
-              .previewVoice({ text: SAMPLE, mouth, voice, speed })
-              .catch(() => setPreviewFailed(true));
-          }}
-        >
-          Preview
-        </Button>
+        <div className="wt-pair">
+          <Select
+            id="wt-voice"
+            label="Voice"
+            value={voice}
+            onChange={setVoice}
+            options={[...VOICES]}
+          />
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPreviewFailed(false);
+              host
+                .previewVoice({ text: SAMPLE, mouth, voice, speed })
+                .catch(() => setPreviewFailed(true));
+            }}
+          >
+            Preview
+          </Button>
+        </div>
         {previewFailed && <p className="wt-help">The preview could not play.</p>}
       </div>
       <Slider

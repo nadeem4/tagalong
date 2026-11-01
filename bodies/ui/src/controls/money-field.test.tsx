@@ -10,6 +10,12 @@ function setup(value: string, extra: Partial<Parameters<typeof MoneyField>[0]> =
 }
 
 describe('MoneyField', () => {
+  it('hides the label visually but keeps it for the field when asked', () => {
+    const { input } = setup('5', { hideLabel: true });
+    expect(screen.getByText('Daily limit')).toHaveClass('tg-sr-only');
+    expect(input).toBeInTheDocument();
+  });
+
   it('plus and minus adjust by 1', () => {
     const { onChange } = setup('5');
     fireEvent.click(screen.getByRole('button', { name: 'Increase' }));

@@ -74,6 +74,13 @@ describe('StepFive', () => {
     });
   });
 
+  it('Preview is a secondary button beside the voice select', async () => {
+    mountStep(<StepFive host={makeWalkthroughHost()} />);
+    const preview = await screen.findByRole('button', { name: /Preview/ });
+    expect(preview).toHaveClass('tg-button--secondary');
+    expect(preview.parentElement).toContainElement(screen.getByLabelText('Voice'));
+  });
+
   it('Preview plays the chosen voice at the chosen speed through the existing preview', async () => {
     const { host } = mount();
     await screen.findByLabelText('Talk key');
