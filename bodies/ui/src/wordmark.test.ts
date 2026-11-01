@@ -25,7 +25,7 @@ describe('Scout wordmark', () => {
   });
 
   it('is not set in the pixel font in the bubble', () => {
-    const source = readFileSync(join(import.meta.dirname, 'companion-bubble.tsx'), 'utf8');
+    const source = readFileSync(join(import.meta.dirname, 'chat-styles.ts'), 'utf8');
     const line = source.split('\n').find((l) => l.startsWith('.bubble-head strong')) ?? '';
     expect(line).not.toBe('');
     expect(line).not.toContain('font.pixel');

@@ -36,4 +36,46 @@ export const CHAT_CSS = `
   padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit;
   font: inherit; text-align: left; cursor: pointer;
 }
+
+/* The close and back buttons are drawn icons. */
+.bubble-close, .bubble-icon { display: grid; place-items: center; padding: 0; }
+.bubble-icon {
+  flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
+  color: ${t.color.textMuted}; cursor: pointer;
+}
+.bubble-icon:hover { background: #222845; color: ${t.color.text}; }
+.bubble-icon:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
+.bubble-sep { width: 1px; height: 16px; background: ${t.color.line}; margin: 0 2px; }
+
+/* The pills: on is a gold dot with a muted gold edge, off a plain edge. */
+.bubble-toggle[aria-checked='true'] { color: ${t.color.text}; border-color: #6B5A2A; background: #1E1D2A; }
+.bubble-toggle[aria-checked='true']::before { background: ${t.color.gold}; }
+
+/* Context chips: a pill with its remove button inside. */
+.bubble-chip { min-height: 28px; padding: 0 8px 0 12px; }
+
+/* The full chat: a 52px header, a log pinned to the newest message, then the footer. */
+.bubble--chat { height: 100vh; padding: 0; gap: 0; overflow: hidden; }
+.bubble-head {
+  flex: none; box-sizing: border-box; height: 52px; display: flex; align-items: center; gap: 8px;
+  padding: 0 8px 0 16px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.sidebar};
+}
+.bubble-head strong {
+  margin-right: auto; font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark};
+  font-size: 16px; line-height: 20px; letter-spacing: -0.01em;
+}
+.bubble-head .bubble-toggle { min-height: 26px; }
+.bubble-head .bubble-row { gap: 8px; }
+.bubble-log {
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px;
+  padding: 20px 16px 20px 20px; scrollbar-width: thin; scrollbar-color: ${t.color.fieldLine} transparent;
+}
+/* Short conversations sit at the bottom, beside the field. */
+.bubble-log > :first-child { margin-top: auto; }
+.bubble-exchange { display: flex; flex-direction: column; gap: 12px; }
+.bubble-mine {
+  align-self: flex-end; max-width: 82%; margin: 0; padding: 12px 16px; border-radius: 12px 12px 4px 12px;
+  background: #222845; font-size: 14px; line-height: 21px; white-space: pre-wrap;
+}
+.bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 `;

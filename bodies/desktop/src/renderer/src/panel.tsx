@@ -254,6 +254,7 @@ function Panel() {
             />
           ) : (
             <CompanionBubble
+              scout={FIGURE.idle}
               petId={petId}
               petName={petName}
               expanded={mode === 'chat'}

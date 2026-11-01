@@ -19,6 +19,7 @@ import { CONTROLS_CSS } from './controls/controls-styles';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
+import { CloseIcon, CollapseIcon } from './chat-icons';
 import { ScoutMark } from './scout-mark';
 import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
@@ -81,6 +82,8 @@ export interface CompanionBubbleProps {
   onDropDone?: () => void;
   /** The top status mark from the host: a muted row above the question box, never spoken. */
   status?: StatusMarkValue | null;
+  /** Bean's idle strip, drawn still in Scout's mark beside lines Scout starts. */
+  scout?: BeanClipData;
   /** Scout's own line the person clicked open on the quiet line: it becomes Scout's first message. */
   remark?: string;
 }
@@ -148,6 +151,7 @@ export function CompanionBubble({
   onDropDone,
   status,
   remark,
+  scout,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -484,6 +488,17 @@ export function CompanionBubble({
     if (mine.current !== null) void bridge.interrupt(mine.current);
   };
 
+  // The chat opens on, and follows, the newest message. Only new content moves it, never typing.
+  const log = useRef<HTMLDivElement>(null);
+  const streamed = reply.state === 'idle' ? '' : reply.text;
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const element = log.current;
+      if (element !== null) element.scrollTop = element.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [past.length, question, streamed, scoutLine, expanded]);
+
   const chips = chipsOf(snapshot).filter((chip) => !removed.has(chip.id));
   const chipList = chips.length > 0 && (
     <ul className="bubble-chips" aria-label={`What ${petName} can see`}>
@@ -530,12 +545,18 @@ export function CompanionBubble({
       )}
     </>
   );
-  // Scout's own line, until the person answers it (then it is in the log).
-  const scoutMessage = scoutLine !== null && (
-    <div className="bubble-answer">
-      <Answer text={scoutLine} />
+  // A line Scout starts: its mark and name above the words.
+  const scoutSays = (words: string) => (
+    <div className="bubble-scoutmsg">
+      <span className="bubble-who">
+        <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} />
+        <span>{petName}</span>
+      </span>
+      <Answer text={words} />
     </div>
   );
+  // Scout's own line, until the person answers it (then it is in the log).
+  const scoutMessage = scoutLine !== null && scoutSays(scoutLine);
   // A health check answers with its card, in the answer's place.
   const answer =
     health === null ? (
@@ -617,7 +638,7 @@ export function CompanionBubble({
 
   const closeButton = onClose !== undefined && (
     <button type="button" className="bubble-close" aria-label="Close" onClick={onClose}>
-      ×
+      <CloseIcon />
     </button>
   );
 
@@ -629,28 +650,43 @@ export function CompanionBubble({
           <style>{BUBBLE_CSS}</style>
           <style>{ANSWER_CSS}</style>
           <style>{CARD_CSS}</style>
+          <style>{CHAT_CSS}</style>
           <header className="bubble-head">
             <strong>{petName}</strong>
             <span className="bubble-row">
               {alwaysToggle}
               {seeingToggle}
               {speakingIndicator}
+              {(alwaysToggle || seeingToggle) && <span className="bubble-sep" aria-hidden="true" />}
               {onCollapse !== undefined && (
-                <button type="button" className="bubble-quiet" onClick={onCollapse}>
-                  Back to bubble
+                <button
+                  type="button"
+                  className="bubble-icon"
+                  aria-label="Back to bubble"
+                  title="Back to bubble"
+                  onClick={onCollapse}
+                >
+                  <CollapseIcon />
                 </button>
               )}
               {closeButton}
             </span>
           </header>
-          <div className="bubble-log" role="log" aria-label={`Conversation with ${petName}`}>
+          <div
+            ref={log}
+            className="bubble-log"
+            role="log"
+            aria-label={`Conversation with ${petName}`}
+          >
             {past.length === 0 && question === null && scoutLine === null && (
               <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
             )}
             {past.map((exchange, index) => (
               <div key={index} className="bubble-exchange">
                 {exchange.question !== null && <p className="bubble-mine">{exchange.question}</p>}
-                {exchange.failed ? (
+                {exchange.question === null ? (
+                  scoutSays(exchange.answer)
+                ) : exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
                   <Answer text={exchange.answer} />
@@ -685,6 +721,7 @@ export function CompanionBubble({
         <style>{BUBBLE_CSS}</style>
         <style>{ANSWER_CSS}</style>
         <style>{CARD_CSS}</style>
+        <style>{CHAT_CSS}</style>
         <div className="bubble-top">
           <span className="bubble-row">
             {alwaysToggle}
@@ -819,7 +856,7 @@ export function GreetingLine({
             </button>
           )}
           <button type="button" className="bubble-close" aria-label="Close" onClick={onDone}>
-            ×
+            <CloseIcon />
           </button>
         </div>
       </div>
@@ -856,19 +893,6 @@ const BUBBLE_CSS = `
   padding: 14px 16px; background: ${t.color.page}; color: ${t.color.text};
   border: 1px solid ${t.color.fieldLine}; border-radius: 12px; font-family: ${t.font.ui};
 }
-.bubble--chat { height: 100vh; padding: 0; gap: 0; overflow: hidden; }
-.bubble-head {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 12px 10px 16px; border-bottom: 1px solid #262C4A; background: ${t.color.sidebar};
-}
-.bubble-head strong { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; font-size: 16px; }
-.bubble-head .bubble-quiet { align-self: center; }
-.bubble-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
-.bubble-exchange { display: flex; flex-direction: column; gap: 8px; }
-.bubble-mine {
-  align-self: flex-end; max-width: 80%; margin: 0; padding: 8px 12px; border-radius: 12px 12px 4px 12px;
-  background: #222845; font-size: 13px; line-height: 1.5; white-space: pre-wrap;
-}
 .bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
 .bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
@@ -899,8 +923,6 @@ const BUBBLE_CSS = `
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine};
 }
 .bubble-toggle:hover { background: #222845; color: ${t.color.text}; }
-.bubble-toggle[aria-checked='true'] { color: ${t.color.text}; border-color: ${t.color.gold}; }
-.bubble-toggle[aria-checked='true']::before { background: ${t.color.gold}; }
 .bubble-toggle:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;

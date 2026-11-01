@@ -6,7 +6,7 @@
 /** The declarations of the rule whose selector is exactly `selector`. */
 export function ruleOf(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = css.match(new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`));
+  const match = css.match(new RegExp(`(?:^|[}\\n])[ \\t]*${escaped}\\s*\\{([^}]*)\\}`));
   if (match === null) throw new Error(`no rule for ${selector}`);
   return match[1] ?? '';
 }

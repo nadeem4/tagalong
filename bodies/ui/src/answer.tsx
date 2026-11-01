@@ -48,7 +48,11 @@ export const ANSWER_CSS = `
   padding: 1px 5px; border-radius: 4px; background: #222845;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12.5px;
 }
-.answer pre { padding: 10px 12px; border-radius: 8px; background: ${t.color.field}; overflow-x: auto; }
+.answer pre {
+  padding: 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 8px; background: ${t.color.field};
+  overflow-x: auto;
+}
+.answer li::marker { color: ${t.color.textMuted}; }
 .answer pre code { padding: 0; background: none; }
 .answer blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid #3A4270; color: ${t.color.textMuted}; }
 .answer table { border-collapse: collapse; font-size: 13px; }

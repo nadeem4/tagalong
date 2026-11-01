@@ -42,6 +42,12 @@ const ask = (text: string) => {
   fireEvent.keyDown(input, { key: 'Enter' });
 };
 
+const ask2 = (label: string, text: string) => {
+  const input = screen.getByLabelText(label);
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+};
+
 const HELLO = 'Hi Sam. Ask me about anything on your screen.';
 const helloRemark = (text = HELLO, extra: Record<string, unknown> = {}) =>
   ({
@@ -479,6 +485,95 @@ describe('GreetingLine, Scout’s own line', () => {
     );
     expect(container.querySelector('.scout-mark')).toBeNull();
     expect(screen.queryByText('Click to reply')).toBeNull();
+  });
+});
+
+describe('CompanionBubble, the chat window', () => {
+  const REMARK = 'Your 3pm with Dana moved to 3:30.';
+  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
+
+  it('collapse and close are icon buttons with their names', () => {
+    renderBubble(createFakeHostBridge(), {
+      expanded: true,
+      onCollapse: () => undefined,
+      onClose: () => undefined,
+    });
+    for (const name of ['Back to bubble', 'Close']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.querySelector('svg')).not.toBeNull();
+      expect(button.textContent).toBe('');
+    }
+    expect(screen.getByRole('button', { name: 'Back to bubble' })).toHaveAttribute(
+      'title',
+      'Back to bubble',
+    );
+  });
+
+  it('the remark in the bubble shows the Scout mark and label', () => {
+    const { container } = render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} scout={IDLE} />
+      </HostBridgeProvider>,
+    );
+    const who = container.querySelector('.bubble-who');
+    expect(who).toHaveTextContent('Scout');
+    expect(who?.querySelector('.scout-mark')).not.toBeNull();
+  });
+
+  it('puts the Scout label on a remark in the log but not on an answer', async () => {
+    const bridge = createFakeHostBridge();
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} expanded />
+      </HostBridgeProvider>,
+    );
+    await act(async () => ask2('Message Scout', 'Yes'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 't1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('t1', 'Pushed.'));
+    });
+    expect(container.querySelectorAll('.bubble-who')).toHaveLength(1);
+  });
+
+  describe('scrolling to the newest message', () => {
+    afterEach(() => vi.restoreAllMocks());
+    function pinned(height: { value: number }) {
+      vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => height.value);
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+        callback(0);
+        return 0;
+      });
+    }
+
+    it('scrolls the log to the bottom when the chat opens', () => {
+      pinned({ value: 700 });
+      renderBubble(createFakeHostBridge(), { expanded: true, remark: REMARK });
+      expect(screen.getByRole('log').scrollTop).toBe(700);
+    });
+
+    it('scrolls the log to the bottom when new text streams in', async () => {
+      const height = { value: 700 };
+      pinned(height);
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge, { expanded: true });
+      await act(async () => ask2('Message Scout', 'hi'));
+      act(() => {
+        bridge.emit({
+          type: 'turn.started',
+          turnId: 't1',
+          petId: 'scout',
+          conversationId: CONVERSATION,
+        });
+      });
+      height.value = 1200;
+      act(() => bridge.emit({ type: 'turn.delta', turnId: 't1', text: 'More and more text' }));
+      expect(screen.getByRole('log').scrollTop).toBe(1200);
+    });
   });
 });
 

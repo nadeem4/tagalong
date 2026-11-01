@@ -2,7 +2,8 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { Answer } from './answer';
+import { ANSWER_CSS, Answer } from './answer';
+import { minPadding, ruleOf } from './test-support/css-rules';
 
 const REPLY = [
   'You are in **ai_pet**, on `engine.test.ts`.',
@@ -49,5 +50,16 @@ describe('Answer', () => {
   it('renders tables', () => {
     render(<Answer text={'| a | b |\n| - | - |\n| 1 | 2 |'} />);
     expect(screen.getByRole('table')).toBeVisible();
+  });
+});
+
+describe('ANSWER_CSS', () => {
+  it('gives a code block a hairline edge and 12px inside', () => {
+    expect(ruleOf(ANSWER_CSS, '.answer pre')).toContain('border: 1px solid #2E3558');
+    expect(minPadding(ANSWER_CSS, '.answer pre')).toBeGreaterThanOrEqual(12);
+  });
+
+  it('mutes list markers', () => {
+    expect(ruleOf(ANSWER_CSS, '.answer li::marker')).toContain('color: #A3AAC4');
   });
 });
