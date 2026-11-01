@@ -1662,6 +1662,23 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
    Anthropic Console API keys page.
 
+## Companion chat window
+
+1. **Action:** close the bubble, then let Scout say something (or `say` something that makes it speak
+   first) so the quiet line appears. Click the line. **Expected:** the bubble opens with Scout's
+   words under Scout's mark and name, and the question box says "Reply to Scout".
+2. **Action:** ask a follow-up, then **Open full chat**. **Expected:** the chat shows Scout's line
+   first, then your message on a tile, then Scout's answer; the log sits at the newest message.
+3. **Action:** ask until the log is longer than the window, then use **Back to bubble** and
+   **Open full chat** again. **Expected:** it lands on the newest message each time.
+4. **Action:** ask something that takes a moment. **Expected:** a gold dot, "Scout is thinking…" and
+   **Stop** on one row; the text box is dimmed but you can still click into it; a gold cursor ends
+   the streaming text and goes when the answer is done.
+5. **Action:** in a fresh chat with no messages. **Expected:** Bean, "Ask Scout anything about what
+   is on your screen." and "Hold [your talk key] to talk" with the key from Settings.
+6. **Action:** check the header icons. **Expected:** the collapse and close buttons are drawn
+   icons with the names "Back to bubble" and "Close".
+
 ## Not supported
 
 Do not test these here.
