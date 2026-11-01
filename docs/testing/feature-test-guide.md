@@ -1733,7 +1733,7 @@ Brain tests only; nothing here installs anything.
 1. `cd brain && uv run pytest tests/test_setup_facts.py tests/test_setup_registry.py -q` passes.
 2. With a real brain, ask Scout what an expert needs: it should call `inspect_machine` and
    `find_experts` and say whether each is buildable here.
-3. Go offline and ask again within a day: the answer still comes, flagged as older.
+3. Go offline and ask again. Within a day the cached list is served as normal; after a day (or with `fetched_at` in `cache/*.json` moved back) it is still served but flagged stale.
 
 ## Not supported
 

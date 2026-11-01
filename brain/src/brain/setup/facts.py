@@ -117,13 +117,19 @@ async def inspect(
         return await _probe(run, path, env) if path else None
 
     private = node_paths(home)
-    private_node = await _probe(run, str(private.node), env) if private else None
+
+    async def private_probe() -> ToolVersion | None:
+        return await _probe(run, str(private.node), env) if private else None
+
+    node, private_node, npm, git, claude = await asyncio.gather(
+        tool("node"), private_probe(), tool("npm"), tool("git"), tool("claude")
+    )
     return Machine(
         os=_OS.get(system.lower(), "linux"),
         arch=_ARCH.get(cpu.lower(), "x64"),
-        node=await tool("node"),
+        node=node,
         private_node=private_node,
-        npm=await tool("npm"),
-        git=await tool("git"),
-        claude_code=await tool("claude"),
+        npm=npm,
+        git=git,
+        claude_code=claude,
     )

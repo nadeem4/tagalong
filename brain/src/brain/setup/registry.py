@@ -4,6 +4,7 @@ Entries are parsed leniently (unknown fields ignored, a malformed entry skipped)
 registries are other people's files. Offline, the cache is served and flagged `stale`.
 """
 
+import hashlib
 import json
 import os
 import time
@@ -58,6 +59,7 @@ class Listing:
     entries: list[RegistryEntry]
     stale: bool
     fetched_at: str
+    more: bool = False  # the registry has further pages; only the first is read
 
 
 def _split(package: str, sep: str) -> tuple[str, str | None]:
@@ -172,10 +174,13 @@ class Registry:
         return Listing(_parse(data.get("agents"), _acp_entry), stale, _iso(at))
 
     async def mcp_servers(self, query: str | None, refresh: bool = False) -> Listing:
+        query = query.strip().lower() if query else None
         url = MCP_URL + (f"&search={quote(query)}" if query else "")
-        name = "mcp" if not query else f"mcp-{quote(query, safe='')}"
+        name = f"mcp-{hashlib.sha1(query.encode()).hexdigest()[:12]}" if query else "mcp"
         data, stale, at = await self._load(name, url, refresh)
-        return Listing(_parse(data.get("servers"), _mcp_entry), stale, _iso(at))
+        meta = data.get("metadata")
+        more = isinstance(meta, dict) and bool(meta.get("nextCursor"))
+        return Listing(_parse(data.get("servers"), _mcp_entry), stale, _iso(at), more)
 
     async def _load(self, name: str, url: str, refresh: bool) -> tuple[dict, bool, float]:
         path = cache_file(self._home, name)
@@ -198,20 +203,21 @@ class Registry:
     def _read_cache(path: Path) -> dict | None:
         try:
             cached = json.loads(path.read_text(encoding="utf-8"))
-            return cached if isinstance(cached["data"], dict) else None
+            ok = isinstance(cached["data"], dict) and isinstance(cached["fetched_at"], int | float)
+            return cached if ok and not isinstance(cached["fetched_at"], bool) else None
         except (OSError, ValueError, KeyError, TypeError):
             return None
 
     @staticmethod
     def _write_cache(path: Path, payload: dict) -> None:
         # Atomic: a crash leaves the old cache, never half a file.
+        part = path.with_name(path.name + ".part")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            part = path.with_name(path.name + ".part")
             part.write_text(json.dumps(payload), encoding="utf-8")
             os.replace(part, path)
         except OSError:
-            pass  # the read still succeeded; the cache is only an optimisation
+            part.unlink(missing_ok=True)  # the read still succeeded; the cache is only a speed-up
 
 
 def _iso(epoch: float) -> str:

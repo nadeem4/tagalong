@@ -195,3 +195,53 @@ async def test_mcp_pypi_package_is_uvx(tmp_path):
     ).encode()
     listing = await registry(tmp_path, Net(mcp=body)).mcp_servers(None)
     assert [d.kind for d in listing.entries[0].distributions] == ["uvx"]
+
+
+async def test_failed_cache_write_leaves_no_part_file(tmp_path, monkeypatch):
+    def boom(src, dst):
+        raise OSError("disk")
+
+    monkeypatch.setattr("brain.setup.registry.os.replace", boom)
+    listing = await registry(tmp_path).acp_agents()
+    assert listing.entries
+    assert not list((tmp_path / "cache").glob("*.part"))
+
+
+async def test_damaged_cache_is_refetched(tmp_path):
+    cache = tmp_path / "cache" / "acp-registry.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({"fetched_at": "soon", "data": {"agents": []}}))
+    net = Net()
+    listing = await registry(tmp_path, net).acp_agents()
+    assert len(net.urls) == 1 and listing.entries
+
+
+async def test_more_is_true_when_the_mcp_page_has_a_cursor(tmp_path):
+    body = json.loads(MCP)
+    body["metadata"] = {"nextCursor": "abc", "count": 2}
+    reg = registry(tmp_path, Net(mcp=json.dumps(body).encode()))
+    assert (await reg.mcp_servers(None)).more is True
+    assert (await registry(tmp_path / "b").acp_agents()).more is False
+
+
+async def test_query_is_lowercased_and_hashed_in_the_cache_name(tmp_path):
+    net = Net()
+    reg = registry(tmp_path, net)
+    await reg.mcp_servers("Note Taking")
+    await reg.mcp_servers("note taking")
+    assert len(net.urls) == 1 and "search=note%20taking" in net.urls[0]
+    names = [p.name for p in (tmp_path / "cache").iterdir()]
+    assert len(names) == 1 and names[0].startswith("mcp-") and " " not in names[0]
+
+
+async def test_tools_pass_more_through(tmp_path):
+    body = json.loads(MCP)
+    body["metadata"] = {"nextCursor": "abc"}
+
+    async def inspect_fn():
+        return machine()
+
+    reg = registry(tmp_path, Net(mcp=json.dumps(body).encode()))
+    tools = {s.name: h for s, h in setup_tools(tmp_path, reg, inspect_fn)}
+    assert json.loads(await tools["find_apps"]({}))["more"] is True
+    assert json.loads(await tools["find_experts"]({}))["more"] is False

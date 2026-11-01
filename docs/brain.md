@@ -496,7 +496,7 @@ words what the person reads (guidance in `mind/soul.md`).
   latter through its `search` parameter, latest versions only) into entries with a way to run
   them (`npx`, `uvx`, `binary` per platform, `remote`). Entries are parsed leniently. Results are
   cached for 24 h in `cache/`; offline, the cache is served with `stale: true`; offline with no
-  cache is `registry_unavailable`. `build_for` says whether an entry can run on this computer.
+  cache is `registry_unavailable`. Only the first MCP page is read; `more: true` in the result says the registry has further pages. `build_for` says whether an entry can run on this computer.
 - `tools.py`: Scout's tools `inspect_machine`, `find_experts` and `find_apps(query)`, all
   read-only and automatic, never offered to Home.
 

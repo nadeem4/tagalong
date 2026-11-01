@@ -39,7 +39,9 @@ def setup_tools(
             }
             for e in found.entries
         ]
-        return json.dumps({key: rows, "stale": found.stale, "fetched_at": found.fetched_at})
+        return json.dumps(
+            {key: rows, "stale": found.stale, "fetched_at": found.fetched_at, "more": found.more}
+        )
 
     async def find_experts(args: dict) -> str:
         return await listing("experts", registry.acp_agents)
