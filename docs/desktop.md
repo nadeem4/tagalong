@@ -215,7 +215,7 @@ Rules each module enforces:
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
   ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks, voice and microphone, a `Toggle` for Scout talks, a `Slider` for speed), bigger jobs (was
+  speaks, voice and microphone, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), bigger jobs (was
   experts; asks the brain's `expert_status` whether Claude Code's connector is installed, with
   Check again; it never claims the login works; a static hand-off card and "More experts are
   coming."), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show

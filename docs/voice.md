@@ -114,6 +114,23 @@ reads "The brain could not load its speech models."
 `listMicrophones()` lists the `audioinput` devices, leaving out `default`, for Settings and the
 health check.
 
+#### The level meter
+
+"Test your microphone" (walkthrough step 5, Settings → Voice) shows how loud the mic is. It is
+local to the window and sends nothing: no IPC, no contract frame, no brain.
+
+- `renderer/src/mic-level.ts#watchLevel(open, onLevel, onError)` opens its own short-lived
+  `openMic` (the picked device, or the default), turns each frame into a 0..1 level with
+  `frameLevel` (RMS on a fixed -60 to 0 dB window; it rises at once and falls by 0.8 a frame) and
+  drops the frame. Nothing is recorded or kept; only the number reaches the page.
+- `MicTest` (`@tagalong/ui`) is the button and the `LevelMeter` (`role="meter"`). It is off until
+  pressed, restarts when the microphone select changes (an unsaved choice is enough), and stops on
+  a second press, on unmount (leaving the step, closing Settings) and an open failure, which shows
+  why (not allowed, in use by another app, no microphone). `stop()` always closes the mic.
+- The talk key and Always listening run in the panel window, which Settings cannot see, so there
+  is no shared listening flag to read. Settings' test stops whenever its window loses focus
+  instead, so it does not hold the microphone while you talk elsewhere.
+
 `mic-worklet.js` gathers samples into 512-sample frames (32 ms) and posts each one. A worklet
 cannot import, so the number 512 is repeated there. It must match `EARS_FRAME` in
 `bodies/desktop/src/shared/voice.ts`.

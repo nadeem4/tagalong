@@ -265,6 +265,8 @@ Scout listens continuously only after you switch **Always listening** on, once, 
 the whole time it is on, and Scout never switches it on itself. Audio goes only to your own
 brain and is never stored; with the brain on this computer it never leaves it.
 
+"Test your microphone" (the walkthrough's voice step and Settings → Voice) opens the microphone only while you have it on, shows a level bar, and records, keeps and sends nothing; it stops when you leave.
+
 Otherwise the microphone is used only while you hold the talk key (Right Ctrl on its own by
 default, Settings → Voice) or after you click the mic in the text box, until you let go or click
 again (at most 30 seconds). Hold-to-talk and the mic button need no name, whether or not Always

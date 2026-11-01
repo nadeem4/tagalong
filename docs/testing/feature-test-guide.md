@@ -678,6 +678,16 @@ popup); the answer is text only.
 2. **Expected:** each preview plays in the chosen voice and speed before saving; with Scout talks off
    the answer is silent, and Preview still plays.
 
+### V.5a. Test your microphone
+
+1. **Action:** in Settings → Voice (and in the first-run tour's voice step) press **Test your
+   microphone** and speak; then change the **Microphone** select without saving; then press
+   **Stop test**; then start it again and click another window.
+2. **Expected:** nothing shows until you press it. The bar moves with your voice and says "Nothing is
+   recorded or sent." Changing the microphone restarts it on that one. **Stop test** and clicking
+   away (Settings) hide the bar and release the microphone. With the microphone blocked in Windows,
+   a line says Scout is not allowed to use it and no bar shows.
+
 ### V.5b. Who speaks: System voice
 
 1. **Action:** in Settings → Voice pick **System voice** under **Who speaks** (the other choice is
