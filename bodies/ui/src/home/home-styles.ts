@@ -146,23 +146,16 @@ export const HOME_CSS = `
   grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
-.apv-section { display: flex; flex-direction: column; gap: ${t.space.lg}px; }
+.apv-section {
+  display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xl}px ${t.space.xxl}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
+}
 .apv-sub { margin: ${t.space.xs}px 0 0; font-size: ${t.fontSize.body}px; }
 .apv-error { color: ${t.color.errInk}; margin: 0; }
-.apv-btn {
-  height: 28px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.small - 2}px;
-  border: 1px solid ${t.color.panelMuted}; background: transparent; color: ${t.color.panelText};
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
-}
-.apv-btn:hover { background: ${t.color.panelTile}; }
-.apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; }
-.apv-pref {
-  position: relative; flex-direction: row; align-items: center; justify-content: space-between;
-  gap: ${t.space.xl}px; padding: ${t.space.lg}px ${t.space.xl}px ${t.space.lg}px ${t.space.xxl}px;
-}
-.apv-pref::before {
-  content: ''; position: absolute; left: 0; top: ${t.space.lg}px; bottom: ${t.space.lg}px; width: 3px;
-  border-radius: 0 3px 3px 0; background: ${t.color.gold};
+.apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.apv-pref.home-card {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: ${t.space.xl}px;
+  padding: ${t.space.lg}px 0; border: 0; border-top: 1px solid ${t.color.panelLine}; border-radius: 0;
 }
 .apv-pref__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .apv-pref__sentence { font-size: ${t.fontSize.field + 1}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }

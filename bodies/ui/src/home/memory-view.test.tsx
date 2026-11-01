@@ -101,4 +101,25 @@ describe('MemoryView', () => {
     unmount();
     expect(off).toHaveBeenCalled();
   });
+
+  it('Delete sits inside its list item and names the fact', async () => {
+    renderView(createFakeHostBridge({ memories: [TEA] }));
+    const button = await screen.findByRole('button', { name: 'Delete: Prefers green tea' });
+    expect(button).toHaveTextContent('Delete');
+    expect(button.closest('li')).toHaveTextContent('Prefers green tea');
+  });
+
+  it('a 1,000-character fact wraps inside its row (wrap rule on the text)', async () => {
+    const text = 'w'.repeat(1000);
+    renderView(createFakeHostBridge({ memories: [{ ...TEA, text }] }));
+    const cell = await screen.findByText(text);
+    expect(cell).toHaveClass('memory-row__text');
+    const css = [...document.querySelectorAll('style')].map((n) => n.textContent).join('');
+    expect(css).toMatch(/\.memory-row__text \{[^}]*overflow-wrap: anywhere/);
+  });
+
+  it('shows its empty line', async () => {
+    renderView(createFakeHostBridge({ memories: [] }));
+    expect(await screen.findByText('Scout doesn’t remember anything yet.')).toBeVisible();
+  });
 });
