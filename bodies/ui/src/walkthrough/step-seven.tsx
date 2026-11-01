@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Button } from '../controls';
 import type { WalkthroughHost } from './walkthrough-host';
 
 type Host = Pick<WalkthroughHost, 'browserFolder' | 'showBrowserFolder' | 'copyText'>;
@@ -25,6 +26,7 @@ export function StepSeven({ host }: { host: Host }) {
 
   return (
     <section>
+      <span className="wt-label">Browser</span>
       <h1>Let Scout read your browser tabs</h1>
       <p className="wt-lead">
         With the add-on in Chrome or Edge, Scout can read the tab you’re on, find a page in your
@@ -35,12 +37,12 @@ export function StepSeven({ host }: { host: Host }) {
           <h3>Open your browser’s extensions page</h3>
           <p>Paste the address into the address bar.</p>
           <div className="wt-row">
-            <button type="button" className="wt-quiet" onClick={() => copy('chrome://extensions')}>
+            <Button variant="quiet" onClick={() => copy('chrome://extensions')}>
               Copy chrome://extensions
-            </button>
-            <button type="button" className="wt-quiet" onClick={() => copy('edge://extensions')}>
+            </Button>
+            <Button variant="quiet" onClick={() => copy('edge://extensions')}>
               Copy edge://extensions
-            </button>
+            </Button>
           </div>
         </li>
         <li>
@@ -51,21 +53,19 @@ export function StepSeven({ host }: { host: Host }) {
           <h3>Choose Load unpacked, then pick this folder</h3>
           {folder !== null && <code className="wt-code">{folder}</code>}
           <div className="wt-row" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="wt-quiet"
+            <Button
+              variant="quiet"
               onClick={() => void host.showBrowserFolder().catch(() => undefined)}
             >
               Show folder
-            </button>
-            <button
-              type="button"
-              className="wt-quiet"
+            </Button>
+            <Button
+              variant="quiet"
               disabled={folder === null}
               onClick={() => folder !== null && copy(folder)}
             >
               Copy folder path
-            </button>
+            </Button>
           </div>
         </li>
       </ol>

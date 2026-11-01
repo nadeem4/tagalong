@@ -1,6 +1,6 @@
 /** Tests for step 7: the three load-unpacked steps, the copy buttons and the folder. */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StepSeven } from './step-seven';
 import { makeWalkthroughHost } from './test-host';
@@ -36,5 +36,12 @@ describe('StepSeven', () => {
     expect(host.showBrowserFolder).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Copy folder path' }));
     expect(host.copyText).toHaveBeenCalledWith('C:/app/browser/dist');
+  });
+
+  it('the steps are an ordered list of three', () => {
+    render(<StepSeven host={makeWalkthroughHost()} />);
+    const list = screen.getByRole('list');
+    expect(list.tagName).toBe('OL');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
   });
 });
