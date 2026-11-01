@@ -322,3 +322,16 @@ def test_say_voice_and_speed_edges():
     assert say.model_validate({"text": "hi", "speed": 0.5, "voice": "v"}).speed == 0.5
     assert say.model_validate({"text": "hi", "speed": 2}).speed == 2
     assert say.model_validate({"text": "hi"}).voice is None
+
+
+def test_ask_open_accepts_free_text_and_recommended():
+    params = {"seq": 1, "id": "a", "state": "open", "text": "t", "options": ["x", "y"]}
+    ask = AskOpen.model_validate({**params, "free_text": True, "recommended": "y"})
+    assert ask.free_text is True
+    assert ask.recommended == "y"
+
+
+def test_ask_open_rejects_recommended_not_in_options():
+    params = {"seq": 1, "id": "a", "state": "open", "text": "t", "options": ["x", "y"]}
+    with pytest.raises(ValidationError):
+        AskOpen.model_validate({**params, "recommended": "z"})

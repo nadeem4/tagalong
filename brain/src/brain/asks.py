@@ -65,15 +65,23 @@ class Asks:
         timeout: float | None = None,
         free_text: bool = False,
         ask_id: str | None = None,
+        recommended: str | None = None,
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
         if ask_id is not None and ask_id in self._open:
             raise ValueError(f"ask {ask_id} is already open")
+        if recommended is not None and recommended not in options:
+            raise ValueError("recommended must be one of the options")
         if not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
         params["options"] = options
+        # Bodies only learn a text box is wanted, or what is recommended, from these fields.
+        if free_text:
+            params["free_text"] = True
+        if recommended is not None:
+            params["recommended"] = recommended
         if tool is not None:
             params["tool"] = tool
         if input is not None:
