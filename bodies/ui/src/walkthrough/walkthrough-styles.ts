@@ -13,7 +13,7 @@ export const WALKTHROUGH_CSS = `
 }
 .wt * { box-sizing: border-box; }
 .wt button, .wt input, .wt select { font-family: inherit; }
-.wt :focus-visible { outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px; }
+.wt :focus-visible { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
 .wt ::selection { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 
 /* Scout's side. The top strip drags the frameless window. */
@@ -51,9 +51,11 @@ export const WALKTHROUGH_CSS = `
 /* The page. The top 40px is the drag strip beside the window's own buttons. */
 .wt-page { display: grid; grid-template-rows: 1fr auto; min-height: 0; padding-top: 40px; position: relative; -webkit-app-region: no-drag; }
 .wt-page::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 40px; -webkit-app-region: drag; }
-.wt-body { overflow-y: auto; padding: ${t.space.xs}px 48px 28px; min-height: 0; animation: wt-enter 320ms cubic-bezier(.16, 1, .3, 1) both; }
+.wt-body { overflow-y: auto; scrollbar-width: thin; scrollbar-color: ${t.color.scrollbarThumb} transparent; padding: ${t.space.xs}px 48px 28px; min-height: 0; animation: wt-enter 320ms cubic-bezier(.16, 1, .3, 1) both; }
 /* A small or highly scaled screen: tighter gutters so the pinned footer wraps instead of overflowing. */
 @media (max-width: 800px) { .wt-body { padding-left: 24px; padding-right: 24px; } .wt-footer { padding: 12px 24px; } }
+.wt-body::-webkit-scrollbar { width: 10px; }
+.wt-body::-webkit-scrollbar-thumb { background: ${t.color.scrollbarThumb}; border-radius: 5px; border: 2px solid ${t.color.panel}; }
 @keyframes wt-enter { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .wt-body { animation: none; } }
 .wt h1 { margin: 0; font-size: 26px; line-height: 1.2; font-weight: ${t.fontWeight.semibold}; letter-spacing: -.01em; max-width: 30ch; text-wrap: balance; }
@@ -108,6 +110,52 @@ export const WALKTHROUGH_CSS = `
 .wt-setting > div { flex: 1; }
 .wt-setting h3 { margin: 0; font-size: 15px; font-weight: ${t.fontWeight.semibold}; }
 
+/* Steps 1 to 4 */
+.wt-body > section > .wt-label:first-child { margin-bottom: 10px; color: ${t.color.panelMuted}; font-size: ${t.fontSize.min}px; }
+.wt-day { margin-top: 28px; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 16px; overflow: hidden; }
+.wt-day > .wt-label { margin: 0; padding: 16px 24px 12px; color: ${t.color.panelMuted}; font-size: ${t.fontSize.min}px; }
+.wt-day ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid ${t.color.panelLine}; }
+.wt-day li { position: relative; padding: 24px 24px 28px; border-left: 1px solid ${t.color.panelLine}; }
+.wt-day li:first-child { border-left: 0; }
+.wt-day li::before { content: ''; position: absolute; top: -6px; left: 24px; width: 11px; height: 11px; border-radius: 50%; background: ${t.color.gold}; border: 1.5px solid ${t.color.goldInk}; }
+.wt-where { display: block; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
+.wt q { display: block; quotes: '“' '”'; margin-top: 10px; font-size: 17px; line-height: 1.3; font-weight: ${t.fontWeight.semibold}; }
+.wt-note--plain { border-top: 0; padding-top: 0; margin-top: 20px; }
+
+.wt-flow { list-style: none; margin: 28px 0 0; padding: 0; display: flex; align-items: center; gap: 28px; }
+.wt-flow > li { position: relative; min-width: 0; }
+.wt-flow > li:not(:last-child)::after { content: '→'; position: absolute; right: -24px; top: 50%; transform: translateY(-50%); color: ${t.color.panelMuted}; font-size: 16px; }
+.wt-node { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; font-size: 13px; }
+.wt-node .wt-label { margin: 0; font-size: ${t.fontSize.min}px; color: ${t.color.panelMuted}; }
+.wt-node .wt-help { margin: 0; }
+.wt-node--back { background: ${t.color.warnFill}; border-color: ${t.color.gold}; }
+.wt-hub { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 12px; background: ${t.color.page}; color: ${t.color.text}; font-size: 18px; }
+.wt-routes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; width: 210px; }
+.wt-sub { margin: 28px 0 0; padding-top: 16px; border-top: 1px solid ${t.color.panelLine}; font-size: 13px; font-weight: ${t.fontWeight.semibold}; }
+.wt-chips--apps { margin-top: 10px; }
+.wt-chip-app { display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border: 1px solid ${t.color.panelLine}; border-radius: 14px; background: #fff; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; }
+.wt-chip-app--any { border-style: dashed; background: transparent; color: ${t.color.panelMuted}; }
+
+.wt-moments { list-style: none; margin: 24px 0 0; padding: 0 20px; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 16px; }
+.wt-moments li { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid ${t.color.panelLine}; }
+.wt-moments li:first-child { border-top: 0; }
+.wt-moments q { margin-top: 0; font-size: 15px; }
+.wt-moments .wt-help::before { content: '→  '; }
+
+.wt-keyrow { margin-bottom: 16px; }
+.wt-keyrow > .wt-label { color: ${t.color.panelMuted}; font-size: ${t.fontSize.min}px; }
+.wt-keybox { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; }
+.wt-keyrow input { width: 100%; }
+.wt-bubble { display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 14px; background: ${t.color.page}; color: ${t.color.text}; border: 1px solid ${t.color.fieldLine}; font-size: 13px; }
+.wt-bubble__chip { align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: ${t.color.rowActive}; font-size: ${t.fontSize.small}px; }
+.wt-bubble__field { padding: 10px 12px; border: 1px solid ${t.color.gold}; border-radius: ${t.radius.field}px; background: ${t.color.field}; }
+.wt-bubble__row { display: flex; align-items: center; gap: 10px; }
+.wt-bubble__quiet { padding: 6px 10px; border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.field}px; font-size: ${t.fontSize.small}px; }
+.wt-bubble__hint { margin-left: auto; font-size: ${t.fontSize.small}px; color: ${t.color.textMuted}; }
+.wt-bubble__ask { padding: 6px 14px; border-radius: ${t.radius.field}px; background: ${t.color.gold}; color: ${t.color.goldInk}; font-weight: ${t.fontWeight.semibold}; }
+.wt-never { margin-top: 24px; }
+.wt-never > .wt-label { color: ${t.color.panelMuted}; font-size: ${t.fontSize.min}px; }
+
 /* Footer */
 .wt-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px ${t.space.lg}px; padding: 16px 48px; min-width: 0; border-top: 1px solid ${t.color.panelLine}; background: ${t.color.panel}; }
 .wt-spacer { flex: 1; }
@@ -119,6 +167,12 @@ export const WALKTHROUGH_CSS = `
 .wt-primary:disabled { background: ${t.color.panelTile}; border-color: ${t.color.panelTile}; color: #8A90A6; cursor: not-allowed; }
 .wt-quiet { border: 1px solid ${t.color.panelMuted}; background: transparent; color: ${t.color.panelText}; }
 .wt-quiet:disabled { opacity: .45; cursor: not-allowed; }
+.wt-back { border: 1px solid ${t.color.scrollbarThumb}; background: #fff; color: ${t.color.panelText}; }
+.wt-back::before { content: '←'; margin-right: 8px; }
+.wt-back:disabled { opacity: .45; cursor: not-allowed; }
+.wt-back:hover:not(:disabled) { border-color: ${t.color.panelMuted}; }
+.wt-next::after { content: '→'; margin-left: 8px; }
+.wt-primary:hover:not(:disabled) { filter: brightness(.96); }
 .wt-text { border: 0; background: none; color: ${t.color.panelMuted}; padding: 0 4px; }
 .wt-text:hover:not(:disabled) { color: ${t.color.panelText}; }
 .wt-error { margin: 0; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.errInk}; }

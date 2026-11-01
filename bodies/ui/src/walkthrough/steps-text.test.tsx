@@ -1,75 +1,88 @@
-/** Tests for steps 1 to 3: each shows its headline and every row of the spec's copy. */
+/** Tests for steps 1 to 3: the one-companion pitch, the route a request takes, and the five moments. */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StepOne } from './step-one';
 import { StepThree } from './step-three';
 import { StepTwo } from './step-two';
 
+const PROMPTS = [
+  'What’s on today?',
+  'Say no to Thursday, kindly',
+  'Which plan fits a team of five?',
+  'Fix this failing test',
+  'Remind me in 20 minutes to call Sam',
+];
+
 describe('StepOne', () => {
-  it('shows the idea, the four-minute note and the example card', () => {
-    render(<StepOne />);
+  it('says "One companion for everything you do" and never "AI tools"', () => {
+    const { container } = render(<StepOne />);
     expect(
-      screen.getByRole('heading', { name: 'One companion for all your AI tools' }),
+      screen.getByRole('heading', { name: 'One companion for everything you do' }),
     ).toBeInTheDocument();
-    for (const text of [
-      'Scout stays with you',
-      'Experts do the heavy work',
-      'Your apps come along',
-      'Back where you are',
-      'Claude Code · finished',
-      'Fixed the empty-cart crash in billing.ts and added a test.',
-      'See the job',
-      'This takes about four minutes.',
-    ]) {
-      expect(screen.getByText(text, { exact: false })).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/AI tools/i);
+  });
+
+  it('lists three moments of the day', () => {
+    render(<StepOne />);
+    expect(screen.getByText('A day with Scout')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    for (const text of PROMPTS.filter((_, index) => index !== 2 && index !== 3)) {
+      expect(screen.getByText(text)).toBeInTheDocument();
     }
-    expect(screen.getByText(/The last step needs an Anthropic API key/)).toBeInTheDocument();
   });
 });
 
 describe('StepTwo', () => {
-  it('shows who does what and what is Now, Coming and Later', () => {
+  it('shows the three ways Scout helps, in order', () => {
     render(<StepTwo />);
-    expect(screen.getByRole('heading', { name: 'How it fits together' })).toBeInTheDocument();
-    for (const text of [
-      'Claude Code',
-      'Gemini CLI',
-      'Codex',
-      'Other coding agents',
-      'Model APIs, tool servers',
-      'Connected apps',
-      'Notion',
-      'GitHub',
-      'Linear',
-      'Any MCP server',
-      'You ask once',
-      'Scout routes',
-      'Nothing goes unseen',
-    ]) {
-      expect(screen.getByText(text)).toBeInTheDocument();
-    }
-    expect(screen.getByText('Now')).toBeInTheDocument();
-    expect(screen.getAllByText('Coming')).toHaveLength(3);
-    expect(screen.getByText('Later')).toBeInTheDocument();
-    expect(screen.getByText(/Each hand-off waits for your Send/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Ask, and Scout finds the way' }),
+    ).toBeInTheDocument();
+    const routes = screen.getByRole('list', { name: 'Ways Scout helps' });
+    expect(
+      within(routes)
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('strong')?.textContent),
+    ).toEqual(['Answers itself', 'Uses your apps', 'Brings in an expert']);
+  });
+
+  it('exposes the flow as an ordered list with an aria-label', () => {
+    render(<StepTwo />);
+    const flow = screen.getByRole('list', { name: 'How a request travels' });
+    expect(flow.tagName).toBe('OL');
+  });
+
+  it('shows the app chips as list items, not buttons', () => {
+    render(<StepTwo />);
+    const apps = screen.getByRole('list', { name: 'Apps you can connect' });
+    expect(
+      within(apps)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Notion', 'GitHub', 'Linear', 'Google Calendar', 'Any MCP server']);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 
 describe('StepThree', () => {
-  it('lists the six everyday examples with who handles each', () => {
+  it('renders the five prompts in order with their outcomes', () => {
     render(<StepThree />);
-    expect(screen.getByRole('heading', { name: 'Things you can ask' })).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(6);
-    for (const text of [
-      'Fix this test and tell me what was wrong.',
-      'Which plan fits a team of five?',
-      'Remind me in 20 minutes to call Sam.',
-      'Tell me when the job finishes.',
-      'Add this article to my reading list.',
-      "What's on my other screen?",
-    ]) {
-      expect(screen.getByText(text, { exact: false })).toBeInTheDocument();
-    }
+    expect(
+      screen.getByRole('heading', { name: 'Everyday things, said plainly' }),
+    ).toBeInTheDocument();
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(5);
+    items.forEach((item, index) => {
+      expect(item).toHaveTextContent(PROMPTS[index] ?? '');
+    });
+    expect(
+      screen.getByText(/Hands it to Claude Code and tells you when it’s done/),
+    ).toBeInTheDocument();
+  });
+
+  it('has no button for them (static)', () => {
+    render(<StepThree />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

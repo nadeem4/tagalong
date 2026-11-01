@@ -1,9 +1,14 @@
-/** Tests for step 4: the ask key is shown and changed, saved only on Next, nothing on Skip. */
+/** Tests for step 4: the keys drawn as keycaps, the ask key changed and saved only on Next, the static preview. */
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StepFour } from './step-four';
 import { makeWalkthroughHost, mountStep } from './test-host';
+
+const keys = (group: HTMLElement) =>
+  within(group)
+    .getAllByText(/.+/, { selector: 'kbd' })
+    .map((key) => key.textContent);
 
 function mount(host = makeWalkthroughHost()) {
   const saver = mountStep(<StepFour host={host} />);
@@ -11,16 +16,18 @@ function mount(host = makeWalkthroughHost()) {
 }
 
 describe('StepFour', () => {
-  it('shows the current ask key as people read it, and Change', async () => {
+  it('shows the ask key and the pause key as keycaps, never CommandOrControl', async () => {
     mount();
-    expect(await screen.findByText('Ctrl+Shift+Space')).toBeInTheDocument();
+    const ask = await screen.findByTestId('wt-ask-key');
+    expect(keys(ask)).toEqual(['Ctrl', 'Shift', 'Space']);
+    expect(keys(screen.getByTestId('wt-pause-key'))).toEqual(['Ctrl', 'Shift', 'Alt', 'P']);
     expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument();
-    expect(screen.getByText('Ctrl+Shift+Alt+P')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('CommandOrControl');
   });
 
   it('saves the changed ask key through saveSettings only when Next saves', async () => {
     const { host, saver } = mount();
-    await screen.findByText('Ctrl+Shift+Space');
+    await screen.findByRole('button', { name: 'Change' });
     fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     fireEvent.change(screen.getByLabelText('Ask key'), { target: { value: 'Alt+Space' } });
     expect(host.saveSettings).not.toHaveBeenCalled();
@@ -36,12 +43,12 @@ describe('StepFour', () => {
 
   it('saves nothing when the ask key was left alone', async () => {
     const { host, saver } = mount();
-    await screen.findByText('Ctrl+Shift+Space');
+    await screen.findByRole('button', { name: 'Change' });
     await saver.save();
     expect(host.saveSettings).not.toHaveBeenCalled();
   });
 
-  it('lists the apps Scout never reads', async () => {
+  it('lists what Scout never looks at', async () => {
     mount();
     for (const text of [
       'Password managers',
@@ -53,22 +60,22 @@ describe('StepFour', () => {
     ]) {
       expect(await screen.findByText(text, { exact: false })).toBeInTheDocument();
     }
+    expect(screen.getByText('Scout never looks at')).toBeInTheDocument();
     expect(screen.getByText(/Home, under Settings > Privacy/)).toBeInTheDocument();
   });
 
-  it('has no try-it hint, and shows the look-only example', async () => {
-    mountStep(<StepFour host={makeWalkthroughHost()} />);
-    await screen.findByText('Ctrl+Shift+Space');
-    expect(screen.queryByText(/Try it/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Press the ask key to see it/)).not.toBeInTheDocument();
+  it('shows a static bubble preview that assistive tech skips', async () => {
+    mount();
+    await screen.findByRole('button', { name: 'Change' });
+    const preview = screen.getByTestId('wt-bubble-preview');
+    expect(preview).toHaveAttribute('aria-hidden', 'true');
     for (const text of [
-      'Chrome · Pricing – Stripe',
-      '2.9% + 30¢',
-      'What would this cost on 400 orders a month?',
+      'Chrome · Acme pricing',
+      'Which plan fits a team of five?',
       'Open full chat',
-      'Seeing',
     ]) {
-      expect(screen.getByText(text, { exact: false })).toBeInTheDocument();
+      expect(within(preview).getByText(text)).toBeInTheDocument();
     }
+    expect(within(preview).queryByRole('button')).not.toBeInTheDocument();
   });
 });
