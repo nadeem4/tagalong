@@ -4,8 +4,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { Slider } from './slider';
 
 function setup(value = 5, onChange = vi.fn(), format?: (n: number) => string) {
+  const formatProp = format === undefined ? {} : { format };
   render(
-    <Slider id="s" label="Speed" value={value} min={0} max={10} step={1} onChange={onChange} format={format} />,
+    <Slider
+      id="s"
+      label="Speed"
+      value={value}
+      min={0}
+      max={10}
+      step={1}
+      onChange={onChange}
+      {...formatProp}
+    />,
   );
   return { input: screen.getByLabelText('Speed') as HTMLInputElement, onChange };
 }

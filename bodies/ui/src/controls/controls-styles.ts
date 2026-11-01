@@ -113,4 +113,28 @@ export const CONTROLS_CSS = `
 .tg-button--quiet:hover:not(:disabled) { color: var(--tg-ctl-ink); background: var(--tg-ctl-bg); }
 .tg-button--danger { background: ${t.color.errFill}; border-color: ${t.color.errInk}; color: ${t.color.errInk}; }
 .tg-button--danger:hover:not(:disabled) { background: ${t.color.errInk}; color: ${t.color.errFill}; }
+
+.tg-keyfield { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-keyfield__label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
+.tg-keyfield__row { display: flex; align-items: center; gap: ${t.space.md}px; }
+.tg-keyfield__box { position: relative; flex: 1; min-width: 0; }
+/* The id selector outranks Settings' generic input rule whatever the sheet order. */
+.tg-keyfield #tg-api-key {
+  width: 100%; height: ${t.size.fieldHeight}px; padding: 0 64px 0 ${t.space.lg}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
+  background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
+}
+.tg-keyfield #tg-api-key:focus-visible { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
+.tg-keyfield[data-state='valid'] /* The id selector outranks Settings' generic input rule whatever the sheet order. */
+.tg-keyfield #tg-api-key { border-color: ${t.color.okInk}; }
+.tg-keyfield #tg-api-key[aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
+.tg-keyfield__box .tg-keyfield__show {
+  position: absolute; top: 50%; right: ${t.space.xs}px; transform: translateY(-50%);
+  height: 28px; padding: 0 ${t.space.md}px;
+}
+.tg-keyfield__row > .tg-button { height: ${t.size.fieldHeight}px; }
+.tg-keyfield__status { min-height: 20px; }
+.tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${t.color.errInk}; font-weight: ${t.fontWeight.semibold}; }
+.tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${t.color.okInk}; }
 `;

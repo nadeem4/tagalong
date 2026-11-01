@@ -43,6 +43,19 @@ export { KeyField, LimitField } from './key/key-field';
 export { useKeyStatus } from './key/use-key-status';
 export type { KeyHost } from './key/use-key-status';
 
+/** Shared controls: toggle, select, slider, money field, keycap, buttons, and their sheet. */
+export {
+  Toggle,
+  Select,
+  Slider,
+  MoneyField,
+  Button,
+  Keycap,
+  Shortcut,
+  CONTROLS_CSS,
+} from './controls';
+export type { ButtonVariant } from './controls';
+
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
 export type { TalkAction } from './voice/push-to-talk';

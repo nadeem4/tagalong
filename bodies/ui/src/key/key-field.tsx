@@ -6,6 +6,7 @@
 
 import { useRef, useState } from 'react';
 import type { KeyResult } from '../host-bridge';
+import { Button } from '../controls/button';
 import { failure } from '../failure';
 import { useKeyStatus } from './use-key-status';
 import type { KeyHost } from './use-key-status';
@@ -66,55 +67,73 @@ export function KeyField({ host, onSaved }: { host: KeyHost; onSaved?: () => voi
     }
   }
 
+  const statusText = environment
+    ? COPY.environment
+    : offline
+      ? COPY.offline
+      : outcome === 'invalid'
+        ? COPY.invalid
+        : outcome === 'unreachable'
+          ? COPY.unreachable
+          : outcome === 'failed'
+            ? failureText
+            : already
+              ? COPY.already
+              : outcome === 'ok'
+                ? COPY.ok
+                : '';
+  const state =
+    outcome === 'invalid' || outcome === 'failed'
+      ? 'invalid'
+      : checking
+        ? 'checking'
+        : already || outcome === 'ok'
+          ? 'valid'
+          : 'empty';
+
   return (
-    <div className="tg-keyfield">
-      <label htmlFor="tg-api-key">
-        <span>API key</span>
-        <input
-          id="tg-api-key"
-          type={shown ? 'text' : 'password'}
-          autoComplete="off"
-          spellCheck={false}
-          value={value}
-          disabled={environment}
-          onChange={(event) => setValue(event.target.value)}
-          // Settings is one form: Enter here checks the key and must not save the page.
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            void check();
-          }}
-        />
+    <div className="tg-keyfield" data-state={state}>
+      <label htmlFor="tg-api-key" className="tg-keyfield__label">
+        API key
       </label>
-      <div className="tg-inline">
-        <button
-          type="button"
-          className="tg-btn-quiet"
-          disabled={environment}
-          onClick={() => setShown((now) => !now)}
-        >
-          {shown ? 'Hide' : 'Show'}
-        </button>
-        <button type="button" className="tg-btn" disabled={!canCheck} onClick={() => void check()}>
+      <div className="tg-keyfield__row">
+        <div className="tg-keyfield__box">
+          <input
+            id="tg-api-key"
+            type={shown ? 'text' : 'password'}
+            autoComplete="off"
+            spellCheck={false}
+            value={value}
+            disabled={environment}
+            aria-invalid={outcome === 'invalid' ? 'true' : undefined}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // Editing after a rejection starts a fresh attempt.
+              if (outcome === 'invalid') setOutcome(null);
+            }}
+            // Settings is one form: Enter here checks the key and must not save the page.
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              void check();
+            }}
+          />
+          <Button
+            variant="quiet"
+            className="tg-keyfield__show"
+            aria-pressed={shown}
+            disabled={environment}
+            onClick={() => setShown((now) => !now)}
+          >
+            {shown ? 'Hide' : 'Show'}
+          </Button>
+        </div>
+        <Button variant="secondary" disabled={!canCheck} onClick={() => void check()}>
           {checking ? 'Checking…' : outcome === 'unreachable' ? 'Try again' : 'Check key'}
-        </button>
+        </Button>
       </div>
-      <p className="tg-help" role="status">
-        {environment
-          ? COPY.environment
-          : offline
-            ? COPY.offline
-            : outcome === 'invalid'
-              ? COPY.invalid
-              : outcome === 'unreachable'
-                ? COPY.unreachable
-                : outcome === 'failed'
-                  ? failureText
-                  : already
-                    ? COPY.already
-                    : outcome === 'ok'
-                      ? COPY.ok
-                      : ''}
+      <p className="tg-help tg-keyfield__status" role="status" aria-live="polite">
+        {statusText}
       </p>
     </div>
   );

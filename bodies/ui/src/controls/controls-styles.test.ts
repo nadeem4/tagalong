@@ -6,7 +6,7 @@ import { CONTROLS_CSS } from './controls-styles';
 describe('CONTROLS_CSS', () => {
   it('defines the focus ring navy on light and gold on navy', () => {
     expect(CONTROLS_CSS).toContain(`--tg-focus: ${t.color.focusOnLight}`);
-    expect(CONTROLS_CSS).toMatch(new RegExp(`\.on-navy[^}]*--tg-focus: ${t.color.focusOnNavy}`));
+    expect(CONTROLS_CSS).toMatch(new RegExp(`.on-navy[^}]*--tg-focus: ${t.color.focusOnNavy}`));
   });
 
   it('rings keyboard focus with the variable', () => {

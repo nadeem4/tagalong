@@ -29,7 +29,9 @@ describe('Select', () => {
   });
 
   it('disabled disables the select', () => {
-    render(<Select id="s" label="Voice" value="a" onChange={() => {}} options={OPTIONS} disabled />);
+    render(
+      <Select id="s" label="Voice" value="a" onChange={() => {}} options={OPTIONS} disabled />,
+    );
     expect(screen.getByLabelText('Voice')).toBeDisabled();
   });
 });
