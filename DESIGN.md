@@ -442,6 +442,7 @@ Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected nex
 - **Slider** (`Slider`): a native range (arrows, Home and End work) with the label above and the value beside it.
 - **Money field** (`MoneyField`): a `$` text field with minus and plus buttons (step 1, never below 0); typed text is not clamped, the caller validates; Enter commits.
 - **Keycap and Shortcut:** one `kbd` per key; an Electron accelerator is shown as Ctrl, Shift, Space, never `CommandOrControl`.
+- **Level meter** (`LevelMeter`, with `MicTest`): a read-only `role="meter"` bar, 10px high, 1px control line, filled in the control ink and Gold at the loud end (80% and up); shown only while the "Test your microphone" button is on, with a small muted line that nothing is recorded or sent and an Err Ink line when the microphone cannot open.
 - **Button** (`Button`): primary (Gold), secondary, quiet and danger; type=button by default.
 - **Key field** (`KeyField`): label above; Show sits inside the input on the right, Check key (secondary) beside it, a polite status line under it. States: empty, checking, valid (ok border) and invalid (2px Err Ink border, `aria-invalid`).
 

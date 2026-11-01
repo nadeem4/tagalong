@@ -104,6 +104,16 @@ export const CONTROLS_CSS = `
 .tg-money .tg-button {
   width: ${t.size.control}px; padding: 0; color: var(--tg-ctl-ink); border-color: var(--tg-ctl-muted);
 }
+.tg-meter {
+  flex: 1; min-width: 120px; height: 10px; border-radius: 5px; overflow: hidden;
+  border: 1px solid var(--tg-ctl-line); background: var(--tg-ctl-bg);
+}
+.tg-meter__bar { width: var(--level); height: 100%; background: var(--tg-ctl-ink); transition: width 80ms linear; }
+.tg-meter__bar--loud { background: ${t.color.gold}; }
+.tg-mictest { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-mictest__row { display: flex; align-items: center; gap: ${t.space.lg}px; }
+.tg-mictest__help { margin: 0; color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
+.tg-mictest__error { margin: 0; color: ${t.color.errInk}; font-size: ${t.fontSize.small}px; }
 .tg-sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;

@@ -7,3 +7,6 @@ export { Button } from './button';
 export type { ButtonVariant } from './button';
 export { Keycap, Shortcut } from './keycap';
 export { CONTROLS_CSS } from './controls-styles';
+export { LevelMeter } from './level-meter';
+export { MicTest } from './mic-test';
+export type { MicWatcher } from './mic-test';

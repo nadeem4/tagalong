@@ -4,11 +4,16 @@ import { openMic } from './mic';
 import { micFailure } from './mic-failure';
 
 /** A microphone and an audio graph that fails at `failAt`, in plain Node. */
-function fakeAudio(failAt: 'context' | 'worklet' | 'node' | 'worklet-abort') {
+function fakeAudio(failAt: 'none' | 'context' | 'worklet' | 'node' | 'worklet-abort') {
   const stop = vi.fn();
   const close = vi.fn(async () => undefined);
+  const ended: (() => void)[] = [];
+  const track = {
+    stop,
+    addEventListener: (_type: string, listener: () => void) => ended.push(listener),
+  };
   vi.stubGlobal('navigator', {
-    mediaDevices: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) },
+    mediaDevices: { getUserMedia: vi.fn(async () => ({ getTracks: () => [track] })) },
   });
   vi.stubGlobal(
     'AudioContext',
@@ -40,7 +45,7 @@ function fakeAudio(failAt: 'context' | 'worklet' | 'node' | 'worklet-abort') {
       connect = (next: unknown) => next;
     },
   );
-  return { stop, close };
+  return { stop, close, endTrack: () => ended.forEach((listener) => listener()) };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -69,5 +74,13 @@ describe('openMic', () => {
     fakeAudio('worklet-abort');
     const error: unknown = await openMic().catch((e: unknown) => e);
     expect(micFailure(error)).toBe('no-mic');
+  });
+
+  it('ends its frames when the device goes away (a track ends)', async () => {
+    const { endTrack } = fakeAudio('none');
+    const mic = await openMic();
+    const reading = mic[Symbol.asyncIterator]();
+    endTrack();
+    await expect(reading.next()).resolves.toEqual({ value: undefined, done: true });
   });
 });

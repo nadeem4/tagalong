@@ -6,6 +6,7 @@
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { vi } from 'vitest';
+import type { MicWatcher } from '../controls';
 import type { KeyResult, KeyStatus } from '../host-bridge';
 import { StepSaveContext } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
@@ -44,6 +45,7 @@ export function makeWalkthroughHost(
     saveSettings: vi.fn((_patch: unknown) => Promise.resolve()),
     previewVoice: vi.fn((_options: unknown) => Promise.resolve()),
     listMicrophones: vi.fn(() => Promise.resolve([{ id: 'mic-1', label: 'Desk microphone' }])),
+    watchMicLevel: vi.fn<MicWatcher>(() => ({ stop: vi.fn() })),
     browserFolder: vi.fn(() => Promise.resolve({ path: 'C:/app/browser/dist', exists: true })),
     showBrowserFolder: vi.fn(() => Promise.resolve()),
     copyText: vi.fn((_text: string) => Promise.resolve()),

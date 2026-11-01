@@ -16,7 +16,8 @@ import '../../shared/ipc';
 import type { SettingsPatch } from '../../shared/settings';
 import { FIGURE } from './bean-assets';
 import { fullBridge } from './full-bridge';
-import { listMicrophones } from './mic';
+import { listMicrophones, openMic } from './mic';
+import { watchLevel } from './mic-level';
 import { previewVoice } from './voice-player';
 
 const bridge = fullBridge();
@@ -37,6 +38,9 @@ const walkthroughHost: WalkthroughHost = {
   saveSettings: (patch) => host.saveSettings(patch as SettingsPatch),
   previewVoice: (preview) => previewVoice(preview, new AbortController().signal),
   listMicrophones: () => listMicrophones(),
+  // The meter's own short-lived mic: only the level leaves watchLevel, never a frame.
+  watchMicLevel: (deviceId, onLevel, onError) =>
+    watchLevel(() => openMic(deviceId), onLevel, onError),
   browserFolder: () => host.browserFolder(),
   showBrowserFolder: () => host.showBrowserFolder(),
   copyText: (text) => navigator.clipboard.writeText(text),

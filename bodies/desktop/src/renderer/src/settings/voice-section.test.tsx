@@ -1,6 +1,7 @@
 /**
- * Tests for the Voice section's speed slider: every voice goes up to 1.3.
- * Static render only (no DOM in this suite); switching voices live is a manual check.
+ * Tests for the Voice section: every voice's speed goes up to 1.3, and the microphone test is
+ * off at first. Static render only (no DOM in this suite): starting, stopping and following the
+ * select are covered by MicTest's tests in @tagalong/ui and by e2e/mic-meter.spec.ts.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -29,5 +30,14 @@ describe('VoiceSection speed slider', () => {
     const expected = { max: '1.3', value: '1.3', saved: '1.3' };
     expect(slider({ mouth: 'kokoro', speed: 1.3 })).toEqual(expected);
     expect(slider({ mouth: 'system', speed: 1.3 })).toEqual(expected);
+  });
+});
+
+describe('VoiceSection microphone test', () => {
+  it('offers Test your microphone with the meter off', () => {
+    const html = renderToStaticMarkup(<VoiceSection settings={SETTINGS_DEFAULTS} />);
+    expect(html).toContain('Test your microphone');
+    expect(html).toContain('Nothing is recorded or sent');
+    expect(html).not.toContain('role="meter"');
   });
 });

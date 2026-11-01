@@ -1,8 +1,9 @@
 /** Tests for step 5: talk key, Scout talks, voice, speed and preview; saved only on Next. */
 
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { StepFive } from './step-five';
+import { StepSaveContext } from './use-step-save';
 import { makeWalkthroughHost, mountStep } from './test-host';
 
 function mount(host = makeWalkthroughHost()) {
@@ -142,6 +143,109 @@ describe('StepFive', () => {
       .map((option) => option.textContent);
     expect(speakers).toEqual(['Kokoro (on the brain)', 'System voice']);
     expect(screen.queryByText(/Try it/)).not.toBeInTheDocument();
+  });
+
+  describe('microphone test', () => {
+    const press = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'Test your microphone' }));
+
+    it('keeps the meter off until Test your microphone is pressed', async () => {
+      const { host } = mount();
+      await screen.findByLabelText('Talk key');
+      expect(screen.queryByRole('meter')).toBeNull();
+      expect(host.watchMicLevel).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('Nothing is recorded or sent. Speak and the bar moves.'),
+      ).toBeInTheDocument();
+    });
+
+    it('watches the picked device when pressed', async () => {
+      const { host } = mount();
+      await screen.findByRole('option', { name: 'Desk microphone' });
+      fireEvent.change(screen.getByLabelText('Microphone'), { target: { value: 'mic-1' } });
+      press();
+      expect(host.watchMicLevel).toHaveBeenCalledWith(
+        'mic-1',
+        expect.any(Function),
+        expect.any(Function),
+      );
+      expect(screen.getByRole('meter')).toBeInTheDocument();
+    });
+
+    it('watches the system default with no device id', async () => {
+      const { host } = mount();
+      await screen.findByLabelText('Microphone');
+      press();
+      expect(host.watchMicLevel).toHaveBeenCalledWith(
+        undefined,
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    it('restarts the watch with the new id when the microphone changes', async () => {
+      const { host } = mount();
+      await screen.findByRole('option', { name: 'Desk microphone' });
+      press();
+      fireEvent.change(screen.getByLabelText('Microphone'), { target: { value: 'mic-1' } });
+      expect(host.watchMicLevel).toHaveBeenCalledTimes(2);
+      expect(host.watchMicLevel).toHaveBeenLastCalledWith(
+        'mic-1',
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    it('stops the watch when the step is left', async () => {
+      const stop = vi.fn();
+      const host = makeWalkthroughHost();
+      host.watchMicLevel.mockReturnValue({ stop });
+      const { unmount } = render(
+        <StepSaveContext.Provider value={() => undefined}>
+          <StepFive host={host} />
+        </StepSaveContext.Provider>,
+      );
+      await screen.findByLabelText('Talk key');
+      press();
+      unmount();
+      expect(stop).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the mic failure line and no meter when permission is denied', async () => {
+      const host = makeWalkthroughHost();
+      host.watchMicLevel.mockImplementation((_id, _level, onError) => {
+        onError('denied');
+        return { stop: vi.fn() };
+      });
+      mount(host);
+      await screen.findByLabelText('Talk key');
+      act(() => press());
+      expect(screen.getByRole('alert')).toHaveTextContent('not allowed to use the microphone');
+      expect(screen.queryByRole('meter')).toBeNull();
+    });
+
+    it('only the level reaches the host: no host method is given any sound', async () => {
+      const host = makeWalkthroughHost();
+      // The fake listens like the real one: it reads a real audio frame, then reports a number.
+      host.watchMicLevel.mockImplementation((_id, onLevel) => {
+        const frame = new Float32Array([0.5, -0.5, 0.25]);
+        onLevel(Math.max(...frame));
+        return { stop: vi.fn() };
+      });
+      mount(host);
+      await screen.findByLabelText('Talk key');
+      act(() => press());
+      const sound = (value: unknown): boolean =>
+        value instanceof Float32Array ||
+        value instanceof ArrayBuffer ||
+        (typeof MediaStream !== 'undefined' && value instanceof MediaStream);
+      for (const [name, fn] of Object.entries(host)) {
+        if (name === 'watchMicLevel') continue;
+        const calls = (fn as { mock: { calls: unknown[][] } }).mock.calls;
+        for (const args of calls) expect(args.some(sound), name).toBe(false);
+      }
+      expect(host.saveSettings).not.toHaveBeenCalled();
+    });
   });
 
   it('says so when the preview cannot play', async () => {
