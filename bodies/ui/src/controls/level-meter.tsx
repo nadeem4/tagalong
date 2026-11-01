@@ -1,6 +1,6 @@
 /**
  * LevelMeter: a read-only bar for a 0..1 level (the microphone test). role="meter" so a screen
- * reader hears a percentage; the bar turns gold at the loud end.
+ * reader hears a percentage (in steps of 10, so it is not read out 30 times a second); the bar turns gold at the loud end.
  */
 import type { CSSProperties } from 'react';
 
@@ -19,7 +19,7 @@ export function LevelMeter({
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={percent}
+      aria-valuenow={Math.round(percent / 10) * 10}
     >
       <div
         className={`tg-meter__bar${percent >= 80 ? ' tg-meter__bar--loud' : ''}`}

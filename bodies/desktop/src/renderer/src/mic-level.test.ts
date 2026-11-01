@@ -109,4 +109,44 @@ describe('watchLevel', () => {
     expect(close).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith('no-mic');
   });
+
+  it('a stream that ends by itself closes the mic and reports no microphone', async () => {
+    const { mic, close, push } = fakeMic();
+    const onError = vi.fn();
+    watchLevel(
+      () => Promise.resolve(mic),
+      () => undefined,
+      onError,
+    );
+    push(null);
+    await settle();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith('no-mic');
+  });
+
+  it('a stream that ends after stop reports nothing', async () => {
+    const { mic, push } = fakeMic();
+    const onError = vi.fn();
+    const watch = watchLevel(
+      () => Promise.resolve(mic),
+      () => undefined,
+      onError,
+    );
+    await settle();
+    watch.stop();
+    push(null);
+    await settle();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('a frame already queued when stop is called never reaches onLevel', async () => {
+    const { mic, push } = fakeMic();
+    const onLevel = vi.fn();
+    const watch = watchLevel(() => Promise.resolve(mic), onLevel);
+    await settle();
+    push(tone(0.5));
+    watch.stop();
+    await settle();
+    expect(onLevel).not.toHaveBeenCalled();
+  });
 });

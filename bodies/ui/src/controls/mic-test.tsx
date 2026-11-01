@@ -5,6 +5,7 @@
  * stays in the window: nothing is recorded or sent.
  */
 import { useEffect, useState } from 'react';
+import { STATUS_WORDS } from '../shapes/status';
 import { Button } from './button';
 import { LevelMeter } from './level-meter';
 
@@ -20,8 +21,8 @@ export type MicWatcher = (
 const FAILURE_LINES: Record<Failure, string> = {
   denied:
     'Scout is not allowed to use the microphone. Allow it in Windows settings, then try again.',
-  busy: 'The microphone is in use by another app. Close it there, then try again.',
-  'no-mic': 'Scout could not open a microphone. Check it is plugged in, then try again.',
+  busy: STATUS_WORDS['mic-busy'].detail,
+  'no-mic': STATUS_WORDS['mic-failed'].detail,
 };
 
 export function MicTest({

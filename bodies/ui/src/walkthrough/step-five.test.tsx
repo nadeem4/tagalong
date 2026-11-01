@@ -224,17 +224,25 @@ describe('StepFive', () => {
       expect(screen.queryByRole('meter')).toBeNull();
     });
 
-    it('only the level reaches the host: no other method is given any sound', async () => {
-      const { host } = mount();
+    it('only the level reaches the host: no host method is given any sound', async () => {
+      const host = makeWalkthroughHost();
+      // The fake listens like the real one: it reads a real audio frame, then reports a number.
+      host.watchMicLevel.mockImplementation((_id, onLevel) => {
+        const frame = new Float32Array([0.5, -0.5, 0.25]);
+        onLevel(Math.max(...frame));
+        return { stop: vi.fn() };
+      });
+      mount(host);
       await screen.findByLabelText('Talk key');
-      press();
-      const [, onLevel] = host.watchMicLevel.mock.calls[0]!;
-      act(() => onLevel(0.4));
+      act(() => press());
+      const sound = (value: unknown): boolean =>
+        value instanceof Float32Array ||
+        value instanceof ArrayBuffer ||
+        (typeof MediaStream !== 'undefined' && value instanceof MediaStream);
       for (const [name, fn] of Object.entries(host)) {
-        if (name !== 'watchMicLevel') {
-          const calls = (fn as { mock: { calls: unknown[][] } }).mock.calls;
-          expect(JSON.stringify(calls)).not.toContain('Float32Array');
-        }
+        if (name === 'watchMicLevel') continue;
+        const calls = (fn as { mock: { calls: unknown[][] } }).mock.calls;
+        for (const args of calls) expect(args.some(sound), name).toBe(false);
       }
       expect(host.saveSettings).not.toHaveBeenCalled();
     });

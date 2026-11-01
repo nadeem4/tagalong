@@ -1,7 +1,7 @@
 /**
  * Walkthrough step 5: talking to Scout. Talk key, Scout talks, who speaks, voice, speed and
- * microphone (with a local level test), all staged here and saved only on Next. Contains StepFive. Words are the spec's
- * step copy; the choices match Settings.
+ * microphone (with a local level test), all staged here and saved only on Next. Contains
+ * StepFive. Words are the spec's step copy; the choices match Settings.
  */
 
 import { useEffect, useState } from 'react';

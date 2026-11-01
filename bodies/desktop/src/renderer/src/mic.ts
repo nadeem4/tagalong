@@ -1,7 +1,8 @@
 /**
  * The microphone in a renderer window: openMic streams 16 kHz mono frames through
  * mic-worklet.js until closed, and listMicrophones lists the devices for Settings.
- * Nothing is recorded or kept. Used by the bubble and Settings.
+ * Nothing is recorded or kept. Used by the bubble, Settings, the walkthrough's and Settings'
+ * "Test your microphone" meter (mic-level.ts), the talk key, the mic button and Always listening.
  */
 import { EARS_SAMPLE_RATE } from '../../shared/voice';
 import { Pushable } from '@tagalong/ui/shapes';
@@ -21,7 +22,9 @@ export type OpenMic = MicStream & { close(): void };
 /**
  * Opens the microphone (the one picked in Settings, or the system default) with Chromium's
  * echo cancellation on, so Scout's own voice played in this window is not heard, and
- * delivers 16 kHz mono frames. Only on the talk key, the mic button or Always listening.
+ * delivers 16 kHz mono frames. Only on the talk key, the mic button, Always listening or the
+ * "Test your microphone" meter (walkthrough step 5 and Settings). Its frames end if the device
+ * goes away (a track ends).
  */
 export async function openMic(deviceId?: string): Promise<OpenMic> {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -55,6 +58,8 @@ export async function openMic(deviceId?: string): Promise<OpenMic> {
     throw new Error(error instanceof Error ? error.message : String(error), { cause: error });
   }
   const audio = context;
+  // An unplugged or revoked device ends its tracks without an error: end the frames so readers stop.
+  stream.getTracks().forEach((track) => track.addEventListener('ended', () => frames.end()));
 
   let open = true;
   const close = (): void => {

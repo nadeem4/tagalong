@@ -128,8 +128,11 @@ local to the window and sends nothing: no IPC, no contract frame, no brain.
   a second press, on unmount (leaving the step, closing Settings) and an open failure, which shows
   why (not allowed, in use by another app, no microphone). `stop()` always closes the mic.
 - The talk key and Always listening run in the panel window, which Settings cannot see, so there
-  is no shared listening flag to read. Settings' test stops whenever its window loses focus
-  instead, so it does not hold the microphone while you talk elsewhere.
+  is no shared listening flag to read. Settings' test stops when its window loses focus, on a
+  best-effort basis. If you hold the talk key while Settings is still focused, the meter and the
+  talk mic share the device briefly. Either way the meter records and sends nothing.
+- If the device goes away (a track ends, a USB mic is unplugged), `openMic` ends its frames and
+  `watchLevel` reports `no-mic`, so the bar stops with a message instead of freezing.
 
 `mic-worklet.js` gathers samples into 512-sample frames (32 ms) and posts each one. A worklet
 cannot import, so the number 512 is repeated there. It must match `EARS_FRAME` in

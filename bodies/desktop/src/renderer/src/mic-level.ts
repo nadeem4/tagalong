@@ -57,6 +57,8 @@ export function watchLevel(
         level = Math.max(frameLevel(frame), level * DECAY);
         onLevel(level);
       }
+      // The stream ended by itself (device unplugged): say so rather than freeze the bar.
+      if (!stopped) onError?.('no-mic');
     } catch (error) {
       if (!stopped) onError?.(micFailure(error));
     } finally {

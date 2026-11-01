@@ -1,8 +1,9 @@
 /**
  * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
  * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold
- * to speak, and which microphone listens, with a local level test. The pickers and the speed are the shared controls, which
- * have no form name, so each value rides in a hidden input that buildSettingsPatch reads.
+ * to speak, and which microphone listens, with a local level test. The pickers and the speed
+ * are the shared controls, which have no form name, so each value rides in a hidden input
+ * that buildSettingsPatch reads.
  */
 import { useEffect, useState } from 'react';
 import { Button, MicTest, Select, Slider, Toggle } from '@tagalong/ui';

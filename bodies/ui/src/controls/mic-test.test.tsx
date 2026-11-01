@@ -86,6 +86,6 @@ describe('MicTest', () => {
     const { report } = setup();
     fireEvent.click(screen.getByRole('button', { name: 'Test your microphone' }));
     act(() => report().error('busy'));
-    expect(screen.getByRole('alert')).toHaveTextContent('another app');
+    expect(screen.getByRole('alert')).toHaveTextContent('Another app is using the microphone');
   });
 });
