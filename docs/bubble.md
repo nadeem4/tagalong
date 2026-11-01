@@ -13,22 +13,23 @@ decides to hand to it.
 
 ## Where it lives
 
-| Path (under `bodies/ui/src/`)                    | What it holds                                                                            |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `index.ts`                                       | The public surface                                                                       |
-| `host-bridge.ts`                                 | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`             |
-| `test-support/fake-host-bridge.ts`               | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                       |
-| `companion-bubble.tsx`                           | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                          |
-| `answer.tsx`                                     | `Answer` (Markdown), `ANSWER_CSS`                                                        |
-| `connector-confirm.tsx`, `drop-card.tsx`         | The other cards in the bubble                                                            |
-| `approved-card.tsx`                              | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`       |
-| `health-ask.ts`, `health.ts`, `health-card.tsx`  | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard` |
-| `stop-status.ts`                                 | `stopStatus`: the quiet line for a turn that ended with nothing said                     |
-| `status-mark.tsx`                                | `StatusMark` (`tag` and `row`)                                                           |
-| `dock-pet.tsx`, `theme/bean-clip.tsx`            | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                          |
-| `home/`                                          | `HomeView` and its pages                                                                 |
-| `voice/`                                         | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                              |
-| `theme/tokens.ts`, `settings/settings-styles.ts` | Theme tokens; `SETTINGS_CSS`                                                             |
+| Path (under `bodies/ui/src/`)                        | What it holds                                                                                      |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `index.ts`                                           | The public surface                                                                                 |
+| `host-bridge.ts`                                     | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`                       |
+| `test-support/fake-host-bridge.ts`                   | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                                 |
+| `companion-bubble.tsx`                               | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                                    |
+| `chat-styles.ts`, `chat-icons.tsx`, `scout-mark.tsx` | `CHAT_CSS` (the chat window's look), the close and collapse icons, `ScoutMark` (Bean's still tile) |
+| `answer.tsx`                                         | `Answer` (Markdown), `ANSWER_CSS`                                                                  |
+| `connector-confirm.tsx`, `drop-card.tsx`             | The other cards in the bubble                                                                      |
+| `approved-card.tsx`                                  | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`                 |
+| `health-ask.ts`, `health.ts`, `health-card.tsx`      | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard`           |
+| `stop-status.ts`                                     | `stopStatus`: the quiet line for a turn that ended with nothing said                               |
+| `status-mark.tsx`                                    | `StatusMark` (`tag` and `row`)                                                                     |
+| `dock-pet.tsx`, `theme/bean-clip.tsx`                | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                    |
+| `home/`                                              | `HomeView` and its pages                                                                           |
+| `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                        |
+| `theme/tokens.ts`, `settings/settings-styles.ts`     | Theme tokens; `SETTINGS_CSS`                                                                       |
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home).
@@ -91,6 +92,29 @@ It renders one of two looks:
 
 The bubble and the full chat are the same component instance state, so they show the same
 conversation: past exchanges (`Exchange { question, answer, failed }`) plus the current one.
+
+**Scout's own line.** A line Scout starts (a remark) is kept as `scoutLine`, separate from `reply`,
+and seeded from the `remark` prop when the person clicks the quiet line open (`GreetingLine`
+`onOpen(text)`; the panel hands the text over, see [desktop.md](desktop.md)). A `pet.remark` turn
+event while the bubble is open sets it too. Asking anything moves it into `past` as an `Exchange`
+with `question: null`, so a follow-up keeps it and the full chat shows it first, with no user tile.
+Lines Scout starts show `ScoutMark` (Bean's still, from the `scout` prop, 20 px) and the name above
+the words; replies to the person's own questions show neither. The quiet line also shows a muted
+"Click to reply" and three bars while Scout reads it aloud.
+
+**The full chat window** (`CHAT_CSS`): a 52 px header (name, the two switches, a separator, then
+**Back to bubble** and **Close** as drawn icon buttons that keep their names), a log with 24 px
+between turns and 12 px inside one, your messages on a tile, Scout's replies full width, code blocks
+with a hairline edge and muted list markers. The log scrolls to the newest message when the chat
+opens and whenever a message, the streamed text or Scout's line changes, never while you type. While
+a turn runs with no text yet the log shows a gold dot, "Scout is thinking…" and **Stop** on one
+row; streamed text ends in a gold cursor; the field is dimmed (`aria-busy`) but stays focusable and
+Enter is ignored. The approval card in the chat takes the card surface with 16 px inside. The footer
+puts the status row above the field, with the mic inside it and a 2 px gold focus ring. The
+placeholder is "Reply to Scout" after Scout's line, otherwise "Ask Scout anything". An empty chat
+shows a 48 px Bean, "Ask Scout anything about what is on your screen." and, when talking is wired,
+"Hold [key] to talk" with the real key from `talk.keyLabel`. Padding rule: anything bordered or
+filled that holds text keeps at least 8 px inside (12 to 16 px for cards and message tiles).
 
 **One answer, as a state machine.** `reply` is one of:
 
@@ -161,7 +185,9 @@ Asks are described in [brain.md](brain.md).
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
 a remark or a brain status mark. It fades after `holdMs` (7,000 ms
 by default, 12,000 for remarks) with a 300 ms fade (`LEAVE_MS`); pointing at it or
-focusing it holds it. Clicking the text opens the bubble (`onOpen`); × closes it (`onDone`).
+focusing it holds it. Clicking the text opens the bubble (`onOpen(text)`, so the words carry over);
+× closes it (`onDone`). It shows Scout's mark and name, a "Click to reply" hint and, with `speaking`,
+the reading-aloud bars. A status line shows no mark.
 Optional `status` shows a `StatusMark` row with Fix it in place of text.
 
 **Placement.** `Speech` wraps every look and draws a rotated square as the tail on the `tail` side,
@@ -395,6 +421,7 @@ marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 | Test (under `bodies/ui/src/` unless noted)                                       | Pins                                                                                                                                                                                                                                                                                                 |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `companion-bubble.test.tsx`                                                      | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold and offers; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
+| `chat-styles.test.ts`, `scout-mark.test.tsx`, `answer.test.tsx`                  | the chat's padding minimums, 52 px header, rhythm, pill, thinking row, cursor, field and empty-state rules; the mark's size; code block and marker styles                                                                                                                                            |
 | `companion-bubble-health.test.tsx`                                               | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                               |
 | `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                   | which questions match; rows and the headline; the card                                                                                                                                                                                                                                               |
 | `answer.test.tsx`                                                                | Markdown formatted, links as text, HTML as text, tables                                                                                                                                                                                                                                              |

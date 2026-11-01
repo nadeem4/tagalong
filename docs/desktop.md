@@ -138,6 +138,11 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
   person asks something while a wake runs, their `say` joins it (`joined: true`) and `ipc/turns.ts`
   calls `claim(turnId)` on the mapper: the wake stops being quiet, the bubble gets `turn.started`
   and the text so far, and the rest streams and ends as a normal turn (no pet remark).
+- **A remark kept in the chat.** A remark seen while the panel is hidden goes to the quiet line only
+  (main's `bubbleDeaf` rule is untouched). When the person clicks it, `GreetingLine` calls
+  `onOpen(text)` and `panel.tsx` keeps the text as `openedRemark` and passes it to `CompanionBubble`
+  as `remark`; it is cleared when a new context, drop or begin arrives. The bubble keeps it as
+  Scout's first message, in the bubble and in the full chat, and in the log after a follow-up.
 - **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
   running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
   brain.") when the contract versions differ. Coming online clears either; "connecting" changes

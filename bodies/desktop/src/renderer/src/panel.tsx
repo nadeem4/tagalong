@@ -20,6 +20,7 @@ import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
 import { fullBridge } from './full-bridge';
+import { FIGURE } from './bean-assets';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
@@ -38,6 +39,8 @@ function Panel() {
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   // A line Scout says on its own (a wake).
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
+  // The line the person clicked open: the bubble keeps it as Scout's first message.
+  const [openedRemark, setOpenedRemark] = useState<string | null>(null);
   // Something dropped on Scout: its card, until a button on it is pressed.
   const [drop, setDrop] = useState<DropOffer | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
@@ -71,6 +74,11 @@ function Panel() {
   const [bridge] = useState(fullBridge);
   // The top status mark: a muted row in the bubble, the same mark as the tag on Scout.
   const [status, setStatus] = useState<StatusMark | null>(null);
+  // The quiet line is over for any reason but a click: nothing of it is carried into the bubble.
+  function clearRemark(): void {
+    setRemark(null);
+    setOpenedRemark(null);
+  }
   function apply(next: PanelSettings): void {
     setTalkKey(next.talkKey);
     setMicrophoneId(next.microphoneId);
@@ -88,7 +96,7 @@ function Panel() {
     answering,
     onBegin: () => {
       player.stop();
-      setRemark(null);
+      clearRemark();
     },
   });
 
@@ -134,6 +142,7 @@ function Panel() {
     () =>
       window.tagalongHost.onRemark((next) => {
         setMode('bubble');
+        setOpenedRemark(null);
         setRemark(next);
       }),
     [],
@@ -159,7 +168,7 @@ function Panel() {
     // A hotkey press means a question: it ends a quiet line and brings back the bubble.
     return window.tagalongHost.onContext((next) => {
       setSnapshot(next);
-      setRemark(null);
+      clearRemark();
       setDrop(null);
     });
   }, []);
@@ -169,7 +178,7 @@ function Panel() {
     () =>
       window.tagalongHost.onDrop((offer) => {
         setMode('bubble');
-        setRemark(null);
+        clearRemark();
         setDrop(offer);
       }),
     [],
@@ -229,17 +238,23 @@ function Panel() {
             <GreetingLine
               petName={petName}
               text={remark.text}
+              speaking={speaking}
+              scout={FIGURE.idle}
               tail={side === 'left' ? 'right' : 'left'}
               holdMs={12_000}
               onDone={() => {
-                setRemark(null);
+                clearRemark();
                 player.stop();
                 void window.tagalongHost.hidePanel();
               }}
-              onOpen={() => setRemark(null)}
+              onOpen={(text) => {
+                setOpenedRemark(text);
+                setRemark(null);
+              }}
             />
           ) : (
             <CompanionBubble
+              scout={FIGURE.idle}
               petId={petId}
               petName={petName}
               expanded={mode === 'chat'}
@@ -262,6 +277,7 @@ function Panel() {
               {...(drop !== null ? { drop } : {})}
               onDropDone={() => setDrop(null)}
               status={status}
+              {...(openedRemark !== null ? { remark: openedRemark } : {})}
             />
           )}
         </div>

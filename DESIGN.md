@@ -374,6 +374,15 @@ Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and 
 
 **The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile it is drawn larger (76px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
 
+**The companion chat.** A 52 px header (Onest name, compact pills where on is a gold dot with a muted
+gold edge, icon buttons for back and close). 24 px between turns, 12 px inside a turn. Your
+messages sit on an avatar-tile bubble (12 px by 16 px inside), Scout's replies run full width, code
+blocks have a 1 px field-line edge and 12 px inside, list markers are muted. Scout's mark (Bean's
+still, 20 px, 48 px when the chat is empty) and name appear only on lines Scout starts. The footer
+field has at least 12 px inside and a 2 px gold focus ring. Anything bordered or filled that holds
+text keeps at least 8 px inside, 12 to 16 px for cards and tiles; only keycaps and small pills are
+tighter.
+
 ## Elevation & Depth
 
 Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines (Shell Line and Field Line on navy, Panel Line on the light pages). The bubble is separated from the desktop by a 1px Field Line border, not a shadow.
