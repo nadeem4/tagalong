@@ -1594,8 +1594,9 @@ with a fake key; the real check against Anthropic is done by hand here.
 3. **Action:** with the network off, check a key. **Expected:** "Scout could not reach Anthropic.
    Try again." and the button reads **Try again**. Stop the brain: "Scout's brain is not running."
 4. **Action:** set the **Daily limit (USD)** to 0, then to 8. **Expected:** 0 is refused ("Enter an
-   amount above $0."); 8 reads "Daily limit saved." and Home's Spend card shows the new limit. A "Spent today: $x.xx" line sits under
-   the limit and updates after Scout answers something; the same line shows on tour step 8.
+   amount above $0."); 8 reads "Daily limit saved." and Home's Spend card shows the new limit. A
+   "Spent today: $x.xx" line sits under the limit and updates after Scout answers something; the
+   same line shows on tour step 8.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
 

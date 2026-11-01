@@ -4,7 +4,7 @@
  * Contains SpentLine.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SpendToday } from '../host-bridge';
 import type { TurnEvent } from '../shapes';
 import { changesSpend, dollars } from './spend-format';
@@ -19,13 +19,18 @@ export function SpentLine({
 }) {
   const [spentUsd, setSpentUsd] = useState<number | null>(null);
 
+  // Reads can resolve out of order; only the newest request may set the amount.
+  const latest = useRef(0);
+
   useEffect(() => {
     let live = true;
-    const refresh = () =>
-      read().then(
-        (next) => live && setSpentUsd(next.spentUsd),
+    const refresh = () => {
+      const mine = ++latest.current;
+      return read().then(
+        (next) => live && mine === latest.current && setSpentUsd(next.spentUsd),
         () => undefined,
       );
+    };
     void refresh();
     const stop = onTurnEvent?.((event) => {
       if (changesSpend(event)) void refresh();

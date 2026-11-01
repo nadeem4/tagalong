@@ -222,7 +222,9 @@ Rules each module enforces:
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
-  uses the same field; both show a quiet "Spent today: $0.42" line under it, read once through `usageSummary`, which the walkthrough host now carries; Settings reads again after a turn starts or ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
+  uses the same field; both show a quiet "Spent today: $0.42" line under it, read once through
+  `usageSummary`, which the walkthrough host carries; Settings reads again after a turn starts or
+  ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
   key, talk key, Scout talks, voice, speed, microphone) and write them through `saveSettings`
   only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
   already reached. Skip finishes when a key is set, else goes to step 9.

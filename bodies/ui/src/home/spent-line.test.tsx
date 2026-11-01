@@ -1,10 +1,14 @@
-/** Tests for SpentLine: one quiet "Spent today" line that never gets in the way. */
+/**
+ * Tests for SpentLine: one quiet "Spent today" line that never gets in the way.
+ * Covers rendering, refresh on turn events, out-of-order replies and unmount.
+ */
 
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TurnEvent } from '../shapes';
 import { SpentLine } from './spent-line';
 
+const completed: TurnEvent = { type: 'turn.completed', turnId: 't', text: '', stopReason: 'end' };
 const spend = (spentUsd: number) => () => Promise.resolve({ spentUsd, limitUsd: 5 });
 
 describe('SpentLine', () => {
@@ -43,7 +47,40 @@ describe('SpentLine', () => {
     );
     await screen.findByText('Spent today: $0.10');
     spent = 0.35;
-    act(() => handler({ type: 'turn.completed', turnId: 't' } as never));
+    act(() => handler(completed));
     await waitFor(() => expect(screen.getByText('Spent today: $0.35')).toBeInTheDocument());
+  });
+
+  it('keeps the latest reply when an earlier read resolves last', async () => {
+    const resolvers: Array<(v: { spentUsd: number; limitUsd: number }) => void> = [];
+    let handler: (event: TurnEvent) => void = () => undefined;
+    render(
+      <SpentLine
+        read={() => new Promise((resolve) => resolvers.push(resolve))}
+        onTurnEvent={(next) => {
+          handler = next;
+          return () => undefined;
+        }}
+      />,
+    );
+    act(() => handler(completed));
+    await act(async () => resolvers[1]?.({ spentUsd: 0.9, limitUsd: 5 }));
+    await act(async () => resolvers[0]?.({ spentUsd: 0.1, limitUsd: 5 }));
+    expect(screen.getByText('Spent today: $0.90')).toBeInTheDocument();
+  });
+
+  it('unsubscribes on unmount and ignores a read that resolves afterwards', async () => {
+    const stop = vi.fn();
+    let resolve: (v: { spentUsd: number; limitUsd: number }) => void = () => undefined;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { unmount, container } = render(
+      <SpentLine read={() => new Promise((r) => (resolve = r))} onTurnEvent={() => stop} />,
+    );
+    unmount();
+    expect(stop).toHaveBeenCalledTimes(1);
+    await act(async () => resolve({ spentUsd: 0.5, limitUsd: 5 }));
+    expect(container).toBeEmptyDOMElement();
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
   });
 });

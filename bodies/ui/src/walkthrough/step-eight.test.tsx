@@ -126,6 +126,7 @@ describe('StepEight', () => {
     fireEvent.change(limit(), { target: { value: '8' } });
     await step.save();
     expect(host.setDailyLimit).toHaveBeenCalledTimes(1);
+    expect(host.setDailyLimit).toHaveBeenCalledWith(8);
     expect(host.usageSummary).toHaveBeenCalledTimes(1);
   });
 
