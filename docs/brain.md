@@ -497,6 +497,17 @@ words what the person reads (guidance in `mind/soul.md`).
   them (`npx`, `uvx`, `binary` per platform, `remote`). Entries are parsed leniently. Results are
   cached for 24 h in `cache/`; offline, the cache is served with `stale: true`; offline with no
   cache is `registry_unavailable`. Only the first MCP page is read; `more: true` in the result says the registry has further pages. `build_for` says whether an entry can run on this computer.
+- `node_runtime.py`, `archive.py`: Tagalong's own Node under `runtime/node/`. `pick_build` takes
+  the newest LTS at or above a minimum major from nodejs.org's `index.json` that has an official
+  archive for this OS and CPU (none is a fact, `NodeBuildMissing`). `ensure_node` reads the
+  checksum from the release's `SHASUMS256.txt`, streams the archive to `runtime/node.part/` while
+  hashing, checks it (one retry, then `NodeIntegrityError`), and extracts into `runtime/node.new/`
+  with `safe_extract`, which refuses absolute paths, `..` and links pointing out before it writes
+  anything (`UnsafeArchive`). Only then does the new folder replace `runtime/node/`; the old one
+  goes after the swap. A failed or broken download removes its `.part` and leaves any existing Node
+  untouched. A marker file in the folder records the release, so a Node that is already new
+  enough returns at once with no network. The system Node, PATH and global npm are never touched.
+  `net.http_fetch` is the real `Fetch` (streams chunks, raises on a non-200).
 - `tools.py`: Scout's tools `inspect_machine`, `find_experts` and `find_apps(query)`, all
   read-only and automatic, never offered to Home.
 

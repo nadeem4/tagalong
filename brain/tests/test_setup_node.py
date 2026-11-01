@@ -4,10 +4,12 @@ All on fakes: an index and checksum list as bytes, tiny archives built here, no 
 """
 
 import hashlib
+import http.server
 import io
 import json
 import os
 import tarfile
+import threading
 import zipfile
 from pathlib import Path
 
@@ -15,6 +17,7 @@ import pytest
 
 from brain.setup.archive import UnsafeArchive, safe_extract
 from brain.setup.facts import node_paths
+from brain.setup.net import http_fetch
 from brain.setup.node_runtime import (
     NodeBuildMissing,
     NodeIntegrityError,
@@ -231,3 +234,38 @@ def test_safe_extract_refuses_a_link_that_escapes(tmp_path):
     archive.write_bytes(tar_with(info))
     with pytest.raises(UnsafeArchive):
         safe_extract(archive, tmp_path / "out")
+
+
+# ---- the real Fetch, against a loopback server (no outside network) ----
+
+
+@pytest.fixture
+def local_server():
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/big":
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"x" * (3 * 1024 * 1024))
+            else:
+                self.send_error(404)
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_port}"
+    server.shutdown()
+    server.server_close()
+
+
+async def test_http_fetch_streams_chunks(local_server):
+    chunks = [c async for c in http_fetch(f"{local_server}/big")]
+    assert len(chunks) > 1
+    assert sum(len(c) for c in chunks) == 3 * 1024 * 1024
+
+
+async def test_http_fetch_raises_on_a_non_200(local_server):
+    with pytest.raises(OSError):
+        [c async for c in http_fetch(f"{local_server}/missing")]

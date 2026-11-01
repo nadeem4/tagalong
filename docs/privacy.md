@@ -172,6 +172,11 @@ When Scout looks for an expert or an app to set up, the brain fetches two public
 words go to it). No account or key is sent, and nothing is installed by looking. The lists are
 cached for a day under your Tagalong folder.
 
+If Scout later needs Tagalong's own copy of Node to set an expert up, the brain downloads it from
+`nodejs.org` only then, checks it against the official checksum, and keeps it under your Tagalong
+folder (`runtime/node`). Nothing is contacted before that first need, and your own Node, PATH and
+global npm are never changed.
+
 ## Connected apps: what goes to them
 
 Apps you connect in Home, Connections (Notion, GitHub, Linear, a local tool) are reached only
