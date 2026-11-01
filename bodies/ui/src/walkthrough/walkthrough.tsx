@@ -23,6 +23,7 @@ import { KEY_STEP, STEPS, skipTour } from './steps';
 import { StepSaveContext } from './use-step-save';
 import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
+import { CONTROLS_CSS } from '../controls/controls-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
 
 interface WalkthroughProps {
@@ -163,6 +164,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
 
   return (
     <div className="wt">
+      <style>{CONTROLS_CSS}</style>
       <style>{WALKTHROUGH_CSS}</style>
       <SidePanel scout={scout} current={current} reached={reached} onJump={go} />
       <main className="wt-page">

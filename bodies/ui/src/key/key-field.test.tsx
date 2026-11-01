@@ -46,6 +46,48 @@ async function paste(value: string) {
 }
 
 describe('KeyField', () => {
+  it('Show toggles the field between password and text and reports aria-pressed', async () => {
+    render(<KeyField host={makeHost()} />);
+    const field = await screen.findByLabelText('API key');
+    const show = screen.getByRole('button', { name: 'Show' });
+    expect(field).toHaveAttribute('type', 'password');
+    expect(show).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(show);
+    expect(field).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('the status line is aria-live polite', async () => {
+    render(<KeyField host={makeHost()} />);
+    await screen.findByLabelText('API key');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('a rejected key sets aria-invalid on the input and a valid one clears it', async () => {
+    const host = makeHost({ result: 'invalid' });
+    render(<KeyField host={host} />);
+    const field = await paste(FAKE_KEY);
+    expect(field).not.toHaveAttribute('aria-invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Check key' }));
+    await screen.findByText('That key was not accepted.');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(field, { target: { value: `${FAKE_KEY}2` } });
+    expect(field).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('Check key is a secondary button and is disabled while checking', async () => {
+    let finish: (result: KeyResult) => void = () => {};
+    const host = makeHost({ result: new Promise<KeyResult>((resolve) => (finish = resolve)) });
+    render(<KeyField host={host} />);
+    await paste(FAKE_KEY);
+    const check = screen.getByRole('button', { name: 'Check key' });
+    expect(check).toHaveClass('tg-button--secondary');
+    fireEvent.click(check);
+    const checking = await screen.findByRole('button', { name: 'Checking…' });
+    expect(checking).toBeDisabled();
+    await act(async () => finish('ok'));
+  });
+
   it('ok clears the field at once and calls onSaved', async () => {
     const host = makeHost({ result: 'ok' });
     const onSaved = vi.fn();

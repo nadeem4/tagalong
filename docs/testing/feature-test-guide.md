@@ -1568,7 +1568,8 @@ with a fake key; the real check against Anthropic is done by hand here.
 2. **Action:** press **Add key**. **Expected:** the walkthrough window opens at step 9, and the
    pet and bubble are hidden while it is open.
 3. **Action:** open **Home → Settings** and find the **Anthropic key** section. **Expected:** the
-   field is masked; **Show** reveals it; **Check key** stays off while the field is empty.
+   field is masked; **Show** (inside the field, on the right) reveals it and reads as pressed;
+   **Check key** stays off while the field is empty. A rejected key turns the border red.
 
 ### K.2. Change key
 

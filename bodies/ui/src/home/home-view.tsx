@@ -11,6 +11,7 @@ import type { Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { BeanClip } from '../theme/bean-clip';
 import type { BeanClipData } from '../theme/bean-clip';
+import { CONTROLS_CSS } from '../controls/controls-styles';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ApprovalsView } from './approvals-view';
 import { ConnectionsPanel } from './connections-panel';
@@ -81,6 +82,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
 
   return (
     <div className="home">
+      <style>{CONTROLS_CSS}</style>
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
       <nav aria-label="Tagalong" className="home-nav">

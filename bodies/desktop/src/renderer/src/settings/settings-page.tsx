@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { SETTINGS_CSS } from '@tagalong/ui';
+import { CONTROLS_CSS, SETTINGS_CSS } from '@tagalong/ui';
 import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
 import { KeySection } from './key-section';
@@ -80,6 +80,7 @@ export function SettingsPage() {
   if (view === null) {
     return (
       <main className="tg-settings">
+        <style>{CONTROLS_CSS}</style>
         <style>{SETTINGS_CSS}</style>
         <p style={{ padding: 20 }}>{status === '' ? 'Loading…' : status}</p>
       </main>
@@ -130,6 +131,7 @@ export function SettingsPage() {
   return (
     <SettingsUiContext.Provider value={ui}>
       <form className="tg-settings tg-settings--embedded" onSubmit={(event) => void save(event)}>
+        <style>{CONTROLS_CSS}</style>
         <style>{SETTINGS_CSS}</style>
         <main className="tg-main">
           <div className="tg-intro">

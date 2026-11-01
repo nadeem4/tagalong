@@ -32,4 +32,29 @@ describe('design tokens', () => {
     expect(contrast(color.text, color.page)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(color.textMuted, color.sidebar)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it('sets the UI font to Onest first', () => {
+    expect(themeTokens.font.ui.startsWith("'Onest'")).toBe(true);
+  });
+
+  it('keeps the Scout wordmark out of the pixel font', () => {
+    expect(themeTokens.font.wordmark).toContain('Onest');
+    expect(themeTokens.font.wordmark).not.toContain('Pixelify');
+    expect(themeTokens.fontWeight.wordmark).toBe(600);
+  });
+
+  it('rings focus navy on light and gold on navy, each readable on its surface', () => {
+    expect(color.focusOnLight).not.toBe(color.focusOnNavy);
+    expect(contrast(color.focusOnLight, color.panel)).toBeGreaterThanOrEqual(3);
+    expect(contrast(color.focusOnNavy, color.page)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('has a white control fill readable under panel text', () => {
+    expect(color.controlFill).toBe('#FFFFFF');
+    expect(contrast(color.panelText, color.controlFill)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('draws keycaps readable on their fill', () => {
+    expect(contrast(color.keycapInk, color.keycapFill)).toBeGreaterThanOrEqual(4.5);
+  });
 });
