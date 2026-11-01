@@ -84,11 +84,9 @@ export function ApprovalsView() {
 
   return (
     <>
-      <div>
+      <div className="home-head">
         <h1 className="home-title">Approvals</h1>
-        <p className="tg-note apv-sub">
-          What you have let Scout and your experts do, and what Scout now handles for you.
-        </p>
+        <p>What you have let Scout and your experts do, and what Scout now handles for you.</p>
       </div>
       {failed && (
         <p role="alert" className="tg-error apv-error">

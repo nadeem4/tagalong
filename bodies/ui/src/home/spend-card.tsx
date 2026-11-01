@@ -66,12 +66,10 @@ export function SpendCard() {
           {spend.spentUsd === 0 ? (
             <p>Nothing spent yet today.</p>
           ) : (
-            <p className="home-card__row">
-              <span>
-                {limit === null
-                  ? dollars(spend.spentUsd)
-                  : `${dollars(spend.spentUsd)} of ${cap(limit)}`}
-              </span>
+            <p className="home-spend">
+              {limit === null
+                ? dollars(spend.spentUsd)
+                : `${dollars(spend.spentUsd)} of ${cap(limit)}`}
             </p>
           )}
         </>

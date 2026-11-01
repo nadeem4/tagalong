@@ -192,7 +192,7 @@ Rules each module enforces:
 - **Mixed scales.** `moveWindow` calls `setBounds` twice when the move `crossesScale` (the two
   displays have different `scaleFactor`): Electron places the first move with the old display's
   scale.
-- **Home.** Escape closes it. `openHome(page?)` focuses an open one and sends
+- **Home.** Every tab renders in one `.home-page` box (920px at most, one inset), and each connection's On/Off is the shared `Toggle` (`role="switch"`). Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`
@@ -500,7 +500,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 - **Where things run:** a card on Home's Overview (`bodies/ui/src/home/where-things-run.tsx`). The
   `brainLink` IPC (`tagalong:brain:link`, `ipc/brain-link.ts`) returns `{ addr: "ws://<addr>", status }`;
   the address is `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), exactly what the desktop dials.
-  Apps come from `listConnections`. Offline, the card says apps return with the brain.
+  Apps come from `listConnections`. Each row is a letter tile, a name over its subline and the
+  Connections page's status chip. Offline, the card says apps return with the brain.
   `e2e/where-things-run.spec.ts` covers it on the fake brain.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`

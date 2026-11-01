@@ -7,18 +7,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppInfo } from '../shapes';
 import { useHostBridge, type BrainLink } from '../host-bridge';
-import { STATUS_DOT, STATUS_WORDS } from './connections-panel';
+import { STATUS_CHIP, STATUS_DOT, STATUS_WORDS } from './connection-row';
 
 // Link states reuse the apps' dots; words say it too, so colour never carries it alone.
-const LINK: Record<BrainLink['status'], { words: string; dot: string }> = {
-  online: { words: 'Connected', dot: STATUS_DOT.connected },
-  connecting: { words: 'Connecting', dot: STATUS_DOT.connecting },
-  offline: { words: 'Offline', dot: STATUS_DOT.off },
-  outdated: { words: 'Needs update', dot: STATUS_DOT['needs-sign-in'] },
+const LINK: Record<BrainLink['status'], { words: string; dot: string; chip: string }> = {
+  online: { words: 'Connected', dot: STATUS_DOT.connected, chip: STATUS_CHIP.connected },
+  connecting: { words: 'Connecting', dot: STATUS_DOT.connecting, chip: STATUS_CHIP.connecting },
+  offline: { words: 'Offline', dot: STATUS_DOT.off, chip: STATUS_CHIP.off },
+  outdated: {
+    words: 'Needs update',
+    dot: STATUS_DOT['needs-sign-in'],
+    chip: STATUS_CHIP['needs-sign-in'],
+  },
 };
 
 // Static on purpose: Claude Code is the one expert and the brain starts it locally.
-const EXPERTS = 'Claude Code · runs on this machine, started by the brain';
+const EXPERTS = 'Runs on this machine, started by the brain';
 
 /** Where an app runs: its web address, or the command line the brain starts. */
 function describeApp(app: AppInfo): string {
@@ -59,27 +63,46 @@ export function WhereThingsRun() {
   return (
     <section className="home-card home-card--run" aria-label="Where things run">
       <h2 className="home-card__label">WHERE THINGS RUN</h2>
-      <p className="home-card__row">
-        <strong>Brain · {link.addr}</strong>
-        <span>
-          <span className={state.dot} aria-hidden="true" />
-          {state.words}
+      <p className="home-card__row home-card__row--app">
+        <span className="home-conn__initial" aria-hidden="true">
+          B
+        </span>
+        <span className="home-entry__body">
+          <strong>Brain</strong>
+          <span className="home-entry__preview">{link.addr}</span>
+        </span>
+        <span className={state.chip}>
+          <span className={state.dot} aria-hidden="true" /> {state.words}
         </span>
       </p>
       {link.status !== 'online' ? (
         <p>Connected apps show up when the brain is connected.</p>
       ) : (
         apps.map((app) => (
-          <p key={app.id} className="home-card__row">
-            <strong>{[app.name, describeApp(app)].filter(Boolean).join(' · ')}</strong>
-            <span>
-              <span className={STATUS_DOT[app.status]} aria-hidden="true" />
+          <p key={app.id} className="home-card__row home-card__row--app">
+            <span className="home-conn__initial" aria-hidden="true">
+              {app.name.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="home-entry__body">
+              <strong>{app.name}</strong>
+              <span className="home-entry__preview">{describeApp(app)}</span>
+            </span>
+            <span className={STATUS_CHIP[app.status]}>
+              <span className={STATUS_DOT[app.status]} aria-hidden="true" />{' '}
               {STATUS_WORDS[app.status]}
             </span>
           </p>
         ))
       )}
-      <p>{EXPERTS}</p>
+      <p className="home-card__row home-card__row--app">
+        <span className="home-conn__initial" aria-hidden="true">
+          C
+        </span>
+        <span className="home-entry__body">
+          <strong>Claude Code</strong>
+          <span className="home-entry__preview">{EXPERTS}</span>
+        </span>
+      </p>
     </section>
   );
 }

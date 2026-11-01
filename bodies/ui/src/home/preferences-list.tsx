@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import type { PreferenceRow } from '../host-bridge';
+import { Button } from '../controls/button';
 import { failure } from '../failure';
 
 interface Props {
@@ -87,19 +88,18 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
                   />
                 </label>
                 <div className="apv-pref__actions">
-                  <button type="button" className="tg-btn" onClick={() => save(pref)}>
+                  <Button variant="primary" onClick={() => save(pref)}>
                     Save
-                  </button>
-                  <button
-                    type="button"
-                    className="tg-btn-quiet"
+                  </Button>
+                  <Button
+                    variant="quiet"
                     onClick={() => {
                       setEditing(null);
                       setError(null);
                     }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -121,22 +121,20 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
                   </span>
                 </div>
                 <div className="apv-pref__actions">
-                  <button
-                    type="button"
-                    className="apv-btn"
+                  <Button
+                    variant="secondary"
                     aria-label={`Edit: ${pref.sentence}`}
                     onClick={() => start(pref)}
                   >
                     Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="apv-btn"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     aria-label={`Remove: ${pref.sentence}`}
                     onClick={() => remove(pref)}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

@@ -986,7 +986,7 @@ the apps in C1 to C7 use a command or a pasted key.
 ### C5. Switch, Restart, Remove
 
 - [ ] Switch an app **Off**. Its word reads **Off**, Scout no longer uses it and says so if you ask.
-      Switch it **On**: it connects again.
+      Switch it **On** (the switch, `role="switch"`, not a checkbox): it connects again.
 - [ ] End the app's process (Task Manager). Within about 30 seconds its row says **Not working** and
       why. **Restart** brings it back to **Connected**.
 - [ ] **Remove** shows **Yes, remove** and **Keep** on the page (no browser dialog). **Keep** backs

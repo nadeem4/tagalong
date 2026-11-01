@@ -96,6 +96,15 @@ describe('ConnectionsPanel', () => {
     expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
   });
 
+  it('groups the list and the add form in two labelled cards', async () => {
+    await renderPanel(createFakeHostBridge());
+    expect(
+      screen.getByText('The apps Scout can use for you. Turn one off to stop Scout using it.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'CONNECTED APPS' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ADD AN APP' })).toBeInTheDocument();
+  });
+
   it('offers sign-in at once after adding an app that signs in with its own page', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
@@ -189,6 +198,38 @@ describe('ConnectionsPanel', () => {
     await click(screen.getByRole('switch', { name: 'Scout can use Files' }));
     expect(bridge.enabledCalls).toEqual([{ id: 'files', enabled: false }]);
     expect(screen.getByRole('switch', { name: 'Scout can use Files' })).not.toBeChecked();
+  });
+
+  it('turning a disabled app on sends the next value, and an off app shows Off', async () => {
+    const bridge = createFakeHostBridge({ apps: [{ ...FILES, enabled: false, status: 'off' }] });
+    await renderPanel(bridge);
+    const toggle = screen.getByRole('switch', { name: 'Scout can use Files' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(toggle).toHaveTextContent('Off');
+    await click(toggle);
+    expect(bridge.enabledCalls).toEqual([{ id: 'files', enabled: true }]);
+  });
+
+  it('a long connection name truncates with its full text in title, and the actions stay', async () => {
+    const name = 'A very long connection name '.repeat(8).trim();
+    const bridge = createFakeHostBridge({ apps: [{ ...FILES, name }] });
+    await renderPanel(bridge);
+    const row = screen.getByRole('region', { name });
+    expect(within(row).getByText(name)).toHaveAttribute('title', name);
+    expect(within(row).getByRole('button', { name: `Restart ${name}` })).toBeVisible();
+    expect(within(row).getByRole('button', { name: `Remove ${name}` })).toBeVisible();
+  });
+
+  it('shows the status as a chip and Sign in as a primary button', async () => {
+    const bridge = createFakeHostBridge({
+      apps: [{ ...FILES, auth: 'oauth', status: 'needs-sign-in' }],
+    });
+    await renderPanel(bridge);
+    const row = screen.getByRole('region', { name: 'Files' });
+    expect(within(row).getByText('Needs sign-in').closest('.tg-chip')).toHaveClass('tg-chip--warn');
+    expect(within(row).getByRole('button', { name: 'Sign in to Files' })).toHaveClass(
+      'tg-button--primary',
+    );
   });
 
   it('Restart asks the brain to restart that app', async () => {

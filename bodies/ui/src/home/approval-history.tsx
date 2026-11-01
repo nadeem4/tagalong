@@ -4,6 +4,7 @@
  * ended. Rows Scout decided carry the sentence they relied on. Contains ApprovalHistory.
  */
 import type { ReactNode } from 'react';
+import { Button } from '../controls/button';
 import type { ApprovalCounts, ApprovalRow } from '../host-bridge';
 
 export type ApprovalFilter = 'all' | 'scout' | 'refused';
@@ -82,7 +83,7 @@ function Row({ row }: { row: ApprovalRow }) {
   const byScout = row.decidedBy === 'scout';
   return (
     <li className={byScout ? 'apv-row apv-row--scout' : 'apv-row'}>
-      <span className="apv-row__time">{time(row.at)}</span>
+      <span className="apv-row__time home-time">{time(row.at)}</span>
       <svg className="apv-row__icon" viewBox="0 0 16 16" aria-hidden="true">
         {source.icon}
       </svg>
@@ -158,9 +159,9 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
         </div>
       ))}
       {hasMore && (
-        <button type="button" className="apv-btn apv-more" onClick={onMore}>
+        <Button variant="secondary" className="apv-more" onClick={onMore}>
           Show more
-        </button>
+        </Button>
       )}
     </section>
   );

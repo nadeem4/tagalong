@@ -411,7 +411,9 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 
 - **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Jobs, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
-- **Jobs and Connections:** rows between Panel Line hairlines with status chips and switches.
+- **Page:** every tab sits in one `.home-page` box, 920px wide at most, centred, with one 32px inset (`space.page`), so the left edge never moves between tabs. Each page opens with a 22px title and one muted line (Overview: "Everything Scout is doing for you."). The nav carries `on-navy`, so shared controls take the gold focus ring there.
+- **Jobs and Connections:** rows between Panel Line hairlines. A job row has the title (truncated, full text in `title`), a state chip and a no-wrap time on the left and its Stop or Show result button on the right. A connection row has an initial tile, the name, a status chip, the shared On/Off switch and its Sign in, Restart and Remove buttons.
+- **Approvals and Memory:** preferences and history are white cards; times never wrap; each memory row has a kind chip, the fact (wraps inside the row), the date and a quiet Delete button.
 
 ### Walkthrough frame
 

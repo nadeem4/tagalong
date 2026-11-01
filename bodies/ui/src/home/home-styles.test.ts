@@ -18,4 +18,14 @@ describe('HOME_CSS', () => {
     expect(HOME_CSS).toContain('.home-card--run .home-card__row strong { min-width: 0;');
     expect(HOME_CSS).not.toContain('\n.home-card__row strong');
   });
+
+  it('caps the page at 920px with one inset from the tokens', () => {
+    expect(HOME_CSS).toContain(`.home-page { max-width: 920px;`);
+    expect(HOME_CSS).toContain(`padding: 0 ${t.space.page}px`);
+  });
+
+  it('never wraps a time', () => {
+    expect(HOME_CSS).toMatch(/\.home-time[^{]*\{[^}]*white-space: nowrap/);
+    expect(HOME_CSS).toMatch(/\.apv-row__time[^{]*\{[^}]*white-space: nowrap/);
+  });
 });

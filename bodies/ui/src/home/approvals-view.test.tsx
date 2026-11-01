@@ -369,4 +369,35 @@ describe('ApprovalsView brain link', () => {
     expect(await screen.findByRole('group', { name: 'Summary' })).toBeVisible();
     expect(screen.getByText(/None yet/)).toBeVisible();
   });
+
+  it('the history time cell never wraps (home-time class)', async () => {
+    renderPage(createFakeHostBridge({ approvalRows: [BY_PERSON] }));
+    const region = await history();
+    const row = region.getByText('Run pnpm install').closest('li') as HTMLElement;
+    expect(row.querySelector('.apv-row__time')).toHaveClass('home-time');
+  });
+
+  it('empty approvals say so in both the preferences and the history', async () => {
+    renderPage(createFakeHostBridge());
+    expect(await screen.findByText('Nothing here yet.')).toBeVisible();
+    expect(screen.getByText(/None yet/)).toBeVisible();
+  });
+
+  it('renders 200 approvals without error', async () => {
+    const many = Array.from({ length: 200 }, (_, i) => ({
+      ...BY_PERSON,
+      id: 1000 + i,
+      summary: `Run command ${i}`,
+    }));
+    renderPage(createFakeHostBridge({ approvalRows: many }));
+    const region = await history();
+    expect(region.getAllByRole('listitem')).toHaveLength(200);
+  });
+
+  it('preference actions are shared buttons inside their card', async () => {
+    renderPage(createFakeHostBridge({ preferences: [GIT_PREF] }));
+    const edit = await screen.findByRole('button', { name: `Edit: ${GIT_PREF.sentence}` });
+    expect(edit).toHaveClass('tg-button--secondary');
+    expect(edit.closest('li')).toHaveClass('apv-pref');
+  });
 });

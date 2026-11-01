@@ -69,7 +69,8 @@ export interface FakeBrain {
 const JOB = {
   id: 'job1',
   agent: 'claude_code',
-  task: 'Fix the build',
+  // Long on purpose: Home must clip it, never widen the page (smoke.spec checks).
+  task: 'Fix the build and then keep going through every failing check until the whole pipeline is green again',
   folder: 'C:/work/app',
   mode: 'ask',
   state: 'running',
@@ -79,6 +80,9 @@ const JOB = {
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
 } as Record<string, unknown>;
+
+// A memory with one unbroken word, the worst case for the memory row's width.
+const LONG_FACT = `Remembers ${'supercalifragilistic'.repeat(8)} and a long story about the launch.`;
 
 // One connected app, as the brain's list_apps row.
 const APPS = [
@@ -96,7 +100,7 @@ const APPS = [
   },
   {
     id: 'wiki',
-    name: 'Wiki',
+    name: 'Wiki of everything the whole company has ever written down in one place',
     transport: 'http',
     auth: 'none',
     enabled: true,
@@ -418,6 +422,13 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'settings' });
         } else if (params.tool === 'expert_status') {
           value = { found: true, command: 'claude-agent-acp' };
+        } else if (params.tool === 'list_memories') {
+          value = {
+            memories: [
+              { id: 'm1', kind: 'summary', text: LONG_FACT, at: '2026-10-27T10:00:00Z' },
+              { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
+            ],
+          };
         } else if (params.tool === 'list_apps') value = { apps: APPS };
         else if (params.tool === 'list_approvals') {
           const filter = params.input?.filter;

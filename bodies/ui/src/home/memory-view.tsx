@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
+import { Button } from '../controls/button';
 import { themeTokens as t } from '../theme/tokens';
 
 const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
@@ -24,17 +25,19 @@ function day(iso: string): string {
 }
 
 const CSS = `
-.memory-head { display: flex; flex-direction: column; gap: ${t.space.xs}px; padding: ${t.space.xxl}px ${t.space.xxl}px ${t.space.md}px; }
-.memory-head p { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; }
-.memory-row { display: flex; align-items: flex-start; gap: ${t.space.lg}px; padding: ${t.space.md}px;
-  border-radius: ${t.radius.row}px; color: ${t.color.panelText}; }
-.memory-row:hover { background: ${t.color.panelTile}; }
-.memory-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
-.memory-row__kind { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
-.memory-row__text { font-size: ${t.fontSize.body}px; overflow-wrap: anywhere; }
-.memory-row__delete { flex: none; width: 28px; height: 28px; border: 0; border-radius: ${t.radius.small}px;
-  background: transparent; color: ${t.color.panelMuted}; cursor: pointer; font-size: 16px; line-height: 1; }
-.memory-row__delete:hover { background: ${t.color.panelLine}; color: ${t.color.panelText}; }
+/* One grid for the list, rows on its subgrid: every row's text starts at the same left edge. */
+.memory-list {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) auto auto;
+}
+.memory-row {
+  display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: start;
+  gap: ${t.space.lg}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
+  color: ${t.color.panelText};
+}
+.memory-row__text { font-size: ${t.fontSize.field}px; overflow-wrap: anywhere; min-width: 0; }
+.memory-row__date { padding-top: 3px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.memory-row .tg-chip { justify-self: start; white-space: nowrap; }
 `;
 
 /**
@@ -76,42 +79,37 @@ export function MemoryView({ name }: { name: string }) {
 
   const title = `What ${name} remembers`;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <>
       <style>{CSS}</style>
-      <div className="memory-head">
+      <div className="home-head">
         <h1 className="home-title">{title}</h1>
         <p>Kept until you delete them. Deleting one is for good.</p>
       </div>
-      {failed && memories === null && (
-        <p className="home-note" role="alert">
-          Tagalong could not read these memories. Reopen Home to try again.
-        </p>
-      )}
-      {memories !== null && memories.length === 0 && (
-        <p className="home-note">{name} doesn’t remember anything yet.</p>
-      )}
-      {memories !== null && memories.length > 0 && (
-        <ul aria-label={title} className="home-activity">
-          {memories.map((memory) => (
-            <li key={memory.id} className="memory-row">
-              <span className="memory-row__body">
-                <span className="memory-row__kind">
-                  {KIND_LABELS[memory.kind]} · {day(memory.createdAt)}
-                </span>
+      <section className="home-card" aria-label="Memories">
+        <h2 className="home-card__label">MEMORIES</h2>
+        {failed && memories === null && (
+          <p role="alert">Tagalong could not read these memories. Reopen Home to try again.</p>
+        )}
+        {memories !== null && memories.length === 0 && <p>{name} doesn’t remember anything yet.</p>}
+        {memories !== null && memories.length > 0 && (
+          <ul aria-label={title} className="memory-list">
+            {memories.map((memory) => (
+              <li key={memory.id} className="memory-row">
+                <span className="tg-chip">{KIND_LABELS[memory.kind]}</span>
                 <span className="memory-row__text">{memory.text}</span>
-              </span>
-              <button
-                type="button"
-                className="memory-row__delete"
-                aria-label={deleteLabel(memory.text)}
-                onClick={() => remove(memory.id)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <span className="memory-row__date home-time">{day(memory.createdAt)}</span>
+                <Button
+                  variant="quiet"
+                  aria-label={deleteLabel(memory.text)}
+                  onClick={() => remove(memory.id)}
+                >
+                  Delete
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

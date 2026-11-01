@@ -34,17 +34,25 @@ export const HOME_CSS = `
 .home-nav__item:hover { color: ${t.color.text}; }
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
-  flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
-  gap: ${t.space.xxl}px; padding: ${t.space.xxxl}px 32px;
+  flex: 1; min-width: 0; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column;
+  padding: ${t.space.xxxl}px 0;
 }
-.home-title { margin: 0; font-size: 20px; font-weight: ${t.fontWeight.semibold}; }
+/* One width and one inset for every tab, so the left edge never jumps between pages. */
+.home-page { max-width: 920px; width: 100%; margin: 0 auto; box-sizing: border-box;
+  padding: 0 ${t.space.page}px; display: flex; flex-direction: column; gap: ${t.space.xxl}px;
+}
+.home-page > * { min-width: 0; }
+.home-head { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.home-head p { margin: 0; font-size: ${t.fontSize.field}px; color: ${t.color.panelMuted}; }
+.home-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.home-title { margin: 0; font-size: 22px; font-weight: ${t.fontWeight.semibold}; }
 .home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: ${t.space.xl}px; }
 .home-card {
   display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.xl}px ${t.space.xxl}px;
   border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
 }
 .home-card p { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; }
-.home-card .tg-btn-quiet { align-self: flex-start; }
+.home-card .tg-button--secondary { align-self: flex-end; }
 .home-card__label {
   margin: 0; font-family: ${t.font.pixel}; font-size: 12px; font-weight: 400;
   letter-spacing: 1px; color: ${t.color.panelMuted};
@@ -53,7 +61,17 @@ export const HOME_CSS = `
 .home-card p.home-card__lead { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
 .home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
 .home-card--run .home-card__row strong { min-width: 0; overflow-wrap: anywhere; }
-.home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
+.home-card__row:not(.home-card__row--app) > span:last-child { flex: none; color: ${t.color.panelMuted}; }
+.home-card--run p.home-card__row { align-items: center; padding: ${t.space.md}px 0; border-top: 1px solid ${t.color.panelLine}; }
+.home-card--run p.home-card__row--app { justify-content: flex-start; }
+.home-card--run .home-card__row--app .home-entry__body { gap: 0; }
+.home-card--run .home-card__row--app .tg-chip { flex: none; margin-left: auto; }
+.home-card--run .tg-chip .home-dot { margin-right: 0; }
+.home-card--run .home-card__row:not(.home-card__row--app) > span:last-child {
+  padding: 2px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
+  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+}
+.home-spend { font-size: 26px; font-weight: ${t.fontWeight.semibold}; font-variant-numeric: tabular-nums; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-dot--warn { background: ${t.color.gold}; }
 .home-dot--err { background: ${t.color.errInk}; }
@@ -75,18 +93,24 @@ export const HOME_CSS = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
-.home-conns__list { list-style: none; margin: 0 0 ${t.space.lg}px; padding: 0; display: flex; flex-direction: column; }
+.home-conns__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.home-conns__list > li:last-child .home-conn { border-bottom: 0; padding-bottom: 0; }
 .home-conn {
   display: flex; flex-direction: column; gap: ${t.space.md}px;
   padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine};
 }
 .home-conn__head { display: flex; align-items: center; gap: ${t.space.lg}px; }
+.home-conn__initial {
+  width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: ${t.radius.row}px; background: ${t.color.panelTile}; font-weight: ${t.fontWeight.semibold};
+}
+.home-conn__head .home-entry__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-conn__head .tg-chip { flex: none; }
 .home-conn__head .tg-error { font-weight: 400; }
-.home-conn__actions { display: flex; align-items: center; gap: ${t.space.md}px; }
+.home-conn__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
-.home-conns__advanced { margin-top: ${t.space.xl}px; }
+.home-conns__form-host.tg-panel { padding: 0; background: transparent; }
 .home-perms { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-row {
@@ -102,42 +126,40 @@ export const HOME_CSS = `
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text { opacity: 0.6; }
 .perm-row .tg-switch { flex: none; }
 .perm-row .tg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
-.home-jobs { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .job-row {
-  display: flex; flex-direction: column; gap: ${t.space.xs}px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: ${t.space.xl}px;
   padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
 }
-.job-row__head { display: flex; align-items: baseline; gap: ${t.space.lg}px; justify-content: space-between; }
-.job-row__task { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
-.job-row__state {
-  flex: none; padding: 1px ${t.space.md}px; border: 1px solid ${t.color.panelMuted};
-  border-radius: 999px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+.job-row__main { min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.job-row__task {
+  font-size: ${t.fontSize.field + 1}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.job-row__state--running { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
-.job-row__meta, .job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
+.job-row__meta { display: flex; align-items: center; gap: ${t.space.md}px; min-width: 0; }
+.job-row__where { min-width: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; overflow-wrap: anywhere; }
+.job-row__state {
+  flex: none; padding: 1px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
+  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+}
+.job-row__state--running { background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
+.job-row__state--done { background: ${t.color.okFill}; color: ${t.color.okInk}; }
+.job-row__state--error { background: ${t.color.errFill}; color: ${t.color.errInk}; }
+.job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
 .job-row__actions { display: flex; gap: ${t.space.lg}px; }
 .job-row__result {
-  margin: 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
+  grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
-.apv-section { display: flex; flex-direction: column; gap: ${t.space.lg}px; }
-.apv-sub { margin: ${t.space.xs}px 0 0; font-size: ${t.fontSize.body}px; }
+.apv-section {
+  display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xl}px ${t.space.xxl}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
+}
 .apv-error { color: ${t.color.errInk}; margin: 0; }
-.apv-btn {
-  height: 28px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.small - 2}px;
-  border: 1px solid ${t.color.panelMuted}; background: transparent; color: ${t.color.panelText};
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
-}
-.apv-btn:hover { background: ${t.color.panelTile}; }
-.apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; }
-.apv-pref {
-  position: relative; flex-direction: row; align-items: center; justify-content: space-between;
-  gap: ${t.space.xl}px; padding: ${t.space.lg}px ${t.space.xl}px ${t.space.lg}px ${t.space.xxl}px;
-}
-.apv-pref::before {
-  content: ''; position: absolute; left: 0; top: ${t.space.lg}px; bottom: ${t.space.lg}px; width: 3px;
-  border-radius: 0 3px 3px 0; background: ${t.color.gold};
+.apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.apv-pref.home-card {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: ${t.space.xl}px;
+  padding: ${t.space.lg}px 0; border: 0; border-top: 1px solid ${t.color.panelLine}; border-radius: 0;
 }
 .apv-pref__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .apv-pref__sentence { font-size: ${t.fontSize.field + 1}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
@@ -163,11 +185,11 @@ export const HOME_CSS = `
 .apv-day { margin: ${t.space.lg}px 0 ${t.space.sm}px; }
 .apv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .apv-row {
-  position: relative; display: grid; grid-template-columns: 48px 20px 1fr auto; align-items: start;
+  position: relative; display: grid; grid-template-columns: 56px 20px 1fr auto; align-items: start;
   gap: ${t.space.lg}px; padding: ${t.space.md}px ${t.space.md}px; border: 1px solid transparent; border-radius: ${t.radius.row}px;
 }
 .apv-row:hover { background: ${t.color.panelTile}; }
-.apv-row__time { padding-top: ${t.space.xxs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.apv-row__time { white-space: nowrap; padding-top: ${t.space.xxs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
 .apv-row__icon { width: 16px; height: 16px; margin-top: ${t.space.xs}px; stroke: ${t.color.panelMuted}; fill: none; stroke-width: 1.6; }
 .apv-row__body { min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .apv-row__what { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; overflow-wrap: anywhere; }

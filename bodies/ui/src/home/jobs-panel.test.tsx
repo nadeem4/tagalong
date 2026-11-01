@@ -149,6 +149,40 @@ describe('JobsPanel', () => {
     errors.mockRestore();
   });
 
+  it('puts the actions in the row, in the same list item as the title', async () => {
+    renderPanel(createFakeHostBridge({ jobs: [RUNNING, DONE] }));
+    const [running, done] = await rows();
+    const title = within(running!).getByText('Fix the login bug');
+    expect(title.closest('li')).toBe(running);
+    expect(
+      within(running!).getByRole('button', { name: 'Stop Fix the login bug' }).closest('li'),
+    ).toBe(running);
+    expect(within(done!).getByRole('button', { name: 'Show result' }).closest('li')).toBe(done);
+  });
+
+  it('truncates a 200-character title and keeps the full text in title', async () => {
+    const long = 'x'.repeat(200);
+    renderPanel(createFakeHostBridge({ jobs: [{ ...RUNNING, task: long }] }));
+    const title = await screen.findByText(long);
+    expect(title).toHaveAttribute('title', long);
+    expect(title).toHaveClass('job-row__task');
+  });
+
+  it('keeps the time in a no-wrap cell', async () => {
+    renderPanel(createFakeHostBridge({ jobs: [DONE] }));
+    const [done] = await rows();
+    expect(within(done!).getByText('2m 5s')).toHaveClass('home-time');
+  });
+
+  it('shows the empty line when there are no jobs', async () => {
+    renderPanel(createFakeHostBridge({ jobs: [] }));
+    expect(
+      await screen.findByText(
+        'No jobs yet. Ask Scout to hand work to Claude Code and it shows here.',
+      ),
+    ).toBeVisible();
+  });
+
   it('stops listening for changes when it goes away', async () => {
     const bridge = createFakeHostBridge({ jobs: [] });
     const off = vi.fn();
