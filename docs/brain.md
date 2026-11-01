@@ -481,6 +481,25 @@ url shows empty. Home shows these rows in its "Where things run" card.
   A new sign-in clears the old registration (the redirect port changes). Removing the app deletes
   the file. Like `app-tokens.json`, it never reaches a row, a tool list or an error line.
 
+## Setting things up (`setup/`)
+
+Scout can look before it suggests a fix. `brain/src/brain/setup/` holds the facts and the registry
+read; installs come in later slices. Everything is read-only and returns JSON facts; the model
+words what the person reads (guidance in `mind/soul.md`).
+
+- `paths.py`: where Tagalong keeps its own Node, expert packages, the registry cache and the
+  installed-experts list, all under `TAGALONG_HOME`.
+- `facts.py`: `inspect()` reports OS, CPU and the versions of node, npm, git and `claude`, and
+  Tagalong's own Node separately. A missing or failing tool is `None`. The command runner
+  (`RunCmd`) is a seam; `real_run_cmd` is the only place a process starts.
+- `registry.py` and `net.py`: read the ACP agent registry and the MCP server registry (the
+  latter through its `search` parameter, latest versions only) into entries with a way to run
+  them (`npx`, `uvx`, `binary` per platform, `remote`). Entries are parsed leniently. Results are
+  cached for 24 h in `cache/`; offline, the cache is served with `stale: true`; offline with no
+  cache is `registry_unavailable`. `build_for` says whether an entry can run on this computer.
+- `tools.py`: Scout's tools `inspect_machine`, `find_experts` and `find_apps(query)`, all
+  read-only and automatic, never offered to Home.
+
 ## Experts
 
 Scout can hand a task to Claude Code, which works in a folder as a job. `experts.py` runs it,

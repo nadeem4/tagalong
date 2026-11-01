@@ -197,6 +197,14 @@ MCP resources, prompts, sampling and elicitation; deferred tool loading; a catal
 apps; importing apps from Claude Code's config; SSE transport; signing in from a different machine
 than the brain's; TLS, pairing and multi-user.
 
+## Finding apps
+
+`find_apps(query)` (Scout, read-only) searches the MCP Registry
+(`registry.modelcontextprotocol.io`, latest versions only) and lists each server with whether it
+can run on this computer. Packages map to `npx` (npm) or `uvx` (pypi); hosted servers are
+`remote`. Results are cached for 24 h under `<TAGALONG_HOME>/cache/`. Nothing is installed or
+connected by searching.
+
 ## Storage
 
 | Where                         | Holds                                                                                                            |
