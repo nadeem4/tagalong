@@ -18,6 +18,8 @@ export const themeTokens = {
     /** Focus ring: navy on light surfaces, gold on navy ones. */
     focusOnLight: '#12162B',
     focusOnNavy: '#F2C14E',
+    /** Fill of fields and secondary buttons on the light page. */
+    controlFill: '#FFFFFF',
     /** Keycaps (a shortcut key drawn as a key). */
     keycapFill: '#FFFFFF',
     keycapLine: '#C9CEDC',

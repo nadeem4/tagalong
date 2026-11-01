@@ -21,7 +21,7 @@ function setup(value = 5, onChange = vi.fn(), format?: (n: number) => string) {
 }
 
 describe('Slider', () => {
-  it('is a native range with min, max and step, so arrows, Home and End work in the browser', () => {
+  it('renders a native range with min, max, step and value', () => {
     const { input } = setup();
     expect(input.type).toBe('range');
     expect([input.min, input.max, input.step, input.value]).toEqual(['0', '10', '1', '5']);

@@ -9,7 +9,7 @@ import { themeTokens as t } from '../theme/tokens';
 export const CONTROLS_CSS = `
 :root {
   --tg-focus: ${t.color.focusOnLight};
-  --tg-ctl-bg: ${t.color.keycapFill};
+  --tg-ctl-bg: ${t.color.controlFill};
   --tg-ctl-line: ${t.color.keycapLine};
   --tg-ctl-ink: ${t.color.panelText};
   --tg-ctl-muted: ${t.color.panelMuted};
@@ -25,6 +25,7 @@ export const CONTROLS_CSS = `
 .tg-money input:focus-visible, .tg-money button:focus-visible, .tg-button:focus-visible {
   outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px;
 }
+/* Select and money rules carry an extra class so they beat the Settings panel field rules. */
 /* Controls size themselves the same on any host page, whatever its reset says. */
 .tg-toggle, .tg-select select, .tg-slider input, .tg-money input, .tg-button, .tg-keyfield #tg-api-key,
 .tg-keycap { box-sizing: border-box; }
@@ -51,7 +52,7 @@ export const CONTROLS_CSS = `
 .tg-select { display: flex; flex-direction: column; gap: ${t.space.xs}px; min-width: 0; }
 .tg-select__label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
 .tg-select__wrap { position: relative; display: block; }
-.tg-select select {
+.tg-select .tg-select__wrap select {
   appearance: none; width: 100%; height: ${t.size.control}px; padding: 0 34px 0 ${t.space.lg}px;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
@@ -92,13 +93,13 @@ export const CONTROLS_CSS = `
 .tg-money > label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
 .tg-money__row { display: flex; align-items: center; gap: ${t.space.sm}px; }
 .tg-money__prefix { color: var(--tg-ctl-muted); font-size: ${t.fontSize.field}px; }
-.tg-money input {
+.tg-money .tg-money__row input[type='text'] {
   width: 96px; height: ${t.size.control}px; padding: 0 ${t.space.lg}px;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
-.tg-money input[aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
+.tg-money .tg-money__row input[type='text'][aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-money .tg-button { width: ${t.size.control}px; padding: 0; }
 
 .tg-button {
@@ -129,8 +130,7 @@ export const CONTROLS_CSS = `
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
 .tg-keyfield #tg-api-key:focus-visible { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
-.tg-keyfield[data-state='valid'] /* The id selector outranks Settings' generic input rule whatever the sheet order. */
-.tg-keyfield #tg-api-key { border-color: ${t.color.okInk}; }
+.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${t.color.okInk}; }
 .tg-keyfield #tg-api-key[aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-keyfield__box .tg-keyfield__show {
   position: absolute; top: 50%; right: ${t.space.xs}px; transform: translateY(-50%);

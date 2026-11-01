@@ -21,7 +21,7 @@ describe('Select', () => {
     expect(onChange).toHaveBeenCalledWith('b');
   });
 
-  it('is a native select, so ArrowDown and ArrowUp move the value in the browser', () => {
+  it('renders a native select with the chosen value and its options', () => {
     render(<Select id="s" label="Voice" value="b" onChange={() => {}} options={OPTIONS} />);
     const select = screen.getByLabelText('Voice') as HTMLSelectElement;
     expect(select.value).toBe('b');

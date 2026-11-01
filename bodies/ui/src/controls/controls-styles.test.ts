@@ -25,6 +25,27 @@ describe('CONTROLS_CSS', () => {
   });
 
   it('gives the wordmark class Onest 600', () => {
-    expect(CONTROLS_CSS).toContain('.tg-wordmark');
+    const rule = CONTROLS_CSS.match(/\.tg-wordmark\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(rule).toContain(t.font.wordmark);
+    expect(rule).toContain('font-weight: 600');
+  });
+
+  it('keeps the valid key field border rule as one intact selector', () => {
+    expect(CONTROLS_CSS).toContain(
+      `.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${t.color.okInk}; }`,
+    );
+  });
+
+  it('out-ranks the Settings panel input and select rules', () => {
+    // .tg-panel input[type='text'] is (0,2,1) and .tg-panel select is (0,1,1).
+    expect(CONTROLS_CSS).toContain(".tg-money .tg-money__row input[type='text'] {");
+    expect(CONTROLS_CSS).toContain(
+      ".tg-money .tg-money__row input[type='text'][aria-invalid='true']",
+    );
+    expect(CONTROLS_CSS).toContain('.tg-select .tg-select__wrap select {');
+  });
+
+  it('uses the control fill token for light controls', () => {
+    expect(CONTROLS_CSS).toContain(`--tg-ctl-bg: ${t.color.controlFill}`);
   });
 });

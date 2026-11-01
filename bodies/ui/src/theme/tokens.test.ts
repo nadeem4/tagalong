@@ -49,6 +49,11 @@ describe('design tokens', () => {
     expect(contrast(color.focusOnNavy, color.page)).toBeGreaterThanOrEqual(3);
   });
 
+  it('has a white control fill readable under panel text', () => {
+    expect(color.controlFill).toBe('#FFFFFF');
+    expect(contrast(color.panelText, color.controlFill)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('draws keycaps readable on their fill', () => {
     expect(contrast(color.keycapInk, color.keycapFill)).toBeGreaterThanOrEqual(4.5);
   });
