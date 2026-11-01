@@ -21,7 +21,7 @@ describe('HOME_CSS', () => {
 
   it('caps the page at 920px with one inset from the tokens', () => {
     expect(HOME_CSS).toContain(`.home-page { max-width: 920px;`);
-    expect(HOME_CSS).toContain(`padding: ${t.space.page}px`);
+    expect(HOME_CSS).toContain(`padding: 0 ${t.space.page}px`);
   });
 
   it('never wraps a time', () => {
