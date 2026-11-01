@@ -8,7 +8,7 @@ Home calls skip that step.
 
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Protocol
 
 from pydantic import ValidationError
@@ -47,6 +47,9 @@ class ToolSpec:
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
     locked: bool = False  # asks until the person sets it to auto; no "Always" button
     self_asks: bool = False  # runs its own ask with the user, so the gate adds none
+    # Facts built by code for the Allow card (and the approvals log) instead of the model's raw
+    # input, e.g. what an install will download. The handler still gets the model's input.
+    card: Callable[[dict], Awaitable[dict]] | None = None
 
 
 class Source(Protocol):
@@ -237,6 +240,8 @@ class Toolbox:
                     decided_by=decided_by,
                 )
 
+        if spec.card is not None:
+            call = replace(call, input=await spec.card(call.input))
         summary = approvals.summarise(call.text, spec.name, call.input) if approvals else ""
         ctx = AskCtx(
             source_kind,

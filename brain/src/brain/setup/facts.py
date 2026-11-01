@@ -29,8 +29,14 @@ class CmdResult:
 RunCmd = Callable[[list[str], Mapping[str, str], Path | None], Awaitable[CmdResult]]
 
 
-async def real_run_cmd(argv: list[str], env: Mapping[str, str], cwd: Path | None) -> CmdResult:
-    """The only place a setup command starts a process: no shell, short timeout."""
+async def real_run_cmd(
+    argv: list[str],
+    env: Mapping[str, str],
+    cwd: Path | None,
+    timeout: float = PROBE_TIMEOUT_S,
+) -> CmdResult:
+    """The only place a setup command starts a process: no shell. The default timeout suits a
+    `--version` probe; an install passes a longer one."""
     proc = await asyncio.create_subprocess_exec(
         *argv,
         env=dict(env),
@@ -40,7 +46,7 @@ async def real_run_cmd(argv: list[str], env: Mapping[str, str], cwd: Path | None
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), PROBE_TIMEOUT_S)
+        out, err = await asyncio.wait_for(proc.communicate(), timeout)
     except TimeoutError:
         proc.kill()
         await proc.wait()

@@ -38,6 +38,8 @@ _KINDS = (
     EventKind("back", batch_seconds=0, max_per_hour=2),
     EventKind("job_question", batch_seconds=None, max_per_hour=None),
     EventKind("choice", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_login", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_progress", wakes=False),
     EventKind("focus", wakes=False),
     EventKind("tab", wakes=False),
     EventKind("download", wakes=False),
