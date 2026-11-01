@@ -18,6 +18,9 @@ import { ANSWER_CSS, Answer } from './answer';
 import { CONTROLS_CSS } from './controls/controls-styles';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
+import { CHAT_CSS } from './chat-styles';
+import { ScoutMark } from './scout-mark';
+import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
@@ -728,6 +731,10 @@ export interface GreetingLineProps {
   onFix?: (target: FixTarget) => void;
   /** It left: the time ran out, or the person closed it. */
   onDone: () => void;
+  /** Whether the host is reading the line aloud: three bars show it. */
+  speaking?: boolean;
+  /** Bean's idle strip, drawn still in Scout's mark. */
+  scout?: BeanClipData;
   /** The person clicked it: open the bubble to ask, carrying the line so it is not lost. */
   onOpen?: (text: string) => void;
   tail?: 'left' | 'right';
@@ -752,6 +759,8 @@ export function GreetingLine({
   holdMs = 7_000,
   status,
   onFix,
+  speaking = false,
+  scout,
 }: GreetingLineProps) {
   const [held, setHeld] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -781,6 +790,7 @@ export function GreetingLine({
       >
         <style>{CONTROLS_CSS}</style>
         <style>{BUBBLE_CSS}</style>
+        <style>{CHAT_CSS}</style>
         <div className="bubble-top">
           {status !== undefined ? (
             <StatusMark mark={status} variant="row" {...(onFix !== undefined ? { onFix } : {})} />
@@ -791,9 +801,21 @@ export function GreetingLine({
               aria-label={`Ask ${petName} something`}
               onClick={() => onOpen?.(text ?? '')}
             >
+              <span className="bubble-who">
+                <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} />
+                <span>{petName}</span>
+                {speaking && (
+                  <span className="bubble-bars" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                )}
+              </span>
               <span role="status" aria-live="polite" className="bubble-text">
                 {text}
               </span>
+              <span className="bubble-hint">Click to reply</span>
             </button>
           )}
           <button type="button" className="bubble-close" aria-label="Close" onClick={onDone}>
@@ -943,13 +965,8 @@ const BUBBLE_CSS = `
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.bubble--line { padding: 10px 8px 10px 14px; transition: opacity ${LEAVE_MS}ms ease, transform ${LEAVE_MS}ms ease; }
+.bubble--line { transition: opacity ${LEAVE_MS}ms ease, transform ${LEAVE_MS}ms ease; }
 .bubble--line[data-leaving='true'] { opacity: 0; transform: translateY(4px); }
-.bubble--line .bubble-top { align-items: center; }
-.bubble-say {
-  flex: 1; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit;
-  font: inherit; text-align: left; cursor: pointer;
-}
 @keyframes bubble-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .bubble--line { animation: none; transition: none; }

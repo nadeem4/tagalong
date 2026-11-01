@@ -438,6 +438,50 @@ describe('Scout’s remark survives', () => {
   });
 });
 
+describe('GreetingLine, Scout’s own line', () => {
+  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
+
+  it('shows the Scout label and mark', () => {
+    const { container } = render(
+      <GreetingLine petName="Scout" text="Hello." scout={IDLE} onDone={() => undefined} />,
+    );
+    expect(container.querySelector('.scout-mark')).not.toBeNull();
+    expect(container.querySelector('.bubble-who')).toHaveTextContent('Scout');
+  });
+
+  it('shows Click to reply', () => {
+    render(<GreetingLine petName="Scout" text="Hello." onDone={() => undefined} />);
+    expect(screen.getByText('Click to reply')).toBeVisible();
+  });
+
+  it('shows speaking bars only while speaking', () => {
+    const { container, rerender } = render(
+      <GreetingLine petName="Scout" text="Hello." onDone={() => undefined} />,
+    );
+    expect(container.querySelector('.bubble-bars')).toBeNull();
+    rerender(<GreetingLine petName="Scout" text="Hello." speaking onDone={() => undefined} />);
+    expect(container.querySelector('.bubble-bars')).not.toBeNull();
+  });
+
+  it('keeps its accessible name Ask Scout something', () => {
+    render(<GreetingLine petName="Scout" text="Hello." onDone={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Ask Scout something' })).toBeVisible();
+  });
+
+  it('a status line has no Scout mark and no hint', () => {
+    const { container } = render(
+      <GreetingLine
+        petName="Scout"
+        status={{ id: 'no-key' }}
+        scout={IDLE}
+        onDone={() => undefined}
+      />,
+    );
+    expect(container.querySelector('.scout-mark')).toBeNull();
+    expect(screen.queryByText('Click to reply')).toBeNull();
+  });
+});
+
 describe('CompanionBubble voice', () => {
   it.each([
     ['refusal', 'Declined'],
