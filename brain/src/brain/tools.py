@@ -22,6 +22,9 @@ from typing import Literal, Protocol
 
 from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
 
+from brain.approvals import SENTENCE_MAX as PREFERENCE_MAX_CHARS
+from brain.approvals import Approvals
+from brain.asks import Asks
 from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
@@ -809,6 +812,53 @@ def choice_tools(choices: Choices) -> list[tuple[ToolSpec, Handler]]:
                 default_mode="auto",  # asking is its own gate
             ),
             choose,
+        )
+    ]
+
+
+SAVE_IT, NOT_NOW = "Save it", "Not now"  # the card's buttons: chrome, not Scout wording
+
+
+def preference_tools(
+    approvals: Approvals, asks: Asks, timeout: float = 300.0
+) -> list[tuple[ToolSpec, Handler]]:
+    """`save_preference`: keep a setup choice as a preference, only if the owner clicks Save.
+    Saved with no tool or group, so it shows in Scout's prompt but never approves an ask."""
+
+    async def save_preference(args: dict) -> str:
+        _need_text("save_preference", args, "sentence", "question")
+        try:
+            answer = await asks.open(
+                text=args["question"], options=[SAVE_IT, NOT_NOW], timeout=timeout
+            )
+        except RpcError:  # nobody answered in time
+            return json.dumps({"saved": False})
+        if answer.option != SAVE_IT:
+            return json.dumps({"saved": False})
+        sentence = args["sentence"].strip()[:PREFERENCE_MAX_CHARS]
+        approvals.add_preference(sentence=sentence, source="setup", tool=None, group_key=None)
+        return json.dumps({"saved": True})
+
+    return [
+        (
+            ToolSpec(
+                "save_preference",
+                "Offer to keep one of the owner's choices as a standing preference, so you "
+                "need not ask again. sentence is the preference in plain words; question is "
+                "what the owner reads on the card. It saves only if they click Save it.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "sentence": {"type": "string"},
+                        "question": {"type": "string"},
+                    },
+                    "required": ["sentence", "question"],
+                },
+                frozenset({"scout"}),
+                effect="change",
+                self_asks=True,
+            ),
+            save_preference,
         )
     ]
 

@@ -111,7 +111,10 @@ class SideCheck:
     def _candidates(self, facts: AskFacts) -> list[Preference]:
         """Preferences Scout may approve under. A locked tool needs one that names it: a
         general preference never unlocks it, so the person's explicit word is required."""
-        prefs = [p for p in self._memory.list_preferences() if not p.builtin]
+        # Setup preferences are prompt facts only: an install must still open the Allow card.
+        prefs = [
+            p for p in self._memory.list_preferences() if not p.builtin and p.source != "setup"
+        ]
         if facts.locked:
             prefs = [p for p in prefs if p.tool == facts.tool]
         return prefs
