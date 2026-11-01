@@ -363,7 +363,34 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   await expect(home.getByRole('region', { name: 'Shortcuts' }).locator('kbd').first()).toHaveText(
     'Ctrl',
   );
-  await expect(home.getByText('CommandOrControl', { exact: false }).first()).toBeHidden();
+  // The raw accelerator is not on screen at rest: no text field, no text.
+  await expect(home.getByText('CommandOrControl', { exact: false })).toHaveCount(0);
+  await expect(home.locator('input#f-askHotkey')).toHaveCount(0);
+  await expect(home.locator('input[name=askHotkey]')).toBeHidden();
+  // Save sends what was changed: Who speaks, the speed and (after Change) the ask shortcut.
+  await panel.evaluate(() => {
+    window.tagalongHost.onSettingsChanged((settings) => {
+      (window as unknown as { __saved?: unknown }).__saved = settings;
+    });
+  });
+  await home.getByLabel('Who speaks').selectOption('system');
+  await home.getByLabel('Speed').fill('1.2');
+  await home.getByRole('button', { name: 'Change ask shortcut' }).click();
+  await home.locator('input#f-askHotkey').fill('Ctrl+Alt+F9');
+  await home.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect
+    .poll(() =>
+      panel.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __saved?: { voice: { mouth?: string; speed: number }; hotkeys: { ask: string } };
+            }
+          ).__saved,
+      ),
+    )
+    .toMatchObject({ voice: { mouth: 'system', speed: 1.2 }, hotkeys: { ask: 'Ctrl+Alt+F9' } });
+
   const seeing = home.getByRole('switch', { name: 'Seeing' });
   const seeingBefore = await seeing.getAttribute('aria-checked');
   await seeing.focus();

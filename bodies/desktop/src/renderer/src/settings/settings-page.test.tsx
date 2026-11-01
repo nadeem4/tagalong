@@ -48,6 +48,12 @@ describe('SettingsFormView', () => {
     expect(render('Saved. Scout uses it from the next ask.')).toContain('role="status"');
   });
 
+  it('puts the save status on the heading row, left of Save', () => {
+    const html = render('Saved. Scout uses it from the next ask.');
+    expect(html.indexOf('role="status"')).toBeLessThan(html.indexOf('>Save<'));
+    expect(html.indexOf('>Save<')).toBeLessThan(html.indexOf('<section'));
+  });
+
   it('draws every section as a home card', () => {
     const html = render();
     expect(html.match(/<section [^>]*class="[^"]*home-card/g)).toHaveLength(5);
@@ -58,6 +64,24 @@ describe('SettingsFormView', () => {
     expect(html).toContain('<kbd class="tg-keycap">Ctrl</kbd>');
     expect(html).toContain('<kbd class="tg-keycap">Shift</kbd>');
     expect(html).not.toMatch(/>[^<]*CommandOrControl[^<]*</);
+  });
+
+  it('keeps the accelerator in a hidden field at rest, with a Change button per shortcut', () => {
+    const html = render();
+    expect(html).toMatch(
+      /<input[^>]*type="hidden"[^>]*name="askHotkey"[^>]*value="CommandOrControl\+Shift\+Space"/,
+    );
+    expect(html).not.toMatch(/<input[^>]*id="f-askHotkey"/);
+    expect(html.match(/>Change</g)).toHaveLength(3);
+  });
+
+  it('opens the field at once for a shortcut the last save refused', () => {
+    const refused = {
+      ...VIEW,
+      hotkeyError: 'Could not take (CommandOrControl+Shift+Space)',
+    } as unknown as HostView;
+    const html = render('', false, refused);
+    expect(html).toMatch(/<input[^>]*id="f-askHotkey"[^>]*aria-invalid="true"/);
   });
 
   it('renders an odd accelerator as plain keycaps without throwing', () => {

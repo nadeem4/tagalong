@@ -100,6 +100,8 @@ export const SETTINGS_CSS = `
 }
 .tg-intro { display: flex; flex-wrap: wrap; align-items: flex-end; gap: ${t.space.xl}px; }
 .tg-intro__text { flex: 1 1 320px; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-intro__save { display: flex; align-items: center; gap: ${t.space.md}px; margin-left: auto; }
+.tg-intro__save p { margin: 0; }
 .tg-intro__title { margin: 0; font-size: ${t.fontSize.title}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
 .tg-titlerow { display: flex; align-items: center; gap: ${t.space.sm}px; }
 .tg-panel h3.tg-sub {

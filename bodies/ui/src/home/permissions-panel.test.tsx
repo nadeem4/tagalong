@@ -73,6 +73,9 @@ describe('PermissionsPanel', () => {
     expect(move).toHaveTextContent('Ask');
     expect(within(read!).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
     expect(read).toHaveTextContent('Auto');
+    // The mode word lives on the switch alone, never beside it a second time.
+    expect(within(move!).getAllByText('Ask')).toHaveLength(1);
+    expect(within(read!).getAllByText('Auto')).toHaveLength(1);
   });
 
   it('sets a tool to auto when its switch is clicked, then shows the new mode', async () => {

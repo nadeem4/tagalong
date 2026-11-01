@@ -173,21 +173,23 @@ export function SettingsFormView({
                 <span className="tg-sr">the information button</span> for more on any setting.
               </p>
             </div>
-            <Button variant="primary" type="submit">
-              Save
-            </Button>
+            <div className="tg-intro__save">
+              {status !== '' && (
+                <p
+                  className={statusIsError ? 'tg-error' : 'tg-saved'}
+                  role={statusIsError ? 'alert' : 'status'}
+                >
+                  {statusIsError ? `Not saved. ${status}` : status}
+                </p>
+              )}
+              <Button variant="primary" type="submit">
+                Save
+              </Button>
+            </div>
           </div>
-          {status !== '' && (
-            <p
-              className={statusIsError ? 'tg-error' : 'tg-saved'}
-              role={statusIsError ? 'alert' : 'status'}
-            >
-              {statusIsError ? `Not saved. ${status}` : status}
-            </p>
-          )}
           <KeySection />
           <PrivacySection settings={settings} />
-          <VoiceSection settings={settings} />
+          <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
         </main>

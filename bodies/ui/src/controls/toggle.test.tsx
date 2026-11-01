@@ -40,6 +40,15 @@ describe('Toggle', () => {
     expect(toggle).toHaveAttribute('aria-disabled', 'true');
   });
 
+  it('shows custom words when given', () => {
+    const { rerender } = render(
+      <Toggle checked={false} onChange={() => {}} label="Tool" onWord="Auto" offWord="Ask" />,
+    );
+    expect(screen.getByText('Ask')).toBeInTheDocument();
+    rerender(<Toggle checked onChange={() => {}} label="Tool" onWord="Auto" offWord="Ask" />);
+    expect(screen.getByText('Auto')).toBeInTheDocument();
+  });
+
   it('shows On or Off text', () => {
     const { rerender } = render(<Toggle checked={false} onChange={() => {}} label="Voice" />);
     expect(screen.getByText('Off')).toBeInTheDocument();

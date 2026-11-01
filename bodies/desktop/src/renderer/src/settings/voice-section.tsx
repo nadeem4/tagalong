@@ -32,7 +32,13 @@ const VOICES: readonly { id: VoiceId; label: string }[] = [
   { id: 'bm_fable', label: 'Fable: warmer, a storyteller' },
 ];
 
-export function VoiceSection({ settings }: { settings: Settings }) {
+export function VoiceSection({
+  settings,
+  hotkeyError,
+}: {
+  settings: Settings;
+  hotkeyError?: string | undefined;
+}) {
   const [talks, setTalks] = useState(settings.voice.enabled);
   const talkKey = settings.hotkeys.talk ?? SETTINGS_DEFAULTS.hotkeys.talk;
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
@@ -50,6 +56,8 @@ export function VoiceSection({ settings }: { settings: Settings }) {
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
   const speedField = useInvalid('voiceSpeed');
+  // The refused-key sentence names the key in brackets; the Talk key select points at it too.
+  const hotkeyRefused = hotkeyError?.includes(`(${talkKey})`) === true;
 
   const preview = (): void => {
     setPreviewing(true);
@@ -132,6 +140,8 @@ export function VoiceSection({ settings }: { settings: Settings }) {
             step={0.05}
             onChange={setSpeed}
             format={(n) => `${n.toFixed(2)}×`}
+            invalid={speedField.props['aria-invalid'] === true}
+            describedBy={speedField.props['aria-describedby']}
           />
           <input type="hidden" name="voiceSpeed" value={speed} />
           {speedField.message}
@@ -147,6 +157,8 @@ export function VoiceSection({ settings }: { settings: Settings }) {
             id="f-talkHotkey"
             value={talkChoice}
             onChange={setTalkChoice}
+            invalid={hotkeyRefused}
+            describedBy={hotkeyRefused ? 'hotkey-error' : undefined}
             options={TALK_KEYS.map((key) => ({ value: key, label: TALK_KEY_LABELS[key] }))}
           />
           <input type="hidden" name="talkHotkey" value={talkChoice} />

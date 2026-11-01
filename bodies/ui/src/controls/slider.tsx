@@ -13,6 +13,8 @@ export function Slider({
   step,
   onChange,
   format = String,
+  invalid = false,
+  describedBy,
 }: {
   id: string;
   label: string;
@@ -22,6 +24,8 @@ export function Slider({
   step: number;
   onChange(n: number): void;
   format?: (n: number) => string;
+  invalid?: boolean;
+  describedBy?: string | undefined;
 }) {
   // The gold track runs up to the thumb; CSS reads the share from --fill.
   const fill = max > min ? ((value - min) / (max - min)) * 100 : 0;
@@ -39,6 +43,8 @@ export function Slider({
         step={step}
         value={value}
         style={{ '--fill': `${fill}%` } as CSSProperties}
+        aria-invalid={invalid ? true : undefined}
+        aria-describedby={describedBy}
         onChange={(event) => onChange(Number(event.target.value))}
       />
     </div>

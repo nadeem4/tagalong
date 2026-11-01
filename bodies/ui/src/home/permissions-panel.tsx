@@ -94,11 +94,12 @@ export function PermissionsPanel() {
                   {selfAsks && <span className="perm-row__note">Asks itself</span>}
                   {!row.online && <span className="perm-row__note">Not connected</span>}
                 </span>
-                <span className="perm-row__mode">{row.mode === 'auto' ? 'Auto' : 'Ask'}</span>
                 <Toggle
                   id={switchId(row.name)}
                   label={row.name}
                   checked={row.mode === 'auto'}
+                  onWord="Auto"
+                  offWord="Ask"
                   disabled={fixed}
                   describedBy={warning === row.name ? `${labelId}-warning` : undefined}
                   onChange={() => choose(row)}

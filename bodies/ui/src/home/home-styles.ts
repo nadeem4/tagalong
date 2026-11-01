@@ -121,11 +121,8 @@ export const HOME_CSS = `
 .perm-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .perm-row__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
 .perm-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; }
-.perm-row__mode { flex: none; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .perm-row__note { font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text { opacity: 0.6; }
-.perm-row .tg-switch { flex: none; }
-.perm-row .tg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .job-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: ${t.space.xl}px;
@@ -210,6 +207,4 @@ export const HOME_CSS = `
 .apv-more { align-self: flex-start; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
-.home-controls .tg-footer { margin-top: ${t.space.xxl}px; }
-.home-controls .tg-footer p { color: ${t.color.panelMuted}; }
 `;

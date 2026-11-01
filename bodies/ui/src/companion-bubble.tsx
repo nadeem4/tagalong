@@ -657,7 +657,6 @@ export function CompanionBubble({
         <style>{ANSWER_CSS}</style>
         <style>{CARD_CSS}</style>
         <div className="bubble-top">
-          <span />
           <span className="bubble-row">
             {alwaysToggle}
             {seeingToggle}
@@ -822,7 +821,7 @@ const BUBBLE_CSS = `
   background: #222845; font-size: 13px; line-height: 1.5; white-space: pre-wrap;
 }
 .bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
-.bubble-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
   flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
   color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
@@ -892,9 +891,9 @@ const BUBBLE_CSS = `
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
+.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
 .bubble-field input {
-  height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
+  flex: none; height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
   border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; font-size: 14px;
 }
 .bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }

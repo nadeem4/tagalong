@@ -9,6 +9,8 @@ export function Toggle({
   disabled = false,
   id,
   describedBy,
+  onWord = 'On',
+  offWord = 'Off',
 }: {
   checked: boolean;
   onChange(next: boolean): void;
@@ -16,6 +18,9 @@ export function Toggle({
   disabled?: boolean;
   id?: string;
   describedBy?: string | undefined;
+  /** The words beside the knob; On and Off unless the setting reads better otherwise. */
+  onWord?: string;
+  offWord?: string;
 }) {
   return (
     <button
@@ -31,7 +36,7 @@ export function Toggle({
       onClick={() => onChange(!checked)}
     >
       <span className="tg-toggle__word" aria-hidden="true">
-        {checked ? 'On' : 'Off'}
+        {checked ? onWord : offWord}
       </span>
       <span className="tg-toggle__knob" aria-hidden="true" />
     </button>
