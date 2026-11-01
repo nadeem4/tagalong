@@ -35,6 +35,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Permissions _(real brain)_](#permissions-_real-brain_)
 - [Log file](#log-file)
 - [Anthropic key in the app](#anthropic-key-in-the-app)
+- [Expert and app registries (spike 20a)](#expert-and-app-registries-spike-20a)
 - [Not supported](#not-supported)
 
 ## Configuration
@@ -1691,6 +1692,17 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    is on your screen." and "Hold [your talk key] to talk" with the key from Settings.
 6. **Action:** check the header icons. **Expected:** the collapse and close buttons are drawn
    icons with the names "Back to bubble" and "Close".
+
+## Expert and app registries (spike 20a)
+
+Fixtures only; nothing in the app reads these yet. The samples in `brain/tests/fixtures/` are
+trimmed copies of the live responses.
+
+| Registry                        | URL                                                                            | Status                           |
+| ------------------------------- | ------------------------------------------------------------------------------ | -------------------------------- |
+| ACP Registry                    | `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`         | tested (fetched, shape recorded) |
+| MCP Registry                    | `https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest` | tested (fetched, shape recorded) |
+| Expert login on a clean machine | read from `authMethods` and source                                             | untested                         |
 
 ## Not supported
 
