@@ -26,6 +26,18 @@ function renderView(bridge: FakeHostBridge) {
 }
 
 describe('MemoryView', () => {
+  it('sizes the kind column to its chip and keeps the chip on one line', async () => {
+    const { container } = render(
+      <HostBridgeProvider bridge={createFakeHostBridge({ memories: [THREAD] })}>
+        <MemoryView name="Scout" />
+      </HostBridgeProvider>,
+    );
+    await screen.findByRole('list', { name: 'What Scout remembers' });
+    const css = container.querySelector('style')?.textContent ?? '';
+    expect(css).toContain('grid-template-columns: max-content minmax(0, 1fr) auto auto');
+    expect(css).toMatch(/\.memory-row \.tg-chip[^{]*\{[^}]*white-space: nowrap/);
+  });
+
   it('lists each memory newest first, with its kind', async () => {
     renderView(createFakeHostBridge({ memories: [TEA, REPO, THREAD] }));
     const rows = within(

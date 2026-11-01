@@ -25,15 +25,19 @@ function day(iso: string): string {
 }
 
 const CSS = `
-.memory-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+/* One grid for the list, rows on its subgrid: every row's text starts at the same left edge. */
+.memory-list {
+  list-style: none; margin: 0; padding: 0; display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) auto auto;
+}
 .memory-row {
-  display: grid; grid-template-columns: 120px minmax(0, 1fr) auto auto; align-items: start;
+  display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: start;
   gap: ${t.space.lg}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
   color: ${t.color.panelText};
 }
 .memory-row__text { font-size: ${t.fontSize.field}px; overflow-wrap: anywhere; min-width: 0; }
 .memory-row__date { padding-top: 3px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
-.memory-row .tg-chip { justify-self: start; }
+.memory-row .tg-chip { justify-self: start; white-space: nowrap; }
 `;
 
 /**

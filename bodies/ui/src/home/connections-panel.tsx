@@ -91,30 +91,28 @@ export function ConnectionsPanel() {
     <>
       <div className="home-head">
         <h1 className="home-title">Connections</h1>
-        <p>
-          Let Scout use your apps: “what’s on my calendar”, “any reviews waiting”. Scout reads with
-          them on its own, and asks you before it changes anything.
-        </p>
+        <p>The apps Scout can use for you. Turn one off to stop Scout using it.</p>
       </div>
-      <div className="tg-panel home-controls home-conns">
-        {offline && (
-          <p className="tg-note" role="status">
-            {apps.length > 0
-              ? 'Scout’s brain isn’t running, so this list may be out of date. Start it, then try again.'
-              : 'Scout’s brain isn’t running, so your apps can’t be shown. Start it, then try again.'}{' '}
-            <Button variant="quiet" onClick={reload}>
-              Try again
-            </Button>
-          </p>
-        )}
-        {status !== null && (
-          <p
-            className={status.error ? 'tg-error' : 'tg-note'}
-            role={status.error ? 'alert' : 'status'}
-          >
-            {status.text}
-          </p>
-        )}
+      {offline && (
+        <p className="tg-note" role="status">
+          {apps.length > 0
+            ? 'Scout’s brain isn’t running, so this list may be out of date. Start it, then try again.'
+            : 'Scout’s brain isn’t running, so your apps can’t be shown. Start it, then try again.'}{' '}
+          <Button variant="quiet" onClick={reload}>
+            Try again
+          </Button>
+        </p>
+      )}
+      {status !== null && (
+        <p
+          className={status.error ? 'tg-error' : 'tg-note'}
+          role={status.error ? 'alert' : 'status'}
+        >
+          {status.text}
+        </p>
+      )}
+      <section className="home-card" aria-label="Connected apps">
+        <h2 className="home-card__label">CONNECTED APPS</h2>
         {apps.length > 0 && (
           <ul aria-label="Apps" className="home-list home-conns__list">
             {apps.map((app) => (
@@ -132,11 +130,16 @@ export function ConnectionsPanel() {
           </ul>
         )}
         {apps.length === 0 && !offline && <p className="tg-note">No apps yet. Add one below.</p>}
-        <details className="home-conns__advanced">
+      </section>
+      <section className="home-card home-conns" aria-label="Add an app">
+        <h2 className="home-card__label">ADD AN APP</h2>
+        <details>
           <summary className="tg-note">Add an app</summary>
-          <AddForm onAdd={add} />
+          <div className="tg-panel home-conns__form-host">
+            <AddForm onAdd={add} />
+          </div>
         </details>
-      </div>
+      </section>
     </>
   );
 }

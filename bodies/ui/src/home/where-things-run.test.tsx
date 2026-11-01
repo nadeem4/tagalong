@@ -66,17 +66,29 @@ describe('WhereThingsRun', () => {
     renderCard(createFakeHostBridge({ apps: [FILES, WIKI] }));
     const region = await card();
     await screen.findByText(/node files-server\.js/);
-    expect(screen.getByText(/Files/).closest('p')).toHaveTextContent('Connected');
+    expect(screen.getByText('Files').closest('p')).toHaveTextContent('Connected');
     expect(region).toHaveTextContent('Wiki');
     expect(region).toHaveTextContent('https://wiki.example.com/mcp');
     expect(region).toHaveTextContent('Not working');
   });
 
+  it('gives each app an initial tile, its name over its location and a coloured chip', async () => {
+    renderCard(createFakeHostBridge({ apps: [FILES, WIKI] }));
+    await card();
+    const row = (await screen.findByText('Wiki')).closest('p') as HTMLElement;
+    expect(row.querySelector('.home-conn__initial')).toHaveTextContent('W');
+    expect(row).toHaveTextContent('https://wiki.example.com/mcp');
+    expect(screen.getByText('Not working').closest('.tg-chip')).toHaveClass('tg-chip--err');
+    expect(screen.getAllByText('Connected', { selector: '.tg-chip--ok' }).length).toBeGreaterThan(
+      1,
+    );
+  });
+
   it('names Claude Code as a local process the brain starts', async () => {
     renderCard(createFakeHostBridge());
-    expect(await card()).toHaveTextContent(
-      'Claude Code · runs on this machine, started by the brain',
-    );
+    const region = await card();
+    expect(region).toHaveTextContent('Claude Code');
+    expect(region).toHaveTextContent('Runs on this machine, started by the brain');
   });
 
   it('reads again when the brain says its link changed', async () => {
@@ -127,7 +139,8 @@ describe('WhereThingsRun', () => {
     const bare: AppInfo = { ...FILES, id: 'y', name: 'Bare', url: '', command: '', args: [] };
     renderCard(createFakeHostBridge({ apps: [empty, bare] }));
     await card();
-    expect(await screen.findByText(/^Odd · node$/)).toBeInTheDocument();
+    expect(await screen.findByText('Odd')).toBeInTheDocument();
+    expect(screen.getByText('node')).toBeInTheDocument();
     expect(screen.getByText('Bare')).toBeInTheDocument();
   });
 });

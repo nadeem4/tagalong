@@ -500,7 +500,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 - **Where things run:** a card on Home's Overview (`bodies/ui/src/home/where-things-run.tsx`). The
   `brainLink` IPC (`tagalong:brain:link`, `ipc/brain-link.ts`) returns `{ addr: "ws://<addr>", status }`;
   the address is `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), exactly what the desktop dials.
-  Apps come from `listConnections`. Offline, the card says apps return with the brain.
+  Apps come from `listConnections`. Each row is a letter tile, a name over its subline and the
+  Connections page's status chip. Offline, the card says apps return with the brain.
   `e2e/where-things-run.spec.ts` covers it on the fake brain.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`

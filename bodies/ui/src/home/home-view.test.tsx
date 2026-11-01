@@ -90,6 +90,12 @@ describe('HomeView', () => {
     expect(bridge.walkthroughOpens).toEqual([1]);
   });
 
+  it('Show the tour again is a secondary button, not a bare quiet one', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    const button = await screen.findByRole('button', { name: 'Show the tour again' });
+    expect(button).toHaveClass('tg-button', 'tg-button--secondary');
+  });
+
   it('home nav has an Approvals item that opens the page', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Approvals' }));

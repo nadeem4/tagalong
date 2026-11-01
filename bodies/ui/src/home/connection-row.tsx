@@ -1,7 +1,7 @@
 /**
  * One app on Home's Connections page: its name and status chip, the On/Off switch and the
  * row's actions inline. Also the status words and dots Overview's "Where things run" reuses.
- * Contains ConnectionRow, STATUS_WORDS, STATUS_DOT and SAME_MACHINE.
+ * Contains ConnectionRow, STATUS_WORDS, STATUS_DOT, STATUS_CHIP and SAME_MACHINE.
  */
 
 import { useState } from 'react';
@@ -30,7 +30,7 @@ export const STATUS_DOT: Record<AppInfo['status'], string> = {
 };
 
 // Colour is never the only signal: the chip always carries the words too.
-const STATUS_CHIP: Record<AppInfo['status'], string> = {
+export const STATUS_CHIP: Record<AppInfo['status'], string> = {
   off: 'tg-chip',
   connecting: 'tg-chip tg-chip--warn',
   connected: 'tg-chip tg-chip--ok',

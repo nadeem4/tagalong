@@ -52,7 +52,7 @@ export const HOME_CSS = `
   border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
 }
 .home-card p { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; }
-.home-card .tg-btn-quiet { align-self: flex-start; }
+.home-card .tg-button--secondary { align-self: flex-end; }
 .home-card__label {
   margin: 0; font-family: ${t.font.pixel}; font-size: 12px; font-weight: 400;
   letter-spacing: 1px; color: ${t.color.panelMuted};
@@ -61,9 +61,13 @@ export const HOME_CSS = `
 .home-card p.home-card__lead { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
 .home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
 .home-card--run .home-card__row strong { min-width: 0; overflow-wrap: anywhere; }
-.home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
+.home-card__row:not(.home-card__row--app) > span:last-child { flex: none; color: ${t.color.panelMuted}; }
 .home-card--run p.home-card__row { align-items: center; padding: ${t.space.md}px 0; border-top: 1px solid ${t.color.panelLine}; }
-.home-card--run .home-card__row > span:last-child {
+.home-card--run p.home-card__row--app { justify-content: flex-start; }
+.home-card--run .home-card__row--app .home-entry__body { gap: 0; }
+.home-card--run .home-card__row--app .tg-chip { flex: none; margin-left: auto; }
+.home-card--run .tg-chip .home-dot { margin-right: 0; }
+.home-card--run .home-card__row:not(.home-card__row--app) > span:last-child {
   padding: 2px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
   font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
 }
@@ -89,7 +93,8 @@ export const HOME_CSS = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
-.home-conns__list { list-style: none; margin: 0 0 ${t.space.lg}px; padding: 0; display: flex; flex-direction: column; }
+.home-conns__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.home-conns__list > li:last-child .home-conn { border-bottom: 0; padding-bottom: 0; }
 .home-conn {
   display: flex; flex-direction: column; gap: ${t.space.md}px;
   padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine};
@@ -105,7 +110,7 @@ export const HOME_CSS = `
 .home-conn__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
-.home-conns__advanced { margin-top: ${t.space.xl}px; }
+.home-conns__form-host.tg-panel { padding: 0; background: transparent; }
 .home-perms { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-row {
@@ -150,7 +155,6 @@ export const HOME_CSS = `
   display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xl}px ${t.space.xxl}px;
   border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
 }
-.apv-sub { margin: ${t.space.xs}px 0 0; font-size: ${t.fontSize.body}px; }
 .apv-error { color: ${t.color.errInk}; margin: 0; }
 .apv-prefs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .apv-pref.home-card {

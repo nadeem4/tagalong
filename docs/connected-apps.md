@@ -171,6 +171,7 @@ flowchart LR
   `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
   there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
   (**Yes, remove** or **Keep**) before `remove_app`.
+- **Cards**: the list sits in a "Connected apps" card, the form in an "Add an app" card.
 - **Add an app** (one form): a command on this PC (command, args, `NAME=value` env lines, which may
   be `${NAME}`) or a web address (https only; auth none, the app's own sign-in page, or a pasted
   key in a password field). The key is sent once, as `token`, and the field is cleared as soon as
@@ -183,8 +184,9 @@ flowchart LR
   `signInConnection`, then `sign_in_app`). While it is connecting the chip reads **Waiting for the
   browser** and the button is gone. A note says the brain and the browser must be on the same
   computer.
-- **Where things run**: Overview has a read-only card with each app's command line
-  (`node files-server.js`) or web address, plus its status. Secrets never show: the brain strips
+- **Where things run**: Overview has a read-only card: for the brain and each app a letter tile,
+  the name over its command line (`node files-server.js`) or web address, and a coloured status
+  chip; Claude Code closes the list. Secrets never show: the brain strips
   them from `list_apps` (see [brain.md](brain.md#home-tools)). Env values and secret url parts are
   moved to the token file for you; do not put secrets in args, which stay in the row.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.

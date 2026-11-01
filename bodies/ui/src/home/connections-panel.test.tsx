@@ -96,6 +96,15 @@ describe('ConnectionsPanel', () => {
     expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
   });
 
+  it('groups the list and the add form in two labelled cards', async () => {
+    await renderPanel(createFakeHostBridge());
+    expect(
+      screen.getByText('The apps Scout can use for you. Turn one off to stop Scout using it.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'CONNECTED APPS' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'ADD AN APP' })).toBeInTheDocument();
+  });
+
   it('offers sign-in at once after adding an app that signs in with its own page', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);

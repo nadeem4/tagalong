@@ -11,6 +11,7 @@ import type { Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { BeanClip } from '../theme/bean-clip';
 import type { BeanClipData } from '../theme/bean-clip';
+import { Button } from '../controls/button';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ApprovalsView } from './approvals-view';
@@ -156,13 +157,9 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
             {status.text}
           </p>
           <p>Looks at your screen when you ask it something. Never at its blind spots.</p>
-          <button
-            type="button"
-            className="tg-btn-quiet"
-            onClick={() => void bridge.openWalkthrough(1)}
-          >
+          <Button variant="secondary" onClick={() => void bridge.openWalkthrough(1)}>
             Show the tour again
-          </button>
+          </Button>
         </section>
       </div>
       <WhereThingsRun />

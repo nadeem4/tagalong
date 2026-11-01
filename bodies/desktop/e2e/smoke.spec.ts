@@ -359,11 +359,25 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
 
   // Every tab shares one page box: at most 920px wide and the same left edge.
   const edges: number[] = [];
+  // Each tab waits for its seeded long content, then must not scroll sideways.
+  const seeded: Record<string, string> = {
+    Jobs: 'Fix the build and then keep going',
+    Connections: 'Wiki of everything',
+    'What Scout remembers': 'supercalifragilistic',
+  };
   for (const tab of ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers']) {
     await nav.getByRole('button', { name: tab, exact: true }).click();
+    if (seeded[tab] !== undefined) {
+      await expect(home.getByText(seeded[tab]).first()).toBeVisible({ timeout: 15_000 });
+    }
+    const overflow = await home.locator('.home-page').evaluate((el) => ({
+      scroll: el.scrollWidth,
+      client: el.clientWidth,
+    }));
+    expect(overflow.scroll).toBeLessThanOrEqual(overflow.client);
     const box = await home.locator('.home-page').boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeLessThanOrEqual(920);
+    expect(Math.round(box!.width)).toBeLessThanOrEqual(920);
     edges.push(Math.round(box!.x));
   }
   expect(new Set(edges).size).toBe(1);

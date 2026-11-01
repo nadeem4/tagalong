@@ -76,7 +76,7 @@ export function JobsPanel() {
         <h1 className="home-title">Jobs</h1>
         <p>Work Scout has handed to Claude Code.</p>
       </div>
-      <section className="home-card home-jobs" aria-label="Jobs">
+      <section className="home-card" aria-label="Jobs">
         <h2 className="home-card__label">JOBS</h2>
         {failed && jobs === null && (
           <p role="alert">
