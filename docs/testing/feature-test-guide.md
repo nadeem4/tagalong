@@ -1597,7 +1597,7 @@ with a fake key; the real check against Anthropic is done by hand here.
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
    "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link and the primary button; the side list (step 6 is "Bigger jobs") jumps only to steps you
+   link (not on step 9) and the primary button; the side list (step 6 is "Bigger jobs") jumps only to steps you
    have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask

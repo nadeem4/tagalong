@@ -41,6 +41,14 @@ describe('StepFour', () => {
     });
   });
 
+  it('Change mode help text says Ctrl, not CommandOrControl', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Change' }));
+    expect(screen.getByText(/Use Ctrl, Shift, Alt/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('CommandOrControl+Shift+Alt');
+    expect(screen.getByText(/joined with \+/).textContent).not.toContain('CommandOrControl');
+  });
+
   it('saves nothing when the ask key was left alone', async () => {
     const { host, saver } = mount();
     await screen.findByRole('button', { name: 'Change' });

@@ -203,7 +203,7 @@ Rules each module enforces:
   `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). The page
   (`src/walkthrough.tsx`) mounts `Walkthrough` from `@tagalong/ui` (`bodies/ui/src/walkthrough/`):
   a navy side panel with the nine-step list, the step on the page, and a footer (Back on the left, not on step 1;
-  a quiet Skip link and the primary Next on the right, "Get started" on step 1 and "Finish" on step 9).
+  a quiet Skip link (not on step 9) and the primary Next on the right, "Get started" on step 1 and "Finish" on step 9).
   Steps 1 to 4 are static copy under the pitch "One companion for everything you do": welcome (a day
   with Scout), how it works (the route a request takes), what to ask (five everyday moments, from
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout

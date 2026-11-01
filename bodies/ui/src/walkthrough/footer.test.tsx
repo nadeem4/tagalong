@@ -56,6 +56,11 @@ describe('Footer', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toHaveClass('wt-primary');
   });
 
+  it('step 9 has no Skip, since there is nothing left to skip', () => {
+    mount(9);
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
+  });
+
   it('Back and Next call their handlers; busy disables all three', () => {
     const props = mount(4);
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));

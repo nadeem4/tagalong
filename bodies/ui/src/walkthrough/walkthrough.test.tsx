@@ -135,11 +135,11 @@ describe('Walkthrough, the end', () => {
     expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
   });
 
-  it('Finish is off on step 9 until the key is set, and Skip stays', async () => {
+  it('Finish is off on step 9 until the key is set, and there is no Skip', async () => {
     open(makeWalkthroughHost(), 9);
     await screen.findByText(/Saved on the machine running/);
     expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
   it('Finish with a key opens the finish card; Close finishes once, Open Home opens Home first', async () => {

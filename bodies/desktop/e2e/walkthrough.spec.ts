@@ -287,20 +287,23 @@ test('every step fits the window: footer in view, nothing wider than the page (1
   }
 });
 
-test('step 3 and the footer fit at 1040x680 without a horizontal scrollbar', async () => {
+test('steps 2 and 3 and the footer fit at 1040x680 without a horizontal scrollbar', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 3);
-  const fit = await tour.evaluate(() => {
-    const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
-    const body = document.querySelector('.wt-body')!;
-    return {
-      noSideScroll: body.scrollWidth <= body.clientWidth,
-      footerInside:
-        footer.bottom <= window.innerHeight + 1 && footer.right <= window.innerWidth + 1,
-    };
-  });
-  expect(fit).toEqual({ noSideScroll: true, footerInside: true });
+  await nextTo(tour, 2);
+  for (const step of [2, 3]) {
+    if (step === 3) await tour.getByRole('button', { name: 'Next' }).click();
+    const fit = await tour.evaluate(() => {
+      const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
+      const body = document.querySelector('.wt-body')!;
+      return {
+        noSideScroll: body.scrollWidth <= body.clientWidth,
+        footerInside:
+          footer.bottom <= window.innerHeight + 1 && footer.right <= window.innerWidth + 1,
+      };
+    });
+    expect(fit, `step ${step}`).toEqual({ noSideScroll: true, footerInside: true });
+  }
 });
 
 test('a small work area still keeps the footer in view and nothing wider than the page', async () => {

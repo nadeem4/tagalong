@@ -44,9 +44,11 @@ export function Footer({
         </p>
       )}
       <span className="wt-spacer" />
-      <button type="button" className="wt-text" disabled={busy} onClick={onSkip}>
-        Skip
-      </button>
+      {!last && (
+        <button type="button" className="wt-text" disabled={busy} onClick={onSkip}>
+          Skip
+        </button>
+      )}
       {last ? (
         <button
           type="button"
