@@ -68,4 +68,49 @@ export const CONTROLS_CSS = `
   background: ${t.color.keycapFill}; color: ${t.color.keycapInk};
   font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
 }
+
+.tg-slider { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-slider__head { display: flex; justify-content: space-between; align-items: baseline; gap: ${t.space.lg}px; }
+.tg-slider__head label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
+.tg-slider__head output { color: var(--tg-ctl-ink); font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold}; }
+.tg-slider input[type='range'] {
+  appearance: none; width: 100%; height: ${t.size.toggleH}px; margin: 0; background: transparent; cursor: pointer;
+}
+.tg-slider input[type='range']::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: var(--tg-ctl-line);
+}
+.tg-slider input[type='range']::-webkit-slider-thumb {
+  appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
+  background: ${t.color.gold}; border: 2px solid ${t.color.goldInk};
+}
+.tg-slider input[type='range']:hover::-webkit-slider-thumb { background: ${t.color.keycapFill}; }
+
+.tg-money { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.tg-money > label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
+.tg-money__row { display: flex; align-items: center; gap: ${t.space.sm}px; }
+.tg-money__prefix { color: var(--tg-ctl-muted); font-size: ${t.fontSize.field}px; }
+.tg-money input {
+  width: 96px; height: ${t.size.control}px; padding: 0 ${t.space.lg}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
+  background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
+}
+.tg-money input[aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
+.tg-money .tg-button { width: ${t.size.control}px; padding: 0; }
+
+.tg-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: ${t.space.sm}px;
+  height: ${t.size.control}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.field}px;
+  border: 1px solid transparent; cursor: pointer;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold};
+}
+.tg-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.tg-button--primary { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
+.tg-button--primary:hover:not(:disabled) { filter: brightness(1.08); }
+.tg-button--secondary { background: var(--tg-ctl-bg); border-color: var(--tg-ctl-line); color: var(--tg-ctl-ink); }
+.tg-button--secondary:hover:not(:disabled) { border-color: var(--tg-ctl-muted); }
+.tg-button--quiet { background: transparent; color: var(--tg-ctl-muted); }
+.tg-button--quiet:hover:not(:disabled) { color: var(--tg-ctl-ink); background: var(--tg-ctl-bg); }
+.tg-button--danger { background: ${t.color.errFill}; border-color: ${t.color.errInk}; color: ${t.color.errInk}; }
+.tg-button--danger:hover:not(:disabled) { background: ${t.color.errInk}; color: ${t.color.errFill}; }
 `;
