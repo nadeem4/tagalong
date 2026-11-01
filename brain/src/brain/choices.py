@@ -56,6 +56,7 @@ class Choices:
                 free_text=free_text,
                 recommended=recommended,
                 ask_id=ask_id,
+                tool="choose",  # lets a body tell Scout's question from an expert's
                 timeout=self._timeout,
             )
         except RpcError:

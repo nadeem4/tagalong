@@ -375,6 +375,33 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
+    it("Scout's choose ask carries free_text and recommended onto the card", () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Which expert?',
+          options: ['Gemini CLI', 'Claude Code'],
+          tool: 'choose',
+          input: undefined,
+          free_text: true,
+          recommended: 'Claude Code',
+        }),
+      );
+      expect(e).toMatchObject({
+        app: 'Scout',
+        tool: 'choose',
+        freeText: true,
+        recommended: 'Claude Code',
+      });
+      expect(e).not.toHaveProperty('question');
+    });
+
+    it('an ask without free_text or recommended adds neither field', () => {
+      const [e] = make().map('ask', jobAsk());
+      expect(e).not.toHaveProperty('freeText');
+      expect(e).not.toHaveProperty('recommended');
+    });
+
     it('a question ask with no text still has a prompt', () => {
       const [e] = make().map(
         'ask',

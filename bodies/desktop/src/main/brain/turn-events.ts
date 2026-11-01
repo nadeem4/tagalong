@@ -120,6 +120,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         summary,
         options: p.options,
         ...(question ? { question: true } : {}),
+        ...(p.free_text ? { freeText: true } : {}),
+        ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
       },
     ];
   }

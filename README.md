@@ -75,6 +75,12 @@ preference. With a preference of yours saved, Scout looks at each ask first and 
 under that preference, then tells you which one. Anything unclear still comes to you. Home's
 **Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
 
+When a choice is yours (which expert to set up, say), Scout asks with clickable options, names the
+one it recommends and may take a typed answer instead. It does not wait on you: it ends its turn and
+picks up when you answer. Your saved preferences are shown to Scout as facts so it need not ask what
+you already told it, and Scout can offer to save a new one (only "Save it" saves). A preference never
+skips the Allow card for an install or a change.
+
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
 `TAGALONG_WAKES_PER_HOUR` (default 12). Scout can also set its own timers (a reminder, or a

@@ -13,23 +13,23 @@ decides to hand to it.
 
 ## Where it lives
 
-| Path (under `bodies/ui/src/`)                        | What it holds                                                                                      |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `index.ts`                                           | The public surface                                                                                 |
-| `host-bridge.ts`                                     | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`                       |
-| `test-support/fake-host-bridge.ts`                   | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                                 |
-| `companion-bubble.tsx`                               | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                                    |
-| `chat-styles.ts`, `chat-icons.tsx`, `scout-mark.tsx` | `CHAT_CSS` (the chat window's look), the close and collapse icons, `ScoutMark` (Bean's still tile) |
-| `answer.tsx`                                         | `Answer` (Markdown), `ANSWER_CSS`                                                                  |
-| `connector-confirm.tsx`, `drop-card.tsx`             | The other cards in the bubble                                                                      |
-| `approved-card.tsx`                                  | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`                 |
-| `health-ask.ts`, `health.ts`, `health-card.tsx`      | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard`           |
-| `stop-status.ts`                                     | `stopStatus`: the quiet line for a turn that ended with nothing said                               |
-| `status-mark.tsx`                                    | `StatusMark` (`tag` and `row`)                                                                     |
-| `dock-pet.tsx`, `theme/bean-clip.tsx`                | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                    |
-| `home/`                                              | `HomeView` and its pages                                                                           |
-| `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                        |
-| `theme/tokens.ts`, `settings/settings-styles.ts`     | Theme tokens; `SETTINGS_CSS`                                                                       |
+| Path (under `bodies/ui/src/`)                        | What it holds                                                                                                                                              |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.ts`                                           | The public surface                                                                                                                                         |
+| `host-bridge.ts`                                     | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`                                                                               |
+| `test-support/fake-host-bridge.ts`                   | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                                                                                         |
+| `companion-bubble.tsx`                               | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                                                                                            |
+| `chat-styles.ts`, `chat-icons.tsx`, `scout-mark.tsx` | `CHAT_CSS` (the chat window's look), the close and collapse icons, `ScoutMark` (Bean's still tile)                                                         |
+| `answer.tsx`                                         | `Answer` (Markdown), `ANSWER_CSS`                                                                                                                          |
+| `connector-confirm.tsx`, `drop-card.tsx`             | The other cards in the bubble; the confirm card also shows Scout's `choose` asks (a text field for `free_text`, the `recommended` option marked and first) |
+| `approved-card.tsx`                                  | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`                                                                         |
+| `health-ask.ts`, `health.ts`, `health-card.tsx`      | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard`                                                                   |
+| `stop-status.ts`                                     | `stopStatus`: the quiet line for a turn that ended with nothing said                                                                                       |
+| `status-mark.tsx`                                    | `StatusMark` (`tag` and `row`)                                                                                                                             |
+| `dock-pet.tsx`, `theme/bean-clip.tsx`                | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                                                                            |
+| `home/`                                              | `HomeView` and its pages                                                                                                                                   |
+| `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                                                                                |
+| `theme/tokens.ts`, `settings/settings-styles.ts`     | Theme tokens; `SETTINGS_CSS`                                                                                                                               |
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home).

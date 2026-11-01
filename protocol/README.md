@@ -80,19 +80,19 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Brain → body
 
-| Method     | Kind         | Params                                                                                                                                        | Result               |
-| ---------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `use`      | request      | `{ call, tool, input }`                                                                                                                       | `{ output: Part[] }` |
-| `cancel`   | notification | `{ call }`                                                                                                                                    |                      |
-| `reply`    | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                             |                      |
-| `turn`     | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                      |                      |
-| `tool`     | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                       |                      |
+| Method     | Kind         | Params                                                                                                                                                                  | Result               |
+| ---------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `use`      | request      | `{ call, tool, input }`                                                                                                                                                 | `{ output: Part[] }` |
+| `cancel`   | notification | `{ call }`                                                                                                                                                              |                      |
+| `reply`    | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                                                       |                      |
+| `turn`     | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                                                |                      |
+| `tool`     | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                                                 |                      |
 | `ask`      | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input?, free_text?, recommended? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
-| `changed`  | notification | `{ seq, what }`                                                                                                                               |                      |
-| `approved` | notification | `{ seq, tool, text, preference }`                                                                                                             |                      |
-| `heard`    | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                           |                      |
-| `voice`    | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                |                      |
-| `speech`   | notification | `{ turn, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                     |                      |
+| `changed`  | notification | `{ seq, what }`                                                                                                                                                         |                      |
+| `approved` | notification | `{ seq, tool, text, preference }`                                                                                                                                       |                      |
+| `heard`    | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                                                     |                      |
+| `voice`    | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                                          |                      |
+| `speech`   | notification | `{ turn, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                                               |                      |
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.

@@ -12,6 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Claude Code asks Scout first (real brain, real Claude Code)](#claude-code-asks-scout-first-real-brain-real-claude-code)
+- [Scout asks with choices (real brain)](#scout-asks-with-choices-real-brain)
 - [Approvals history (real brain)](#approvals-history-real-brain)
 - [Learned approvals (real brain, real Claude Code)](#learned-approvals-real-brain-real-claude-code)
 - [Approvals page (real brain)](#approvals-page-real-brain)
@@ -305,6 +306,25 @@ Needs the same setup as the hand-off section above, with the desktop connected.
 3. The fallback when the daily budget is spent (the card appears at once, since Scout cannot wake)
    cannot be followed by hand and is covered by the test
    `test_budget_spent_falls_back_to_the_user_card`.
+
+## Scout asks with choices (real brain)
+
+Needs the real brain and the desktop, and an Anthropic key. The `choose` and `save_preference`
+tools are Scout's own, so ask for a choice in words, for example "Ask me, with choices, whether I want
+tea or coffee, and recommend one."
+
+1. **Action:** send that request.
+   **Expected:** a card with the question and the options as buttons, the recommended one first and
+   marked "Recommended", and a text field "Your answer". Scout's turn ends without waiting.
+2. **Action:** click an option.
+   **Expected:** the card goes and Scout wakes with your answer and carries on.
+3. **Action:** repeat, but type your own answer in the field and press Enter.
+   **Expected:** Scout receives the typed text as your answer.
+4. **Action:** repeat and leave the card unanswered for 10 minutes.
+   **Expected:** the card closes and Scout says nothing; answering a closed card does nothing.
+5. **Action:** after an answer, tell Scout to keep it as a preference.
+   **Expected:** a card with "Save it" and "Not now". "Save it" adds the sentence under Home, Approvals;
+   "Not now" saves nothing. A later question shows Scout acting under it, and an install still asks first.
 
 ## Approvals history (real brain)
 

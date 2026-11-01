@@ -48,6 +48,13 @@ async def test_choose_returns_the_ask_id_without_waiting():
     assert events == []
 
 
+async def test_the_ask_names_the_choose_tool_so_bodies_can_tell_it_from_an_expert():
+    bodies, _, choices = rig()
+    choices.ask("Which?", ["a"], None, True)
+    await settle()
+    assert bodies.opened()[0]["tool"] == "choose"
+
+
 async def test_an_answer_emits_a_choice_event_with_option_and_text():
     bodies, events, choices = rig()
     asks = choices._asks
