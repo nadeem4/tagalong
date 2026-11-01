@@ -29,6 +29,7 @@ from brain.builtin_guards import (
     tool_mode,
     wake_caps,
 )
+from brain.choices import Choices
 from brain.config import (
     DEFAULT_EXPERT_CMD,
     DEFAULT_EXPERT_TIMEOUT_S,
@@ -56,6 +57,7 @@ from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import (
     KeySettings,
     brain_tools,
+    choice_tools,
     expert_tools,
     home_tools,
     question_tools,
@@ -145,6 +147,7 @@ class Session:
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
+        choices = Choices(self._asks, self.scheduler.emit)
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
@@ -152,6 +155,7 @@ class Session:
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
+            + choice_tools(choices)
             + approval_home_tools(approvals)
         )
         sources: list = []

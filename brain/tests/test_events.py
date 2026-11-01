@@ -135,6 +135,13 @@ def test_job_question_defaults_never_merge_and_ignore_caps():
     assert kind.max_per_hour is None
 
 
+def test_choice_wakes_every_time_and_ignores_caps():
+    kind = EVENT_KINDS["choice"]
+    assert kind.wakes is True
+    assert kind.batch_seconds is None
+    assert kind.max_per_hour is None
+
+
 def test_tab_event_is_kept_not_woken():
     assert EVENT_KINDS["tab"].wakes is False
     assert EVENT_KINDS["download"].wakes is False

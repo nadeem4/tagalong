@@ -22,6 +22,7 @@ from typing import Literal, Protocol
 
 from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
 
+from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs
@@ -752,6 +753,63 @@ def question_tools(questions: ScoutQuestions) -> list[tuple[ToolSpec, Handler]]:
             ),
             pass_question,
         ),
+    ]
+
+
+def choice_tools(choices: Choices) -> list[tuple[ToolSpec, Handler]]:
+    """`choose`: ask the person with clickable options. It returns at once; the answer comes
+    back later as a `choice` wake, so no turn waits on a person."""
+
+    async def choose(args: dict) -> str:
+        question, options = args.get("question"), args.get("options", [])
+        recommended, free_text = args.get("recommended"), args.get("free_text", True)
+        if not isinstance(question, str) or not question.strip():
+            raise MemoryRefused("choose needs question (a string).")
+        if (
+            not isinstance(options, list)
+            or not all(isinstance(o, str) and o.strip() for o in options)
+            or len(options) > MAX_CHOICE_OPTIONS
+        ):
+            raise MemoryRefused(f"options must be at most {MAX_CHOICE_OPTIONS} short strings.")
+        if recommended is not None and not isinstance(recommended, str):
+            raise MemoryRefused("recommended must be one of the options.")
+        ask_id = choices.ask(question, options, recommended, bool(free_text))
+        return json.dumps({"asked": ask_id})
+
+    return [
+        (
+            ToolSpec(
+                "choose",
+                "Ask the owner to pick from clickable options, optionally with a typed answer. "
+                "Name the option you recommend. It does not wait: the answer arrives later as "
+                "a choice event, so end your turn after asking.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "question": {"type": "string"},
+                        "options": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "maxItems": MAX_CHOICE_OPTIONS,
+                            "description": "Short labels; may be empty only with free_text.",
+                        },
+                        "recommended": {
+                            "type": "string",
+                            "description": "One of the options.",
+                        },
+                        "free_text": {
+                            "type": "boolean",
+                            "description": "Allow a typed answer (default true).",
+                        },
+                    },
+                    "required": ["question", "options"],
+                },
+                frozenset({"scout"}),
+                effect="read",
+                default_mode="auto",  # asking is its own gate
+            ),
+            choose,
+        )
     ]
 
 
