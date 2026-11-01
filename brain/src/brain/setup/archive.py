@@ -1,7 +1,8 @@
 """Safe archive extraction: refuse any member that could land outside the target.
 
-Absolute paths, drive letters, `..` and links pointing out are all refused before anything is
-written. Shared by the Node download and, later, expert binary downloads.
+Absolute paths, drive letters, `..`, backslash tricks, links pointing out and device files are
+all refused by a check of every member before any file is written. Shared by the Node download
+and, later, expert binary downloads.
 """
 
 import tarfile
@@ -22,9 +23,10 @@ def _check_name(name: str) -> None:
 
 
 def _check_link(name: str, link: str) -> None:
-    """A link may point inside the archive only; resolve it relative to its own folder."""
-    _check_name(name)
-    if PurePosixPath(link).is_absolute() or PureWindowsPath(link).drive:
+    """A symlink may point inside the archive only; resolve it relative to its own folder."""
+    link = link.replace("\\", "/")
+    win = PureWindowsPath(link)
+    if PurePosixPath(link).is_absolute() or win.drive or win.root:
         raise UnsafeArchive(f"{name} -> {link}")
     depth = len(PurePosixPath(name).parts) - 1
     for part in PurePosixPath(link).parts:
@@ -45,9 +47,14 @@ def safe_extract(archive: Path, target: Path) -> None:
     with tarfile.open(archive) as t:
         for member in t.getmembers():
             _check_name(member.name)
-            if member.issym() or member.islnk():
+            if member.issym():
                 _check_link(member.name, member.linkname)
+            elif member.islnk():  # a hard link names another member, from the archive root
+                _check_name(member.linkname)
             elif member.isdev():
                 raise UnsafeArchive(member.name)
         target.mkdir(parents=True, exist_ok=True)
-        t.extractall(target, filter="data")
+        try:
+            t.extractall(target, filter="data")
+        except tarfile.FilterError as e:
+            raise UnsafeArchive(str(e)) from e

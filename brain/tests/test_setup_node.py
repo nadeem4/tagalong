@@ -3,13 +3,13 @@
 All on fakes: an index and checksum list as bytes, tiny archives built here, no network.
 """
 
+import asyncio
 import hashlib
-import http.server
 import io
 import json
 import os
 import tarfile
-import threading
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from brain.setup.net import http_fetch
 from brain.setup.node_runtime import (
     NodeBuildMissing,
     NodeIntegrityError,
+    NodeInUse,
     archive_name,
     ensure_node,
     pick_build,
@@ -206,66 +207,198 @@ async def test_the_system_environment_is_never_touched(tmp_path):
     assert dict(os.environ) == before
 
 
-# ---- safe_extract on its own ----
+# ---- safe_extract on its own: refuse, and write nothing anywhere ----
 
 
-def tar_with(info: tarfile.TarInfo, data: bytes = b"") -> bytes:
+def snapshot(root: Path) -> set[Path]:
+    return {p for p in root.rglob("*")}
+
+
+def tar_of(*members: tuple[tarfile.TarInfo, bytes]) -> bytes:
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w") as t:
-        t.addfile(info, io.BytesIO(data))
+        for info, data in members:
+            t.addfile(info, io.BytesIO(data))
     return buf.getvalue()
 
 
-def test_safe_extract_refuses_absolute_paths(tmp_path):
-    info = tarfile.TarInfo("/etc/evil")
+def file_member(name: str) -> tuple[tarfile.TarInfo, bytes]:
+    info = tarfile.TarInfo(name)
     info.size = 1
+    return info, b"x"
+
+
+def link_member(name: str, kind: bytes, target: str) -> tuple[tarfile.TarInfo, bytes]:
+    info = tarfile.TarInfo(name)
+    info.type = kind
+    info.linkname = target
+    return info, b""
+
+
+def special_member(name: str, kind: bytes) -> tuple[tarfile.TarInfo, bytes]:
+    info = tarfile.TarInfo(name)
+    info.type = kind
+    return info, b""
+
+
+def zip_of(*names: str) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name in names:
+            z.writestr(name, b"x")
+    return buf.getvalue()
+
+
+def refused(tmp_path: Path, data: bytes) -> None:
+    """The archive is refused and neither the target nor anything beside it was written."""
+    work = tmp_path / "work"
+    work.mkdir(exist_ok=True)
+    archive = work / "a.bin"
+    archive.write_bytes(data)
+    target = work / "out"
+    before = snapshot(tmp_path)
+    with pytest.raises(UnsafeArchive):
+        safe_extract(archive, target)
+    assert snapshot(tmp_path) == before
+    assert not target.exists()
+
+
+def test_refuses_a_tar_absolute_path(tmp_path):
+    refused(tmp_path, tar_of(file_member("/etc/evil")))
+
+
+def test_refuses_a_tar_dotdot_member(tmp_path):
+    refused(tmp_path, tar_of(file_member("top/ok"), file_member("../evil")))
+
+
+def test_refuses_a_zip_absolute_or_drive_path(tmp_path):
+    refused(tmp_path, zip_of("top/ok", "C:/evil"))
+
+
+def test_refuses_a_backslash_dotdot_name(tmp_path):
+    refused(tmp_path, tar_of(file_member(r"..\..\x")))
+    refused(tmp_path, zip_of(r"..\..\x"))
+
+
+def test_refuses_a_symlink_that_escapes(tmp_path):
+    refused(tmp_path, tar_of(link_member("top/link", tarfile.SYMTYPE, "../../outside")))
+
+
+def test_refuses_a_backslash_symlink_that_escapes(tmp_path):
+    refused(tmp_path, tar_of(link_member("top/link", tarfile.SYMTYPE, r"..\..\outside")))
+    refused(tmp_path, tar_of(link_member("top/link", tarfile.SYMTYPE, r"\abs")))
+
+
+def test_refuses_a_hardlink_that_escapes(tmp_path):
+    refused(tmp_path, tar_of(link_member("top/hl", tarfile.LNKTYPE, "../../etc/passwd")))
+    refused(tmp_path, tar_of(link_member("top/hl", tarfile.LNKTYPE, "/etc/passwd")))
+
+
+def test_refuses_a_fifo_or_device_member(tmp_path):
+    refused(tmp_path, tar_of(special_member("top/fifo", tarfile.FIFOTYPE)))
+    refused(tmp_path, tar_of(special_member("top/dev", tarfile.CHRTYPE)))
+
+
+def test_a_filter_error_becomes_unsafe_archive(tmp_path, monkeypatch):
+    def boom(self, *args, **kwargs):
+        raise tarfile.AbsoluteLinkError(tarfile.TarInfo("x"))
+
+    monkeypatch.setattr(tarfile.TarFile, "extractall", boom)
     archive = tmp_path / "a.tar"
-    archive.write_bytes(tar_with(info, b"x"))
+    archive.write_bytes(tar_of(file_member("top/ok")))
     with pytest.raises(UnsafeArchive):
         safe_extract(archive, tmp_path / "out")
-    assert not (tmp_path / "out").exists()
 
 
-def test_safe_extract_refuses_a_link_that_escapes(tmp_path):
-    info = tarfile.TarInfo("top/link")
-    info.type = tarfile.SYMTYPE
-    info.linkname = "../../outside"
+def test_a_safe_archive_with_an_inside_link_extracts(tmp_path):
     archive = tmp_path / "a.tar"
-    archive.write_bytes(tar_with(info))
-    with pytest.raises(UnsafeArchive):
-        safe_extract(archive, tmp_path / "out")
+    archive.write_bytes(
+        tar_of(file_member("top/real"), link_member("top/bin/l", tarfile.SYMTYPE, "../real"))
+    )
+    safe_extract(archive, tmp_path / "out")
+    assert (tmp_path / "out" / "top" / "real").exists()
 
 
-# ---- the real Fetch, against a loopback server (no outside network) ----
+# ---- the swap and concurrency ----
 
 
-@pytest.fixture
-def local_server():
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            if self.path == "/big":
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"x" * (3 * 1024 * 1024))
-            else:
-                self.send_error(404)
+async def test_a_locked_swap_is_node_in_use_and_the_old_node_stays(tmp_path, monkeypatch):
+    node = tmp_path / "runtime" / "node"
+    node.mkdir(parents=True)
+    (node / ".tagalong-node-version").write_text("v18.0.0")
+    (node / "node.exe").write_bytes(b"old")
+    real = Path.rename
 
-        def log_message(self, *args):
-            pass
+    def locked(self, target):
+        if self == node:
+            raise PermissionError("in use")
+        return real(self, target)
 
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield f"http://127.0.0.1:{server.server_port}"
-    server.shutdown()
-    server.server_close()
+    monkeypatch.setattr(Path, "rename", locked)
+    with pytest.raises(NodeInUse):
+        await run(tmp_path, Net(make_zip()))
+    assert (node / "node.exe").read_bytes() == b"old"
+    assert not (tmp_path / "runtime" / "node.new").exists()
 
 
-async def test_http_fetch_streams_chunks(local_server):
-    chunks = [c async for c in http_fetch(f"{local_server}/big")]
+async def test_a_failed_move_into_place_restores_the_old_node(tmp_path, monkeypatch):
+    node = tmp_path / "runtime" / "node"
+    node.mkdir(parents=True)
+    (node / ".tagalong-node-version").write_text("v18.0.0")
+    (node / "node.exe").write_bytes(b"old")
+    real = Path.rename
+
+    def locked(self, target):
+        if target == node and self.name != "node.old":
+            raise PermissionError("in use")
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", locked)
+    with pytest.raises(NodeInUse):
+        await run(tmp_path, Net(make_zip()))
+    assert (node / "node.exe").read_bytes() == b"old"
+
+
+async def test_two_concurrent_calls_download_once(tmp_path):
+    net = Net(make_zip())
+    await asyncio.gather(run(tmp_path, net), run(tmp_path, net))
+    assert len([u for u in net.fetched if u.endswith(".zip")]) == 1
+
+
+# ---- the real Fetch, against a fake urlopen (no network at all) ----
+
+
+class FakeResponse:
+    def __init__(self, url="https://nodejs.org/x", status=200, size=3 * 1024 * 1024):
+        self.url, self.status, self.left = url, status, size
+
+    def read(self, n):
+        got = min(n, self.left)
+        self.left -= got
+        return b"x" * got
+
+    def close(self):
+        pass
+
+
+def serve(monkeypatch, response):
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: response)
+
+
+async def test_http_fetch_streams_chunks(monkeypatch):
+    serve(monkeypatch, FakeResponse())
+    chunks = [c async for c in http_fetch("https://nodejs.org/x")]
     assert len(chunks) > 1
     assert sum(len(c) for c in chunks) == 3 * 1024 * 1024
 
 
-async def test_http_fetch_raises_on_a_non_200(local_server):
+async def test_http_fetch_raises_on_a_non_200(monkeypatch):
+    serve(monkeypatch, FakeResponse(status=404))
     with pytest.raises(OSError):
-        [c async for c in http_fetch(f"{local_server}/missing")]
+        [c async for c in http_fetch("https://nodejs.org/x")]
+
+
+async def test_http_fetch_refuses_a_redirect_to_plain_http(monkeypatch):
+    serve(monkeypatch, FakeResponse(url="http://evil.example/x"))
+    with pytest.raises(OSError):
+        [c async for c in http_fetch("https://nodejs.org/x")]

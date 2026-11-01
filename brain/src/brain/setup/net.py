@@ -30,6 +30,8 @@ async def http_fetch(url: str) -> AsyncIterator[bytes]:
     request = urllib.request.Request(url, headers={"User-Agent": "tagalong"})
     response = await asyncio.to_thread(urllib.request.urlopen, request, timeout=TIMEOUT_S)
     try:
+        if not response.url.startswith("https://"):  # a redirect must not downgrade
+            raise OSError(f"{url}: redirected to a non-https address")
         if response.status != 200:
             raise OSError(f"{url}: HTTP {response.status}")
         while chunk := await asyncio.to_thread(response.read, CHUNK):

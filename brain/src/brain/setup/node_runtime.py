@@ -37,6 +37,10 @@ class NodeBuildMissing(Exception):
     """No official Node archive for this computer."""
 
 
+class NodeInUse(Exception):
+    """The old Node could not be moved aside or the new one moved in (probably running)."""
+
+
 class NodeIntegrityError(Exception):
     """The downloaded Node did not match the official checksum, twice in a row."""
 
@@ -96,7 +100,7 @@ async def _download(part: Path, build: NodeBuild, want: str, fetch: Fetch) -> Pa
         with target.open("wb") as out:
             async for chunk in fetch(build.url):
                 digest.update(chunk)
-                out.write(chunk)
+                await asyncio.to_thread(out.write, chunk)
         if digest.hexdigest() == want:
             return target
         if attempt == 1:
@@ -112,14 +116,17 @@ def _install(archive: Path, new: Path, node: Path, version: str) -> None:
     (root / MARKER).write_text(version)
     old = node.with_name(node.name + ".old")
     shutil.rmtree(old, ignore_errors=True)
-    if node.exists():
-        node.rename(old)
+    try:
+        if node.exists():
+            node.rename(old)  # fails while the old Node (or a leftover .old) is held open
+    except OSError as e:
+        raise NodeInUse(str(node)) from e
     try:
         root.rename(node)
-    except BaseException:
+    except OSError as e:
         if old.exists():
             old.rename(node)
-        raise
+        raise NodeInUse(str(node)) from e
     shutil.rmtree(old, ignore_errors=True)
 
 
@@ -128,6 +135,13 @@ def _installed_major(node: Path) -> int | None:
         return _major((node / MARKER).read_text().strip())
     except (OSError, ValueError):
         return None
+
+
+_LOCK = asyncio.Lock()  # one download at a time, whoever asks
+
+
+async def _clean(*folders: Path) -> None:
+    await asyncio.to_thread(lambda: [shutil.rmtree(f, ignore_errors=True) for f in folders])
 
 
 async def ensure_node(
@@ -140,35 +154,34 @@ async def ensure_node(
     on_progress: Progress,
 ) -> NodePaths:
     """Make sure Tagalong's own Node (major >= min_major) is under `home`, downloading if needed."""
-    node = node_dir(home)
-    have = node_paths(home)
-    major = _installed_major(node)
-    if have and major is not None and major >= min_major:
+    async with _LOCK:
+        node = node_dir(home)
+        have = node_paths(home)
+        major = _installed_major(node)
+        if have and major is not None and major >= min_major:
+            on_progress(1.0)
+            return have
+        on_progress(0.0)
+        index = json.loads(await get_json(f"{DIST}/index.json"))
+        build = pick_build(index, min_major, machine_os, machine_arch)
+        if build is None:
+            raise NodeBuildMissing(f"{machine_os}-{machine_arch}")
+        sums = (await get_json(f"{DIST}/{build.version}/SHASUMS256.txt")).decode()
+        want = _wanted_sum(sums, build.filename)
+        if want is None:
+            raise NodeIntegrityError(f"no checksum listed for {build.filename}")
+        on_progress(0.05)
+        runtime = node.parent
+        part, new = runtime / "node.part", runtime / "node.new"
+        await _clean(part, new)
+        try:
+            archive = await _download(part, build, want, fetch)
+            on_progress(0.8)
+            await asyncio.to_thread(_install, archive, new, node, build.version)
+        finally:
+            await _clean(part, new)
+        result = node_paths(home)
+        if result is None:
+            raise NodeBuildMissing(f"{build.filename} had no node and npm")
         on_progress(1.0)
-        return have
-    on_progress(0.0)
-    index = json.loads(await get_json(f"{DIST}/index.json"))
-    build = pick_build(index, min_major, machine_os, machine_arch)
-    if build is None:
-        raise NodeBuildMissing(f"{machine_os}-{machine_arch}")
-    sums = (await get_json(f"{DIST}/{build.version}/SHASUMS256.txt")).decode()
-    want = _wanted_sum(sums, build.filename)
-    if want is None:
-        raise NodeIntegrityError(f"no checksum listed for {build.filename}")
-    on_progress(0.05)
-    runtime = node.parent
-    part, new = runtime / "node.part", runtime / "node.new"
-    for leftover in (part, new):
-        shutil.rmtree(leftover, ignore_errors=True)
-    try:
-        archive = await _download(part, build, want, fetch)
-        on_progress(0.8)
-        await asyncio.to_thread(_install, archive, new, node, build.version)
-    finally:
-        for leftover in (part, new):
-            shutil.rmtree(leftover, ignore_errors=True)
-    result = node_paths(home)
-    if result is None:
-        raise NodeBuildMissing(f"{build.filename} had no node and npm")
-    on_progress(1.0)
-    return result
+        return result
