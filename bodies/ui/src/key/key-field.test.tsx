@@ -279,6 +279,6 @@ describe('LimitField', () => {
     const host = { setDailyLimit: () => Promise.resolve() };
     const { rerender } = render(<LimitField host={host} limitUsd={5} />);
     rerender(<LimitField host={host} limitUsd={8} />);
-    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue(8);
+    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('8');
   });
 });

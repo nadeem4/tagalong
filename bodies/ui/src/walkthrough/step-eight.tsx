@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { MoneyField } from '../controls';
 import { useStepSave } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 
@@ -31,28 +32,10 @@ function LimitForm({
     if (usd !== start) await host.setDailyLimit(usd);
   });
 
-  const step = (by: number) => {
-    const now = parseLimit(text) ?? start;
-    setText(String(Math.max(1, Math.round(now) + by)));
-  };
-
   return (
-    <div className="wt-row">
-      <button type="button" className="wt-quiet" aria-label="Less" onClick={() => step(-1)}>
-        −
-      </button>
-      <input
-        aria-label="Daily spending limit"
-        type="number"
-        min="0"
-        step="any"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-      />
-      <button type="button" className="wt-quiet" aria-label="More" onClick={() => step(1)}>
-        +
-      </button>
-      <span className="wt-help">US dollars a day (default ${DEFAULT_LIMIT})</span>
+    <div>
+      <MoneyField id="wt-limit" label="Daily limit (USD)" value={text} onChange={setText} />
+      <p className="wt-help">US dollars a day (default ${DEFAULT_LIMIT})</p>
     </div>
   );
 }
@@ -75,7 +58,8 @@ export function StepEight({
 
   return (
     <section>
-      <h1>You stay in charge</h1>
+      <span className="wt-label">You’re in charge</span>
+      <h1>Scout asks first, and you set the limit</h1>
       <p className="wt-lead">
         Scout reads and answers on its own. Nothing is sent, changed or handed off without your OK.
       </p>
@@ -107,12 +91,14 @@ export function StepEight({
         </ul>
         <div aria-hidden="true">
           <span className="wt-label">What it looks like</span>
-          <div className="wt-example">
-            <span className="wt-chip">File this as an issue in GitHub?</span>
+          <div className="wt-handoff">
+            <h3>File this as an issue in GitHub?</h3>
             <p>App GitHub · shop-api</p>
             <p>New issue: “Empty cart throws in checkout”</p>
-            <span className="wt-fake-button">Cancel</span>{' '}
-            <span className="wt-fake-button">Allow once</span>
+            <div className="wt-handoff__actions">
+              <span className="wt-handoff__cancel">Cancel</span>
+              <span className="wt-handoff__send">Allow once</span>
+            </div>
           </div>
         </div>
       </div>

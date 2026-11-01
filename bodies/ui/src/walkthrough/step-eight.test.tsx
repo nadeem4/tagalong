@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { StepEight } from './step-eight';
 import { makeWalkthroughHost, mountStep, NO_KEY } from './test-host';
 
-const limit = () => screen.getByLabelText('Daily spending limit') as HTMLInputElement;
+const limit = () => screen.getByLabelText('Daily limit (USD)') as HTMLInputElement;
 
 describe('StepEight', () => {
   it('starts at the brain’s limit', async () => {
@@ -29,13 +29,13 @@ describe('StepEight', () => {
     expect(host.setDailyLimit).toHaveBeenCalledWith(8.5);
   });
 
-  it('the plus and minus buttons step the amount by one dollar', async () => {
+  it('the money stepper plus raises by one dollar and minus lowers by one', async () => {
     mountStep(<StepEight host={makeWalkthroughHost()} />);
     await screen.findByDisplayValue('5');
-    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Increase' }));
     expect(limit().value).toBe('6');
-    fireEvent.click(screen.getByRole('button', { name: 'Less' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Less' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease' }));
     expect(limit().value).toBe('4');
   });
 
@@ -67,7 +67,9 @@ describe('StepEight', () => {
   it('copy covers asks, memory and the limit', async () => {
     mountStep(<StepEight host={makeWalkthroughHost()} />);
     await screen.findByDisplayValue('5');
-    expect(screen.getByRole('heading', { name: 'You stay in charge' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Scout asks first, and you set the limit' }),
+    ).toBeVisible();
     for (const text of [
       'It asks first',
       'Home > Approvals',
@@ -78,5 +80,20 @@ describe('StepEight', () => {
     ]) {
       expect(screen.getAllByText(text, { exact: false }).length).toBeGreaterThan(0);
     }
+  });
+
+  it('uses the shared money field', async () => {
+    mountStep(<StepEight host={makeWalkthroughHost()} />);
+    await screen.findByDisplayValue('5');
+    expect(limit().closest('.tg-money')).not.toBeNull();
+    expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument();
+  });
+
+  it('the approval preview is aria-hidden and has no live buttons', async () => {
+    mountStep(<StepEight host={makeWalkthroughHost()} />);
+    await screen.findByDisplayValue('5');
+    const preview = screen.getByText('File this as an issue in GitHub?').closest('[aria-hidden]');
+    expect(preview).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('button', { name: 'Allow once' })).not.toBeInTheDocument();
   });
 });

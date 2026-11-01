@@ -129,7 +129,9 @@ describe('Walkthrough, the end', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Let Scout read your browser tabs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await screen.findByRole('heading', { name: 'You stay in charge' });
+    await screen.findByRole('heading', { name: 'Scout asks first, and you set the limit' });
+    // Dense steps scroll inside the content panel, with the footer outside it.
+    expect(screen.getByLabelText('Daily limit (USD)').closest('.wt-body')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Add your Anthropic API key' });
     expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
