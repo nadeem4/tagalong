@@ -165,6 +165,13 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   offset. What Scout remembers rides in the same message: the same notes, to the same provider,
   nothing new. Nothing of this is stored by the line itself.
 
+## Registries: what is contacted
+
+When Scout looks for an expert or an app to set up, the brain fetches two public lists:
+`cdn.agentclientprotocol.com` (experts) and `registry.modelcontextprotocol.io` (apps; your search
+words go to it). No account or key is sent, and nothing is installed by looking. The lists are
+cached for a day under your Tagalong folder.
+
 ## Connected apps: what goes to them
 
 Apps you connect in Home, Connections (Notion, GitHub, Linear, a local tool) are reached only

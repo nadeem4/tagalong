@@ -25,6 +25,9 @@ from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
+from brain.setup.facts import inspect
+from brain.setup.registry import Registry
+from brain.setup.tools import setup_tools
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
@@ -95,6 +98,9 @@ async def _run() -> None:
         turn_timeout=config.turn_timeout,
         masker=masker,
         keys=keys,
+        extra_tools=setup_tools(
+            config.data_dir, Registry(config.data_dir), partial(inspect, config.data_dir)
+        ),
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),

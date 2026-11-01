@@ -53,7 +53,7 @@ from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.side_check import SideCheck
 from brain.timers import Timers
-from brain.toolbox import BodySource, BrainSource, Toolbox
+from brain.toolbox import BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
     KeySettings,
     brain_tools,
@@ -92,6 +92,7 @@ class Session:
         turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
         masker: Masker | None = None,
         keys: KeySettings | None = None,
+        extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
     ) -> None:
         self._model = model
         # Set by main when voice is built; None answers `listen` with method_not_found.
@@ -159,6 +160,7 @@ class Session:
             + choice_tools(choices)
             + preference_tools(approvals, self._asks)
             + approval_home_tools(approvals)
+            + (extra_tools or [])
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair

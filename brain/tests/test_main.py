@@ -277,3 +277,23 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
     finally:
         os.environ.pop("ANTHROPIC_API_KEY", None)
     assert cleared == [1]
+
+
+def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
+    seen = []
+
+    async def stop(host, port, bodies, sid, session):
+        seen.append(session)
+        raise RuntimeError("stop")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    toolbox = seen[0].toolbox
+    scout = {t["name"] for t in toolbox.model_tools()}
+    home = {t.name for t in toolbox.home_tools()}
+    names = {"inspect_machine", "find_experts", "find_apps"}
+    assert names <= scout
+    assert not names & home
