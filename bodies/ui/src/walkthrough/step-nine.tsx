@@ -28,6 +28,7 @@ export function StepNine({
 
   return (
     <section>
+      <span className="wt-label">API key</span>
       <h1>Add your Anthropic API key</h1>
       <p className="wt-lead">
         Scout thinks with Claude, through your own Anthropic account. This is the one thing Tagalong
@@ -42,15 +43,17 @@ export function StepNine({
           </button>
         </p>
       </div>
-      <div className="wt-note">
-        <h3>Kept only on your brain</h3>
-        <p className="wt-help">
-          The desktop hands the key to your brain once and keeps no copy. The brain saves it in one
-          file and never writes it to Scout’s history or logs.
-        </p>
+      <div className="wt-card wt-notes">
+        <ul className="wt-checks">
+          <li>Saved by Scout’s brain, in one file on the machine it runs on</li>
+          <li>Only sent to Anthropic</li>
+          <li>Never written to Scout’s history or logs</li>
+          <li>Change or remove it any time in Settings</li>
+        </ul>
         {facts !== null && facts.source !== 'environment' && (
           <p className="wt-help">Saved on the machine running Scout’s brain in {facts.envPath}</p>
         )}
+        <p className="wt-help">The desktop hands the key to your brain once and keeps no copy.</p>
         {facts !== null && (
           <p className="wt-help">
             Anthropic bills this key for what Scout uses, up to your daily limit of $

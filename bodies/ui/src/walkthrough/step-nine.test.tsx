@@ -3,7 +3,7 @@
  * tells anyone to edit .env, and the pasted key is gone from the page once it is saved.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { KeyResult, KeyStatus } from '../host-bridge';
 import { FinishCard } from './finish-card';
@@ -160,6 +160,21 @@ describe('StepNine', () => {
   });
 });
 
+describe('StepNine key notes', () => {
+  it('shows the four key notes verbatim', async () => {
+    mount(NO_KEY);
+    await screen.findByText(/Saved on the machine running/);
+    for (const note of [
+      'Saved by Scout’s brain, in one file on the machine it runs on',
+      'Only sent to Anthropic',
+      'Never written to Scout’s history or logs',
+      'Change or remove it any time in Settings',
+    ]) {
+      expect(screen.getByText(note)).toBeInTheDocument();
+    }
+  });
+});
+
 describe('FinishCard', () => {
   const props = {
     askKey: 'Ctrl+Shift+Space',
@@ -168,23 +183,39 @@ describe('FinishCard', () => {
     onClose: vi.fn(),
   };
 
-  it('shows the ask and talk keys, Open Home and Close', () => {
+  it('shows the heading, where Scout is, Open Home and Done', () => {
     render(<FinishCard {...props} />);
     expect(screen.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
-    expect(screen.getByText('Ctrl+Shift+Space')).toBeInTheDocument();
-    expect(screen.getByText('Right Ctrl')).toBeInTheDocument();
     expect(screen.getByText(/Look for Scout at the bottom right/)).toBeInTheDocument();
     expect(screen.getByText(/what Scout remembers are in Home/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open Home' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 
-  it('Close and Open Home call their handlers', () => {
+  it('shows the ask and talk keys as keycaps', () => {
+    const { container } = render(<FinishCard {...props} />);
+    const caps = Array.from(container.querySelectorAll('kbd.tg-keycap')).map((k) => k.textContent);
+    expect(caps).toEqual(['Ctrl', 'Shift', 'Space', 'Right Ctrl']);
+  });
+
+  it('never shows CommandOrControl', () => {
+    const { container } = render(<FinishCard {...props} askKey="CommandOrControl+Shift+Space" />);
+    expect(container.textContent).not.toMatch(/CommandOrControl/);
+  });
+
+  it('lists three things to try', () => {
+    render(<FinishCard {...props} />);
+    const list = screen.getByRole('list', { name: 'Try these first' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('Done and Open Home call their handlers once each', () => {
     const onClose = vi.fn();
     const onOpenHome = vi.fn();
     render(<FinishCard {...props} onClose={onClose} onOpenHome={onOpenHome} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onOpenHome).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
