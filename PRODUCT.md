@@ -67,8 +67,8 @@ its result.
   those need no name. The bubble offers the key to reply.
 - The bubble's header has Always listening (off by default) and Seeing (sight on or paused);
   Settings has both, plus who speaks and who listens.
-- Home, the control centre: Overview, Jobs, Connections, Approvals, what Scout remembers,
-  Settings.
+- Home, the control centre: Overview (everything Scout is doing for you), Jobs, Connections,
+  Approvals, what Scout remembers, Settings.
 - Settings: privacy, voice, shortcuts and the browser extension, each with a short line visible and the longer story behind ⓘ.
 - The Chrome extension is a tools-only body, with no display: Scout can see and manage your tabs when
   you allow it, and you can ask Scout from a right-click on selected text or the address bar.

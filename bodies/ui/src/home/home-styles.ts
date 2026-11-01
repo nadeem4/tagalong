@@ -34,7 +34,7 @@ export const HOME_CSS = `
 .home-nav__item:hover { color: ${t.color.text}; }
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
-  flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
+  flex: 1; min-width: 0; overflow-y: auto; scrollbar-gutter: stable; display: flex; flex-direction: column;
   padding: ${t.space.xxxl}px 0;
 }
 /* One width and one inset for every tab, so the left edge never jumps between pages. */

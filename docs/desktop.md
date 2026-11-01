@@ -192,7 +192,7 @@ Rules each module enforces:
 - **Mixed scales.** `moveWindow` calls `setBounds` twice when the move `crossesScale` (the two
   displays have different `scaleFactor`): Electron places the first move with the old display's
   scale.
-- **Home.** Escape closes it. `openHome(page?)` focuses an open one and sends
+- **Home.** Every tab renders in one `.home-page` box (920px at most, one inset), and each connection's On/Off is the shared `Toggle` (`role="switch"`). Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`

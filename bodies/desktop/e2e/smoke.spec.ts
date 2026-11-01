@@ -354,6 +354,20 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   await expect(home.getByRole('region', { name: 'Files' })).toBeVisible({
     timeout: 15_000,
   });
+  // The app's On/Off is a real switch.
+  await expect(home.getByRole('switch', { name: 'Scout can use Files' })).toBeVisible();
+
+  // Every tab shares one page box: at most 920px wide and the same left edge.
+  const edges: number[] = [];
+  for (const tab of ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers']) {
+    await nav.getByRole('button', { name: tab, exact: true }).click();
+    const box = await home.locator('.home-page').boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(920);
+    edges.push(Math.round(box!.x));
+  }
+  expect(new Set(edges).size).toBe(1);
+  await nav.getByRole('button', { name: 'Connections' }).click();
   await home.screenshot({ path: join(appDir, 'test-results', 'connections.png') });
 
   // The bundled typefaces must load under the page's CSP, or Home falls back to system
