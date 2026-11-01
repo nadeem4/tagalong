@@ -396,6 +396,24 @@ describe('createTurnEvents: asks', () => {
       expect(e).not.toHaveProperty('question');
     });
 
+    it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: 'Keep it?', options: ['Save it', 'Not now'], tool: 'save_preference' }),
+      );
+      expect(e).toMatchObject({ app: 'Scout', tool: 'save_preference' });
+      expect(e).not.toHaveProperty('question');
+    });
+
+    it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: 'Keep it?', options: ['Save it', 'Not now'], tool: 'save_preference' }),
+      );
+      expect(e).toMatchObject({ app: 'Scout', tool: 'save_preference' });
+      expect(e).not.toHaveProperty('question');
+    });
+
     it('an ask without free_text or recommended adds neither field', () => {
       const [e] = make().map('ask', jobAsk());
       expect(e).not.toHaveProperty('freeText');

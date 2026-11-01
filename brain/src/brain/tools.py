@@ -774,7 +774,7 @@ def choice_tools(choices: Choices) -> list[tuple[ToolSpec, Handler]]:
             or len(options) > MAX_CHOICE_OPTIONS
         ):
             raise MemoryRefused(f"options must be at most {MAX_CHOICE_OPTIONS} short strings.")
-        if recommended is not None and not isinstance(recommended, str):
+        if recommended is not None and recommended not in options:
             raise MemoryRefused("recommended must be one of the options.")
         ask_id = choices.ask(question, options, recommended, bool(free_text))
         return json.dumps({"asked": ask_id})
@@ -829,7 +829,10 @@ def preference_tools(
         _need_text("save_preference", args, "sentence", "question")
         try:
             answer = await asks.open(
-                text=args["question"], options=[SAVE_IT, NOT_NOW], timeout=timeout
+                text=args["question"],
+                options=[SAVE_IT, NOT_NOW],
+                tool="save_preference",
+                timeout=timeout,
             )
         except RpcError:  # nobody answered in time
             return json.dumps({"saved": False})

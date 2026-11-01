@@ -286,7 +286,7 @@ describe('the connector confirm card', () => {
           ...over,
         });
 
-      it('free_text shows a text field, and Enter sends the first option with the text', async () => {
+      it('free_text shows a text field, and Enter sends the text with no option picked', async () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
         act(() => bridge.emit(choose()));
@@ -297,11 +297,11 @@ describe('the connector confirm card', () => {
           await Promise.resolve();
         });
         expect(bridge.jobAnswers).toEqual([
-          { approvalId: APPROVAL, option: 'Gemini CLI', text: 'something else' },
+          { approvalId: APPROVAL, option: '', text: 'something else' },
         ]);
       });
 
-      it('typed text with no options sends the text as the option', async () => {
+      it('typed text with no options sends the text with no option picked', async () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
         act(() => bridge.emit(choose({ options: [] })));
@@ -312,9 +312,7 @@ describe('the connector confirm card', () => {
           fireEvent.click(screen.getByRole('button', { name: 'Send' }));
           await Promise.resolve();
         });
-        expect(bridge.jobAnswers).toEqual([
-          { approvalId: APPROVAL, option: 'my words', text: 'my words' },
-        ]);
+        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: '', text: 'my words' }]);
       });
 
       it('marks the recommended option and puts it first', () => {

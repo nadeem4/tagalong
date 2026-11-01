@@ -30,8 +30,6 @@ class Choices:
     def ask(self, text: str, options: list[str], recommended: str | None, free_text: bool) -> str:
         if not options and not free_text:
             raise MemoryRefused("choose needs options, or free_text for a typed answer.")
-        if recommended is not None and recommended not in options:
-            raise MemoryRefused("recommended must be one of the options.")
         if not self._asks.anyone_online():
             raise MemoryRefused("nobody is online to ask.")
         ask_id = uuid.uuid4().hex
@@ -41,10 +39,6 @@ class Choices:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return ask_id
-
-    def cancel_all(self) -> None:
-        for task in list(self._tasks):
-            task.cancel()
 
     async def _wait(
         self, ask_id: str, text: str, options: list[str], recommended: str | None, free_text: bool
@@ -64,10 +58,12 @@ class Choices:
             return
         if answer.option is None:  # everyone went offline before it opened
             return
+        # A typed answer is the text alone: the body picked no option, so none is reported.
+        picked = answer.option if answer.option in options else ""
         facts = {
             "ask": ask_id,
             "question": text,
-            "option": answer.option,
+            "option": picked,
             "text": answer.text or "",
         }
         self._emit(Event("choice", facts, key=ask_id))

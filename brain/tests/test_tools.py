@@ -783,6 +783,8 @@ async def test_save_preference_saves_on_save_it(mem):
     task = asyncio.create_task(handler({"sentence": "Prefer Claude Code", "question": "Keep it?"}))
     params = await _open_ask(bodies)
     assert params["text"] == "Keep it?" and params["options"] == ["Save it", "Not now"]
+    assert params["tool"] == "save_preference"  # so a body labels it Scout's, not an expert's
+    assert params["tool"] == "save_preference"  # so a body labels it Scout's, not an expert's
     asks.answer(params["id"], "Save it", "desktop")
     assert json.loads(await task) == {"saved": True}
     (saved,) = [p for p in mem.list_preferences() if not p.builtin]

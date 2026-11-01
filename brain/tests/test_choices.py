@@ -73,14 +73,9 @@ async def test_typed_text_answer_is_carried_as_text():
     await settle()
     choices._asks.answer(ask_id, "other", "desktop", text="my own")
     await settle()
-    assert events[0].facts["option"] == "other"
+    # The body did not pick an option, so none is reported; the text is the answer.
+    assert events[0].facts["option"] == ""
     assert events[0].facts["text"] == "my own"
-
-
-async def test_recommended_must_be_one_of_the_options():
-    _, _, choices = rig()
-    with pytest.raises(MemoryRefused):
-        choices.ask("Which?", ["a", "b"], "c", True)
 
 
 async def test_empty_options_need_free_text():
@@ -118,16 +113,6 @@ async def test_nobody_online_refuses_and_emits_nothing():
     with pytest.raises(MemoryRefused):
         choices.ask("Which?", ["a"], None, True)
     await settle()
-    assert events == []
-
-
-async def test_cancel_all_cancels_waiting_tasks():
-    _, events, choices = rig()
-    choices.ask("Which?", ["a"], None, True)
-    await settle()
-    choices.cancel_all()
-    await settle()
-    assert choices._tasks == set()
     assert events == []
 
 

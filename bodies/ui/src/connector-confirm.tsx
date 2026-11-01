@@ -45,10 +45,9 @@ export function ConnectorConfirmCard({
     const text = typed.trim();
     const typable = confirm.question === true || confirm.freeText === true;
     // The brain takes typed text with any option name. An expert's question sends the text as
-    // the option; Scout's choice keeps the first option's label so the answer reads as a pick.
+    // the option; Scout's choice sends no option, since none was picked.
     const sendTyped = (): void => {
-      const option = confirm.question === true ? text : (confirm.options?.[0] ?? text);
-      onReply({ option, text });
+      onReply({ option: confirm.question === true ? text : '', text });
     };
     // The recommended option is listed first (so it is first in tab order) and marked.
     const options = [...(confirm.options ?? [])].sort(
