@@ -1,5 +1,5 @@
 /**
- * The walkthrough's navy side: Bean standing still, "Your companion", the nine steps (only
+ * The walkthrough's navy side: Bean standing still, the "Scout" wordmark, the nine steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 
@@ -17,12 +17,12 @@ interface SidePanelProps {
 
 export function SidePanel({ scout, current, reached, onJump }: SidePanelProps) {
   return (
-    <aside className="wt-side">
+    <aside className="wt-side on-navy">
       <div className="wt-scout">
         <div className="wt-tile">
           <BeanClip clip={scout} still size={132} name="idle" />
         </div>
-        <p className="wt-name">Scout</p>
+        <p className="wt-name tg-wordmark">Scout</p>
         <p className="wt-role">Your companion</p>
       </div>
       <ol className="wt-steps" aria-label="Steps">

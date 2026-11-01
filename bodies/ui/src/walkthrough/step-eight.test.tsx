@@ -39,7 +39,7 @@ describe('StepEight', () => {
     expect(limit().value).toBe('4');
   });
 
-  it('an unchanged amount saves nothing (Skip for now and Back never reach setDailyLimit)', async () => {
+  it('an unchanged amount saves nothing (Skip and Back never reach setDailyLimit)', async () => {
     const host = makeWalkthroughHost();
     const step = mountStep(<StepEight host={host} />);
     await screen.findByDisplayValue('5');

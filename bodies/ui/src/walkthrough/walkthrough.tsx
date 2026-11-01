@@ -1,7 +1,7 @@
 /**
  * The first-run walkthrough: Scout's navy side with the step list, one step on the off-white
- * page, and the footer. Contains Walkthrough. Next saves what the step staged; Back, Skip for
- * now and the side list save nothing; only Finish and Skip tour mark the tour seen.
+ * page, and the footer. Contains Walkthrough. Next saves what the step staged; Back, Skip
+ * and the side list save nothing; only Finish and Skip with a key mark the tour seen.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -19,7 +19,7 @@ import { StepSeven } from './step-seven';
 import { StepSix } from './step-six';
 import { StepThree } from './step-three';
 import { StepTwo } from './step-two';
-import { KEY_STEP, STEPS, skipTour } from './steps';
+import { STEPS, skipTour } from './steps';
 import { StepSaveContext } from './use-step-save';
 import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
@@ -189,8 +189,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
               error={error}
               onBack={() => go(Math.max(current - 1, 1))}
               onNext={() => void next()}
-              onSkipStep={() => go(Math.min(current + 1, KEY_STEP))}
-              onSkipTour={() => void leave()}
+              onSkip={() => void leave()}
               canFinish={keyValid}
               onFinish={() => void finish()}
             />
