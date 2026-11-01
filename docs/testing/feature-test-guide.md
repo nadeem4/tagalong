@@ -1595,21 +1595,23 @@ with a fake key; the real check against Anthropic is done by hand here.
 
 1. **Action:** delete `settings.json` and start Tagalong, with or without a brain. **Expected:**
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
-2. **Action:** press **Next** through the steps; use **Skip for now** on one. **Expected:**
-   Back is off on step 1; the side list jumps only to steps you have reached; Skip for now saves
-   nothing.
+2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
+   "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
+   link and the primary button; the side list (step 6 is "Bigger jobs") jumps only to steps you
+   have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
+   4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
    key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
 4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, change the voice and speed,
    press **Preview**, then **Next**. **Expected:** Preview plays the chosen voice; the choices
    appear in Home → Settings. There is no Always listening control.
-5. **Action:** with a key set, press **Skip tour**. **Expected:** the window closes, the pet
-   appears and the tour does not open at the next launch. With no key, **Skip tour** goes to step
+5. **Action:** with a key set, press **Skip**. **Expected:** the window closes, the pet
+   appears and the tour does not open at the next launch. With no key, **Skip** goes to step
    9 instead.
 6. **Action:** while the tour is open, start Tagalong a second time, or use the tray's **Show or
    hide Scout**. **Expected:** the tour comes forward; the pet stays hidden.
 7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
-   **Expected:** the tour opens once; after Finish or Skip tour it never opens again.
+   **Expected:** the tour opens once; after Finish or Skip it never opens again.
 
 ### K.5. Steps 6 to 9 and the end
 
@@ -1624,8 +1626,8 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
 3. **Action:** on step 8 set the limit to 0, then 8, press **Next**. **Expected:** 0 shows "Enter
-   an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip for now**
-   leaves the limit alone.
+   an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip**
+   with no key goes to step 9 and leaves the limit alone.
 4. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
    was not accepted." with the field kept and **Finish** off; then the field empties, "A key is
    already set." shows and **Finish** turns on. With the network off the line reads "Scout could

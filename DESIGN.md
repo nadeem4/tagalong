@@ -346,7 +346,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 ### Hierarchy
 
 - **Page title** (Onest 600, 20px): each Home page's heading.
-- **Wordmark** (Onest 600, 18px): "Scout" in Home's nav and the walkthrough side; the chat header uses 16px. Never the pixel face (its c reads as o). Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
+- **Wordmark** (Onest 600, 18px): "Scout" in Home's nav and the walkthrough side (the side panel is `on-navy`, so controls there take the gold focus ring); the chat header uses 16px. Never the pixel face (its c reads as o). Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
 - **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
 - **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("JOBS", "SPEND").
 - **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
@@ -412,6 +412,10 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 - **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Jobs, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
 - **Jobs and Connections:** rows between Panel Line hairlines with status chips and switches.
+
+### Walkthrough frame
+
+1040x680: a navy side panel (`on-navy`: Scout, the nine steps, the footnote) beside the off-white page. Each step opens with a small uppercase eyebrow (the step name), a 26px Onest 600 headline and a lead; dense steps scroll inside the page with a thin scrollbar while the footer stays pinned. The footer is Back (outlined, left, hidden on step 1), a quiet Skip text link and the gold primary button ("Get started", "Next", "Finish") with an arrow. Steps 1 to 4 use white cards with a 1px line and 12 to 16px radius, a day strip with gold timeline dots, a CSS-arrow flow, keycaps for shortcuts and a static navy bubble preview.
 
 ### Settings controls
 
