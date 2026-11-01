@@ -5,6 +5,7 @@ from pathlib import Path
 
 from brain.setup.facts import CmdResult, inspect, node_paths
 from brain.setup.paths import cache_file, experts_file, node_dir, tools_dir
+from brain.setup.registry import Registry
 from brain.setup.tools import setup_tools
 
 
@@ -117,7 +118,9 @@ async def test_inspect_machine_tool_is_json_and_read_only(tmp_path):
     async def inspect_fn():
         return await inspect(tmp_path, fake_run({}), linux, which_of())
 
-    tools = {spec.name: (spec, h) for spec, h in setup_tools(tmp_path, None, inspect_fn)}
+    tools = {
+        spec.name: (spec, h) for spec, h in setup_tools(tmp_path, Registry(tmp_path), inspect_fn)
+    }
     spec, handler = tools["inspect_machine"]
     assert spec.effect == "read" and spec.default_mode == "auto"
     out = json.loads(await handler({}))
