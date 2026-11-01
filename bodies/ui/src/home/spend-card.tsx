@@ -6,18 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { SpendToday } from '../host-bridge';
-import type { TurnEvent } from '../shapes';
-
-/** The events after which the day's spend is read again: a turn started or ended. */
-function changesSpend(event: TurnEvent): boolean {
-  return (
-    event.type === 'turn.started' || event.type === 'turn.completed' || event.type === 'turn.error'
-  );
-}
-
-function dollars(usd: number): string {
-  return usd > 0 && usd < 0.01 ? 'under $0.01' : `$${usd.toFixed(2)}`;
-}
+import { changesSpend, dollars } from './spend-format';
 
 /** A cap as the person typed it: "$1", "$2.50". */
 function cap(usd: number): string {
