@@ -88,6 +88,10 @@ export const ConnectorConfirmParams = z.object({
   options: z.array(z.string()).optional(),
   /** A Claude Code job asks the person something: the card takes typed text as well as a choice. */
   question: z.boolean().optional(),
+  /** The brain allows a typed answer (the ask's `free_text`): the card shows a text field. */
+  freeText: z.boolean().optional(),
+  /** One of `options` the brain recommends: the card marks it and lists it first. */
+  recommended: z.string().optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

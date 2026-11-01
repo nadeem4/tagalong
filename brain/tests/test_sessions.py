@@ -271,6 +271,26 @@ async def test_what_you_know_in_system_prompt():
     assert "What you know" in model.systems[0] and "answer in French" in model.systems[0]
 
 
+async def test_session_passes_current_preferences_each_turn():
+    memory = Memory(":memory:")
+    memory.add_preference(
+        sentence="Set up Claude Code when I ask", source="home", tool=None, group_key=None, at="t"
+    )
+    model = Gate(["hi", "again"])
+    session, _ = make(model, memory)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert "Preferences the owner saved" in model.systems[0]
+    assert "Set up Claude Code when I ask" in model.systems[0]
+    memory.add_preference(
+        sentence="Never touch my Downloads", source="home", tool=None, group_key=None, at="t"
+    )
+    session.say("desktop", say("next"))
+    await finish(session)
+    assert "Never touch my Downloads" not in model.systems[0]
+    assert "Never touch my Downloads" in model.systems[1]
+
+
 async def test_know_read_once_per_turn():
     memory = Memory(":memory:")
     model = Gate([remember_call("be brief"), "ok", "again"])

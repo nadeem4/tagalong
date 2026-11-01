@@ -173,7 +173,13 @@ const AskOpen = z
     confirm: z.boolean().optional(),
     tool: z.string().optional(),
     input: Input.optional(),
+    free_text: z.boolean().optional(),
+    recommended: z.string().optional(),
   })
+  .refine(
+    (a) => a.recommended === undefined || a.options.includes(a.recommended),
+    'recommended must be one of the options',
+  )
   .refine(
     (a) =>
       !a.confirm ||

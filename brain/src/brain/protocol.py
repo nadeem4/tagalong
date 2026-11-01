@@ -322,6 +322,14 @@ class AskOpen(Model):
     confirm: bool | None = None
     tool: str | None = None
     input: Input | None = None
+    free_text: bool | None = None
+    recommended: str | None = None
+
+    @model_validator(mode="after")
+    def _recommended_offered(self) -> "AskOpen":
+        if self.recommended is not None and self.recommended not in self.options:
+            raise ValueError("recommended must be one of the options")
+        return self
 
     @model_validator(mode="after")
     def _confirm_shape(self) -> "AskOpen":

@@ -276,6 +276,65 @@ describe('the connector confirm card', () => {
       expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     });
 
+    describe("Scout's choose ask", () => {
+      const choose = (over: Record<string, unknown> = {}) =>
+        jobAsk({
+          tool: 'choose',
+          summary: 'Which expert?',
+          options: ['Gemini CLI', 'Claude Code'],
+          freeText: true,
+          ...over,
+        });
+
+      it('free_text shows a text field, and Enter sends the text with no option picked', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose()));
+        const field = screen.getByRole('textbox', { name: 'Your answer' });
+        fireEvent.change(field, { target: { value: 'something else' } });
+        await act(async () => {
+          fireEvent.keyDown(field, { key: 'Enter' });
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([
+          { approvalId: APPROVAL, option: '', text: 'something else' },
+        ]);
+      });
+
+      it('typed text with no options sends the text with no option picked', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose({ options: [] })));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Your answer' }), {
+          target: { value: 'my words' },
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: '', text: 'my words' }]);
+      });
+
+      it('marks the recommended option and puts it first', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose({ recommended: 'Claude Code' })));
+        const buttons = screen.getAllByRole('button');
+        expect(buttons[0]).toHaveTextContent('Claude Code');
+        expect(buttons[0]).toHaveTextContent('Recommended');
+        expect(buttons[1]).toHaveTextContent('Gemini CLI');
+        expect(buttons[1]).not.toHaveTextContent('Recommended');
+      });
+
+      it('an ask without the fields renders as before: no text field, no mark', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose({ freeText: undefined })));
+        expect(screen.queryByRole('textbox', { name: 'Your answer' })).toBeNull();
+        expect(screen.queryByText('Recommended')).toBeNull();
+      });
+    });
+
     it('closes cleanly when the ask is cancelled, with no turn running', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

@@ -383,3 +383,33 @@ async def test_open_rejects_a_duplicate_ask_id():
         await asks.open(text="Again?", options=["a"], ask_id="job1-a")
     asks.answer("job1-a", "a", "desktop")  # the first ask is untouched
     assert await first == Answer("a", None)
+
+
+async def test_open_ask_params_include_free_text_and_recommended_when_given():
+    bodies = FakeBodies()
+    asks = Asks(bodies)
+    task = asyncio.create_task(
+        asks.open(text="Which?", options=["a", "b"], free_text=True, recommended="b")
+    )
+    params = await opened(bodies)
+    assert params["free_text"] is True
+    assert params["recommended"] == "b"
+    asks.answer(params["id"], "b", "desktop")
+    await task
+
+
+async def test_open_ask_params_omit_them_by_default():
+    bodies = FakeBodies()
+    asks = Asks(bodies)
+    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"]))
+    params = await opened(bodies)
+    assert "free_text" not in params
+    assert "recommended" not in params
+    asks.answer(params["id"], "a", "desktop")
+    await task
+
+
+async def test_recommended_outside_options_raises():
+    asks = Asks(FakeBodies())
+    with pytest.raises(ValueError):
+        await asks.open(text="Which?", options=["a", "b"], recommended="c")

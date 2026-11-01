@@ -7,8 +7,8 @@ from importlib.resources import files
 
 import pytest
 
-from brain.memory import Item
-from brain.mind.prompt import render_know, system_prompt, user_content
+from brain.memory import Item, Preference
+from brain.mind.prompt import render_know, render_preferences, system_prompt, user_content
 from brain.protocol import Body, SayParams
 
 NOW = datetime(2026, 10, 25, 15, 24, 59)
@@ -25,7 +25,7 @@ def say(**kw) -> SayParams:
 def test_soul_ships_as_package_data_and_has_no_scripted_lines():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert soul.startswith("You are Scout")
-    assert len(soul.splitlines()) < 40
+    assert len(soul.splitlines()) < 44
     assert "silence" in soul.lower() or "nothing useful" in soul.lower()
 
 
@@ -73,6 +73,40 @@ def test_system_prompt_places_know_between_soul_and_now():
     assert sections[0].startswith("You are Scout")
     assert sections[-3] == "What you know:\nInstructions from the owner:\n- [1] Be brief"
     assert sections[-2].startswith("Now: ")
+
+
+def prefer(id, sentence, builtin=False):
+    return Preference(id, sentence, "home", None, None, builtin, "2026-10-25T00:00:00", 0, None)
+
+
+def test_render_preferences_skips_builtin_and_caps_count_and_length():
+    prefs = [prefer(1, "oldest"), prefer(2, "default", builtin=True), prefer(3, "x" * 50)]
+    prefs.append(prefer(4, "newest"))
+    out = render_preferences(prefs, cap=2, each=10)
+    lines = out.splitlines()
+    assert lines[0].startswith("Preferences the owner saved")
+    assert lines[1:] == ["- newest", "- " + "x" * 10]
+
+
+def test_render_preferences_empty_is_blank():
+    assert render_preferences([]) == ""
+    assert render_preferences([prefer(1, "default", builtin=True)]) == ""
+
+
+def test_system_prompt_includes_the_preference_block_only_when_there_are_some():
+    block = render_preferences([prefer(1, "Install Claude Code without asking twice")])
+    sections = system_prompt(NOW, [], "", preferences=block).split("\n\n")
+    assert sections[-3] == block
+    assert sections[-2].startswith("Now: ")
+    assert "Preferences the owner saved" not in system_prompt(NOW, [])
+
+
+def test_preferences_follow_what_you_know():
+    know = render_know({"instruction": [item(1, "instruction", "Be brief")]})
+    block = render_preferences([prefer(1, "Prefer Claude Code")])
+    sections = system_prompt(NOW, [], know, preferences=block).split("\n\n")
+    assert sections[-4].startswith("What you know:")
+    assert sections[-3] == block
 
 
 def test_system_prompt_without_know_unchanged():

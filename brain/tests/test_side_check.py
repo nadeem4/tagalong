@@ -80,6 +80,16 @@ async def test_no_user_preference_means_no_model_call(mem):
     assert model.calls == 0
 
 
+async def test_a_setup_preference_is_never_a_candidate(mem):
+    # Setup choices are facts for Scout's prompt; an install must still open the Allow card.
+    mem.add_preference(
+        sentence="Install experts freely", source="setup", tool=None, group_key=None, at=AT
+    )
+    model = Model(approve(1))
+    assert await check(mem, model).decide(facts()) is None
+    assert model.calls == 0
+
+
 async def test_approve_returns_the_named_preference(mem):
     p = pref(mem)
     model = Model(approve(p.id))

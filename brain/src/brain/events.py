@@ -37,6 +37,7 @@ _KINDS = (
     EventKind("body_online", batch_seconds=0, max_per_hour=2),
     EventKind("back", batch_seconds=0, max_per_hour=2),
     EventKind("job_question", batch_seconds=None, max_per_hour=None),
+    EventKind("choice", batch_seconds=None, max_per_hour=None),
     EventKind("focus", wakes=False),
     EventKind("tab", wakes=False),
     EventKind("download", wakes=False),

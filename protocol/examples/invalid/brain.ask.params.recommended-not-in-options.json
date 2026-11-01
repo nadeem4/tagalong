@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 8,
+    "id": "a3",
+    "state": "open",
+    "text": "Which expert should I set up?",
+    "options": ["Claude Code", "Gemini CLI"],
+    "recommended": "Codex"
+  }
+}

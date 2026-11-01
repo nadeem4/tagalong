@@ -77,6 +77,7 @@ the total can run a little low.
 | `brain/src/brain/scheduler.py`      | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
 | `brain/src/brain/timers.py`         | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
 | `brain/src/brain/mind/events.md`    | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
+| `brain/src/brain/choices.py`        | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
 | `brain/src/brain/questions.py`      | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
 | `brain/src/brain/jobs.py`           | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
 | `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
@@ -327,7 +328,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Reconnect.** Asks live in memory only. A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
-- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=)`
+- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=, recommended=)`
   is for work with no Scout turn (expert jobs). It sends a plain ask: no `turn`, no `confirm`, any
   option names (for example `allow-once`, `reject`). It waits until closed; there is no default
   timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
@@ -335,7 +336,27 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   option is not listed is accepted when it carries non-empty `text` (the user typed their own
   answer). `cancel_all(ask_ids)` closes the named asks with `reason: "cancelled"` and their waiters
   get a `cancelled` error. `answer {ask, option, text}` now passes `text` through to the ask; the
-  closed frame is unchanged.
+  closed frame is unchanged. An open ask now sends `free_text: true` (when set) and `recommended`
+  (one of the options, else `ValueError`), so a body shows a text box and marks the recommendation.
+
+### Choices and preferences
+
+`choose` (`choices.py`, `choice_tools`) is Scout's way to ask the person a setup question with
+clickable options. It is `effect: "read"`, mode `auto` (the ask is its own gate), and it does not
+wait: it opens an ask (`tool: "choose"`, optional `free_text`, optional `recommended`, 1-6 short
+options, none only with `free_text`) and returns `{"asked": id}` at once. A background task waits
+(10 minutes); when the person answers it emits a `choice` event `{ask, question, option, text}`
+(`option` is empty when the person typed their own answer) that wakes Scout (never merged, outside the hourly caps). An unanswered or timed-out choice emits
+nothing, so no turn is stuck, and a late answer gets `not_found`. With nobody online the tool
+refuses.
+
+Saved preferences reach Scout as facts: `render_preferences` (`mind/prompt.py`) lists the
+owner's non-built-in preferences, newest first (at most 40, 300 characters each), after "What you
+know" in the system prompt. They are data to weigh, not orders, and the gate stays code: a
+preference never replaces the Allow card. `save_preference {sentence, question}` (asks itself)
+shows `question` with the buttons "Save it" and "Not now" and saves through
+`Approvals.add_preference(source="setup", tool=None, group_key=None)` only on "Save it". Setup
+preferences are never candidates for `SideCheck`, so they cannot approve an ask.
 
 ## Home tools
 
@@ -553,6 +574,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `body_online`  | 0 s          | 2            | A body came back after 10+ minutes away                                                                                         |
 | `back`         | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                        |
 | `job_question` | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap |
+| `choice`       | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                     |
 | `focus`        | none         | none         | Which window is in front (context, no wake)                                                                                     |
 | `tab`          | none         | none         | Which browser tab is in front (context, no wake)                                                                                |
 | `download`     | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |

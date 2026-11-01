@@ -29,6 +29,7 @@ from brain.builtin_guards import (
     tool_mode,
     wake_caps,
 )
+from brain.choices import Choices
 from brain.config import (
     DEFAULT_EXPERT_CMD,
     DEFAULT_EXPERT_TIMEOUT_S,
@@ -43,7 +44,7 @@ from brain.experts import ExpertRun
 from brain.jobs import Jobs, job_note
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
-from brain.mind.prompt import render_know, system_prompt, user_content
+from brain.mind.prompt import render_know, render_preferences, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
@@ -56,8 +57,10 @@ from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import (
     KeySettings,
     brain_tools,
+    choice_tools,
     expert_tools,
     home_tools,
+    preference_tools,
     question_tools,
     timer_tools,
     voice_tools,
@@ -145,6 +148,7 @@ class Session:
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
+        choices = Choices(self._asks, self.scheduler.emit)
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
@@ -152,6 +156,8 @@ class Session:
             + expert_tools(self.jobs)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
+            + choice_tools(choices)
+            + preference_tools(approvals, self._asks)
             + approval_home_tools(approvals)
         )
         sources: list = []
@@ -330,6 +336,7 @@ class Session:
         self._append_user(content)
         # Read once per turn so the system prompt stays identical across its steps (cache).
         know = render_know(self._memory.always_loaded())
+        prefs = render_preferences(self._memory.list_preferences())
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(
@@ -355,6 +362,7 @@ class Session:
                     self._latest("focus"),
                     self._latest("tab"),
                     self._latest("download"),
+                    prefs,
                 ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
