@@ -345,6 +345,99 @@ describe('GreetingLine', () => {
   });
 });
 
+describe('Scout’s remark survives', () => {
+  const REMARK = 'Your 3pm with Dana moved to 3:30. Want me to push the review back too?';
+  const askIn = (label: string, text: string) => {
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+  const turn = (bridge: FakeHostBridge, id: string, text: string) =>
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: id,
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done(id, text));
+    });
+
+  it('clicking the quiet line calls onOpen with its text', () => {
+    const onOpen = vi.fn();
+    render(<GreetingLine petName="Scout" text={REMARK} onDone={() => undefined} onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Scout something' }));
+    expect(onOpen).toHaveBeenCalledWith(REMARK);
+  });
+
+  it('the bubble opened with a remark shows it as Scout’s message', () => {
+    renderBubble(createFakeHostBridge(), { remark: REMARK });
+    expect(screen.getByText(REMARK)).toBeVisible();
+  });
+
+  it('a follow-up question keeps the remark in the log', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { remark: REMARK, expanded: true });
+    await act(async () => askIn('Message Scout', 'Yes, and tell Marco too'));
+    turn(bridge, 'turn-1', 'Done.');
+    const log = screen.getByRole('log', { name: 'Conversation with Scout' });
+    expect(log.textContent).toMatch(/Dana.*Yes, and tell Marco too.*Done\./);
+  });
+
+  it('a remark arriving while open is kept after the next question', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { expanded: true });
+    act(() => bridge.emit(helloRemark(REMARK)));
+    await act(async () => askIn('Message Scout', 'Yes please'));
+    turn(bridge, 'turn-1', 'Pushed.');
+    const log = screen.getByRole('log', { name: 'Conversation with Scout' });
+    expect(log.textContent).toMatch(/Dana.*Yes please.*Pushed\./);
+  });
+
+  it('a second remark keeps the first above it', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { expanded: true });
+    act(() => bridge.emit(helloRemark('First thing.')));
+    act(() => bridge.emit(helloRemark('Second thing.')));
+    const log = screen.getByRole('log', { name: 'Conversation with Scout' });
+    expect(log.textContent).toMatch(/First thing\..*Second thing\./);
+  });
+
+  it('the expanded chat shows the remark as its first message', () => {
+    renderBubble(createFakeHostBridge(), { remark: REMARK, expanded: true });
+    const log = screen.getByRole('log', { name: 'Conversation with Scout' });
+    expect(within(log).getByText(REMARK)).toBeVisible();
+    expect(within(log).queryByText(/anything about what is on your screen/)).toBeNull();
+  });
+
+  it('back to bubble then chat again still shows the remark', () => {
+    const bridge = createFakeHostBridge();
+    const tree = (expanded: boolean) => (
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} expanded={expanded} />
+      </HostBridgeProvider>
+    );
+    const { rerender } = render(tree(false));
+    rerender(tree(true));
+    rerender(tree(false));
+    expect(screen.getByText(REMARK)).toBeVisible();
+    rerender(tree(true));
+    expect(within(screen.getByRole('log')).getByText(REMARK)).toBeVisible();
+  });
+
+  it('a remark exchange has no user tile', async () => {
+    const bridge = createFakeHostBridge();
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} expanded />
+      </HostBridgeProvider>,
+    );
+    await act(async () => askIn('Message Scout', 'Yes'));
+    turn(bridge, 'turn-1', 'Ok.');
+    expect(container.querySelectorAll('.bubble-mine')).toHaveLength(1);
+  });
+});
+
 describe('CompanionBubble voice', () => {
   it.each([
     ['refusal', 'Declined'],

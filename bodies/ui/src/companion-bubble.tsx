@@ -78,11 +78,13 @@ export interface CompanionBubbleProps {
   onDropDone?: () => void;
   /** The top status mark from the host: a muted row above the question box, never spoken. */
   status?: StatusMarkValue | null;
+  /** Scout's own line the person clicked open on the quiet line: it becomes Scout's first message. */
+  remark?: string;
 }
 
-/** A question and how it was answered, once it is over. */
+/** A question and how it was answered, once it is over; no question when Scout spoke first. */
 interface Exchange {
-  question: string;
+  question: string | null;
   answer: string;
   failed: boolean;
 }
@@ -142,6 +144,7 @@ export function CompanionBubble({
   drop,
   onDropDone,
   status,
+  remark,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -180,12 +183,32 @@ export function CompanionBubble({
     setOpenDrop(drop);
   }
 
+  // Scout's own line (a wake's remark), kept until the person answers it; then it moves into
+  // the log as an exchange with no question, so a follow-up never loses it.
+  const [scoutLine, setScoutLine] = useState<string | null>(remark ?? null);
+  const [lastRemark, setLastRemark] = useState(remark);
+  if (remark !== lastRemark) {
+    setLastRemark(remark);
+    if (remark !== undefined) setScoutLine(remark);
+  }
+
   // A new capture brings every chip back: removing is per question, not forever.
   const [lastSnapshot, setLastSnapshot] = useState(snapshot);
   if (snapshot !== lastSnapshot) {
     setLastSnapshot(snapshot);
     setRemoved(new Set());
   }
+
+  /** Moves what is on show (the last answer, Scout's own line) into the log. */
+  const keepShown = (): void => {
+    const earlier: Exchange[] = [];
+    if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
+      earlier.push({ question, answer: reply.text, failed: reply.state === 'failed' });
+    }
+    if (scoutLine !== null) earlier.push({ question: null, answer: scoutLine, failed: false });
+    if (earlier.length > 0) setPast((current) => [...current, ...earlier]);
+    setScoutLine(null);
+  };
 
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
     if (event.type === 'turn.completed' || event.type === 'turn.error') {
@@ -240,13 +263,12 @@ export function CompanionBubble({
         return;
       case 'pet.remark':
         // A wake's words with the bubble open: Scout's message, unless an answer is streaming.
+        // What was on show (an answer, an earlier remark) goes into the log above it.
         if (reply.state === 'running' || health !== null) return;
-        if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
-          const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
-          setPast((current) => [...current, answered]);
-        }
+        keepShown();
         setQuestion(null);
-        setReply({ state: 'done', text: event.text });
+        setReply({ state: 'idle' });
+        setScoutLine(event.text);
         return;
       default:
         return;
@@ -361,10 +383,7 @@ export function CompanionBubble({
     heard = asSpoken,
     withDrop = false,
   ): void => {
-    if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
-      const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
-      setPast((current) => [...current, answered]);
-    }
+    keepShown();
     healthRun.current += 1;
     setHealth(null);
     if (wantsHealthCheck(text)) {
@@ -508,6 +527,12 @@ export function CompanionBubble({
       )}
     </>
   );
+  // Scout's own line, until the person answers it (then it is in the log).
+  const scoutMessage = scoutLine !== null && (
+    <div className="bubble-answer">
+      <Answer text={scoutLine} />
+    </div>
+  );
   // A health check answers with its card, in the answer's place.
   const answer =
     health === null ? (
@@ -616,12 +641,12 @@ export function CompanionBubble({
             </span>
           </header>
           <div className="bubble-log" role="log" aria-label={`Conversation with ${petName}`}>
-            {past.length === 0 && question === null && (
+            {past.length === 0 && question === null && scoutLine === null && (
               <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
             )}
             {past.map((exchange, index) => (
               <div key={index} className="bubble-exchange">
-                <p className="bubble-mine">{exchange.question}</p>
+                {exchange.question !== null && <p className="bubble-mine">{exchange.question}</p>}
                 {exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
@@ -629,6 +654,7 @@ export function CompanionBubble({
                 )}
               </div>
             ))}
+            {scoutLine !== null && <div className="bubble-exchange">{scoutMessage}</div>}
             {question !== null && (
               <div className="bubble-exchange">
                 <p className="bubble-mine">{question}</p>
@@ -671,6 +697,7 @@ export function CompanionBubble({
             {question}
           </p>
         )}
+        {scoutMessage}
         {answer}
         {cards}
         {statusRow}
@@ -701,8 +728,8 @@ export interface GreetingLineProps {
   onFix?: (target: FixTarget) => void;
   /** It left: the time ran out, or the person closed it. */
   onDone: () => void;
-  /** The person clicked it: open the bubble to ask. */
-  onOpen?: () => void;
+  /** The person clicked it: open the bubble to ask, carrying the line so it is not lost. */
+  onOpen?: (text: string) => void;
   tail?: 'left' | 'right';
   /** How long it stays when nobody touches it. */
   holdMs?: number;
@@ -762,7 +789,7 @@ export function GreetingLine({
               type="button"
               className="bubble-say"
               aria-label={`Ask ${petName} something`}
-              onClick={onOpen}
+              onClick={() => onOpen?.(text ?? '')}
             >
               <span role="status" aria-live="polite" className="bubble-text">
                 {text}

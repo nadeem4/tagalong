@@ -62,6 +62,8 @@ export interface FakeBrain {
   };
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
+  /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
+  sendRemark(text: string): void;
   close(): Promise<void>;
 }
 
@@ -496,6 +498,23 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         socket.send(
           JSON.stringify({ jsonrpc: '2.0', method: 'approved', params: { seq: ++seq, ...note } }),
         );
+      }
+    },
+    sendRemark: (text) => {
+      const turn = `t${++turns}`;
+      const base = { turn, body: 'desktop' };
+      const frames: [string, Record<string, unknown>][] = [
+        ['turn', { ...base, state: 'started', started_by: 'brain' }],
+        ['reply', { ...base, delta: text }],
+        ['reply', { ...base, done: true }],
+        ['turn', { ...base, state: 'ended', reason: 'done' }],
+      ];
+      for (const [method, params] of frames) {
+        for (const socket of sockets) {
+          socket.send(
+            JSON.stringify({ jsonrpc: '2.0', method, params: { seq: ++seq, ...params } }),
+          );
+        }
       }
     },
     close: () =>
