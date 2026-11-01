@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { MoneyField } from '../controls';
+import { SpentLine } from '../home/spent-line';
 import { useStepSave } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 
@@ -21,7 +22,7 @@ function LimitForm({
   host,
   start,
 }: {
-  host: Pick<WalkthroughHost, 'setDailyLimit'>;
+  host: Pick<WalkthroughHost, 'setDailyLimit' | 'usageSummary'>;
   start: number;
 }) {
   const [text, setText] = useState(String(start));
@@ -43,6 +44,7 @@ function LimitForm({
         invalid={parseLimit(text) === null}
       />
       <p className="wt-help">US dollars a day (default ${DEFAULT_LIMIT})</p>
+      <SpentLine read={host.usageSummary} />
     </div>
   );
 }
@@ -50,7 +52,7 @@ function LimitForm({
 export function StepEight({
   host,
 }: {
-  host: Pick<WalkthroughHost, 'keyStatus' | 'setDailyLimit'>;
+  host: Pick<WalkthroughHost, 'keyStatus' | 'setDailyLimit' | 'usageSummary'>;
 }) {
   const [start, setStart] = useState<number | null>(null);
   const { keyStatus } = host;

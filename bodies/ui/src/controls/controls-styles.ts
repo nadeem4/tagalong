@@ -147,4 +147,5 @@ export const CONTROLS_CSS = `
 .tg-keyfield__status { min-height: 20px; }
 .tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${t.color.errInk}; font-weight: ${t.fontWeight.semibold}; }
 .tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${t.color.okInk}; }
+.tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; font-variant-numeric: tabular-nums; }
 `;

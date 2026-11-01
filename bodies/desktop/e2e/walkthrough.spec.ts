@@ -327,6 +327,7 @@ test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', a
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
   await nextTo(tour, 8);
+  await expect(tour.getByText('Spent today: $0.42')).toBeVisible();
   await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });

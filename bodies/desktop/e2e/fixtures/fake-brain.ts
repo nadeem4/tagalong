@@ -8,7 +8,7 @@
  * the error text if the tool failed (how a paused sight shows up).
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
- * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`,
+ * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`, `spend_today` ($0.42),
  * `set_daily_limit`, `expert_status`) follow `FakeBrainOptions`; the brain counts key attempts
  * and keeps no key.
  *
@@ -410,6 +410,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             env_path: 'C:/Users/test/Tagalong/.env',
             daily_limit_usd: dailyLimitUsd,
           };
+        } else if (params.tool === 'spend_today') {
+          value = { spent_usd: 0.42, limit_usd: dailyLimitUsd };
         } else if (params.tool === 'set_api_key') {
           keyCalls.attempts += 1;
           const status = keyResults.length > 1 ? keyResults.shift() : keyResults[0];

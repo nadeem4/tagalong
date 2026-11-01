@@ -91,8 +91,8 @@ its result.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens stay in the brain's data folder.
-- Spend: Home's Overview shows what Scout spent today against a daily limit. At the limit Scout
-  pauses for the day.
+- Spend: Home's Overview shows what Scout spent today against a daily limit, and the same "Spent today" line sits beside the
+  limit in Settings and in the tour. At the limit Scout pauses for the day.
 - Not built yet: macOS and Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 

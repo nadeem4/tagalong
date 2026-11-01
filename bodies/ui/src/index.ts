@@ -36,6 +36,9 @@ export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 
+/** The "Spent today" line beside a daily-limit field. */
+export { SpentLine } from './home/spent-line';
+
 export { SETTINGS_CSS } from './settings/settings-styles';
 
 /** The Anthropic key field and the daily-limit field, shared by Settings and the walkthrough. */

@@ -26,6 +26,7 @@ const walkthroughHost: WalkthroughHost = {
   keyStatus: bridge.keyStatus,
   setKey: bridge.setKey,
   setDailyLimit: bridge.setDailyLimit,
+  usageSummary: bridge.usageSummary,
   onBrainChanged: bridge.onBrainChanged,
   openWalkthrough: bridge.openWalkthrough,
   expertStatus: () => host.expertStatus(),
