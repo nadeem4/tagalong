@@ -39,6 +39,16 @@ describe('StepEight', () => {
     expect(limit().value).toBe('4');
   });
 
+  it('marks the field invalid while the amount is not above $0', async () => {
+    mountStep(<StepEight host={makeWalkthroughHost()} />);
+    await screen.findByDisplayValue('5');
+    expect(limit()).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(limit(), { target: { value: '0' } });
+    expect(limit()).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(limit(), { target: { value: '3' } });
+    expect(limit()).not.toHaveAttribute('aria-invalid');
+  });
+
   it('an unchanged amount saves nothing (Skip and Back never reach setDailyLimit)', async () => {
     const host = makeWalkthroughHost();
     const step = mountStep(<StepEight host={host} />);

@@ -344,10 +344,12 @@ test('150 percent scale on a 1366x768 work area still shows Finish and Skip', as
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
       ?.setContentSize(910, 512),
   );
-  await nextTo(tour, 9);
+  // Skip is on every step but the last, so check it on step 8 and Finish on step 9.
+  await nextTo(tour, 8);
+  await expect(tour.getByRole('button', { name: 'Skip' })).toBeInViewport();
+  await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await expect(tour.getByRole('button', { name: 'Finish' })).toBeInViewport();
-  await expect(tour.getByRole('button', { name: 'Skip' })).toBeInViewport();
 });
 
 test('the voice step works from the keyboard: switch, slider and select', async () => {
@@ -369,6 +371,7 @@ test('the voice step works from the keyboard: switch, slider and select', async 
   expect(Number(await speed.inputValue())).toBeGreaterThan(before);
 
   const talk = tour.getByLabel('Talk key');
+  await expect(talk).toHaveValue('RightControl');
   await talk.focus();
   await tour.keyboard.press('ArrowDown');
   await expect(talk).not.toHaveValue('RightControl');

@@ -71,6 +71,14 @@ describe('StepNine', () => {
     await waitFor(() => expect(lastValid(onValid)).toBe(true));
   });
 
+  it('hides the brain-saved and Settings notes when the key comes from the environment', async () => {
+    mount({ ...HAS_KEY, source: 'environment' });
+    await screen.findByText('Set by your environment');
+    expect(document.body.textContent).not.toContain('Saved by Scout’s brain');
+    expect(document.body.textContent).not.toContain('Change or remove it any time in Settings');
+    expect(screen.getByText('Only sent to Anthropic')).toBeInTheDocument();
+  });
+
   it('shows where the brain saves the key, and never says to edit .env', async () => {
     const { container } = render(<StepNine host={makeWalkthroughHost()} onValid={vi.fn()} />);
     expect(

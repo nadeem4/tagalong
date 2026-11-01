@@ -34,7 +34,13 @@ function LimitForm({
 
   return (
     <div>
-      <MoneyField id="wt-limit" label="Daily limit (USD)" value={text} onChange={setText} />
+      <MoneyField
+        id="wt-limit"
+        label="Daily limit (USD)"
+        value={text}
+        onChange={setText}
+        invalid={parseLimit(text) === null}
+      />
       <p className="wt-help">US dollars a day (default ${DEFAULT_LIMIT})</p>
     </div>
   );

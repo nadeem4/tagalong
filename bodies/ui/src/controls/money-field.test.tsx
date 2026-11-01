@@ -18,10 +18,12 @@ describe('MoneyField', () => {
     expect(onChange).toHaveBeenLastCalledWith('4');
   });
 
-  it('minus stops at 0', () => {
-    const { onChange } = setup('0.5');
+  it('minus stops at 1 by default', () => {
+    const { onChange } = setup('1.5');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease' }));
-    expect(onChange).toHaveBeenLastCalledWith('0');
+    expect(onChange).toHaveBeenLastCalledWith('1');
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease' }));
+    expect(onChange).toHaveBeenLastCalledWith('1');
   });
 
   it('plus from text that is not a number starts at 1', () => {

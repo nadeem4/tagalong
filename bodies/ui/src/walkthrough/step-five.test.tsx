@@ -31,7 +31,7 @@ describe('StepFive', () => {
     }
   });
 
-  it('the speed slider moves with ArrowRight semantics and shows its value', async () => {
+  it('the speed slider is a step 0.05 slider and shows its changed value', async () => {
     mount();
     const speed = await screen.findByLabelText(/^Speed/);
     expect(speed.closest('.tg-slider')).not.toBeNull();
