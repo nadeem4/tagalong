@@ -1666,9 +1666,10 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
 1. **Action:** close the bubble, then let Scout say something (or `say` something that makes it speak
    first) so the quiet line appears. Click the line. **Expected:** the bubble opens with Scout's
-   words under Scout's mark and name, and the question box says "Reply to Scout".
-2. **Action:** ask a follow-up, then **Open full chat**. **Expected:** the chat shows Scout's line
-   first, then your message on a tile, then Scout's answer; the log sits at the newest message.
+   words under Scout's mark and name.
+2. **Action:** press **Open full chat**. **Expected:** the question box says "Reply to Scout". Ask a
+   follow-up: the chat shows Scout's line first, then your message on a tile, then Scout's answer;
+   the log sits at the newest message, and once the answer is done the box says "Ask Scout anything".
 3. **Action:** ask until the log is longer than the window, then use **Back to bubble** and
    **Open full chat** again. **Expected:** it lands on the newest message each time.
 4. **Action:** ask something that takes a moment. **Expected:** a gold dot, "Scout is thinking…" and

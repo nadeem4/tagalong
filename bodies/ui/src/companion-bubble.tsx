@@ -498,7 +498,7 @@ export function CompanionBubble({
       if (element !== null) element.scrollTop = element.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
-  }, [past.length, question, streamed, scoutLine, expanded]);
+  }, [past.length, question, streamed, scoutLine, expanded, confirm, health, openDrop]);
 
   const chips = chipsOf(snapshot).filter((chip) => !removed.has(chip.id));
   const chipList = chips.length > 0 && (
@@ -630,7 +630,8 @@ export function CompanionBubble({
     </>
   );
   // Replying to Scout's own line, not asking cold.
-  const replying = scoutLine !== null || past[past.length - 1]?.question === null;
+  const replying =
+    scoutLine !== null || (question === null && past[past.length - 1]?.question === null);
   const field = (label: string, inChat = false) => (
     <label className="bubble-field">
       <span className={inChat ? 'bubble-sr' : undefined}>{label}</span>
@@ -964,13 +965,14 @@ const BUBBLE_CSS = `
 @keyframes bubble-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .bubble-listening-dot { animation: none; } }
 /* The host sets --tg-voice-level (0 to 1) from the audio as it plays. */
-.bubble-speaking span {
+.bubble-speaking span, .bubble-bars span {
   width: 3px; height: 14px; border-radius: 2px; background: ${t.color.gold};
   transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4) * 0.7)); transition: transform 90ms linear;
 }
-.bubble-speaking span:nth-child(2) { transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4))); }
+.bubble-speaking span:nth-child(2), .bubble-bars span:nth-child(2) { transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4))); }
 @media (prefers-reduced-motion: reduce) {
-  .bubble-speaking span, .bubble-speaking span:nth-child(2) { transform: scaleY(0.6); transition: none; }
+  .bubble-speaking span, .bubble-speaking span:nth-child(2),
+  .bubble-bars span, .bubble-bars span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }

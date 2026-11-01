@@ -1,4 +1,7 @@
-/** Tests for ScoutMark: Bean's still tile beside lines Scout starts. */
+/**
+ * Tests for ScoutMark: Bean's still tile beside lines Scout starts.
+ * Covers the still frame and the optional animated clip. Runs on jsdom with no host bridge.
+ */
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';

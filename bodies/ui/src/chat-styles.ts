@@ -17,16 +17,11 @@ export const CHAT_CSS = `
   font-weight: ${t.fontWeight.semibold}; color: ${t.color.text};
 }
 .bubble-hint { font-size: 11px; line-height: 16px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.textMuted}; }
-/* The quiet line reading aloud: the same three bars as the speaking button, not pressable. */
+/* The quiet line reading aloud: the speaking button's bars (styled in companion-bubble), not pressable. */
 .bubble-bars { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; }
-.bubble-bars span {
-  width: 3px; border-radius: 2px; background: ${t.color.gold};
-  transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4) * 0.7)); transition: transform 90ms linear;
-}
 .bubble-bars span:nth-child(1) { height: 8px; }
 .bubble-bars span:nth-child(2) { height: 14px; }
 .bubble-bars span:nth-child(3) { height: 10px; }
-@media (prefers-reduced-motion: reduce) { .bubble-bars span { transform: none; transition: none; } }
 
 .bubble--line { padding: 12px 8px 12px 14px; gap: 8px; }
 .bubble--line:hover { border-color: #3A4270; }

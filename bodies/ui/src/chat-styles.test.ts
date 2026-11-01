@@ -1,4 +1,7 @@
-/** Tests for CHAT_CSS: the padding rule on every bordered or filled rule that holds text. */
+/**
+ * Tests for CHAT_CSS: the padding rule on every bordered or filled rule that holds text.
+ * Reads the rules as text, so it needs no browser. Uses the helpers in test-support/css-rules.
+ */
 import { describe, expect, it } from 'vitest';
 import { CHAT_CSS } from './chat-styles';
 import { minPadding, ruleOf } from './test-support/css-rules';
