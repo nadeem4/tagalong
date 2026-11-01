@@ -291,3 +291,23 @@ describe('LimitField', () => {
     expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('8');
   });
 });
+
+describe('inside the Settings form', () => {
+  // Settings is one form with one Save: Check key and Set limit must act alone, never submit it.
+  it('Check key, Enter in the key field and Set limit do not submit the form', async () => {
+    const onSubmit = vi.fn((event: { preventDefault(): void }) => event.preventDefault());
+    const setDailyLimit = vi.fn(() => Promise.resolve());
+    render(
+      <form onSubmit={onSubmit}>
+        <KeyField host={makeHost()} />
+        <LimitField host={{ setDailyLimit }} limitUsd={5} />
+      </form>,
+    );
+    const field = await paste(FAKE_KEY);
+    fireEvent.keyDown(field, { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Check key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+    await waitFor(() => expect(setDailyLimit).toHaveBeenCalledWith(5));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

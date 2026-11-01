@@ -43,6 +43,25 @@ describe('Slider', () => {
     expect(input.style.getPropertyValue('--fill')).toBe('50%');
   });
 
+  it('marks the range invalid and described when asked', () => {
+    render(
+      <Slider
+        id="s2"
+        label="Pace"
+        value={1}
+        min={0}
+        max={2}
+        step={1}
+        onChange={() => {}}
+        invalid
+        describedBy="err"
+      />,
+    );
+    const input = screen.getByLabelText('Pace');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAttribute('aria-describedby', 'err');
+  });
+
   it('shows the plain number without a formatter', () => {
     setup(3);
     expect(screen.getByText('3')).toBeInTheDocument();

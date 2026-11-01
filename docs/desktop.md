@@ -194,6 +194,7 @@ Rules each module enforces:
   scale.
 - **Home.** Every tab renders in one `.home-page` box (920px at most, one inset), and each connection's On/Off is the shared `Toggle` (`role="switch"`). Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
+- **Settings form.** The Settings page of Home (`renderer/src/settings/settings-page.tsx`) has one **Save**, at the top beside the heading (its result shows to the left of it on the heading row; there is no footer). Each section is a `home-card`. Toggles, selects and the speed slider are the shared controls from `@tagalong/ui`; since they have no form name, the Voice section keeps `mouth`, `ears`, `voice`, `voiceSpeed`, `talkHotkey` and `microphoneId` (and `voiceEnabled` when on) in hidden inputs so `buildSettingsPatch` reads the same form fields as before. The three shortcuts show as keycaps (`Shortcut`, never `CommandOrControl`) with a Change button that reveals the text field holding the accelerator (a refused one opens it at once; at rest a hidden field carries it so Save still sends every key); an odd one such as `Foo+Bar` shows as plain keycaps. Check key and Set limit act alone (they never submit the form), and a key from the environment disables the key field.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`
   calls `openWalkthrough(9)` instead.
@@ -460,7 +461,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
   pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
   reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
-  Each row has an Ask/Auto switch; a locked tool shows Ask and "Risky action", its switch works, and turning it to Auto asks you to confirm first; a
+  The card is a `home-card` like every Home panel. Each row has an Ask/Auto switch (the shared `Toggle`, on is Auto, with the word Ask or Auto beside it); a locked tool shows Ask and "Risky action", its switch works, and turning it to Auto asks you to confirm first; a
   tool of an offline body is dimmed, marked "Not connected", and its switch is disabled (the brain
   cannot set a mode for it yet). The list reads again on `changed { what: "permissions" }`. The e2e
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`

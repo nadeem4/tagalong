@@ -28,4 +28,8 @@ describe('HOME_CSS', () => {
     expect(HOME_CSS).toMatch(/\.home-time[^{]*\{[^}]*white-space: nowrap/);
     expect(HOME_CSS).toMatch(/\.apv-row__time[^{]*\{[^}]*white-space: nowrap/);
   });
+
+  it('gives the permissions card no width or margin of its own', () => {
+    expect(HOME_CSS).not.toMatch(/\.home-perms\s*\{[^}]*(max-width|margin)/);
+  });
 });

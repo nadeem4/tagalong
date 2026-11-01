@@ -25,6 +25,11 @@ describe('Toggle', () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 
+  it('can be described by a note elsewhere on the page', () => {
+    render(<Toggle checked onChange={() => {}} label="Voice" describedBy="note" />);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-describedby', 'note');
+  });
+
   it('disabled ignores clicks and is aria-disabled', () => {
     const onChange = vi.fn();
     render(<Toggle checked onChange={onChange} label="Voice" disabled />);
@@ -33,6 +38,15 @@ describe('Toggle', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(toggle).toBeDisabled();
     expect(toggle).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('shows custom words when given', () => {
+    const { rerender } = render(
+      <Toggle checked={false} onChange={() => {}} label="Tool" onWord="Auto" offWord="Ask" />,
+    );
+    expect(screen.getByText('Ask')).toBeInTheDocument();
+    rerender(<Toggle checked onChange={() => {}} label="Tool" onWord="Auto" offWord="Ask" />);
+    expect(screen.getByText('Auto')).toBeInTheDocument();
   });
 
   it('shows On or Off text', () => {

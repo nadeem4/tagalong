@@ -681,3 +681,40 @@ describe('the approval offer ask', () => {
     ]);
   });
 });
+
+describe('CompanionBubble on navy', () => {
+  it('marks every bubble surface on-navy and rings focus in gold', () => {
+    const bridge = createFakeHostBridge();
+    const { container, rerender } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    expect(container.querySelector('.bubble')).toHaveClass('on-navy');
+    const css = [...container.querySelectorAll('style')].map((s) => s.textContent).join('');
+    expect(css).toContain('--tg-focus');
+    expect(css).not.toContain('outline: 2px solid #7CB8F2');
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded />
+      </HostBridgeProvider>,
+    );
+    expect(container.querySelector('.bubble--chat')).toHaveClass('on-navy');
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <GreetingLine petName="Scout" text="Hello" onDone={() => undefined} />
+      </HostBridgeProvider>,
+    );
+    expect(container.querySelector('.bubble--line')).toHaveClass('on-navy');
+  });
+
+  it('keeps the context chips in their own row, away from the close button', () => {
+    renderBubble(createFakeHostBridge(), { snapshot: SNAPSHOT, onClose: () => undefined });
+    const chips = screen.getByRole('list', { name: 'What Scout can see' });
+    const close = screen.getByRole('button', { name: 'Close' });
+    const header = close.closest('.bubble-top');
+    expect(header).not.toBeNull();
+    expect(header!.contains(chips)).toBe(false);
+    expect(chips.closest('.bubble-top')).toBeNull();
+  });
+});

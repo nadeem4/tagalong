@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { CONTROLS_CSS, SETTINGS_CSS } from '@tagalong/ui';
+import { Button, CONTROLS_CSS, SETTINGS_CSS } from '@tagalong/ui';
 import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
 import { KeySection } from './key-section';
@@ -87,8 +87,6 @@ export function SettingsPage() {
     );
   }
 
-  const { settings } = view;
-
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (view === null) return;
@@ -129,8 +127,40 @@ export function SettingsPage() {
   }
 
   return (
+    <SettingsFormView
+      view={view}
+      browserFolder={browserFolder}
+      ui={ui}
+      status={status}
+      statusIsError={statusIsError}
+      onSubmit={(event) => void save(event)}
+    />
+  );
+}
+
+/**
+ * The page's markup, apart from its loading and saving so a static render can test the layout.
+ * Save sits once, beside the heading: a footer Save is a page-length scroll away from the field.
+ */
+export function SettingsFormView({
+  view,
+  browserFolder,
+  ui,
+  status,
+  statusIsError,
+  onSubmit,
+}: {
+  view: HostView;
+  browserFolder: BrowserFolder | null;
+  ui: SettingsUi;
+  status: string;
+  statusIsError: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const { settings } = view;
+  return (
     <SettingsUiContext.Provider value={ui}>
-      <form className="tg-settings tg-settings--embedded" onSubmit={(event) => void save(event)}>
+      <form className="tg-settings tg-settings--embedded" onSubmit={onSubmit}>
         <style>{CONTROLS_CSS}</style>
         <style>{SETTINGS_CSS}</style>
         <main className="tg-main">
@@ -143,30 +173,25 @@ export function SettingsPage() {
                 <span className="tg-sr">the information button</span> for more on any setting.
               </p>
             </div>
-            <button type="submit" className="tg-btn">
-              Save
-            </button>
+            <div className="tg-intro__save">
+              {status !== '' && (
+                <p
+                  className={statusIsError ? 'tg-error' : 'tg-saved'}
+                  role={statusIsError ? 'alert' : 'status'}
+                >
+                  {statusIsError ? `Not saved. ${status}` : status}
+                </p>
+              )}
+              <Button variant="primary" type="submit">
+                Save
+              </Button>
+            </div>
           </div>
           <KeySection />
-          <PrivacySection settings={settings} platform={view.platform} />
+          <PrivacySection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
-          <div className="tg-footer">
-            <button type="submit" className="tg-btn">
-              Save
-            </button>
-            {status === '' ? (
-              <p>Changes apply from the next ask.</p>
-            ) : (
-              <p
-                className={statusIsError ? 'tg-error' : 'tg-saved'}
-                role={statusIsError ? 'alert' : 'status'}
-              >
-                {statusIsError ? `Not saved. ${status}` : status}
-              </p>
-            )}
-          </div>
         </main>
       </form>
     </SettingsUiContext.Provider>

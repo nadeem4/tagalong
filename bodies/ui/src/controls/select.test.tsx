@@ -28,6 +28,28 @@ describe('Select', () => {
     expect(select.options).toHaveLength(2);
   });
 
+  it('marks the select invalid and described when asked', () => {
+    render(
+      <Select
+        id="s"
+        label="Voice"
+        value="a"
+        onChange={() => {}}
+        options={OPTIONS}
+        invalid
+        describedBy="err"
+      />,
+    );
+    const select = screen.getByLabelText('Voice');
+    expect(select).toHaveAttribute('aria-invalid', 'true');
+    expect(select).toHaveAttribute('aria-describedby', 'err');
+  });
+
+  it('has no aria-invalid by default', () => {
+    render(<Select id="s" label="Voice" value="a" onChange={() => {}} options={OPTIONS} />);
+    expect(screen.getByLabelText('Voice')).not.toHaveAttribute('aria-invalid');
+  });
+
   it('disabled disables the select', () => {
     render(
       <Select id="s" label="Voice" value="a" onChange={() => {}} options={OPTIONS} disabled />,

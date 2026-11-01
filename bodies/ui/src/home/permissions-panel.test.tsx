@@ -51,15 +51,31 @@ const rows = async () =>
   within(await screen.findByRole('list', { name: 'Permissions' })).getAllByRole('listitem');
 
 describe('PermissionsPanel', () => {
+  it('sits in a home-card section labelled Permissions', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [MOVE] }));
+    await rows();
+    const card = screen.getByRole('region', { name: 'Permissions' });
+    expect(card).toHaveClass('home-card');
+  });
+
+  it('uses the shared switch, not the old text button', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [MOVE] }));
+    const toggle = await screen.findByRole('switch', { name: 'desktop__move_window' });
+    expect(toggle).toHaveClass('tg-toggle');
+  });
+
   it('lists one row per tool with its description and switch state', async () => {
     renderPanel(createFakeHostBridge({ permissions: [MOVE, READ] }));
     const [move, read] = await rows();
     expect(move).toHaveTextContent('desktop__move_window');
     expect(move).toHaveTextContent('Move a window on your desktop');
     expect(within(move!).getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-    expect(within(move!).getByRole('switch')).toHaveTextContent('Ask');
+    expect(move).toHaveTextContent('Ask');
     expect(within(read!).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-    expect(within(read!).getByRole('switch')).toHaveTextContent('Auto');
+    expect(read).toHaveTextContent('Auto');
+    // The mode word lives on the switch alone, never beside it a second time.
+    expect(within(move!).getAllByText('Ask')).toHaveLength(1);
+    expect(within(read!).getAllByText('Auto')).toHaveLength(1);
   });
 
   it('sets a tool to auto when its switch is clicked, then shows the new mode', async () => {
@@ -84,7 +100,7 @@ describe('PermissionsPanel', () => {
     const toggle = await screen.findByRole('switch', { name: 'forget' });
     expect(toggle).toBeEnabled();
     expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(toggle).toHaveTextContent('Ask');
+    expect(screen.getByText('Ask')).toBeInTheDocument();
     expect(screen.getByText('Risky action')).toBeInTheDocument();
     expect(screen.queryByText('Always asks')).toBeNull();
   });

@@ -111,7 +111,6 @@ export const HOME_CSS = `
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__form-host.tg-panel { padding: 0; background: transparent; }
-.home-perms { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.xl}px;
@@ -124,8 +123,6 @@ export const HOME_CSS = `
 .perm-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; }
 .perm-row__note { font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text { opacity: 0.6; }
-.perm-row .tg-switch { flex: none; }
-.perm-row .tg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .job-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: ${t.space.xl}px;
@@ -210,6 +207,4 @@ export const HOME_CSS = `
 .apv-more { align-self: flex-start; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
-.home-controls .tg-footer { margin-top: ${t.space.xxl}px; }
-.home-controls .tg-footer p { color: ${t.color.panelMuted}; }
 `;

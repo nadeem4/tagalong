@@ -1,9 +1,11 @@
 /**
  * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
  * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold
- * to speak, and which microphone listens.
+ * to speak, and which microphone listens. The pickers and the speed are the shared controls, which
+ * have no form name, so each value rides in a hidden input that buildSettingsPatch reads.
  */
 import { useEffect, useState } from 'react';
+import { Button, Select, Slider, Toggle } from '@tagalong/ui';
 import {
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
@@ -39,7 +41,6 @@ export function VoiceSection({
 }) {
   const [talks, setTalks] = useState(settings.voice.enabled);
   const talkKey = settings.hotkeys.talk ?? SETTINGS_DEFAULTS.hotkeys.talk;
-  const talkRefused = hotkeyError?.includes(`(${TALK_KEY_LABELS[talkKey]})`) === true;
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     listMicrophones()
@@ -47,11 +48,16 @@ export function VoiceSection({
       .catch((error: unknown) => console.warn('[voice] could not list microphones', error));
   }, []);
   const picked = settings.voice.microphoneId ?? '';
+  const [microphone, setMicrophone] = useState(picked);
+  const [ears, setEars] = useState<string>(settings.voice.ears ?? 'local');
+  const [talkChoice, setTalkChoice] = useState<string>(talkKey);
   const [mouth, setMouth] = useState<string>(chosenMouth(settings.voice));
   const [voice, setVoice] = useState<VoiceId>(settings.voice.voice);
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
   const speedField = useInvalid('voiceSpeed');
+  // The refused-key sentence names the key in brackets; the Talk key select points at it too.
+  const hotkeyRefused = hotkeyError?.includes(`(${talkKey})`) === true;
 
   const preview = (): void => {
     setPreviewing(true);
@@ -72,16 +78,7 @@ export function VoiceSection({
           </h3>
           <p className="tg-help">Scout reads its answers aloud, so you can look away.</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          className="tg-switch"
-          aria-checked={talks}
-          aria-labelledby="talks-label"
-          onClick={() => setTalks((on) => !on)}
-        >
-          {talks ? 'On' : 'Off'}
-        </button>
+        <Toggle label="Scout talks" checked={talks} onChange={setTalks} />
         {talks && <input type="hidden" name="voiceEnabled" value="on" />}
       </div>
       <Tip tip="voice">
@@ -93,68 +90,60 @@ export function VoiceSection({
       </Tip>
       <div className="tg-grid">
         <div>
-          <label htmlFor="f-mouth">Who speaks</label>
-          <select
+          <Select
             id="f-mouth"
-            name="mouth"
+            label="Who speaks"
             value={mouth}
-            onChange={(event) => setMouth(event.target.value)}
-          >
-            {MOUTHS.map((adapter) => (
-              <option key={adapter.id} value={adapter.id}>
-                {adapter.label}
-              </option>
-            ))}
-          </select>
+            onChange={setMouth}
+            options={MOUTHS.map((adapter) => ({ value: adapter.id, label: adapter.label }))}
+          />
+          <input type="hidden" name="mouth" value={mouth} />
           <p className="tg-help">
             {voiceFacts(MOUTHS.find((adapter) => adapter.id === mouth) ?? MOUTHS[0]!)}
           </p>
         </div>
         <div>
-          <label htmlFor="f-ears">Who listens</label>
-          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'local'}>
-            {EARS.map((adapter) => (
-              <option key={adapter.id} value={adapter.id}>
-                {adapter.label}
-              </option>
-            ))}
-          </select>
+          <Select
+            id="f-ears"
+            label="Who listens"
+            value={ears}
+            onChange={setEars}
+            options={EARS.map((adapter) => ({ value: adapter.id, label: adapter.label }))}
+          />
+          <input type="hidden" name="ears" value={ears} />
           <p className="tg-help">{voiceFacts(EARS[0]!)}</p>
         </div>
       </div>
       <div className="tg-grid">
         <div>
-          <label htmlFor="f-voice">Voice</label>
           <div className="tg-actions tg-voice-pick">
-            <select
+            <Select
               id="f-voice"
-              name="voice"
+              label="Voice"
               value={voice}
-              onChange={(event) => setVoice(event.target.value as VoiceId)}
-            >
-              {VOICES.map((choice) => (
-                <option key={choice.id} value={choice.id}>
-                  {choice.label}
-                </option>
-              ))}
-            </select>
-            <button type="button" className="tg-btn-quiet" onClick={preview} disabled={previewing}>
+              onChange={(next) => setVoice(next as VoiceId)}
+              options={VOICES.map((choice) => ({ value: choice.id, label: choice.label }))}
+            />
+            <Button variant="quiet" onClick={preview} disabled={previewing}>
               <span aria-hidden="true">▶</span> Preview
-            </button>
+            </Button>
           </div>
+          <input type="hidden" name="voice" value={voice} />
         </div>
         <div>
-          <label htmlFor={speedField.props.id}>Speed: {speed.toFixed(2)}×</label>
-          <input
-            name="voiceSpeed"
-            type="range"
+          <Slider
+            id={speedField.props.id}
+            label="Speed"
+            value={speed}
             min={MIN_VOICE_SPEED}
             max={MAX_VOICE_SPEED}
             step={0.05}
-            value={speed}
-            onChange={(event) => setSpeed(Number(event.target.value))}
-            {...speedField.props}
+            onChange={setSpeed}
+            format={(n) => `${n.toFixed(2)}×`}
+            invalid={speedField.props['aria-invalid'] === true}
+            describedBy={speedField.props['aria-describedby']}
           />
+          <input type="hidden" name="voiceSpeed" value={speed} />
           {speedField.message}
         </div>
       </div>
@@ -164,34 +153,31 @@ export function VoiceSection({
             <label htmlFor="f-talkHotkey">Talk to Scout</label>
             <Info tip="talk" label="About talking to Scout" />
           </div>
-          <select
+          <Select
             id="f-talkHotkey"
-            name="talkHotkey"
-            defaultValue={talkKey}
-            {...(talkRefused
-              ? { 'aria-invalid': true as const, 'aria-describedby': 'hotkey-error' }
-              : {})}
-          >
-            {TALK_KEYS.map((key) => (
-              <option key={key} value={key}>
-                {TALK_KEY_LABELS[key]}
-              </option>
-            ))}
-          </select>
+            value={talkChoice}
+            onChange={setTalkChoice}
+            invalid={hotkeyRefused}
+            describedBy={hotkeyRefused ? 'hotkey-error' : undefined}
+            options={TALK_KEYS.map((key) => ({ value: key, label: TALK_KEY_LABELS[key] }))}
+          />
+          <input type="hidden" name="talkHotkey" value={talkChoice} />
         </div>
         <div>
-          <label htmlFor="f-microphone">Microphone</label>
-          <select id="f-microphone" name="microphoneId" defaultValue={picked}>
-            <option value="">System default</option>
-            {microphones.map((microphone) => (
-              <option key={microphone.id} value={microphone.id}>
-                {microphone.label}
-              </option>
-            ))}
-            {picked !== '' && !microphones.some((microphone) => microphone.id === picked) && (
-              <option value={picked}>The microphone picked before</option>
-            )}
-          </select>
+          <Select
+            id="f-microphone"
+            label="Microphone"
+            value={microphone}
+            onChange={setMicrophone}
+            options={[
+              { value: '', label: 'System default' },
+              ...microphones.map((mic) => ({ value: mic.id, label: mic.label })),
+              ...(picked !== '' && !microphones.some((mic) => mic.id === picked)
+                ? [{ value: picked, label: 'The microphone picked before' }]
+                : []),
+            ]}
+          />
+          <input type="hidden" name="microphoneId" value={microphone} />
         </div>
       </div>
       <p className="tg-help">

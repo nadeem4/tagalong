@@ -15,6 +15,7 @@ import type {
   TurnEvent,
 } from './shapes';
 import { ANSWER_CSS, Answer } from './answer';
+import { CONTROLS_CSS } from './controls/controls-styles';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
@@ -595,7 +596,8 @@ export function CompanionBubble({
   if (expanded) {
     return (
       <Speech tail={tail}>
-        <div className="bubble bubble--chat">
+        <div className="bubble bubble--chat on-navy">
+          <style>{CONTROLS_CSS}</style>
           <style>{BUBBLE_CSS}</style>
           <style>{ANSWER_CSS}</style>
           <style>{CARD_CSS}</style>
@@ -649,12 +651,12 @@ export function CompanionBubble({
 
   return (
     <Speech tail={tail}>
-      <div className="bubble">
+      <div className="bubble on-navy">
+        <style>{CONTROLS_CSS}</style>
         <style>{BUBBLE_CSS}</style>
         <style>{ANSWER_CSS}</style>
         <style>{CARD_CSS}</style>
         <div className="bubble-top">
-          {chipList || <span />}
           <span className="bubble-row">
             {alwaysToggle}
             {seeingToggle}
@@ -662,6 +664,7 @@ export function CompanionBubble({
             {closeButton}
           </span>
         </div>
+        {chipList}
         {askedAloud && question !== null && (
           <p className="bubble-heard">
             <span className="bubble-sr">You said: </span>
@@ -742,13 +745,14 @@ export function GreetingLine({
   return (
     <Speech tail={tail}>
       <div
-        className="bubble bubble--line"
+        className="bubble bubble--line on-navy"
         data-leaving={leaving}
         onMouseEnter={hold}
         onMouseLeave={() => setHeld(false)}
         onFocus={hold}
         onBlur={() => setHeld(false)}
       >
+        <style>{CONTROLS_CSS}</style>
         <style>{BUBBLE_CSS}</style>
         <div className="bubble-top">
           {status !== undefined ? (
@@ -817,7 +821,7 @@ const BUBBLE_CSS = `
   background: #222845; font-size: 13px; line-height: 1.5; white-space: pre-wrap;
 }
 .bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
-.bubble-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
   flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
   color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
@@ -836,7 +840,7 @@ const BUBBLE_CSS = `
 }
 .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
 .bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
-.bubble-mic:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }
+.bubble-mic:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-toggle {
   flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
   border: 1px solid ${t.color.fieldLine}; border-radius: 999px; background: transparent;
@@ -848,7 +852,7 @@ const BUBBLE_CSS = `
 .bubble-toggle:hover { background: #222845; color: ${t.color.text}; }
 .bubble-toggle[aria-checked='true'] { color: ${t.color.text}; border-color: ${t.color.gold}; }
 .bubble-toggle[aria-checked='true']::before { background: ${t.color.gold}; }
-.bubble-toggle:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }
+.bubble-toggle:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
   background: #222845; color: #C9CEE0; font-size: 13px; line-height: 1.45;
@@ -887,9 +891,9 @@ const BUBBLE_CSS = `
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
+.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
 .bubble-field input {
-  height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
+  flex: none; height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
   border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; font-size: 14px;
 }
 .bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
@@ -905,7 +909,7 @@ const BUBBLE_CSS = `
   border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; font-size: 12px; cursor: pointer;
 }
 .bubble-primary:focus-visible, .bubble-quiet:focus-visible, .bubble-close:focus-visible, .bubble-say:focus-visible {
-  outline: 2px solid #7CB8F2; outline-offset: 2px;
+  outline: 2px solid var(--tg-focus); outline-offset: 2px;
 }
 .bubble--line { animation: bubble-in 220ms ease-out both; }
 .bubble-sr {

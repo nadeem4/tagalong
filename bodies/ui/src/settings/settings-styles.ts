@@ -60,11 +60,10 @@ export const SETTINGS_CSS = `
 .tg-panel ::placeholder { color: ${t.color.panelMuted}; opacity: 1; }
 .tg-note { color: ${t.color.panelMuted}; font-size: ${t.fontSize.small}px; line-height: 1.5; margin: 0 0 ${t.space.lg}px; }
 .tg-error { display: flex; gap: ${t.space.sm}px; align-items: center; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; }
-.tg-btn, .tg-btn-quiet {
+.tg-btn-quiet {
   height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.field}px;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
 }
-.tg-btn { border: 1px solid ${t.color.gold}; background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .tg-btn-quiet { border: 1px solid ${t.color.fieldLine}; background: transparent; color: ${t.color.textMuted}; }
 .tg-btn-quiet:hover { color: ${t.color.text}; }
 .tg-panel .tg-btn-quiet { border-color: ${t.color.panelMuted}; color: ${t.color.panelText}; }
@@ -86,15 +85,6 @@ export const SETTINGS_CSS = `
 .tg-choice:has(input:checked) { border-color: ${t.color.gold}; background: ${t.color.panelTile}; }
 .tg-choice:has(input:focus-visible) { outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px; }
 .tg-choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.tg-switch {
-  display: inline-flex; align-items: center; gap: ${t.space.xs}px; min-width: 64px; height: 32px;
-  padding: 0 ${t.space.lg}px; border-radius: ${t.radius.field}px; border: 1px solid ${t.color.panelMuted};
-  background: transparent; color: ${t.color.panelMuted}; font-family: ${t.font.ui};
-  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
-}
-.tg-switch[aria-checked='true'] { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
-.tg-footer { display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px; }
-.tg-footer p { flex-basis: 100%; margin: 0; color: ${t.color.textMuted}; font-size: ${t.fontSize.small}px; }
 
 /* The Settings page: sections, ⓘ notes, status and errors. */
 .tg-settings [hidden] { display: none !important; }
@@ -102,13 +92,16 @@ export const SETTINGS_CSS = `
 .tg-settings .tg-panel label { margin-bottom: 0; }
 .tg-settings .tg-panel__heading { margin: 0; }
 .tg-settings .tg-chips { margin: 0; }
-.tg-settings--embedded .tg-main { gap: ${t.space.xxl}px; max-width: 820px; }
+.tg-settings--embedded .tg-main { gap: ${t.space.xxl}px; }
+/* Same box as Home's .home-card; written here too because this sheet loads after Home's. */
 .tg-settings--embedded .tg-panel {
-  background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; padding: ${t.space.xxxl}px 28px;
+  background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px;
+  padding: ${t.space.xl}px ${t.space.xxl}px;
 }
-.tg-settings--embedded .tg-footer p { color: ${t.color.panelMuted}; }
 .tg-intro { display: flex; flex-wrap: wrap; align-items: flex-end; gap: ${t.space.xl}px; }
 .tg-intro__text { flex: 1 1 320px; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-intro__save { display: flex; align-items: center; gap: ${t.space.md}px; margin-left: auto; }
+.tg-intro__save p { margin: 0; }
 .tg-intro__title { margin: 0; font-size: ${t.fontSize.title}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
 .tg-titlerow { display: flex; align-items: center; gap: ${t.space.sm}px; }
 .tg-panel h3.tg-sub {
@@ -136,17 +129,13 @@ export const SETTINGS_CSS = `
 .tg-inline label { flex: 1 1 320px; }
 .tg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px; }
 .tg-setting { display: flex; align-items: flex-start; gap: ${t.space.xxl}px; }
-.tg-panel input[type='range'] { width: 100%; min-height: ${t.size.fieldHeight}px; accent-color: ${t.color.gold}; }
-.tg-voice-pick select { flex: 1; width: auto; }
+.tg-voice-pick { align-items: flex-end; }
+.tg-voice-pick .tg-select { flex: 1; }
+.tg-shortcut + input { margin-top: ${t.space.sm}px; }
 .tg-setting__text { flex: 1; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .tg-divider { margin: 0; height: 1px; border: 0; background: ${t.color.panelLine}; }
-.tg-kbd {
-  display: inline-block; margin: 0 2px; padding: 1px 7px; border: 1px solid ${t.color.panelLine};
-  border-bottom-width: 2px; border-radius: 6px; background: #fff; color: ${t.color.panelText};
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
-}
 .tg-panel [aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-panel .tg-error, .tg-settings--embedded .tg-error { color: ${t.color.errInk}; }
 .tg-field-error { margin: ${t.space.xs}px 0 0; white-space: pre-line; }
-.tg-settings--embedded .tg-footer p.tg-saved { color: ${t.color.okInk}; font-weight: ${t.fontWeight.semibold}; }
+.tg-settings--embedded .tg-saved { color: ${t.color.okInk}; font-weight: ${t.fontWeight.semibold}; }
 `;

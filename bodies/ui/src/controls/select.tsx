@@ -9,6 +9,8 @@ export function Select({
   options,
   label,
   disabled = false,
+  invalid = false,
+  describedBy,
 }: {
   id: string;
   value: string;
@@ -16,6 +18,9 @@ export function Select({
   options: { value: string; label: string }[];
   label?: string;
   disabled?: boolean;
+  /** Marks the select as refused by the last save. */
+  invalid?: boolean;
+  describedBy?: string | undefined;
 }) {
   return (
     <div className="tg-select">
@@ -29,6 +34,8 @@ export function Select({
           id={id}
           value={value}
           disabled={disabled}
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(event.target.value)}
         >
           {options.map((option) => (

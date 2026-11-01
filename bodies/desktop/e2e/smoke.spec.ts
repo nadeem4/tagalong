@@ -157,6 +157,15 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   const panel = await windowFor('panel');
   const mic = panel.getByRole('button', { name: 'Talk to Scout' });
   await mic.waitFor({ state: 'visible', timeout: 30_000 });
+  // The mic sits inside the ask field's box, not over its text.
+  const fieldBox = await panel.getByRole('textbox', { name: 'Ask Scout' }).boundingBox();
+  const micBox = await mic.boundingBox();
+  expect(fieldBox).not.toBeNull();
+  expect(micBox).not.toBeNull();
+  expect(micBox!.x).toBeGreaterThanOrEqual(fieldBox!.x);
+  expect(micBox!.x + micBox!.width).toBeLessThanOrEqual(fieldBox!.x + fieldBox!.width);
+  expect(micBox!.y).toBeGreaterThanOrEqual(fieldBox!.y);
+  expect(micBox!.y + micBox!.height).toBeLessThanOrEqual(fieldBox!.y + fieldBox!.height);
   await mic.click();
   await expect(panel.getByRole('button', { name: 'Stop listening' })).toBeVisible();
   await expect(panel.getByText(/Listening/)).toBeVisible();
@@ -348,6 +357,47 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   for (const section of ['Privacy', 'Shortcuts']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
+
+  // One Save, at the top; the shortcuts are keycaps; a switch answers the keyboard.
+  await expect(home.getByRole('button', { name: 'Save', exact: true })).toHaveCount(1);
+  await expect(home.getByRole('region', { name: 'Shortcuts' }).locator('kbd').first()).toHaveText(
+    'Ctrl',
+  );
+  // The raw accelerator is not on screen at rest: no text field, no text.
+  await expect(home.getByText('CommandOrControl', { exact: false })).toHaveCount(0);
+  await expect(home.locator('input#f-askHotkey')).toHaveCount(0);
+  await expect(home.locator('input[name=askHotkey]')).toBeHidden();
+  // Save sends what was changed: Who speaks, the speed and (after Change) the ask shortcut.
+  await panel.evaluate(() => {
+    window.tagalongHost.onSettingsChanged((settings) => {
+      (window as unknown as { __saved?: unknown }).__saved = settings;
+    });
+  });
+  await home.getByLabel('Who speaks').selectOption('system');
+  await home.getByLabel('Speed').fill('1.2');
+  await home.getByRole('button', { name: 'Change ask shortcut' }).click();
+  await home.locator('input#f-askHotkey').fill('Ctrl+Alt+F9');
+  await home.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect
+    .poll(() =>
+      panel.evaluate(
+        () =>
+          (
+            window as unknown as {
+              __saved?: { voice: { mouth?: string; speed: number }; hotkeys: { ask: string } };
+            }
+          ).__saved,
+      ),
+    )
+    .toMatchObject({ voice: { mouth: 'system', speed: 1.2 }, hotkeys: { ask: 'Ctrl+Alt+F9' } });
+
+  const seeing = home.getByRole('switch', { name: 'Seeing' });
+  const seeingBefore = await seeing.getAttribute('aria-checked');
+  await seeing.focus();
+  await home.keyboard.press('Space');
+  await expect(seeing).not.toHaveAttribute('aria-checked', seeingBefore ?? '');
+  await home.keyboard.press('Space');
+  await expect(seeing).toHaveAttribute('aria-checked', seeingBefore ?? '');
 
   // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();
