@@ -11,6 +11,35 @@ function mount(host = makeWalkthroughHost()) {
 }
 
 describe('StepFive', () => {
+  it('Scout talks is a switch with aria-checked and no native checkbox remains', async () => {
+    mount();
+    const container = document.body;
+    const toggle = await screen.findByRole('switch', { name: 'Scout talks' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+  });
+
+  it('talk key, who speaks, voice and microphone are Selects with the label above', async () => {
+    mount();
+    const container = document.body;
+    await screen.findByLabelText('Talk key');
+    expect(container.querySelectorAll('.tg-select')).toHaveLength(4);
+    for (const label of ['Talk key', 'Who speaks', 'Voice', 'Microphone']) {
+      expect(screen.getByLabelText(label).closest('.tg-select')).not.toBeNull();
+    }
+  });
+
+  it('the speed slider moves with ArrowRight semantics and shows its value', async () => {
+    mount();
+    const speed = await screen.findByLabelText(/^Speed/);
+    expect(speed.closest('.tg-slider')).not.toBeNull();
+    expect(speed).toHaveAttribute('step', '0.05');
+    fireEvent.change(speed, { target: { value: '1' } });
+    expect(screen.getByText('1.00x')).toBeInTheDocument();
+  });
+
   it('offers no Always listening control', async () => {
     mount();
     await screen.findByLabelText('Talk key');
