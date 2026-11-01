@@ -346,7 +346,7 @@ clickable options. It is `effect: "read"`, mode `auto` (the ask is its own gate)
 wait: it opens an ask (`tool: "choose"`, optional `free_text`, optional `recommended`, 1-6 short
 options, none only with `free_text`) and returns `{"asked": id}` at once. A background task waits
 (10 minutes); when the person answers it emits a `choice` event `{ask, question, option, text}`
-that wakes Scout (never merged, outside the hourly caps). An unanswered or timed-out choice emits
+(`option` is empty when the person typed their own answer) that wakes Scout (never merged, outside the hourly caps). An unanswered or timed-out choice emits
 nothing, so no turn is stuck, and a late answer gets `not_found`. With nobody online the tool
 refuses.
 
