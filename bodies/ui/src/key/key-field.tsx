@@ -103,6 +103,7 @@ export function KeyField({ host, onSaved }: { host: KeyHost; onSaved?: () => voi
             type={shown ? 'text' : 'password'}
             autoComplete="off"
             spellCheck={false}
+            placeholder="sk-ant-…"
             value={value}
             disabled={environment}
             aria-invalid={outcome === 'invalid' ? 'true' : undefined}

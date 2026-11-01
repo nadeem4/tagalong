@@ -9,8 +9,8 @@ import { themeTokens as t } from '../theme/tokens';
 export const CONTROLS_CSS = `
 :root {
   --tg-focus: ${t.color.focusOnLight};
-  --tg-ctl-bg: ${t.color.panelTile};
-  --tg-ctl-line: ${t.color.panelLine};
+  --tg-ctl-bg: ${t.color.keycapFill};
+  --tg-ctl-line: ${t.color.keycapLine};
   --tg-ctl-ink: ${t.color.panelText};
   --tg-ctl-muted: ${t.color.panelMuted};
 }
@@ -25,6 +25,9 @@ export const CONTROLS_CSS = `
 .tg-money input:focus-visible, .tg-money button:focus-visible, .tg-button:focus-visible {
   outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px;
 }
+/* Controls size themselves the same on any host page, whatever its reset says. */
+.tg-toggle, .tg-select select, .tg-slider input, .tg-money input, .tg-button, .tg-keyfield #tg-api-key,
+.tg-keycap { box-sizing: border-box; }
 .tg-wordmark { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; }
 
 .tg-toggle {
@@ -40,7 +43,7 @@ export const CONTROLS_CSS = `
 .tg-toggle__word { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); }
 .tg-toggle[aria-checked='true'] .tg-toggle__word { right: auto; left: 7px; }
 .tg-toggle__knob {
-  position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
   background: ${t.color.keycapFill}; box-shadow: 0 1px 2px ${t.color.line}; transition: transform 120ms;
 }
 .tg-toggle[aria-checked='true'] .tg-toggle__knob { transform: translateX(${t.size.toggleW - t.size.toggleH}px); }
@@ -115,7 +118,7 @@ export const CONTROLS_CSS = `
 .tg-button--danger:hover:not(:disabled) { background: ${t.color.errInk}; color: ${t.color.errFill}; }
 
 .tg-keyfield { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
-.tg-keyfield__label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }
+.tg-keyfield__label { color: var(--tg-ctl-ink); font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold}; }
 .tg-keyfield__row { display: flex; align-items: center; gap: ${t.space.md}px; }
 .tg-keyfield__box { position: relative; flex: 1; min-width: 0; }
 /* The id selector outranks Settings' generic input rule whatever the sheet order. */
