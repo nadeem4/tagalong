@@ -1,7 +1,10 @@
 """Checks the setup facts: paths under the home folder and the read-only machine inspection."""
 
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 from brain.setup.facts import CmdResult, inspect, node_paths
 from brain.setup.paths import cache_file, experts_file, node_dir, tools_dir
@@ -126,3 +129,27 @@ async def test_inspect_machine_tool_is_json_and_read_only(tmp_path):
     out = json.loads(await handler({}))
     assert out["machine"]["os"] == "linux" and out["machine"]["node"] is None
     assert out["experts"] == []
+
+
+async def test_inspect_machine_lists_installed_experts(tmp_path):
+    from brain.setup.store import ExpertStore, InstalledExpert
+
+    ExpertStore(tmp_path).add(InstalledExpert("e", "E", "1", ["x"], "registry", None))
+
+    async def inspect_fn():
+        return await inspect(tmp_path, fake_run({}), linux, which_of())
+
+    handler = {s.name: h for s, h in setup_tools(tmp_path, Registry(tmp_path), inspect_fn)}
+    out = json.loads(await handler["inspect_machine"]({}))
+    assert [e["id"] for e in out["experts"]] == ["e"]
+
+
+async def test_real_run_cmd_timeout_is_a_parameter():
+    import sys
+
+    from brain.setup.facts import real_run_cmd
+
+    with pytest.raises(TimeoutError):
+        await real_run_cmd(
+            [sys.executable, "-c", "import time; time.sleep(5)"], os.environ, None, timeout=0.3
+        )

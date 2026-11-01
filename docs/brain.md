@@ -511,8 +511,30 @@ words what the person reads (guidance in `mind/soul.md`).
   enough returns at once with no network. The system Node, PATH and global npm are never touched.
   `net.http_fetch` is the real `Fetch` (streams chunks, raises on a non-200 or on a redirect
   away from https).
-- `tools.py`: Scout's tools `inspect_machine`, `find_experts` and `find_apps(query)`, all
-  read-only and automatic, never offered to Home.
+- `tools.py`: Scout's tools `inspect_machine` (which also lists the installed experts),
+  `find_experts` and `find_apps(query)`, all read-only and automatic, never offered to Home.
+- `store.py`: `ExpertStore`, the installed experts in `experts.json` (id, name, version, the
+  command to start it, `registry` or `custom`, and whether it is logged in). Re-read on every call
+  because the CLI writes the same file; writes are atomic; a corrupt file is kept as
+  `experts.json.bad` and read as empty.
+- `install.py`, `expert_tools.py`: the `install_expert(id)` tool installs one expert from the ACP
+  registry into `tools/<id>/`. It is a normal change tool, so it always opens the Allow card
+  unless the person chose Always for it; a preference in Scout's prompt never skips the card.
+  The card's input is built by code (`ToolSpec.card`): the expert, its version, the folder, and
+  `node_download` (the Node version and folder, or `null` when a system Node is new enough). An
+  `npx` entry runs `npm install --prefix tools/<id> <package>@<version>` with a system Node that
+  is new enough (and has its own npm), else Tagalong's own Node (floor: the entry's `requires`
+  `node`, default 22). The command runs with a copy of the environment (the chosen Node first on
+  PATH for the child only); the system environment is never changed and nothing is global.
+  The stored command is `[node, <the package's bin js>, <registry args>]`. A `binary` entry is
+  streamed, checked against its listed sha256 (none listed is refused) and extracted with
+  `safe_extract`. `uvx` and hosted entries are `unsupported`; an entry with no build for this
+  computer is `no_build`. A registry id must be a plain folder name. Any failure or cancel removes
+  `tools/<id>/` and its `.part` and records nothing; failures are `InstallError(kind, detail)`
+  facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
+  `unsafe_archive`, `download_failed`) returned to Scout as JSON. Progress goes out as a
+  non-waking `setup_progress` event (`expert`, `stage`, `percent`) plus `changed {what: "setup"}`.
+  Login is not part of this slice yet.
 
 ## Experts
 
@@ -600,17 +622,18 @@ offline ask from the same job replaces the first. This news is held in memory on
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind           | Batch window | Cap per hour | Note                                                                                                                            |
-| -------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `job_ended`    | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                 |
-| `timer`        | 0 s          | 6            | One of Scout's timers came due                                                                                                  |
-| `body_online`  | 0 s          | 2            | A body came back after 10+ minutes away                                                                                         |
-| `back`         | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                        |
-| `job_question` | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap |
-| `choice`       | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                     |
-| `focus`        | none         | none         | Which window is in front (context, no wake)                                                                                     |
-| `tab`          | none         | none         | Which browser tab is in front (context, no wake)                                                                                |
-| `download`     | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |
+| Kind             | Batch window | Cap per hour | Note                                                                                                                            |
+| ---------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `job_ended`      | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                 |
+| `timer`          | 0 s          | 6            | One of Scout's timers came due                                                                                                  |
+| `body_online`    | 0 s          | 2            | A body came back after 10+ minutes away                                                                                         |
+| `back`           | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                        |
+| `job_question`   | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap |
+| `choice`         | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                     |
+| `focus`          | none         | none         | Which window is in front (context, no wake)                                                                                     |
+| `tab`            | none         | none         | Which browser tab is in front (context, no wake)                                                                                |
+| `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |
+| `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                         |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
