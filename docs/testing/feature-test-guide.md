@@ -1604,7 +1604,8 @@ with a fake key; the real check against Anthropic is done by hand here.
    key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
 4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, change the voice and speed,
    press **Preview**, then **Next**. **Expected:** Preview plays the chosen voice; the choices
-   appear in Home → Settings. There is no Always listening control.
+   appear in Home → Settings. There is no Always listening control. From the keyboard, Space or
+   Enter flips **Scout talks** (On/Off), the arrow keys move **Speed** and change the selects.
 5. **Action:** with a key set, press **Skip**. **Expected:** the window closes, the pet
    appears and the tour does not open at the next launch. With no key, **Skip** goes to step
    9 instead.
@@ -1621,11 +1622,13 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    connector is installed on this computer." and nothing about the login. Rename the command or
    stop the brain, press **Check again**. **Expected:** "was not found" with the
    `npm install -g @agentclientprotocol/claude-agent-acp` line, or "Scout's brain is not running".
-   Gemini CLI, Codex and other coding agents read **Coming soon**.
+   The page reads "For bigger jobs, Scout calls in an expert", shows a hand-off card and ends
+   with "More experts are coming."
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
-3. **Action:** on step 8 set the limit to 0, then 8, press **Next**. **Expected:** 0 shows "Enter
+3. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
+   set it to 0, then 8, press **Next**. **Expected:** **+** raises it by 1; 0 shows "Enter
    an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip**
    with no key goes to step 9 and leaves the limit alone.
 4. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
@@ -1634,11 +1637,13 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    not reach Anthropic. Try again." and Finish stays off.
 5. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
    Finish off; start the brain and Check turns on by itself. The step never says to edit a file;
-   it shows where the machine running Scout's brain saved the key.
+   it shows where the machine running Scout's brain saved the key, under four notes ("Only sent to
+   Anthropic", "Never written to Scout's history or logs", and so on).
 6. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
    step 9 reads "Set by your environment" and Finish is on.
 7. **Action:** press **Finish**. **Expected:** the card "Scout is on your screen" shows the ask
-   and talk keys, and the tour is marked seen at once. **Close** (or **Open Home**) closes the
+   and talk keys as keycaps (never "CommandOrControl") and three things to try, and the tour is
+   marked seen at once. **Done** (or **Open Home**) closes the
    window and the pet appears; closing the card with the window's X does the same. Either way the
    tour does not open at the next launch (closing part-way, before Finish, brings it back).
 8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
