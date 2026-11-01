@@ -4,6 +4,7 @@
  * WalkthroughHost and WalkthroughSettings.
  */
 
+import type { MicWatcher } from '../controls';
 import type { ExpertStatus, HostBridge } from '../host-bridge';
 
 /**
@@ -50,6 +51,11 @@ export type WalkthroughHost = Pick<
   saveSettings(patch: Partial<WalkthroughSettings>): Promise<unknown>;
   previewVoice(preview: VoicePreview): Promise<void>;
   listMicrophones(): Promise<{ id: string; label: string }[]>;
+  /**
+   * Reads the microphone's loudness (0..1) for step 5's meter until stop(). The sound itself
+   * never leaves the host: only the level does. A failure to open is reported, not thrown.
+   */
+  watchMicLevel: MicWatcher;
   /** Where the browser add-on's folder is (step 7). */
   browserFolder(): Promise<{ path: string; exists: boolean }>;
   showBrowserFolder(): Promise<void>;

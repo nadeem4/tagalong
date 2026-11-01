@@ -1,11 +1,11 @@
 /**
  * Walkthrough step 5: talking to Scout. Talk key, Scout talks, who speaks, voice, speed and
- * microphone, all staged here and saved only on Next. Contains StepFive. Words are the spec's
+ * microphone (with a local level test), all staged here and saved only on Next. Contains StepFive. Words are the spec's
  * step copy; the choices match Settings.
  */
 
 import { useEffect, useState } from 'react';
-import { Button, Select, Slider, Toggle } from '../controls';
+import { Button, MicTest, Select, Slider, Toggle } from '../controls';
 import { useStepSave, useWalkthroughSettings } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -139,6 +139,7 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
         format={(n) => `${n.toFixed(2)}x`}
       />
       <Select id="wt-mic" label="Microphone" value={mic} onChange={setMic} options={micOptions} />
+      <MicTest watch={host.watchMicLevel} deviceId={mic === '' ? undefined : mic} />
       <p className="wt-help">
         Your voice is turned into text by your own brain and is never stored. With the brain on this
         computer, it never leaves it. The listening models download the first time you talk (about
