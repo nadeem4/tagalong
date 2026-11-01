@@ -84,6 +84,8 @@ test('valid key clears the field and shows already set', async () => {
   await expect(home.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await expect(home.getByLabel('API key')).toHaveValue('');
   expect(brain.keyAttempts).toBe(2);
+  // The daily limit shows what is spent today beside it (the fake brain reports $0.42).
+  await expect(home.getByText('Spent today: $0.42')).toBeVisible({ timeout: 30_000 });
   // The no-key mark leaves with the key.
   const avatar = await windowFor('avatar');
   await expect(avatar.getByTestId('status-mark')).toHaveCount(0, { timeout: 30_000 });

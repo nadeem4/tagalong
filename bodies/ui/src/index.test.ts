@@ -24,6 +24,7 @@ describe('ui package surface', () => {
         'Toggle',
         'Select',
         'Slider',
+        'SpentLine',
         'MoneyField',
         'Button',
         'Keycap',
