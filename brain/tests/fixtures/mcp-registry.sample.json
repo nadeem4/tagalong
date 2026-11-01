@@ -1,0 +1,120 @@
+{
+  "servers": [
+    {
+      "server": {
+        "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+        "name": "ai.2kw/mcp-server",
+        "description": "EU-hosted AI platform: OpenAI-compatible LLM gateway, document extraction, transcription, agents.",
+        "title": "2kw.ai",
+        "version": "8.0.3",
+        "websiteUrl": "https://2kw.ai",
+        "packages": [
+          {
+            "registryType": "npm",
+            "registryBaseUrl": "https://registry.npmjs.org",
+            "identifier": "@2kw/ai-mcp-server",
+            "version": "8.0.3",
+            "transport": {
+              "type": "stdio"
+            },
+            "environmentVariables": [
+              {
+                "description": "API key for the 2kw.ai platform",
+                "isRequired": true,
+                "isSecret": true,
+                "name": "AI_2KW_API_KEY"
+              },
+              {
+                "description": "Override the API base URL for self-hosted deployments",
+                "name": "AI_2KW_BASE_URL"
+              },
+              {
+                "description": "true opts agent runs into agent memory (X-Backbone-Memory: enabled)",
+                "name": "AI_2KW_MEMORY"
+              }
+            ]
+          }
+        ]
+      },
+      "_meta": {
+        "io.modelcontextprotocol.registry/official": {
+          "status": "active",
+          "statusChangedAt": "2026-10-25T22:46:43.86716Z",
+          "publishedAt": "2026-10-25T22:46:43.86716Z",
+          "updatedAt": "2026-10-25T22:46:43.86716Z",
+          "isLatest": true
+        }
+      }
+    },
+    {
+      "server": {
+        "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+        "name": "ai.adeu/adeu",
+        "description": "Automated DOCX Redlining Engine",
+        "repository": {
+          "url": "https://github.com/dealfluence/adeu",
+          "source": "github"
+        },
+        "version": "1.5.2",
+        "packages": [
+          {
+            "registryType": "pypi",
+            "identifier": "adeu",
+            "version": "1.5.2",
+            "transport": {
+              "type": "stdio"
+            }
+          }
+        ]
+      },
+      "_meta": {
+        "io.modelcontextprotocol.registry/official": {
+          "status": "active",
+          "statusChangedAt": "2026-05-05T14:01:01.659721Z",
+          "publishedAt": "2026-05-05T14:01:01.659721Z",
+          "updatedAt": "2026-05-05T14:01:01.659721Z",
+          "isLatest": false
+        }
+      }
+    },
+    {
+      "server": {
+        "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+        "name": "academy.apexai/apex-ai-academy",
+        "description": "Co-Learn with your Agent: fact-checked AI lessons with Human and Agent views.",
+        "title": "Apex AI Academy",
+        "repository": {
+          "url": "https://github.com/ApexAI-Academy/sample-agents",
+          "source": "github"
+        },
+        "version": "1.0.2",
+        "websiteUrl": "https://apexai.academy/developers/",
+        "remotes": [
+          {
+            "type": "streamable-http",
+            "url": "https://apexai.academy/mcp",
+            "headers": [
+              {
+                "description": "Optional: Bearer <personal apex_ key> for Premium tools. Public tools need no key.",
+                "isSecret": true,
+                "name": "Authorization"
+              }
+            ]
+          }
+        ]
+      },
+      "_meta": {
+        "io.modelcontextprotocol.registry/official": {
+          "status": "active",
+          "statusChangedAt": "2026-10-17T03:25:05.205722Z",
+          "publishedAt": "2026-10-17T03:25:05.205722Z",
+          "updatedAt": "2026-10-17T03:25:05.205722Z",
+          "isLatest": true
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "count": 3
+  }
+}

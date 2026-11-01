@@ -496,6 +496,21 @@ after the process is gone. A stop answers any pending permission or question as 
 Claude Code runs on the user's own login. It must be logged in, or the first hand-off fails with
 the adapter's own message (for example that auth is required).
 
+### Expert adapters (spike, 2026-11-01)
+
+What the three adapters in the ACP Registry need, read from `initialize` and the packages (the
+machine was not clean, so clean-machine login was read from `authMethods` and source, not run):
+
+| Expert                | Install command                                    | Bundles the agent                 | Node floor    | load_session | Login kind                                                                                                                                                                                                                                                                      | Env to strip                                                                                                              |
+| --------------------- | -------------------------------------------------- | --------------------------------- | ------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Claude (`claude-acp`) | `npx @agentclientprotocol/claude-agent-acp@0.99.1` | Yes (Agent SDK and native binary) | 22            | yes          | terminal: the client runs the adapter exe with `--cli auth login --claudeai` (or `--console`); methods appear only if the client sends `clientCapabilities.auth.terminal: true`; one `claude-login` (`claude /login`) when `NO_BROWSER`, `SSH_*` or `CLAUDE_CODE_REMOTE` is set | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`                          |
+| Codex (`codex-acp`)   | `npx @agentclientprotocol/codex-acp@2.5.0`         | Yes (`@openai/codex`)             | none declared | yes          | browser (`chat-gpt`) via ACP `authenticate`; or `api-key`                                                                                                                                                                                                                       | `CODEX_API_KEY`, `OPENAI_API_KEY`                                                                                         |
+| Gemini (`gemini`)     | `npx @google/gemini-cli@0.66.0 --acp`              | It is the agent                   | 20            | yes          | browser (`oauth-personal`) via ACP `authenticate`; or `gemini-api-key`, `vertex-ai`                                                                                                                                                                                             | `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` |
+
+The registries: ACP `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`, MCP
+`https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest`. Samples of both
+are in `brain/tests/fixtures/`.
+
 ### Jobs and tools
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
