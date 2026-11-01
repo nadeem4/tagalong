@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
+import { Button } from '../controls/button';
 
 const STATE_LABEL: Record<string, string> = {
   running: 'Running',
@@ -70,64 +71,72 @@ export function JobsPanel() {
     });
 
   return (
-    <section className="home-card home-jobs" aria-label="Jobs">
-      <h2 className="home-card__label">JOBS</h2>
-      {failed && jobs === null && (
-        <p role="alert">
-          Tagalong could not read the jobs. They load again when Home reopens or a job changes.
-        </p>
-      )}
-      {jobs !== null && jobs.length === 0 && (
-        <p>No jobs yet. Ask Scout to hand work to Claude Code and it shows here.</p>
-      )}
-      {jobs !== null && jobs.length > 0 && (
-        <ul aria-label="Jobs" className="job-list">
-          {jobs.map((job) => (
-            <li key={job.id} className="job-row">
-              <div className="job-row__head">
-                <span className="job-row__task">{job.task}</span>
-                <span className={`job-row__state job-row__state--${job.state}`}>
-                  {STATE_LABEL[job.state] ?? job.state}
-                </span>
-              </div>
-              <span className="job-row__meta">
-                {job.folder} · {job.mode} · {when(job)}
-              </span>
-              {job.state === 'running' && job.progress !== null && (
-                <span className="job-row__text">{job.progress}</span>
-              )}
-              {job.reason !== null && job.state !== 'running' && (
-                <span className="job-row__text">{job.reason}</span>
-              )}
-              <div className="job-row__actions">
-                {job.state === 'running' && (
-                  <button
-                    type="button"
-                    className="tg-btn-quiet"
-                    aria-label={`Stop ${job.task}`}
-                    onClick={() => stop(job)}
-                  >
-                    Stop
-                  </button>
+    <>
+      <div className="home-head">
+        <h1 className="home-title">Jobs</h1>
+        <p>Work Scout has handed to Claude Code.</p>
+      </div>
+      <section className="home-card home-jobs" aria-label="Jobs">
+        <h2 className="home-card__label">JOBS</h2>
+        {failed && jobs === null && (
+          <p role="alert">
+            Tagalong could not read the jobs. They load again when Home reopens or a job changes.
+          </p>
+        )}
+        {jobs !== null && jobs.length === 0 && (
+          <p>No jobs yet. Ask Scout to hand work to Claude Code and it shows here.</p>
+        )}
+        {jobs !== null && jobs.length > 0 && (
+          <ul aria-label="Jobs" className="job-list">
+            {jobs.map((job) => (
+              <li key={job.id} className="job-row">
+                <div className="job-row__main">
+                  <span className="job-row__task" title={job.task}>
+                    {job.task}
+                  </span>
+                  <span className="job-row__meta">
+                    <span className={`job-row__state job-row__state--${job.state}`}>
+                      {STATE_LABEL[job.state] ?? job.state}
+                    </span>
+                    <span className="job-row__where">
+                      {job.folder} · {job.mode} · <span className="home-time">{when(job)}</span>
+                    </span>
+                  </span>
+                  {job.state === 'running' && job.progress !== null && (
+                    <span className="job-row__text">{job.progress}</span>
+                  )}
+                  {job.reason !== null && job.state !== 'running' && (
+                    <span className="job-row__text">{job.reason}</span>
+                  )}
+                </div>
+                <div className="job-row__actions">
+                  {job.state === 'running' && (
+                    <Button
+                      variant="secondary"
+                      aria-label={`Stop ${job.task}`}
+                      onClick={() => stop(job)}
+                    >
+                      Stop
+                    </Button>
+                  )}
+                  {job.state !== 'running' && job.result !== null && (
+                    <Button
+                      variant="secondary"
+                      aria-expanded={open.has(job.id)}
+                      onClick={() => toggle(job.id)}
+                    >
+                      {open.has(job.id) ? 'Hide result' : 'Show result'}
+                    </Button>
+                  )}
+                </div>
+                {open.has(job.id) && job.result !== null && (
+                  <pre className="job-row__result">{job.result}</pre>
                 )}
-                {job.state !== 'running' && job.result !== null && (
-                  <button
-                    type="button"
-                    className="tg-btn-quiet"
-                    aria-expanded={open.has(job.id)}
-                    onClick={() => toggle(job.id)}
-                  >
-                    {open.has(job.id) ? 'Hide result' : 'Show result'}
-                  </button>
-                )}
-              </div>
-              {open.has(job.id) && job.result !== null && (
-                <pre className="job-row__result">{job.result}</pre>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

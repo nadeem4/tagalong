@@ -62,6 +62,12 @@ export const HOME_CSS = `
 .home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
 .home-card--run .home-card__row strong { min-width: 0; overflow-wrap: anywhere; }
 .home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
+.home-card--run p.home-card__row { align-items: center; padding: ${t.space.md}px 0; border-top: 1px solid ${t.color.panelLine}; }
+.home-card--run .home-card__row > span:last-child {
+  padding: 2px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
+  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+}
+.home-spend { font-size: 26px; font-weight: ${t.fontWeight.semibold}; font-variant-numeric: tabular-nums; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-dot--warn { background: ${t.color.gold}; }
 .home-dot--err { background: ${t.color.errInk}; }
@@ -110,23 +116,29 @@ export const HOME_CSS = `
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text { opacity: 0.6; }
 .perm-row .tg-switch { flex: none; }
 .perm-row .tg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
-.home-jobs { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .job-row {
-  display: flex; flex-direction: column; gap: ${t.space.xs}px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: ${t.space.xl}px;
   padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
 }
-.job-row__head { display: flex; align-items: baseline; gap: ${t.space.lg}px; justify-content: space-between; }
-.job-row__task { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
-.job-row__state {
-  flex: none; padding: 1px ${t.space.md}px; border: 1px solid ${t.color.panelMuted};
-  border-radius: 999px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+.job-row__main { min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.job-row__task {
+  font-size: ${t.fontSize.field + 1}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.job-row__state--running { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
-.job-row__meta, .job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
+.job-row__meta { display: flex; align-items: center; gap: ${t.space.md}px; min-width: 0; }
+.job-row__where { min-width: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; overflow-wrap: anywhere; }
+.job-row__state {
+  flex: none; padding: 1px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
+  font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+}
+.job-row__state--running { background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
+.job-row__state--done { background: ${t.color.okFill}; color: ${t.color.okInk}; }
+.job-row__state--error { background: ${t.color.errFill}; color: ${t.color.errInk}; }
+.job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
 .job-row__actions { display: flex; gap: ${t.space.lg}px; }
 .job-row__result {
-  margin: 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
+  grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
 .apv-section { display: flex; flex-direction: column; gap: ${t.space.lg}px; }
