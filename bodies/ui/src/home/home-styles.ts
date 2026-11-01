@@ -35,9 +35,17 @@ export const HOME_CSS = `
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
   flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
-  gap: ${t.space.xxl}px; padding: ${t.space.xxxl}px 32px;
+  padding: ${t.space.xxxl}px 0;
 }
-.home-title { margin: 0; font-size: 20px; font-weight: ${t.fontWeight.semibold}; }
+/* One width and one inset for every tab, so the left edge never jumps between pages. */
+.home-page { max-width: 920px; width: 100%; margin: 0 auto; box-sizing: border-box;
+  padding: 0 ${t.space.page}px; display: flex; flex-direction: column; gap: ${t.space.xxl}px;
+}
+.home-page > * { min-width: 0; }
+.home-head { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.home-head p { margin: 0; font-size: ${t.fontSize.field}px; color: ${t.color.panelMuted}; }
+.home-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.home-title { margin: 0; font-size: 22px; font-weight: ${t.fontWeight.semibold}; }
 .home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: ${t.space.xl}px; }
 .home-card {
   display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.xl}px ${t.space.xxl}px;
@@ -163,11 +171,11 @@ export const HOME_CSS = `
 .apv-day { margin: ${t.space.lg}px 0 ${t.space.sm}px; }
 .apv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .apv-row {
-  position: relative; display: grid; grid-template-columns: 48px 20px 1fr auto; align-items: start;
+  position: relative; display: grid; grid-template-columns: 56px 20px 1fr auto; align-items: start;
   gap: ${t.space.lg}px; padding: ${t.space.md}px ${t.space.md}px; border: 1px solid transparent; border-radius: ${t.radius.row}px;
 }
 .apv-row:hover { background: ${t.color.panelTile}; }
-.apv-row__time { padding-top: ${t.space.xxs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.apv-row__time { white-space: nowrap; padding-top: ${t.space.xxs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
 .apv-row__icon { width: 16px; height: 16px; margin-top: ${t.space.xs}px; stroke: ${t.color.panelMuted}; fill: none; stroke-width: 1.6; }
 .apv-row__body { min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .apv-row__what { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; overflow-wrap: anywhere; }

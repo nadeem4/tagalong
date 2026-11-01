@@ -85,7 +85,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
       <style>{CONTROLS_CSS}</style>
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
-      <nav aria-label="Tagalong" className="home-nav">
+      <nav aria-label="Tagalong" className="home-nav on-navy">
         <div className="home-nav__who">
           <span className="home-nav__tile">
             {/* Larger than the tile, which crops it: Bean fills about two thirds of a frame. */}
@@ -109,17 +109,19 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
         ))}
       </nav>
       <main className="home-main">
-        {page === 'overview' && <Overview companion={companion} host={host} />}
-        {page === 'jobs' && <JobsPanel />}
-        {page === 'connections' && <ConnectionsPanel />}
-        {page === 'approvals' && <ApprovalsView />}
-        {page === 'memory' && <MemoryView name={name} />}
-        {page === 'settings' && (
-          <>
-            {settings}
-            <PermissionsPanel />
-          </>
-        )}
+        <div className="home-page">
+          {page === 'overview' && <Overview companion={companion} host={host} />}
+          {page === 'jobs' && <JobsPanel />}
+          {page === 'connections' && <ConnectionsPanel />}
+          {page === 'approvals' && <ApprovalsView />}
+          {page === 'memory' && <MemoryView name={name} />}
+          {page === 'settings' && (
+            <>
+              {settings}
+              <PermissionsPanel />
+            </>
+          )}
+        </div>
       </main>
     </div>
   );
@@ -139,7 +141,10 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
   const name = companion?.name ?? 'Scout';
   return (
     <>
-      <h1 className="home-title">Overview</h1>
+      <div className="home-head">
+        <h1 className="home-title">Overview</h1>
+        <p>Everything {name} is doing for you.</p>
+      </div>
       <div className="home-cards">
         <section className="home-card" aria-label={name}>
           <h2 className="home-card__label">{name.toUpperCase()}</h2>

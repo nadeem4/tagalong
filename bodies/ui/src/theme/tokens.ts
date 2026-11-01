@@ -60,7 +60,7 @@ export const themeTokens = {
     title: 20,
   },
   fontWeight: { semibold: 600, bold: 700, wordmark: 600 },
-  space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24 },
+  space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24, page: 32 },
   radius: { field: 8, row: 10, tile: 10, chip: 10, small: 8 },
   size: {
     headerHeight: 64,

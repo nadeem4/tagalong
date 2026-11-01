@@ -49,6 +49,40 @@ describe('HomeView', () => {
     ).toEqual(['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers', 'Settings']);
   });
 
+  it('every page renders inside one .home-page wrapper', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    await screen.findByRole('navigation', { name: 'Tagalong' });
+    for (const label of ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers']) {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      const main = document.querySelector('.home-main') as HTMLElement;
+      expect(main.children).toHaveLength(1);
+      expect(main.firstElementChild).toHaveClass('home-page');
+    }
+  });
+
+  it('the nav marks the open page with aria-current and sits on navy', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    expect(nav).toHaveClass('on-navy');
+    expect(within(nav).getByRole('button', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    fireEvent.click(within(nav).getByRole('button', { name: 'Jobs' }));
+    expect(within(nav).getByRole('button', { name: 'Jobs' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('button', { name: 'Overview' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('frames Overview as everything Scout is doing for you', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    expect(await screen.findByText('Everything Scout is doing for you.')).toBeVisible();
+  });
+
   it('Show the tour again opens the walkthrough at step 1', async () => {
     const bridge = createFakeHostBridge({ pets: [SCOUT] });
     renderHome(bridge);
