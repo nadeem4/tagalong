@@ -75,6 +75,7 @@ import { registerJobsIpc } from './ipc/jobs';
 import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
+import { registerSetupIpc } from './ipc/setup';
 import { registerSpendIpc } from './ipc/spend';
 import { readKeyStatus, registerKeyIpc } from './ipc/key';
 import { registerWalkthroughIpc } from './ipc/walkthrough';
@@ -417,6 +418,7 @@ async function start(): Promise<void> {
         reloadAt: (at) =>
           void window.loadURL(window.webContents.getURL().split('?')[0] + `?step=${String(at)}`),
         close: () => window.close(),
+        owns: (event) => (event as { sender?: unknown } | null)?.sender === window.webContents,
       };
     },
   });
@@ -838,6 +840,10 @@ function registerIpc(): void {
     brain: required().brain,
     answer: (ask, decision) => required().brain.answer(ask, decision),
     reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
+  });
+  registerSetupIpc(handle, {
+    brain: required().brain,
+    fromTour: (event) => required().walkthroughGate?.fromTour(event) ?? false,
   });
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });

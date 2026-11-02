@@ -43,6 +43,7 @@ function setup(options: { petVisible?: boolean } = {}) {
         focus: () => void (state.focused += 1),
         reloadAt: (at) => void state.reloaded.push(at),
         close: () => onClosed(),
+        owns: (event) => event === 'tour-event',
       };
     },
   });
@@ -57,6 +58,14 @@ function setup(options: { petVisible?: boolean } = {}) {
 }
 
 describe('walkthrough gate', () => {
+  it('fromTour is true only for events from the open tour window', () => {
+    const { gate } = setup();
+    expect(gate.fromTour('tour-event')).toBe(false);
+    gate.open();
+    expect(gate.fromTour('tour-event')).toBe(true);
+    expect(gate.fromTour('other')).toBe(false);
+  });
+
   it('opens at launch with no brain at all, and the pet it never showed counts as visible', () => {
     const { gate, state } = setup({ petVisible: false });
     gate.openAtLaunch();
