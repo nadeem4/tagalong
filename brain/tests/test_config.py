@@ -243,3 +243,15 @@ def test_empty_environment_value_is_filled_from_the_file(tmp_path):
 def test_upsert_creates_the_file_owner_only(tmp_path):
     upsert_env_value(tmp_path, "A_KEY", "v", {})
     assert (tmp_path / ".env").stat().st_mode & 0o777 == 0o600
+
+
+def test_expert_idle_defaults_to_300_and_reads_the_environment():
+    assert load_config({}).expert_idle_s == 300.0
+    assert load_config({"TAGALONG_EXPERT_IDLE_S": "45"}).expert_idle_s == 45.0
+    assert load_config({"TAGALONG_EXPERT_IDLE_S": "0"}).expert_idle_s == 0.0  # stop at once
+
+
+@pytest.mark.parametrize("value", ["abc", "-5", "nan"])
+def test_bad_expert_idle_raises(value):
+    with pytest.raises(ValueError):
+        load_config({"TAGALONG_EXPERT_IDLE_S": value})

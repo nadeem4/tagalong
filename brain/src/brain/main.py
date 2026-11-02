@@ -126,7 +126,7 @@ async def _run() -> None:
         bodies,
         config.step_cap,
         memory,
-        make_run=make_run_for(config.expert_timeout),
+        make_run=make_run_for(config.expert_timeout, config.expert_idle_s),
         experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,
         tokens=tokens,
