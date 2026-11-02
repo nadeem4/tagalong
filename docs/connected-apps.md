@@ -205,6 +205,23 @@ can run on this computer. Packages map to `npx` (npm) or `uvx` (pypi); hosted se
 `remote`. Results are cached for 24 h under `<TAGALONG_HOME>/cache/`. Nothing is installed or
 connected by searching.
 
+## Adding an app from the registry
+
+`install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `locked`
+and `person_only`: the Allow card names the transport, the package and version (or the host), the
+environment variable names it needs and any Node download, and neither a saved preference nor a
+stored Auto skips it. After Allow it saves the app through the same code as `add_app`.
+
+- **Local (`npx`, `uvx`).** A stdio app that runs by absolute path: Node's `npm exec` (the system
+  Node if 22 or newer, else Tagalong's own, downloaded first) or `uvx` when it is installed
+  (otherwise Scout is told `uv_missing`). Required environment variables are stored as `${NAME}`
+  references; set the values in the brain's environment or `<TAGALONG_HOME>/.env` and restart the
+  app. Scout is told which are missing (`needs_env`).
+- **Remote (hosted).** An http app with sign-in `oauth`: if the server asks for a sign-in, the
+  browser opens through the existing flow (`app_oauth.py`). A server that requires a header
+  (a token) is not added by Scout; add it by hand with a token from Home.
+- No secret value is ever written into the app's row, the card or the result.
+
 ## Storage
 
 | Where                         | Holds                                                                                                            |

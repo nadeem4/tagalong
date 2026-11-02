@@ -1789,6 +1789,23 @@ Brain tests only; nothing here installs anything.
 5. Leave the window open for ten minutes: Scout reports a timeout once.
 6. On a brain without a display (or not Windows): Scout tells you the command to run yourself.
 
+### Scout offers a missing expert or app
+
+1. `cd brain && uv run pytest tests/test_jobs.py tests/test_setup_apps.py tests/test_prompt.py -q`
+   passes (fakes only: no network, install or API call).
+2. By hand with a real brain and no expert installed: ask Scout to hand a task to Claude Code in a
+   folder. The refusal reaches Scout as facts; Scout says what is missing (for example Node 18
+   where 22 is needed), recommends one expert with a reason and asks with clickable choices. Pick
+   the recommendation: the install Allow card opens (naming the Node download), with no **Always**.
+3. Save a preference that sounds like it covers installs, then ask again: the card still opens.
+4. Ask for an app that is not connected (for example one that reads your notes). Scout searches
+   the registry, recommends one and asks. After you choose, the Allow card names the package or
+   host and the variable names it needs. Deny: nothing is added. Allow: the app appears on
+   Home's Connections list. A hosted app opens your browser to sign in when its server asks; a
+   local one that needs a key reports the variable name, and no key value is stored anywhere (open
+   `tagalong.db`'s apps row: only `${NAME}`).
+5. Ask for an app that needs a token header: Scout says it cannot add it itself.
+
 ## Not supported
 
 Do not test these here.

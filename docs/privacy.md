@@ -185,6 +185,13 @@ installed globally and no PATH is edited. npm runs with a minimal environment of
 never sees your API keys. Only you can allow an install: a saved preference never skips that card,
 and there is no Always allow for it.
 
+Adding an app from the MCP registry is the same: only after you press Allow on a card that names
+the package (or host), the variables it needs and any Node download, with no Always. A local app
+runs through `npm exec` (npm contacts `registry.npmjs.org` the first time it starts) or `uvx`;
+a hosted app is contacted at its own address and may open your browser to sign in. Required
+variables are written as references (`${NAME}`), never as values, so nothing secret is stored by
+setting an app up.
+
 Logging an expert in also needs your Allow, on a card that says whether a terminal window or your
 browser will open. You sign in there, on the expert's own page, with your own account: no password,
 code or link goes through Scout or the brain, and the login stays with the expert (in its own
