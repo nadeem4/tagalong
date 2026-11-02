@@ -86,6 +86,11 @@ export function JobLog({
                 <div className="job-log__line job-log__cmd">
                   <Glyph status={e.status} />
                   <span>{`$ ${e.text}`}</span>
+                  {e.exit !== null && (
+                    <span
+                      className={`job-log__exit job-log__exit--${e.exit === 0 ? 'ok' : 'err'}`}
+                    >{`exit ${e.exit}`}</span>
+                  )}
                   {e.status === 'running' && (
                     <span className="job-log__meta">{elapsed(e.at, now)}</span>
                   )}

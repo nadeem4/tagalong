@@ -122,4 +122,35 @@ describe('JobLog', () => {
     expect(screen.queryByText(/10%/)).toBeNull();
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });
+
+  it('shows the exit code beside a command: ok for 0, error otherwise', () => {
+    render(
+      <JobLog
+        entries={[
+          entry(1, { text: 'ok cmd', status: 'done', exit: 0, step: 'a' }),
+          entry(2, { text: 'bad cmd', status: 'failed', exit: 2, step: 'b' }),
+        ]}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByText('exit 0')).toHaveClass('job-log__exit', 'job-log__exit--ok');
+    expect(screen.getByText('exit 2')).toHaveClass('job-log__exit', 'job-log__exit--err');
+    expect(screen.getByRole('img', { name: 'done' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'failed' })).toBeInTheDocument();
+  });
+
+  it('shows only the glyph when there is no exit code', () => {
+    render(
+      <JobLog
+        entries={[
+          entry(1, { text: 'killed', status: 'failed', exit: null, step: 'a' }),
+          entry(2, { text: 'plain', status: 'done', exit: null, step: 'b' }),
+          entry(3, { text: 'busy', status: 'running', exit: null, step: 'c' }),
+        ]}
+        now={NOW}
+      />,
+    );
+    expect(screen.queryByText(/^exit /)).toBeNull();
+    expect(screen.getByRole('img', { name: 'failed' })).toBeInTheDocument();
+  });
 });

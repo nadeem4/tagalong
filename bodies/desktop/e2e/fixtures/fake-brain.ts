@@ -67,7 +67,7 @@ export interface FakeBrain {
   /** Add a step to a job's activity log (new `rev`) and tell the bodies `changed: job_activity`. */
   pushActivity(
     job: string,
-    entry: { kind: string; text: string; status?: string; step?: string },
+    entry: { kind: string; text: string; status?: string; step?: string; exit?: number },
   ): void;
   /** Set what `job_activity` with no job returns (the bubble's live line) and tell the bodies `changed: what`. */
   setRunning(

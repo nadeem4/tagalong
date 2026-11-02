@@ -292,6 +292,12 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     pill appears; press it to follow again. Press **Stop**: the page ends with `# stopped`. Open
     **Watch** on a finished job: the full log and a final `# done` line, no clock ticking. Nothing
     can be typed into the page. With Windows animations off (reduced motion) the spinner is still.
+    **Exit codes (manual):** hand a job to Claude Code that runs a failing command (for example
+    "run `node -e process.exit(2)` and tell me what happened"). **Expected:** its `$` line ends
+    with a red cross and `exit 2`; a command that succeeds shows a green check and `exit 0`.
+    Automated: `test_job_activity.py` (output replace and append, a secret split across chunks,
+    exit 0, non-zero and signal, unknown ids), `test_jobs.py` on the fake agent with
+    `FAKE_ACP_META_ONLY=1`, `job-log.test.tsx` and `e2e/jobs.spec.ts`.
     **Live line in the bubble (manual):** hand a job to Claude Code that runs a command, then open
     Scout's bubble. **Expected:** one quiet line such as `Claude Code: npm test` near the bottom,
     changing as the job moves on, never output text, not read aloud. When the job ends the line

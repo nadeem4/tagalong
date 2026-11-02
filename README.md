@@ -159,7 +159,7 @@ looks past its own bubble to the window you were using. A screenshot adds roughl
 tokens, which is why it is not taken on every question.
 
 **Hand-offs.** Scout can hand a task to Claude Code, which works in a folder on this computer as a
-job. Watch it in **Home → Jobs**: **Watch** opens a read-only, terminal-style page of what it is doing (live while it runs), **Stop** a running one, **Show result** for a finished one. When
+job. Watch it in **Home → Jobs**: **Watch** opens a read-only, terminal-style page of what it is doing, live while it runs, with each command's exit code, **Stop** a running one, **Show result** for a finished one. When
 Claude Code asks for permission or has a question, Scout gets it first and answers from what it
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
 moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:

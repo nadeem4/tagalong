@@ -119,7 +119,7 @@ test('a job page pulls its steps by cursor', async () => {
   expect(next.rev).toBe(4);
 });
 
-test('watching a job shows its log and follows new steps', async () => {
+test('watching a job shows its log, follows new steps and shows exit codes', async () => {
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Jobs', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
@@ -136,6 +136,16 @@ test('watching a job shows its log and follows new steps', async () => {
   });
   await expect(log).toContainText('$ git status', { timeout: 15_000 });
   await expect(log).toContainText('running, ');
+
+  // A finished command carries its exit code beside the glyph.
+  brain.pushActivity('job1', {
+    kind: 'command',
+    text: 'npm run lint',
+    status: 'failed',
+    step: 's10',
+    exit: 1,
+  });
+  await expect(log).toContainText('exit 1', { timeout: 15_000 });
 
   await home.getByRole('button', { name: 'Back to Jobs' }).click();
   await expect(home.getByRole('region', { name: 'Jobs' })).toContainText('Fix the build');

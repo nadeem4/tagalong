@@ -15,6 +15,9 @@ wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": s
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
 FAKE_ACP_REPLAY=1 makes session/load replay one tool call (id "replayed") before answering,
 like an adapter replaying the old chat.
+A tool may carry "terminal": true (adds terminal_info meta); a tool_update may carry
+"terminal": {"output", "delta"?, "exit"?, "signal"?}, sent as terminal_output/_exit meta
+(FAKE_ACP_META_ONLY=1: only to a client that advertised it, else as a console text block).
 FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail); "known" serves
 only ids this process created (a restarted adapter forgot the rest), "nomodes" answers
 without modes;
@@ -58,6 +61,7 @@ class FakeAgent:
         self.stubborn = False
         self.sessions = 0
         self.created: set[str] = set()
+        self.meta = False
 
     def on_connect(self, conn) -> None:
         self.conn = conn
@@ -65,6 +69,8 @@ class FakeAgent:
     async def initialize(self, protocol_version, client_capabilities=None, **kw):
         if os.environ.get("FAKE_ACP_HANG_INIT"):
             await asyncio.Event().wait()  # an adapter that never answers the handshake
+        meta = getattr(client_capabilities, "field_meta", None) or {}
+        self.meta = bool(meta.get("terminal_output") or meta.get("terminal_output_delta"))
         auth = json.loads(os.environ.get("FAKE_ACP_AUTH", "[]"))
         auth_caps = getattr(client_capabilities, "auth", None)
         can_terminal = bool(auth_caps and auth_caps.terminal)
@@ -83,6 +89,10 @@ class FakeAgent:
             ),
             auth_methods=methods,
         )
+
+    def _meta_ok(self) -> bool:
+        # With FAKE_ACP_META_ONLY=1 terminal _meta goes only to a client that advertised it.
+        return self.meta or not os.environ.get("FAKE_ACP_META_ONLY")
 
     def _needs_login(self) -> bool:
         marker = os.environ.get("FAKE_ACP_LOGIN_FILE")
@@ -173,9 +183,20 @@ class FakeAgent:
                     session_id, acp.update_agent_message_text(step["text"])
                 )
             elif "tool" in step:
-                await self.conn.session_update(session_id, _tool_start(step["tool"]))
+                start = _tool_start(step["tool"])
+                if not self._meta_ok():
+                    start.field_meta = None
+                await self.conn.session_update(session_id, start)
             elif "tool_update" in step:
-                await self.conn.session_update(session_id, _tool_progress(step["tool_update"]))
+                spec = step["tool_update"]
+                if "terminal" in spec and self._meta_ok():
+                    for update in _terminal_updates(spec):
+                        await self.conn.session_update(session_id, update)
+                else:
+                    if "terminal" in spec:  # no opt-in: the console text block, like the adapter
+                        body = spec["terminal"]["output"]
+                        spec = {**spec, "text": "```console\n" + body + "\n```"}
+                    await self.conn.session_update(session_id, _tool_progress(spec))
             elif "plan" in step:
                 entries = [
                     acp.plan_entry(e["content"], status=e.get("status", "pending"))
@@ -241,7 +262,7 @@ class FakeAgent:
 
 def _tool_start(spec: dict):
     locations = [schema.ToolCallLocation(path=p) for p in spec.get("locations", [])]
-    return acp.start_tool_call(
+    update = acp.start_tool_call(
         spec["id"],
         spec["title"],
         kind=spec.get("kind", "other"),
@@ -249,12 +270,27 @@ def _tool_start(spec: dict):
         raw_input=spec.get("input"),
         locations=locations or None,
     )
+    if spec.get("terminal"):
+        update.field_meta = {"terminal_info": {"terminal_id": spec["id"]}}
+    return update
 
 
 def _tool_progress(spec: dict):
     text = spec.get("text")
     content = [acp.tool_content(acp.text_block(text))] if text is not None else None
     return acp.update_tool_call(spec["id"], status=spec["status"], content=content)
+
+
+def _terminal_updates(spec: dict):
+    """Progress updates carrying output then exit as `_meta`, like the real adapter."""
+    term, tid = spec["terminal"], spec["id"]
+    out = acp.update_tool_call(tid)
+    key = "terminal_output_delta" if term.get("delta") else "terminal_output"
+    out.field_meta = {key: {"terminal_id": tid, "data": term["output"]}}
+    done = acp.update_tool_call(tid, status=spec["status"])
+    exit_meta = {"terminal_id": tid, "exit_code": term.get("exit"), "signal": term.get("signal")}
+    done.field_meta = {"terminal_exit": exit_meta}
+    return [out, done]
 
 
 def frame_logger(path: str):

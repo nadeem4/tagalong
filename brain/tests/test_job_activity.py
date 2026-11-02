@@ -246,3 +246,151 @@ def test_end_marks_open_steps_failed_when_stopped_or_errored(tmp_path):
         ]
         assert rows[-1].kind == "end"
         r.memory.close()
+
+
+def meta_update(id, **meta):
+    u = acp.update_tool_call(id)
+    u.field_meta = meta
+    return u
+
+
+def out(id, data, delta=False, tid=None):
+    key = "terminal_output_delta" if delta else "terminal_output"
+    return meta_update(id, **{key: {"terminal_id": tid or id, "data": data}})
+
+
+def exited(id, code, signal=None, tid=None):
+    exit_meta = {"terminal_id": tid or id, "exit_code": code, "signal": signal}
+    return meta_update(id, terminal_exit=exit_meta)
+
+
+def outputs(rig):
+    return [e for e in rig.rows() if e.kind == "output"]
+
+
+def test_terminal_output_replaces_the_step_output(rig):
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    rig.log.on_update(meta_update("t1", terminal_info={"terminal_id": "t1"}))
+    rig.log.on_update(out("t1", "a"))
+    rig.log.on_update(out("t1", "b"))
+    assert [e.text for e in outputs(rig)] == ["b"]
+
+
+def test_terminal_id_equals_tool_call_id_maps_output_to_the_command_step(rig):
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    rig.log.on_update(out("t1", "x"))
+    assert [e.step for e in outputs(rig)] == ["t1"]
+
+
+def test_terminal_delta_appends_in_order(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "he", delta=True))
+    first = outputs(rig)[0].rev
+    rig.log.on_update(out("t1", "llo", delta=True))
+    [entry] = outputs(rig)
+    assert (entry.text, entry.rev > first) == ("hello", True)
+
+
+def test_secret_split_across_deltas_is_masked(tmp_path):
+    r = Rig(tmp_path, mask=Masker(lambda: []).mask)
+    r.log.on_update(start("t1"))
+    r.log.on_update(out("t1", "key sk-ant-api03-AAAAAAAAAA", delta=True))
+    r.log.on_update(out("t1", "AAAAAAAAAAAAAA done", delta=True))
+    [entry] = outputs(r)
+    assert "[secret]" in entry.text and "sk-ant" not in entry.text
+    r.memory.close()
+
+
+def test_exit_zero_marks_done_and_sets_exit(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(exited("t1", 0))
+    [cmd] = rig.rows()
+    assert (cmd.status, cmd.exit) == ("done", 0)
+
+
+def test_exit_two_marks_failed_and_a_later_completed_keeps_it(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(exited("t1", 2))
+    rig.log.on_update(progress("t1", "completed"))
+    [cmd] = rig.rows()
+    assert (cmd.status, cmd.exit) == ("failed", 2)
+
+
+def test_signal_exit_marks_failed_without_exit_number(rig):
+    rig.log.on_update(start("t1", raw_input={"command": "sleep 9"}))
+    rig.log.on_update(exited("t1", None, signal="SIGKILL"))
+    [cmd] = rig.rows()
+    assert (cmd.status, cmd.exit, cmd.text) == ("failed", None, "sleep 9")
+
+
+def test_exit_before_output_and_unknown_terminal_id_are_tolerated(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(exited("t1", 1))
+    rig.log.on_update(out("t1", "late"))
+    rig.log.on_update(exited("t1", 1, tid="nope"))
+    rig.log.on_update(out("t1", "ghost", tid="nostep"))  # unknown terminal id: no extra step
+    assert [e.kind for e in rig.rows()] == ["command", "output"]
+    assert rig.rows()[0].exit == 1
+
+
+def test_delta_output_stays_within_the_cap(rig):
+    rig.log.on_update(start("t1"))
+    for _ in range(200):
+        rig.log.on_update(out("t1", "x" * 1024, delta=True))
+    [entry] = outputs(rig)
+    assert entry.text.startswith(job_activity.CUT_MARKER)
+    assert len(entry.text) <= job_activity.OUTPUT_CAP + len(job_activity.CUT_MARKER) + 1
+
+
+def _real_rig(tmp_path):
+    return Rig(tmp_path, mask=Masker(lambda: []).mask)
+
+
+KEY = "sk-ant-api03-" + "B" * 40
+
+
+def test_cut_never_leaves_part_of_a_secret_on_replace(tmp_path):
+    rig = _real_rig(tmp_path)
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "y" * 100 + KEY + "x" * (job_activity.OUTPUT_CAP - 30)))
+    [entry] = outputs(rig)
+    assert "BBBB" not in entry.text
+
+
+def test_cut_never_leaves_part_of_a_secret_on_delta(tmp_path):
+    rig = _real_rig(tmp_path)
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "y" * 100 + KEY, delta=True))
+    # the head is trimmed at index 130, inside the key
+    keep = job_activity.OUTPUT_CAP + job_activity.CARRY
+    rig.log.on_update(out("t1", "x" * (keep + 130 - 100 - len(KEY)), delta=True))
+    [entry] = outputs(rig)
+    assert "BBBB" not in entry.text
+    assert entry.text.startswith(job_activity.CUT_MARKER)
+
+
+def test_raw_output_is_released_after_exit(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "hi", delta=True))
+    rig.log.on_update(exited("t1", 0))
+    assert rig.log._raw == {}
+
+
+def test_without_meta_a_command_still_completes(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(progress("t1", "completed", "ok"))
+    [cmd, _out] = rig.rows()
+    assert (cmd.status, cmd.exit) == ("done", None)
+
+
+def test_console_fence_is_stripped_without_the_opt_in(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(progress("t1", "completed", "```console\nok\n```"))
+    assert [e.text for e in outputs(rig)] == ["ok"]
+
+
+def test_heartbeats_are_ignored(rig):
+    rig.log.on_update(start("t1"))
+    before = rig.memory.last_rev("j")
+    rig.log.on_update(progress("t1", "in_progress"))
+    assert rig.memory.last_rev("j") == before

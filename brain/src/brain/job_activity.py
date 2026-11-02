@@ -2,7 +2,7 @@
 
 One JobActivity per job. Every text is masked before it is stored and capped after, so no
 raw secret and no unbounded output reaches the database or a reader. Entries are written
-through Memory; the transport that serves them comes later.
+through Memory.
 """
 
 from collections.abc import Callable
@@ -14,6 +14,7 @@ KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", 
 STATUSES = ("pending", "running", "done", "failed")
 
 OUTPUT_CAP = 65536  # bytes of one command's output kept (the tail)
+CARRY = 1024  # extra raw chars kept so a cut never lands inside a secret (dropped after masking)
 SAY_CAP = 8192  # characters of one message
 ENTRY_CAP = 2000  # entries per job
 JOB_BYTES_CAP = 1_000_000  # text bytes per job
@@ -48,6 +49,9 @@ class JobActivity:
         self._seq = 0
         self._steps: dict[str, ActivityEntry] = {}  # tool call id -> its command/edit/... entry
         self._outputs: dict[str, int] = {}  # tool call id -> seq of its output entry
+        self._terminals: dict[str, str] = {}  # terminal id -> tool call id (terminal_info)
+        self._raw: dict[str, str] = {}  # tool call id -> raw delta tail; memory only, never stored
+        self._exited: set[str] = set()  # steps whose exit code already decided their status
         self._says: dict[object, tuple[int, str]] = {}  # message id -> (seq, raw text so far)
         self._last_say: object = None  # key of the message still being written, if any
         self._plan_seq: int | None = None
@@ -70,7 +74,9 @@ class JobActivity:
         if state != "done":
             for step, old in list(self._steps.items()):
                 if old.status in ("running", "pending"):
-                    self._steps[step] = self._put(old.seq, old.kind, old.text, "failed", step)
+                    self._steps[step] = self._put(
+                        old.seq, old.kind, old.text, "failed", step, exit=old.exit
+                    )
         self._put(None, "end", text)
         self._on_change()
 
@@ -86,15 +92,61 @@ class JobActivity:
         if old is None:
             kind = _KIND.get(str(u.kind), "other") if u.kind else "other"
             entry = self._put(None, kind, _step_text(u, kind), status or "pending", step)
-        elif status and status != old.status:
-            entry = self._put(old.seq, old.kind, old.text, status, step)
+        elif status and status != old.status and step not in self._exited:
+            entry = self._put(old.seq, old.kind, old.text, status, step, exit=old.exit)
         else:
             entry = old
         self._steps[step] = entry
-        output = _output_text(u)
+        meta = getattr(u, "field_meta", None) or {}
+        self._terminal(step, meta)
+        output = None if _has_terminal_output(meta) else _output_text(u)
         if output is not None:
-            out = self._put(self._outputs.get(step), "output", output, None, step, _cut_output)
-            self._outputs[step] = out.seq
+            self._write_output(step, output)
+
+    def _terminal(self, step: str, meta: dict) -> None:
+        """Adapter `_meta`: the terminal id, the command's output (whole or appended) and exit."""
+        info = meta.get("terminal_info")
+        if isinstance(info, dict) and isinstance(info.get("terminal_id"), str):
+            self._terminals[info["terminal_id"]] = step
+        for key in ("terminal_output", "terminal_output_delta"):
+            part = meta.get(key)
+            if not isinstance(part, dict) or not isinstance(part.get("data"), str):
+                continue
+            target = self._terminals.get(part.get("terminal_id"), step)
+            if target not in self._steps:
+                continue
+            if key.endswith("delta"):
+                self._append_delta(target, part["data"])
+            else:
+                self._write_output(target, part["data"])
+        done = meta.get("terminal_exit")
+        if isinstance(done, dict):
+            target = self._terminals.get(done.get("terminal_id"), done.get("terminal_id"))
+            if target in self._steps:
+                self._finish_command(target, done.get("exit_code"))
+
+    def _finish_command(self, step: str, code: object) -> None:
+        old = self._steps[step]
+        code = code if isinstance(code, int) and not isinstance(code, bool) else None
+        status = "done" if code == 0 else "failed"
+        self._exited.add(step)
+        self._raw.pop(step, None)
+        if (old.status, old.exit) != (status, code):
+            self._steps[step] = self._put(old.seq, old.kind, old.text, status, step, exit=code)
+
+    def _append_delta(self, step: str, data: str) -> None:
+        """Keep a little more raw than the cap, so the cut is made after masking."""
+        raw = self._raw.get(step, "") + data
+        if len(raw) <= OUTPUT_CAP + CARRY:
+            self._raw[step] = raw
+            self._write_output(step, raw)
+            return
+        self._raw[step] = raw[-(OUTPUT_CAP + CARRY) :]
+        self._write_output(step, self._raw[step], _cut_trimmed)
+
+    def _write_output(self, step: str, text: str, cap: Callable[[str], str] | None = None) -> None:
+        out = self._put(self._outputs.get(step), "output", text, None, step, cap or _cut_output)
+        self._outputs[step] = out.seq
 
     def _say(self, u) -> None:
         text = getattr(u.content, "text", None)
@@ -122,6 +174,7 @@ class JobActivity:
         status: str | None = None,
         step: str | None = None,
         cap: Callable[[str], str] = lambda t: t,
+        exit: int | None = None,
     ) -> ActivityEntry:
         """Write one entry (a new one when seq is None); masks first, then caps."""
         if seq is None:
@@ -135,6 +188,7 @@ class JobActivity:
             text=cap(self._mask(text)),
             status=status,
             step=step,
+            exit=exit,
         )
         self._memory.save_activity(self._job, entry)
         self._memory.trim_activity(self._job, ENTRY_CAP, JOB_BYTES_CAP)
@@ -162,12 +216,30 @@ def _output_text(u) -> str | None:
         if getattr(c, "type", None) == "content" and hasattr(c.content, "text")
     ]
     if parts:
-        return "".join(parts)
+        return _strip_fence("".join(parts))
     raw = getattr(u, "raw_output", None)
     return raw if isinstance(raw, str) else None
+
+
+def _has_terminal_output(meta: dict) -> bool:
+    return "terminal_output" in meta or "terminal_output_delta" in meta
+
+
+def _strip_fence(text: str) -> str:
+    """Without the opt-in an adapter wraps output in a console fence; show the same text."""
+    head, tail = "```console" + chr(10), chr(10) + "```"
+    if text.startswith(head) and text.endswith(tail):
+        return text[len(head) : -len(tail)]
+    return text
 
 
 def _cut_output(text: str) -> str:
     if len(text.encode()) <= OUTPUT_CAP:
         return text
     return CUT_MARKER + "\n" + text.encode()[-OUTPUT_CAP:].decode(errors="ignore")
+
+
+def _cut_trimmed(text: str) -> str:
+    """The text already lost its head: drop the unsafe carry, always say so."""
+    tail = text[CARRY:].encode()[-OUTPUT_CAP:].decode(errors="ignore")
+    return CUT_MARKER + chr(10) + tail

@@ -1354,6 +1354,33 @@ async def test_a_jobs_steps_are_saved_masked(make_rig):
     assert (end.kind, end.text) == ("end", "# done")
 
 
+async def test_a_failing_command_through_the_fake_agent_has_its_exit_code(make_rig, monkeypatch):
+    monkeypatch.setenv("FAKE_ACP_META_ONLY", "1")
+    steps = [
+        {
+            "tool": {
+                "id": "t1",
+                "title": "Run",
+                "kind": "execute",
+                "terminal": True,
+                "input": {"command": "false"},
+            }
+        },
+        {
+            "tool_update": {
+                "id": "t1",
+                "status": "failed",
+                "terminal": {"output": "boom", "exit": 1},
+            }
+        },
+    ]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    command, output, _end = rows_of(rig, job_id)
+    assert (command.status, command.exit, output.text) == ("failed", 1, "boom")
+
+
 async def test_a_stopped_job_ends_its_log_with_stopped(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), HANG)
     job_id = await rig.jobs.start("go", str(rig.folder))

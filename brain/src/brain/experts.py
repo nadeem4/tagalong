@@ -33,6 +33,9 @@ from acp.schema import (
 from brain.setup.env import expert_env
 
 _NO_MESSAGE = object()
+# Tells the adapter to send a command's output and exit code as structured `_meta` (Claude
+# Code's adapter does; one that ignores the key keeps sending the console text block).
+CLIENT_META = {"terminal_output": True}
 log = logging.getLogger(__name__)
 
 
@@ -229,7 +232,8 @@ class ExpertHost:
                     )
                 )
                 caps = ClientCapabilities(
-                    elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities())
+                    elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities()),
+                    field_meta=CLIENT_META,
                 )
                 init = await self.conn.initialize(
                     protocol_version=acp.PROTOCOL_VERSION, client_capabilities=caps
