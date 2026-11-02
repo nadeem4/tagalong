@@ -269,16 +269,16 @@ asks for itself (below) is `auto`; then the user's saved choice (a locked tool i
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                          | Default mode                              |
-| --------------------------------------------- | ----------------------------------------- |
-| Reads (`effect: "read"`), such as `list_jobs` | `auto`                                    |
-| Changes (`effect: "change"`)                  | `ask`                                     |
-| Memory tools (`remember`, `forget`)           | `auto`                                    |
-| Timer tools `set_timer` and `cancel_timer`    | `auto`                                    |
-| Expert tools `tell_expert` and `stop_job`     | `auto`                                    |
-| `hand_off` (asks itself, see below)           | `auto`, no gate ask                       |
-| A body tool that does not declare effect      | `ask`                                     |
-| Locked (`confirm: true` from the body)        | `ask`, until you set it to `auto` on Home |
+| Tool                                                   | Default mode                              |
+| ------------------------------------------------------ | ----------------------------------------- |
+| Reads (`effect: "read"`), such as `list_jobs`          | `auto`                                    |
+| Changes (`effect: "change"`)                           | `ask`                                     |
+| Memory tools (`remember`, `forget`)                    | `auto`                                    |
+| Timer tools `set_timer` and `cancel_timer`             | `auto`                                    |
+| Expert tools `tell_expert`, `watch_job` and `stop_job` | `auto`                                    |
+| `hand_off` (asks itself, see below)                    | `auto`, no gate ask                       |
+| A body tool that does not declare effect               | `ask`                                     |
+| Locked (`confirm: true` from the body)                 | `ask`, until you set it to `auto` on Home |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -786,7 +786,8 @@ watch}`: the entries whose `rev` is above the cursor, in `rev` order, at most 50
 when cut). `rev` is the cursor to send next; a body that missed notices or reconnected sends
 `after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
 masked when written, so serving does no second pass. An unknown job is `invalid_params`; a job
-from before the log existed has an empty page. `watch` is `null` for now. With no `job` it returns
+from before the log existed has an empty page. `watch` is Scout's watch list for the job (see Watch
+list), or `null` when it has none. With no `job` it returns
 `{"running": [{job, expert, text, at}]}`: the latest running or pending step of each running job (`expert` is the
 expert's display name), for the bubble's one live line. `list_jobs` rows gain `activity: true`
 when the job has any rows (one query, `Memory.jobs_with_activity`).
@@ -905,7 +906,8 @@ flowchart TD
 | `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
 | `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
 | `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
-| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, `expert`, `parent_job` and `session_id_known`                       |
+| `watch_job`    | scout       | change | `auto`                    | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                             |
+| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, Scout's `watch` list, `expert`, `parent_job` and `session_id_known` |
 | `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
 | `job_activity` | home        | read   | `auto`                    | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
 
@@ -989,6 +991,20 @@ flowchart LR
   entries gets `no activity recorded`. The log is masked when written and `Jobs.wake_facts` masks
   the finished text once more. `list_jobs` rows gain `summary`, a one-line form (`activity_line`, at
   most 200 characters). Scout has no tool to read the whole log.
+- **Watch list.** Right after `hand_off` returns the job id, Scout writes what it expects in its own
+  words with `watch_job {job, items: [{text, done}]}`; it calls it again to tick an item or reword
+  one. The call replaces the whole list: at most 10 items, text 1 to 200 characters, `done` a
+  boolean. A bad shape (or an unknown job) is a plain refusal line for Scout and the stored list
+  is left as it was; `[]` clears it. The list is one nullable JSON `watch` column on `jobs`
+  (`Memory.set_watch`, `Job.watch`), masked when saved (`mask_json(guards, "job_watch", ...)`), so
+  it survives a restart. `Jobs.wake_facts` adds a `watching` fact (`[x] done item` / `[ ] open
+item`, one per line, only when a list exists), so `job_ended`, `job_quiet` and `job_step_failed`
+  show it; `list_jobs` rows carry `watch`; and `job_activity` pages carry it for the job page,
+  where it is read-only. A change sends the throttled `changed {what: "job_activity"}`. Code
+  never checks a brief or the list against the result: the model judges. How to brief an expert
+  (the goal, how done will be judged, that it tests its own work and ends with a summary of what
+  changed, test results and what is left, no pasted chat) is guidance in `mind/soul.md` and the
+  `hand_off` description only.
 - **Failed steps.** When a step turns failed, `JobActivity` calls `on_failed` once per step id and
   `Jobs` emits `job_step_failed` (facts: job, command, exit, activity), keyed by the job. Failures
   batch for 120 s and a newer one for the same job replaces the held one, so ten red commands in a

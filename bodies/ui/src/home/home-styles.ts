@@ -158,6 +158,12 @@ export const HOME_CSS = `
 .job-page__title .home-title { min-width: 0; overflow-wrap: anywhere; }
 .job-page__title .tg-button { margin-left: auto; }
 .job-page__time { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.watch-list { margin-top: ${t.space.sm}px; }
+.home-head .watch-list__caption { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.watch-list__items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.watch-list__item { display: flex; gap: ${t.space.md}px; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.watch-list__glyph { flex: none; width: 14px; text-align: center; color: ${t.color.panelMuted}; }
+.watch-list__glyph--done { color: ${t.color.okInk}; }
 .job-page__alert {
   margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.field}px;
   background: ${t.color.errFill}; color: ${t.color.errInk}; font-size: ${t.fontSize.body}px;

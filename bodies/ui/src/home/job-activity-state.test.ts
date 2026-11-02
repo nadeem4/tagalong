@@ -30,7 +30,7 @@ const page = (rev: number, entries: JobActivityEntry[], state = 'running'): JobA
 
 describe('applyPage', () => {
   it('starts empty at rev 0', () => {
-    expect(emptyLog()).toEqual({ entries: [], rev: 0, state: 'running' });
+    expect(emptyLog()).toEqual({ entries: [], rev: 0, state: 'running', watch: null });
   });
 
   it('appends pages in seq order', () => {
@@ -54,6 +54,15 @@ describe('applyPage', () => {
     const log = applyPage(applyPage(emptyLog(), page(7, [entry(1, 7)])), page(3, [], 'done'));
     expect(log.rev).toBe(7);
     expect(log.state).toBe('done');
+  });
+
+  it('takes the watch list of the latest page, even a page with no new entries', () => {
+    const items = [{ text: 'tests pass', done: false }];
+    const first = applyPage(emptyLog(), { ...page(2, [entry(1, 1)]), watch: items });
+    expect(first.watch).toEqual(items);
+    const ticked = [{ text: 'tests pass', done: true }];
+    expect(applyPage(first, { ...page(2, []), watch: ticked }).watch).toEqual(ticked);
+    expect(applyPage(first, page(2, [])).watch).toBeNull();
   });
 
   it('is idempotent', () => {

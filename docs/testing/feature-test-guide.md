@@ -292,6 +292,15 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     pill appears; press it to follow again. Press **Stop**: the page ends with `# stopped`. Open
     **Watch** on a finished job: the full log and a final `# done` line, no clock ticking. Nothing
     can be typed into the page. With Windows animations off (reduced motion) the spinner is still.
+    **Watch list (manual):** hand a job to Claude Code and watch the tool calls. **Expected:** right
+    after `hand_off` Scout calls `watch_job` with a few short items for what it expects. Open the
+    job's **Watch** page: the same items sit under the title with a "Scout is checking" caption, an
+    empty circle each; there is nothing to click or type. When the job ends Scout's report comes
+    with the list (ticked items show a check); if Scout ticks one while the page is open, the
+    header updates without a reload. A job Scout never wrote a list for shows no list and no empty
+    box. Automated: `test_jobs.py` (`set_watch`, refusals, masking, `wake_facts`), `test_tools.py`,
+    `test_memory.py` (the column and its migration), `watch-list.test.tsx`, `job-page.test.tsx`
+    and `e2e/jobs.spec.ts` (`setWatch` on the fake brain).
     **Exit codes (manual):** hand a job to Claude Code that runs a failing command (for example
     "run `node -e process.exit(2)` and tell me what happened"). **Expected:** its `$` line ends
     with a red cross and `exit 2`; a command that succeeds shows a green check and `exit 0`.

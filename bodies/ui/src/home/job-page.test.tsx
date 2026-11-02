@@ -106,6 +106,44 @@ describe('JobPage', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("shows Scout's watch list in the header from the first page", async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [JOB],
+      activity: { j1: [step(1)] },
+      watch: { j1: [{ text: 'tests pass', done: false }] },
+    });
+    renderPage(bridge);
+    expect(await screen.findByRole('list', { name: 'Scout is checking' })).toHaveTextContent(
+      'tests pass',
+    );
+  });
+
+  it('updates the list when a later page ticks an item', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [JOB],
+      activity: { j1: [step(1)] },
+      watch: { j1: [{ text: 'tests pass', done: false }] },
+    });
+    renderPage(bridge);
+    expect(await screen.findByLabelText('not done')).toBeInTheDocument();
+    bridge.watch.j1 = [{ text: 'tests pass', done: true }];
+    act(() => bridge.emitChanged('job_activity'));
+    expect(await screen.findByLabelText('done')).toBeInTheDocument();
+  });
+
+  it('shows nothing when Scout cleared the list', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [JOB],
+      activity: { j1: [step(1)] },
+      watch: { j1: [{ text: 'tests pass', done: false }] },
+    });
+    renderPage(bridge);
+    expect(await screen.findByRole('list')).toBeInTheDocument();
+    bridge.watch.j1 = [];
+    act(() => bridge.emitChanged('job_activity'));
+    await waitFor(() => expect(screen.queryByRole('list')).toBeNull());
+  });
+
   it('goes back through the Jobs link', () => {
     const bridge = createFakeHostBridge({ jobs: [JOB], activity: { j1: [] } });
     const onBack = renderPage(bridge);
