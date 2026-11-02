@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any, Literal
 
@@ -93,6 +93,7 @@ class Session:
         masker: Masker | None = None,
         keys: KeySettings | None = None,
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
+        setup_facts: Callable[[], Awaitable[dict]] | None = None,
     ) -> None:
         self._model = model
         # Set by main when voice is built; None answers `listen` with method_not_found.
@@ -145,6 +146,7 @@ class Session:
             offers=offer,
             guards=self.guards,
             on_away=self._on_job_away,
+            setup_facts=setup_facts,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)

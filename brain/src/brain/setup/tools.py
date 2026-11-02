@@ -14,6 +14,38 @@ from brain.setup.store import ExpertStore
 from brain.toolbox import Handler, ToolSpec
 
 InspectFn = Callable[[], Awaitable[Machine]]
+_INSTALLABLE = ("npx", "binary")  # the kinds install_expert can place; others are not candidates
+
+
+async def setup_facts(registry: Registry, inspect_fn: InspectFn) -> dict:
+    """What a refused hand-off needs for Scout to recommend a fix: this machine in short tokens,
+    and the registry experts that can be set up here. Offline with no cache: none, `stale`."""
+    machine = await inspect_fn()
+    try:
+        listing = await registry.acp_agents()
+        candidates = [
+            e.id
+            for e in listing.entries
+            if (d := build_for(e, machine)) is not None and d.kind in _INSTALLABLE
+        ]
+        stale = listing.stale
+    except RegistryUnavailable:
+        candidates, stale = [], True
+
+    def version(found) -> str | None:
+        return found.version if found else None
+
+    return {
+        "machine": {
+            "os": machine.os,
+            "arch": machine.arch,
+            "node": version(machine.node),
+            "private_node": version(machine.private_node),
+            "claude_code": version(machine.claude_code),
+        },
+        "candidates": candidates,
+        "stale": stale,
+    }
 
 
 def setup_tools(

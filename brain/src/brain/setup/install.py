@@ -104,23 +104,32 @@ def _private_ok(home: Path, machine: Machine) -> bool:
     return mine is not None and _major(mine.version) >= NODE_FLOOR and node_paths(home) is not None
 
 
+async def node_download_fact(home: Path, machine: Machine, get_json: GetJson) -> dict | None:
+    """What Tagalong's own Node download would be, or None when a usable Node is already here.
+    For an Allow card, so the person sees the download before it happens."""
+    if _usable_system_node(machine) is not None or _private_ok(home, machine):
+        return None
+    build = pick_build(
+        json.loads(await get_json(f"{DIST}/index.json")), NODE_FLOOR, machine.os, machine.arch
+    )
+    if build is None:
+        raise InstallError("node_failed", "no official Node for this computer")
+    return {"version": build.version, "into": str(node_dir(home))}
+
+
+def usable_node(home: Path, machine: Machine) -> NodePaths | None:
+    """A Node new enough to run packages: the system one, else Tagalong's own, else None."""
+    if (system := _usable_system_node(machine)) is not None:
+        return system
+    return node_paths(home) if _private_ok(home, machine) else None
+
+
 async def install_card(
     entry: RegistryEntry, home: Path, machine: Machine, get_json: GetJson
 ) -> dict:
     """Facts for the Allow card, so it names everything the install will download."""
     dist = _plan(entry, machine)
-    download = None
-    if dist.kind == "npx":
-        if _usable_system_node(machine) is None and not _private_ok(home, machine):
-            build = pick_build(
-                json.loads(await get_json(f"{DIST}/index.json")),
-                NODE_FLOOR,
-                machine.os,
-                machine.arch,
-            )
-            if build is None:
-                raise InstallError("node_failed", "no official Node for this computer")
-            download = {"version": build.version, "into": str(node_dir(home))}
+    download = await node_download_fact(home, machine, get_json) if dist.kind == "npx" else None
     return {
         "expert": entry.id,
         "version": _version(entry, dist),
@@ -188,7 +197,7 @@ async def install_expert(
     on_progress({"stage": "checking"})
     node, node_kind = None, None
     if dist.kind == "npx":
-        node, node_kind = await _node_for(home, machine, fetch, get_json, on_progress)
+        node, node_kind = await node_for(home, machine, fetch, get_json, on_progress)
     final, staged = tools_dir(home, entry.id), tools_dir(home, entry.id + ".part")
     download, old = tools_dir(home, entry.id + ".dl"), tools_dir(home, entry.id + ".old")
     await _clean(staged, download, old)
@@ -216,7 +225,7 @@ async def install_expert(
     return expert
 
 
-async def _node_for(
+async def node_for(
     home: Path, machine: Machine, fetch: Fetch, get_json: GetJson, on_progress
 ) -> tuple[NodePaths, Literal["private", "system"]]:
     if (system := _usable_system_node(machine)) is not None:

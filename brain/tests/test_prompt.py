@@ -372,3 +372,11 @@ def test_the_spoken_note_comes_after_the_context_and_an_empty_spoken_say_still_f
 
 def test_the_system_prompt_does_not_depend_on_speech():
     assert "read aloud" not in system_prompt(NOW, [])
+
+
+def test_soul_has_the_setup_guidance():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    for tool in ("find_apps", "find_experts", "inspect_machine", "install_app", "install_expert"):
+        assert f"`{tool}`" in soul
+    assert "`choose`" in soul and "Allow card" in soul
+    assert len(soul.splitlines()) < 44

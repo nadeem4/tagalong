@@ -59,6 +59,12 @@ it from the registry; nothing is installed ahead of time. With several installed
 one to use (`list_experts` shows them). Each runs on your own login, never an API key. To run one
 agent of your own, set `TAGALONG_EXPERT_CMD` (it is listed as `custom`).
 
+When a request needs an expert or an app you do not have, Scout looks at what your computer has and
+at the public registries, recommends one option with a reason, and installs it only after you
+choose and press Allow on a card that names what it will run and download. Apps from the MCP
+registry (local `npx` or `uvx` packages, or hosted ones that sign in through your browser) are
+added the same way as apps you add by hand; required keys are never stored, only their names.
+
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
 

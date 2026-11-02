@@ -362,7 +362,8 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         try:
             job_id = await jobs.start(args["task"], args["folder"], args.get("expert"))
         except JobError as err:
-            return str(err)
+            # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
+            return json.dumps(err.facts) if err.facts else str(err)
         return f"job {job_id} started"
 
     async def list_experts(args: dict) -> str:

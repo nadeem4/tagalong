@@ -573,6 +573,26 @@ words what the person reads (guidance in `mind/soul.md`).
   switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them; every expert also loses
   `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
   for the login child and the check, and by expert runs later.
+- `apps.py`: `install_app` (Scout, `change`, `locked` and `person_only` like `install_expert`: the
+  Allow card cannot be skipped by a preference or a stored Auto, and has no Always). `app_params`
+  turns an MCP Registry entry into the params `validate_app` takes, and `app_tools.save_app` (the
+  same path Home's `add_app` uses) stores it. An `npx` package becomes a stdio app that runs
+  `<node> <npm-cli.js> exec --yes -- <package>@<version>` with absolute paths, the system Node when
+  it is 22 or newer, else Tagalong's own (downloaded first, named on the card; the system PATH is
+  never edited, only that app's own `PATH` has the Node folder first). A `uvx` package becomes stdio
+  `uvx` when it is installed, else the `uv_missing` fact. A remote entry becomes an http app with
+  `auth: "oauth"` (it only prompts when the server answers 401) and, when a browser body is
+  online, starts the sign-in through `Apps.sign_in`; with no browser the result says
+  `browser: false`. A remote entry that requires a header is the `needs_token` fact (a secret is
+  the person's to supply with Home's `add_app`). Required environment variables become `${NAME}`
+  references and no value is stored; the result lists the ones the brain's environment lacks as
+  `needs_env`. The card names the id, transport, package and version (or host), required env names
+  and any Node download. The result is `{id, transport, auth, status}` where `status` is the app's
+  state after at most 20 s (`connected`, `connecting`, `needs-sign-in`, `error`) or `signing_in`;
+  failures are `{error, detail}` facts (`unknown_app`, `needs_token`, `no_build`, `node_missing`,
+  `uv_missing`, `already_added`, `registry_unavailable`). Pass the same `query` as `find_apps` so
+  the entry is in the cached page.
+- `tools.py` `setup_facts`: the facts a refused `hand_off` carries (see Experts).
 
 ## Experts
 
@@ -746,7 +766,15 @@ flowchart TD
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
-`expert <id> is not installed; installed: <ids>`, `no experts installed`) and Scout words it. The
+`expert <id> is not installed; installed: <ids>`, `no experts installed`) and Scout words it.
+A setup refusal also carries `JobError.facts`, and `hand_off` returns them as JSON instead of the
+line: `{problem, expert?, needs: {node_major: 22}, machine: {os, arch, node, private_node,
+claude_code}, candidates: [registry ids buildable here], stale}`. `problem` is `no_expert`,
+`unknown_expert`, `expert_not_logged_in` (the saved record says so; nothing is spawned) or
+`expert_missing_node` (the expert runs on a Node that is gone). All values are ids, versions and
+numbers, never sentences. Offline with no cache, `candidates` is empty and `stale` is true. Scout
+looks, recommends with `choose` and installs (`install_expert`, `install_app`) as `mind/soul.md`
+says; the Allow card still opens whatever preference is saved. The
 row's `agent` is the expert id; its asks are logged and grouped by that id (`codex-acp:<folder>`; Claude Code keeps `claude_code:<folder>`), so a preference saved for one expert never approves another's. Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
 result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
 shows them as Scout does.

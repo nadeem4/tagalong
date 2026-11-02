@@ -25,6 +25,7 @@ from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
+from brain.setup.apps import app_setup_tools
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
 from brain.setup.install import NPM_TIMEOUT_S
@@ -33,7 +34,7 @@ from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
-from brain.setup.tools import setup_tools
+from brain.setup.tools import setup_facts, setup_tools
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
@@ -106,6 +107,19 @@ async def _run() -> None:
         emit_event,
         bodies.notify,
     )
+    app_tools = app_setup_tools(
+        config.data_dir,
+        registry,
+        inspect_machine,
+        apps,
+        memory,
+        tokens,
+        bodies.notify,
+        bodies,
+        http_fetch,
+        real_get_json,
+        os.environ,
+    )
     session = Session(
         model,
         budget,
@@ -120,8 +134,10 @@ async def _run() -> None:
         turn_timeout=config.turn_timeout,
         masker=masker,
         keys=keys,
+        setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools
+        + app_tools
         + login_tools(config.data_dir, logins),
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
