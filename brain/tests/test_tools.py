@@ -1039,4 +1039,4 @@ def test_hand_off_description_points_to_watch_job_and_how_done_is_judged(home):
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     text = described["hand_off"]
     assert "watch_job" in text and "done" in text and "summary" in text
-    assert "watch_job" in described["list_jobs"] or "watch" in described["list_jobs"]
+    assert "watch list" in described["list_jobs"]

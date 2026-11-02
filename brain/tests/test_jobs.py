@@ -1802,3 +1802,28 @@ async def test_activity_page_carries_the_watch_list(make_rig):
     assert rig.jobs.activity_page("j1", 0)["watch"] is None
     rig.jobs.set_watch("j1", _items(1))
     assert rig.jobs.activity_page("j1", 0)["watch"] == _items(1)
+
+
+async def test_set_watch_saves_the_stripped_text_and_limits_the_stripped_text(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    saved = rig.jobs.set_watch("j1", [{"text": "  tests pass 	", "done": False}])
+    assert saved == [{"text": "tests pass", "done": False}]
+    padded = " " + "x" * 200 + " "
+    assert rig.jobs.set_watch("j1", [{"text": padded, "done": False}])[0]["text"] == "x" * 200
+    with pytest.raises(JobError):
+        rig.jobs.set_watch("j1", [{"text": " " + "x" * 201, "done": False}])
+
+
+async def test_two_quick_watch_changes_end_in_one_trailing_notice(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.set_watch("j1", _items(1))
+    rig.jobs.set_watch("j1", _items(2))
+    rig.jobs.set_watch("j1", _items(3))
+    assert activity_changes(rig) == 1  # the first goes at once
+    await until(lambda: activity_changes(rig) == 2)  # the burst is one trailing notice
+    await asyncio.sleep(0.3)
+    assert activity_changes(rig) == 2
+    assert rig.memory.get_job("j1").watch == _items(3)
