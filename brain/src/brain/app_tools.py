@@ -8,6 +8,7 @@ app's own claim and cannot be trusted to lower the bar. Results come back fenced
 import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -144,6 +145,53 @@ def format_result(app_id: str, result: CallToolResult) -> str:
     return f'<data kind="app" app="{app_id}">\n{_fence_safe(body)}\n</data>'
 
 
+async def save_app(
+    apps: Apps,
+    memory: "Memory",
+    tokens: TokenFile,
+    notify: Notify,
+    params: dict,
+    token: str | None = None,
+) -> AppRow:
+    """Validate, store (secrets apart) and connect one app; the one path every way of adding an
+    app takes, Home's add_app and Scout's install_app alike. Raises AppError as a plain line."""
+    row = validate_app(params, taken={r.id for r in memory.list_apps()})
+    if row.auth == "token" and not (isinstance(token, str) and token):
+        raise AppError("an app with token sign-in needs its token.")
+    if token is not None and row.auth != "token":
+        raise AppError("a token only goes with auth token.")
+    clean, secrets = split_secrets(row.id, row.config, row.transport)
+    row = AppRow(row.id, row.name, row.transport, clean, row.auth, row.enabled)
+    try:
+        if token is not None:
+            tokens.set(row.id, token)
+        for key, value in secrets.items():
+            tokens.set(key, value)
+        memory.add_app(row)
+    except BaseException:
+        tokens.clear_app(row.id)  # a failed save must not leave a secret behind
+        raise
+    await apps.restart(row.id)
+    notify("changed", {"what": "apps"})
+    return row
+
+
+def browser_opener(bodies: Bodies, app_id: str) -> Callable[[str], Awaitable[None]] | None:
+    """How a sign-in reaches a browser: an online body that can open a web page runs the
+    open_url; None when no such body is online."""
+    body_id = next(
+        (b for b in bodies.online_ids() if any(t.name == "open_url" for t in bodies.tools(b))),
+        None,
+    )
+    if body_id is None:
+        return None
+
+    async def open_url(url: str) -> None:
+        await bodies.use(body_id, f"sign-in-{app_id}", "open_url", {"url": url})
+
+    return open_url
+
+
 def app_home_tools(
     apps: Apps, memory: "Memory", tokens: TokenFile, notify: Notify, bodies: Bodies
 ) -> list[tuple[ToolSpec, Handler]]:
@@ -204,28 +252,9 @@ def app_home_tools(
         config = {k: args[k] for k in ("command", "args", "env", "url") if k in args}
         params = {k: args[k] for k in ("name", "transport", "auth") if k in args}
         try:
-            row = validate_app(
-                {**params, "config": config}, taken={r.id for r in memory.list_apps()}
-            )
+            row = await save_app(apps, memory, tokens, notify, {**params, "config": config}, token)
         except AppError as exc:
             raise refuse(str(exc)) from None
-        if row.auth == "token" and not (isinstance(token, str) and token):
-            raise refuse("an app with token sign-in needs its token.")
-        if token is not None and row.auth != "token":
-            raise refuse("a token only goes with auth token.")
-        clean, secrets = split_secrets(row.id, row.config, row.transport)
-        row = AppRow(row.id, row.name, row.transport, clean, row.auth, row.enabled)
-        try:
-            if token is not None:
-                tokens.set(row.id, token)
-            for key, value in secrets.items():
-                tokens.set(key, value)
-            memory.add_app(row)
-        except BaseException:
-            tokens.clear_app(row.id)  # a failed save must not leave a secret behind
-            raise
-        await apps.restart(row.id)
-        notify("changed", {"what": "apps"})
         return json.dumps({"id": row.id})
 
     async def set_app_enabled(args: dict) -> str:
@@ -254,13 +283,6 @@ def app_home_tools(
         await apps.restart(app_id)
         return json.dumps({"id": app_id, "restarting": True})
 
-    def browser_body() -> str | None:
-        """An online body that can open a web page on the person's machine."""
-        return next(
-            (b for b in bodies.online_ids() if any(t.name == "open_url" for t in bodies.tools(b))),
-            None,
-        )
-
     async def sign_in_app(args: dict) -> str:
         app_id = known(args)
         row = next(r for r in memory.list_apps() if r.id == app_id)
@@ -268,13 +290,9 @@ def app_home_tools(
             raise refuse(f"{row.name} does not use sign-in.")
         if not row.enabled:
             raise refuse(f"Turn {row.name} on before signing in.")
-        body_id = browser_body()
-        if body_id is None:
+        open_url = browser_opener(bodies, app_id)
+        if open_url is None:
             raise refuse("Open Tagalong on the machine the brain runs on to sign in.")
-
-        async def open_url(url: str) -> None:
-            await bodies.use(body_id, f"sign-in-{app_id}", "open_url", {"url": url})
-
         try:
             await apps.sign_in(app_id, open_url)
         except AppError as exc:

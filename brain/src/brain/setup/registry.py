@@ -7,6 +7,7 @@ registries are other people's files. Offline, the cache is served and flagged `s
 import hashlib
 import json
 import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -41,6 +42,10 @@ class Distribution:
     cmd: list[str] = field(default_factory=list)
     args: list[str] = field(default_factory=list)
     platforms: tuple[str, ...] = ()
+    # Names of what an MCP entry requires: environment variables (a package) or headers (a
+    # remote). Names only; a value is never part of a registry entry.
+    env: tuple[str, ...] = ()
+    headers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -106,6 +111,17 @@ def _acp_entry(raw: dict) -> RegistryEntry:
     )
 
 
+def _required(items: object, safe: str) -> tuple[str, ...]:
+    """Names marked isRequired that match `safe` (an env name must fit a `${NAME}` reference)."""
+    if not isinstance(items, list):
+        return ()
+    return tuple(
+        i["name"]
+        for i in items
+        if isinstance(i, dict) and i.get("isRequired") and re.fullmatch(safe, str(i.get("name")))
+    )
+
+
 def _mcp_entry(raw: dict) -> RegistryEntry:
     server = raw["server"]
     if not (raw.get("_meta") or {}).get(_LATEST, {}).get("isLatest", True):
@@ -114,9 +130,16 @@ def _mcp_entry(raw: dict) -> RegistryEntry:
     for package in server.get("packages") or []:
         kind = {"npm": "npx", "pypi": "uvx"}.get(package.get("registryType"))
         if kind:
-            out.append(Distribution(kind, package["identifier"], package.get("version")))
+            env = _required(package.get("environmentVariables"), r"[A-Za-z_]\w*")
+            out.append(Distribution(kind, package["identifier"], package.get("version"), env=env))
     for remote in server.get("remotes") or []:
-        out.append(Distribution("remote", url=remote["url"]))
+        out.append(
+            Distribution(
+                "remote",
+                url=remote["url"],
+                headers=_required(remote.get("headers"), r"[A-Za-z0-9-]+"),
+            )
+        )
     if not out:
         raise ValueError("no way to run it")
     return RegistryEntry(
