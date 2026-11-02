@@ -74,11 +74,6 @@ export interface FakeBrain {
     steps: { job: string; expert: string; text: string; at: string }[],
     what: string,
   ): void;
-  /** Set what `job_activity` with no job returns (the bubble's live line) and tell the bodies `changed: what`. */
-  setRunning(
-    steps: { job: string; expert: string; text: string; at: string }[],
-    what: string,
-  ): void;
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
