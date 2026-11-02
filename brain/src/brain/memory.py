@@ -170,7 +170,26 @@ MIGRATIONS = (
     """
     ALTER TABLE jobs ADD COLUMN parent_job TEXT;
     """,
+    # What a job did, step by step. rev rises on every write (cursor for readers); seq is the
+    # display order, fixed at insert; seq 0 is the "[older steps dropped]" marker.
+    """
+    CREATE TABLE job_activity(
+        job_id TEXT NOT NULL,
+        rev INTEGER NOT NULL,
+        seq INTEGER NOT NULL,
+        at TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        step TEXT,
+        status TEXT,
+        exit INTEGER,
+        text TEXT NOT NULL,
+        PRIMARY KEY(job_id, seq)
+    );
+    CREATE INDEX job_activity_rev ON job_activity(job_id, rev);
+    """,
 )
+
+DROPPED_MARKER = "[older steps dropped]"
 
 
 class MemoryRefused(Exception):
@@ -203,6 +222,18 @@ class Job:
     started_at: str
     ended_at: str | None
     parent_job: str | None = None
+
+
+@dataclass(frozen=True)
+class ActivityEntry:
+    rev: int
+    seq: int
+    at: str  # ISO UTC
+    kind: str
+    text: str
+    status: str | None = None
+    step: str | None = None
+    exit: int | None = None
 
 
 @dataclass(frozen=True)
@@ -412,6 +443,85 @@ class Memory:
             fields["progress"] = fields["progress"][-JOB_PROGRESS_CAP:]  # a running tail
         sets = ", ".join(f"{k}=?" for k in fields)
         self._db.execute(f"UPDATE jobs SET {sets} WHERE id=?", (*fields.values(), id))
+
+    def save_activity(self, job_id: str, entry: ActivityEntry) -> None:
+        self._db.execute(
+            "INSERT INTO job_activity(job_id, rev, seq, at, kind, step, status, exit, text)"
+            " VALUES (?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(job_id, seq) DO UPDATE SET rev=excluded.rev, at=excluded.at,"
+            " kind=excluded.kind, step=excluded.step, status=excluded.status,"
+            " exit=excluded.exit, text=excluded.text",
+            (
+                job_id,
+                entry.rev,
+                entry.seq,
+                entry.at,
+                entry.kind,
+                entry.step,
+                entry.status,
+                entry.exit,
+                entry.text,
+            ),
+        )
+
+    def activity_after(self, job_id: str, after_rev: int, limit: int) -> list[ActivityEntry]:
+        rows = self._db.execute(
+            "SELECT rev, seq, at, kind, text, status, step, exit FROM job_activity"
+            " WHERE job_id=? AND rev>? ORDER BY rev LIMIT ?",
+            (job_id, after_rev, limit),
+        )
+        return [ActivityEntry(*r) for r in rows]
+
+    def last_rev(self, job_id: str) -> int:
+        row = self._db.execute("SELECT MAX(rev) FROM job_activity WHERE job_id=?", (job_id,))
+        return row.fetchone()[0] or 0
+
+    def jobs_with_activity(self) -> set[str]:
+        return {r[0] for r in self._db.execute("SELECT DISTINCT job_id FROM job_activity")}
+
+    def trim_activity(self, job_id: str, max_entries: int, max_bytes: int) -> None:
+        """Keep a job's log inside its caps: blank the oldest output text first, then delete
+        the oldest rows, leaving one marker (seq 0) where they were."""
+        total = self._db.execute(
+            "SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB))), 0) FROM job_activity WHERE job_id=?",
+            (job_id,),
+        ).fetchone()[0]
+        if total > max_bytes:
+            outputs = self._db.execute(
+                "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_activity"
+                " WHERE job_id=? AND kind='output' AND text!='' ORDER BY seq",
+                (job_id,),
+            ).fetchall()
+            for seq, size in outputs:
+                if total <= max_bytes:
+                    break
+                self._db.execute(
+                    "UPDATE job_activity SET text='' WHERE job_id=? AND seq=?", (job_id, seq)
+                )
+                total -= size
+        seqs = [
+            r[0]
+            for r in self._db.execute(
+                "SELECT seq FROM job_activity WHERE job_id=? AND seq>0 ORDER BY seq", (job_id,)
+            )
+        ]
+        excess = len(seqs) - max_entries
+        if excess <= 0:
+            return
+        self._db.execute(
+            "DELETE FROM job_activity WHERE job_id=? AND seq>0 AND seq<=?",
+            (job_id, seqs[excess - 1]),
+        )
+        self.save_activity(
+            job_id,
+            ActivityEntry(
+                rev=self.last_rev(job_id) + 1,
+                seq=0,
+                at=self._now().isoformat(),
+                kind="other",
+                text=DROPPED_MARKER,
+            ),
+        )
 
     def get_job(self, id: str) -> Job | None:
         rows = self._jobs("WHERE id=?", (id,))
