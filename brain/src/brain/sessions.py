@@ -126,7 +126,7 @@ class Session:
             kinds=kinds or EVENT_KINDS,
         )
         questions = ScoutQuestions(self.scheduler.emit)
-        approvals = Approvals(memory, notify, now, guards=self.guards)
+        approvals = self.approvals = Approvals(memory, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, guards=self.guards)
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
@@ -388,6 +388,10 @@ class Session:
 
     def answer(self, ask_id: str, option: str, body_id: str, text: str | None = None) -> None:
         self._asks.answer(ask_id, option, body_id, text)
+
+    @property
+    def asks(self) -> Asks:
+        return self._asks
 
     def open_asks(self) -> list[dict]:
         return self._asks.open_asks()
