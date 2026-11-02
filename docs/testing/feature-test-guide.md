@@ -292,6 +292,11 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     pill appears; press it to follow again. Press **Stop**: the page ends with `# stopped`. Open
     **Watch** on a finished job: the full log and a final `# done` line, no clock ticking. Nothing
     can be typed into the page. With Windows animations off (reduced motion) the spinner is still.
+    **Live line in the bubble (manual):** hand a job to Claude Code that runs a command, then open
+    Scout's bubble. **Expected:** one quiet line such as `Claude Code: npm test` near the bottom,
+    changing as the job moves on, never output text, not read aloud. When the job ends the line
+    disappears and the bubble does not jump. Automated: `job-line.test.tsx`, `companion-bubble.test.tsx`
+    and `e2e/jobs.spec.ts` (`setRunning` on the fake brain).
 12. **Action:** with the bubble closed, start a Manual-mode job that needs permission (or asks a
     question; its card appears once Scout passes the question on or cannot answer it) and leave
     the relayed ask unanswered for a minute.

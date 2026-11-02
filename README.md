@@ -165,7 +165,7 @@ knows, or passes it to you. Ask Scout to tell a working job something ("tell Cla
 moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:
 the expert reopens that session when it can, and Scout says so when it starts fresh instead.
 The brain also records each job's steps (commands, edits, messages, plan) in a masked, size-capped
-log. Home and the bubble can already ask the brain for it by cursor; the page that shows it comes in a later release.
+log. Home's Jobs page shows it as a terminal-style page, and while a job runs the bubble shows one quiet line with its current step (for example `Claude Code: npm test`).
 
 **Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
 on it speaks the answer to a question you asked out loud, the answer to a typed question, its
