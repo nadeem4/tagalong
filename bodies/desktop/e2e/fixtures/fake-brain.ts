@@ -69,6 +69,8 @@ export interface FakeBrain {
     job: string,
     entry: { kind: string; text: string; status?: string; step?: string; exit?: number },
   ): void;
+  /** Replace Scout's watch list for a job and tell the bodies `changed: job_activity`. */
+  setWatch(job: string, items: { text: string; done: boolean }[]): void;
   /** Set what `job_activity` with no job returns (the bubble's live line) and tell the bodies `changed: what`. */
   setRunning(
     steps: { job: string; expert: string; text: string; at: string }[],
@@ -223,6 +225,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
   const activity: Record<string, Record<string, unknown>[]> = { job1: [...JOB_STEPS] };
+  const watches: Record<string, { text: string; done: boolean }[]> = {
+    job1: [
+      { text: 'tests pass', done: true },
+      { text: 'README updated', done: false },
+    ],
+  };
   let running: unknown[] = [];
   const permissions = [
     {
@@ -439,7 +447,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               rev,
               entries,
               more: false,
-              watch: null,
+              watch: watches[job] ?? null,
             };
           }
         } else if (params.tool === 'stop_job') {
@@ -579,6 +587,18 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         exit: null,
         ...entry,
       });
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'job_activity' },
+          }),
+        );
+      }
+    },
+    setWatch: (job, items) => {
+      watches[job] = items;
       for (const socket of sockets) {
         socket.send(
           JSON.stringify({

@@ -1724,3 +1724,106 @@ async def test_a_job_with_no_entries_gets_a_short_summary_not_an_error(make_rig)
     rig = make_rig(FakeAsks())
     rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
     assert rig.jobs.wake_facts("j1") == {"activity": "no activity recorded"}
+
+
+# --- JM3: Scout's watch list -------------------------------------------------------------
+
+
+def _items(n: int) -> list[dict]:
+    return [{"text": f"item {i}", "done": False} for i in range(n)]
+
+
+async def test_set_watch_saves_masks_and_notifies_job_activity(make_rig):
+    rig = make_rig(FakeAsks(), guards=masking_guards())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    saved = rig.jobs.set_watch("j1", [{"text": f"uses {TOKEN}", "done": False}])
+    assert TOKEN not in str(saved) and "[secret]" in saved[0]["text"]
+    assert rig.memory.get_job("j1").watch == saved
+    assert ("changed", {"what": "job_activity"}) in rig.notes
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        _items(11),
+        [{"text": "x" * 201, "done": False}],
+        [{"text": "", "done": False}],
+        [{"text": "a", "done": "yes"}],
+        "not a list",
+        [{"done": True}],
+        ["just text"],
+    ],
+)
+async def test_set_watch_refuses_a_bad_list_and_keeps_the_old_one(make_rig, bad):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    old = [{"text": "keep", "done": True}]
+    rig.jobs.set_watch("j1", old)
+    with pytest.raises(JobError):
+        rig.jobs.set_watch("j1", bad)
+    assert rig.memory.get_job("j1").watch == old
+
+
+async def test_set_watch_accepts_ten_items_and_an_empty_list_clears(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    assert len(rig.jobs.set_watch("j1", _items(10))) == 10
+    assert rig.jobs.set_watch("j1", []) == []
+    assert rig.memory.get_job("j1").watch is None
+
+
+async def test_set_watch_refuses_an_unknown_job(make_rig):
+    rig = make_rig(FakeAsks())
+    with pytest.raises(JobError, match="no job nope"):
+        rig.jobs.set_watch("nope", _items(1))
+
+
+async def test_wake_facts_has_watching_lines_in_order(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    assert "watching" not in rig.jobs.wake_facts("j1")
+    rig.jobs.set_watch(
+        "j1", [{"text": "tests pass", "done": True}, {"text": "README updated", "done": False}]
+    )
+    assert rig.jobs.wake_facts("j1")["watching"] == "[x] tests pass\n[ ] README updated"
+
+
+async def test_job_ended_note_shows_the_watch_list_after_a_restart(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.memory.update_job("j1", state="done", reason="", result="ok", ended_at="2026-01-01")
+    rig.jobs.set_watch("j1", [{"text": "tests pass", "done": False}])
+    assert "Watching:\n[ ] tests pass" in rig.jobs.note(rig.memory.get_job("j1"))
+
+
+async def test_activity_page_carries_the_watch_list(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    assert rig.jobs.activity_page("j1", 0)["watch"] is None
+    rig.jobs.set_watch("j1", _items(1))
+    assert rig.jobs.activity_page("j1", 0)["watch"] == _items(1)
+
+
+async def test_set_watch_saves_the_stripped_text_and_limits_the_stripped_text(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    saved = rig.jobs.set_watch("j1", [{"text": "  tests pass 	", "done": False}])
+    assert saved == [{"text": "tests pass", "done": False}]
+    padded = " " + "x" * 200 + " "
+    assert rig.jobs.set_watch("j1", [{"text": padded, "done": False}])[0]["text"] == "x" * 200
+    with pytest.raises(JobError):
+        rig.jobs.set_watch("j1", [{"text": " " + "x" * 201, "done": False}])
+
+
+async def test_two_quick_watch_changes_end_in_one_trailing_notice(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.set_watch("j1", _items(1))
+    rig.jobs.set_watch("j1", _items(2))
+    rig.jobs.set_watch("j1", _items(3))
+    assert activity_changes(rig) == 1  # the first goes at once
+    await until(lambda: activity_changes(rig) == 2)  # the burst is one trailing notice
+    await asyncio.sleep(0.3)
+    assert activity_changes(rig) == 2
+    assert rig.memory.get_job("j1").watch == _items(3)

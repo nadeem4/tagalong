@@ -165,7 +165,7 @@ knows, or passes it to you. Ask Scout to tell a working job something ("tell Cla
 moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:
 the expert reopens that session when it can, and Scout says so when it starts fresh instead.
 The brain also records each job's steps (commands, edits, messages, plan) in a masked, size-capped
-log. Home's Jobs page shows it as a terminal-style page, and while a job runs the bubble shows one quiet line with its current step (for example `Claude Code: npm test`).
+log. Home's Jobs page shows it as a terminal-style page (with Scout's own short list of what it expects from the job, read-only, under the title), and while a job runs the bubble shows one quiet line with its current step (for example `Claude Code: npm test`).
 
 **Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
 on it speaks the answer to a question you asked out loud, the answer to a typed question, its
@@ -235,6 +235,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   (at most once every couple of minutes per job) when a step a job ran (usually a command) fails, and every such wake comes
   with a short summary of what the job did: step counts, the step running now, the latest commands
   and failed commands with their last output lines. Scout can tell a failure from normal work and may just wait.
+  Scout also writes a short list of what it expects from each job (`watch_job`); you see it, read-only,
+  under the job page's title, and Scout sees it again on every wake about the job.
 - **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.

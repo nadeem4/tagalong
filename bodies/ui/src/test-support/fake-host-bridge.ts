@@ -22,6 +22,7 @@ import type {
   JobActivityPage,
   JobRow,
   RunningStep,
+  WatchItem,
   PermissionRow,
   PreferenceRow,
   KeyResult,
@@ -54,6 +55,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly jobStops: readonly string[];
   /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
   activity: Record<string, JobActivityEntry[]>;
+  /** Scout's watch list by job id; a test may swap them. */
+  watch: Record<string, WatchItem[]>;
   running: RunningStep[];
   /** How many times runningSteps was called. */
   runningStepCalls: number;
@@ -107,6 +110,7 @@ export function createFakeHostBridge(
     jobs?: JobRow[];
     /** A job's steps by job id, and the running steps the bubble shows. */
     activity?: Record<string, JobActivityEntry[]>;
+    watch?: Record<string, WatchItem[]>;
     runningSteps?: RunningStep[];
     /** Home's Approvals history and preferences. */
     approvalRows?: ApprovalRow[];
@@ -323,7 +327,7 @@ export function createFakeHostBridge(
         rev: all.reduce((top, e) => Math.max(top, e.rev), 0),
         entries,
         more: false,
-        watch: null,
+        watch: fake.watch[job] ?? null,
       };
       return Promise.resolve(page);
     },
@@ -332,6 +336,7 @@ export function createFakeHostBridge(
       return Promise.resolve(fake.running.map((step) => ({ ...step })));
     },
     activity: { ...options.activity },
+    watch: { ...options.watch },
     running: (options.runningSteps ?? []).map((step) => ({ ...step })),
     runningStepCalls: 0,
     activityCalls,

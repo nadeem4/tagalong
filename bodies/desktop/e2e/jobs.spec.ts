@@ -151,6 +151,70 @@ test('watching a job shows its log, follows new steps and shows exit codes', asy
   await expect(home.getByRole('region', { name: 'Jobs' })).toContainText('Fix the build');
 });
 
+test('the job page shows what Scout is watching, read-only', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Watch Fix the build' }).click();
+
+  const list = home.getByRole('list', { name: 'Scout is checking' });
+  await expect(list).toContainText('tests pass', { timeout: 15_000 });
+  await expect(list).toContainText('README updated');
+  await expect(list.getByLabel('done', { exact: true })).toHaveCount(1);
+  await expect(list.getByRole('button')).toHaveCount(0);
+
+  // Scout ticks the second item: the header follows without a reload.
+  brain.setWatch('job1', [
+    { text: 'tests pass', done: true },
+    { text: 'README updated', done: true },
+  ]);
+  await expect(list.getByLabel('done', { exact: true })).toHaveCount(2, { timeout: 15_000 });
+
+  // Scout clears the list: the header shows nothing, not an empty box.
+  brain.setWatch('job1', []);
+  await expect(home.getByRole('list', { name: 'Scout is checking' })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+  brain.setWatch('job1', [
+    { text: 'tests pass', done: true },
+    { text: 'README updated', done: false },
+  ]);
+  await home.getByRole('button', { name: 'Back to Jobs' }).click();
+});
+
+test('a long watch list never pushes the log or its pill off the screen', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Watch Fix the build' }).click();
+  const items = Array.from({ length: 10 }, (_, i) => ({
+    text: `expectation ${i + 1}`,
+    done: i < 3,
+  }));
+  brain.setWatch('job1', items);
+  const list = home.getByRole('list', { name: 'Scout is checking' });
+  await expect(list).toContainText('expectation 10', { timeout: 15_000 });
+
+  const fit = await home.evaluate(() => {
+    const log = document.querySelector('[role="log"]')?.getBoundingClientRect();
+    const main = document.querySelector('.home-main');
+    const list = document.querySelector('.watch-list__items');
+    return {
+      logBottom: log?.bottom ?? Infinity,
+      viewport: window.innerHeight,
+      outerScroll: main ? main.scrollHeight - main.clientHeight : Infinity,
+      listScrolls: list ? list.scrollHeight > list.clientHeight : false,
+    };
+  });
+  expect(fit.logBottom).toBeLessThanOrEqual(fit.viewport);
+  expect(fit.outerScroll).toBeLessThanOrEqual(1);
+  expect(fit.listScrolls).toBe(true); // capped, so ten items scroll inside their own box
+
+  brain.setWatch('job1', [
+    { text: 'tests pass', done: true },
+    { text: 'README updated', done: false },
+  ]);
+  await home.getByRole('button', { name: 'Back to Jobs' }).click();
+});
+
 test('a changed jobs notice refreshes the list', async () => {
   // Answering the question made the brain add a second job and say only that jobs changed.
   const home = await windowFor('home');

@@ -13,6 +13,7 @@ export type {
   JobActivityPage,
   JobRow,
   RunningStep,
+  WatchItem,
   ApprovalRow,
   ApprovalCounts,
   PreferenceRow,

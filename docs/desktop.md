@@ -490,7 +490,11 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   `HomeView` navigation is unchanged. The page pulls `jobActivity(job, rev)` on mount and on every
   `changed { what: "job_activity" }`, loops while `more` is true, and folds each page with
   `applyPage` (`job-activity-state.ts`: an entry with a seen `seq` is replaced in place, the rest
-  appended, sorted by `seq`). `JobLog` (`job-log.tsx`) draws the steps as styled text, not a
+  appended, sorted by `seq`; the page's `watch` is taken from the latest page). `WatchList`
+  (`watch-list.tsx`) draws Scout's watch list under the title in the header, read-only: a muted
+  "Scout is checking" caption and one line per item with a done or not-done glyph, text only as plain text,
+  nothing at all when the list is null or empty. The list is capped at about six lines and scrolls inside
+  its own box, and the page is a flex column so the log fills the remaining height (no outer scroll). `JobLog` (`job-log.tsx`) draws the steps as styled text, not a
   terminal emulator, so nothing can be typed: `$ command` lines with a status glyph (spinner,
   check, cross), output through a small SGR-only parser (`ansi.ts`: bold and the 16 colours; cursor
   moves, clears, charset selects and OSC strings (BEL or ST ended) are dropped and `\r` progress

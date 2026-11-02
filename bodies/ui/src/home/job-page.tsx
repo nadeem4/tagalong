@@ -1,7 +1,8 @@
 /**
  * The job page in Home: one job's activity as a read-only log, live while the job runs. It pulls
  * the brain's job_activity by cursor on mount and on every `job_activity` notice, follows the
- * newest line until the person scrolls up, and offers Jump to latest. Contains JobPage.
+ * newest line until the person scrolls up, and offers Jump to latest. Scout's watch list shows
+ * read-only in the header. Contains JobPage.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
 import { useHostBridge } from '../host-bridge';
@@ -9,6 +10,7 @@ import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
 import { applyPage, emptyLog, type LogState } from './job-activity-state';
 import { JobLog } from './job-log';
+import { WatchList } from './watch-list';
 
 const STATE_LABEL: Record<string, string> = {
   running: 'Running',
@@ -133,6 +135,7 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
             </Button>
           )}
         </div>
+        <WatchList items={log.watch} />
       </div>
       {failed && (
         <p role="alert" className="job-page__alert">

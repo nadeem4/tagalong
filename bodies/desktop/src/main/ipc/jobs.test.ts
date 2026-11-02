@@ -121,6 +121,12 @@ describe('registerJobsIpc', () => {
     expect(calls).toEqual([['job_activity', { job: 'j1', after_rev: 7 }]]);
   });
 
+  it("passes Scout's watch list through on the page", async () => {
+    const watch = [{ text: 'tests pass', done: true }];
+    const { invoke } = setup(() => text({ ...PAGE, watch }));
+    expect(((await invoke(IPC.jobActivity, 'j1', 0)) as { watch: unknown }).watch).toEqual(watch);
+  });
+
   it('refuses a bad job id or cursor for the activity pull, without asking the brain', async () => {
     const { invoke, calls } = setup(() => text(PAGE));
     await expect(invoke(IPC.jobActivity, '', 0)).rejects.toThrow('bad job id');

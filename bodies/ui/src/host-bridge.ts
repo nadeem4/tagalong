@@ -90,8 +90,14 @@ export interface JobActivityPage {
   rev: number;
   entries: JobActivityEntry[];
   more: boolean;
-  /** Reserved for the watch list; null until the brain fills it. */
-  watch: null;
+  /** What Scout said it expects from the job; null when it has said nothing (or cleared it). */
+  watch: WatchItem[] | null;
+}
+
+/** One line of Scout's watch list for a job; the owner sees it read-only. */
+export interface WatchItem {
+  text: string;
+  done: boolean;
 }
 
 /** The step a running job is on now, for the bubble's one live line. */

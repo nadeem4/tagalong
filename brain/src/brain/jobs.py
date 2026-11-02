@@ -40,6 +40,10 @@ log = logging.getLogger("brain")
 AGENT = "claude_code"
 
 
+WATCH_MAX_ITEMS = 10
+WATCH_TEXT_MAX = 200
+
+
 def _prefix(agent: str) -> str:
     """Claude Code keeps its old `claude_code` prefix, so saved preferences and the bodies' label
     for its asks still match; any other expert is keyed by its own id."""
@@ -334,8 +338,19 @@ class Jobs:
             "rev": rows[-1].rev if more else self._memory.last_rev(job_id),
             "entries": [asdict(r) for r in rows],
             "more": more,
-            "watch": None,
+            "watch": job.watch,
         }
+
+    def set_watch(self, job_id: str, items: object) -> list[dict]:
+        """Replace Scout's watch list for a job. A bad shape is refused with a plain line and the
+        old list stays; text is masked before it is saved, like anything model-written."""
+        if self._memory.get_job(job_id) is None:
+            raise JobError(f"no job {job_id}")
+        clean = _check_watch(items)
+        clean = mask_json(self._guards, "job_watch", clean)
+        self._memory.set_watch(job_id, clean)
+        self._activity_changed(job_id)  # an open job page redraws its header
+        return clean
 
     async def _quiet(self, job_id: str, facts: QuietFacts) -> None:
         """A running job showed nothing new for the threshold: tell Scout the facts. Code never
@@ -370,7 +385,11 @@ class Jobs:
         """Facts every job wake carries: a short summary of what the job did, read from its
         stored log (so a job from before a restart has one too) and masked once more."""
         summary = activity_summary(self._memory, job_id, self._now())
-        return {"activity": mask_json(self._guards, "job_summary", summary)}
+        facts = {"activity": mask_json(self._guards, "job_summary", summary)}
+        job = self._memory.get_job(job_id)
+        if job is not None and job.watch:  # already masked when saved
+            facts["watching"] = render_watch(job.watch)
+        return facts
 
     def note(self, job: Job) -> str:
         """The wake text for a finished job: its row and the summary of its steps."""
@@ -606,6 +625,31 @@ class Jobs:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _check_watch(items: object) -> list[dict]:
+    if not isinstance(items, list):
+        raise JobError("watch_job needs items as a list of {text, done}.")
+    if len(items) > WATCH_MAX_ITEMS:
+        raise JobError(
+            f"watch_job takes at most {WATCH_MAX_ITEMS} items; keep the few that matter."
+        )
+    clean = []
+    for item in items:
+        text = item.get("text") if isinstance(item, dict) else None
+        done = item.get("done") if isinstance(item, dict) else None
+        text = text.strip() if isinstance(text, str) else None
+        if not text or len(text) > WATCH_TEXT_MAX:
+            raise JobError(f"Each watch item needs text of 1 to {WATCH_TEXT_MAX} characters.")
+        if not isinstance(done, bool):
+            raise JobError("Each watch item needs done as true or false.")
+        clean.append({"text": text, "done": done})
+    return clean
+
+
+def render_watch(items: list[dict] | None) -> str:
+    """The watch list as plain lines, ticked or not, for Scout's wakes."""
+    return "\n".join(f"[{'x' if i['done'] else ' '}] {i['text']}" for i in items or [])
 
 
 def job_note(job: Job, facts: dict[str, str] | None = None) -> str:

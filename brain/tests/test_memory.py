@@ -740,3 +740,41 @@ def test_stop_running_on_start_writes_an_end_row(mem):
     [end] = mem.activity_after("a", 0, 10)
     assert (end.kind, end.text) == ("end", "# stopped")
     assert mem.activity_after("b", 0, 10) == []
+
+
+def test_watch_round_trips_and_defaults_to_none(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    assert mem.get_job("j1").watch is None
+    items = [{"text": "tests pass", "done": False}, {"text": "docs", "done": True}]
+    mem.set_watch("j1", items)
+    assert mem.get_job("j1").watch == items
+
+
+def test_set_watch_none_clears_it(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.set_watch("j1", [{"text": "x", "done": False}])
+    mem.set_watch("j1", None)
+    assert mem.get_job("j1").watch is None
+
+
+def test_an_old_database_gets_the_watch_column_by_migration(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.execute(
+        "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
+        " VALUES ('j1','a','t','f','m','done','2026-01-01')"
+    )
+    db.close()
+    m = Memory(path)
+    assert m.get_job("j1").watch is None
+    m.set_watch("j1", [{"text": "x", "done": True}])
+    assert m.get_job("j1").watch == [{"text": "x", "done": True}]
+    m.close()
+
+
+def test_a_malformed_stored_watch_reads_as_none(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.update_job("j1", watch="not json")
+    assert mem.get_job("j1").watch is None

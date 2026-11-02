@@ -25,7 +25,7 @@ def say(**kw) -> SayParams:
 def test_soul_ships_as_package_data_and_has_no_scripted_lines():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert soul.startswith("You are Scout")
-    assert len(soul.splitlines()) < 44
+    assert len(soul.splitlines()) < 45
     assert "silence" in soul.lower() or "nothing useful" in soul.lower()
 
 
@@ -379,4 +379,16 @@ def test_soul_has_the_setup_guidance():
     for tool in ("find_apps", "find_experts", "inspect_machine", "install_app", "install_expert"):
         assert f"`{tool}`" in soul
     assert "`choose`" in soul and "Allow card" in soul
-    assert len(soul.splitlines()) < 44
+    assert len(soul.splitlines()) < 45
+
+
+def test_soul_has_the_hand_off_guidance_and_no_template():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8").lower()
+    for word in ("goal", "done", "test", "summary", "watch_job"):
+        assert word in soul
+    assert "{" not in soul
+
+
+def test_events_notes_mention_the_watch_list():
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    assert events.count("Watching, when present") == 3

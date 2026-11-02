@@ -42,6 +42,8 @@ export const HOME_CSS = `
   padding: 0 ${t.space.page}px; display: flex; flex-direction: column; gap: ${t.space.xxl}px;
 }
 .home-page > * { min-width: 0; }
+/* At least the free height, so a page that wants it (the job log) can fill what the head leaves. */
+.home-page { flex: 1 0 auto; }
 .home-head { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .home-head p { margin: 0; font-size: ${t.fontSize.field}px; color: ${t.color.panelMuted}; }
 .home-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -158,19 +160,29 @@ export const HOME_CSS = `
 .job-page__title .home-title { min-width: 0; overflow-wrap: anywhere; }
 .job-page__title .tg-button { margin-left: auto; }
 .job-page__time { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.watch-list { margin-top: ${t.space.sm}px; }
+.home-head .watch-list__caption { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.watch-list__items {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xs}px;
+  /* About six lines; a longer list scrolls in its own box so it never squeezes the log. */
+  max-height: 144px; overflow-y: auto;
+}
+.watch-list__item { display: flex; gap: ${t.space.md}px; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.watch-list__glyph { flex: none; width: 14px; text-align: center; color: ${t.color.panelMuted}; }
+.watch-list__glyph--done { color: ${t.color.okInk}; }
 .job-page__alert {
   margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.field}px;
   background: ${t.color.errFill}; color: ${t.color.errInk}; font-size: ${t.fontSize.body}px;
 }
-.job-page__frame { position: relative; }
+.job-page__frame { position: relative; flex: 1 1 0; min-height: 280px; display: flex; flex-direction: column; }
 .job-page__jump {
   position: absolute; left: 50%; bottom: ${t.space.lg}px; transform: translateX(-50%);
   min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
   background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
 }
 .job-log {
-  /* 240px is roughly the head, nav gaps and page padding above the log, so it fills the rest. */
-  height: calc(100vh - 240px); min-height: 280px; overflow-y: auto; overscroll-behavior: contain;
+  /* Fills what the page's head leaves (the frame is a flex item), whatever the head's height. */
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: ${t.space.lg}px ${t.space.xl}px; border: 1px solid ${t.color.line}; border-radius: ${t.radius.row}px;
   background: ${t.color.page}; color: ${t.color.text};
   font-family: ${t.font.mono}; font-size: ${t.fontSize.small}px; line-height: 1.55;

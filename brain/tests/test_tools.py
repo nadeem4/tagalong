@@ -204,6 +204,7 @@ class FakeJobs:
         self.resumable = {}
         self.started = JobId("ab12cd34")
         self.lines: dict[str, str] = {}
+        self.watch = None
 
     def installed(self):
         return self.experts
@@ -246,8 +247,14 @@ class FakeJobs:
             "rev": 3,
             "entries": [],
             "more": False,
-            "watch": None,
+            "watch": self.watch,
         }
+
+    def set_watch(self, job_id, items):
+        self.calls.append(("set_watch", job_id, items))
+        if self.error:
+            raise self.error
+        return items
 
     def running_steps(self):
         return self.steps
@@ -592,6 +599,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "forget",
         "hand_off",
         "tell_expert",
+        "watch_job",
         "list_experts",
         "list_jobs",
         "stop_job",
@@ -985,3 +993,50 @@ async def test_list_jobs_rows_carry_the_activity_flag(home, mem):
     home.jobs.activity_jobs = {"j1"}
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
     assert rows["j1"]["activity"] is True and rows["j2"]["activity"] is False
+
+
+async def test_watch_job_replaces_the_list_and_returns_it(home):
+    items = [{"text": "tests pass", "done": False}]
+    out = await home.run("watch_job", {"job": "j1", "items": items})
+    assert home.jobs.calls == [("set_watch", "j1", items)]
+    assert json.loads(out) == {"job": "j1", "watch": items}
+
+
+async def test_watch_job_refusals_are_plain_lines_not_errors(home):
+    home.jobs.error = JobError("no job j9")
+    assert await home.run("watch_job", {"job": "j9", "items": []}) == "no job j9"
+
+
+async def test_watch_job_needs_a_job_and_a_list(home):
+    with pytest.raises(MemoryRefused):
+        await home.run("watch_job", {"items": []})
+
+
+def test_watch_job_spec_is_scout_only_change_effect_auto_mode(home):
+    spec = expert_specs(home)["watch_job"]
+    assert spec.audience == frozenset({"scout"})
+    assert spec.effect == "change" and spec.default_mode == "auto"
+    schema = {t["name"]: t["input_schema"] for t in home.box.model_tools()}["watch_job"]
+    assert schema["required"] == ["job", "items"]
+    assert set(schema["properties"]["items"]["items"]["required"]) == {"text", "done"}
+
+
+async def test_list_jobs_row_carries_watch(home, mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.set_watch("j1", [{"text": "x", "done": True}])
+    home.jobs.rows = mem.list_jobs(20)
+    (row,) = json.loads(await home.run("list_jobs"))["jobs"]
+    assert row["watch"] == [{"text": "x", "done": True}]
+
+
+async def test_job_activity_returns_the_watch_list(home):
+    home.jobs.watch = [{"text": "x", "done": False}]
+    out = json.loads(await home.run("job_activity", {"job": "j1"}))
+    assert out["watch"] == [{"text": "x", "done": False}]
+
+
+def test_hand_off_description_points_to_watch_job_and_how_done_is_judged(home):
+    described = {t["name"]: t["description"] for t in home.box.model_tools()}
+    text = described["hand_off"]
+    assert "watch_job" in text and "done" in text and "summary" in text
+    assert "watch list" in described["list_jobs"]
