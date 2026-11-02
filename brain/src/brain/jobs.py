@@ -1,7 +1,8 @@
 """Jobs: Scout's hand-offs to Claude Code, from the folder check to the finished row.
 Owns the running ExpertRuns, asks the user to pick a mode (the hand-off ask), relays Claude
 Code's own permission and question prompts as turn-less asks, and keeps the jobs table current.
-It tells bodies through the injected notify (`changed: jobs`); the tools that call it come later.
+It tells bodies through the injected notify (`changed: jobs`, `changed: job_activity`); the tools
+that call it come later.
 """
 
 import asyncio
@@ -535,9 +536,8 @@ class Jobs:
         self._memory.update_job(job_id, state=state, reason=reason, result=result, ended_at=_now())
         self._runs.pop(job_id, None)
         if activity := self._activity.pop(job_id, None):
-            activity.end(state, reason)
             self._stop_activity_notes(job_id)
-            self._send_activity(job_id)  # the page sees the end entry at once
+            activity.end(state, reason)  # its change notice is the one, sent after the end row
             self._activity_sent.pop(job_id, None)
         self._progress_sent.pop(job_id, None)
         self._asks.cancel_all(self._ask_ids.pop(job_id, set()))
