@@ -48,10 +48,11 @@ _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 
 class InstallError(Exception):
-    def __init__(self, kind: str, detail: str = "") -> None:
+    def __init__(self, kind: str, detail: str = "", id: str | None = None) -> None:
         super().__init__(f"{kind}: {detail}")
         self.kind = kind
         self.detail = detail
+        self.id = id  # the existing row's id, for already_added
 
 
 class NoBuild(InstallError):

@@ -593,6 +593,21 @@ words what the person reads (guidance in `mind/soul.md`).
   `uv_missing`, `already_added`, `registry_unavailable`). Pass the same `query` as `find_apps` so
   the entry is in the cached page.
 - `tools.py` `setup_facts`: the facts a refused `hand_off` carries (see Experts).
+- `cli.py`: the `tagalong` command (`uv run tagalong`, or `tagalong` once installed), for a brain
+  machine with no screen. It is a thin caller of the functions above (`inspect`, `Registry`,
+  `install_card`, `install_expert`, `app_params`, `save_app`, `LoginDriver`, `ExpertStore`) with
+  the same seams (`run`, `fetch`, `get_json`, `ask`), and it never contacts a running brain: it
+  reads and writes the files under the data folder, and a brain re-reads them when it next needs
+  them (an app it adds connects when the brain next starts). `doctor` prints the machine, Node,
+  npm, git, whether a key is set (never the key), the installed experts and their login, and the
+  registry (from the cache, flagged, when offline); it exits 0 even when something is missing.
+  `key set` reads the key from a hidden prompt or `--stdin`, never from the command line, and
+  writes `ANTHROPIC_API_KEY` to `.env` with `upsert_env_value`. `install <expert>` and
+  `apps add <app>` print what the Allow card shows (id, version, folder or host, the Node
+  download), then ask `[y/N]`; `--yes` skips the question. `login <expert>` runs the same
+  `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits
+  for the result; where no window can open it prints the command to run yourself. A failure
+  prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
 
 ## Experts
 

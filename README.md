@@ -65,6 +65,11 @@ choose and press Allow on a card that names what it will run and download. Apps 
 registry (local `npx` or `uvx` packages, or hosted ones that sign in through your browser) are
 added the same way as apps you add by hand; required keys are never stored, only their names.
 
+On a brain machine with no screen, `uv run tagalong doctor` shows what is set up and what is
+missing, and `tagalong key set`, `install <expert>`, `login <expert>` and `apps add <app>` do the
+same setup from a terminal (see [docs/development.md](docs/development.md)); none of them needs the
+brain to be running.
+
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
 

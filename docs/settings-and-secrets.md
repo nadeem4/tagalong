@@ -154,6 +154,11 @@ start commands).
 `TAGALONG_EXPERT_CMD` (in `.env` or the environment) names one custom expert; it holds a command, never a secret, and each expert's own key variables are stripped from its process (see brain.md).
 None holds a secret. See [brain.md](brain.md#setting-things-up-setup).
 
+`tagalong key set` (the CLI, for a machine with no screen) writes the same `ANTHROPIC_API_KEY`
+line into `<TAGALONG_HOME>/.env` that the app does, owner-only; the key comes from a hidden
+prompt or standard input, never from an argument (shell history and the process list would keep
+it), and is never printed. `tagalong doctor` says only whether a key is set.
+
 ## Failure handling
 
 - **A bad settings file** never stops boot: the `.bak`, then the defaults, with a warning. The bad

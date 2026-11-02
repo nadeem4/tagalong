@@ -1808,6 +1808,25 @@ Brain tests only; nothing here installs anything.
    **Restart** and it connects.
 5. Ask for an app that needs a token header: Scout says it cannot add it itself.
 
+### The `tagalong` command on a brain with no screen
+
+1. `cd brain && uv run pytest tests/test_cli.py -q` passes (fakes only: no network, install,
+   window or API call; a test also checks that no connection to a brain is opened).
+2. By hand, with `TAGALONG_HOME` pointing at an empty folder and no brain running: `uv run
+tagalong doctor` lists this machine, Node, npm and git, says there is no key and no expert,
+   and exits 0. With the network off it still lists the cached registry and says it is cached.
+3. `uv run tagalong key set` (hidden prompt) then `doctor`: the key is reported as set and never
+   shown; `<TAGALONG_HOME>/.env` holds the line. `key set sk-ant-x` is refused as a usage error.
+4. `uv run tagalong install claude-acp`: it prints the version, the folder and the Node download
+   (or that the Node here is used), asks `[y/N]`; `n` installs nothing. Answer `y`: progress lines
+   and `installed`. `experts.json` now lists it.
+5. Start the brain afterwards: the expert is available with no restart of anything else. (Start it
+   first and install after: Scout sees the expert on its next use, without a restart.)
+6. `uv run tagalong login claude-acp` on a machine with a screen opens the terminal window and
+   ends with `logged in`; over SSH on a headless machine it prints the command to run yourself.
+7. `uv run tagalong apps add <registry-id>` for a hosted app: the card shows its host, `y` adds
+   it, and it says the sign-in is done from the app.
+
 ## Not supported
 
 Do not test these here.
