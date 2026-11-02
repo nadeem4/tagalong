@@ -34,6 +34,7 @@ class EventKind:
 _KINDS = (
     EventKind("timer", batch_seconds=0, max_per_hour=6),
     EventKind("job_ended", batch_seconds=30, max_per_hour=10),
+    EventKind("job_quiet", batch_seconds=0, max_per_hour=3),
     EventKind("body_online", batch_seconds=0, max_per_hour=2),
     EventKind("back", batch_seconds=0, max_per_hour=2),
     EventKind("job_question", batch_seconds=None, max_per_hour=None),

@@ -10,8 +10,10 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from fake_clock import FakeClock
 
 from brain.experts import (
     ExpertError,
@@ -69,7 +71,6 @@ def make_run(
     h: Harness,
     tmp_path: Path,
     steps,
-    timeout: float = 30,
     command=None,
     expert_id: str = "custom",
     path_first=None,
@@ -92,7 +93,6 @@ def make_run(
     )
     h.run = ExpertRun(
         host=host,
-        timeout=timeout,
         on_permission=h.on_permission,
         on_question=h.on_question,
         on_progress=h.on_progress,
@@ -319,20 +319,6 @@ async def test_stop_cancels_and_leaves_no_process(tmp_path):
     assert any(f.get("method") == "session/cancel" for f in frames(tmp_path))
 
 
-async def test_timeout_ends_in_error_and_the_process_is_gone(tmp_path):
-    h = Harness()
-    run = make_run(h, tmp_path, [{"hang": True}], timeout=0.5)
-    try:
-        await run.start(tmp_path)
-        process = run.process
-        await run.begin("default", "go")
-        state = await finished(h)
-    finally:
-        await run.close()
-    assert state[:2] == ("error", "timeout")
-    assert process.returncode is not None
-
-
 async def test_adapter_crash_ends_in_error(tmp_path):
     h = Harness()
     run = make_run(h, tmp_path, [{"text": "about to die"}, {"crash": 3}])
@@ -422,7 +408,7 @@ def test_the_factory_puts_a_private_nodes_dir_first_and_leaves_others_alone(tmp_
         expert = InstalledExpert(
             "x", "x", "1", [str(tmp_path / "n" / "node.exe")], "registry", True, node
         )
-        return ExpertHosts(5)(
+        return ExpertHosts()(
             expert, on_permission=None, on_question=None, on_progress=None, on_end=None
         )
 
@@ -521,9 +507,9 @@ async def test_stop_while_a_question_is_pending_answers_cancel(tmp_path):
     assert replies and replies[0]["result"]["action"] == "cancel"
 
 
-async def test_timeout_during_the_stop_grace_still_reports_stopped(tmp_path):
+async def test_stopping_a_stubborn_run_still_reports_stopped(tmp_path):
     h = Harness()
-    run = make_run(h, tmp_path, [{"stubborn": True}], timeout=0.5, grace=2)
+    run = make_run(h, tmp_path, [{"stubborn": True}], grace=2)
     await run.start(tmp_path)
     await run.begin("default", "go")
     await asyncio.sleep(0.1)
@@ -623,7 +609,6 @@ async def test_two_runs_on_one_adapter_get_only_their_own_updates(tmp_path):
     def run_for(h):
         h.run = ExpertRun(
             host=host,
-            timeout=30,
             on_permission=h.on_permission,
             on_question=h.on_question,
             on_progress=h.on_progress,
@@ -642,3 +627,190 @@ async def test_two_runs_on_one_adapter_get_only_their_own_updates(tmp_path):
     await finished(hb)
     assert [u.tool_call_id for u in ha.updates] == ["a"]
     assert [u.tool_call_id for u in hb.updates] == ["b"]
+
+
+# --- the quiet clock: unit tests on a stub host and a fake clock, no subprocess ---
+
+
+class StubHost:
+    def __init__(self) -> None:
+        self.process = SimpleNamespace(returncode=None)
+
+
+async def quiet_run(clock: FakeClock, facts: list, quiet_s: float = 1200.0) -> ExpertRun:
+    async def on_quiet(f):
+        facts.append(f)
+
+    async def noop(*a):
+        return None
+
+    run = ExpertRun(
+        host=StubHost(),
+        on_permission=noop,
+        on_question=noop,
+        on_progress=noop,
+        on_end=noop,
+        on_quiet=on_quiet,
+        quiet_s=quiet_s,
+        sleep=clock.sleep,
+        clock=clock.clock,
+    )
+    run._active = True
+    run._start_quiet()
+    await asyncio.sleep(0)  # the sleeper registers its wait before the test moves time
+    return run
+
+
+def tool(id_, status="pending", **kw):
+    return SimpleNamespace(
+        session_update="tool_call",
+        tool_call_id=id_,
+        status=status,
+        content=None,
+        raw_output=None,
+        **kw,
+    )
+
+
+def tool_update(id_, status="in_progress", content=None, raw_output=None, field_meta=None):
+    return SimpleNamespace(
+        session_update="tool_call_update",
+        tool_call_id=id_,
+        status=status,
+        content=content,
+        raw_output=raw_output,
+        field_meta=field_meta,
+    )
+
+
+async def test_quiet_fires_after_the_threshold_with_no_activity():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    await clock.advance(1199)
+    assert facts == []
+    await clock.advance(1)
+    assert [(f.quiet_s, f.adapter_alive) for f in facts] == [(1200.0, True)]
+    await run._stop_quiet()
+
+
+async def test_heartbeat_updates_do_not_reset_the_clock():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    await run._update(tool("a"))  # a step at t=0
+    for _ in range(10):
+        await clock.advance(100)
+        await run._update(tool_update("a", "pending"))  # same status, no content
+    await clock.advance(200)
+    assert len(facts) == 1
+    await run._stop_quiet()
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        tool("b"),
+        tool_update("a", "completed"),
+        tool_update("a", "pending", content=[object()]),
+        tool_update("a", "pending", raw_output="out"),
+        SimpleNamespace(session_update="agent_message_chunk"),
+        SimpleNamespace(session_update="plan"),
+    ],
+)
+async def test_real_activity_resets_the_clock(update):
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    await run._update(tool("a"))
+    await clock.advance(1000)
+    await run._update(update)
+    await clock.advance(200)  # t=1200: the first deadline passes, the reset one has not
+    assert facts == []
+    await clock.advance(1000)  # t=2200
+    assert len(facts) == 1
+    await run._stop_quiet()
+
+
+async def test_it_rearms_a_full_threshold_after_the_emit():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    await clock.advance(1200)
+    assert len(facts) == 1
+    await clock.advance(1199)
+    assert len(facts) == 1
+    await clock.advance(1)
+    assert len(facts) == 2
+    await run._stop_quiet()
+
+
+async def test_it_does_not_fire_while_an_ask_is_open():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    ask = asyncio.get_running_loop().create_future()
+    run._asks.add(ask)
+    await clock.advance(1200)
+    await clock.advance(1200)
+    assert facts == []
+    run._asks.clear()
+    await clock.advance(1200)  # a full threshold after the last check
+    assert len(facts) == 1
+    await run._stop_quiet()
+
+
+async def test_the_sleeper_is_cancelled_when_the_run_ends():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    task = run._quiet_task
+    await run._stop_quiet()
+    assert task.done()
+    await clock.advance(5000)
+    assert facts == []
+
+
+async def test_adapter_alive_reflects_the_process():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+    run._host.process.returncode = 1
+    await clock.advance(1200)
+    assert facts[0].adapter_alive is False
+    await run._stop_quiet()
+
+
+async def test_a_failing_on_quiet_is_logged_and_the_clock_keeps_running():
+    clock = FakeClock()
+    calls = []
+
+    async def boom(f):
+        calls.append(f)
+        raise RuntimeError("bug")
+
+    async def noop(*a):
+        return None
+
+    run = ExpertRun(
+        host=StubHost(),
+        on_permission=noop,
+        on_question=noop,
+        on_progress=noop,
+        on_end=noop,
+        on_quiet=boom,
+        quiet_s=10,
+        sleep=clock.sleep,
+        clock=clock.clock,
+    )
+    run._active = True
+    run._start_quiet()
+    await asyncio.sleep(0)
+    await clock.advance(10)
+    await clock.advance(10)
+    assert len(calls) == 2
+    await run._stop_quiet()
+
+
+async def test_a_run_without_on_quiet_starts_no_sleeper():
+    async def noop(*a):
+        return None
+
+    run = ExpertRun(
+        host=StubHost(), on_permission=noop, on_question=noop, on_progress=noop, on_end=noop
+    )
+    run._start_quiet()
+    assert run._quiet_task is None

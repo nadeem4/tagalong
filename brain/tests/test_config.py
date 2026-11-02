@@ -97,25 +97,30 @@ def test_load_env_file_missing_is_fine(tmp_path):
 
 
 def test_expert_defaults():
-    cfg = load_config({})
-    assert (cfg.expert_cmd, cfg.expert_timeout) == ([], 1800.0)
+    assert load_config({}).expert_cmd == []
 
 
 def test_expert_overrides_split_the_command_like_a_shell():
-    cfg = load_config(
-        {
-            "TAGALONG_EXPERT_CMD": 'node "/opt/my agent/index.js" --x',
-            "TAGALONG_EXPERT_TIMEOUT_S": "60",
-        }
-    )
+    cfg = load_config({"TAGALONG_EXPERT_CMD": 'node "/opt/my agent/index.js" --x'})
     assert cfg.expert_cmd == ["node", "/opt/my agent/index.js", "--x"]
-    assert cfg.expert_timeout == 60.0
 
 
-@pytest.mark.parametrize("value", ["abc", "0", "-5", "nan"])
-def test_bad_expert_timeout_raises(value):
-    with pytest.raises(ValueError):
-        load_config({"TAGALONG_EXPERT_TIMEOUT_S": value})
+def test_job_quiet_defaults_to_twenty_minutes():
+    assert load_config({}).job_quiet_min == 20.0
+
+
+def test_job_quiet_reads_the_env():
+    assert load_config({"TAGALONG_JOB_QUIET_MIN": "45"}).job_quiet_min == 45.0
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "soon", "nan"])
+def test_job_quiet_must_be_a_positive_number(value):
+    with pytest.raises(ValueError, match="TAGALONG_JOB_QUIET_MIN"):
+        load_config({"TAGALONG_JOB_QUIET_MIN": value})
+
+
+def test_the_old_run_timeout_variable_is_ignored():
+    load_config({"TAGALONG_EXPERT_TIMEOUT_S": "banana"})  # a stale .env must not break startup
 
 
 def test_turn_timeout_defaults_to_300():

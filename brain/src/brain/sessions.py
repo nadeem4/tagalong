@@ -30,7 +30,6 @@ from brain.builtin_guards import (
 )
 from brain.choices import Choices
 from brain.config import (
-    DEFAULT_EXPERT_TIMEOUT_S,
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
     DEFAULT_OFFER_WINDOW_DAYS,
@@ -110,8 +109,8 @@ class Session:
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
         notify = bodies.notify
-        # main passes the installed experts and the timeout; the defaults keep tests short.
-        make_run = make_run or ExpertHosts(DEFAULT_EXPERT_TIMEOUT_S)
+        # main passes the installed experts and the quiet threshold; the defaults keep tests short.
+        make_run = make_run or ExpertHosts()
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         self.scheduler = Scheduler(
@@ -147,6 +146,7 @@ class Session:
             guards=self.guards,
             on_away=self._on_job_away,
             setup_facts=setup_facts,
+            emit=self.scheduler.emit,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)

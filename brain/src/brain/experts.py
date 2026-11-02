@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import Awaitable, Callable
 from contextlib import AsyncExitStack, suppress
 from dataclasses import dataclass
@@ -41,6 +42,36 @@ log = logging.getLogger(__name__)
 
 class ExpertError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class QuietFacts:
+    """What the quiet clock reports: how long nothing happened and whether the adapter lives."""
+
+    quiet_s: float
+    adapter_alive: bool
+
+
+def counts_as_activity(update: object, seen: dict[str, str | None]) -> bool:
+    """Whether an ACP update is real progress. A repeated status with no content is a
+    heartbeat and must not hide a stuck command; `seen` remembers each call's last status."""
+    kind = getattr(update, "session_update", None)
+    if kind in ("agent_message_chunk", "plan"):
+        return True
+    if kind not in ("tool_call", "tool_call_update"):
+        return False
+    step = getattr(update, "tool_call_id", None)
+    status = str(update.status) if getattr(update, "status", None) else None
+    changed = status is not None and status != seen.get(step)
+    if status is not None:
+        seen[step] = status
+    meta = getattr(update, "field_meta", None) or {}
+    output = bool(
+        getattr(update, "content", None)
+        or getattr(update, "raw_output", None)
+        or meta.get("terminal_output")
+    )
+    return kind == "tool_call" or changed or output
 
 
 @dataclass(frozen=True)
@@ -106,14 +137,16 @@ class ExpertHosts:
 
     def __init__(
         self,
-        timeout: float,
         idle_s: float = 0.0,
         *,
+        quiet_s: float = 1200.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self._timeout = timeout
         self._idle_s = idle_s
+        self._quiet_s = quiet_s
         self._sleep = sleep
+        self._clock = clock
         self._hosts: dict[tuple, ExpertHost] = {}
 
     def __call__(self, expert, **callbacks) -> "ExpertRun":
@@ -125,7 +158,9 @@ class ExpertHosts:
             host = self._hosts[key] = ExpertHost(
                 expert.command, expert.id, path_first, idle_s=self._idle_s, sleep=self._sleep
             )
-        return ExpertRun(host=host, timeout=self._timeout, **callbacks)
+        return ExpertRun(
+            host=host, quiet_s=self._quiet_s, sleep=self._sleep, clock=self._clock, **callbacks
+        )
 
     def can_resume(self, expert_id: str) -> bool | None:
         """Whether this expert's adapter reopens sessions; None until it has been started once."""
@@ -339,17 +374,27 @@ class ExpertRun:
         self,
         *,
         host: ExpertHost,
-        timeout: float,
         on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
         on_question: Callable[[Question], Awaitable[dict | None]],
         on_progress: Callable[[str], Awaitable[None]],
         on_end: Callable[[str, str, str | None], Awaitable[None]],
         on_update: Callable[[object], Awaitable[None]] | None = None,
+        on_quiet: Callable[[QuietFacts], Awaitable[None]] | None = None,
+        quiet_s: float = 1200.0,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        clock: Callable[[], float] = time.monotonic,
         grace: float = 3.0,
         startup_timeout: float = 60.0,
     ) -> None:
         self._host = host
-        self._timeout = timeout
+        self._on_quiet = on_quiet
+        self._quiet_s = quiet_s
+        self._sleep = sleep
+        self._clock = clock
+        self._seen: dict[str, str | None] = {}
+        self._quiet_task: asyncio.Task | None = None
+        self._quiet_from = 0.0
+        self.last_step_at = 0.0
         self._grace = grace
         self._startup_timeout = startup_timeout
         self._on_permission = on_permission
@@ -387,6 +432,7 @@ class ExpertRun:
                 f"The expert did not answer within {self._startup_timeout:g} s to a mode change."
             ) from None
         self._active = True
+        self._start_quiet()
         self._task = asyncio.ensure_future(self._drive(task))
 
     def note(self, text: str) -> bool:
@@ -438,30 +484,28 @@ class ExpertRun:
         state, reason = "done", "end_turn"
         prompt = first
         try:
-            async with asyncio.timeout(self._timeout):
-                while True:
-                    self._message_id = _NO_MESSAGE
-                    response = await self._host.conn.prompt(
-                        session_id=self.session_id, prompt=[acp.text_block(prompt)]
-                    )
-                    reason = response.stop_reason
-                    if self._stopping:
-                        state, reason = "stopped", "stopped"
-                        break
-                    if not self._notes:
-                        break
-                    prompt = self._notes.pop(0)
+            while True:
+                self._message_id = _NO_MESSAGE
+                response = await self._host.conn.prompt(
+                    session_id=self.session_id, prompt=[acp.text_block(prompt)]
+                )
+                reason = response.stop_reason
+                if self._stopping:
+                    state, reason = "stopped", "stopped"
+                    break
+                if not self._notes:
+                    break
+                prompt = self._notes.pop(0)
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
-            elif isinstance(exc, TimeoutError):
-                state, reason = "error", "timeout"
             else:
                 state, reason = (
                     "error",
                     f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__,
                 )
         self._active = False
+        await self._stop_quiet()
         self.result = self.progress or None
         try:
             await self._host.release(self, broken=state == "error")
@@ -475,12 +519,48 @@ class ExpertRun:
     async def _update(self, update: object) -> None:
         """Every ACP update of this session. Dropped before begin: a resumed session replays
         its old chat first, and that must not reach the job's log."""
-        if self._on_update is None or not self._active:
+        if not self._active:
+            return
+        if counts_as_activity(update, self._seen):
+            self.last_step_at = self._clock()
+        if self._on_update is None:
             return
         try:
             await self._on_update(update)
         except Exception:
             log.exception("expert on_update failed")
+
+    def _start_quiet(self) -> None:
+        self.last_step_at = self._quiet_from = self._clock()
+        if self._on_quiet is not None:
+            self._quiet_task = asyncio.ensure_future(self._watch_quiet())
+
+    async def _stop_quiet(self) -> None:
+        task, self._quiet_task = self._quiet_task, None
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    def _deadline(self) -> float:
+        return max(self.last_step_at, self._quiet_from) + self._quiet_s
+
+    async def _watch_quiet(self) -> None:
+        """Wake the owner of this run when nothing real has happened for quiet_s. Code never
+        stops a quiet run; a job waiting on an ask is waiting for a person, so it is not counted."""
+        while True:
+            await self._sleep(max(0.0, self._deadline() - self._clock()))
+            if self._clock() < self._deadline():  # activity moved the deadline while we slept
+                continue
+            self._quiet_from = self._clock()
+            if self._asks:
+                continue
+            process = self._host.process
+            alive = process is not None and process.returncode is None
+            try:
+                await self._on_quiet(QuietFacts(self._quiet_s, alive))
+            except Exception:
+                log.exception("expert on_quiet failed")
 
     async def _message_chunk(self, message_id, text: str) -> None:
         if message_id != self._message_id:

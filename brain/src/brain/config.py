@@ -17,7 +17,7 @@ DEFAULT_PORT = 47321
 DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_STEP_CAP = 25
-DEFAULT_EXPERT_TIMEOUT_S = 1800.0
+DEFAULT_JOB_QUIET_MIN = 20.0
 DEFAULT_EXPERT_IDLE_S = 300.0
 DEFAULT_TURN_TIMEOUT_S = 300.0
 DEFAULT_WAKES_PER_HOUR = 12
@@ -35,7 +35,7 @@ class Config:
     daily_budget_usd: float = DEFAULT_DAILY_BUDGET_USD
     step_cap: int = DEFAULT_STEP_CAP
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
-    expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
+    job_quiet_min: float = DEFAULT_JOB_QUIET_MIN
     expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
     turn_timeout: float = DEFAULT_TURN_TIMEOUT_S
     wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
@@ -76,7 +76,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         daily_budget_usd=_budget(env.get("TAGALONG_DAILY_BUDGET_USD")),
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
-        expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
+        job_quiet_min=_job_quiet_min(env.get("TAGALONG_JOB_QUIET_MIN")),
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
         turn_timeout=_turn_timeout(env.get("TAGALONG_TURN_TIMEOUT_S")),
         wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
@@ -102,15 +102,15 @@ def _budget(text: str | None) -> float:
     return value
 
 
-def _expert_timeout(text: str | None) -> float:
+def _job_quiet_min(text: str | None) -> float:
     if not text:
-        return DEFAULT_EXPERT_TIMEOUT_S
+        return DEFAULT_JOB_QUIET_MIN
     try:
         value = float(text)
     except ValueError:
-        raise ValueError(f"bad TAGALONG_EXPERT_TIMEOUT_S: {text!r}") from None
+        raise ValueError(f"bad TAGALONG_JOB_QUIET_MIN: {text!r}") from None
     if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"TAGALONG_EXPERT_TIMEOUT_S must be positive: {text!r}")
+        raise ValueError(f"TAGALONG_JOB_QUIET_MIN must be positive: {text!r}")
     return value
 
 
