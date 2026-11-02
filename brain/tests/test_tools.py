@@ -291,6 +291,12 @@ async def test_hand_off_refusal_is_a_plain_line(home):
     assert await home.run("hand_off", {"task": "t", "folder": "C:/p"}) == "not started"
 
 
+async def test_hand_off_refusal_with_facts_returns_the_facts_as_json(home):
+    home.jobs.error = JobError("no experts installed", {"problem": "no_expert", "candidates": []})
+    out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p"}))
+    assert out == {"problem": "no_expert", "candidates": []}
+
+
 async def test_hand_off_needs_task_and_folder(home):
     with pytest.raises(MemoryRefused):
         await home.run("hand_off", {"task": "t"})

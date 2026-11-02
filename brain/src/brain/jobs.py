@@ -6,9 +6,10 @@ It tells bodies through the injected notify (`changed: jobs`); the tools that ca
 
 import inspect
 import logging
+import shutil
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from brain.memory import Job, Memory
 from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
+from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 
@@ -48,7 +50,12 @@ RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in th
 
 
 class JobError(Exception):
-    """A plain message for the model or the user; never a crash."""
+    """A plain message for the model or the user; never a crash. `facts` (JSON-able ids and
+    numbers, no sentences) lets Scout reason about a setup problem and word it himself."""
+
+    def __init__(self, message: str, facts: dict | None = None) -> None:
+        super().__init__(message)
+        self.facts = facts or {}
 
 
 class Jobs:
@@ -68,8 +75,10 @@ class Jobs:
         offers: Offers | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
+        setup_facts: Callable[[], Awaitable[dict]] | None = None,
     ) -> None:
         self._memory = memory
+        self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
         self._notify = notify
         self._experts = experts  # read afresh: an install adds one while the brain runs
@@ -100,24 +109,50 @@ class Jobs:
     def installed(self) -> list[InstalledExpert]:
         return self._experts()
 
-    def _pick(self, named: str | None) -> InstalledExpert:
+    async def _refusal(self, message: str, problem: str, expert: str | None = None) -> JobError:
+        """A refusal Scout can act on: the problem, what is needed and what this machine and the
+        registry offer. The facts source failing never hides the refusal itself."""
+        facts: dict = {"problem": problem, "needs": {"node_major": NODE_FLOOR}}
+        if expert is not None:
+            facts["expert"] = expert
+        if self._setup_facts is not None:
+            try:
+                facts.update(await self._setup_facts())
+            except Exception:
+                log.warning("setup facts failed", exc_info=True)
+        return JobError(message, facts)
+
+    async def _pick(self, named: str | None) -> InstalledExpert:
         """The named expert, or the only one; the refusals are facts for the model to word."""
         found = self._experts()
         ids = ", ".join(e.id for e in found)
         if named is not None:
             match = next((e for e in found if e.id == named), None)
             if match is None:
-                raise JobError(f"expert {named} is not installed; installed: {ids or 'none'}")
-            return match
+                message = f"expert {named} is not installed; installed: {ids or 'none'}"
+                raise await self._refusal(message, "unknown_expert", named)
+            return await self._usable(match)
         if not found:
-            raise JobError("no experts installed")
+            raise await self._refusal("no experts installed", "no_expert")
         if len(found) > 1:
             raise JobError(f"several experts installed, name one: {ids}")
-        return found[0]
+        return await self._usable(found[0])
+
+    async def _usable(self, expert: InstalledExpert) -> InstalledExpert:
+        """Refuse before spawning when the record already says it cannot work."""
+        if expert.logged_in is False:
+            raise await self._refusal(
+                f"{expert.id} is not logged in", "expert_not_logged_in", expert.id
+            )
+        if expert.node is not None and shutil.which(expert.command[0]) is None:
+            raise await self._refusal(
+                f"{expert.id} cannot find its node", "expert_missing_node", expert.id
+            )
+        return expert
 
     async def start(self, task: str, folder: str, expert: str | None = None) -> str:
         """Hand the task to an expert once the user picks a mode. Returns the job id."""
-        chosen = self._pick(expert)
+        chosen = await self._pick(expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")

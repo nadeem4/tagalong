@@ -100,6 +100,7 @@ class Rig:
         expert_timeout=30,
         guards=None,
         experts=None,
+        setup_facts=None,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
@@ -135,6 +136,7 @@ class Rig:
             approvals=self.approvals,
             side_check=side_check,
             guards=guards,
+            setup_facts=setup_facts,
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -1087,3 +1089,90 @@ async def test_no_experts_at_all_is_a_fact_not_wording(make_rig):
         await rig.jobs.start("go", str(rig.folder))
     assert str(err.value) == "no experts installed"
     assert rig.runs == []
+
+
+FACTS = {
+    "machine": {"os": "windows", "node": "18.0.0"},
+    "candidates": ["claude-acp"],
+    "stale": False,
+}
+
+
+async def fake_facts():
+    return FACTS
+
+
+def _facts_of(err: JobError) -> dict:
+    return err.facts
+
+
+async def test_no_expert_carries_setup_facts_with_candidates(make_rig):
+    rig = make_rig(FakeAsks(), experts=[], setup_facts=fake_facts)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    facts = _facts_of(err.value)
+    assert facts["problem"] == "no_expert"
+    assert facts["needs"] == {"node_major": 22}
+    assert facts["candidates"] == ["claude-acp"] and facts["machine"]["os"] == "windows"
+    assert str(err.value) == "no experts installed"
+
+
+async def test_unknown_expert_carries_facts(make_rig):
+    rig = make_rig(FakeAsks(), setup_facts=fake_facts)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder), "gemini")
+    assert _facts_of(err.value)["problem"] == "unknown_expert"
+    assert _facts_of(err.value)["expert"] == "gemini"
+
+
+async def test_a_not_logged_in_expert_is_a_fact_and_starts_nothing(make_rig):
+    rig = make_rig(FakeAsks(), experts=[installed(logged_in=False)], setup_facts=fake_facts)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert _facts_of(err.value)["problem"] == "expert_not_logged_in"
+    assert _facts_of(err.value)["expert"] == "claude-acp"
+    assert rig.runs == []
+
+
+async def test_an_expert_whose_node_is_gone_is_a_fact(make_rig, tmp_path):
+    gone = installed(command=[str(tmp_path / "no-such-node"), "x.js"], node="system")
+    rig = make_rig(FakeAsks(), experts=[gone], setup_facts=fake_facts)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert _facts_of(err.value)["problem"] == "expert_missing_node"
+    assert rig.runs == []
+
+
+async def test_facts_hold_ids_and_numbers_never_sentences(make_rig):
+    rig = make_rig(FakeAsks(), experts=[], setup_facts=fake_facts)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+
+    def leaves(value):
+        if isinstance(value, dict):
+            for v in value.values():
+                yield from leaves(v)
+        elif isinstance(value, list):
+            for v in value:
+                yield from leaves(v)
+        else:
+            yield value
+
+    assert all(" " not in v for v in leaves(_facts_of(err.value)) if isinstance(v, str))
+
+
+async def test_without_a_facts_source_the_error_has_no_facts(make_rig):
+    rig = make_rig(FakeAsks(), experts=[])
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert err.value.facts == {"problem": "no_expert", "needs": {"node_major": 22}}
+
+
+async def test_a_failing_facts_source_never_hides_the_refusal(make_rig):
+    async def broken():
+        raise RuntimeError("boom")
+
+    rig = make_rig(FakeAsks(), experts=[], setup_facts=broken)
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert err.value.facts["problem"] == "no_expert" and "candidates" not in err.value.facts

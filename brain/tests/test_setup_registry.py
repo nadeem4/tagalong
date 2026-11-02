@@ -245,3 +245,36 @@ async def test_tools_pass_more_through(tmp_path):
     tools = {s.name: h for s, h in setup_tools(tmp_path, reg, inspect_fn)}
     assert json.loads(await tools["find_apps"]({}))["more"] is True
     assert json.loads(await tools["find_experts"]({}))["more"] is False
+
+
+async def test_setup_facts_lists_buildable_candidates_in_short_tokens(tmp_path):
+    from brain.setup.facts import ToolVersion
+    from brain.setup.tools import setup_facts
+
+    m = Machine("windows", "x64", ToolVersion("18.0.0", "n"), None, None, None, None)
+
+    async def inspect_fn():
+        return m
+
+    facts = await setup_facts(registry(tmp_path), inspect_fn)
+    assert "claude-acp" in facts["candidates"] and facts["stale"] is False
+    assert facts["machine"] == {
+        "os": "windows",
+        "arch": "x64",
+        "node": "18.0.0",
+        "private_node": None,
+        "claude_code": None,
+    }
+
+
+async def test_setup_facts_offline_with_no_cache_is_empty_and_stale(tmp_path):
+    from brain.setup.tools import setup_facts
+
+    net = Net()
+    net.offline = True
+
+    async def inspect_fn():
+        return machine()
+
+    facts = await setup_facts(registry(tmp_path, net), inspect_fn)
+    assert facts["candidates"] == [] and facts["stale"] is True

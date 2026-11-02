@@ -33,7 +33,7 @@ from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
-from brain.setup.tools import setup_tools
+from brain.setup.tools import setup_facts, setup_tools
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
@@ -120,6 +120,7 @@ async def _run() -> None:
         turn_timeout=config.turn_timeout,
         masker=masker,
         keys=keys,
+        setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools
         + login_tools(config.data_dir, logins),
