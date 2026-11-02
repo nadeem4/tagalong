@@ -670,8 +670,8 @@ async def test_cancel_job_is_called_when_a_job_ends(make_rig):
     assert scout.cancelled == [job_id]
 
 
-def with_approvals(make_rig, asks, steps, side_check=None):
-    return make_rig(asks, steps, approvals=True, side_check=side_check)
+def with_approvals(make_rig, asks, steps, side_check=None, **kw):
+    return make_rig(asks, steps, approvals=True, side_check=side_check, **kw)
 
 
 def logged(rig):
@@ -1049,6 +1049,21 @@ async def test_a_named_expert_is_used_and_recorded_as_the_rows_agent(make_rig):
     job_id = await rig.jobs.start("go", str(rig.folder), "codex-acp")
     assert rig.expert_ids == ["codex-acp"]
     assert rig.memory.get_job(job_id).agent == "codex-acp"
+
+
+async def test_asks_are_grouped_by_the_jobs_expert_so_preferences_do_not_cross(make_rig):
+    steps = [{"permission": {"title": "ls"}}]
+    rig = with_approvals(
+        make_rig,
+        FakeAsks(Answer("Plan"), Answer("Yes")),
+        steps,
+        experts=[installed("claude-acp"), installed("codex-acp")],
+    )
+    await rig.jobs.start("go", str(rig.folder), "codex-acp")
+    await until(lambda: rig.finished)
+    (row,) = logged(rig)
+    assert row.source == "claude_code"  # the DB constraint
+    assert row.tool == "codex-acp:ls" and row.group_key == f"codex-acp:{rig.folder}"
 
 
 async def test_an_unknown_expert_is_a_fact_naming_what_is_installed(make_rig):

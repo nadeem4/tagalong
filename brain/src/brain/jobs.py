@@ -28,8 +28,18 @@ from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
-# The approvals source and tool prefix for every expert's asks (memory.py constrains the value).
+# The approvals source for every expert's asks (memory.py constrains the value); the tool
+# prefix and group key come from the job's expert (see _prefix), so a preference saved for one
+# expert never approves another's asks.
 AGENT = "claude_code"
+
+
+def _prefix(agent: str) -> str:
+    """Claude Code keeps its old `claude_code` prefix, so saved preferences and the bodies' label
+    for its asks still match; any other expert is keyed by its own id."""
+    return AGENT if agent == "claude-acp" else agent
+
+
 CANCEL = "cancel"
 HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
@@ -223,7 +233,8 @@ class Jobs:
         once = next((o for o in request.options if o.kind == "allow_once"), None)
         job = self._memory.get_job(job_id)
         folder = job.folder if job is not None else ""
-        tool = f"{AGENT}:{request.title}"
+        agent = _prefix(job.agent) if job is not None else AGENT
+        tool = f"{agent}:{request.title}"
         approvals = self._approvals
         picked = None  # the option the person chose, kept for the return value
 
@@ -243,7 +254,7 @@ class Jobs:
             tool,
             approvals.summarise(request.title, tool, request.input) if approvals else "",
             request.input,
-            f"{AGENT}:{folder}",
+            f"{agent}:{folder}",
             False,
             None,
             ask_person,
@@ -278,20 +289,22 @@ class Jobs:
         """A person allowed this: Scout may offer to approve the whole folder's kind of ask."""
         job = self._memory.get_job(job_id)
         if self._offers is not None and job is not None:
-            self._offers.consider(f"{AGENT}:{job.folder}", AGENT, f"{AGENT}:{request.title}")
+            self._offers.consider(
+                f"{_prefix(job.agent)}:{job.folder}", AGENT, f"{_prefix(job.agent)}:{request.title}"
+            )
 
     def _record(self, job_id: str, request: PermissionRequest, outcome: str) -> None:
         job = self._memory.get_job(job_id)
         if self._approvals is None or job is None:
             return
-        tool = f"claude_code:{request.title}"
+        tool = f"{_prefix(job.agent)}:{request.title}"
         answered = outcome in ("approved", "refused")
         self._approvals.record(
             source=AGENT,
             tool=tool,
             summary=self._approvals.summarise(request.title, tool, request.input),
             input=request.input,
-            group_key=f"{AGENT}:{job.folder}",
+            group_key=f"{_prefix(job.agent)}:{job.folder}",
             outcome=outcome,
             job_id=job_id,
             decided_by="person" if answered else "none",

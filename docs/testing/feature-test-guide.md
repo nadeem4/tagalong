@@ -1675,8 +1675,8 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
 1. **Action:** on step 6 with Claude Code's connector installed. **Expected:** "Claude Code's
    connector is installed on this computer." and nothing about the login. Rename the command or
-   stop the brain, press **Check again**. **Expected:** "was not found" with the
-   `npm install -g @agentclientprotocol/claude-agent-acp` line, or "Scout's brain is not running".
+   stop the brain, press **Check again**. **Expected:** "was not found" (Scout
+   installs the connector on request; nothing is installed ahead of time), or "Scout's brain is not running".
    The page reads "For bigger jobs, Scout calls in an expert", shows a hand-off card and ends
    with "More experts are coming."
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show

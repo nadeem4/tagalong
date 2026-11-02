@@ -532,7 +532,7 @@ words what the person reads (guidance in `mind/soul.md`).
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
   `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. Brain
   shutdown cancels running installs, each of which cleans up what it staged.
-  An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` with a system
+  An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` (the card shows that same version; an unpinned package gets the entry's) with a system
   Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
   every npx expert. npm gets a minimal environment of its own (PATH with the chosen Node first,
   the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
@@ -570,7 +570,8 @@ words what the person reads (guidance in `mind/soul.md`).
   window leaves the first running); the card says `unknown` when the check could not tell; shutdown cancels
   them all; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
-  switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them), used
+  switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them; every expert also loses
+  `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
   for the login child and the check, and by expert runs later.
 
 ## Experts
@@ -600,7 +601,8 @@ run limit. The override is split like a shell on Linux and macOS; on Windows bac
 title, the question's own text (`description`), the option labels and `multi` (a multi-select
 answers with a list of labels). The child gets the brain's environment through `setup/env.py` `expert_env(expert_id, ...)`,
 without that expert's own key variables (the last column of the table below; an unknown id loses
-all of them), so each expert runs on the user's own login, never a key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
+all of them) and without `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so each expert runs on the user's own login, never a key Scout uses. For an expert on the private
+Node, that Node's folder goes first on the child's PATH (the brain's own PATH is unchanged). The process is closed by closing its stdin; if it stays alive it is killed with
 its children (`taskkill /T /F` on Windows; on Linux and macOS only the adapter process is
 killed, and its children exit when their stdin closes). Start and the mode change are bounded by a 60 s
 startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are
@@ -745,7 +747,7 @@ flowchart TD
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
 `expert <id> is not installed; installed: <ids>`, `no experts installed`) and Scout words it. The
-row's `agent` is the expert id. Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
+row's `agent` is the expert id; its asks are logged and grouped by that id (`codex-acp:<folder>`; Claude Code keeps `claude_code:<folder>`), so a preference saved for one expert never approves another's. Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
 result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
 shows them as Scout does.
 

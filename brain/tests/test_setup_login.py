@@ -223,11 +223,7 @@ def test_expert_env_strips_per_expert_and_unknown_ids_get_every_key():
         "OPENAI_API_KEY": "o",
         "GEMINI_API_KEY": "g",
     }
-    assert expert_env("codex-acp", base) == {
-        "PATH": "p",
-        "ANTHROPIC_API_KEY": "a",
-        "GEMINI_API_KEY": "g",
-    }
+    assert expert_env("codex-acp", base) == {"PATH": "p", "GEMINI_API_KEY": "g"}
     assert expert_env("someone-else", base) == {"PATH": "p"}
 
 

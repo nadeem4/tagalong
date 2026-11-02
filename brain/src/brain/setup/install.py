@@ -123,7 +123,7 @@ async def install_card(
             download = {"version": build.version, "into": str(node_dir(home))}
     return {
         "expert": entry.id,
-        "version": entry.version,
+        "version": _version(entry, dist),
         "node_download": download,
         "installs_into": str(tools_dir(home, entry.id)),
     }
@@ -196,7 +196,7 @@ async def install_expert(
     # cancel here removes only what was staged.
     try:
         if node is not None:
-            command = await _npm_install(dist, staged, final, node, run, on_progress)
+            command = await _npm_install(entry, dist, staged, final, node, run, on_progress)
         else:
             command = await _binary_install(dist, staged, final, download, fetch, on_progress)
         await _clean(download)
@@ -204,7 +204,7 @@ async def install_expert(
         await asyncio.shield(_clean(staged, download))
         raise
     expert = InstalledExpert(
-        entry.id, entry.name, entry.version, command, "registry", None, node_kind
+        entry.id, entry.name, _version(entry, dist), command, "registry", None, node_kind
     )
     try:
         # Shielded: a cancel from here on still finishes the swap and the record together.
@@ -237,6 +237,11 @@ async def _node_for(
     return private, "private"
 
 
+def _version(entry: RegistryEntry, dist: Distribution) -> str:
+    """The version the card shows and npm installs: always the same one."""
+    return dist.version or entry.version
+
+
 def _npm_env(node: Path) -> dict[str, str]:
     """A minimal environment for npm alone: the OS essentials and the chosen Node first on PATH
     (so install scripts find the same Node), and no key and no `npm_config_*` of the person's.
@@ -250,11 +255,18 @@ def _npm_env(node: Path) -> dict[str, str]:
 
 
 async def _npm_install(
-    dist: Distribution, staged: Path, final: Path, node: NodePaths, run: RunCmd, on_progress
+    entry: RegistryEntry,
+    dist: Distribution,
+    staged: Path,
+    final: Path,
+    node: NodePaths,
+    run: RunCmd,
+    on_progress,
 ) -> list[str]:
     on_progress({"stage": "installing"})
     staged.mkdir(parents=True)
-    spec = f"{dist.package}@{dist.version}" if dist.version else str(dist.package)
+    version = _version(entry, dist)
+    spec = f"{dist.package}@{version}" if version else str(dist.package)
     argv = [str(node.node), str(node.npm_cli), "install", "--prefix", str(staged), spec]
     try:
         result = await run(argv, _npm_env(node.node), staged)

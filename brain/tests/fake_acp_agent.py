@@ -222,6 +222,7 @@ async def main() -> None:
         keys = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY")
         env = {k: os.environ.get(k) for k in keys}
         env["PATH_set"] = "PATH" in os.environ
+        env["PATH"] = os.environ.get("PATH")
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps({"env": env}) + "\n")
     # run_agent returns when stdin closes, which is how the real adapter ends too.

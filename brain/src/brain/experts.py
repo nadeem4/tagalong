@@ -101,7 +101,15 @@ def make_run_for(timeout: float) -> Callable[..., "ExpertRun"]:
     """The Jobs factory: one run of the given expert, with its command and its own env."""
 
     def make(expert, **callbacks) -> "ExpertRun":
-        return ExpertRun(command=expert.command, expert_id=expert.id, timeout=timeout, **callbacks)
+        # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
+        path_first = Path(expert.command[0]).parent if expert.node == "private" else None
+        return ExpertRun(
+            command=expert.command,
+            expert_id=expert.id,
+            timeout=timeout,
+            path_first=path_first,
+            **callbacks,
+        )
 
     return make
 
@@ -112,6 +120,7 @@ class ExpertRun:
         *,
         command: list[str],
         expert_id: str = "custom",
+        path_first: Path | None = None,
         timeout: float,
         on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
         on_question: Callable[[Question], Awaitable[dict | None]],
@@ -124,6 +133,7 @@ class ExpertRun:
     ) -> None:
         self._command = command
         self._expert_id = expert_id
+        self._path_first = path_first
         self._timeout = timeout
         self._grace = grace
         self._startup_timeout = startup_timeout
@@ -151,6 +161,8 @@ class ExpertRun:
             raise ExpertError(f"command not found: {self._command[0]}")
         # Explicit env: ours, minus the keys that would switch this expert off the user's login.
         env = expert_env(self._expert_id, os.environ)
+        if self._path_first is not None:
+            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
         self._stack = AsyncExitStack()
         try:
             async with asyncio.timeout(self._startup_timeout):

@@ -6,13 +6,14 @@ runner sends, so tests read that log to see the prompts, mode and replies that a
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from brain.experts import ExpertError, ExpertRun, Question, kill_tree
+from brain.experts import ExpertError, ExpertRun, Question, kill_tree, make_run_for
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 
@@ -346,12 +347,19 @@ async def test_missing_command_is_a_fact_with_the_exe_and_no_install_hint(tmp_pa
     ("expert_id", "gone", "kept"),
     [
         ("claude-acp", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"),
-        ("codex-acp", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"),
+        ("codex-acp", "OPENAI_API_KEY", "GEMINI_API_KEY"),
+        ("codex-acp", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"),
+        ("codex-acp", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY"),
         ("gemini", "GEMINI_API_KEY", "OPENAI_API_KEY"),
+        ("gemini", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"),
+        ("custom", "ANTHROPIC_API_KEY", None),
+        ("custom", "OPENAI_API_KEY", None),
     ],
 )
-async def test_each_expert_loses_only_its_own_keys(tmp_path, monkeypatch, expert_id, gone, kept):
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"):
+async def test_each_expert_loses_its_own_keys_and_the_anthropic_pair(
+    tmp_path, monkeypatch, expert_id, gone, kept
+):
+    for key in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY"):
         monkeypatch.setenv(key, "secret")
     h = Harness()
     run = make_run(h, tmp_path, [], expert_id=expert_id)
@@ -360,7 +368,39 @@ async def test_each_expert_loses_only_its_own_keys(tmp_path, monkeypatch, expert
     finally:
         await run.close()
     env = json.loads((tmp_path / "log.jsonl").read_text().splitlines()[0])["env"]
-    assert env[gone] is None and env[kept] == "secret"
+    assert env[gone] is None
+    if kept:
+        assert env[kept] == "secret"
+
+
+async def test_a_private_node_dir_goes_first_on_the_child_path_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", "/usr/bin")
+    h = Harness()
+    node_dir = tmp_path / "node"
+    run = make_run(h, tmp_path, [], path_first=node_dir)
+    try:
+        await run.start(tmp_path)
+    finally:
+        await run.close()
+    env = json.loads((tmp_path / "log.jsonl").read_text().splitlines()[0])["env"]
+    assert env["PATH"] == str(node_dir) + os.pathsep + "/usr/bin"
+    assert os.environ["PATH"] == "/usr/bin"
+
+
+def test_the_factory_puts_a_private_nodes_dir_first_and_leaves_others_alone(tmp_path):
+    from brain.setup.store import InstalledExpert
+
+    def run_for(node):
+        expert = InstalledExpert(
+            "x", "x", "1", [str(tmp_path / "n" / "node.exe")], "registry", True, node
+        )
+        return make_run_for(5)(
+            expert, on_permission=None, on_question=None, on_progress=None, on_end=None
+        )
+
+    assert run_for("private")._path_first == tmp_path / "n"
+    assert run_for("system")._path_first is None
+    assert run_for(None)._path_first is None
 
 
 async def test_kill_tree_ends_a_process_that_ignores_stdin_close():

@@ -59,6 +59,9 @@ it from the registry; nothing is installed ahead of time. With several installed
 one to use (`list_experts` shows them). Each runs on your own login, never an API key. To run one
 agent of your own, set `TAGALONG_EXPERT_CMD` (it is listed as `custom`).
 
+Upgrading: if you installed the Claude Code adapter globally with npm before, set
+`TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
+
 Scout remembers instructions and facts about you across restarts, in `~/.tagalong/tagalong.db`, and picks the conversation back up after a restart. Scout can also use the desktop's window tools.
 
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It

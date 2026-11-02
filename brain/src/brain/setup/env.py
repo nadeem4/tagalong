@@ -23,11 +23,13 @@ _KEYS = {
         "GOOGLE_CLOUD_PROJECT",
     ),
 }
+# Every expert loses this pair: Anthropic keys in our environment are never an expert's to use.
+_ANTHROPIC_PAIR = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 _ALL = tuple(sorted({k for keys in _KEYS.values() for k in keys}))
 
 
 def expert_env(expert_id: str, base: Mapping[str, str]) -> dict[str, str]:
-    stripped = _KEYS.get(expert_id, _ALL)
+    stripped = {*_ANTHROPIC_PAIR, *_KEYS.get(expert_id, _ALL)}
     return {k: v for k, v in base.items() if k not in stripped}
 
 

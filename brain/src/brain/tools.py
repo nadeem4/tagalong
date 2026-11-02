@@ -402,15 +402,15 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         (
             ToolSpec(
                 "hand_off",
-                "Hand a task to Claude Code, which works in a folder on the user's computer and "
+                "Hand a task to an expert, which works in a folder on the user's computer and "
                 "reports back when done. Use the folder the user named; if they did not name "
                 "one, ask them which folder first, never guess. The user picks how much freedom "
-                "Claude Code gets; this tool asks them itself. With several experts installed, "
+                "the expert gets; this tool asks them itself. With several experts installed, "
                 "name one by its id from list_experts. Returns the job id once started.",
                 {
                     "type": "object",
                     "properties": {
-                        "task": {"type": "string", "description": "What Claude Code should do."},
+                        "task": {"type": "string", "description": "What the expert should do."},
                         "folder": {"type": "string", "description": "Absolute folder path."},
                         "expert": {
                             "type": "string",
