@@ -343,6 +343,16 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     expert, or one still running, is refused with a plain reason. Automated tests cover resume,
     the fallbacks and the idle stop on the fake agent; this pass is the only real one.
 
+17. **Action:** with a job running, ask Scout in chat to nudge it ("tell it to use tabs"). Then let
+    a check-back timer wake Scout and have it nudge or continue a job on its own.
+    **Expected:** the chat request goes through with no card and no new row in Approvals. The nudge
+    Scout starts on a wake asks you first (an Allow card for `tell_expert`, or the mode card for a
+    `continue_job` follow-up). Save a preference that covers nudges and repeat: Scout proceeds, the
+    row says it was Scout's decision, and a follow-up reuses the earlier mode with no card. Type a
+    message into a wake turn that is already running: once it reaches Scout, the next nudge goes
+    through with no ask (a nudge already waiting on its card still asks). With the bubble
+    closed (nobody online) the nudge is refused and Scout says so.
+
 ## Claude Code asks Scout first (real brain, real Claude Code)
 
 Needs the same setup as the hand-off section above, with the desktop connected.

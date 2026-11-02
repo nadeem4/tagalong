@@ -1909,3 +1909,138 @@ async def test_job_ended_still_wakes_scout_after_cleanup():
     texts = [m[-1]["content"][-1]["text"] for m in model.seen]
     assert any("Job j1 ended" in t for t in texts)
     assert all("Event: timer" not in t for t in texts)
+
+
+# --- turn origin: who the running turn belongs to (JM5) ----------------------------------
+
+
+async def test_a_say_started_turn_is_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]))
+    assert session.owner_turn() is False  # nothing running
+    session.say("desktop", say("hi"))
+    assert session.owner_turn() is True
+    gate.set()
+    await finish(session)
+
+
+async def test_a_timer_wake_turn_is_not_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session._busy()
+    assert session.owner_turn() is False
+    gate.set()
+    await idle(session)
+
+
+async def test_an_owner_message_makes_a_wake_turn_theirs_only_once_the_model_has_it():
+    gate = asyncio.Event()
+    again = asyncio.Event()
+    session, _ = make(Gate([gate, "ok", again, "done"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session.say("desktop", say("do it")).joined is True
+    assert session.owner_turn() is False  # joined, but not in history yet
+    gate.set()
+    await settle()
+    assert session.owner_turn() is True  # drained into history after the first step
+    again.set()
+    await idle(session)
+
+
+async def test_the_next_wake_after_an_owner_turn_is_not_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate(["one", gate, "two"]), kinds=None)
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await idle(session)
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session._busy()
+    assert session.owner_turn() is False
+    gate.set()
+    await idle(session)
+
+
+def nudge_call(job="j1"):
+    block = {
+        "type": "tool_use",
+        "id": "n1",
+        "name": "tell_expert",
+        "input": {"job": job, "note": "try the other way"},
+    }
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+def open_asks(sent):
+    return [p for m, p in sent if m == "ask" and p.get("state") == "open"]
+
+
+def tool_results(session):
+    return [
+        b["content"]
+        for m in session.history
+        if m["role"] == "user" and isinstance(m["content"], list)
+        for b in m["content"]
+        if b.get("type") == "tool_result"
+    ]
+
+
+async def test_a_nudge_the_owner_asked_for_runs_without_an_ask():
+    session, sent = make(Gate([nudge_call(), "sent"]))
+    join(session, "desktop")
+    session.say("desktop", say("tell the job to try the other way"))
+    await idle(session)
+    assert open_asks(sent) == []
+    assert "no job j1" in str(tool_results(session))  # the tool ran
+
+
+async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
+    session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    [ask] = open_asks(sent)
+    assert ask["tool"] == "tell_expert"
+    assert tool_results(session) == []  # held on the ask
+    session.cancel(session._turn_id)
+    await idle(session)
+
+
+async def test_a_nudge_from_the_step_after_the_owner_joins_a_wake_turn_runs_without_an_ask():
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, "first", nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    session.say("desktop", say("nudge it"))  # the owner steps into the wake turn
+    gate.set()
+    await idle(session)
+    assert open_asks(sent) == []
+    assert "no job j1" in str(tool_results(session))
+
+
+async def test_a_nudge_already_in_flight_when_the_owner_joins_still_asks():
+    session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    assert len(open_asks(sent)) == 1  # Scout's own nudge, held on the ask
+    session.say("desktop", say("hello"))  # the owner joins; they did not ask for this nudge
+    await settle()
+    assert len(open_asks(sent)) == 1
+    assert tool_results(session) == []
+    session.cancel(session._turn_id)
+    await idle(session)
+
+
+async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
+    session, sent = make(Gate(["hello", nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await idle(session)
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
+    session.cancel(session._turn_id)
+    await idle(session)

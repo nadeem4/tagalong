@@ -50,6 +50,9 @@ class ToolSpec:
     # Only the person may allow it, every time: no stored Auto, no Scout approval under a
     # preference. Set it with `locked` (which also hides the Always button).
     person_only: bool = False
+    # A nudge or follow-up on an expert's job: the owner's own chat message counts as the yes, so
+    # on an owner-driven turn the gate adds no ask; on a wake turn it asks like any ask-mode tool.
+    follow_up: bool = False
     # Facts built by code for the Allow card (and the approvals log) instead of the model's raw
     # input, e.g. what an install will download. The handler still gets the model's input.
     card: Callable[[dict], Awaitable[dict]] | None = None
@@ -160,6 +163,7 @@ class Toolbox:
         side_check: SideCheck | None = None,
         offers: Offers | None = None,
         guards: Guards | None = None,
+        owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
     ) -> None:
         self.sources = sources  # brain source first, then the body and app sources
         self._modes = modes  # stored per-tool choices, read on every call
@@ -170,7 +174,7 @@ class Toolbox:
         if guards is None:
             # Standalone toolbox: build the same chain the Session registers.
             guards = Guards()
-            guards.add(tool_mode(modes))
+            guards.add(tool_mode(modes, owner_turn))
             if asks is not None:
                 guards.add(anyone_online(asks))
                 if side_check is not None and approvals is not None:

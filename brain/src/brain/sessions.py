@@ -159,7 +159,7 @@ class Session:
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
-            + expert_tools(self.jobs)
+            + expert_tools(self.jobs, self.owner_turn)
             + timer_tools(memory, timers, now)
             + question_tools(questions)
             + choice_tools(choices)
@@ -181,7 +181,12 @@ class Session:
             notify("changed", {"what": "permissions"})
 
         # The tool gate and its ask chain: nobody online, then Scout's look, then the person.
-        self.guards.add(tool_mode(memory.permission_modes))
+        self.guards.add(
+            tool_mode(
+                memory.permission_modes,
+                lambda turn_id: self._owner_turn and turn_id == self._turn_id,
+            )
+        )
         self.guards.add(anyone_online(self._asks))
         self.guards.add(side_check_guard(side_check, approvals))
         self.guards.add(person_ask())
@@ -205,6 +210,9 @@ class Session:
             self._saved -= 1
         self._inbox: list = []
         self._turn_id: str | None = None
+        # True while the running turn is the owner's: they started it, or they typed into it.
+        # A wake turn stays Scout's own until then, so its follow-ups still ask.
+        self._owner_turn = False
         self._task: asyncio.Task | None = None
         self._last_body: str | None = None  # where a wake turn goes first
         self._turn_body: str | None = None  # the body showing the running turn
@@ -235,6 +243,15 @@ class Session:
         turn = self._start_turn(shown_on, content)
         self._speak(turn, shown_on, params)
         return SayResult(turn=turn, joined=False)
+
+    def _owner_joined(self) -> None:
+        # The owner's words reached the model, so a nudge from here on is theirs; one already
+        # in flight when they joined still asks.
+        self._owner_turn = True
+
+    def owner_turn(self) -> bool:
+        """True while the running turn is the owner's, so a follow-up in it needs no ask."""
+        return self._owner_turn and self._busy()
 
     def _ready(self) -> bool:
         return getattr(self._model, "ready", True)  # fakes and other models need no key
@@ -336,6 +353,7 @@ class Session:
     ) -> str:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
+        self._owner_turn = started_by == "user"
         self._turn_body = body_id
         if self._inbox:  # says from the finished turn come before this newer one
             self._append_user([b for s in self._inbox for b in s])
@@ -380,6 +398,7 @@ class Session:
                 step_cap=self._step_cap,
                 guards=self.guards,
                 turn_timeout=self._turn_timeout,
+                on_owner_input=self._owner_joined,
             )
         )
         self._task = task
@@ -432,6 +451,7 @@ class Session:
                 self._append_user([b for s in self._inbox for b in s])
                 self._inbox.clear()
             self._turn_id = None
+            self._owner_turn = False
             self._task = None
         self._persist()
         if turn_id in self._spoken:

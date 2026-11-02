@@ -101,11 +101,18 @@ def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["ask", "auto"]
     return "auto" if spec.effect == "read" else "ask"
 
 
-def tool_mode(modes: Callable[[], dict[str, str]]) -> Guard:
+def tool_mode(
+    modes: Callable[[], dict[str, str]],
+    owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
+) -> Guard:
     def check(ctx: ToolCallCtx) -> Verdict:
         if ctx.caller == "home":
             return ALLOW
         if resolve_mode(ctx.spec, modes().get(ctx.spec.name)) == "ask":
+            # A follow-up the owner asked for in chat is already their yes; one Scout starts
+            # on a wake goes through the ask chain.
+            if ctx.spec.follow_up and not ctx.spec.person_only and owner_turn(ctx.turn_id):
+                return ALLOW
             return ask("needs your yes")
         return ALLOW
 

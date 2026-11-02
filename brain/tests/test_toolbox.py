@@ -1066,3 +1066,118 @@ def test_a_person_only_tool_always_asks_and_its_mode_cannot_be_changed():
         box.set_mode("a", "auto")
     assert e.value.code == ErrorCode.invalid_params
     assert stored == {"a": "auto"}
+
+
+# --- tell_expert: asks when Scout starts the nudge, free when the owner asked (JM5) ------
+
+
+class NudgeJobs:
+    def __init__(self):
+        self.told = []
+
+    def tell(self, job_id, note):
+        self.told.append((job_id, note))
+
+
+def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
+    from brain.tools import expert_tools
+
+    jobs = NudgeJobs()
+    tools = [t for t in expert_tools(jobs, lambda: owner) if t[0].name == "tell_expert"]
+    sent = []
+    bodies = AskBodies(online)
+    approvals = Approvals(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
+    stored = {}
+    box = RealToolbox(
+        [BrainSource(tools)],
+        lambda: stored,
+        stored.__setitem__,
+        Asks(bodies),
+        approvals,
+        check,
+        offers,
+        owner_turn=lambda turn_id: owner and turn_id == "t1",
+    )
+    return box, jobs, bodies, stored
+
+
+def nudge():
+    return Call(
+        id="c1",
+        name="tell_expert",
+        input={"job": "j1", "note": "try tabs"},
+        turn="t1",
+        text="Nudging j1.",
+    )
+
+
+def test_tell_expert_defaults_to_ask_and_is_marked_follow_up(mem):
+    box, *_ = nudger(mem)
+    spec = box.sources[0].specs()[0]
+    assert (spec.default_mode, spec.follow_up) == ("ask", True)
+    assert box.mode(spec) == "ask"
+
+
+async def test_tell_expert_on_an_owner_turn_runs_without_an_ask(mem):
+    box, jobs, bodies, _ = nudger(mem, FakeSideCheck(None), owner=True)
+    assert await box.run(nudge()) == "note queued for job j1"
+    assert bodies.sent == [] and jobs.told == [("j1", "try tabs")]
+    assert mem.list_approvals("all", 10, None) == []
+
+
+async def test_tell_expert_on_a_brain_turn_asks_the_owner(mem):
+    offers = FakeOffers()
+    box, jobs, bodies, _ = nudger(mem, FakeSideCheck(None), offers=offers)
+    task = asyncio.create_task(box.run(nudge()))
+    await until(lambda: opened_asks(bodies))
+    assert opened_asks(bodies)[0]["tool"] == "tell_expert"
+    assert jobs.told == []  # held on the ask
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "note queued for job j1"
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "person")
+    assert offers.considered == [("tell_expert", "scout_tool", "tell_expert")]
+
+
+async def test_tell_expert_on_a_brain_turn_with_a_covering_preference_runs_via_side_check(mem):
+    box, jobs, bodies, _ = nudger(mem, FakeSideCheck(preference(mem, "Nudge my jobs")))
+    assert await box.run(nudge()) == "note queued for job j1"
+    assert bodies.sent == [] and jobs.told == [("j1", "try tabs")]
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "scout")
+
+
+async def test_tell_expert_on_a_brain_turn_when_the_side_check_passes_asks_the_owner(mem):
+    box, jobs, bodies, _ = nudger(mem, FakeSideCheck(None))
+    task = asyncio.create_task(box.run(nudge()))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
+    assert jobs.told == []
+
+
+async def test_a_failing_side_check_on_a_nudge_asks_the_owner_not_allows(mem):
+    box, jobs, bodies, _ = nudger(mem, RaisingSideCheck())
+    task = asyncio.create_task(box.run(nudge()))
+    await until(lambda: opened_asks(bodies))
+    assert jobs.told == []
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    await task
+
+
+async def test_tell_expert_on_a_brain_turn_with_nobody_online_is_refused_and_logged(mem):
+    box, jobs, _, _ = nudger(mem, FakeSideCheck(preference(mem)), online=())
+    with pytest.raises(RpcError) as err:
+        await box.run(nudge())
+    assert "Nobody was there to ask" in str(err.value)
+    assert jobs.told == []
+    [row] = mem.list_approvals("all", 10, None)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")
+
+
+async def test_a_stored_auto_nudge_runs_without_an_ask_on_a_brain_turn(mem):
+    box, jobs, bodies, stored = nudger(mem, FakeSideCheck(None))
+    stored["tell_expert"] = "auto"  # the Home permission switch
+    assert await box.run(nudge()) == "note queued for job j1"
+    assert bodies.sent == []

@@ -255,3 +255,43 @@ async def test_side_check_guard_never_decides_a_person_only_ask():
     v = await side_check_guard(side, StubApprovals()).check(ctx)
     assert (v.kind, v.once) == ("allow", False)  # falls through to the person
     assert side.facts == []
+
+
+# --- follow-up tools: the owner's own message already said yes ---------------------------
+
+
+def follow_up_ctx():
+    return tool_ctx(effect="change", default_mode="ask", follow_up=True)
+
+
+def test_tool_mode_lets_a_follow_up_tool_through_on_an_owner_turn():
+    guard = tool_mode(lambda: {}, lambda turn_id: turn_id == "t1")
+    assert guard.check(follow_up_ctx()).kind == "allow"
+
+
+def test_tool_mode_asks_for_a_follow_up_tool_on_a_brain_turn():
+    guard = tool_mode(lambda: {}, lambda turn_id: False)
+    assert guard.check(follow_up_ctx()).kind == "ask"
+    assert tool_mode(lambda: {}).check(follow_up_ctx()).kind == "ask"  # the default is no owner
+
+
+def test_tool_mode_ignores_follow_up_for_a_tool_that_is_not_marked():
+    guard = tool_mode(lambda: {}, lambda turn_id: True)
+    assert guard.check(tool_ctx(effect="change", default_mode="ask")).kind == "ask"
+
+
+def test_tool_mode_stored_auto_still_allows_a_follow_up_tool_on_a_brain_turn():
+    guard = tool_mode(lambda: {"t": "auto"}, lambda turn_id: False)
+    assert guard.check(follow_up_ctx()).kind == "allow"
+
+
+def test_tool_mode_stored_ask_is_waved_through_only_on_an_owner_turn():
+    stored = {"t": "ask"}
+    assert tool_mode(lambda: stored, lambda t: True).check(follow_up_ctx()).kind == "allow"
+    assert tool_mode(lambda: stored, lambda t: False).check(follow_up_ctx()).kind == "ask"
+
+
+def test_tool_mode_asks_for_a_person_only_follow_up_even_on_an_owner_turn():
+    guard = tool_mode(lambda: {}, lambda turn_id: True)
+    ctx = tool_ctx(effect="change", default_mode="ask", follow_up=True, person_only=True)
+    assert guard.check(ctx).kind == "ask"

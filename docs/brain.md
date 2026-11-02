@@ -269,16 +269,17 @@ asks for itself (below) is `auto`; then the user's saved choice (a locked tool i
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                                   | Default mode                              |
-| ------------------------------------------------------ | ----------------------------------------- |
-| Reads (`effect: "read"`), such as `list_jobs`          | `auto`                                    |
-| Changes (`effect: "change"`)                           | `ask`                                     |
-| Memory tools (`remember`, `forget`)                    | `auto`                                    |
-| Timer tools `set_timer` and `cancel_timer`             | `auto`                                    |
-| Expert tools `tell_expert`, `watch_job` and `stop_job` | `auto`                                    |
-| `hand_off` (asks itself, see below)                    | `auto`, no gate ask                       |
-| A body tool that does not declare effect               | `ask`                                     |
-| Locked (`confirm: true` from the body)                 | `ask`, until you set it to `auto` on Home |
+| Tool                                          | Default mode                                |
+| --------------------------------------------- | ------------------------------------------- |
+| Reads (`effect: "read"`), such as `list_jobs` | `auto`                                      |
+| Changes (`effect: "change"`)                  | `ask`                                       |
+| Memory tools (`remember`, `forget`)           | `auto`                                      |
+| Timer tools `set_timer` and `cancel_timer`    | `auto`                                      |
+| Expert tools `watch_job` and `stop_job`       | `auto`                                      |
+| `tell_expert` (`follow_up`)                   | `ask` on a wake turn, free on an owner turn |
+| `hand_off` (asks itself, see below)           | `auto`, no gate ask                         |
+| A body tool that does not declare effect      | `ask`                                       |
+| Locked (`confirm: true` from the body)        | `ask`, until you set it to `auto` on Home   |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -316,6 +317,37 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
   A locked tool gets this look only under a preference you made that names the tool; the
   built-in default and general preferences never approve it. A tool stays in `ask` mode.
+- **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
+  true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed
+  into it (a wake turn they join becomes theirs once their message is drained into history, so a
+  nudge already in flight when they joined still asks). It ends with the turn, so the next timer wake starts
+  as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
+  owner turn `tool_mode` waves it through (their message was the yes, no ask, no approvals row;
+  never for a `person_only` tool); on a
+  wake turn it runs the normal chain (`anyone_online`, the side-check, the Allow card, with offers
+  after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
+  nobody online the nudge is refused ("Nobody was there to ask...") and Scout is told. `hand_off`
+  with an explicit `continue_job` on an owner turn skips the chain and shows the mode card as
+  always; on a wake turn it runs the same chain first (source `claude_code`,
+  tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
+  and skips the mode card (Scout's row says `decided_by: "scout"`, no offer follows). Otherwise the mode card is the
+  owner's question: the chain's own person step answers at once so nothing is asked twice, and the
+  card pick is logged as a person row and offered like any approval. A mode the new session does not
+  offer shows the card without running the chain. A card that times out is logged `timed_out`; a
+  cancel leaves no row. A new job (no `continue_job`) always shows the card.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart TD
+  A[Scout calls tell_expert or hand_off continue_job] --> B{owner turn?}
+  B -- yes --> C[tell_expert runs now, no ask, no row; hand_off shows the mode card]
+  B -- no --> D{anyone online?}
+  D -- no --> E[refused, row no_one]
+  D -- yes --> F{preference covers it?}
+  F -- yes --> G[runs once, row by scout; hand_off reuses the earlier mode]
+  F -- no or error --> H[ask the owner: Allow card or mode card]
+```
+
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
   `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
@@ -901,15 +933,15 @@ flowchart TD
   H --> I[Scout decides: speak or stay silent]
 ```
 
-| Tool           | Audience    | Effect | Gate                      | Does                                                                                                                                                                               |
-| -------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
-| `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
-| `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
-| `watch_job`    | scout       | change | `auto`                    | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                             |
-| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, Scout's `watch` list, `expert`, `parent_job` and `session_id_known` |
-| `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
-| `job_activity` | home        | read   | `auto`                    | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
+| Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                               |
+| -------------- | ----------- | ------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
+| `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
+| `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note}`. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                             |
+| `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                             |
+| `list_jobs`    | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, Scout's `watch` list, `expert`, `parent_job` and `session_id_known` |
+| `stop_job`     | scout, home | change | `auto`                       | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
+| `job_activity` | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
