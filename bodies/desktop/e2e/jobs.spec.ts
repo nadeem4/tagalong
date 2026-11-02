@@ -137,7 +137,7 @@ test('watching a job shows its log and follows new steps', async () => {
   await expect(log).toContainText('$ git status', { timeout: 15_000 });
   await expect(log).toContainText('running, ');
 
-  await home.getByRole('button', { name: 'Jobs', exact: true }).last().click();
+  await home.getByRole('button', { name: 'Back to Jobs' }).click();
   await expect(home.getByRole('region', { name: 'Jobs' })).toContainText('Fix the build');
 });
 
