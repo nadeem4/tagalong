@@ -54,9 +54,10 @@ pnpm dev:desktop    # starts the brain too, and stops it when you quit
 To run the brain on its own instead (for example on another machine), use
 `cd brain && uv run brain`; the desktop connects to it and leaves it running.
 
-To let Scout hand work to Claude Code, install its adapter once with
-`npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer). Claude Code must be
-logged in: it runs on your own login, not the API key.
+To let Scout hand work to an expert (Claude Code, Codex or Gemini, each tested), have Scout install
+it from the registry; nothing is installed ahead of time. With several installed, Scout names the
+one to use (`list_experts` shows them). Each runs on your own login, never an API key. To run one
+agent of your own, set `TAGALONG_EXPERT_CMD` (it is listed as `custom`).
 
 Scout remembers instructions and facts about you across restarts, in `~/.tagalong/tagalong.db`, and picks the conversation back up after a restart. Scout can also use the desktop's window tools.
 

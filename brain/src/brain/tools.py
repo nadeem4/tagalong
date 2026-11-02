@@ -672,8 +672,11 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
 
     async def expert_status(args: dict) -> str:
         # Reads the installed list and nothing more: it never starts an expert.
-        rows = expert_rows(keys.experts())
-        return json.dumps({"found": bool(rows), "experts": rows})
+        found = keys.experts()
+        # `command` stays for the desktop's key IPC until 21d reworks the walkthrough: the
+        # custom expert's command, empty when there is none.
+        command = " ".join(next((e.command for e in found if e.source == "custom"), []))
+        return json.dumps({"found": bool(found), "command": command, "experts": expert_rows(found)})
 
     home = frozenset({"home"})
     empty = {"type": "object", "properties": {}}

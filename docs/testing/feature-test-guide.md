@@ -134,7 +134,8 @@ desktop app. You need `uv` and an Anthropic key.
    `~/.tagalong/.env` with the other lines untouched, and the next `say` is answered without a
    restart.) Call `set_daily_limit` with `{"usd":0}`: `invalid_params`; with `{"usd":7.5}`:
    `{"limit_usd":7.5}`, `TAGALONG_DAILY_BUDGET_USD=7.5` in `.env` and `spend_today` shows 7.5.
-   Call `expert_status`: `{"found":...,"command":"claude-agent-acp"}`.
+   Call `expert_status`: `{"found":false,"command":"","experts":[]}` with no expert installed and
+   no `TAGALONG_EXPERT_CMD`; with the override set, `found` is true and `experts` lists `custom`.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
    result and its turn ends at once with `reason: "over_budget"` and no deltas. The brain log
@@ -239,8 +240,8 @@ run it on its own for those.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
-This section covers the Python brain. It needs `npm install -g @agentclientprotocol/claude-agent-acp`
-(Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running
+This section covers the Python brain. It needs an installed, logged-in expert (ask Scout to set up
+Claude Code, or set `TAGALONG_EXPERT_CMD` to your own ACP agent), the brain and the desktop running
 as above, and a small test folder you do not mind Claude Code editing. Jobs show in Home →
 Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 
@@ -291,6 +292,14 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
     **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
+15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
+    "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
+    naming one.
+    **Expected:** each named expert runs the job and Home → Jobs shows its id as the agent; Scout
+    lists the experts with login state and whether each is tested (Claude, Codex and Gemini are;
+    any other registry expert is "untested"); an unnamed hand-off with two installed makes Scout
+    ask which. With no expert installed, Scout says so and offers to set one up. Automated tests
+    cover all three on the fake agent with their own stripped env; this pass is the only real one.
 
 ## Claude Code asks Scout first (real brain, real Claude Code)
 

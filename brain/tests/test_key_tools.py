@@ -196,10 +196,14 @@ async def test_key_never_in_any_reply_or_log(tmp_path, monkeypatch, caplog):
 async def test_expert_status_lists_the_experts_and_found(rig):
     from brain.setup.store import InstalledExpert
 
-    assert json.loads(await rig.run("expert_status")) == {"found": False, "experts": []}
+    assert json.loads(await rig.run("expert_status")) == {
+        "found": False,
+        "command": "",
+        "experts": [],
+    }
     rig.experts = [InstalledExpert("codex-acp", "Codex", "2", ["x"], "registry", None)]
     status = json.loads(await rig.run("expert_status"))
-    assert status["found"] is True
+    assert status["found"] is True and status["command"] == ""
     assert status["experts"][0] == {
         "id": "codex-acp",
         "name": "Codex",

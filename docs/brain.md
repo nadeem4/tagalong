@@ -24,21 +24,21 @@ the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it 
 `<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
 variable still works and is the developer path.
 
-| Variable                       | Default            | Meaning                                                                                                                                  |
-| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                     |
-| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                       |
-| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                  |
-| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                                                               |
-| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                             |
-| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
-| `TAGALONG_EXPERT_CMD`          | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line)                                                                |
-| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`             | Longest an expert run may take, in seconds                                                                                               |
-| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
-| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
-| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                              |
-| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                         |
-| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset |
+| Variable                       | Default           | Meaning                                                                                                                                  |
+| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port                                                                                     |
+| `TAGALONG_HOME`                | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                       |
+| `TAGALONG_MODEL`               | `claude-opus-5-5` | Model Scout thinks with                                                                                                                  |
+| `TAGALONG_DAILY_BUDGET_USD`    | `5`               | Most Scout may spend per local day, in USD                                                                                               |
+| `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                             |
+| `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
+| `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                 |
+| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`            | Longest an expert run may take, in seconds                                                                                               |
+| `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
+| `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
+| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`              | How far back those approvals are counted, in days (whole number, 1 or more)                                                              |
+| `TAGALONG_KEEP_ASKING_DAYS`    | `7`               | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                         |
+| `ANTHROPIC_API_KEY`            | none              | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -397,12 +397,12 @@ so there is one gate and no second path.
 
 The first-run setup adds four more Home tools (never offered to Scout):
 
-| Tool              | Input             | Result text (JSON)                                                                                                                                                          |
-| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
-| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
-| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
-| `expert_status`   | `{}`              | `{"found": bool, "command": str}`: whether the first word of `TAGALONG_EXPERT_CMD` is on `PATH`; it does not start the expert or see the login                              |
+| Tool              | Input             | Result text (JSON)                                                                                                                                                                                                                                  |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                                                                                                |
+| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment                                                                         |
+| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                                                                                                       |
+| `expert_status`   | `{}`              | `{"found": bool, "command": str, "experts": [...]}`: `found` is whether any expert is installed (or a custom command set); `experts` is the `list_experts` rows; `command` is the custom command, `""` if none. It starts nothing and sees no login |
 
 - **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
   newline, one pair of quotes); a missing, non-string, empty, over-256-character or
@@ -527,7 +527,8 @@ words what the person reads (guidance in `mind/soul.md`).
   folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
   enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
   background, outside the turn, one per expert id at a time (a second ask for the same id returns
-  `already_installing`). It emits non-waking `setup_progress` events (`expert`, `stage`,
+  `already_installing`). If the registry moved on after the card named a version, it returns
+  `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
   `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. Brain
   shutdown cancels running installs, each of which cleans up what it staged.
@@ -590,15 +591,16 @@ returns the answer fields (`None` cancels), `on_progress` gets the latest assist
 `on_end(state, reason, result)` ends the run with `done`, `error` (including `timeout` and an
 adapter crash) or `stopped`.
 
-Install the adapter once: `npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer).
-A missing command is reported with that step. `TAGALONG_EXPERT_CMD` swaps the command and
-`TAGALONG_EXPERT_TIMEOUT_S` sets the run limit. The command is split like a shell on Linux and
-macOS; on Windows backslashes are kept, so `C:\Users\me\AppData\Roaming\npm\claude-agent-acp.cmd`
-works as written (quote it if it has spaces). A question's `QuestionField` carries the key,
+`ExpertRun` takes the expert's `command` and its `expert_id`; a missing executable raises
+`ExpertError("command not found: <exe>")`, a fact the model words. Experts come from
+the installed list (`setup/store.py`); `TAGALONG_EXPERT_CMD` adds one custom expert (id `custom`,
+source `custom`) beside them and works with none installed. `TAGALONG_EXPERT_TIMEOUT_S` sets the
+run limit. The override is split like a shell on Linux and macOS; on Windows backslashes are kept
+(quote it if it has spaces). A question's `QuestionField` carries the key,
 title, the question's own text (`description`), the option labels and `multi` (a multi-select
-answers with a list of labels). The child gets the brain's environment without
-`ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so Claude Code bills the user's own login, not
-the key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
+answers with a list of labels). The child gets the brain's environment through `setup/env.py` `expert_env(expert_id, ...)`,
+without that expert's own key variables (the last column of the table below; an unknown id loses
+all of them), so each expert runs on the user's own login, never a key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
 its children (`taskkill /T /F` on Windows; on Linux and macOS only the adapter process is
 killed, and its children exit when their stdin closes). Start and the mode change are bounded by a 60 s
 startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are
@@ -626,8 +628,8 @@ are in `brain/tests/fixtures/`.
 ### Jobs and tools
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
-[Permissions and asks](#permissions-and-asks)). `Session` builds it with the `ExpertRun` factory
-that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
+[Permissions and asks](#permissions-and-asks)). `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
+override) and the `ExpertRun` factory (`make_run_for(TAGALONG_EXPERT_TIMEOUT_S)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
@@ -732,14 +734,18 @@ flowchart TD
   H --> I[Scout decides: speak or stay silent]
 ```
 
-| Tool          | Audience    | Effect | Gate                      | Does                                                                         |
-| ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |
-| `hand_off`    | scout       | change | asks itself (`self_asks`) | `{task, folder}`. Returns `job <id> started`, or the plain reason it did not |
-| `tell_expert` | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                   |
-| `list_jobs`   | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress   |
-| `stop_job`    | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`          |
+| Tool           | Audience    | Effect | Gate                      | Does                                                                                                                                                                               |
+| -------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?}`. Returns `job <id> started`, or the plain reason it did not                                                                                              |
+| `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
+| `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
+| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress                                                                                                         |
+| `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
 
-Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
+Which expert: with one installed it is the default; with several and none named, or a name that is
+not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
+`expert <id> is not installed; installed: <ids>`, `no experts installed`) and Scout words it. The
+row's `agent` is the expert id. Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
 result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
 shows them as Scout does.
 

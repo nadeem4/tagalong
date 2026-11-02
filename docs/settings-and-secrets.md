@@ -151,6 +151,7 @@ Setup keeps its own files under the same data folder, never anywhere else: `runt
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped
 in only on success, so a failed install removes only what it staged), `cache/` (registry lists) and `experts.json` (the installed experts and their
 start commands).
+`TAGALONG_EXPERT_CMD` (in `.env` or the environment) names one custom expert; it holds a command, never a secret, and each expert's own key variables are stripped from its process (see brain.md).
 None holds a secret. See [brain.md](brain.md#setting-things-up-setup).
 
 ## Failure handling
