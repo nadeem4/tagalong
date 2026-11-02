@@ -520,6 +520,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "forget",
         "hand_off",
         "tell_expert",
+        "list_experts",
         "list_jobs",
         "stop_job",
     }
@@ -529,6 +530,7 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
     records = home.box.home_tools()
     assert {r.name for r in records} == {
         "forget",
+        "list_experts",
         "list_jobs",
         "stop_job",
         "list_memories",
