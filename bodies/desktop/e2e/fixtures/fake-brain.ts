@@ -433,7 +433,14 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             const after = Number(params.input?.after_rev ?? 0);
             const rev = rows.reduce((top, e) => Math.max(top, Number(e.rev)), 0);
             const entries = rows.filter((e) => Number(e.rev) > after);
-            value = { job, state: 'done', rev, entries, more: false, watch: null };
+            value = {
+              job,
+              state: jobs.find((j) => j.id === job)?.state ?? 'done',
+              rev,
+              entries,
+              more: false,
+              watch: null,
+            };
           }
         } else if (params.tool === 'stop_job') {
           stops.push(String(params.input?.job));

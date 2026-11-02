@@ -39,9 +39,10 @@ function colorFor(code: number): AnsiColor | null {
   return null;
 }
 
-// CSI sequences (final byte decides) and OSC strings ending in BEL.
+// CSI sequences (final byte decides), OSC strings (BEL or ST end, never past the next ESC) and any
+// other short escape such as charset selects, so nothing leaks as text.
 // eslint-disable-next-line no-control-regex -- the escape byte is the whole point
-const ESCAPE = /\x1b\[([0-9;?]*)([ -/]*[@-~])|\x1b\][^\x07]*\x07/g;
+const ESCAPE = /\x1b\[([0-?]*)([ -/]*[@-~])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[ -/]*[0-~]?/g;
 
 export function parseAnsi(text: string): AnsiSpan[] {
   const spans: AnsiSpan[] = [];
@@ -57,7 +58,7 @@ export function parseAnsi(text: string): AnsiSpan[] {
   for (const match of text.matchAll(ESCAPE)) {
     push(text.slice(from, match.index));
     from = match.index + match[0].length;
-    if (match[2] !== 'm') continue;
+    if (match[2] !== 'm' || !/^[0-9;]*$/.test(match[1] ?? '')) continue;
     const codes = (match[1] ?? '').split(';').map((c) => (c === '' ? 0 : Number(c)));
     for (let i = 0; i < codes.length; i += 1) {
       const code = codes[i] ?? 0;

@@ -169,6 +169,7 @@ export const HOME_CSS = `
   background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
 }
 .job-log {
+  /* 240px is roughly the head, nav gaps and page padding above the log, so it fills the rest. */
   height: calc(100vh - 240px); min-height: 280px; overflow-y: auto; overscroll-behavior: contain;
   padding: ${t.space.lg}px ${t.space.xl}px; border: 1px solid ${t.color.line}; border-radius: ${t.radius.row}px;
   background: ${t.color.page}; color: ${t.color.text};
@@ -177,7 +178,7 @@ export const HOME_CSS = `
 .job-log__line { display: flex; gap: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .job-log__cmd { margin-top: ${t.space.md}px; font-weight: ${t.fontWeight.semibold}; }
 .job-log__meta { font-weight: 400; color: ${t.color.textMuted}; }
-.job-log__note { margin-left: 20px; color: ${t.color.textMuted}; }
+.job-log__note { margin-left: ${t.space.xxl}px; color: ${t.color.textMuted}; }
 .job-log__glyph { flex: none; width: 12px; text-align: center; font-weight: ${t.fontWeight.bold}; }
 .job-log__glyph--done { color: ${t.ansi.green}; }
 .job-log__glyph--failed { color: ${t.ansi.red}; }
@@ -185,7 +186,7 @@ export const HOME_CSS = `
 .job-log__glyph--running { color: ${t.color.gold}; }
 .job-log__glyph--running[data-motion='on'] { display: inline-block; animation: job-log-spin 1s linear infinite; }
 @keyframes job-log-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .job-log__glyph--running { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .job-log__glyph--running[data-motion='on'] { animation: none; } }
 .job-log__out, .job-log__plan {
   margin: 0 0 ${t.space.sm}px 20px; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; color: ${t.color.textMuted};
 }

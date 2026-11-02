@@ -109,7 +109,7 @@ describe('JobPage', () => {
   it('goes back through the Jobs link', () => {
     const bridge = createFakeHostBridge({ jobs: [JOB], activity: { j1: [] } });
     const onBack = renderPage(bridge);
-    fireEvent.click(screen.getByRole('button', { name: 'Jobs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Jobs' }));
     expect(onBack).toHaveBeenCalled();
   });
 

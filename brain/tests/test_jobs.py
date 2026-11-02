@@ -1452,6 +1452,22 @@ async def test_running_steps_lists_each_running_job_that_has_a_step(make_rig):
     assert rig.jobs.running_steps() == []  # an ended job is absent
 
 
+async def test_running_steps_includes_a_pending_step(make_rig):
+    pending = {
+        "tool": {
+            "id": "p1",
+            "title": "Run",
+            "kind": "execute",
+            "status": "pending",
+            "input": {"command": "npm ci"},
+        }
+    }
+    rig = make_rig(FakeAsks(Answer("Plan")), [pending, {"hang": True}], experts=[installed()])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.jobs.running_steps())
+    assert [(s["job"], s["text"]) for s in rig.jobs.running_steps()] == [(job_id, "npm ci")]
+
+
 async def test_first_activity_change_is_sent_at_once(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [TOOL_STEPS[0], {"hang": True}])
     await rig.jobs.start("go", str(rig.folder))
@@ -1482,3 +1498,22 @@ async def test_the_end_cancels_the_trailing_change_and_announces_itself(make_rig
     assert count >= 2
     await asyncio.sleep(0.4)
     assert activity_changes(rig) == count  # no late flush after the end
+
+
+async def test_the_end_sends_exactly_one_notice_after_the_end_row(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0)  # nothing throttled
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "a"}, {"end": "end_turn"}])
+    seen: list[bool] = []  # per job_activity notice: was the end row already written?
+    real = rig.jobs._notify
+
+    def spy(method, params):
+        if params == {"what": "job_activity"}:
+            rows = rig.memory.activity_after(job_id, 0, 1000)
+            seen.append(any(e.kind == "end" for e in rows))
+        real(method, params)
+
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    rig.jobs._notify = spy
+    await finish(rig, job_id)
+    await asyncio.sleep(0.1)
+    assert seen.count(True) == 1 and seen[-1] is True

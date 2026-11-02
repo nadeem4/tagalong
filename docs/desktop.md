@@ -486,15 +486,15 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   refused before the brain. `e2e/jobs.spec.ts` covers the panel, the cursor pull and the job page
   on the fake brain (`pushActivity` adds a step and sends `changed: job_activity`).
 - **Job page:** a job with `activity: true` has a **Watch** button; `JobsPanel` then renders
-  `JobPage` (`bodies/ui/src/home/job-page.tsx`) in place of the list, with a "Jobs" link back, so
+  `JobPage` (`bodies/ui/src/home/job-page.tsx`) in place of the list, with a "Back to Jobs" button (focus moves to the page heading on Watch and returns to that job's Watch button on back), so
   `HomeView` navigation is unchanged. The page pulls `jobActivity(job, rev)` on mount and on every
   `changed { what: "job_activity" }`, loops while `more` is true, and folds each page with
   `applyPage` (`job-activity-state.ts`: an entry with a seen `seq` is replaced in place, the rest
   appended, sorted by `seq`). `JobLog` (`job-log.tsx`) draws the steps as styled text, not a
   terminal emulator, so nothing can be typed: `$ command` lines with a status glyph (spinner,
   check, cross), output through a small SGR-only parser (`ansi.ts`: bold and the 16 colours; cursor
-  moves and clears are dropped and `
-` progress lines keep their last state), edits in sky,
+  moves, clears, charset selects and OSC strings (BEL or ST ended) are dropped and `\r` progress
+  lines keep their last state), edits in sky,
   reads and said lines muted (`# `), plans as `[x]` lines and the end line. A running command with
   no output shows `running, N s` (from the step's `at` and the clock) and "output appears when the
   command finishes". The header has the task, the state chip, the elapsed time and **Stop** while

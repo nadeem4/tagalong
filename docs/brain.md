@@ -768,14 +768,14 @@ when cut). `rev` is the cursor to send next; a body that missed notices or recon
 `after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
 masked when written, so serving does no second pass. An unknown job is `invalid_params`; a job
 from before the log existed has an empty page. `watch` is `null` for now. With no `job` it returns
-`{"running": [{job, expert, text, at}]}`: the step each running job is on (`expert` is the
+`{"running": [{job, expert, text, at}]}`: the latest running or pending step of each running job (`expert` is the
 expert's display name), for the bubble's one live line. `list_jobs` rows gain `activity: true`
 when the job has any rows (one query, `Memory.jobs_with_activity`).
 
 `Jobs` tells bodies with `changed {what: "job_activity"}` at most once per `ACTIVITY_NOTIFY_S`
 (250 ms): the first change goes at once, a burst becomes one trailing send so the last write is
-never left unannounced, and the job's end cancels the trailing send and sends its own, after the
-`end` entry. The Jobs list keeps its own 2 s `changed {what: "jobs"}`.
+never left unannounced, and the job's end cancels the trailing send; the `end` entry's own change
+is the one notice, sent after that row. The Jobs list keeps its own 2 s `changed {what: "jobs"}`.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
 are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
