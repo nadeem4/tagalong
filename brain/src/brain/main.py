@@ -25,8 +25,12 @@ from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
-from brain.setup.facts import inspect
+from brain.setup.expert_tools import expert_setup_tools
+from brain.setup.facts import inspect, real_run_cmd
+from brain.setup.install import NPM_TIMEOUT_S
+from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
+from brain.setup.store import ExpertStore
 from brain.setup.tools import setup_tools
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
@@ -85,6 +89,19 @@ async def _run() -> None:
     )
     for handler in logging.getLogger().handlers:  # every logger reaches disk or the console here
         handler.addFilter(SecretLogFilter(masker))
+    registry = Registry(config.data_dir)
+    inspect_machine = partial(inspect, config.data_dir)
+    expert_tools, stop_installs = expert_setup_tools(
+        config.data_dir,
+        registry,
+        inspect_machine,
+        ExpertStore(config.data_dir),
+        partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
+        http_fetch,
+        real_get_json,
+        lambda event: session.scheduler.emit(event),  # session exists by the first install
+        bodies.notify,
+    )
     session = Session(
         model,
         budget,
@@ -98,9 +115,7 @@ async def _run() -> None:
         turn_timeout=config.turn_timeout,
         masker=masker,
         keys=keys,
-        extra_tools=setup_tools(
-            config.data_dir, Registry(config.data_dir), partial(inspect, config.data_dir)
-        ),
+        extra_tools=setup_tools(config.data_dir, registry, inspect_machine) + expert_tools,
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),
@@ -119,6 +134,7 @@ async def _run() -> None:
     finally:
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
+        await stop_installs()  # cancel running installs; each removes what it staged
         await session.jobs.shutdown()
         await apps.shutdown()
         memory.close()

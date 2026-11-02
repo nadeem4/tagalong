@@ -148,7 +148,9 @@ to the session, and ends a Scout turn that runs too long.
 
 Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
 (Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
-exist only while it downloads), `tools/<expert>/`, `cache/` (registry lists) and `experts.json`.
+exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped
+in only on success, so a failed install removes only what it staged), `cache/` (registry lists) and `experts.json` (the installed experts and their
+start commands).
 None holds a secret. See [brain.md](brain.md#setting-things-up-setup).
 
 ## Failure handling

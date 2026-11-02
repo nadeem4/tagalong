@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from brain.experts import kill_tree
 from brain.setup.paths import node_dir
 
 PROBE_TIMEOUT_S = 10.0
@@ -29,8 +30,14 @@ class CmdResult:
 RunCmd = Callable[[list[str], Mapping[str, str], Path | None], Awaitable[CmdResult]]
 
 
-async def real_run_cmd(argv: list[str], env: Mapping[str, str], cwd: Path | None) -> CmdResult:
-    """The only place a setup command starts a process: no shell, short timeout."""
+async def real_run_cmd(
+    argv: list[str],
+    env: Mapping[str, str],
+    cwd: Path | None,
+    timeout: float = PROBE_TIMEOUT_S,
+) -> CmdResult:
+    """The only place a setup command starts a process: no shell. The default timeout suits a
+    `--version` probe; an install passes a longer one."""
     proc = await asyncio.create_subprocess_exec(
         *argv,
         env=dict(env),
@@ -40,10 +47,10 @@ async def real_run_cmd(argv: list[str], env: Mapping[str, str], cwd: Path | None
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), PROBE_TIMEOUT_S)
-    except TimeoutError:
-        proc.kill()
-        await proc.wait()
+        out, err = await asyncio.wait_for(proc.communicate(), timeout)
+    except BaseException:
+        # A timeout, a cancel or anything else: npm and the scripts it started die with it.
+        await asyncio.shield(kill_tree(proc))
         raise
     return CmdResult(
         proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")

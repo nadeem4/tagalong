@@ -10,6 +10,7 @@ from pathlib import Path
 
 from brain.setup.facts import Machine
 from brain.setup.registry import Listing, Registry, RegistryUnavailable, build_for
+from brain.setup.store import ExpertStore
 from brain.toolbox import Handler, ToolSpec
 
 InspectFn = Callable[[], Awaitable[Machine]]
@@ -19,8 +20,8 @@ def setup_tools(
     home: Path, registry: Registry, inspect_fn: InspectFn
 ) -> list[tuple[ToolSpec, Handler]]:
     async def inspect_machine(args: dict) -> str:
-        # `experts` is filled once installed experts are recorded (20e, 21a).
-        return json.dumps({"machine": asdict(await inspect_fn()), "experts": []})
+        experts = [asdict(e) for e in ExpertStore(home).list()]
+        return json.dumps({"machine": asdict(await inspect_fn()), "experts": experts})
 
     async def listing(key: str, fetch: Callable[[], Awaitable[Listing]]) -> str:
         try:

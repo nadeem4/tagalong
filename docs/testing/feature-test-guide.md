@@ -1743,6 +1743,25 @@ Brain tests only; nothing here installs anything.
    npm. Run it again: nothing is downloaded. Your own `node --version` and PATH are unchanged.
 3. Cut the network mid-download: no `runtime/node.part` is left and any earlier Node still works.
 
+### Install an expert
+
+1. `cd brain && uv run pytest tests/test_setup_store.py tests/test_setup_install.py -q` passes
+   (fakes only: no network, npm or Node download).
+2. By hand with a real brain, clean `<TAGALONG_HOME>` and Node 18 first on PATH: ask Scout to set up
+   Claude Code. The Allow card names the expert, its version, `tools/claude-acp` and the Node
+   download, and offers no **Always allow**. Deny: nothing is written. Allow: the tool returns at
+   once, Scout is free to talk, and when the install ends Scout says so (a `setup_done` event).
+   `tools/claude-acp` and `runtime/node` appear, `experts.json` lists it (with `node` set to
+   `private`), and `node --version` and PATH are unchanged.
+3. Cut the network during the install: no `tools/claude-acp` or `.part` is left and `experts.json`
+   has no entry for it.
+4. Save a preference that sounds like it covers installs: the card still opens. Home's
+   permission switch for `install_expert` cannot make it automatic.
+5. Ask for the same install twice while the first runs: the second is refused as already
+   installing. Quit the brain mid-install: no `tools/claude-acp.part` is left.
+6. Install again over an existing expert and cut the network: the old `tools/claude-acp` and its
+   `experts.json` entry are unchanged.
+
 ## Not supported
 
 Do not test these here.

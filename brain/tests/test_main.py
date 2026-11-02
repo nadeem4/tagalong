@@ -10,6 +10,7 @@ import sys
 import pytest
 
 from brain import main
+from brain.builtin_guards import resolve_mode
 from brain.main import _run
 from brain.masking import Masker, SecretLogFilter
 from brain.voice.service import VoiceService
@@ -294,6 +295,9 @@ def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     toolbox = seen[0].toolbox
     scout = {t["name"] for t in toolbox.model_tools()}
     home = {t.name for t in toolbox.home_tools()}
-    names = {"inspect_machine", "find_experts", "find_apps"}
+    names = {"inspect_machine", "find_experts", "find_apps", "install_expert"}
     assert names <= scout
     assert not names & home
+    # Installing changes the machine: it asks unless the person chose Always for it.
+    spec = next(s for s in toolbox.known_specs() if s.name == "install_expert")
+    assert resolve_mode(spec, None) == "ask"

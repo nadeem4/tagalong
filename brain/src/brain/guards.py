@@ -99,6 +99,7 @@ class AskCtx:
     ask_person: Callable[[], Awaitable[str]]
     job_id: str | None = None  # an expert's job, so Scout's approval row names it
     can_approve: bool = True  # False: Scout may not answer (an expert offered no allow-once)
+    person_only: bool = False  # only the person answers: the side-check never sees this ask
 
 
 @dataclass(frozen=True)

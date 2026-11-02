@@ -1055,3 +1055,14 @@ async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
     assert err.value.code == ErrorCode.denied
     assert source.ran == []
     assert mem.list_approvals("all", 10, None) == []
+
+
+def test_a_person_only_tool_always_asks_and_its_mode_cannot_be_changed():
+    spec = ToolSpec("a", "d", {"type": "object"}, locked=True, person_only=True)
+    stored = {"a": "auto"}  # even a stored auto (an old Home switch) never opens it
+    box = Toolbox([FakeSource([spec])], stored)
+    assert box.mode(spec) == "ask"
+    with pytest.raises(RpcError) as e:
+        box.set_mode("a", "auto")
+    assert e.value.code == ErrorCode.invalid_params
+    assert stored == {"a": "auto"}
