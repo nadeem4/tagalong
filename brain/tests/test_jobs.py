@@ -20,7 +20,7 @@ from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, Question
 from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
-from brain.memory import Job, Memory
+from brain.memory import ActivityEntry, Job, Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 
@@ -122,6 +122,7 @@ class Rig:
         self.now = 0.0
         self.clock = FakeClock()  # the quiet clock of each run, moved by the test
         self.emitted: list = []
+        self.dropped: list = []
         self.experts = [installed()] if experts is None else experts
         self.expert_ids: list[str] = []
         self.approvals = (
@@ -147,6 +148,7 @@ class Rig:
             guards=guards,
             setup_facts=setup_facts,
             emit=self.emitted.append,
+            drop=lambda kind, key: self.dropped.append((kind, key, len(self.finished))),
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -1053,6 +1055,7 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig, monkeyp
 
     monkeypatch.setattr("brain.jobs.datetime", Later)
     await rig.clock.advance(1200)
+    activity = rig.jobs.wake_facts(job_id)["activity"]
     assert rig.emitted == [
         Event(
             "job_quiet",
@@ -1062,6 +1065,7 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig, monkeyp
                 "adapter_alive": "yes",
                 "running": "npm install",
                 "running_minutes": 34,
+                "activity": activity,
             },
             key=f"job:{job_id}",
         )
@@ -1591,3 +1595,120 @@ async def test_the_end_sends_exactly_one_notice_after_the_end_row(make_rig, monk
     await finish(rig, job_id)
     await asyncio.sleep(0.1)
     assert seen.count(True) == 1 and seen[-1] is True
+
+
+# --- summary on wakes, failed steps (JM2) ---
+
+FAIL_THEN_HANG = [
+    {
+        "tool": {
+            "id": "t1",
+            "title": "Run",
+            "kind": "execute",
+            "terminal": True,
+            "input": {"command": "npm test"},
+        }
+    },
+    {
+        "tool_update": {
+            "id": "t1",
+            "status": "failed",
+            "terminal": {"output": f"key {TOKEN}\nboom", "exit": 1},
+        }
+    },
+    {"hang": True},
+]
+
+
+def masking_guards() -> Guards:
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: [TOKEN])))
+    return guards
+
+
+async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary(
+    make_rig, monkeypatch
+):
+    monkeypatch.setenv("FAKE_ACP_META_ONLY", "1")
+    rig = make_rig(FakeAsks(Answer("Plan")), FAIL_THEN_HANG, guards=masking_guards())
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.emitted)
+    (event,) = rig.emitted
+    assert (event.kind, event.key) == ("job_step_failed", f"job:{job_id}")
+    assert (event.facts["job"], event.facts["command"], event.facts["exit"]) == (
+        job_id,
+        "npm test",
+        1,
+    )
+    assert "failed: npm test (exit 1)" in event.facts["activity"]
+    assert "boom" in event.facts["activity"]
+    assert TOKEN not in str(event.facts)
+
+
+async def test_job_end_drops_held_failed_and_quiet_events_for_that_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    assert (("job_step_failed", f"job:{job_id}", 0)) in rig.dropped
+    assert (("job_quiet", f"job:{job_id}", 0)) in rig.dropped  # dropped before on_finished ran
+
+
+async def test_job_quiet_facts_include_the_activity_summary(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), STEP_THEN_HANG)
+    job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
+    await rig.clock.advance(1200)
+    (event,) = rig.emitted
+    assert "running: npm install" in event.facts["activity"]
+    assert event.facts["job"] == job_id
+
+
+async def test_job_ended_note_carries_the_activity_summary_beside_the_result(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan")),
+        [
+            {"tool": {"id": "t", "title": "Run", "kind": "execute", "input": {"command": "ls"}}},
+            {"text": "all done"},
+        ],
+    )
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    note = rig.jobs.note(rig.finished[0])
+    assert note.startswith(f"Job {job_id} ended.")
+    assert "Result:" in note and "Activity:\nsteps: 1" in note
+
+
+def test_job_note_without_facts_is_unchanged():
+    job = Job(
+        "a1", "claude_code", "t", "C:/x", "default", "done", "", "p", "r", "s", True, "t0", "t1"
+    )
+    assert "Activity:" not in job_note(job)
+    assert job_note(job, {"activity": "steps: 1"}).endswith("Activity:\nsteps: 1")
+
+
+async def test_wake_facts_masks_a_secret_in_the_summary(make_rig):
+    rig = make_rig(FakeAsks(), guards=masking_guards())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    at = datetime.now(UTC).isoformat()
+    rig.memory.save_activity(
+        "j1", ActivityEntry(1, 1, at, "command", f"curl {TOKEN}", "failed", "s", 1)
+    )
+    facts = rig.jobs.wake_facts("j1")
+    assert TOKEN not in facts["activity"] and "[secret]" in facts["activity"]
+
+
+async def test_note_for_a_job_finished_before_a_restart_still_has_its_summary(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.memory.update_job("j1", state="done", reason="", result="ok", ended_at="2026-01-01")
+    at = datetime.now(UTC).isoformat()
+    rig.memory.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
+    assert "steps: 1" in rig.jobs.note(rig.memory.get_job("j1"))
+
+
+async def test_a_job_with_no_entries_gets_a_short_summary_not_an_error(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    assert rig.jobs.wake_facts("j1") == {"activity": "no activity recorded"}

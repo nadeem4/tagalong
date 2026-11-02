@@ -515,3 +515,46 @@ def test_pump_keeps_events_when_the_emit_guard_stops_with_another_code():
     rig = Rig(guards=guards)
     rig.scheduler.emit(ev("ping"))
     assert len(rig.starts) == 1
+
+
+def test_drop_removes_a_held_event_of_that_kind_and_key():
+    rig = Rig()
+    rig.busy = True
+    rig.scheduler.emit(ev("slow", key="job:a", fact="x"))
+    rig.scheduler.drop("slow", "job:a")
+    rig.busy = False
+    rig.t = T0 + timedelta(hours=1)
+    rig.scheduler.pump()
+    assert rig.starts == []
+
+
+def test_drop_leaves_other_keys_and_kinds_alone():
+    rig = Rig()
+    rig.busy = True
+    rig.scheduler.emit(ev("slow", key="job:a", fact="a"))
+    rig.scheduler.emit(ev("slow", key="job:b", fact="b"))
+    rig.scheduler.emit(ev("ping", key="job:a", fact="p"))
+    rig.scheduler.drop("slow", "job:a")
+    rig.busy = False
+    rig.t = T0 + timedelta(hours=1)
+    for _ in range(3):  # one held group starts per pump
+        rig.scheduler.pump()
+    texts = " ".join(rig.text(i) for i in range(len(rig.starts)))
+    assert "fact: b" in texts and "fact: p" in texts and "fact: a" not in texts
+
+
+def test_drop_of_an_unknown_key_or_kind_is_a_no_op():
+    rig = Rig()
+    rig.scheduler.drop("slow", "nope")
+    rig.scheduler.drop("never_heard_of", "nope")
+    assert rig.starts == []
+
+
+def test_a_newer_event_for_the_same_key_in_a_batch_is_the_one_held():
+    rig = Rig()
+    rig.scheduler.emit(ev("slow", key="job:a", fact="first"))
+    rig.t = T0 + timedelta(seconds=10)
+    rig.scheduler.emit(ev("slow", key="job:a", fact="second"))
+    rig.t = T0 + timedelta(seconds=60)
+    rig.scheduler.pump()
+    assert "fact: second" in rig.text() and "fact: first" not in rig.text()

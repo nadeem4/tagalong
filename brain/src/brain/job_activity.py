@@ -20,6 +20,14 @@ ENTRY_CAP = 2000  # entries per job
 JOB_BYTES_CAP = 1_000_000  # text bytes per job
 PAGE_LIMIT = 500  # entries per page a reader asks for
 
+SUMMARY_CAP = 1500  # characters of the digest a wake carries
+LINE_CAP = 200  # characters of the one-line form in list_jobs
+FAILED_TAIL_LINES = 3  # last output lines shown under a failed command
+RECENT_COMMANDS = 5  # last commands listed with their exit codes
+FAILED_SHOWN = 3  # failed commands listed in full
+_PART_CAP = 200  # one command or output line in the digest
+_STEP_KINDS = ("command", "edit", "read", "search", "other")
+
 CUT_MARKER = "[earlier output cut]"
 _STATUS = {"pending": "pending", "in_progress": "running", "completed": "done", "failed": "failed"}
 _KIND = {
@@ -40,7 +48,11 @@ class JobActivity:
         mask: Callable[[str], str],
         now: Callable[[], datetime],
         on_change: Callable[[], None],
+        on_failed: Callable[[ActivityEntry], None] = lambda entry: None,
     ) -> None:
+        self._on_failed = on_failed  # called once per step id, after the update is written
+        self._failed_seen: set[str] = set()
+        self._touched: set[str] = set()
         self._job = job_id
         self._memory = memory
         self._mask = mask
@@ -59,6 +71,7 @@ class JobActivity:
 
     def on_update(self, update: object) -> None:
         self._wrote = False
+        self._touched = set()
         match getattr(update, "session_update", None):
             case "tool_call" | "tool_call_update":
                 self._tool(update)
@@ -66,8 +79,17 @@ class JobActivity:
                 self._say(update)
             case "plan":
                 self._plan(update)
+        self._report_failed()
         if self._wrote:
             self._on_change()
+
+    def _report_failed(self) -> None:
+        """Once per step id, after the whole update (its output included) is stored."""
+        for step in self._touched:
+            entry = self._steps.get(step)
+            if entry is not None and step not in self._failed_seen and is_failed(entry):
+                self._failed_seen.add(step)
+                self._on_failed(entry)
 
     def end(self, state: str, reason: str) -> None:
         text = {"done": "# done", "stopped": "# stopped"}.get(state, f"# error: {reason}")
@@ -97,6 +119,7 @@ class JobActivity:
         else:
             entry = old
         self._steps[step] = entry
+        self._touched.add(step)
         meta = getattr(u, "field_meta", None) or {}
         self._terminal(step, meta)
         output = None if _has_terminal_output(meta) else _output_text(u)
@@ -130,6 +153,7 @@ class JobActivity:
         code = code if isinstance(code, int) and not isinstance(code, bool) else None
         status = "done" if code == 0 else "failed"
         self._exited.add(step)
+        self._touched.add(step)
         self._raw.pop(step, None)
         if (old.status, old.exit) != (status, code):
             self._steps[step] = self._put(old.seq, old.kind, old.text, status, step, exit=code)
@@ -243,3 +267,78 @@ def _cut_trimmed(text: str) -> str:
     """The text already lost its head: drop the unsafe carry, always say so."""
     tail = text[CARRY:].encode()[-OUTPUT_CAP:].decode(errors="ignore")
     return CUT_MARKER + chr(10) + tail
+
+
+def is_failed(entry: ActivityEntry) -> bool:
+    """A step failed by its status, or a command that exited non-zero whatever its status says."""
+    return entry.status == "failed" or (entry.kind == "command" and entry.exit not in (None, 0))
+
+
+def _clip(text: str, cap: int = _PART_CAP) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= cap else text[: cap - 1] + "…"
+
+
+def _exit(entry: ActivityEntry) -> str:
+    return f"exit {entry.exit}" if entry.exit is not None else (entry.status or "?")
+
+
+def _digest(memory: Memory, job_id: str) -> tuple[list[ActivityEntry], dict[str, str]]:
+    rows = sorted(memory.activity_after(job_id, 0, ENTRY_CAP), key=lambda e: e.seq)
+    outputs = {e.step: e.text for e in rows if e.kind == "output" and e.step}
+    return [e for e in rows if e.kind in _STEP_KINDS], outputs
+
+
+def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMMARY_CAP) -> str:
+    """Facts about what a job did, for a wake: counts, failed commands with their output tail,
+    the last commands and the step running now. Plain reads; the stored text is already masked."""
+    steps, outputs = _digest(memory, job_id)
+    if not steps:
+        return "no activity recorded"
+    failed = [e for e in steps if is_failed(e)]
+    lines = [f"steps: {len(steps)}, failed: {len(failed)}"]
+    for entry in failed[-FAILED_SHOWN:]:
+        lines.append(f"failed: {_clip(entry.text)} ({_exit(entry)})")
+        tail = [ln for ln in outputs.get(entry.step or "", "").splitlines() if ln.strip()]
+        lines.extend(f"  {_clip(ln)}" for ln in tail[-FAILED_TAIL_LINES:])
+    commands = [e for e in steps if e.kind == "command"]
+    if commands:
+        lines.append("recent:")
+        lines.extend(f"  {_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:])
+    live = [e for e in steps if e.status in ("running", "pending")]
+    if live:
+        entry = live[-1]
+        minutes = max(0, int((now - datetime.fromisoformat(entry.at)).total_seconds() // 60))
+        lines.append(f"running: {_clip(entry.text)}, {minutes} min")
+    return _fit(lines, cap)
+
+
+def _fit(lines: list[str], cap: int) -> str:
+    """Whole lines first; the line that crosses the cap is cut with an ellipsis."""
+    out: list[str] = []
+    used = 0
+    for line in lines:
+        room = cap - used - (1 if out else 0)
+        if len(line) <= room:
+            out.append(line)
+            used += len(line) + (1 if len(out) > 1 else 0)
+            continue
+        if room > 1:
+            out.append(line[: room - 1] + "…")
+        break
+    return "\n".join(out)
+
+
+def activity_line(memory: Memory, job_id: str, now: datetime) -> str:
+    """One line for list_jobs: counts, then what is running or the last failure."""
+    steps, _ = _digest(memory, job_id)
+    if not steps:
+        return ""
+    failed = [e for e in steps if is_failed(e)]
+    line = f"{len(steps)} steps, {len(failed)} failed"
+    live = [e for e in steps if e.status in ("running", "pending")]
+    if live:
+        line += f"; running: {_clip(live[-1].text, 80)}"
+    elif failed:
+        line += f"; last failure: {_clip(failed[-1].text, 80)} ({_exit(failed[-1])})"
+    return _clip(line, LINE_CAP)

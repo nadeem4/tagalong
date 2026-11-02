@@ -1,6 +1,6 @@
 """Tests for JobActivity: ACP updates become masked, capped, persisted activity entries."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import acp
 import pytest
@@ -10,7 +10,7 @@ from brain import job_activity
 from brain.guards import Guards
 from brain.job_activity import JobActivity
 from brain.masking import Masker, mask_json, mask_secrets
-from brain.memory import Memory
+from brain.memory import ActivityEntry, Memory
 
 SECRET = "fake-token-12345678"
 
@@ -394,3 +394,148 @@ def test_heartbeats_are_ignored(rig):
     before = rig.memory.last_rev("j")
     rig.log.on_update(progress("t1", "in_progress"))
     assert rig.memory.last_rev("j") == before
+
+
+# --- summary and one-line form (JM2) ---
+
+NOW = datetime(2026, 1, 1, 1, 0, tzinfo=UTC)
+
+
+def seed(memory, rows):
+    """rows: (kind, text, status, step, exit, minutes_ago); seq and rev run in order."""
+    for i, (kind, text, status, step, code, ago) in enumerate(rows, 1):
+        at = (NOW - timedelta(minutes=ago)).isoformat()
+        memory.save_activity("j", ActivityEntry(i, i, at, kind, text, status, step, code))
+
+
+def cmd(text, step, code=0, status="done", ago=10):
+    return ("command", text, status, step, code, ago)
+
+
+def outrow(text, step):
+    return ("output", text, None, step, None, 1)
+
+
+def test_summary_counts_steps_and_failed_steps(rig):
+    seed(
+        rig.memory,
+        [cmd("a", "1"), cmd("b", "2"), cmd("c", "3", 1, "failed"), cmd("d", "4"), cmd("e", "5")],
+    )
+    assert "steps: 5, failed: 1" in job_activity.activity_summary(rig.memory, "j", NOW)
+
+
+def test_summary_lists_a_failed_command_with_exit_and_last_three_output_lines(rig):
+    seed(rig.memory, [cmd("npm test", "1", 1, "failed"), outrow("l1\nl2\nl3\nl4\nl5", "1")])
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "failed: npm test (exit 1)" in text
+    assert "l3" in text and "l4" in text and "l5" in text
+    assert "l2" not in text
+
+
+def test_summary_lists_the_last_five_commands_with_exit_codes_oldest_first(rig):
+    seed(rig.memory, [cmd(f"c{i}", str(i), i % 2) for i in range(1, 8)])
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    recent = text[text.index("recent:") :]
+    assert "c1 " not in recent and "c2 " not in recent
+    assert recent.index("c3 (exit 1)") < recent.index("c4 (exit 0)") < recent.index("c7 (exit 1)")
+
+
+def test_summary_names_the_running_step_and_how_long(rig):
+    seed(rig.memory, [cmd("npm install", "1", None, "running", 34)])
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "running: npm install, 34 min" in text
+
+
+def test_summary_for_a_job_with_no_entries_is_one_short_line(rig):
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "\n" not in text and "no activity" in text
+
+
+def test_summary_is_cut_to_the_cap_on_a_character_boundary(rig):
+    seed(rig.memory, [cmd("é" * 10_000, "1", 1, "failed"), outrow("ü" * 10_000, "1")])
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert 0 < len(text) <= job_activity.SUMMARY_CAP
+    text.encode()  # a clean string: no half character
+
+
+def test_a_command_with_nonzero_exit_counts_as_failed_even_if_status_is_done(rig):
+    seed(rig.memory, [cmd("make", "1", 2, "done")])
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "failed: 1" in text and "failed: make (exit 2)" in text
+
+
+def test_activity_line_is_one_line_within_line_cap(rig):
+    seed(rig.memory, [cmd("x" * 500, "1", 1, "failed"), outrow("a\nb", "1")])
+    line = job_activity.activity_line(rig.memory, "j", NOW)
+    assert line and "\n" not in line and len(line) <= job_activity.LINE_CAP
+
+
+def test_activity_line_is_empty_without_entries(rig):
+    assert job_activity.activity_line(rig.memory, "j", NOW) == ""
+
+
+# --- on_failed ---
+
+
+class FailRig(Rig):
+    def __init__(self, tmp_path) -> None:
+        super().__init__(tmp_path)
+        self.failed: list = []
+        self.log = JobActivity(
+            "j",
+            self.memory,
+            lambda t: t,
+            lambda: datetime(2026, 1, 1, tzinfo=UTC),
+            on_change=self._changed,
+            on_failed=self.failed.append,
+        )
+
+
+@pytest.fixture
+def frig(tmp_path):
+    r = FailRig(tmp_path)
+    yield r
+    r.memory.close()
+
+
+def test_on_failed_fires_once_when_a_step_turns_failed(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "false"}))
+    frig.log.on_update(progress("t1", "failed", "boom"))
+    [entry] = frig.failed
+    assert entry.text == "false" and entry.status == "failed"
+
+
+def test_on_failed_does_not_fire_for_a_done_step_with_exit_zero(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    frig.log.on_update(progress("t1", "completed", "ok"))
+    frig.log.on_update(exited("t1", 0))
+    assert frig.failed == []
+
+
+def test_on_failed_fires_for_nonzero_exit(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "make"}))
+    frig.log.on_update(exited("t1", 2))
+    [entry] = frig.failed
+    assert entry.exit == 2
+
+
+def test_on_failed_fires_once_per_step_id_across_later_updates(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "false"}))
+    frig.log.on_update(progress("t1", "failed", "a"))
+    frig.log.on_update(progress("t1", "failed", "ab"))
+    frig.log.on_update(progress("t1", "completed", "abc"))
+    assert len(frig.failed) == 1
+
+
+def test_on_failed_sees_the_output_written_in_the_same_update(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "false"}))
+    seen = []
+    frig.log._on_failed = lambda e: seen.append(frig.rows()[-1].text)
+    frig.log.on_update(progress("t1", "failed", "boom"))
+    assert seen == ["boom"]
+
+
+def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "sleep 9"}))
+    frig.log.end("stopped", "")
+    assert frig.failed == []

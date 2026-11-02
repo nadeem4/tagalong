@@ -182,3 +182,8 @@ def test_long_title_is_capped_at_200():
     assert len(ev.facts["title"]) == 200 and len(ev.facts["url"]) == 300
     dl = from_body("b", "download", {"name": "n" * 300, "state": "interrupted"})
     assert len(dl.facts["name"]) == 200
+
+
+def test_job_step_failed_kind_batches_120_s_capped_four_an_hour():
+    kind = EVENT_KINDS["job_step_failed"]
+    assert (kind.batch_seconds, kind.max_per_hour, kind.wakes) == (120, 4, True)

@@ -38,7 +38,7 @@ from brain.config import (
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.experts import ExpertHosts, ExpertRun
-from brain.jobs import Jobs, job_note
+from brain.jobs import Jobs
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
 from brain.mind.prompt import render_know, render_preferences, system_prompt, user_content
@@ -147,6 +147,7 @@ class Session:
             on_away=self._on_job_away,
             setup_facts=setup_facts,
             emit=self.scheduler.emit,
+            drop=self.scheduler.drop,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = Timers(memory, self.scheduler.emit, now)
@@ -308,7 +309,7 @@ class Session:
 
     def _on_job_finished(self, job: Job) -> None:
         self.scheduler.emit(
-            Event("job_ended", {"report": job_note(job)}, key=job.id),
+            Event("job_ended", {"report": self.jobs.note(job)}, key=job.id),
             on_start=lambda: self._memory.mark_reported(job.id),
         )
 

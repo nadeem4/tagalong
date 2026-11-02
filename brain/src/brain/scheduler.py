@@ -111,6 +111,13 @@ class Scheduler:
         group.hooks.append((on_start, on_drop, on_end))
         self.pump()
 
+    def drop(self, kind: str, key: str) -> None:
+        """Forget a held event of that kind and key (its news is superseded); no hook runs."""
+        kind_obj = self._kinds.get(kind)
+        if kind_obj is not None:
+            self._replace_held(kind_obj, key)
+            self.pump()
+
     def _replace_held(self, kind: EventKind, key: str) -> None:
         for group in self._groups:
             if group.kind is not kind:
