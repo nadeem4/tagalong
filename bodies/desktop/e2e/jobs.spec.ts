@@ -106,6 +106,19 @@ test('a hand-off asks its mode, a relayed permission and a question with no turn
   await expect(panel.getByRole('region', { name: 'Claude Code asks' })).toHaveCount(0);
 });
 
+test('a job page pulls its steps by cursor', async () => {
+  const home = await windowFor('home');
+  const first = await home.evaluate(() => window.tagalong.jobActivity('job1', 0));
+  expect(first.entries.map((e) => e.kind)).toEqual(['command', 'output', 'end']);
+  expect(first.rev).toBe(3);
+  expect(await home.evaluate(() => window.tagalong.runningSteps())).toEqual([]);
+
+  brain.pushActivity('job1', { kind: 'say', text: 'All done.' });
+  const next = await home.evaluate(() => window.tagalong.jobActivity('job1', 3));
+  expect(next.entries.map((e) => e.text)).toEqual(['All done.']);
+  expect(next.rev).toBe(4);
+});
+
 test('a changed jobs notice refreshes the list', async () => {
   // Answering the question made the brain add a second job and say only that jobs changed.
   const home = await windowFor('home');

@@ -1382,3 +1382,138 @@ async def test_entries_belong_to_their_job(make_rig):
     await finish(rig, two)
     texts = lambda job: [e.text for e in rows_of(rig, job) if e.kind == "command"]  # noqa: E731
     assert texts(one) == ["first"] and texts(two) == ["second"]
+
+
+def activity_changes(rig) -> int:
+    return sum(1 for n in rig.notes if n == ("changed", {"what": "job_activity"}))
+
+
+TOOL_STEPS = [
+    {"tool": {"id": "t1", "title": "Run", "kind": "execute", "input": {"command": "npm test"}}},
+    {"tool_update": {"id": "t1", "status": "completed", "text": "ok"}},
+    {"tool": {"id": "t2", "title": "Run", "kind": "execute", "input": {"command": "npm run b"}}},
+]
+
+
+async def test_activity_page_returns_entries_after_the_cursor(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    page = rig.jobs.activity_page(job_id, 0)
+    assert page["job"] == job_id and page["state"] == "done" and page["more"] is False
+    assert page["watch"] is None
+    assert {"rev", "seq", "at", "kind", "text", "status", "step", "exit"} == set(page["entries"][0])
+    assert page["entries"][-1]["kind"] == "end"
+    assert page["rev"] == max(e["rev"] for e in page["entries"])
+    again = rig.jobs.activity_page(job_id, page["rev"])
+    assert again["entries"] == [] and again["rev"] == page["rev"]
+
+
+async def test_activity_page_cuts_at_the_page_limit(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.PAGE_LIMIT", 2)
+    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    page = rig.jobs.activity_page(job_id, 0)
+    assert len(page["entries"]) == 2 and page["more"] is True
+    assert page["rev"] == page["entries"][-1]["rev"]  # the cursor to continue from
+
+
+async def test_activity_page_for_an_unknown_job_is_a_job_error(make_rig):
+    rig = make_rig(FakeAsks())
+    with pytest.raises(JobError, match="no job nope"):
+        rig.jobs.activity_page("nope", 0)
+
+
+async def test_an_old_job_without_rows_has_an_empty_page(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
+    page = rig.jobs.activity_page("old", 0)
+    assert page["entries"] == [] and page["rev"] == 0 and page["more"] is False
+    assert rig.jobs.with_activity() == set()
+
+
+async def test_running_steps_lists_each_running_job_that_has_a_step(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan"), Answer("Plan")),
+        [[*TOOL_STEPS, {"hang": True}], [{"text": "hi"}, {"hang": True}]],
+        experts=[installed(name="Claude Code")],
+        shared=True,
+    )
+    one = await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))  # says something, runs no step
+    await until(lambda: rig.jobs.running_steps())
+    steps = rig.jobs.running_steps()
+    assert [(s["job"], s["expert"], s["text"]) for s in steps] == [
+        (one, "Claude Code", "npm run b")
+    ]
+    assert steps[0]["at"]
+    await rig.jobs.stop(one)
+    assert rig.jobs.running_steps() == []  # an ended job is absent
+
+
+async def test_running_steps_includes_a_pending_step(make_rig):
+    pending = {
+        "tool": {
+            "id": "p1",
+            "title": "Run",
+            "kind": "execute",
+            "status": "pending",
+            "input": {"command": "npm ci"},
+        }
+    }
+    rig = make_rig(FakeAsks(Answer("Plan")), [pending, {"hang": True}], experts=[installed()])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.jobs.running_steps())
+    assert [(s["job"], s["text"]) for s in rig.jobs.running_steps()] == [(job_id, "npm ci")]
+
+
+async def test_first_activity_change_is_sent_at_once(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [TOOL_STEPS[0], {"hang": True}])
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: activity_changes(rig) >= 1)
+
+
+async def test_a_burst_sends_one_leading_and_one_trailing_change(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
+    steps = [{"text": str(i)} for i in range(30)]
+    rig = make_rig(FakeAsks(Answer("Plan")), [*steps, {"hang": True}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.memory.last_rev(job_id) >= 1)
+    await asyncio.sleep(0.05)  # the burst is over; the clock never moved
+    assert activity_changes(rig) == 1
+    await until(lambda: activity_changes(rig) == 2)  # the trailing flush announces the last write
+    await asyncio.sleep(0.3)
+    assert activity_changes(rig) == 2
+    assert rig.notes[-1] == ("changed", {"what": "job_activity"})
+
+
+async def test_the_end_cancels_the_trailing_change_and_announces_itself(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
+    steps = [{"text": "a"}, {"text": "b"}, {"end": "end_turn"}]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    count = activity_changes(rig)
+    assert count >= 2
+    await asyncio.sleep(0.4)
+    assert activity_changes(rig) == count  # no late flush after the end
+
+
+async def test_the_end_sends_exactly_one_notice_after_the_end_row(make_rig, monkeypatch):
+    monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0)  # nothing throttled
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "a"}, {"end": "end_turn"}])
+    seen: list[bool] = []  # per job_activity notice: was the end row already written?
+    real = rig.jobs._notify
+
+    def spy(method, params):
+        if params == {"what": "job_activity"}:
+            rows = rig.memory.activity_after(job_id, 0, 1000)
+            seen.append(any(e.kind == "end" for e in rows))
+        real(method, params)
+
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    rig.jobs._notify = spy
+    await finish(rig, job_id)
+    await asyncio.sleep(0.1)
+    assert seen.count(True) == 1 and seen[-1] is True

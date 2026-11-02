@@ -384,16 +384,17 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                          | Result text (JSON)                                                                                                          |
-| ------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                           | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
-| `forget`           | `{"id": int}`                  | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
-| `spend_today`      | `{}`                           | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
-| `list_permissions` | `{}`                           | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
-| `set_permission`   | `{"tool": str, "mode": str}`   | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
-| `speak_sample`     | `{"text", "voice?", "speed?"}` | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                            |
-| `list_jobs`        | `{}`                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
-| `stop_job`         | `{"job": str}`                 | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
+| Tool               | Input                              | Result text (JSON)                                                                                                          |
+| ------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                            |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
+| `stop_job`         | `{"job": str}`                     | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only     |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -759,7 +760,22 @@ or step still being updated survives), and keeps one marker. Messages without an
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
 `running`/`pending` are marked `failed` before the `end` entry; a job stopped by a brain restart
 gets its `# stopped` entry too. Nothing unmasked is stored. The log lives as long as its job row.
-Reading it (a Home tool, `changed` pushes) is not built yet.
+
+**Serving the log.** Home reads it with the Home-only tool `job_activity` (it rides `call`, so the
+contract does not change). With `{job, after_rev}` it returns `{job, state, rev, entries, more,
+watch}`: the entries whose `rev` is above the cursor, in `rev` order, at most 500 (`more: true`
+when cut). `rev` is the cursor to send next; a body that missed notices or reconnected sends
+`after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
+masked when written, so serving does no second pass. An unknown job is `invalid_params`; a job
+from before the log existed has an empty page. `watch` is `null` for now. With no `job` it returns
+`{"running": [{job, expert, text, at}]}`: the latest running or pending step of each running job (`expert` is the
+expert's display name), for the bubble's one live line. `list_jobs` rows gain `activity: true`
+when the job has any rows (one query, `Memory.jobs_with_activity`).
+
+`Jobs` tells bodies with `changed {what: "job_activity"}` at most once per `ACTIVITY_NOTIFY_S`
+(250 ms): the first change goes at once, a burst becomes one trailing send so the last write is
+never left unannounced, and the job's end cancels the trailing send; the `end` entry's own change
+is the one notice, sent after that row. The Jobs list keeps its own 2 s `changed {what: "jobs"}`.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
 are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
@@ -870,6 +886,7 @@ flowchart TD
 | `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
 | `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, `expert`, `parent_job` and `session_id_known`                                                          |
 | `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
+| `job_activity` | home        | read   | `auto`                    | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,

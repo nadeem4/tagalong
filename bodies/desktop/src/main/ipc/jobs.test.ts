@@ -50,6 +50,27 @@ const JOB = {
   result: null,
   startedAt: '2026-10-27T10:00:00Z',
   endedAt: null,
+  activity: false,
+};
+
+const PAGE = {
+  job: 'j1',
+  state: 'running',
+  rev: 4,
+  entries: [
+    {
+      rev: 4,
+      seq: 1,
+      at: 't',
+      kind: 'command',
+      text: 'npm test',
+      status: 'running',
+      step: 's1',
+      exit: null,
+    },
+  ],
+  more: false,
+  watch: null,
 };
 
 describe('registerJobsIpc', () => {
@@ -89,7 +110,52 @@ describe('registerJobsIpc', () => {
     await expect(other.invoke(IPC.listJobs)).rejects.toThrow('brain sent bad jobs');
   });
 
-  it('handles its two channels and nothing else', () => {
-    expect(setup(() => []).channels()).toEqual([IPC.listJobs, IPC.stopJob].sort());
+  it('maps the activity flag on a row', async () => {
+    const { invoke } = setup(() => text({ jobs: [{ ...BRAIN_ROW, activity: true }] }));
+    expect(await invoke(IPC.listJobs)).toEqual([{ ...JOB, activity: true }]);
+  });
+
+  it('pulls a job page by cursor through the job_activity tool', async () => {
+    const { invoke, calls } = setup(() => text(PAGE));
+    expect(await invoke(IPC.jobActivity, 'j1', 7)).toEqual(PAGE);
+    expect(calls).toEqual([['job_activity', { job: 'j1', after_rev: 7 }]]);
+  });
+
+  it('refuses a bad job id or cursor for the activity pull, without asking the brain', async () => {
+    const { invoke, calls } = setup(() => text(PAGE));
+    await expect(invoke(IPC.jobActivity, '', 0)).rejects.toThrow('bad job id');
+    await expect(invoke(IPC.jobActivity, 7, 0)).rejects.toThrow('bad job id');
+    await expect(invoke(IPC.jobActivity, 'j1', -1)).rejects.toThrow('bad cursor');
+    await expect(invoke(IPC.jobActivity, 'j1', 1.5)).rejects.toThrow('bad cursor');
+    await expect(invoke(IPC.jobActivity, 'j1', '2')).rejects.toThrow('bad cursor');
+    expect(calls).toEqual([]);
+  });
+
+  it('rejects an activity page whose entries are not a list', async () => {
+    const { invoke } = setup(() => text({ ...PAGE, entries: 'nope' }));
+    await expect(invoke(IPC.jobActivity, 'j1', 0)).rejects.toThrow('brain sent bad activity');
+  });
+
+  it('rejects an activity page without a numeric rev', async () => {
+    const { invoke } = setup(() => text({ ...PAGE, rev: '7' }));
+    await expect(invoke(IPC.jobActivity, 'j1', 0)).rejects.toThrow('brain sent bad activity');
+  });
+
+  it('lists the running steps for the bubble', async () => {
+    const running = [{ job: 'j1', expert: 'Claude Code', text: 'npm test', at: 't' }];
+    const { invoke, calls } = setup(() => text({ running }));
+    expect(await invoke(IPC.runningSteps)).toEqual(running);
+    expect(calls).toEqual([['job_activity', {}]]);
+  });
+
+  it('rejects running steps the brain did not send as a list', async () => {
+    const { invoke } = setup(() => text({ running: 3 }));
+    await expect(invoke(IPC.runningSteps)).rejects.toThrow('brain sent bad running steps');
+  });
+
+  it('handles its four channels and nothing else', () => {
+    expect(setup(() => []).channels()).toEqual(
+      [IPC.listJobs, IPC.stopJob, IPC.jobActivity, IPC.runningSteps].sort(),
+    );
   });
 });

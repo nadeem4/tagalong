@@ -672,6 +672,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
     assert names == [
         "edit_preference",
         "forget",
+        "job_activity",
         "key_status",
         "list_approvals",
         "list_experts",

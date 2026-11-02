@@ -391,8 +391,10 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
 
     async def list_jobs(args: dict) -> str:
         rows = []
+        watched = jobs.with_activity()  # one query, not one per row
         for job in jobs.list():
             row = asdict(job)
+            row["activity"] = job.id in watched
             # The session id is an opaque handle; Scout only needs to know a follow-up can use it.
             row["session_id_known"] = bool(row.pop("session_id"))
             row["expert"] = job.agent
@@ -411,6 +413,22 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         except JobError as err:
             raise RpcError(ErrorCode.invalid_params, str(err)) from err
         return json.dumps({"job": args["job"], "stopping": True})
+
+    async def job_activity(args: dict) -> str:
+        """Home reads a job's steps by cursor; with no job, the step each running job is on."""
+        if args.get("job") is None:
+            return json.dumps({"running": jobs.running_steps()})
+        _need_text("job_activity", args, "job")
+        after = args.get("after_rev", 0)
+        if not isinstance(after, int) or isinstance(after, bool) or after < 0:
+            raise RpcError(
+                ErrorCode.invalid_params,
+                "job_activity needs after_rev as a non-negative whole number.",
+            )
+        try:
+            return json.dumps(jobs.activity_page(args["job"], after))
+        except JobError as err:
+            raise RpcError(ErrorCode.invalid_params, str(err)) from err
 
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
     job_id = {"type": "string", "description": "The job id from hand_off or list_jobs."}
@@ -497,6 +515,20 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                 default_mode="auto",
             ),
             stop_job,
+        ),
+        (
+            ToolSpec(
+                "job_activity",
+                "A job's steps after a revision (after_rev), or the step each running job is on.",
+                {
+                    "type": "object",
+                    "properties": {"job": job_id, "after_rev": {"type": "integer", "minimum": 0}},
+                },
+                frozenset({"home"}),
+                effect="read",
+                default_mode="auto",
+            ),
+            job_activity,
         ),
     ]
 

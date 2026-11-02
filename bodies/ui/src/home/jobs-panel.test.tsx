@@ -21,6 +21,7 @@ const RUNNING: JobRow = {
   result: null,
   startedAt: '2026-10-28T09:00:00.000Z',
   endedAt: null,
+  activity: false,
 };
 const DONE: JobRow = {
   ...RUNNING,
