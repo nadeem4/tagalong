@@ -332,7 +332,7 @@ tea or coffee, and recommend one."
 
 1. **Action:** send that request.
    **Expected:** a card with the question and the options as buttons, the recommended one first and
-   marked "Recommended", and a text field "Your answer". Scout's turn ends without waiting.
+   stacked as full-width rows, the recommended one marked with a "Recommended" tag on the right, and a text field "Your answer". Scout's turn ends without waiting.
 2. **Action:** click an option.
    **Expected:** the card goes and Scout wakes with your answer and carries on.
 3. **Action:** repeat, but type your own answer in the field and press Enter.

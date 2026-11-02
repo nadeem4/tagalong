@@ -71,18 +71,20 @@ export function ConnectorConfirmCard({
             />
           </label>
         )}
-        <div className="bubble-row">
+        <div className="bubble-choices" role="group" aria-label="Options">
           {options.map((option, i) => (
             <button
               key={option}
               type="button"
-              className={i === 0 ? 'bubble-primary' : 'bubble-quiet'}
+              className={`bubble-choice ${i === 0 ? 'bubble-primary' : 'bubble-quiet'}`}
               onClick={() => onReply({ option })}
             >
-              {option}
-              {option === confirm.recommended && <small> Recommended</small>}
+              <span>{option}</span>
+              {option === confirm.recommended && <span className="bubble-tag">Recommended</span>}
             </button>
           ))}
+        </div>
+        <div className="bubble-row">
           {typable && (
             <button
               type="button"
@@ -137,17 +139,29 @@ export function ConnectorConfirmCard({
           </div>
         )}
       </dl>
-      <div className="bubble-row">
-        <button type="button" className="bubble-primary" onClick={() => onAnswer('once')}>
-          Allow once
+      <div className="bubble-choices" role="group" aria-label="Options">
+        <button
+          type="button"
+          className="bubble-choice bubble-primary"
+          onClick={() => onAnswer('once')}
+        >
+          <span>Allow once</span>
         </button>
         {canAlways && (
-          <button type="button" className="bubble-quiet" onClick={() => onAnswer('always')}>
-            Always allow
+          <button
+            type="button"
+            className="bubble-choice bubble-quiet"
+            onClick={() => onAnswer('always')}
+          >
+            <span>Always allow</span>
           </button>
         )}
-        <button type="button" className="bubble-quiet" onClick={() => onAnswer('deny')}>
-          Deny
+        <button
+          type="button"
+          className="bubble-choice bubble-quiet"
+          onClick={() => onAnswer('deny')}
+        >
+          <span>Deny</span>
         </button>
       </div>
     </section>
