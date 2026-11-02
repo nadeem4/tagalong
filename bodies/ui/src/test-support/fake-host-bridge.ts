@@ -3,7 +3,15 @@
  * record what the components asked for. Contains createFakeHostBridge and FakeHostBridge.
  */
 
-import type { AppAddParams, AppInfo, Pet, MemoryEntry, TurnEvent } from '../shapes';
+import type {
+  AppAddParams,
+  AppInfo,
+  Pet,
+  MemoryEntry,
+  SetupOverview,
+  SetupResult,
+  TurnEvent,
+} from '../shapes';
 import type {
   ApprovalCounts,
   ApprovalRow,
@@ -61,6 +69,9 @@ export interface FakeHostBridge extends HostBridge {
   readonly restarts: readonly string[];
   readonly signIns: readonly string[];
   readonly removedConnections: readonly string[];
+  /** The brain's setup overview and every setupExpert / setupApp call, in order. */
+  setup: SetupOverview;
+  readonly setupCalls: readonly { kind: 'expert' | 'app'; id: string; approved: boolean }[];
 }
 
 /**
@@ -72,6 +83,10 @@ export function createFakeHostBridge(
     pets?: Pet[];
     /** The brain's apps to start with. */
     apps?: AppInfo[];
+    /** What setupOverview answers; defaults to nothing set up and nothing to add. */
+    setup?: Partial<SetupOverview>;
+    /** What setupExpert and setupApp answer; defaults to `{}`, which is success. */
+    setupResult?: SetupResult;
     /** Listing apps rejects with this message, as "brain offline" does. */
     listFails?: string;
     /** What Scout remembers, newest first. */
@@ -105,6 +120,7 @@ export function createFakeHostBridge(
   const restarts: string[] = [];
   const signIns: string[] = [];
   const removedConnections: string[] = [];
+  const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
   const keysSet: string[] = [];
@@ -148,6 +164,29 @@ export function createFakeHostBridge(
     restarts,
     signIns,
     removedConnections,
+    setup: {
+      experts: [],
+      apps: [],
+      browseExperts: [],
+      browseApps: [],
+      stale: false,
+      progress: null,
+      failed: null,
+      ...options.setup,
+    },
+    setupCalls,
+    setupOverview() {
+      if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
+      return Promise.resolve(structuredClone(fake.setup));
+    },
+    setupExpert(id, approved) {
+      setupCalls.push({ kind: 'expert', id, approved });
+      return Promise.resolve(options.setupResult ?? {});
+    },
+    setupApp(id, approved) {
+      setupCalls.push({ kind: 'app', id, approved });
+      return Promise.resolve(options.setupResult ?? {});
+    },
     listConnections() {
       if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
       return Promise.resolve({ apps: structuredClone(fake.apps) });
