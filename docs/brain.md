@@ -545,8 +545,29 @@ words what the person reads (guidance in `mind/soul.md`).
   `uvx` and hosted entries are `unsupported`; an entry with no build for this computer is
   `no_build`. A registry id must be a plain folder name. Failures are `InstallError(kind, detail)`
   facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
-  `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`. Login is not part
-  of this slice yet.
+  `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`.
+- `login.py`, `terminal.py`, `env.py`: the `login_expert(id)` tool logs an installed expert in on
+  the person's own subscription. Like install it is `locked` and `person_only`; the card (built by
+  code) shows `expert`, the chosen `method` and `opens` (`terminal window` or `browser`), so
+  nothing opens before the OK. `LoginDriver.check` spawns the adapter with
+  `clientCapabilities.auth.terminal = true` (without it Claude lists no methods), calls
+  `new_session` in a scratch folder and sends no prompt: success is logged in, an auth-required
+  error is not logged in (with the advertised methods), anything else is unknown. `start` picks a
+  subscription method: the terminal `claude-ai-login`, else the one terminal method, else a
+  browser one (`chat-gpt`, `oauth-personal`); never an API-key method. A terminal method opens a
+  visible window (the `OpenTerminal` seam; `real_open_terminal` is Windows only: `cmd` with
+  `CREATE_NEW_CONSOLE`) running the adapter's own command plus the method's args, with the
+  expert's env, wrapped so the exit code lands in `cache/login-<id>.done`; elsewhere it raises
+  `NoTerminal` and the tool answers `{error: "no_terminal", command}` so Scout can tell the person
+  what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
+  browser. The tool returns `{state: "waiting", kind}` at once; a background task waits (10
+  minutes at most for the done file or the call), re-checks login, records it in `experts.json`
+  and emits one waking `setup_login` event (`expert`, `state` = `logged_in`, `failed` or
+  `unknown`, and `detail`). A second login for the same expert cancels the first; shutdown cancels
+  them all; every adapter process tree is killed on the way out. No link or code passes through
+  Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
+  switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them), used
+  for the login child and the check, and by expert runs later.
 
 ## Experts
 
@@ -647,6 +668,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |
 | `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                         |
 | `setup_done`     | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                      |
+| `setup_login`    | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                            |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a

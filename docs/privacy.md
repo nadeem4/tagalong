@@ -185,6 +185,11 @@ installed globally and no PATH is edited. npm runs with a minimal environment of
 never sees your API keys. Only you can allow an install: a saved preference never skips that card,
 and there is no Always allow for it.
 
+Logging an expert in also needs your Allow, on a card that says whether a terminal window or your
+browser will open. You sign in there, on the expert's own page, with your own account: no password,
+code or link goes through Scout or the brain, and the login stays with the expert (in its own
+config), never in Tagalong's chat, memory or logs. Experts are never logged in with an API key.
+
 ## Connected apps: what goes to them
 
 Apps you connect in Home, Connections (Notion, GitHub, Linear, a local tool) are reached only
