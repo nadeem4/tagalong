@@ -42,7 +42,7 @@ async def real_open_terminal(argv: list[str], env: Mapping[str, str], done_file:
     proc = subprocess.Popen(  # noqa: S603 - argv is the installed expert's own command
         terminal_line(argv, done_file),
         env=dict(env),
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),  # absent off Windows
     )
 
     def watch() -> None:
