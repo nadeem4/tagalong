@@ -9,7 +9,7 @@
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`, `spend_today` ($0.42),
- * `set_daily_limit`, `expert_status`) follow `FakeBrainOptions`; the brain counts key attempts
+ * `set_daily_limit`, `setup_overview`) follow `FakeBrainOptions`; the brain counts key attempts
  * and keeps no key.
  *
  * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
@@ -47,6 +47,10 @@ export interface FakeBrain {
   limits: number[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
+  /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
+  expertSetups: string[];
+  /** The `approved` flag of each setup_expert call: the tour's press must send true. */
+  expertApprovals: unknown[];
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
   /** What the desktop asked of the brain's ears and mouth, in order. */
@@ -174,6 +178,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const answers: FakeBrain['answers'] = [];
   const permissionSets: { tool: string; mode: string }[] = [];
   const stops: string[] = [];
+  const expertSetups: string[] = [];
+  const expertApprovals: unknown[] = [];
+  let expertInstalled = false;
   const limits: number[] = [];
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
@@ -391,6 +398,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             id?: number;
             filter?: string;
             usd?: number;
+            approved?: boolean;
           };
         };
         let value: unknown = {};
@@ -424,8 +432,31 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           dailyLimitUsd = Number(params.input?.usd);
           limits.push(dailyLimitUsd);
           notify('changed', { what: 'settings' });
-        } else if (params.tool === 'expert_status') {
-          value = { found: true, command: 'claude-agent-acp' };
+        } else if (params.tool === 'setup_overview') {
+          value = {
+            experts: expertInstalled
+              ? [
+                  {
+                    id: 'claude-acp',
+                    name: 'Claude Code',
+                    version: '2.0.0',
+                    state: 'ready',
+                    tested: true,
+                  },
+                ]
+              : [],
+            apps: [],
+            browse_experts: [],
+            browse_apps: [],
+            stale: false,
+            progress: null,
+            failed: null,
+          };
+        } else if (params.tool === 'setup_expert') {
+          expertSetups.push(String(params.input?.id));
+          expertApprovals.push(params.input?.approved);
+          expertInstalled = true;
+          notify('changed', { what: 'setup' });
         } else if (params.tool === 'list_memories') {
           value = {
             memories: [
@@ -493,6 +524,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     },
     limits,
     stops,
+    expertSetups,
+    expertApprovals,
     removedPreferences,
     voice,
     sendApproved: (note) => {

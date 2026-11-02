@@ -1,11 +1,11 @@
 /**
- * IPC for the Anthropic key: key:status, key:set, limit:set and expert:status, each a thin call
+ * IPC for the Anthropic key: key:status, key:set and limit:set, each a thin call
  * to the brain's tool of the same job. Contains registerKeyIpc and readKeyStatus. The pasted key is forwarded
  * once; it is never kept, logged, returned or put in a thrown error.
  */
 
 import { BrainOffline, RpcError } from '@tagalong/contract';
-import type { ExpertStatus, KeyResult, KeyStatus } from '../../shared/ipc';
+import type { KeyResult, KeyStatus } from '../../shared/ipc';
 import { IPC } from '../../shared/ipc';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
@@ -73,16 +73,5 @@ export function registerKeyIpc(handle: IpcHandle, { brain, openExternal }: KeyIp
       throw new Error('Enter an amount above $0.');
     }
     await brain.call('set_daily_limit', { usd });
-  });
-
-  handle(IPC.expertStatus, async (): Promise<ExpertStatus> => {
-    const expert = (await callJson(brain, 'expert_status')) as {
-      found?: unknown;
-      command?: unknown;
-    } | null;
-    if (typeof expert?.found !== 'boolean' || typeof expert.command !== 'string') {
-      throw new Error('brain sent bad expert status');
-    }
-    return { found: expert.found, command: expert.command };
   });
 }

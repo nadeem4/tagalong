@@ -39,12 +39,6 @@ export interface KeyStatus {
 /** How a key check ended; `offline` is the body's own word for "no brain connected". */
 export type KeyResult = 'ok' | 'invalid' | 'unreachable' | 'offline';
 
-/** Whether the expert's command is on the brain's PATH. */
-export interface ExpertStatus {
-  found: boolean;
-  command: string;
-}
-
 /**
  * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
  * (`auto`). A locked tool asks until set to auto on Home; an offline body's tool cannot be changed yet.

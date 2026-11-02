@@ -21,7 +21,7 @@ interface Props {
 }
 
 const SOURCE: Record<ApprovalRow['source'], { label: string; icon: ReactNode }> = {
-  claude_code: { label: 'Claude Code expert', icon: <path d="M3 3h10v7H8l-3 3v-3H3z" /> },
+  claude_code: { label: 'Expert', icon: <path d="M3 3h10v7H8l-3 3v-3H3z" /> },
   scout_tool: {
     label: 'Scout tool',
     icon: (

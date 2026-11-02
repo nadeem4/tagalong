@@ -269,6 +269,16 @@ test('Show the tour again from Home reopens it at step 1', async () => {
   ).toBeVisible();
 });
 
+test('step 6 installs Claude Code on the fake brain and shows it ready', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 6);
+  await tour.getByRole('button', { name: 'Set up Claude Code' }).click();
+  await expect(tour.getByText('Claude Code is set up.')).toBeVisible({ timeout: 15_000 });
+  expect(brain!.expertSetups).toEqual(['claude-acp']);
+  expect(brain!.expertApprovals).toEqual([true]); // the press is the OK, so no Allow card
+});
+
 test('every step fits the window: footer in view, nothing wider than the page (150% scaling)', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');

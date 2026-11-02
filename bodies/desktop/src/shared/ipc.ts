@@ -15,9 +15,9 @@ import type {
 } from '@tagalong/ui/shapes';
 import type { Settings, SettingsPatch } from './settings';
 import type { DropOffer, HostBridge } from '@tagalong/ui';
-import type { ExpertStatus, KeyResult, KeyStatus } from '@tagalong/ui';
+import type { KeyResult, KeyStatus } from '@tagalong/ui';
 
-export type { ExpertStatus, KeyResult, KeyStatus };
+export type { KeyResult, KeyStatus };
 import type { FixTarget } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
@@ -112,7 +112,6 @@ export const IPC = {
   keyOpenPage: 'tagalong:key:open-page',
   keySet: 'tagalong:key:set',
   limitSet: 'tagalong:limit:set',
-  expertStatus: 'tagalong:expert:status',
   // The first-run walkthrough: open it (at a step) or finish it.
   walkthroughOpen: 'tagalong:walkthrough:open',
   walkthroughFinish: 'tagalong:walkthrough:finish',
@@ -322,8 +321,6 @@ export interface TagalongHostApi {
   getStatusMark(): Promise<StatusMark | null>;
   /** Fires with the new top status mark, or null when none is left. */
   onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
-  /** Whether the expert's command is on the brain's PATH (the walkthrough's Claude Code step). */
-  expertStatus(): Promise<ExpertStatus>;
   /** Opens Anthropic's Console key page in the browser (a fixed address, chosen by main). */
   openKeyPage(): Promise<void>;
   /** Finish or Skip: marks the walkthrough seen and closes its window. */

@@ -102,12 +102,20 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       p.confirm && p.text !== '' ? p.text : [lead, ...input].filter((s) => s !== '').join('\n');
     // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
     const body = tool.includes('__') ? tool.split('__')[0]! : '';
+    // A job's ask is `<expert>:<title>`; Claude Code keeps `claude_code`, others use their id.
+    const expert = body === '' && tool.includes(':') ? tool.split(':')[0]! : '';
+    const label = (id: string): string => {
+      const name = id.replace(/-acp$/, '');
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    };
     const app =
-      question || tool.startsWith('claude_code:')
+      question || expert === 'claude_code' || expert === 'claude-acp'
         ? 'Claude Code'
-        : body === ''
-          ? 'Scout'
-          : body.charAt(0).toUpperCase() + body.slice(1);
+        : expert !== ''
+          ? label(expert)
+          : body === ''
+            ? 'Scout'
+            : label(body);
     asks.add(p.id);
     return [
       {

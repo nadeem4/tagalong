@@ -356,6 +356,14 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
+    it("another expert's permission ask is labelled by that expert, not Scout", () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: '', tool: 'codex-acp:Run command', input: {}, options: ['Allow once'] }),
+      );
+      expect(e).toMatchObject({ type: 'connector.confirm', app: 'Codex' });
+    });
+
     it('a question ask (no tool) is marked as a question and keeps its choices', () => {
       const [e] = make().map(
         'ask',

@@ -523,7 +523,6 @@ class KeySettings:
     notify: Notify
     source: Literal["environment", "file", "none"]
     check: Callable[[str], Awaitable[KeyCheck]]
-    experts: Callable[[], list[InstalledExpert]]
     on_key: Callable[[], None] = lambda: None  # main drops its cached masker values here
 
 
@@ -636,7 +635,7 @@ def home_tools(
 
 
 def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handler]]:
-    """key_status, set_api_key, set_daily_limit and expert_status for the first-run setup."""
+    """key_status, set_api_key and set_daily_limit for the first-run setup."""
     env_path = keys.data_dir / ".env"
     lock = asyncio.Lock()  # one check and one .env write at a time
 
@@ -694,14 +693,6 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
         keys.notify("changed", {"what": "settings"})
         return json.dumps({"limit_usd": budget.limit})
 
-    async def expert_status(args: dict) -> str:
-        # Reads the installed list and nothing more: it never starts an expert.
-        found = keys.experts()
-        # `command` stays for the desktop's key IPC until 21d reworks the walkthrough: the
-        # custom expert's command, empty when there is none.
-        command = " ".join(next((e.command for e in found if e.source == "custom"), []))
-        return json.dumps({"found": bool(found), "command": command, "experts": expert_rows(found)})
-
     home = frozenset({"home"})
     empty = {"type": "object", "properties": {}}
     return [
@@ -743,16 +734,6 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
                 effect="change",
             ),
             set_daily_limit,
-        ),
-        (
-            ToolSpec(
-                "expert_status",
-                "The installed experts, and whether there is any.",
-                empty,
-                home,
-                effect="read",
-            ),
-            expert_status,
         ),
     ]
 

@@ -21,7 +21,7 @@ const LINK: Record<BrainLink['status'], { words: string; dot: string; chip: stri
   },
 };
 
-// Static on purpose: Claude Code is the one expert and the brain starts it locally.
+// Static on purpose: every expert is started locally by the brain.
 const EXPERTS = 'Runs on this machine, started by the brain';
 
 /** Where an app runs: its web address, or the command line the brain starts. */

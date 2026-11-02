@@ -8,6 +8,7 @@ import type { ReactElement } from 'react';
 import { vi } from 'vitest';
 import type { MicWatcher } from '../controls';
 import type { KeyResult, KeyStatus } from '../host-bridge';
+import type { SetupOverview } from '../shapes';
 import { StepSaveContext } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -38,7 +39,18 @@ export function makeWalkthroughHost(
     usageSummary: vi.fn(() => Promise.resolve({ spentUsd: 0.42, limitUsd: 5 })),
     onBrainChanged: vi.fn((_handler: (what: string) => void) => () => undefined),
     openWalkthrough: vi.fn(() => Promise.resolve()),
-    expertStatus: vi.fn(() => Promise.resolve({ found: true, command: 'claude-agent-acp' })),
+    setupOverview: vi.fn((): Promise<SetupOverview> =>
+      Promise.resolve({
+        experts: [],
+        apps: [],
+        browseExperts: [],
+        browseApps: [],
+        stale: false,
+        progress: null,
+        failed: null,
+      }),
+    ),
+    setupExpert: vi.fn((_id: string) => Promise.resolve()),
     finishWalkthrough: vi.fn(() => Promise.resolve()),
     openKeyPage: vi.fn(() => Promise.resolve()),
     getSettings: vi.fn(() => Promise.resolve(options.settings ?? SETTINGS)),
