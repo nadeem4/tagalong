@@ -64,6 +64,8 @@ export interface FakeBrain {
     /** Every `read_aloud` event the desktop sent, in order. */
     readAloud: Record<string, unknown>[];
   };
+  /** Add a step to a job's activity log (new `rev`) and tell the bodies `changed: job_activity`. */
+  pushActivity(job: string, entry: { kind: string; text: string }): void;
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
@@ -85,7 +87,15 @@ const JOB = {
   result: null,
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
+  activity: true,
 } as Record<string, unknown>;
+
+// A job's steps, as job_activity sends them: a command, its output, and the end line.
+const JOB_STEPS = [
+  { rev: 1, seq: 1, kind: 'command', text: 'npm test', status: 'done', step: 's1', exit: null },
+  { rev: 2, seq: 2, kind: 'output', text: 'all green', status: null, step: 's1', exit: null },
+  { rev: 3, seq: 3, kind: 'end', text: '# done', status: null, step: null, exit: null },
+].map((e) => ({ ...e, at: '2026-10-27T10:00:05Z' }));
 
 // A memory with one unbroken word, the worst case for the memory row's width.
 const LONG_FACT = `Remembers ${'supercalifragilistic'.repeat(8)} and a long story about the launch.`;
@@ -204,6 +214,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const SILENCE = Buffer.alloc(24_000 * 3 * 2).toString('base64');
   const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
+  const activity: Record<string, Record<string, unknown>[]> = { job1: [...JOB_STEPS] };
   const permissions = [
     {
       name: 'desktop__move_window',
@@ -395,6 +406,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             tool?: string;
             mode?: string;
             job?: string;
+            after_rev?: number;
             id?: number;
             filter?: string;
             usd?: number;
@@ -403,7 +415,18 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         };
         let value: unknown = {};
         if (params.tool === 'list_jobs') value = { jobs };
-        else if (params.tool === 'stop_job') {
+        else if (params.tool === 'job_activity') {
+          // No job: the bubble's running steps (none here). A job: its steps after the cursor.
+          const job = params.input?.job;
+          if (job === undefined) value = { running: [] };
+          else {
+            const rows = activity[job] ?? [];
+            const after = Number(params.input?.after_rev ?? 0);
+            const rev = rows.reduce((top, e) => Math.max(top, Number(e.rev)), 0);
+            const entries = rows.filter((e) => Number(e.rev) > after);
+            value = { job, state: 'done', rev, entries, more: false, watch: null };
+          }
+        } else if (params.tool === 'stop_job') {
           stops.push(String(params.input?.job));
           const row = jobs.find((j) => j.id === params.input?.job);
           if (row !== undefined) {
@@ -528,6 +551,28 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     expertApprovals,
     removedPreferences,
     voice,
+    pushActivity: (job, entry) => {
+      const rows = (activity[job] ??= []);
+      const rev = rows.reduce((top, e) => Math.max(top, Number(e.rev)), 0) + 1;
+      rows.push({
+        rev,
+        seq: rev,
+        at: '2026-10-27T10:00:06Z',
+        status: null,
+        step: null,
+        exit: null,
+        ...entry,
+      });
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'job_activity' },
+          }),
+        );
+      }
+    },
     sendApproved: (note) => {
       for (const socket of sockets) {
         socket.send(

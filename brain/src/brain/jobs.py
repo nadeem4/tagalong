@@ -4,6 +4,7 @@ Code's own permission and question prompts as turn-less asks, and keeps the jobs
 It tells bodies through the injected notify (`changed: jobs`); the tools that call it come later.
 """
 
+import asyncio
 import inspect
 import logging
 import shutil
@@ -11,6 +12,7 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -19,7 +21,7 @@ from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question
 from brain.guards import AskCtx, Guards, Hook
-from brain.job_activity import JobActivity
+from brain.job_activity import PAGE_LIMIT, JobActivity
 from brain.masking import mask_json
 from brain.memory import Job, Memory
 from brain.offers import Offers
@@ -46,6 +48,7 @@ def _prefix(agent: str) -> str:
 CANCEL = "cancel"
 HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
+ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
 RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in the row
 
@@ -115,6 +118,8 @@ class Jobs:
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
         self._progress_sent: dict[str, float] = {}
+        self._activity_sent: dict[str, float] = {}
+        self._activity_trailing: dict[str, asyncio.Task] = {}
 
     def startup(self) -> None:
         self._memory.stop_running_on_start()
@@ -243,7 +248,7 @@ class Jobs:
                 self._memory,
                 lambda text: mask_json(self._guards, "job_activity", text),
                 lambda: datetime.now(UTC),
-                on_change=lambda: None,  # the transport that tells bodies comes later
+                on_change=lambda: self._activity_changed(job_id),
             )
             handed_off = True
             self._starting -= 1
@@ -257,6 +262,7 @@ class Jobs:
                 self._memory.update_job(job_id, state="error", reason=message, ended_at=_now())
                 self._runs.pop(job_id, None)
                 self._activity.pop(job_id, None)
+                self._stop_activity_notes(job_id)
                 self._changed()
                 await run.close()
                 if isinstance(exc, Exception):
@@ -296,8 +302,49 @@ class Jobs:
         for run in list(self._runs.values()):
             with suppress(Exception):
                 await run.stop()
+        for job_id in list(self._activity_trailing):
+            self._stop_activity_notes(job_id)
         if self._hosts is not None:  # warm adapters waiting for a follow-up go too
             await self._hosts.shutdown()
+
+    def with_activity(self) -> set[str]:
+        return self._memory.jobs_with_activity()
+
+    def activity_page(self, job_id: str, after_rev: int) -> dict:
+        """A job's steps after the cursor (rows are masked when written); `rev` is the cursor
+        to pass next time. `watch` is filled by the watch feature later."""
+        job = self._memory.get_job(job_id)
+        if job is None:
+            raise JobError(f"no job {job_id}")
+        rows = self._memory.activity_after(job_id, after_rev, PAGE_LIMIT + 1)
+        more = len(rows) > PAGE_LIMIT
+        rows = rows[:PAGE_LIMIT]
+        return {
+            "job": job_id,
+            "state": job.state,
+            "rev": rows[-1].rev if more else self._memory.last_rev(job_id),
+            "entries": [asdict(r) for r in rows],
+            "more": more,
+            "watch": None,
+        }
+
+    def running_steps(self) -> list[dict]:
+        """The step each running job is on now, for the bubble's one live line."""
+        names = {e.id: e.name for e in self._experts()}
+        out = []
+        for job in self._memory.running_jobs():
+            activity = self._activity.get(job.id)
+            step = activity.running_step() if activity else None
+            if step is not None:
+                out.append(
+                    {
+                        "job": job.id,
+                        "expert": names.get(job.agent, job.agent),
+                        "text": step.text,
+                        "at": step.at,
+                    }
+                )
+        return out
 
     def list(self) -> list[Job]:
         return self._memory.list_jobs(LIST_LIMIT)
@@ -451,6 +498,34 @@ class Jobs:
             self._progress_sent[job_id] = now
             self._changed()
 
+    def _activity_changed(self, job_id: str) -> None:
+        """Tell bodies a job's log moved, at most once per ACTIVITY_NOTIFY_S: the first change
+        at once, a burst as one trailing flush so the last write is never left unannounced."""
+        now = self._clock()
+        last = self._activity_sent.get(job_id)
+        if last is None or now - last >= ACTIVITY_NOTIFY_S:
+            self._send_activity(job_id)
+        elif job_id not in self._activity_trailing:
+            wait = ACTIVITY_NOTIFY_S - (now - last)
+            self._activity_trailing[job_id] = asyncio.create_task(
+                self._flush_activity(job_id, wait)
+            )
+
+    async def _flush_activity(self, job_id: str, wait: float) -> None:
+        await asyncio.sleep(wait)
+        self._activity_trailing.pop(job_id, None)
+        self._send_activity(job_id)
+
+    def _send_activity(self, job_id: str) -> None:
+        self._activity_sent[job_id] = self._clock()
+        self._notify("changed", {"what": "job_activity"})
+
+    def _stop_activity_notes(self, job_id: str) -> None:
+        task = self._activity_trailing.pop(job_id, None)
+        if task:
+            task.cancel()
+        self._activity_sent.pop(job_id, None)
+
     async def _activity_update(self, job_id: str, update: object) -> None:
         if activity := self._activity.get(job_id):
             activity.on_update(update)
@@ -461,6 +536,9 @@ class Jobs:
         self._runs.pop(job_id, None)
         if activity := self._activity.pop(job_id, None):
             activity.end(state, reason)
+            self._stop_activity_notes(job_id)
+            self._send_activity(job_id)  # the page sees the end entry at once
+            self._activity_sent.pop(job_id, None)
         self._progress_sent.pop(job_id, None)
         self._asks.cancel_all(self._ask_ids.pop(job_id, set()))
         if self._scout is not None:

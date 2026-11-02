@@ -190,6 +190,7 @@ describe('HomeView', () => {
         result: null,
         startedAt: '2026-10-28T09:00:00.000Z',
         endedAt: null,
+        activity: false,
       },
     ];
     renderHome(createFakeHostBridge({ pets: [SCOUT], jobs }), { page: 'jobs' });

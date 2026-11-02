@@ -27,7 +27,9 @@ import type {
   DropOffer,
   ApprovalCounts,
   ApprovalRow,
+  JobActivityPage,
   JobRow,
+  RunningStep,
   PreferenceRow,
   PermissionRow,
   SpendToday,
@@ -87,6 +89,9 @@ const bridge: PreloadBridge = {
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
+  jobActivity: (job: string, afterRev: number) =>
+    ipcRenderer.invoke(IPC.jobActivity, job, afterRev) as Promise<JobActivityPage>,
+  runningSteps: () => ipcRenderer.invoke(IPC.runningSteps) as Promise<RunningStep[]>,
   listApprovals: (filter: 'all' | 'scout' | 'refused', before?: number) =>
     ipcRenderer.invoke(IPC.listApprovals, filter, before) as Promise<{
       approvals: ApprovalRow[];

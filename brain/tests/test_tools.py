@@ -198,6 +198,8 @@ class FakeJobs:
         self.calls = []
         self.error = None
         self.rows = []
+        self.activity_jobs = set()
+        self.steps = []
         self.experts = []
         self.resumable = {}
         self.started = JobId("ab12cd34")
@@ -226,6 +228,25 @@ class FakeJobs:
 
     def list(self):
         return self.rows
+
+    def with_activity(self):
+        return self.activity_jobs
+
+    def activity_page(self, job_id, after_rev):
+        self.calls.append(("activity_page", job_id, after_rev))
+        if self.error:
+            raise self.error
+        return {
+            "job": job_id,
+            "state": "done",
+            "rev": 3,
+            "entries": [],
+            "more": False,
+            "watch": None,
+        }
+
+    def running_steps(self):
+        return self.steps
 
 
 def expert_specs(home):
@@ -570,6 +591,7 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
         "list_experts",
         "list_jobs",
         "stop_job",
+        "job_activity",
         "list_memories",
         "spend_today",
         "list_permissions",
@@ -892,3 +914,60 @@ async def test_save_preference_needs_both_arguments(mem):
     _, _, (_, handler) = _preference_rig(mem)
     with pytest.raises(MemoryRefused):
         await handler({"sentence": "s"})
+
+
+async def test_job_activity_returns_the_jobs_page_from_the_cursor(home):
+    out = json.loads(await home.run("job_activity", {"job": "j1", "after_rev": 2}))
+    assert out["job"] == "j1" and out["rev"] == 3 and out["watch"] is None
+    assert home.jobs.calls == [("activity_page", "j1", 2)]
+    await home.run("job_activity", {"job": "j1"})
+    assert home.jobs.calls[-1] == ("activity_page", "j1", 0)
+
+
+async def test_job_activity_unknown_job_is_invalid_params(home):
+    home.jobs.error = JobError("no job nope")
+    with pytest.raises(RpcError) as err:
+        await home.run("job_activity", {"job": "nope"})
+    assert err.value.code == ErrorCode.invalid_params
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        {"job": ""},
+        {"job": 5},
+        {"job": "j1", "after_rev": -1},
+        {"job": "j1", "after_rev": "x"},
+        {"job": "j1", "after_rev": True},
+        {"job": "j1", "after_rev": 1.5},
+    ],
+)
+async def test_job_activity_refuses_bad_arguments(home, args):
+    with pytest.raises((MemoryRefused, RpcError)):
+        await home.run("job_activity", args)
+    assert home.jobs.calls == []
+
+
+async def test_job_activity_without_a_job_lists_the_running_steps(home):
+    home.jobs.steps = [{"job": "j1", "expert": "Claude Code", "text": "npm test", "at": "t"}]
+    out = json.loads(await home.run("job_activity"))
+    assert out == {"running": home.jobs.steps}
+
+
+async def test_job_activity_is_home_only_and_read_only(home):
+    spec = expert_specs(home)["job_activity"]
+    assert spec.audience == frozenset({"home"}) and spec.effect == "read"
+    assert spec.default_mode == "auto"
+    out = await home.box.run(Call("c", "job_activity", {}, "", ""), "home")
+    assert json.loads(out) == {"running": []}
+    with pytest.raises(RpcError):  # Scout never sees a job's raw steps
+        await home.box.run(Call("c", "job_activity", {}, "", ""), "scout")
+
+
+async def test_list_jobs_rows_carry_the_activity_flag(home, mem):
+    mem.add_job("j1", "claude_code", "task", "C:/x", "default")
+    mem.add_job("j2", "claude_code", "task", "C:/x", "default")
+    home.jobs.rows = mem.list_jobs(20)
+    home.jobs.activity_jobs = {"j1"}
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["activity"] is True and rows["j2"]["activity"] is False

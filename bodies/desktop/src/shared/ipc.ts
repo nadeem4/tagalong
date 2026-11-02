@@ -45,6 +45,8 @@ export const IPC = {
   setPermission: 'tagalong:permissions:set',
   listJobs: 'tagalong:jobs:list',
   stopJob: 'tagalong:jobs:stop',
+  jobActivity: 'tagalong:jobs:activity',
+  runningSteps: 'tagalong:jobs:running-steps',
   usageSummary: 'tagalong:usage:summary',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',

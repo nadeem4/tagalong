@@ -18,7 +18,10 @@ import type {
   AskInput,
   BrainLink,
   HostBridge,
+  JobActivityEntry,
+  JobActivityPage,
   JobRow,
+  RunningStep,
   PermissionRow,
   PreferenceRow,
   KeyResult,
@@ -49,6 +52,11 @@ export interface FakeHostBridge extends HostBridge {
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
   readonly jobStops: readonly string[];
+  /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
+  activity: Record<string, JobActivityEntry[]>;
+  running: RunningStep[];
+  /** Every jobActivity call as [job, afterRev], in order. */
+  readonly activityCalls: readonly (readonly [string, number])[];
   /** Home's Approvals history, newest first, and the preferences Scout follows; a test may swap them. */
   approvalRows: ApprovalRow[];
   preferences: PreferenceRow[];
@@ -95,6 +103,9 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's Jobs rows. */
     jobs?: JobRow[];
+    /** A job's steps by job id, and the running steps the bubble shows. */
+    activity?: Record<string, JobActivityEntry[]>;
+    runningSteps?: RunningStep[];
     /** Home's Approvals history and preferences. */
     approvalRows?: ApprovalRow[];
     preferences?: PreferenceRow[];
@@ -123,6 +134,7 @@ export function createFakeHostBridge(
   const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
+  const activityCalls: [string, number][] = [];
   const keysSet: string[] = [];
   const limitsSet: number[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
@@ -298,6 +310,27 @@ export function createFakeHostBridge(
       jobStops.push(job);
       return Promise.resolve();
     },
+    jobActivity(job, afterRev) {
+      activityCalls.push([job, afterRev]);
+      const all = fake.activity[job];
+      if (!all) return Promise.reject(new Error(`no job ${job}`));
+      const entries = all.filter((e) => e.rev > afterRev);
+      const page: JobActivityPage = {
+        job,
+        state: 'running',
+        rev: all.reduce((top, e) => Math.max(top, e.rev), 0),
+        entries,
+        more: false,
+        watch: null,
+      };
+      return Promise.resolve(page);
+    },
+    runningSteps() {
+      return Promise.resolve(fake.running.map((step) => ({ ...step })));
+    },
+    activity: { ...options.activity },
+    running: (options.runningSteps ?? []).map((step) => ({ ...step })),
+    activityCalls,
     approvalRows: (options.approvalRows ?? []).map((row) => ({ ...row })),
     preferences: (options.preferences ?? []).map((row) => ({ ...row })),
     approvalListCalls,

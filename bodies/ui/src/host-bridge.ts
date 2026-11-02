@@ -67,6 +67,39 @@ export interface JobRow {
   result: string | null;
   startedAt: string;
   endedAt: string | null;
+  /** True when the brain kept steps for this job, so Home can offer to watch it. */
+  activity: boolean;
+}
+
+/** One step of a job, as the brain's job_activity sends it (text is already masked). */
+export interface JobActivityEntry {
+  rev: number;
+  seq: number;
+  at: string;
+  kind: string;
+  text: string;
+  status: string | null;
+  step: string | null;
+  exit: number | null;
+}
+
+/** A page of a job's steps after a cursor; pass `rev` back as the next `afterRev`. */
+export interface JobActivityPage {
+  job: string;
+  state: string;
+  rev: number;
+  entries: JobActivityEntry[];
+  more: boolean;
+  /** Reserved for the watch list; null until the brain fills it. */
+  watch: null;
+}
+
+/** The step a running job is on now, for the bubble's one live line. */
+export interface RunningStep {
+  job: string;
+  expert: string;
+  text: string;
+  at: string;
 }
 
 /** One permission decision in Home's Approvals history, as the brain's list_approvals sends it. */
@@ -184,6 +217,10 @@ export interface HostBridge {
   listJobs(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
   stopJob(job: string): Promise<void>;
+  /** A job's steps after `afterRev` (0 for all); rejects for an unknown job. */
+  jobActivity(job: string, afterRev: number): Promise<JobActivityPage>;
+  /** The step each running job is on; empty when none has started one. */
+  runningSteps(): Promise<RunningStep[]>;
   /** Home's Approvals history, newest first; `before` is the `next` cursor of the page above. */
   listApprovals(
     filter: 'all' | 'scout' | 'refused',
