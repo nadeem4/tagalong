@@ -164,6 +164,8 @@ Claude Code asks for permission or has a question, Scout gets it first and answe
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
 moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:
 the expert reopens that session when it can, and Scout says so when it starts fresh instead.
+The brain also records each job's steps (commands, edits, messages, plan) in a masked, size-capped
+log; the page to read it comes in a later release.
 
 **Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
 on it speaks the answer to a question you asked out loud, the answer to a typed question, its

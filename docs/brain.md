@@ -81,6 +81,7 @@ the total can run a little low.
 | `brain/src/brain/choices.py`        | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
 | `brain/src/brain/questions.py`      | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
 | `brain/src/brain/jobs.py`           | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
+| `brain/src/brain/job_activity.py`   | `JobActivity`: one per running job; turns ACP updates into masked, capped, stored activity entries                                                                                                                                                                                         |
 | `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
 | `brain/src/brain/app_oauth.py`      | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
 | `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
@@ -723,6 +724,42 @@ cross), `session reported no modes`, `the earlier job saved no session` or `null
 never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
 `list_jobs` rows carry `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
+
+**Activity log.** `job_activity.py` records what each running job did, so a body can show it
+later. `ExpertRun` forwards every ACP update of its session to `on_update` (through
+`ExpertRun._update`), but only after `begin`: a resumed session replays its old chat first, and
+that replay never reaches the log. `Jobs` creates one `JobActivity` per job when the row is
+inserted and ends it in `_end`; updates are keyed by the run found from the session id, so jobs
+sharing one adapter each get only their own steps.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+    A[ACP session update] --> B[ExpertRun._update]
+    B -->|only after begin| C[JobActivity]
+    C -->|mask, then cap| D[(job_activity table)]
+```
+
+Entries (`ActivityEntry` in `memory.py`) have a `rev` that rises on every write to the job's log
+(the cursor readers will use), a `seq` fixed at insert (display order; `0` is the
+`[older steps dropped]` marker), a `kind` (`command`, `output`, `edit`, `read`, `search`,
+`other`, `say`, `plan`, `end`), an optional `status` (`pending`, `running`, `done`, `failed`), the
+tool call id as `step` and the text. A tool call is one entry updated in place as its status moves;
+its output is one `output` entry per step, replaced in place. A message is one `say` entry per
+message id, the plan one `plan` entry (`[x]` or `[ ]` per line), and the end one `end` entry
+(`# done`, `# error: <reason>`, `# stopped`). Unknown kinds or a missing command become `other`
+with the title, never an error.
+
+Every text is masked (`mask_json(guards, "job_activity", ...)`) on the whole accumulated text,
+then capped: a command's output keeps its last 64 KB behind `[earlier output cut]` (cut on a
+character boundary), a message 8,192 characters, a job 2,000 entries or 1 MB of text. Over the
+caps `Memory.trim_activity` blanks the oldest `output` text first (bumping its `rev`), then
+deletes rows by entry count and by bytes, least recently written first (lowest `rev`, so a plan
+or step still being updated survives), and keeps one marker. Messages without an id join into one
+entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
+`running`/`pending` are marked `failed` before the `end` entry; a job stopped by a brain restart
+gets its `# stopped` entry too. Nothing unmasked is stored. The log lives as long as its job row.
+Reading it (a Home tool, `changed` pushes) is not built yet.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
 are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job

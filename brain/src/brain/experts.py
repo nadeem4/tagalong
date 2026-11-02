@@ -340,6 +340,7 @@ class ExpertRun:
         on_question: Callable[[Question], Awaitable[dict | None]],
         on_progress: Callable[[str], Awaitable[None]],
         on_end: Callable[[str, str, str | None], Awaitable[None]],
+        on_update: Callable[[object], Awaitable[None]] | None = None,
         grace: float = 3.0,
         startup_timeout: float = 60.0,
     ) -> None:
@@ -351,6 +352,7 @@ class ExpertRun:
         self._on_question = on_question
         self._on_progress = on_progress
         self._on_end = on_end
+        self._on_update = on_update
         self._task: asyncio.Task | None = None
         self._notes: list[str] = []
         self._active = False
@@ -466,6 +468,16 @@ class ExpertRun:
         except Exception:
             log.exception("expert on_end failed")
 
+    async def _update(self, update: object) -> None:
+        """Every ACP update of this session. Dropped before begin: a resumed session replays
+        its old chat first, and that must not reach the job's log."""
+        if self._on_update is None or not self._active:
+            return
+        try:
+            await self._on_update(update)
+        except Exception:
+            log.exception("expert on_update failed")
+
     async def _message_chunk(self, message_id, text: str) -> None:
         if message_id != self._message_id:
             self._message_id = message_id
@@ -485,12 +497,11 @@ class _Client:
 
     async def session_update(self, session_id, update, **kw) -> None:
         run = self._host.session_for(session_id)  # a replayed or unknown session is dropped
-        if (
-            run
-            and update.session_update == "agent_message_chunk"
-            and hasattr(update.content, "text")
-        ):
+        if run is None:
+            return
+        if update.session_update == "agent_message_chunk" and hasattr(update.content, "text"):
             await run._message_chunk(update.message_id, update.content.text)
+        await run._update(update)
 
     async def request_permission(self, session_id, tool_call, options, **kw):
         run = self._host.session_for(session_id)

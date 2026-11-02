@@ -338,3 +338,19 @@ async def test_authenticate_succeeds_only_when_logged_in(tmp_path):
     async with running_with_env(tmp_path, FAKE_ACP_AUTH=AUTH, FAKE_ACP_LOGGED_IN="1") as (c, _l):
         await c.initialize(protocol_version=1)
         await c.authenticate(method_id="claude-login")
+
+
+async def test_tool_steps_reach_the_client(tmp_path):
+    steps = [
+        {"tool": {"id": "t1", "title": "Run", "kind": "execute", "input": {"command": "ls"}}},
+        {"tool_update": {"id": "t1", "status": "completed", "text": "a.txt"}},
+        {"plan": [{"content": "step one", "status": "completed"}, {"content": "step two"}]},
+    ]
+    async with running(tmp_path, steps) as (conn, _process, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        kinds = [u.session_update for u in client.updates]
+        assert kinds == ["tool_call", "tool_call_update", "plan"]
+        assert client.updates[0].raw_input == {"command": "ls"}
+        assert client.updates[1].content[0].content.text == "a.txt"
+        assert [e.status for e in client.updates[2].entries] == ["completed", "pending"]
