@@ -162,7 +162,8 @@ tokens, which is why it is not taken on every question.
 job. Watch it in **Home → Jobs**: **Stop** a running one, **Show result** for a finished one. When
 Claude Code asks for permission or has a question, Scout gets it first and answers from what it
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
-moment") and it passes the note on.
+moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:
+the expert reopens that session when it can, and Scout says so when it starts fresh instead.
 
 **Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
 on it speaks the answer to a question you asked out loud, the answer to a typed question, its

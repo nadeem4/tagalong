@@ -34,6 +34,7 @@ variable still works and is the developer path.
 | `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
 | `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                 |
 | `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`            | Longest an expert run may take, in seconds                                                                                               |
+| `TAGALONG_EXPERT_IDLE_S`       | `300`             | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                         |
 | `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
 | `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
 | `TAGALONG_OFFER_WINDOW_DAYS`   | `14`              | How far back those approvals are counted, in days (whole number, 1 or more)                                                              |
@@ -72,7 +73,7 @@ the total can run a little low.
 | `brain/src/brain/side_check.py`     | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                           |
 | `brain/src/brain/offers.py`         | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                |
 | `brain/src/brain/mind/approvals.md` | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                               |
-| `brain/src/brain/experts.py`        | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                                                                                                                                           |
+| `brain/src/brain/experts.py`        | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`         | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`      | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
 | `brain/src/brain/timers.py`         | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
@@ -294,7 +295,7 @@ A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the 
 its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
-Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
+Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, start and end times and `parent_job` (the job a follow-up continued). Rows still `running` at brain start become `stopped` with reason `brain restarted`.
 When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-tools)).
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
@@ -644,6 +645,31 @@ startup limit (an adapter that never answers is killed and reported). `stop()` a
 safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
 after the process is gone. A stop answers any pending permission or question as cancelled.
 
+`ExpertRun` is one session; the process belongs to an `ExpertHost`. Run alone (tests), a run
+builds its own host that stops with it, as above. `Jobs` gets its runs from `ExpertHosts`
+(`ExpertHosts(timeout, idle_s)`), which keeps one host per installed expert and command.
+
+### Hosts, sessions and resume
+
+- **One adapter per expert.** The host starts the process with the first session
+  (`initialize` once, then `session/new` or `session/load` per session) and routes each frame to
+  its session: `session_update` and `request_permission` by `sessionId`, `create_elicitation` by
+  the session id in its mode; a frame for an unknown session is dropped (cancelled for an ask).
+  Two jobs of one expert share the process, and a stop ends only its own session. A stop that the
+  adapter ignores (past the grace period) kills the process, and any session sharing it ends in
+  `error`.
+- **Idle stop.** After the last session ends the process stays up for `TAGALONG_EXPERT_IDLE_S`
+  (default 300 s; 0 stops it at once), so a follow-up reuses a warm adapter. A new session cancels
+  the wait. The brain stops every host on exit. A session that ends in `error` stops the process
+  at once if no other session uses it, so a crash is never kept warm; the next session starts a
+  new process.
+- **Resume.** `initialize` says whether the adapter supports `session/load`
+  (`ExpertHost.can_resume`, `null` until the adapter has started once; `list_experts` shows it).
+  `ExpertRun.start(folder, resume=<session id>)` calls `session/load` when it can. Otherwise, or
+  when the call fails (the adapter no longer has that session), it opens a fresh session and sets
+  `resumed = False` and `fresh_reason` to a fact: `expert cannot reopen sessions` or
+  `session could not be loaded`. An adapter that died and restarted is the second case.
+
 Claude Code runs on the user's own login. It must be logged in, or the first hand-off fails with
 the adapter's own message (for example that auth is required).
 
@@ -666,8 +692,20 @@ are in `brain/tests/fixtures/`.
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
 [Permissions and asks](#permissions-and-asks)). `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
-override) and the `ExpertRun` factory (`make_run_for(TAGALONG_EXPERT_TIMEOUT_S)`) and calls
+override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_TIMEOUT_S, TAGALONG_EXPERT_IDLE_S)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
+
+**Follow-ups.** `hand_off` takes an optional `continue_job`, the id of a finished job. The new
+job must use the same expert and the same folder as that job, which must not be running; each
+mismatch is a `JobError` with a plain reason. It reopens the earlier job's saved session id when
+the expert can, and records the earlier job in `parent_job` so `list_jobs` shows the chain. The
+hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh"}`,
+with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
+`session is in use by another job` (a second follow-up of one session runs fresh, so asks never
+cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
+never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
+`list_jobs` rows carry `expert` and `session_id_known` instead of the session id. The mode card
+still opens for a follow-up; its choices come from the reopened session.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
 are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
@@ -773,10 +811,10 @@ flowchart TD
 
 | Tool           | Audience    | Effect | Gate                      | Does                                                                                                                                                                               |
 | -------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?}`. Returns `job <id> started`, or the plain reason it did not                                                                                              |
+| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
 | `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
 | `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
-| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress                                                                                                         |
+| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, `expert`, `parent_job` and `session_id_known`                                                          |
 | `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is

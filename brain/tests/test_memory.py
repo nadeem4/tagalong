@@ -708,3 +708,25 @@ def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
     m = Memory(path)
     assert m.list_approvals("all", 10, None)[0].preference_sentence is None
     m.close()
+
+
+def test_a_job_row_keeps_its_parent_job(mem):
+    mem.add_job("a", "x", "t", "f", "m")
+    mem.add_job("b", "x", "t", "f", "m", parent_job="a")
+    assert mem.get_job("a").parent_job is None
+    assert mem.get_job("b").parent_job == "a"
+
+
+def test_the_parent_job_column_is_added_to_an_older_database(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.execute(
+        "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
+        " VALUES ('a','x','t','f','m','done','now')"
+    )
+    db.close()
+    m = Memory(path)
+    assert m.get_job("a").parent_job is None
+    m.close()

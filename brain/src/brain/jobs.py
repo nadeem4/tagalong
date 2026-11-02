@@ -17,7 +17,7 @@ from pathlib import Path
 from brain.approvals import Approvals
 from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
-from brain.experts import ExpertRun, PermissionRequest, Question
+from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question
 from brain.guards import AskCtx, Guards, Hook
 from brain.masking import mask_json
 from brain.memory import Job, Memory
@@ -58,6 +58,16 @@ class JobError(Exception):
         self.facts = facts or {}
 
 
+class JobId(str):
+    """A job id that also carries the session facts of its start, for the hand_off result."""
+
+    def __new__(cls, job_id: str, session: str = "fresh", why_fresh: str | None = None):
+        self = super().__new__(cls, job_id)
+        self.session = session  # "continued" or "fresh"
+        self.why_fresh = why_fresh
+        return self
+
+
 class Jobs:
     def __init__(
         self,
@@ -83,6 +93,7 @@ class Jobs:
         self._notify = notify
         self._experts = experts  # read afresh: an install adds one while the brain runs
         self._make_run = make_run  # called with the expert, then the four callbacks as keywords
+        self._hosts = make_run if isinstance(make_run, ExpertHosts) else None
         self._max_running = max_running
         self._on_finished = on_finished
         self._on_away = on_away  # an ask found nobody online: (job id, what it asked)
@@ -108,6 +119,23 @@ class Jobs:
 
     def installed(self) -> list[InstalledExpert]:
         return self._experts()
+
+    def can_resume(self, expert_id: str) -> bool | None:
+        """Whether the expert's adapter reopens sessions; None until it has been started."""
+        return self._hosts.can_resume(expert_id) if self._hosts else None
+
+    def _earlier(self, job_id: str, folder: str, expert: str | None) -> Job:
+        """The finished job a follow-up continues; the refusals are facts for the model."""
+        earlier = self._memory.get_job(job_id)
+        if earlier is None:
+            raise JobError(f"no job {job_id}")
+        if earlier.state == "running":
+            raise JobError(f"job {job_id} is still running; send it a note instead")
+        if expert is not None and expert != earlier.agent:
+            raise JobError(f"job {job_id} ran on {earlier.agent}, which is another expert")
+        if Path(folder) != Path(earlier.folder):
+            raise JobError(f"job {job_id} worked in {earlier.folder}, which is another folder")
+        return earlier
 
     async def _refusal(
         self, message: str, problem: str, expert: str | None = None, **more: object
@@ -156,9 +184,19 @@ class Jobs:
             )
         return expert
 
-    async def start(self, task: str, folder: str, expert: str | None = None) -> str:
-        """Hand the task to an expert once the user picks a mode. Returns the job id."""
-        chosen = await self._pick(expert)
+    async def start(
+        self,
+        task: str,
+        folder: str,
+        expert: str | None = None,
+        continue_job: str | None = None,
+    ) -> JobId:
+        """Hand the task to an expert once the user picks a mode. Returns the job id.
+
+        continue_job reopens that finished job's session (same expert, same folder); when the
+        expert cannot, a fresh session starts and the result says why."""
+        earlier = self._earlier(continue_job, folder, expert) if continue_job else None
+        chosen = await self._pick(earlier.agent if earlier else expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
@@ -179,7 +217,8 @@ class Jobs:
         handed_off = False
         try:
             try:
-                modes = await run.start(path)
+                resume = earlier.session_id if earlier else None
+                modes = await run.start(path, resume=resume)
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
             by_name = {m.name: m.id for m in modes}
@@ -193,7 +232,8 @@ class Jobs:
             mode_id = by_name.get(answer.option) if answer else None
             if mode_id is None:  # cancel, a timeout, or nobody online
                 raise JobError("not started")
-            self._memory.add_job(job_id, chosen.id, task, str(path), mode_id)
+            parent = earlier.id if earlier else None
+            self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             self._runs[job_id] = run
             handed_off = True
             self._starting -= 1
@@ -212,12 +252,22 @@ class Jobs:
                     raise JobError(message) from exc
                 raise
             self._memory.update_job(job_id, session_id=run.session_id)
-            return job_id
+            return self._started(job_id, earlier, run)
         finally:
             if slot_held:
                 self._starting -= 1
             if not handed_off:
                 await run.close()
+
+    @staticmethod
+    def _started(job_id: str, earlier: Job | None, run: ExpertRun) -> JobId:
+        if earlier is None:
+            return JobId(job_id)
+        if earlier.session_id is None:
+            return JobId(job_id, "fresh", "the earlier job saved no session")
+        if run.resumed:
+            return JobId(job_id, "continued")
+        return JobId(job_id, "fresh", run.fresh_reason)
 
     def tell(self, job_id: str, note: str) -> None:
         run = self._running(job_id)
@@ -235,6 +285,8 @@ class Jobs:
         for run in list(self._runs.values()):
             with suppress(Exception):
                 await run.stop()
+        if self._hosts is not None:  # warm adapters waiting for a follow-up go too
+            await self._hosts.shutdown()
 
     def list(self) -> list[Job]:
         return self._memory.list_jobs(LIST_LIMIT)

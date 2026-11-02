@@ -18,6 +18,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_STEP_CAP = 25
 DEFAULT_EXPERT_TIMEOUT_S = 1800.0
+DEFAULT_EXPERT_IDLE_S = 300.0
 DEFAULT_TURN_TIMEOUT_S = 300.0
 DEFAULT_WAKES_PER_HOUR = 12
 DEFAULT_OFFER_MIN_APPROVALS = 3
@@ -35,6 +36,7 @@ class Config:
     step_cap: int = DEFAULT_STEP_CAP
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
     expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
+    expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
     turn_timeout: float = DEFAULT_TURN_TIMEOUT_S
     wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
     offer_min_approvals: int = DEFAULT_OFFER_MIN_APPROVALS
@@ -75,6 +77,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
         expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
+        expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
         turn_timeout=_turn_timeout(env.get("TAGALONG_TURN_TIMEOUT_S")),
         wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
         offer_min_approvals=_positive_int(
@@ -108,6 +111,18 @@ def _expert_timeout(text: str | None) -> float:
         raise ValueError(f"bad TAGALONG_EXPERT_TIMEOUT_S: {text!r}") from None
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"TAGALONG_EXPERT_TIMEOUT_S must be positive: {text!r}")
+    return value
+
+
+def _expert_idle(text: str | None) -> float:
+    if not text:
+        return DEFAULT_EXPERT_IDLE_S
+    try:
+        value = float(text)
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_EXPERT_IDLE_S: {text!r}") from None
+    if not math.isfinite(value) or value < 0:  # 0 stops the adapter as soon as it is idle
+        raise ValueError(f"TAGALONG_EXPERT_IDLE_S must be 0 or more: {text!r}")
     return value
 
 
