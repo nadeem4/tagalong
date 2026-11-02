@@ -80,12 +80,17 @@ export function ConnectorConfirmCard({
               onClick={() => onReply({ option })}
             >
               <span>{option}</span>
-              {option === confirm.recommended && <span className="bubble-tag">Recommended</span>}
+              {option === confirm.recommended && (
+                <>
+                  {' '}
+                  <span className="bubble-tag">Recommended</span>
+                </>
+              )}
             </button>
           ))}
         </div>
-        <div className="bubble-row">
-          {typable && (
+        {typable && (
+          <div className="bubble-row">
             <button
               type="button"
               className="bubble-primary"
@@ -94,8 +99,8 @@ export function ConnectorConfirmCard({
             >
               Send
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </section>
     );
   }

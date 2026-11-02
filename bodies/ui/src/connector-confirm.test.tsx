@@ -179,6 +179,20 @@ describe('the connector confirm card', () => {
       expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Always allow' })).toBeNull();
+      const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveClass('bubble-primary');
+      expect(rows[1]).toHaveClass('bubble-quiet');
+    });
+
+    it('marks the first row primary and the rest quiet', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
+      expect(rows[0]).toHaveClass('bubble-primary');
+      expect(rows[1]).toHaveClass('bubble-quiet');
+      expect(rows[2]).toHaveClass('bubble-quiet');
     });
   });
 
@@ -349,6 +363,29 @@ describe('the connector confirm card', () => {
         expect(rows[0]).toHaveClass('bubble-primary');
         expect(rows[1]).toHaveClass('bubble-quiet');
         expect(within(rows[0]!).getByText('Recommended')).toHaveClass('bubble-tag');
+      });
+
+      it('the recommended row reads "Claude Code Recommended" to a screen reader', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose({ recommended: 'Claude Code' })));
+        expect(
+          screen.getByRole('button', { name: /Claude Code\sRecommended/ }),
+        ).toBeInTheDocument();
+      });
+
+      it('has no free-text row when the ask is not typable', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose({ freeText: undefined })));
+        expect(
+          within(screen.getByRole('region', { name: 'Scout asks' })).queryByRole('button', {
+            name: 'Send',
+          }),
+        ).toBeNull();
+        expect(
+          screen.getByRole('region', { name: 'Scout asks' }).querySelector('.bubble-row'),
+        ).toBeNull();
       });
 
       it('an ask without the fields renders as before: no text field, no mark', () => {

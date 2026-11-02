@@ -17,9 +17,9 @@ export const CARD_CSS = `
 .bubble-choices .bubble-choice {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
   box-sizing: border-box; height: auto; min-height: 36px; padding: 8px 12px; text-align: left;
-  line-height: 1.35; overflow-wrap: anywhere;
+  line-height: 1.35; overflow-wrap: anywhere; font-size: 13px;
 }
-.bubble-choices .bubble-choice.bubble-quiet { align-self: stretch; font-size: 13px; }
+.bubble-choices .bubble-choice.bubble-quiet { align-self: stretch; }
 .bubble-choices .bubble-choice.bubble-quiet:hover { background: rgba(255, 255, 255, 0.06); }
 .bubble-choices .bubble-choice.bubble-primary:hover { filter: brightness(1.06); }
 .bubble-tag { flex: none; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; opacity: 0.7; }
