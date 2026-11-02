@@ -250,22 +250,34 @@ class Jobs:
             by_name = {m.name: m.id for m in modes}
             scout_follow_up = earlier is not None and not owner_asked
             mode_id = None
-            if scout_follow_up and await self._follow_up_ask(chosen, earlier, task, path):
-                if earlier.mode in by_name.values():
-                    mode_id = earlier.mode  # covered: same mode as before, no card
+            # The chain runs only when the earlier mode can be reused, so a Scout row always
+            # means a mode was chosen; otherwise the card is the owner's question as today.
+            if (
+                scout_follow_up
+                and earlier.mode in by_name.values()
+                and await self._follow_up_ask(chosen, earlier, task, path)
+            ):
+                mode_id = earlier.mode  # covered: same mode as before, no card
             if mode_id is None:
-                answer = await self._ask_or_none(
-                    text=task,
-                    tool="hand_off",
-                    input={"folder": str(path)},
-                    options=[*by_name, CANCEL],
-                    timeout=HANDOFF_TIMEOUT_S,
-                )
+                timed_out = False
+                answer = None
+                try:
+                    answer = await self._open_ask(
+                        text=task,
+                        tool="hand_off",
+                        input={"folder": str(path)},
+                        options=[*by_name, CANCEL],
+                        timeout=HANDOFF_TIMEOUT_S,
+                    )
+                except RpcError as err:
+                    timed_out = err.code == ErrorCode.timeout
                 mode_id = by_name.get(answer.option) if answer else None
                 if mode_id is None:  # cancel, a timeout, or nobody online
+                    if scout_follow_up and timed_out:
+                        self._record_hand_off(chosen, path, task, "timed_out", "none")
                     raise JobError("not started")
                 if scout_follow_up:
-                    self._card_picked(chosen, earlier, task, path)
+                    self._card_picked(chosen, task, path)
             parent = earlier.id if earlier else None
             self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             self._runs[job_id] = run
@@ -311,7 +323,7 @@ class Jobs:
         (Scout's own row is logged); False means show the mode card, which is the owner's real
         question, so the chain's own person step answers at once and nothing is asked twice."""
         group = f"{_prefix(chosen.id)}:{path}"
-        tool_input = {"folder": str(path)}
+        tool_input = {"folder": str(path), "mode": earlier.mode}  # the mode being reused
 
         async def card_follows() -> str:
             return "allow"
@@ -330,22 +342,28 @@ class Jobs:
         verdict = await self._guards.run(Hook.ask, ctx)
         if verdict.kind in ("block", "stop"):
             if verdict.guard == "anyone_online":
-                self._record_hand_off(chosen, path, task, "no_one", "none")
+                self._record_hand_off(chosen, path, task, "no_one", "none", tool_input)
             raise JobError("not started")
         return verdict.kind == "allow" and verdict.guard == "side_check"
 
-    def _card_picked(self, chosen: InstalledExpert, earlier: Job, task: str, path: Path) -> None:
+    def _card_picked(self, chosen: InstalledExpert, task: str, path: Path) -> None:
         """The owner picked a mode on the card for Scout's follow-up: log it, maybe offer."""
         self._record_hand_off(chosen, path, task, "approved", "person")
         if self._offers is not None:
             self._offers.consider(f"{_prefix(chosen.id)}:{path}", AGENT, "hand_off")
 
     def _record_hand_off(
-        self, chosen: InstalledExpert, path: Path, task: str, outcome: str, decided_by: str
+        self,
+        chosen: InstalledExpert,
+        path: Path,
+        task: str,
+        outcome: str,
+        decided_by: str,
+        tool_input: dict | None = None,
     ) -> None:
         if self._approvals is None:
             return
-        tool_input = {"folder": str(path)}
+        tool_input = tool_input or {"folder": str(path)}
         self._approvals.record(
             source=AGENT,
             tool="hand_off",

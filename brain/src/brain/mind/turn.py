@@ -105,6 +105,7 @@ async def run_turn(
     step_cap: int,
     guards: Guards | None = None,
     turn_timeout: float | None = None,
+    on_owner_input: Callable[[], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
@@ -161,13 +162,15 @@ async def run_turn(
                         results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
                         if due is not None:
                             limit.reschedule(due + clock() - began)
-                        history.append({"role": "user", "content": results + _drain(inbox)})
+                        history.append(
+                            {"role": "user", "content": results + _drain(inbox, on_owner_input)}
+                        )
                         continue
                     closed = _close_dangling_tool_use(history)
                     if final.stop_reason == "refusal":
                         reason = "error"
                         break
-                    says = _drain(inbox)
+                    says = _drain(inbox, on_owner_input)
                     if not says:
                         reason = "done"
                         break
@@ -208,9 +211,12 @@ async def run_turn(
     return reason
 
 
-def _drain(inbox: list) -> list[dict]:
+def _drain(inbox: list, on_owner_input: Callable[[], None] | None = None) -> list[dict]:
+    """Move the owner's says into history; `on_owner_input` fires only when there were some."""
     blocks = [block for say in inbox for block in say]
     inbox.clear()
+    if blocks and on_owner_input is not None:
+        on_owner_input()
     return blocks
 
 

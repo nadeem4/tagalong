@@ -236,7 +236,6 @@ class Session:
         # A finished task whose callback has not run yet is a dead turn: start a new one.
         if self._busy():
             self._inbox.append(content)
-            self._owner_turn = True
             self._speak(self._turn_id, self._turn_body, params)
             return SayResult(turn=self._turn_id, joined=True)
         if not self._ready():
@@ -244,6 +243,11 @@ class Session:
         turn = self._start_turn(shown_on, content)
         self._speak(turn, shown_on, params)
         return SayResult(turn=turn, joined=False)
+
+    def _owner_joined(self) -> None:
+        # The owner's words reached the model, so a nudge from here on is theirs; one already
+        # in flight when they joined still asks.
+        self._owner_turn = True
 
     def owner_turn(self) -> bool:
         """True while the running turn is the owner's, so a follow-up in it needs no ask."""
@@ -394,6 +398,7 @@ class Session:
                 step_cap=self._step_cap,
                 guards=self.guards,
                 turn_timeout=self._turn_timeout,
+                on_owner_input=self._owner_joined,
             )
         )
         self._task = task
