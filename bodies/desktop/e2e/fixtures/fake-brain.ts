@@ -65,7 +65,10 @@ export interface FakeBrain {
     readAloud: Record<string, unknown>[];
   };
   /** Add a step to a job's activity log (new `rev`) and tell the bodies `changed: job_activity`. */
-  pushActivity(job: string, entry: { kind: string; text: string }): void;
+  pushActivity(
+    job: string,
+    entry: { kind: string; text: string; status?: string; step?: string },
+  ): void;
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */

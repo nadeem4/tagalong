@@ -148,6 +148,69 @@ export const HOME_CSS = `
   grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
+.job-page__back {
+  align-self: flex-start; margin: 0 0 ${t.space.xs}px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.link};
+}
+.job-page__back::before { content: '\\2039' / ''; margin-right: ${t.space.sm}px; }
+.job-page__back:hover { text-decoration: underline; }
+.job-page__title { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.md}px ${t.space.lg}px; }
+.job-page__title .home-title { min-width: 0; overflow-wrap: anywhere; }
+.job-page__title .tg-button { margin-left: auto; }
+.job-page__time { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; font-variant-numeric: tabular-nums; }
+.job-page__alert {
+  margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.field}px;
+  background: ${t.color.errFill}; color: ${t.color.errInk}; font-size: ${t.fontSize.body}px;
+}
+.job-page__frame { position: relative; }
+.job-page__jump {
+  position: absolute; left: 50%; bottom: ${t.space.lg}px; transform: translateX(-50%);
+  min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
+  background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
+}
+.job-log {
+  /* 240px is roughly the head, nav gaps and page padding above the log, so it fills the rest. */
+  height: calc(100vh - 240px); min-height: 280px; overflow-y: auto; overscroll-behavior: contain;
+  padding: ${t.space.lg}px ${t.space.xl}px; border: 1px solid ${t.color.line}; border-radius: ${t.radius.row}px;
+  background: ${t.color.page}; color: ${t.color.text};
+  font-family: ${t.font.mono}; font-size: ${t.fontSize.small}px; line-height: 1.55;
+}
+.job-log__line { display: flex; gap: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-log__cmd { margin-top: ${t.space.md}px; font-weight: ${t.fontWeight.semibold}; }
+.job-log__meta { font-weight: 400; color: ${t.color.textMuted}; }
+.job-log__note { margin-left: ${t.space.xxl}px; color: ${t.color.textMuted}; }
+.job-log__glyph { flex: none; width: 12px; text-align: center; font-weight: ${t.fontWeight.bold}; }
+.job-log__glyph--done { color: ${t.ansi.green}; }
+.job-log__glyph--failed { color: ${t.ansi.red}; }
+.job-log__glyph--pending { color: ${t.color.textMuted}; }
+.job-log__glyph--running { color: ${t.color.gold}; }
+.job-log__glyph--running[data-motion='on'] { display: inline-block; animation: job-log-spin 1s linear infinite; }
+@keyframes job-log-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .job-log__glyph--running[data-motion='on'] { animation: none; } }
+.job-log__out, .job-log__plan {
+  margin: 0 0 ${t.space.sm}px 20px; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; color: ${t.color.textMuted};
+}
+.job-log__edit { color: ${t.color.sky}; }
+.job-log__quiet, .job-log__say { color: ${t.color.textMuted}; white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-log__say { margin-top: ${t.space.md}px; }
+.job-log__end { margin-top: ${t.space.lg}px; font-weight: ${t.fontWeight.semibold}; }
+.ansi-bold { font-weight: ${t.fontWeight.semibold}; }
+.ansi-black { color: ${t.ansi.black}; }
+.ansi-red { color: ${t.ansi.red}; }
+.ansi-green { color: ${t.ansi.green}; }
+.ansi-yellow { color: ${t.ansi.yellow}; }
+.ansi-blue { color: ${t.ansi.blue}; }
+.ansi-magenta { color: ${t.ansi.magenta}; }
+.ansi-cyan { color: ${t.ansi.cyan}; }
+.ansi-white { color: ${t.ansi.white}; }
+.ansi-brightBlack { color: ${t.ansi.brightBlack}; }
+.ansi-brightRed { color: ${t.ansi.brightRed}; }
+.ansi-brightGreen { color: ${t.ansi.brightGreen}; }
+.ansi-brightYellow { color: ${t.ansi.brightYellow}; }
+.ansi-brightBlue { color: ${t.ansi.brightBlue}; }
+.ansi-brightMagenta { color: ${t.ansi.brightMagenta}; }
+.ansi-brightCyan { color: ${t.ansi.brightCyan}; }
+.ansi-brightWhite { color: ${t.ansi.brightWhite}; }
 .apv-section {
   display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xl}px ${t.space.xxl}px;
   border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;

@@ -159,7 +159,7 @@ looks past its own bubble to the window you were using. A screenshot adds roughl
 tokens, which is why it is not taken on every question.
 
 **Hand-offs.** Scout can hand a task to Claude Code, which works in a folder on this computer as a
-job. Watch it in **Home → Jobs**: **Stop** a running one, **Show result** for a finished one. When
+job. Watch it in **Home → Jobs**: **Watch** opens a read-only, terminal-style page of what it is doing (live while it runs), **Stop** a running one, **Show result** for a finished one. When
 Claude Code asks for permission or has a question, Scout gets it first and answers from what it
 knows, or passes it to you. Ask Scout to tell a working job something ("tell Claude to use dayjs, not
 moment") and it passes the note on. To follow up on a finished job, ask Scout to continue it:
@@ -229,8 +229,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   another when the brain starts. A single
   Scout turn is also stopped after 300 seconds unless `TAGALONG_TURN_TIMEOUT_S` sets another;
   Scout then says it took too long. Time spent in tools, or waiting for you to answer, does not count.
-- **Jobs**: the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show
-  result** for a finished one. Claude Code must be installed and signed in on this computer.
+- **Jobs**: the jobs Scout has handed to Claude Code, with **Watch** (a read-only log of its steps),
+  **Stop** for a running one and **Show result** for a finished one. Claude Code must be installed and signed in on this computer.
 - **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
