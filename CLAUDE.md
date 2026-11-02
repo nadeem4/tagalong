@@ -20,7 +20,7 @@ The brain is Python; the TypeScript apps are bodies.
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
 - Brain (Python 3.12 or 3.13): cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server)
 - Run: pnpm dev:desktop (builds contract, ui and the browser add-on first; the desktop starts the brain if none is running and stops only that one on quit; or run `cd brain && uv run brain` yourself); the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
-- Experts: npm install -g @agentclientprotocol/claude-agent-acp (Node 22+), and Claude Code logged in (it runs on the user's login, not the API key)
+- Experts: Scout installs them on demand from the registry (nothing to install by hand); each runs on the user's own login, not the API key; TAGALONG_EXPERT_CMD adds one custom expert
 - Package: pnpm package:win
 
 ## Layout

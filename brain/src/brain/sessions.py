@@ -11,7 +11,6 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import datetime
-from functools import partial
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -31,7 +30,6 @@ from brain.builtin_guards import (
 )
 from brain.choices import Choices
 from brain.config import (
-    DEFAULT_EXPERT_CMD,
     DEFAULT_EXPERT_TIMEOUT_S,
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
@@ -40,7 +38,7 @@ from brain.config import (
     DEFAULT_WAKES_PER_HOUR,
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
-from brain.experts import ExpertRun
+from brain.experts import ExpertRun, make_run_for
 from brain.jobs import Jobs, job_note
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
@@ -51,6 +49,7 @@ from brain.offers import Offers, OfferSettings
 from brain.protocol import ReadAloudData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler, WakeSkipped
+from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Handler, Toolbox, ToolSpec
@@ -84,6 +83,7 @@ class Session:
         memory: Memory,
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
         make_run: Callable[..., ExpertRun] | None = None,
+        experts: Callable[[], list[InstalledExpert]] | None = None,
         apps: Apps | None = None,
         tokens: TokenFile | None = None,
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
@@ -109,10 +109,8 @@ class Session:
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
         notify = bodies.notify
-        # main passes the configured command and timeout; the defaults keep tests short.
-        make_run = make_run or partial(
-            ExpertRun, command=[DEFAULT_EXPERT_CMD], timeout=DEFAULT_EXPERT_TIMEOUT_S
-        )
+        # main passes the installed experts and the timeout; the defaults keep tests short.
+        make_run = make_run or make_run_for(DEFAULT_EXPERT_TIMEOUT_S)
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         self.scheduler = Scheduler(
@@ -138,6 +136,7 @@ class Session:
             memory,
             self._asks,
             notify,
+            experts or (lambda: []),
             make_run,
             on_finished=self._on_job_finished,
             scout_questions=questions,

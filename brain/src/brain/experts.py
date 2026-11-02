@@ -2,7 +2,7 @@
 
 One session, reported through async callbacks: on_permission -> option id | None,
 on_question -> answer dict | None (None cancels), on_progress, on_end(done|error|stopped).
-API key variables are stripped from the child so Claude Code bills the user's own login.
+Each expert's API key variables are stripped from the child so it runs on the user's own login.
 The adapter may be a .cmd shim with children, so teardown kills the tree if stdin close fails.
 """
 
@@ -29,8 +29,8 @@ from acp.schema import (
     RequestPermissionResponse,
 )
 
-STRIPPED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
-INSTALL_STEP = "npm install -g @agentclientprotocol/claude-agent-acp"
+from brain.setup.env import expert_env
+
 _NO_MESSAGE = object()
 log = logging.getLogger(__name__)
 
@@ -97,11 +97,30 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
+def make_run_for(timeout: float) -> Callable[..., "ExpertRun"]:
+    """The Jobs factory: one run of the given expert, with its command and its own env."""
+
+    def make(expert, **callbacks) -> "ExpertRun":
+        # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
+        path_first = Path(expert.command[0]).parent if expert.node == "private" else None
+        return ExpertRun(
+            command=expert.command,
+            expert_id=expert.id,
+            timeout=timeout,
+            path_first=path_first,
+            **callbacks,
+        )
+
+    return make
+
+
 class ExpertRun:
     def __init__(
         self,
         *,
         command: list[str],
+        expert_id: str = "custom",
+        path_first: Path | None = None,
         timeout: float,
         on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
         on_question: Callable[[Question], Awaitable[dict | None]],
@@ -113,6 +132,8 @@ class ExpertRun:
         startup_timeout: float = 60.0,
     ) -> None:
         self._command = command
+        self._expert_id = expert_id
+        self._path_first = path_first
         self._timeout = timeout
         self._grace = grace
         self._startup_timeout = startup_timeout
@@ -137,12 +158,11 @@ class ExpertRun:
     async def start(self, folder: Path) -> list[Mode]:
         exe = shutil.which(self._command[0])
         if exe is None:
-            raise ExpertError(
-                f"Cannot find the expert command {self._command[0]!r}. "
-                f"Install the Claude Code adapter with: {INSTALL_STEP}"
-            )
-        # Explicit env: the parent's, minus the two keys that would override the user's login.
-        env = {k: v for k, v in os.environ.items() if k not in STRIPPED_ENV}
+            raise ExpertError(f"command not found: {self._command[0]}")
+        # Explicit env: ours, minus the keys that would switch this expert off the user's login.
+        env = expert_env(self._expert_id, os.environ)
+        if self._path_first is not None:
+            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
         self._stack = AsyncExitStack()
         try:
             async with asyncio.timeout(self._startup_timeout):

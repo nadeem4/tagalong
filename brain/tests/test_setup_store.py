@@ -90,3 +90,16 @@ def test_which_node_the_command_uses_is_recorded(tmp_path):
     assert store.get("claude-acp").node == "private"
     store.add(expert("other"))  # an expert with no Node (a binary, a custom one)
     assert store.get("other").node is None
+
+
+def test_all_experts_adds_the_custom_command_as_source_custom(tmp_path):
+    from brain.setup.store import all_experts
+
+    store = ExpertStore(tmp_path)
+    assert all_experts(store, []) == []
+    custom = all_experts(store, ["node", "my agent.js"])
+    assert [(e.id, e.source, e.command) for e in custom] == [
+        ("custom", "custom", ["node", "my agent.js"])
+    ]
+    store.add(expert())
+    assert [e.id for e in all_experts(store, ["x"])] == ["claude-acp", "custom"]

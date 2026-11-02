@@ -42,6 +42,7 @@ class Rig:
         self.max_running = 0
         self.status = status
         self.cleared = 0
+        self.experts = []
         self.budget = Budget(tmp_path / "b.json", 5.0, today=lambda: datetime.date(2026, 10, 31))
         self.keys = KeySettings(
             tmp_path,
@@ -49,7 +50,7 @@ class Rig:
             lambda m, p: self.sent.append((m, p)),
             source,
             self.check,
-            ["claude-agent-acp"],
+            lambda: self.experts,
             on_key=lambda: setattr(self, "cleared", self.cleared + 1),
         )
         handlers = {s.name: h for s, h in home_tools(self.budget, lambda: None, self.keys)}
@@ -192,16 +193,24 @@ async def test_key_never_in_any_reply_or_log(tmp_path, monkeypatch, caplog):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
 
-async def test_expert_status_found_and_not_found(rig, monkeypatch):
-    monkeypatch.setattr(tools.shutil, "which", lambda cmd: "C:/bin/claude-agent-acp.cmd")
-    assert json.loads(await rig.run("expert_status")) == {
-        "found": True,
-        "command": "claude-agent-acp",
-    }
-    monkeypatch.setattr(tools.shutil, "which", lambda cmd: None)
+async def test_expert_status_lists_the_experts_and_found(rig):
+    from brain.setup.store import InstalledExpert
+
     assert json.loads(await rig.run("expert_status")) == {
         "found": False,
-        "command": "claude-agent-acp",
+        "command": "",
+        "experts": [],
+    }
+    rig.experts = [InstalledExpert("codex-acp", "Codex", "2", ["x"], "registry", None)]
+    status = json.loads(await rig.run("expert_status"))
+    assert status["found"] is True and status["command"] == ""
+    assert status["experts"][0] == {
+        "id": "codex-acp",
+        "name": "Codex",
+        "version": "2",
+        "logged_in": None,
+        "tested": True,
+        "can_resume": None,
     }
 
 

@@ -13,7 +13,6 @@ import json
 import logging
 import math
 import re
-import shutil
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -32,6 +31,8 @@ from brain.jobs import JobError, Jobs
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
+from brain.setup.env import is_tested
+from brain.setup.store import InstalledExpert
 from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
@@ -337,6 +338,21 @@ def timer_tools(
     ]
 
 
+def expert_rows(experts: list[InstalledExpert]) -> list[dict]:
+    """What Scout and Home see of each expert; can_resume stays null until sessions can resume."""
+    return [
+        {
+            "id": e.id,
+            "name": e.name,
+            "version": e.version,
+            "logged_in": e.logged_in,
+            "tested": is_tested(e.id),
+            "can_resume": None,
+        }
+        for e in experts
+    ]
+
+
 def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
     """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
     raises it as an RpcError so the body shows the same words."""
@@ -344,10 +360,13 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
         try:
-            job_id = await jobs.start(args["task"], args["folder"])
+            job_id = await jobs.start(args["task"], args["folder"], args.get("expert"))
         except JobError as err:
             return str(err)
         return f"job {job_id} started"
+
+    async def list_experts(args: dict) -> str:
+        return json.dumps({"experts": expert_rows(jobs.installed())})
 
     async def tell_expert(args: dict) -> str:
         _need_text("tell_expert", args, "job", "note")
@@ -383,15 +402,20 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         (
             ToolSpec(
                 "hand_off",
-                "Hand a task to Claude Code, which works in a folder on the user's computer and "
+                "Hand a task to an expert, which works in a folder on the user's computer and "
                 "reports back when done. Use the folder the user named; if they did not name "
                 "one, ask them which folder first, never guess. The user picks how much freedom "
-                "Claude Code gets; this tool asks them itself. Returns the job id once started.",
+                "the expert gets; this tool asks them itself. With several experts installed, "
+                "name one by its id from list_experts. Returns the job id once started.",
                 {
                     "type": "object",
                     "properties": {
-                        "task": {"type": "string", "description": "What Claude Code should do."},
+                        "task": {"type": "string", "description": "What the expert should do."},
                         "folder": {"type": "string", "description": "Absolute folder path."},
+                        "expert": {
+                            "type": "string",
+                            "description": "An expert id from list_experts; optional with one.",
+                        },
                     },
                     "required": ["task", "folder"],
                 },
@@ -400,6 +424,17 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                 self_asks=True,
             ),
             hand_off,
+        ),
+        (
+            ToolSpec(
+                "list_experts",
+                "The installed experts: id, name, version, whether logged in (null: not checked), "
+                "tested (we ran it ourselves) and can_resume.",
+                {"type": "object", "properties": {}},
+                both,
+                effect="read",
+            ),
+            list_experts,
         ),
         (
             ToolSpec(
@@ -464,7 +499,7 @@ class KeySettings:
     notify: Notify
     source: Literal["environment", "file", "none"]
     check: Callable[[str], Awaitable[KeyCheck]]
-    expert_cmd: list[str]
+    experts: Callable[[], list[InstalledExpert]]
     on_key: Callable[[], None] = lambda: None  # main drops its cached masker values here
 
 
@@ -636,10 +671,12 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
         return json.dumps({"limit_usd": budget.limit})
 
     async def expert_status(args: dict) -> str:
-        # Looks the command up on PATH and nothing more: it never starts the expert, and the
-        # Claude Code login cannot be seen from here.
-        found = bool(keys.expert_cmd) and shutil.which(keys.expert_cmd[0]) is not None
-        return json.dumps({"found": found, "command": " ".join(keys.expert_cmd)})
+        # Reads the installed list and nothing more: it never starts an expert.
+        found = keys.experts()
+        # `command` stays for the desktop's key IPC until 21d reworks the walkthrough: the
+        # custom expert's command, empty when there is none.
+        command = " ".join(next((e.command for e in found if e.source == "custom"), []))
+        return json.dumps({"found": bool(found), "command": command, "experts": expert_rows(found)})
 
     home = frozenset({"home"})
     empty = {"type": "object", "properties": {}}
@@ -686,7 +723,7 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
         (
             ToolSpec(
                 "expert_status",
-                "Whether the configured expert command is installed.",
+                "The installed experts, and whether there is any.",
                 empty,
                 home,
                 effect="read",

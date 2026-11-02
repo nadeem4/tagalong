@@ -98,7 +98,7 @@ def test_load_env_file_missing_is_fine(tmp_path):
 
 def test_expert_defaults():
     cfg = load_config({})
-    assert (cfg.expert_cmd, cfg.expert_timeout) == (["claude-agent-acp"], 1800.0)
+    assert (cfg.expert_cmd, cfg.expert_timeout) == ([], 1800.0)
 
 
 def test_expert_overrides_split_the_command_like_a_shell():

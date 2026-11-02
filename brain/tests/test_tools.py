@@ -198,9 +198,13 @@ class FakeJobs:
         self.calls = []
         self.error = None
         self.rows = []
+        self.experts = []
 
-    async def start(self, task, folder):
-        self.calls.append(("start", task, folder))
+    def installed(self):
+        return self.experts
+
+    async def start(self, task, folder, expert=None):
+        self.calls.append(("start", task, folder, expert))
         if self.error:
             raise self.error
         return "ab12cd34"
@@ -238,7 +242,7 @@ def test_expert_specs_audiences_effects_and_gate(home):
 def test_expert_model_tool_schemas(home):
     tools = {t["name"]: t["input_schema"] for t in home.box.model_tools()}
     assert tools["hand_off"]["required"] == ["task", "folder"]
-    assert set(tools["hand_off"]["properties"]) == {"task", "folder"}
+    assert set(tools["hand_off"]["properties"]) == {"task", "folder", "expert"}
     assert tools["tell_expert"]["required"] == ["job", "note"]
     assert tools["stop_job"]["required"] == ["job"]
     assert tools["list_jobs"]["properties"] == {}
@@ -248,8 +252,38 @@ def test_expert_model_tool_schemas(home):
 
 async def test_hand_off_reaches_jobs_start(home):
     out = await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
-    assert home.jobs.calls == [("start", "fix the bug", "C:/proj")]
+    assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None)]
     assert "ab12cd34" in out and "started" in out
+
+
+async def test_hand_off_passes_the_named_expert(home):
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "expert": "codex-acp"})
+    assert home.jobs.calls == [("start", "t", "C:/p", "codex-acp")]
+
+
+async def test_list_experts_is_read_only_and_shows_untested_for_unknown_ids(home):
+    from brain.setup.store import InstalledExpert
+
+    def row(id, **kw):
+        return InstalledExpert(id, id, "1.2", ["x"], "registry", True, **kw)
+
+    home.jobs.experts = [row("claude-acp"), row("goose")]
+    spec = expert_specs(home)["list_experts"]
+    assert spec.effect == "read" and spec.audience == frozenset({"scout", "home"})
+    rows = json.loads(await home.run("list_experts"))["experts"]
+    assert rows == [
+        dict(
+            id="claude-acp",
+            name="claude-acp",
+            version="1.2",
+            logged_in=True,
+            tested=True,
+            can_resume=None,
+        ),
+        dict(
+            id="goose", name="goose", version="1.2", logged_in=True, tested=False, can_resume=None
+        ),
+    ]
 
 
 async def test_hand_off_refusal_is_a_plain_line(home):
@@ -486,6 +520,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "forget",
         "hand_off",
         "tell_expert",
+        "list_experts",
         "list_jobs",
         "stop_job",
     }
@@ -495,6 +530,7 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
     records = home.box.home_tools()
     assert {r.name for r in records} == {
         "forget",
+        "list_experts",
         "list_jobs",
         "stop_job",
         "list_memories",

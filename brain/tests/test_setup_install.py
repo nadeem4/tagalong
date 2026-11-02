@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import sys
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -28,7 +29,7 @@ from brain.setup.install import (
     install_card,
     install_expert,
 )
-from brain.setup.paths import node_dir, tools_dir
+from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
 from brain.toolbox import BrainSource, resolve_mode
@@ -44,14 +45,14 @@ def machine(node: ToolVersion | None = None, os_name="windows", arch="x64") -> M
     return Machine(os_name, arch, node, None, None, None, None)
 
 
-def npx_entry(requires=None) -> RegistryEntry:
+def npx_entry(requires=None, version="0.99.1", pinned="0.99.1") -> RegistryEntry:
     return RegistryEntry(
         "claude-acp",
         "Claude Agent",
-        "0.99.1",
+        version,
         "",
         "",
-        [Distribution("npx", PKG, "0.99.1", args=["--acp"])],
+        [Distribution("npx", PKG, pinned, args=["--acp"])],
         requires or {},
     )
 
@@ -251,7 +252,7 @@ async def test_a_failed_reinstall_keeps_the_old_install_and_record(tmp_path, ens
     old = tools_dir(tmp_path, "claude-acp")
     (old / "marker").write_text("v1")
     with pytest.raises(InstallError):
-        await go(tmp_path, replace(npx_entry(), version="0.99.2"), machine(), Npm(code=1))
+        await go(tmp_path, npx_entry(version="0.99.2", pinned="0.99.2"), machine(), Npm(code=1))
     assert (old / "marker").read_text() == "v1"
     assert ExpertStore(tmp_path).get("claude-acp").version == "0.99.1"
     assert not tools_dir(tmp_path, "claude-acp.part").exists()
@@ -261,7 +262,7 @@ async def test_a_good_reinstall_swaps_in_the_new_files_and_record(tmp_path, ensu
     await go(tmp_path, npx_entry(), machine(), Npm())
     old = tools_dir(tmp_path, "claude-acp")
     (old / "marker").write_text("v1")
-    expert = await go(tmp_path, replace(npx_entry(), version="0.99.2"), machine(), Npm())
+    expert = await go(tmp_path, npx_entry(version="0.99.2", pinned="0.99.2"), machine(), Npm())
     assert not (old / "marker").exists()
     assert expert.command[1].startswith(str(old))  # resolved against the final prefix
     assert Path(expert.command[1]).is_file()
@@ -418,6 +419,22 @@ async def test_card_input_names_the_node_download_when_the_system_node_is_old(tm
     assert card["expert"] == "claude-acp" and card["version"] == "0.99.1"
     assert card["installs_into"] == str(tools_dir(tmp_path, "claude-acp"))
     assert card["node_download"] == {"version": "v22.12.0", "into": str(node_dir(tmp_path))}
+
+
+async def test_card_and_install_use_the_pinned_version_not_the_entrys(tmp_path, ensure):
+    entry = npx_entry(version="0.99.9", pinned="0.99.1")
+    card = await install_card(entry, tmp_path, machine(), index_only)
+    npm = Npm()
+    expert = await go(tmp_path, entry, machine(), npm)
+    assert card["version"] == "0.99.1" and expert.version == "0.99.1"
+    assert npm.calls[0][0][-1] == f"{PKG}@0.99.1"
+
+
+async def test_an_unpinned_npm_package_is_pinned_to_the_entrys_version(tmp_path, ensure):
+    entry = npx_entry(version="0.99.5", pinned=None)
+    npm = Npm()
+    await go(tmp_path, entry, machine(), npm)
+    assert npm.calls[0][0][-1] == f"{PKG}@0.99.5"
 
 
 async def test_card_input_has_no_node_download_when_the_system_node_will_do(tmp_path):
@@ -613,4 +630,20 @@ async def test_a_refused_card_installs_nothing(tmp_path, ensure):
         await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert ExpertStore(tmp_path).list() == []
     assert not (tmp_path / "tools").exists()
+    await stop()
+
+
+async def test_install_refuses_when_the_registry_version_changed_after_the_card(
+    tmp_path, ensure, monkeypatch
+):
+    tools, emitted, _, stop = make_tools(tmp_path, Npm())
+    spec, handler = tools["install_expert"]
+    shown = await spec.card({"id": "claude-acp"})
+    assert shown["version"] == "0.99.1"
+    # The 24 h cache expired while the card was open, and the registry moved on.
+    cache_file(tmp_path, "acp").unlink()
+    monkeypatch.setattr(sys.modules[__name__], "ACP", ACP.replace(b"0.99.1", b"1.0.0"))
+    out = json.loads(await handler({"id": "claude-acp"}))
+    assert out == {"error": "version_changed", "detail": "0.99.1 -> 1.0.0"}
+    assert not [e for e in emitted if e.kind == "setup_done"]
     await stop()
