@@ -257,7 +257,16 @@ def timer_tools(
                 raise MemoryRefused(f"repeat_minutes must be at least {MIN_REPEAT_S // 60}.")
             if repeat > TIMER_MAX_MINUTES:
                 raise MemoryRefused(f"repeat_minutes must be at most {TIMER_MAX_MINUTES} (a year).")
-        timer = memory.add_timer(note, when, repeat * 60 if repeat else None)
+        job_id = args.get("job")
+        if job_id is not None:
+            if not isinstance(job_id, str):
+                raise MemoryRefused("job must be a job id.")
+            job = memory.get_job(job_id)
+            if job is None:
+                raise MemoryRefused(f"no job with id {job_id}.")
+            if job.state != "running":
+                raise MemoryRefused(f"job {job_id} is not running ({job.state}).")
+        timer = memory.add_timer(note, when, repeat * 60 if repeat else None, job_id)
         timers.changed()
         local = timer.next_at.astimezone(current.tzinfo)
         out = f"timer {timer.id} set for {local.isoformat(timespec='seconds')}"
@@ -272,6 +281,7 @@ def timer_tools(
                 "repeat_minutes": t.repeat_s // 60 if t.repeat_s else None,
                 # Fired but Scout has not heard it yet.
                 "pending": bool(t.fired),
+                "job": t.job_id,
             }
             for t in memory.list_timers()
         ]
@@ -293,7 +303,9 @@ def timer_tools(
                 "set_timer",
                 "Set a timer that wakes you later with your note. The note is a message to your "
                 "future self. Give exactly one of in_minutes or at (ISO 8601 with a UTC offset, "
-                "e.g. 2026-10-28T15:00:00+01:00). repeat_minutes (at least 5) makes it repeat.",
+                "e.g. 2026-10-28T15:00:00+01:00). repeat_minutes (at least 5) makes it repeat. To "
+                "check back on a running job, pass its id as job: you are woken with what you were "
+                "watching for, the job's state and a summary of its steps.",
                 {
                     "type": "object",
                     "properties": {
@@ -301,6 +313,11 @@ def timer_tools(
                         "in_minutes": {"type": "number", "description": "Minutes from now."},
                         "at": {"type": "string", "description": "ISO 8601 time with offset."},
                         "repeat_minutes": {"type": "integer", "description": "At least 5."},
+                        "job": {
+                            "type": "string",
+                            "description": "A running job's id: the wake then carries that "
+                            "job's watch list, state and activity summary.",
+                        },
                     },
                     "required": ["note"],
                 },

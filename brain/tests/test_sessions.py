@@ -994,6 +994,27 @@ async def test_a_due_timer_wakes_scout_with_its_note():
     assert "look at the deploy" in text
 
 
+async def test_session_job_timer_wake_includes_watching_and_activity():
+    tz = datetime.timezone(datetime.timedelta(hours=1))
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
+    memory = Memory(":memory:")
+    kinds = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    # A job running after startup (startup stops any left over), then its timer comes due.
+    memory.add_job("j1", "a", "t", "f", "m")
+    memory.set_watch("j1", [{"text": "tests pass", "done": False}])
+    memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
+    session.timers.fire_due()
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "check the job" in text
+    assert "watching" in text and "tests pass" in text
+    assert "activity" in text
+
+
 # --- body events and the online wake (10c) ---
 
 
