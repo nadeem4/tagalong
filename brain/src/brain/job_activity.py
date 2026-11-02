@@ -80,8 +80,8 @@ class JobActivity:
         self._on_change()
 
     def running_step(self) -> ActivityEntry | None:
-        running = [e for e in self._steps.values() if e.status == "running"]
-        return max(running, key=lambda e: e.seq, default=None)
+        live = [e for e in self._steps.values() if e.status in ("running", "pending")]
+        return max(live, key=lambda e: e.seq, default=None)
 
     def _tool(self, u) -> None:
         self._last_say = None

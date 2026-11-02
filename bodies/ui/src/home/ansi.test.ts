@@ -57,3 +57,38 @@ describe('collapseCarriageReturns', () => {
     expect(collapseCarriageReturns('a\r\nb')).toBe('a\nb');
   });
 });
+
+describe('parseAnsi escapes', () => {
+  const plain = (t: string) =>
+    parseAnsi(t)
+      .map((s) => s.text)
+      .join('');
+
+  it('strips charset selects like tput sgr0 emits', () => {
+    expect(plain('a\x1b(Bb')).toBe('ab');
+  });
+
+  it('strips ST-terminated OSC 8 links and keeps the link text', () => {
+    expect(plain('\x1b]8;;http://x.test\x1b\\link\x1b]8;;\x1b\\ done')).toBe('link done');
+  });
+
+  it('does not let an unterminated OSC eat later text', () => {
+    expect(plain('a\x1b]0;title\x1b[31mred')).toBe('ared');
+  });
+
+  it('strips colon and private-mode parameters without reading them as colour', () => {
+    expect(parseAnsi('\x1b[38:5:200mx\x1b[>4;2my')).toEqual([
+      { text: 'xy', bold: false, color: null },
+    ]);
+  });
+
+  it('drops a lone escape', () => {
+    expect(plain('a\x1b\nb')).toBe('a\nb');
+  });
+
+  it('parses 32k unterminated OSC starts quickly', () => {
+    const start = performance.now();
+    parseAnsi('\x1b]'.repeat(32_000));
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+});

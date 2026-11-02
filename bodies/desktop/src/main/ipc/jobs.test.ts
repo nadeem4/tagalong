@@ -136,6 +136,11 @@ describe('registerJobsIpc', () => {
     await expect(invoke(IPC.jobActivity, 'j1', 0)).rejects.toThrow('brain sent bad activity');
   });
 
+  it('rejects an activity page without a numeric rev', async () => {
+    const { invoke } = setup(() => text({ ...PAGE, rev: '7' }));
+    await expect(invoke(IPC.jobActivity, 'j1', 0)).rejects.toThrow('brain sent bad activity');
+  });
+
   it('lists the running steps for the bubble', async () => {
     const running = [{ job: 'j1', expert: 'Claude Code', text: 'npm test', at: 't' }];
     const { invoke, calls } = setup(() => text({ running }));

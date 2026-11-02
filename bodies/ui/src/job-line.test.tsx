@@ -3,7 +3,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HostBridgeProvider } from './host-bridge';
+import { HostBridgeProvider, type RunningStep } from './host-bridge';
 import { JobLine, useRunningStep } from './job-line';
 import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
@@ -55,16 +55,64 @@ describe('useRunningStep', () => {
   });
 
   it('throttles a burst to a leading and a trailing read', async () => {
-    const bridge = createFakeHostBridge({ runningSteps: [step('one')] });
+    vi.useFakeTimers();
+    try {
+      const bridge = createFakeHostBridge({ runningSteps: [step('one')] });
+      renderHook(() => useRunningStep(bridge));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const calls = bridge.runningStepCalls;
+      // The leading read just happened at t=0, so a burst now waits for the window to end.
+      act(() => {
+        for (let i = 0; i < 20; i += 1) bridge.emitChanged('job_activity');
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(249);
+      });
+      expect(bridge.runningStepCalls).toBe(calls);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(bridge.runningStepCalls).toBe(calls + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('makes no trailing read after unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      const bridge = createFakeHostBridge({ runningSteps: [step('one')] });
+      const { unmount } = renderHook(() => useRunningStep(bridge));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => bridge.emitChanged('job_activity'));
+      const calls = bridge.runningStepCalls;
+      unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(bridge.runningStepCalls).toBe(calls);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores an older reply that arrives after a newer one', async () => {
+    const bridge = createFakeHostBridge();
+    const replies: Array<(steps: RunningStep[]) => void> = [];
+    bridge.runningSteps = () => new Promise((resolve) => replies.push(resolve));
     const { result } = renderHook(() => useRunningStep(bridge));
-    await waitFor(() => expect(result.current).not.toBeNull());
-    const calls = bridge.runningStepCalls;
-    bridge.running = [step('last')];
-    act(() => {
-      for (let i = 0; i < 20; i += 1) bridge.emitChanged('job_activity');
-    });
-    await waitFor(() => expect(result.current?.text).toBe('last'));
-    expect(bridge.runningStepCalls - calls).toBeLessThanOrEqual(2);
+    expect(replies).toHaveLength(1);
+    // Force a second read once the throttle window has passed.
+    await new Promise((resolve) => setTimeout(resolve, 260));
+    act(() => bridge.emitChanged('job_activity'));
+    expect(replies).toHaveLength(2);
+    await act(async () => replies[1]?.([step('newer')]));
+    await act(async () => replies[0]?.([step('older')]));
+    expect(result.current?.text).toBe('newer');
   });
 
   it('stops listening on unmount', async () => {

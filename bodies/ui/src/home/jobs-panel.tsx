@@ -4,7 +4,7 @@
  * lists them and reads again when the brain says they changed. Watch opens a job's page in
  * place of the list. Contains JobsPanel.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -73,8 +73,28 @@ export function JobsPanel() {
       return next;
     });
 
+  // Coming back from a job page, focus returns to that job's Watch button.
+  const listRef = useRef<HTMLUListElement>(null);
+  const returnTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (watching !== null || returnTo.current === null) return;
+    const id = returnTo.current;
+    returnTo.current = null;
+    listRef.current?.querySelector<HTMLElement>(`[data-watch="${CSS.escape(id)}"]`)?.focus();
+  }, [watching, jobs]);
+
   const watched = watching === null ? undefined : jobs?.find((job) => job.id === watching);
-  if (watched) return <JobPage job={watched} onBack={() => setWatching(null)} />;
+  if (watched) {
+    return (
+      <JobPage
+        job={watched}
+        onBack={() => {
+          returnTo.current = watched.id;
+          setWatching(null);
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -93,7 +113,7 @@ export function JobsPanel() {
           <p>No jobs yet. Ask Scout to hand work to Claude Code and it shows here.</p>
         )}
         {jobs !== null && jobs.length > 0 && (
-          <ul aria-label="Jobs" className="job-list">
+          <ul aria-label="Jobs" className="job-list" ref={listRef}>
             {jobs.map((job) => (
               <li key={job.id} className="job-row">
                 <div className="job-row__main">
@@ -120,6 +140,7 @@ export function JobsPanel() {
                     <Button
                       variant="secondary"
                       aria-label={`Watch ${job.task}`}
+                      data-watch={job.id}
                       onClick={() => setWatching(job.id)}
                     >
                       Watch

@@ -193,6 +193,19 @@ def test_running_step_is_the_latest_running_command(rig):
     assert rig.log.running_step() is None
 
 
+def test_running_step_counts_a_pending_tool_call(rig):
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    rig.log.on_update(
+        acp.start_tool_call(
+            "t2", "Run", kind="execute", status="pending", raw_input={"command": "pwd"}
+        )
+    )
+    assert rig.log.running_step().text == "pwd"  # the latest of running and pending
+    rig.log.on_update(progress("t1", "completed"))
+    rig.log.on_update(progress("t2", "completed"))
+    assert rig.log.running_step() is None
+
+
 def test_idless_messages_around_a_tool_call_are_separate_says(rig):
     def chunk(t):
         return schema.AgentMessageChunk(

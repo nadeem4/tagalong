@@ -4,7 +4,7 @@
  * line). Plain React with no terminal emulator, so nothing can be typed into it.
  * Contains JobLog.
  */
-import { Fragment, type RefObject, type UIEvent } from 'react';
+import { Fragment, memo, type RefObject, type UIEvent } from 'react';
 import type { JobActivityEntry } from '../host-bridge';
 import { collapseCarriageReturns, parseAnsi } from './ansi';
 
@@ -33,7 +33,8 @@ function Glyph({ status }: { status: string | null }) {
   );
 }
 
-function Output({ text }: { text: string }) {
+// Memoised so the 1 s clock tick does not re-parse every output block.
+const Output = memo(function Output({ text }: { text: string }) {
   return (
     <pre className="job-log__out">
       {parseAnsi(collapseCarriageReturns(text)).map((span, i) => (
@@ -48,7 +49,7 @@ function Output({ text }: { text: string }) {
       ))}
     </pre>
   );
-}
+});
 
 function elapsed(at: string, now: number): string {
   return `running, ${Math.max(0, Math.floor((now - Date.parse(at)) / 1000))} s`;

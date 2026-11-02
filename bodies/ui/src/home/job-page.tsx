@@ -32,6 +32,7 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [following, setFollowing] = useState(true);
   const logRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const rev = useRef(0);
   const busy = useRef(false);
   const again = useRef(false);
@@ -77,6 +78,9 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
     };
   }, [bridge, pull]);
 
+  // The list that had focus is gone, so land on the page's heading.
+  useEffect(() => headingRef.current?.focus(), []);
+
   const running = log.state === 'running';
   useEffect(() => {
     if (!running) return undefined;
@@ -112,11 +116,13 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
   return (
     <>
       <div className="home-head">
-        <button type="button" className="job-page__back" onClick={onBack}>
+        <button type="button" className="job-page__back" aria-label="Back to Jobs" onClick={onBack}>
           Jobs
         </button>
         <div className="job-page__title">
-          <h1 className="home-title">{job.task}</h1>
+          <h1 className="home-title" ref={headingRef} tabIndex={-1}>
+            {job.task}
+          </h1>
           <span className={`job-row__state job-row__state--${log.state}`}>
             {STATE_LABEL[log.state] ?? log.state}
           </span>
