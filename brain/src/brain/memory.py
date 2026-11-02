@@ -166,6 +166,10 @@ MIGRATIONS = (
     """
     ALTER TABLE approvals ADD COLUMN preference_sentence TEXT;
     """,
+    # A follow-up job points at the job whose session it continues, so the list shows the chain.
+    """
+    ALTER TABLE jobs ADD COLUMN parent_job TEXT;
+    """,
 )
 
 
@@ -198,6 +202,7 @@ class Job:
     reported: bool
     started_at: str
     ended_at: str | None
+    parent_job: str | None = None
 
 
 @dataclass(frozen=True)
@@ -250,7 +255,7 @@ class Hit:
 _COLUMNS = "id, kind, text, cadence, created_at, updated_at"
 _JOB_COLUMNS = (
     "id, agent, task, folder, mode, state, reason, progress, result, session_id,"
-    " reported, started_at, ended_at"
+    " reported, started_at, ended_at, parent_job"
 )
 _JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
 JOB_RESULT_CAP = 20_000
@@ -381,14 +386,17 @@ class Memory:
             sql += " LIMIT ?"
             args += (limit,)
         return [
-            Job(*r[:10], bool(r[10]), r[11], r[12]) for r in self._db.execute(sql, args).fetchall()
+            Job(*r[:10], bool(r[10]), r[11], r[12], r[13])
+            for r in self._db.execute(sql, args).fetchall()
         ]
 
-    def add_job(self, id: str, agent: str, task: str, folder: str, mode: str) -> Job:
+    def add_job(
+        self, id: str, agent: str, task: str, folder: str, mode: str, parent_job: str | None = None
+    ) -> Job:
         self._db.execute(
-            "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
-            " VALUES (?,?,?,?,?,'running',?)",
-            (id, agent, task, folder, mode, self._now().isoformat()),
+            "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at, parent_job)"
+            " VALUES (?,?,?,?,?,'running',?,?)",
+            (id, agent, task, folder, mode, self._now().isoformat(), parent_job),
         )
         return self._jobs("WHERE id=?", (id,))[0]
 

@@ -10,7 +10,7 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.guardrails import Budget
-from brain.jobs import JobError
+from brain.jobs import JobError, JobId
 from brain.memory import Hit, Memory, MemoryRefused
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
@@ -199,15 +199,20 @@ class FakeJobs:
         self.error = None
         self.rows = []
         self.experts = []
+        self.resumable = {}
+        self.started = JobId("ab12cd34")
 
     def installed(self):
         return self.experts
 
-    async def start(self, task, folder, expert=None):
-        self.calls.append(("start", task, folder, expert))
+    def can_resume(self, expert_id):
+        return self.resumable.get(expert_id)
+
+    async def start(self, task, folder, expert=None, continue_job=None):
+        self.calls.append(("start", task, folder, expert, continue_job))
         if self.error:
             raise self.error
-        return "ab12cd34"
+        return self.started
 
     def tell(self, job_id, note):
         self.calls.append(("tell", job_id, note))
@@ -242,7 +247,7 @@ def test_expert_specs_audiences_effects_and_gate(home):
 def test_expert_model_tool_schemas(home):
     tools = {t["name"]: t["input_schema"] for t in home.box.model_tools()}
     assert tools["hand_off"]["required"] == ["task", "folder"]
-    assert set(tools["hand_off"]["properties"]) == {"task", "folder", "expert"}
+    assert set(tools["hand_off"]["properties"]) == {"task", "folder", "expert", "continue_job"}
     assert tools["tell_expert"]["required"] == ["job", "note"]
     assert tools["stop_job"]["required"] == ["job"]
     assert tools["list_jobs"]["properties"] == {}
@@ -252,13 +257,27 @@ def test_expert_model_tool_schemas(home):
 
 async def test_hand_off_reaches_jobs_start(home):
     out = await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
-    assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None)]
-    assert "ab12cd34" in out and "started" in out
+    assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None, None)]
+    assert json.loads(out) == {"job": "ab12cd34", "session": "fresh", "why_fresh": None}
+
+
+async def test_hand_off_continue_job_reports_the_session_facts(home):
+    home.jobs.started = JobId("n1", "fresh", "expert cannot reopen sessions")
+    out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
+    assert home.jobs.calls == [("start", "t", "C:/p", None, "old1")]
+    assert json.loads(out) == {
+        "job": "n1",
+        "session": "fresh",
+        "why_fresh": "expert cannot reopen sessions",
+    }
+    home.jobs.started = JobId("n2", "continued")
+    out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "n1"})
+    assert json.loads(out) == {"job": "n2", "session": "continued", "why_fresh": None}
 
 
 async def test_hand_off_passes_the_named_expert(home):
     await home.run("hand_off", {"task": "t", "folder": "C:/p", "expert": "codex-acp"})
-    assert home.jobs.calls == [("start", "t", "C:/p", "codex-acp")]
+    assert home.jobs.calls == [("start", "t", "C:/p", "codex-acp", None)]
 
 
 async def test_list_experts_is_read_only_and_shows_untested_for_unknown_ids(home):
@@ -268,6 +287,7 @@ async def test_list_experts_is_read_only_and_shows_untested_for_unknown_ids(home
         return InstalledExpert(id, id, "1.2", ["x"], "registry", True, **kw)
 
     home.jobs.experts = [row("claude-acp"), row("goose")]
+    home.jobs.resumable = {"claude-acp": True}
     spec = expert_specs(home)["list_experts"]
     assert spec.effect == "read" and spec.audience == frozenset({"scout", "home"})
     rows = json.loads(await home.run("list_experts"))["experts"]
@@ -278,7 +298,7 @@ async def test_list_experts_is_read_only_and_shows_untested_for_unknown_ids(home
             version="1.2",
             logged_in=True,
             tested=True,
-            can_resume=None,
+            can_resume=True,
         ),
         dict(
             id="goose", name="goose", version="1.2", logged_in=True, tested=False, can_resume=None
@@ -322,6 +342,17 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem):
     assert {"task", "folder", "mode", "state", "progress", "result", "started_at"} <= set(
         out["jobs"][0]
     )
+
+
+async def test_list_jobs_shows_the_expert_the_parent_and_whether_a_session_is_known(home, mem):
+    mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
+    mem.update_job("j1", session_id="s-secret")
+    mem.add_job("j2", "codex-acp", "task", "C:/x", "default", parent_job="j1")
+    home.jobs.rows = mem.list_jobs(20)
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["expert"] == "codex-acp" and rows["j1"]["session_id_known"] is True
+    assert rows["j2"]["session_id_known"] is False and rows["j2"]["parent_job"] == "j1"
+    assert "session_id" not in rows["j1"]  # an opaque handle Scout never needs to see
 
 
 async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home, mem):

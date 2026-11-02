@@ -14,7 +14,7 @@ import pytest
 
 from brain.approvals import Approvals
 from brain.asks import Answer
-from brain.experts import ExpertRun, Question, QuestionField
+from brain.experts import ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
@@ -101,11 +101,15 @@ class Rig:
         guards=None,
         experts=None,
         setup_facts=None,
+        shared: bool = False,
+        load: bool = False,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
         monkeypatch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
+        if load:
+            monkeypatch.setenv("FAKE_ACP_LOAD", "1")
         self.log = tmp_path / "log.jsonl"
         self.folder = tmp_path / "proj"
         self.folder.mkdir()
@@ -123,12 +127,15 @@ class Rig:
             if approvals
             else None
         )
+        # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
+        self.gate = asyncio.Event()
+        self.hosts = ExpertHosts(expert_timeout, 300, sleep=lambda s: self.gate.wait())
         self.jobs = Jobs(
             self.memory,
             asks,
             lambda method, params: self.notes.append((method, params)),
             lambda: self.experts,
-            self.make_run,
+            self.hosts if shared else self.make_run,
             max_running=max_running,
             on_finished=self.finished.append,
             clock=lambda: self.now,
@@ -157,11 +164,15 @@ class Rig:
     def frames(self) -> list[dict]:
         return [json.loads(line) for line in self.log.read_text().splitlines()]
 
+    def spawns(self) -> int:
+        return sum(1 for f in self.frames() if "env" in f)
+
     async def teardown(self) -> None:
         for job_id in list(self.jobs._runs):
             await self.jobs.stop(job_id)
         for run in self.runs:
             await run.close()
+        await self.hosts.shutdown()
         self.memory.close()
 
 
@@ -298,7 +309,7 @@ async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
     def failing(expert, **callbacks):
         run = original(expert, **callbacks)
 
-        async def refuse(folder):
+        async def refuse(folder, resume=None):
             raise RuntimeError("auth required")
 
         run.start = refuse
@@ -1180,3 +1191,120 @@ async def test_a_failing_facts_source_never_hides_the_refusal(make_rig):
     with pytest.raises(JobError) as err:
         await rig.jobs.start("go", str(rig.folder))
     assert err.value.facts["problem"] == "no_expert" and "candidates" not in err.value.facts
+
+
+async def finish(rig, job_id) -> None:
+    await until(lambda: rig.memory.get_job(job_id).state != "running")
+
+
+async def test_continue_job_reuses_the_saved_session_id_when_the_expert_can_resume(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert (second.session, second.why_fresh) == ("continued", None)
+    loads = [f for f in rig.frames() if f.get("method") == "session/load"]
+    assert loads[0]["params"]["sessionId"] == rig.memory.get_job(first).session_id
+    assert rig.memory.get_job(second).session_id == rig.memory.get_job(first).session_id
+
+
+async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert (second.session, second.why_fresh) == ("fresh", "expert cannot reopen sessions")
+    assert not any(f.get("method") == "session/load" for f in rig.frames())
+
+
+async def test_a_session_the_adapter_lost_falls_back_to_fresh(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    rig.memory.update_job(first, session_id="bad-1")
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert (second.session, second.why_fresh) == ("fresh", "session could not be loaded")
+
+
+async def test_a_job_that_saved_no_session_continues_fresh(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    rig.memory.update_job(first, session_id=None)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert (second.session, second.why_fresh) == ("fresh", "the earlier job saved no session")
+
+
+async def test_a_plain_hand_off_reports_a_fresh_session_without_a_reason(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    assert (job.session, job.why_fresh) == ("fresh", None)
+
+
+async def test_continuing_from_another_expert_or_folder_is_a_job_error(make_rig, tmp_path):
+    other = installed("codex-acp")
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], experts=[installed(), other])
+    first = await rig.jobs.start("one", str(rig.folder), "claude-acp")
+    await finish(rig, first)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    with pytest.raises(JobError, match="another expert"):
+        await rig.jobs.start("two", str(rig.folder), "codex-acp", continue_job=first)
+    with pytest.raises(JobError, match="another folder"):
+        await rig.jobs.start("two", str(elsewhere), "claude-acp", continue_job=first)
+    with pytest.raises(JobError, match="no job nope"):
+        await rig.jobs.start("two", str(rig.folder), "claude-acp", continue_job="nope")
+    assert len(rig.memory.list_jobs()) == 1
+
+
+async def test_continuing_a_running_job_is_a_job_error(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    first = await rig.jobs.start("one", str(rig.folder))
+    with pytest.raises(JobError, match="still running"):
+        await rig.jobs.start("two", str(rig.folder), continue_job=first)
+
+
+async def test_the_new_row_records_its_parent(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert rig.memory.get_job(second).parent_job == first
+    assert rig.memory.get_job(first).parent_job is None
+
+
+async def test_a_finished_jobs_adapter_is_reused_by_the_follow_up(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True, shared=True
+    )
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    await finish(rig, second)
+    assert rig.spawns() == 1
+    assert rig.jobs.can_resume("claude-acp") is True
+
+
+async def test_two_running_jobs_of_one_expert_share_the_process_and_the_cap_holds(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), shared=True)
+    await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))
+    assert rig.spawns() == 1
+    with pytest.raises(JobError, match="2 jobs are already running"):
+        await rig.jobs.start("three", str(rig.folder))
+    assert rig.spawns() == 1
+
+
+async def test_can_resume_is_unknown_until_the_adapter_has_started(make_rig):
+    rig = make_rig(FakeAsks(), shared=True)
+    assert rig.jobs.can_resume("claude-acp") is None
+
+
+async def test_shutdown_stops_every_host(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], shared=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    process = next(iter(rig.hosts._hosts.values())).process
+    assert process.returncode is None  # warm for the follow-up
+    await rig.jobs.shutdown()
+    assert process.returncode is not None

@@ -338,8 +338,11 @@ def timer_tools(
     ]
 
 
-def expert_rows(experts: list[InstalledExpert]) -> list[dict]:
-    """What Scout and Home see of each expert; can_resume stays null until sessions can resume."""
+def expert_rows(
+    experts: list[InstalledExpert],
+    can_resume: Callable[[str], bool | None] = lambda expert_id: None,
+) -> list[dict]:
+    """What Scout and Home see of each expert; can_resume is null until its adapter has run."""
     return [
         {
             "id": e.id,
@@ -347,7 +350,7 @@ def expert_rows(experts: list[InstalledExpert]) -> list[dict]:
             "version": e.version,
             "logged_in": e.logged_in,
             "tested": is_tested(e.id),
-            "can_resume": None,
+            "can_resume": can_resume(e.id),
         }
         for e in experts
     ]
@@ -360,14 +363,23 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
         try:
-            job_id = await jobs.start(args["task"], args["folder"], args.get("expert"))
+            job_id = await jobs.start(
+                args["task"], args["folder"], args.get("expert"), args.get("continue_job")
+            )
         except JobError as err:
             # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
             return json.dumps(err.facts) if err.facts else str(err)
-        return f"job {job_id} started"
+        # Facts only; Scout words them. Without a continue, the session is simply fresh.
+        return json.dumps(
+            {
+                "job": str(job_id),
+                "session": getattr(job_id, "session", "fresh"),
+                "why_fresh": getattr(job_id, "why_fresh", None),
+            }
+        )
 
     async def list_experts(args: dict) -> str:
-        return json.dumps({"experts": expert_rows(jobs.installed())})
+        return json.dumps({"experts": expert_rows(jobs.installed(), jobs.can_resume)})
 
     async def tell_expert(args: dict) -> str:
         _need_text("tell_expert", args, "job", "note")
@@ -381,6 +393,9 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         rows = []
         for job in jobs.list():
             row = asdict(job)
+            # The session id is an opaque handle; Scout only needs to know a follow-up can use it.
+            row["session_id_known"] = bool(row.pop("session_id"))
+            row["expert"] = job.agent
             # Twenty full rows would flood Scout's context: keep a result's start, a progress tail.
             if row["result"] and len(row["result"]) > LIST_TEXT_CAP:
                 row["result"] = row["result"][:LIST_TEXT_CAP] + "…"
@@ -407,7 +422,11 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                 "reports back when done. Use the folder the user named; if they did not name "
                 "one, ask them which folder first, never guess. The user picks how much freedom "
                 "the expert gets; this tool asks them itself. With several experts installed, "
-                "name one by its id from list_experts. Returns the job id once started.",
+                "name one by its id from list_experts. To follow up on a finished job, pass its id "
+                "as continue_job (same folder, same expert): the expert reopens that session when "
+                "it can, else starts fresh. Either way write a short brief of what is needed; "
+                "never paste the chat. Returns JSON: the job id, session (continued or fresh) "
+                "and why_fresh.",
                 {
                     "type": "object",
                     "properties": {
@@ -416,6 +435,10 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                         "expert": {
                             "type": "string",
                             "description": "An expert id from list_experts; optional with one.",
+                        },
+                        "continue_job": {
+                            "type": "string",
+                            "description": "A finished job's id to follow up on, from list_jobs.",
                         },
                     },
                     "required": ["task", "folder"],
@@ -456,8 +479,8 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         (
             ToolSpec(
                 "list_jobs",
-                "Recent Claude Code jobs (the last 20), newest first, with state and latest "
-                "progress.",
+                "Recent expert jobs (the last 20), newest first, with expert, state, latest "
+                "progress, parent_job (the job a follow-up continued) and session_id_known.",
                 {"type": "object", "properties": {}},
                 both,
                 effect="read",
