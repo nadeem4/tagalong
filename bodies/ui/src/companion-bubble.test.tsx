@@ -1,6 +1,6 @@
 /** Tests for CompanionBubble and GreetingLine: asking, chips, full chat, talk and voice. */
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from './shapes';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -1094,5 +1094,39 @@ describe('CompanionBubble on navy', () => {
     expect(header).not.toBeNull();
     expect(header!.contains(chips)).toBe(false);
     expect(chips.closest('.bubble-top')).toBeNull();
+  });
+});
+
+describe('the live job line', () => {
+  const running = (text: string) => ({
+    job: 'j1',
+    expert: 'Claude Code',
+    text,
+    at: '2026-11-02T10:00:00Z',
+  });
+
+  it('shows the running step, quiet, and drops it when the job ends', async () => {
+    const bridge = createFakeHostBridge({ runningSteps: [running('npm init -y')] });
+    renderBubble(bridge);
+    const line = await screen.findByTestId('job-line');
+    expect(line.textContent).toBe('Claude Code: npm init -y');
+    expect(line.getAttribute('aria-live')).toBe('off');
+    bridge.running = [];
+    act(() => bridge.emitChanged('jobs'));
+    await waitFor(() => expect(screen.queryByTestId('job-line')).toBeNull());
+  });
+
+  it('is absent with no running job', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await waitFor(() => expect(bridge.runningStepCalls).toBe(1));
+    expect(screen.queryByTestId('job-line')).toBeNull();
+  });
+
+  it('keeps the full text in its title when the step is long', async () => {
+    const long = `cat ${'C:/very/long/path/'.repeat(8)}file.ts`;
+    renderBubble(createFakeHostBridge({ runningSteps: [running(long)] }));
+    const line = await screen.findByTestId('job-line');
+    expect(line.getAttribute('title')).toBe(`Claude Code: ${long}`);
   });
 });

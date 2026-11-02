@@ -69,6 +69,11 @@ export interface FakeBrain {
     job: string,
     entry: { kind: string; text: string; status?: string; step?: string },
   ): void;
+  /** Set what `job_activity` with no job returns (the bubble's live line) and tell the bodies `changed: what`. */
+  setRunning(
+    steps: { job: string; expert: string; text: string; at: string }[],
+    what: string,
+  ): void;
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
@@ -218,6 +223,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const sockets = new Set<WebSocket>();
   const jobs: Record<string, unknown>[] = [{ ...JOB }];
   const activity: Record<string, Record<string, unknown>[]> = { job1: [...JOB_STEPS] };
+  let running: unknown[] = [];
   const permissions = [
     {
       name: 'desktop__move_window',
@@ -419,9 +425,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         let value: unknown = {};
         if (params.tool === 'list_jobs') value = { jobs };
         else if (params.tool === 'job_activity') {
-          // No job: the bubble's running steps (none here). A job: its steps after the cursor.
+          // No job: the bubble's running steps (set by a test). A job: its steps after the cursor.
           const job = params.input?.job;
-          if (job === undefined) value = { running: [] };
+          if (job === undefined) value = { running };
           else {
             const rows = activity[job] ?? [];
             const after = Number(params.input?.after_rev ?? 0);
@@ -580,6 +586,14 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             method: 'changed',
             params: { seq: ++seq, what: 'job_activity' },
           }),
+        );
+      }
+    },
+    setRunning: (steps, what) => {
+      running = steps;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({ jsonrpc: '2.0', method: 'changed', params: { seq: ++seq, what } }),
         );
       }
     },

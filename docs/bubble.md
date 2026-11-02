@@ -26,6 +26,7 @@ decides to hand to it.
 | `health-ask.ts`, `health.ts`, `health-card.tsx`      | "Scout, what's wrong?": `wantsHealthCheck`, `healthRows`, `healthHeadline`, `HealthCard`                                                                                       |
 | `stop-status.ts`                                     | `stopStatus`: the quiet line for a turn that ended with nothing said                                                                                                           |
 | `status-mark.tsx`                                    | `StatusMark` (`tag` and `row`)                                                                                                                                                 |
+| `job-line.tsx`                                       | `useRunningStep`, `JobLine`: the live job line                                                                                                                                 |
 | `dock-pet.tsx`, `theme/bean-clip.tsx`                | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                                                                                                |
 | `home/`                                              | `HomeView` and its pages                                                                                                                                                       |
 | `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                                                                                                    |
@@ -189,6 +190,24 @@ focusing it holds it. Clicking the text opens the bubble (`onOpen(text)`, so the
 × closes it (`onDone`). It shows Scout's mark and name, a "Click to reply" hint and, with `speaking`,
 the reading-aloud bars. A status line shows no mark.
 Optional `status` shows a `StatusMark` row with Fix it in place of text.
+
+**The live job line.** While any expert job runs, `CompanionBubble` shows one muted 12 px line
+above the status row: `<expert>: <step title>` (`Claude Code: npm init -y`), from `job-line.tsx`.
+`useRunningStep(bridge)` calls `runningSteps()` on mount and on each `onBrainChanged` of
+`job_activity` or `jobs`, at most once per 250 ms (leading read, then one trailing read). With
+several jobs running it shows the first entry, the most recently updated. It shows the step's own
+title only, never output, so nothing new needs masking. It takes no space when absent, is
+`aria-live="off"`, is never spoken, truncates with an ellipsis (the full text is its `title`), and
+disappears when the next `jobs` change leaves nothing running. A failed read (brain offline) logs
+once and shows no line.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+  A[brain: changed job_activity or jobs] --> B[useRunningStep, 250 ms throttle]
+  B --> C[bridge.runningSteps]
+  C --> D[JobLine in the bubble]
+```
 
 **Placement.** `Speech` wraps every look and draws a rotated square as the tail on the `tail` side,
 34 px above the bottom, so the bubble reads as the pet speaking. Main places the window; see
@@ -376,6 +395,7 @@ onListen?, note, partial?, keyLabel, onMic, always? }`, `GreetingLineProps`.
 - `DropOffer = { dropped, explain } | { refusal }` (`drop-card.tsx`).
 - `DockPetProps { pet, mood, figure, sightPaused?, listening?, blinkEveryMs?,
 status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
+- `useRunningStep(bridge): RunningStep | null`, `JobLine({ step })` (`job-line.tsx`).
 - `StatusMarkProps { mark, variant: 'tag' | 'row', onFix? }`; `StatusId`, `StatusMark`,
   `STATUS_WORDS`, `FixTarget` (protocol).
 - `HomeViewProps { host, scout, settings, page?, onPage? }`, `HomeHost`, `HomePage`.

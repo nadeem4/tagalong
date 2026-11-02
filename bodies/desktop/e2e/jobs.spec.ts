@@ -148,3 +148,14 @@ test('a changed jobs notice refreshes the list', async () => {
     timeout: 15_000,
   });
 });
+
+test("the bubble shows a running job's latest step", async () => {
+  const panel = await windowFor('panel');
+  const step = { job: 'job1', expert: 'Claude Code', text: 'npm test', at: '2026-10-27T10:00:00Z' };
+  brain.setRunning([step], 'job_activity');
+  const line = panel.getByTestId('job-line');
+  await expect(line).toHaveText('Claude Code: npm test', { timeout: 15_000 });
+
+  brain.setRunning([], 'jobs');
+  await expect(line).toHaveCount(0, { timeout: 15_000 });
+});
