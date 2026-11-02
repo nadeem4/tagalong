@@ -26,6 +26,7 @@ import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
+import { JobLine, useRunningStep } from './job-line';
 import { wantsHealthCheck } from './health-ask';
 import { healthHeadline, healthRows } from './health';
 import type { HealthRow } from './health';
@@ -369,6 +370,8 @@ export function CompanionBubble({
       ) : null}
     </p>
   );
+  const runningStep = useRunningStep(bridge);
+  const jobLine = runningStep !== null && <JobLine step={runningStep} />;
   const statusRow = status != null && (
     <StatusMark
       mark={status}
@@ -729,6 +732,7 @@ export function CompanionBubble({
           </div>
           <footer className="bubble-foot">
             {chipList}
+            {jobLine}
             {statusRow}
             {talkStatus}
             {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
@@ -765,6 +769,7 @@ export function CompanionBubble({
         {scoutMessage}
         {answer}
         {cards}
+        {jobLine}
         {statusRow}
         {talkStatus}
         {field(`Ask ${petName}`)}
@@ -976,6 +981,9 @@ const BUBBLE_CSS = `
 }
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
+.bubble-jobline {
+  margin: 0; color: #C9CEE0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
