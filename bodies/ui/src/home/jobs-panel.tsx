@@ -1,12 +1,14 @@
 /**
  * Home's Jobs panel, on the Jobs page: the Claude Code jobs Scout handed work to, newest first,
  * with a Stop on running ones and the result of finished ones. The brain owns the jobs; this
- * lists them and reads again when the brain says they changed. Contains JobsPanel.
+ * lists them and reads again when the brain says they changed. Watch opens a job's page in
+ * place of the list. Contains JobsPanel.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
+import { JobPage } from './job-page';
 
 const STATE_LABEL: Record<string, string> = {
   running: 'Running',
@@ -34,6 +36,7 @@ export function JobsPanel() {
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [watching, setWatching] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     bridge
@@ -69,6 +72,9 @@ export function JobsPanel() {
       if (!next.delete(id)) next.add(id);
       return next;
     });
+
+  const watched = watching === null ? undefined : jobs?.find((job) => job.id === watching);
+  if (watched) return <JobPage job={watched} onBack={() => setWatching(null)} />;
 
   return (
     <>
@@ -110,6 +116,15 @@ export function JobsPanel() {
                   )}
                 </div>
                 <div className="job-row__actions">
+                  {job.activity && (
+                    <Button
+                      variant="secondary"
+                      aria-label={`Watch ${job.task}`}
+                      onClick={() => setWatching(job.id)}
+                    >
+                      Watch
+                    </Button>
+                  )}
                   {job.state === 'running' && (
                     <Button
                       variant="secondary"

@@ -40,6 +40,7 @@ function colorFor(code: number): AnsiColor | null {
 }
 
 // CSI sequences (final byte decides) and OSC strings ending in BEL.
+// eslint-disable-next-line no-control-regex -- the escape byte is the whole point
 const ESCAPE = /\x1b\[([0-9;?]*)([ -/]*[@-~])|\x1b\][^\x07]*\x07/g;
 
 export function parseAnsi(text: string): AnsiSpan[] {

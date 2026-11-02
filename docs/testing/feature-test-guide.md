@@ -278,10 +278,20 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens the result text.
     The brain also keeps an activity log per job (steps, edits, messages, plan) and serves it to
-    Home by cursor (`job_activity`, with a throttled `changed`); nothing shows it yet, so there is
-    no manual check. Automated tests cover it on the fake agent (steps `tool`, `tool_update`,
-    `plan`): masking, size caps, resume replay, two jobs on one adapter, the cursor pages, the
-    250 ms `changed` throttle and, in `e2e/jobs.spec.ts`, the desktop pull on the fake brain.
+    Home by cursor (`job_activity`, with a throttled `changed`). Automated tests cover it on the
+    fake agent (steps `tool`, `tool_update`, `plan`): masking, size caps, resume replay, two jobs
+    on one adapter, the cursor pages, the 250 ms `changed` throttle and, in `e2e/jobs.spec.ts`,
+    the desktop pull and the job page on the fake brain.
+    **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
+    tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
+    page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it
+    works: `$ command` lines with a spinner that turns into a check (or a cross if it failed),
+    output beneath in muted text with colours kept, edits in blue, `# ` lines for what Claude Code
+    says. A command that has not finished shows `running, 14 s` and "output appears when the
+    command finishes". Scroll up while it runs: the view stops following and a **Jump to latest**
+    pill appears; press it to follow again. Press **Stop**: the page ends with `# stopped`. Open
+    **Watch** on a finished job: the full log and a final `# done` line, no clock ticking. Nothing
+    can be typed into the page. With Windows animations off (reduced motion) the spinner is still.
 12. **Action:** with the bubble closed, start a Manual-mode job that needs permission (or asks a
     question; its card appears once Scout passes the question on or cannot answer it) and leave
     the relayed ask unanswered for a minute.

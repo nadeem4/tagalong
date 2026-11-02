@@ -483,8 +483,25 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   `jobActivity(job, afterRev)` and `runningSteps()` (host bridge) pull a job's steps by cursor and
   the step each running job is on, through the brain tool `job_activity`; a bad job id or cursor is
-  refused before the brain. No page shows them yet. `e2e/jobs.spec.ts` covers the panel and the
-  cursor pull on the fake brain (`pushActivity` adds a step and sends `changed: job_activity`).
+  refused before the brain. `e2e/jobs.spec.ts` covers the panel, the cursor pull and the job page
+  on the fake brain (`pushActivity` adds a step and sends `changed: job_activity`).
+- **Job page:** a job with `activity: true` has a **Watch** button; `JobsPanel` then renders
+  `JobPage` (`bodies/ui/src/home/job-page.tsx`) in place of the list, with a "Jobs" link back, so
+  `HomeView` navigation is unchanged. The page pulls `jobActivity(job, rev)` on mount and on every
+  `changed { what: "job_activity" }`, loops while `more` is true, and folds each page with
+  `applyPage` (`job-activity-state.ts`: an entry with a seen `seq` is replaced in place, the rest
+  appended, sorted by `seq`). `JobLog` (`job-log.tsx`) draws the steps as styled text, not a
+  terminal emulator, so nothing can be typed: `$ command` lines with a status glyph (spinner,
+  check, cross), output through a small SGR-only parser (`ansi.ts`: bold and the 16 colours; cursor
+  moves and clears are dropped and `
+` progress lines keep their last state), edits in sky,
+  reads and said lines muted (`# `), plans as `[x]` lines and the end line. A running command with
+  no output shows `running, N s` (from the step's `at` and the clock) and "output appears when the
+  command finishes". The header has the task, the state chip, the elapsed time and **Stop** while
+  running; the one-second clock runs only while the job does. The log is a focusable `role="log"`
+  with `aria-live="off"`, follows the newest line until the person scrolls up, then shows a
+  **Jump to latest** pill; the spinner stands still under `prefers-reduced-motion`. A failed pull
+  shows one alert line and keeps the log.
 - **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses
   `list_approvals`, `list_preferences`, `remove_preference` and `edit_preference`
   (`ipc/approvals.ts`, channels `tagalong:approvals:list`, `tagalong:approvals:preferences:list`,

@@ -32,4 +32,18 @@ describe('HOME_CSS', () => {
   it('gives the permissions card no width or margin of its own', () => {
     expect(HOME_CSS).not.toMatch(/\.home-perms\s*\{[^}]*(max-width|margin)/);
   });
+
+  it('draws the job log in mono on the navy shell with every ANSI colour from the tokens', () => {
+    expect(HOME_CSS).toMatch(new RegExp(`\\.job-log \\{[^}]*background: ${t.color.page}`));
+    expect(HOME_CSS).toContain(`font-family: ${t.font.mono}`);
+    for (const [name, hex] of Object.entries(t.ansi)) {
+      expect(HOME_CSS).toContain(`.ansi-${name} { color: ${hex}; }`);
+    }
+  });
+
+  it('stops the job spinner for reduced motion', () => {
+    expect(HOME_CSS).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{[^}]*\.job-log__glyph--running[^}]*animation: none/,
+    );
+  });
 });

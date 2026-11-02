@@ -119,6 +119,28 @@ test('a job page pulls its steps by cursor', async () => {
   expect(next.rev).toBe(4);
 });
 
+test('watching a job shows its log and follows new steps', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Watch Fix the build' }).click();
+
+  const log = home.getByRole('log');
+  await expect(log).toContainText('$ npm test', { timeout: 15_000 });
+  await expect(log).toContainText('all green');
+
+  brain.pushActivity('job1', {
+    kind: 'command',
+    text: 'git status',
+    status: 'running',
+    step: 's9',
+  });
+  await expect(log).toContainText('$ git status', { timeout: 15_000 });
+  await expect(log).toContainText('running, ');
+
+  await home.getByRole('button', { name: 'Jobs', exact: true }).last().click();
+  await expect(home.getByRole('region', { name: 'Jobs' })).toContainText('Fix the build');
+});
+
 test('a changed jobs notice refreshes the list', async () => {
   // Answering the question made the brain add a second job and say only that jobs changed.
   const home = await windowFor('home');

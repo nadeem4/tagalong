@@ -136,6 +136,19 @@ describe('JobsPanel', () => {
     expect(await screen.findByText('Write the release notes')).toBeInTheDocument();
   });
 
+  it('offers Watch only on jobs that kept steps, opens the page and comes back', async () => {
+    const watched: JobRow = { ...DONE, id: 'j9', task: 'Watched job', activity: true };
+    const bridge = createFakeHostBridge({ jobs: [RUNNING, watched], activity: { j9: [] } });
+    renderPanel(bridge);
+    await rows();
+    expect(screen.queryByRole('button', { name: 'Watch Fix the login bug' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Watch Watched job' }));
+    expect(await screen.findByRole('log')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Jobs' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Jobs' }));
+    expect(await screen.findByRole('list', { name: 'Jobs' })).toBeInTheDocument();
+  });
+
   it('has an empty state', async () => {
     renderPanel(createFakeHostBridge({ jobs: [] }));
     expect(await screen.findByText(/No jobs yet/)).toBeInTheDocument();

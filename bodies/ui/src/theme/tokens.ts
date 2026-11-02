@@ -14,6 +14,8 @@ export const themeTokens = {
     field: '#1A1F3A',
     fieldLine: '#2E3558',
     gold: '#F2C14E',
+    /** Sky blue: the job log's edit lines (the bubble hard-codes the same blue). */
+    sky: '#7CB8F2',
     goldInk: '#12162B',
     /** Focus ring: navy on light surfaces, gold on navy ones. */
     focusOnLight: '#12162B',
@@ -48,6 +50,26 @@ export const themeTokens = {
     pixel: "'Pixelify Sans', 'Onest', sans-serif",
     /** The name "Scout": Onest, never the pixel font (its c reads as o). */
     wordmark: "'Onest', system-ui, sans-serif",
+    mono: "ui-monospace, 'Cascadia Mono', Consolas, monospace",
+  },
+  /** The 16 terminal colours, tuned to read on the navy of the job log. */
+  ansi: {
+    black: '#6B7394',
+    red: '#F28B82',
+    green: '#8FD19E',
+    yellow: '#F2C14E',
+    blue: '#7CB8F2',
+    magenta: '#C9A0F2',
+    cyan: '#7FD6D9',
+    white: '#C9CEDC',
+    brightBlack: '#8A92B0',
+    brightRed: '#FFADA6',
+    brightGreen: '#B1E5BC',
+    brightYellow: '#FFD97A',
+    brightBlue: '#A6D0F7',
+    brightMagenta: '#DEC2F7',
+    brightCyan: '#A6E8EA',
+    brightWhite: '#FFFFFF',
   },
   fontSize: {
     /** The smallest functional text. Nothing goes below it. */
