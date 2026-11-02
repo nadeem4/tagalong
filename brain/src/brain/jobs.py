@@ -290,6 +290,7 @@ class Jobs:
                 self._runs.pop(job_id, None)
                 self._activity.pop(job_id, None)
                 self._stop_activity_notes(job_id)
+                self._end_timers(job_id)
                 self._changed()
                 await run.close()
                 if isinstance(exc, Exception):
@@ -668,6 +669,13 @@ class Jobs:
         if activity := self._activity.get(job_id):
             activity.on_update(update)
 
+    def _end_timers(self, job_id: str) -> None:
+        """A job's check-back timers are lifecycle, not a decision: gone with the job."""
+        if timer_ids := self._memory.delete_timers_for_job(job_id):
+            for timer_id in timer_ids:
+                self._drop("timer", f"timer:{timer_id}")
+            self._timers_changed()
+
     async def _end(self, job_id: str, state: str, reason: str, result: str | None) -> None:
         result = mask_json(self._guards, "job_result", result)
         self._memory.update_job(job_id, state=state, reason=reason, result=result, ended_at=_now())
@@ -675,11 +683,7 @@ class Jobs:
         # job_ended carries the same facts, so held failure and quiet news is stale now
         self._drop("job_step_failed", f"job:{job_id}")
         self._drop("job_quiet", f"job:{job_id}")
-        # its check-back timers are lifecycle, not a decision: gone with the job
-        if timer_ids := self._memory.delete_timers_for_job(job_id):
-            for timer_id in timer_ids:
-                self._drop("timer", f"timer:{timer_id}")
-            self._timers_changed()
+        self._end_timers(job_id)
         if activity := self._activity.pop(job_id, None):
             self._stop_activity_notes(job_id)
             activity.end(state, reason)  # its change notice is the one, sent after the end row

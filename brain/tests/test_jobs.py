@@ -312,6 +312,28 @@ async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_t
     await rig.jobs.start("again", str(rig.folder))  # the cap of one is free again
 
 
+async def test_begin_failure_deletes_the_jobs_timers_and_rearms(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    original = rig.make_run
+
+    def failing(expert, **callbacks):
+        run = original(expert, **callbacks)
+
+        async def boom(mode_id, task):
+            job_id = rig.memory.list_jobs()[0].id
+            rig.memory.add_timer("x", datetime.now(UTC) + timedelta(hours=1), job_id=job_id)
+            raise ConnectionError("connection lost")
+
+        run.begin = boom
+        return run
+
+    rig.jobs._make_run = failing
+    with pytest.raises(JobError, match="connection lost"):
+        await rig.jobs.start("go", str(rig.folder))
+    assert rig.memory.list_timers() == []
+    assert rig.timers_changed == 1
+
+
 async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
     rig = make_rig(FakeAsks())
     original = rig.make_run
