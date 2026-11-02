@@ -339,7 +339,11 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** Scout continues the earlier job: Home → Jobs shows the new job under the same
     expert and folder, and Scout says whether the session was continued or started fresh (and
     why: the expert cannot reopen sessions, or the session could not be loaded). Within the idle
-    period the same adapter process serves it. Asking to continue a job of another folder or
+    period the same adapter process serves it. A plain second hand-off in that folder (no
+    follow-up wording) also continues the session: Scout says continued. Say "start over" and
+    Scout hands off fresh (a new session, no earlier context). Start a second hand-off while the
+    first still runs: it starts fresh with the in-use reason and the first is unaffected. Asking
+    to continue a job of another folder or
     expert, or one still running, is refused with a plain reason. Automated tests cover resume,
     the fallbacks and the idle stop on the fake agent; this pass is the only real one.
 

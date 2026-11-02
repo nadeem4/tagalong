@@ -204,6 +204,7 @@ class FakeJobs:
     def __init__(self):
         self.calls = []
         self.owner_asked = None
+        self.fresh = None
         self.error = None
         self.rows = []
         self.activity_jobs = set()
@@ -220,9 +221,12 @@ class FakeJobs:
     def can_resume(self, expert_id):
         return self.resumable.get(expert_id)
 
-    async def start(self, task, folder, expert=None, continue_job=None, *, owner_asked=True):
+    async def start(
+        self, task, folder, expert=None, continue_job=None, *, owner_asked=True, fresh=False
+    ):
         self.calls.append(("start", task, folder, expert, continue_job))
         self.owner_asked = owner_asked
+        self.fresh = fresh
         if self.error:
             raise self.error
         return self.started
@@ -288,18 +292,31 @@ def test_expert_specs_audiences_effects_and_gate(home):
 def test_expert_model_tool_schemas(home):
     tools = {t["name"]: t["input_schema"] for t in home.box.model_tools()}
     assert tools["hand_off"]["required"] == ["task", "folder"]
-    assert set(tools["hand_off"]["properties"]) == {"task", "folder", "expert", "continue_job"}
+    assert set(tools["hand_off"]["properties"]) == {
+        "task",
+        "folder",
+        "expert",
+        "continue_job",
+        "fresh",
+    }
+    assert tools["hand_off"]["properties"]["fresh"]["type"] == "boolean"
     assert tools["tell_expert"]["required"] == ["job", "note"]
     assert tools["stop_job"]["required"] == ["job"]
     assert tools["list_jobs"]["properties"] == {}
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     assert "never guess" in described["hand_off"]
+    assert "fresh" in described["hand_off"] and "same folder" in described["hand_off"]
 
 
 async def test_hand_off_reaches_jobs_start(home):
     out = await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
     assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None, None)]
-    assert json.loads(out) == {"job": "ab12cd34", "session": "fresh", "why_fresh": None}
+    assert json.loads(out) == {
+        "job": "ab12cd34",
+        "session": "fresh",
+        "why_fresh": None,
+        "parent_job": None,
+    }
 
 
 async def test_home_permission_list_shows_tell_expert_as_ask(home):
@@ -323,10 +340,23 @@ async def test_hand_off_continue_job_reports_the_session_facts(home):
         "job": "n1",
         "session": "fresh",
         "why_fresh": "expert cannot reopen sessions",
+        "parent_job": None,
     }
-    home.jobs.started = JobId("n2", "continued")
+    home.jobs.started = JobId("n2", "continued", None, "n1")
     out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "n1"})
-    assert json.loads(out) == {"job": "n2", "session": "continued", "why_fresh": None}
+    assert json.loads(out) == {
+        "job": "n2",
+        "session": "continued",
+        "why_fresh": None,
+        "parent_job": "n1",
+    }
+
+
+async def test_hand_off_passes_fresh_to_jobs(home):
+    await home.run("hand_off", {"task": "t", "folder": "C:/p"})
+    assert home.jobs.fresh is False
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "fresh": True})
+    assert home.jobs.fresh is True
 
 
 async def test_hand_off_passes_the_named_expert(home):
