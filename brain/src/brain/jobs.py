@@ -98,7 +98,9 @@ class Jobs:
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         drop: Callable[[str, str], None] = lambda kind, key: None,
+        on_timers_changed: Callable[[], None] = lambda: None,
     ) -> None:
+        self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
@@ -609,6 +611,11 @@ class Jobs:
         # job_ended carries the same facts, so held failure and quiet news is stale now
         self._drop("job_step_failed", f"job:{job_id}")
         self._drop("job_quiet", f"job:{job_id}")
+        # its check-back timers are lifecycle, not a decision: gone with the job
+        if timer_ids := self._memory.delete_timers_for_job(job_id):
+            for timer_id in timer_ids:
+                self._drop("timer", f"timer:{timer_id}")
+            self._timers_changed()
         if activity := self._activity.pop(job_id, None):
             self._stop_activity_notes(job_id)
             activity.end(state, reason)  # its change notice is the one, sent after the end row

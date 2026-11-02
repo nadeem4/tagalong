@@ -1860,3 +1860,18 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
     assert states(sent) == ["started", "ended"]
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: job_step_failed" in text and "cmd9" in text and "cmd8" not in text
+
+
+async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
+    tz = datetime.timezone(datetime.timedelta(hours=1))
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
+    memory = Memory(":memory:")
+    memory.add_job("j1", "a", "t", "f", "m")  # left running by the dead brain
+    memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
+    kinds = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
+    session, _ = make(Gate(["ok"]), memory, kinds=kinds, now=lambda: now)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    assert memory.list_timers() == []
+    assert memory.get_job("j1").state == "stopped"

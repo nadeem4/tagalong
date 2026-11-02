@@ -148,6 +148,7 @@ class Session:
             setup_facts=setup_facts,
             emit=self.scheduler.emit,
             drop=self.scheduler.drop,
+            on_timers_changed=lambda: timers.changed(),
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = self.timers = Timers(

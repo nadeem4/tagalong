@@ -178,3 +178,13 @@ def test_a_plain_timer_wake_facts_are_unchanged():
     t = mem.add_timer("plain", T0 - timedelta(seconds=1))
     timers.fire_due()
     assert events[0].facts == {"id": t.id, "note": "plain", "repeat_minutes": 0}
+
+
+def test_a_repeating_job_timer_does_not_fire_after_its_job_ends():
+    timers, mem, clock, events, _s = make()
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.add_timer("again", T0 + timedelta(minutes=5), repeat_s=300, job_id="j1")
+    mem.delete_timers_for_job("j1")  # what Jobs._end does
+    clock.at = T0 + timedelta(minutes=6)
+    timers.fire_due()
+    assert events == []

@@ -123,6 +123,7 @@ class Rig:
         self.clock = FakeClock()  # the quiet clock of each run, moved by the test
         self.emitted: list = []
         self.dropped: list = []
+        self.timers_changed = 0
         self.wall = datetime.now(UTC)
         self.experts = [installed()] if experts is None else experts
         self.expert_ids: list[str] = []
@@ -151,6 +152,7 @@ class Rig:
             emit=self.emitted.append,
             drop=lambda kind, key: self.dropped.append((kind, key, len(self.finished))),
             now=lambda: self.wall,
+            on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -1802,3 +1804,44 @@ async def test_activity_page_carries_the_watch_list(make_rig):
     assert rig.jobs.activity_page("j1", 0)["watch"] is None
     rig.jobs.set_watch("j1", _items(1))
     assert rig.jobs.activity_page("j1", 0)["watch"] == _items(1)
+
+
+async def test_ending_a_job_deletes_its_timers_and_rearms(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    when = datetime.now(UTC) + timedelta(hours=1)
+    rig.memory.add_timer("a", when, job_id=job_id)
+    rig.memory.add_timer("b", when, repeat_s=600, job_id=job_id)
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    assert rig.memory.list_timers() == []
+    assert rig.timers_changed == 1
+
+
+async def test_ending_a_job_drops_a_held_timer_event_for_it(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    t = rig.memory.add_timer("a", datetime.now(UTC) + timedelta(hours=1), job_id=job_id)
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    assert ("timer", f"timer:{t.id}", 0) in rig.dropped  # dropped before on_finished ran
+
+
+async def test_ending_a_job_leaves_other_jobs_and_plain_timers(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    when = datetime.now(UTC) + timedelta(hours=1)
+    other = rig.memory.add_timer("o", when, job_id="someone-else")
+    plain = rig.memory.add_timer("p", when)
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    assert {t.id for t in rig.memory.list_timers()} == {other.id, plain.id}
+    assert not any(kind == "timer" for kind, _key, _n in rig.dropped)
+
+
+async def test_ending_a_job_without_timers_does_not_rearm(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    await until(lambda: rig.finished)
+    assert rig.timers_changed == 0
