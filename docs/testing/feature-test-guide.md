@@ -539,6 +539,14 @@ expect a word right when one is due.
 4. **Action:** ask Scout to repeat something every 1 minute.
    **Expected:** Scout says in plain words that a repeat must be at least 5 minutes, and sets no
    such timer.
+5. **Action:** start a job that runs a while, then ask Scout "check that job again in 5 minutes
+   and tell me where it is".
+   **Expected:** when the timer fires Scout speaks from the job's state and a short summary of its
+   steps (and what it was watching for), without raw output; "what timers do you have?" before
+   that shows the timer with the job id.
+6. **Action:** set a check-back timer on a job, then stop the job (or let it finish).
+   **Expected:** the timer is gone from "what timers do you have?" and never fires afterwards.
+   Repeat with a job still running when you stop the brain and restart it: no stale timer wake.
 
 ## Scout notices you (real brain, desktop)
 

@@ -191,6 +191,10 @@ MIGRATIONS = (
     """
     ALTER TABLE jobs ADD COLUMN watch TEXT;
     """,
+    # A timer can belong to a running job; it goes when the job ends.
+    """
+    ALTER TABLE timers ADD COLUMN job_id TEXT;
+    """,
 )
 
 DROPPED_MARKER = "[older steps dropped]"
@@ -249,6 +253,7 @@ class Timer:
     repeat_s: int | None
     created_at: str
     fired: bool
+    job_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -577,6 +582,9 @@ class Memory:
                 ),
             )
         self._db.execute(
+            "DELETE FROM timers WHERE job_id IN (SELECT id FROM jobs WHERE state='running')"
+        )
+        self._db.execute(
             "UPDATE jobs SET state='stopped', reason='brain restarted', ended_at=?"
             " WHERE state='running'",
             (self._now().isoformat(),),
@@ -590,16 +598,24 @@ class Memory:
 
     def _timers(self, where: str = "", args: tuple = ()) -> list[Timer]:
         rows = self._db.execute(
-            "SELECT id, note, next_at, repeat_s, created_at, fired FROM timers"
+            "SELECT id, note, next_at, repeat_s, created_at, fired, job_id FROM timers"
             f" {where} ORDER BY next_at, id",
             args,
         ).fetchall()
-        return [Timer(i, n, datetime.fromisoformat(a), r, c, bool(f)) for i, n, a, r, c, f in rows]
+        return [
+            Timer(i, n, datetime.fromisoformat(a), r, c, bool(f), j) for i, n, a, r, c, f, j in rows
+        ]
 
-    def add_timer(self, note: str, next_at: datetime, repeat_s: int | None = None) -> Timer:
+    def add_timer(
+        self,
+        note: str,
+        next_at: datetime,
+        repeat_s: int | None = None,
+        job_id: str | None = None,
+    ) -> Timer:
         cur = self._db.execute(
-            "INSERT INTO timers(note, next_at, repeat_s, created_at) VALUES (?,?,?,?)",
-            (note, _utc_text(next_at), repeat_s, self._now().isoformat()),
+            "INSERT INTO timers(note, next_at, repeat_s, created_at, job_id) VALUES (?,?,?,?,?)",
+            (note, _utc_text(next_at), repeat_s, self._now().isoformat(), job_id),
         )
         return self._timers("WHERE id=?", (cur.lastrowid,))[0]
 
@@ -609,6 +625,12 @@ class Memory:
 
     def delete_timer(self, id: int) -> bool:
         return self._db.execute("DELETE FROM timers WHERE id=?", (id,)).rowcount > 0
+
+    def delete_timers_for_job(self, job_id: str) -> list[int]:
+        """Lifecycle cleanup: every timer of this job, fired one-offs included."""
+        ids = [r[0] for r in self._db.execute("SELECT id FROM timers WHERE job_id=?", (job_id,))]
+        self._db.execute("DELETE FROM timers WHERE job_id=?", (job_id,))
+        return ids
 
     def set_timer_next(self, id: int, next_at: datetime) -> None:
         self._db.execute("UPDATE timers SET next_at=? WHERE id=?", (_utc_text(next_at), id))

@@ -994,6 +994,27 @@ async def test_a_due_timer_wakes_scout_with_its_note():
     assert "look at the deploy" in text
 
 
+async def test_session_job_timer_wake_includes_watching_and_activity():
+    tz = datetime.timezone(datetime.timedelta(hours=1))
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
+    memory = Memory(":memory:")
+    kinds = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    # A job running after startup (startup stops any left over), then its timer comes due.
+    memory.add_job("j1", "a", "t", "f", "m")
+    memory.set_watch("j1", [{"text": "tests pass", "done": False}])
+    memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
+    session.timers.fire_due()
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "check the job" in text
+    assert "watching" in text and "tests pass" in text
+    assert "activity" in text
+
+
 # --- body events and the online wake (10c) ---
 
 
@@ -1839,3 +1860,52 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
     assert states(sent) == ["started", "ended"]
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: job_step_failed" in text and "cmd9" in text and "cmd8" not in text
+
+
+async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
+    tz = datetime.timezone(datetime.timedelta(hours=1))
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
+    memory = Memory(":memory:")
+    memory.add_job("j1", "a", "t", "f", "m")  # left running by the dead brain
+    memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
+    kinds = {
+        "timer": EventKind("timer", batch_seconds=0, max_per_hour=6),
+        "job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10),
+    }
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    assert memory.list_timers() == []
+    assert memory.get_job("j1").state == "stopped"
+    texts = [m[-1]["content"][-1]["text"] for m in model.seen]
+    assert texts and all("Event: timer" not in t for t in texts)  # only the job_ended wake
+
+
+async def test_job_ended_still_wakes_scout_after_cleanup():
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)
+    memory = Memory(":memory:")
+    kinds = {
+        "timer": EventKind("timer", batch_seconds=0, max_per_hour=6),
+        "job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10),
+    }
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    memory.add_job("j1", "claude_code", "t", "C:/x", "default")
+    # A fired one-off, held by the scheduler (no body online), and a future repeating timer
+    # that keeps the sleeper armed.
+    fired = memory.add_timer("look", now - datetime.timedelta(minutes=1), job_id="j1")
+    memory.add_timer("later", now + datetime.timedelta(hours=1), repeat_s=600, job_id="j1")
+    session.timers.fire_due()
+    assert session.timers._handle is not None
+    await session.jobs._end("j1", "done", "finished", "all good")
+    assert [t for t in memory.list_timers() if t.id == fired.id] == []
+    assert memory.list_timers() == []
+    assert session.timers._handle is None  # the sleeper was re-armed for nothing
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    texts = [m[-1]["content"][-1]["text"] for m in model.seen]
+    assert any("Job j1 ended" in t for t in texts)
+    assert all("Event: timer" not in t for t in texts)

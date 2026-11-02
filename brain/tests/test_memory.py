@@ -498,7 +498,7 @@ def _t(hour, minute=0, tz=UTC):
 def test_timers_table_exists_after_migration(mem):
     assert mem.list_timers() == []
     cols = [r[1] for r in mem._db.execute("PRAGMA table_info(timers)")]
-    assert cols == ["id", "note", "next_at", "repeat_s", "created_at", "fired"]
+    assert cols == ["id", "note", "next_at", "repeat_s", "created_at", "fired", "job_id"]
 
 
 def test_add_and_list_timers_soonest_first(mem):
@@ -778,3 +778,59 @@ def test_a_malformed_stored_watch_reads_as_none(mem):
     mem.add_job("j1", "a", "t", "f", "m")
     mem.update_job("j1", watch="not json")
     assert mem.get_job("j1").watch is None
+
+
+def test_timer_job_id_round_trips_and_defaults_to_none(mem):
+    plain = mem.add_timer("p", _t(9))
+    linked = mem.add_timer("l", _t(10), job_id="j1")
+    assert plain.job_id is None and linked.job_id == "j1"
+    assert [t.job_id for t in mem.list_timers()] == [None, "j1"]
+
+
+def test_delete_timers_for_job_returns_ids_and_leaves_other_timers(mem):
+    a = mem.add_timer("a", _t(9), job_id="j1")
+    b = mem.add_timer("b", _t(10), repeat_s=600, job_id="j1")
+    other = mem.add_timer("o", _t(11), job_id="j2")
+    plain = mem.add_timer("p", _t(12))
+    assert sorted(mem.delete_timers_for_job("j1")) == sorted([a.id, b.id])
+    assert {t.id for t in mem.list_timers()} == {other.id, plain.id}
+    assert mem.delete_timers_for_job("j1") == []
+
+
+def test_delete_timers_for_job_includes_fired_one_offs(mem):
+    t = mem.add_timer("a", _t(9), job_id="j1")
+    mem.mark_timer_fired(t.id)
+    assert mem.delete_timers_for_job("j1") == [t.id]
+    assert mem.fired_timers() == []
+
+
+def test_stop_running_on_start_deletes_the_timers_of_jobs_it_stops(mem):
+    mem.add_job("a", "a", "t", "f", "m")
+    linked = mem.add_timer("x", _t(9), job_id="a")
+    mem.stop_running_on_start()
+    assert mem.get_job("a").state == "stopped"
+    assert all(t.id != linked.id for t in mem.list_timers())
+
+
+def test_stop_running_on_start_keeps_timers_of_finished_jobs_and_plain_timers(mem):
+    mem.add_job("done", "a", "t", "f", "m")
+    mem.update_job("done", state="done", ended_at="x")
+    kept = mem.add_timer("k", _t(9), job_id="done")
+    plain = mem.add_timer("p", _t(10))
+    mem.stop_running_on_start()
+    assert {t.id for t in mem.list_timers()} == {kept.id, plain.id}
+
+
+def test_an_old_database_gets_the_job_id_column(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.execute(
+        "INSERT INTO timers(note, next_at, created_at) VALUES ('n','2026-01-01T00:00:00+00:00','c')"
+    )
+    db.close()
+    m = Memory(path)
+    assert m.list_timers()[0].job_id is None
+    assert m.add_timer("x", _t(9), job_id="j").job_id == "j"
+    m.close()

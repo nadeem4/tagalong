@@ -743,7 +743,7 @@ async def test_list_timers_shows_next_and_repeat(mem, trun):
     assert rows[0]["next_at"] == "2026-10-28T08:10:00+00:00"
     assert rows[0]["repeat_minutes"] == 15
     assert rows[1]["repeat_minutes"] is None
-    assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes", "pending"}
+    assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes", "pending", "job"}
 
 
 async def test_cancel_timer_removes_it_and_refuses_unknown_ids(mem, trun):
@@ -1040,3 +1040,37 @@ def test_hand_off_description_points_to_watch_job_and_how_done_is_judged(home):
     text = described["hand_off"]
     assert "watch_job" in text and "done" in text and "summary" in text
     assert "watch list" in described["list_jobs"]
+
+
+async def test_set_timer_with_a_running_job_stores_job_id(mem, trun):
+    mem.add_job("j1", "a", "t", "f", "m")
+    await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
+    assert mem.list_timers()[0].job_id == "j1"
+    assert trun.fake.changes == 1
+
+
+async def test_set_timer_refuses_an_unknown_job(mem, trun):
+    with pytest.raises(MemoryRefused, match="no job"):
+        await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "nope"})
+    assert mem.list_timers() == []
+
+
+async def test_set_timer_refuses_a_finished_job(mem, trun):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.update_job("j1", state="done", ended_at="x")
+    with pytest.raises(MemoryRefused, match="not running"):
+        await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
+    assert mem.list_timers() == []
+
+
+async def test_set_timer_refuses_a_non_string_job(mem, trun):
+    with pytest.raises(MemoryRefused, match="job"):
+        await trun("set_timer", {"note": "n", "in_minutes": 10, "job": 5})
+
+
+async def test_list_timers_shows_the_job(mem, trun):
+    mem.add_job("j1", "a", "t", "f", "m")
+    await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
+    await trun("set_timer", {"note": "p", "in_minutes": 20})
+    rows = json.loads(await trun("list_timers", {}))["timers"]
+    assert [r["job"] for r in rows] == ["j1", None]

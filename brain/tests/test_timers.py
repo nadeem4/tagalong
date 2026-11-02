@@ -21,7 +21,7 @@ class Clock:
         return self.at
 
 
-def make(memory=None, clock=None):
+def make(memory=None, clock=None, job_facts=None):
     memory = memory or Memory(":memory:")
     clock = clock or Clock()
     events = []
@@ -31,7 +31,8 @@ def make(memory=None, clock=None):
         events.append(event)
         starts.append(on_start)
 
-    return Timers(memory, emit, clock), memory, clock, events, starts
+    kw = {"job_facts": job_facts} if job_facts else {}
+    return Timers(memory, emit, clock, **kw), memory, clock, events, starts
 
 
 def _timer(mem, id):
@@ -147,3 +148,43 @@ async def test_changed_rearms_for_a_new_sooner_timer():
     timers.changed()
     await asyncio.sleep(1.7)
     assert [e.facts["note"] for e in events] == ["soon"]
+
+
+def test_a_job_timer_wake_has_job_state_and_wake_facts():
+    seen = []
+
+    def job_facts(job_id):
+        seen.append(job_id)
+        return {"activity": "2 steps", "watching": "- tests pass"}
+
+    timers, mem, _c, events, _s = make(job_facts=job_facts)
+    mem.add_job("j1", "a", "t", "f", "m")
+    t = mem.add_timer("check back", T0 - timedelta(seconds=1), job_id="j1")
+    timers.fire_due()
+    assert events[0].facts == {
+        "id": t.id,
+        "note": "check back",
+        "repeat_minutes": 0,
+        "job": "j1",
+        "state": "running",
+        "activity": "2 steps",
+        "watching": "- tests pass",
+    }
+    assert seen == ["j1"]
+
+
+def test_a_plain_timer_wake_facts_are_unchanged():
+    timers, mem, _c, events, _s = make(job_facts=lambda j: {"activity": "x"})
+    t = mem.add_timer("plain", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    assert events[0].facts == {"id": t.id, "note": "plain", "repeat_minutes": 0}
+
+
+def test_a_repeating_job_timer_does_not_fire_after_its_job_ends():
+    timers, mem, clock, events, _s = make()
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.add_timer("again", T0 + timedelta(minutes=5), repeat_s=300, job_id="j1")
+    mem.delete_timers_for_job("j1")  # what Jobs._end does
+    clock.at = T0 + timedelta(minutes=6)
+    timers.fire_due()
+    assert events == []

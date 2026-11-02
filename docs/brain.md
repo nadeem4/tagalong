@@ -1039,26 +1039,33 @@ timer has a 0 s batch window (timer events held together share one wake) and wak
 an hour.
 
 The `timers` table (in `tagalong.db`): `id`, `note`, `next_at` (UTC ISO text, so text order is time
-order), `repeat_s` (null for a one-off), `created_at` and `fired` (0 or 1). Times are stored in UTC.
+order), `repeat_s` (null for a one-off), `created_at`, `fired` (0 or 1) and `job_id` (null, or the running job the timer checks back on). Times are stored in UTC.
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
-| Tool           | Effect | Mode   | Does                                                                                                                                                        |
-| -------------- | ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                     |
-| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
-| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                      |
+| Tool           | Effect | Mode   | Does                                                                                                                                                             |
+| -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                    |
+| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
+| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                           |
 
 `set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
 one of `in_minutes` (a number above 0, at most 525600, one year) or `at` (ISO 8601 with a UTC
 offset, in the future). A repeat (`repeat_minutes`) must be a whole number from 5 to 525600. `cancel_timer`
 needs `id` as a whole number. Refusals are plain sentences the model reads, for example
 `repeat_minutes must be at least 5.`, `at is not in the future.` or, from `cancel_timer`,
-`no timer with id 7.`.
+`no timer with id 7.`. `job` is the id of a running job; an unknown one or one that is not running
+is refused (`no job with id j9.`, `job j9 is not running (done).`).
 
 - **Firing.** When a timer is due, `Timers` emits `timer` with the facts `id`, `note` and
   `repeat_minutes`, keyed `timer:<id>`. It sleeps until the next due timer, and wakes at least
   hourly to re-check.
+- **Job timers.** With `job`, the wake keeps kind `timer` (same batch window and cap) and its facts
+  also carry `job`, `state` and the job's wake facts from `Jobs.wake_facts` (`activity`, the masked
+  summary of its steps, and `watching`, Scout's watch list), so Scout decides from those whether to
+  speak, nudge the job or set the next check. A job timer is deleted, with any held wake for it
+  dropped and the sleeper re-armed, when its job ends (`Jobs._end`) and, for jobs a dead brain left
+  running, when the brain starts (`Memory.stop_running_on_start`). This is cleanup, not a decision.
 - **One-offs.** A due one-off is marked `fired` and deleted once Scout's wake turn starts. If the
   brain stops before that, the timer is emitted again at the next start.
 - **Repeats.** A repeating timer sets its next time from the moment it fired, not the old time. After

@@ -34,7 +34,7 @@ An expert login you started with login_expert has ended. state is logged_in, fai
 
 ## timer
 
-This is your own message to yourself, set earlier with set_timer. Do what it says, using the named app's tools if needed, then decide whether anything is worth telling the owner. A routine check with nothing new should be silent.
+This is your own message to yourself, set earlier with set_timer. Do what it says, using the named app's tools if needed, then decide whether anything is worth telling the owner. A routine check with nothing new should be silent. When the wake names a job, it carries what you were watching for, the job's state and a summary of its steps: decide from those whether to tell the owner, nudge the job, or set the next check. The timer ends with the job.
 
 ## body_online
 

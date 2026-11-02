@@ -148,9 +148,12 @@ class Session:
             setup_facts=setup_facts,
             emit=self.scheduler.emit,
             drop=self.scheduler.drop,
+            on_timers_changed=lambda: timers.changed(),
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
-        timers = Timers(memory, self.scheduler.emit, now)
+        timers = self.timers = Timers(
+            memory, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
+        )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
             brain_tools(memory, notify)
