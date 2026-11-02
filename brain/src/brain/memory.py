@@ -187,6 +187,10 @@ MIGRATIONS = (
     );
     CREATE INDEX job_activity_rev ON job_activity(job_id, rev);
     """,
+    # What Scout says it expects from a job: a JSON list of {text, done}, replaced whole.
+    """
+    ALTER TABLE jobs ADD COLUMN watch TEXT;
+    """,
 )
 
 DROPPED_MARKER = "[older steps dropped]"
@@ -222,6 +226,7 @@ class Job:
     started_at: str
     ended_at: str | None
     parent_job: str | None = None
+    watch: list[dict] | None = None
 
 
 @dataclass(frozen=True)
@@ -286,11 +291,22 @@ class Hit:
 _COLUMNS = "id, kind, text, cadence, created_at, updated_at"
 _JOB_COLUMNS = (
     "id, agent, task, folder, mode, state, reason, progress, result, session_id,"
-    " reported, started_at, ended_at, parent_job"
+    " reported, started_at, ended_at, parent_job, watch"
 )
 _JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
 JOB_RESULT_CAP = 20_000
 JOB_PROGRESS_CAP = 2_000
+
+
+def _parse_watch(raw: str | None) -> list[dict] | None:
+    """A stored watch list; anything unreadable reads as none, never as a crash."""
+    if not raw:
+        return None
+    try:
+        items = json.loads(raw)
+    except ValueError:
+        return None
+    return items if isinstance(items, list) else None
 
 
 def _utc_text(at: datetime) -> str:
@@ -417,7 +433,7 @@ class Memory:
             sql += " LIMIT ?"
             args += (limit,)
         return [
-            Job(*r[:10], bool(r[10]), r[11], r[12], r[13])
+            Job(*r[:10], bool(r[10]), r[11], r[12], r[13], _parse_watch(r[14]))
             for r in self._db.execute(sql, args).fetchall()
         ]
 
@@ -430,6 +446,10 @@ class Memory:
             (id, agent, task, folder, mode, self._now().isoformat(), parent_job),
         )
         return self._jobs("WHERE id=?", (id,))[0]
+
+    def set_watch(self, job_id: str, items: list[dict] | None) -> None:
+        """Replace Scout's watch list for a job; none or empty clears it."""
+        self.update_job(job_id, watch=json.dumps(items) if items else None)
 
     def update_job(self, id: str, **fields) -> None:
         unknown = set(fields) - _JOB_FIELDS

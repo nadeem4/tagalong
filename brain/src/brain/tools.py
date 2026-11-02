@@ -389,6 +389,14 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
             return str(err)
         return f"note queued for job {args['job']}"
 
+    async def watch_job(args: dict) -> str:
+        _need_text("watch_job", args, "job")
+        try:
+            items = jobs.set_watch(args["job"], args.get("items"))
+        except JobError as err:
+            return str(err)
+        return json.dumps({"job": args["job"], "watch": items})
+
     async def list_jobs(args: dict) -> str:
         rows = []
         watched = jobs.with_activity()  # one query, not one per row
@@ -443,9 +451,12 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                 "the expert gets; this tool asks them itself. With several experts installed, "
                 "name one by its id from list_experts. To follow up on a finished job, pass its id "
                 "as continue_job (same folder, same expert): the expert reopens that session when "
-                "it can, else starts fresh. Either way write a short brief of what is needed; "
-                "never paste the chat. Returns JSON: the job id, session (continued or fresh) "
-                "and why_fresh.",
+                "it can, else starts fresh. Either way write a short brief in your own words: the "
+                "goal, how you will judge it done, that it tests its own work, and that it ends "
+                "with a summary of what changed, the test results and what is left. Leave "
+                "planning and splitting to the expert; never paste the chat or direct each step. "
+                "Then call watch_job with what you expect. Returns JSON: the job id, session "
+                "(continued or fresh) and why_fresh.",
                 {
                     "type": "object",
                     "properties": {
@@ -497,10 +508,43 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         ),
         (
             ToolSpec(
+                "watch_job",
+                "Write what you expect from a job, in your own words: a few short items "
+                "(at most 10, each up to 200 characters) such as what must pass or be changed. "
+                "Call it right after hand_off returns the job id, and again to tick an item "
+                "(done: true) or reword it. The whole list is replaced each time; an empty "
+                "list clears it. You see it on every wake about the job and in list_jobs, and "
+                "the owner sees it, read-only, on the job page.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "job": job_id,
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "text": {"type": "string"},
+                                    "done": {"type": "boolean"},
+                                },
+                                "required": ["text", "done"],
+                            },
+                        },
+                    },
+                    "required": ["job", "items"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            watch_job,
+        ),
+        (
+            ToolSpec(
                 "list_jobs",
                 "Recent expert jobs (the last 20), newest first, with expert, state, latest "
-                "progress, a one-line summary of its steps, parent_job (the job a follow-up "
-                "continued) and session_id_known.",
+                "progress, a one-line summary of its steps, your watch list for it, parent_job "
+                "(the job a follow-up continued) and session_id_known.",
                 {"type": "object", "properties": {}},
                 both,
                 effect="read",
