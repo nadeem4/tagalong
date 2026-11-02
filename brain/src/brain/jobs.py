@@ -22,9 +22,9 @@ from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import AskCtx, Guards, Hook
-from brain.job_activity import PAGE_LIMIT, JobActivity
+from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.masking import mask_json
-from brain.memory import Job, Memory
+from brain.memory import ActivityEntry, Job, Memory
 from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
@@ -93,9 +93,11 @@ class Jobs:
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        drop: Callable[[str, str], None] = lambda kind, key: None,
     ) -> None:
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
+        self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
         self._memory = memory
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
@@ -255,6 +257,7 @@ class Jobs:
                 lambda text: mask_json(self._guards, "job_activity", text),
                 self._now,
                 on_change=lambda: self._activity_changed(job_id),
+                on_failed=lambda entry: self._step_failed(job_id, entry),
             )
             handed_off = True
             self._starting -= 1
@@ -350,7 +353,33 @@ class Jobs:
             event_facts["running_minutes"] = max(
                 0, int((self._now() - began).total_seconds() // 60)
             )
+        event_facts.update(self.wake_facts(job_id))
         self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
+
+    def _step_failed(self, job_id: str, entry: ActivityEntry) -> None:
+        """A command failed: tell Scout the facts (batched and capped by the scheduler)."""
+        facts: dict[str, str | int] = {
+            "job": job_id,
+            "step": _clip(entry.text),
+            "exit": "" if entry.exit is None else entry.exit,
+        }
+        facts.update(self.wake_facts(job_id))
+        self._emit(Event("job_step_failed", facts, key=f"job:{job_id}"))
+
+    def wake_facts(self, job_id: str) -> dict[str, str]:
+        """Facts every job wake carries: a short summary of what the job did, read from its
+        stored log (so a job from before a restart has one too) and masked once more."""
+        summary = activity_summary(self._memory, job_id, self._now())
+        return {"activity": mask_json(self._guards, "job_summary", summary)}
+
+    def note(self, job: Job) -> str:
+        """The wake text for a finished job: its row and the summary of its steps."""
+        return job_note(job, self.wake_facts(job.id))
+
+    def activity_line(self, job_id: str) -> str:
+        """One line about a job's steps for list_jobs; empty when it recorded none."""
+        line = activity_line(self._memory, job_id, self._now())
+        return mask_json(self._guards, "job_summary", line) if line else ""
 
     def running_steps(self) -> list[dict]:
         """The step each running job is on now, for the bubble's one live line."""
@@ -558,6 +587,9 @@ class Jobs:
         result = mask_json(self._guards, "job_result", result)
         self._memory.update_job(job_id, state=state, reason=reason, result=result, ended_at=_now())
         self._runs.pop(job_id, None)
+        # job_ended carries the same facts, so held failure and quiet news is stale now
+        self._drop("job_step_failed", f"job:{job_id}")
+        self._drop("job_quiet", f"job:{job_id}")
         if activity := self._activity.pop(job_id, None):
             self._stop_activity_notes(job_id)
             activity.end(state, reason)  # its change notice is the one, sent after the end row
@@ -576,8 +608,9 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def job_note(job: Job) -> str:
-    """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides."""
+def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
+    """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides.
+    Each extra fact (the activity summary) follows as its own block."""
     lines = [
         f"Job {job.id} ended.",
         f"Task: {job.task}",
@@ -591,4 +624,6 @@ def job_note(job: Job) -> str:
         if len(job.result) > RESULT_NOTE_CHARS:
             result += "\n[trimmed]"
         lines.append(f"Result:\n{result}")
+    for key, value in (facts or {}).items():
+        lines.append(f"{key.capitalize()}:\n{value}")
     return "\n".join(lines)

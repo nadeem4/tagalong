@@ -824,21 +824,22 @@ offline ask from the same job replaces the first. This news is held in memory on
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind             | Batch window | Cap per hour | Note                                                                                                                                                                   |
-| ---------------- | ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `job_ended`      | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                        |
-| `job_quiet`      | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long) |
-| `timer`          | 0 s          | 6            | One of Scout's timers came due                                                                                                                                         |
-| `body_online`    | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                |
-| `back`           | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                               |
-| `job_question`   | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                        |
-| `choice`         | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                            |
-| `focus`          | none         | none         | Which window is in front (context, no wake)                                                                                                                            |
-| `tab`            | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                       |
-| `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                      |
-| `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                |
-| `setup_done`     | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                                                             |
-| `setup_login`    | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                   |
+| Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
+| ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
+| `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
+| `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                       |
+| `timer`           | 0 s          | 6            | One of Scout's timers came due                                                                                                                                                               |
+| `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                      |
+| `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                     |
+| `job_question`    | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                                              |
+| `choice`          | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                                                  |
+| `focus`           | none         | none         | Which window is in front (context, no wake)                                                                                                                                                  |
+| `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                             |
+| `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                            |
+| `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                      |
+| `setup_done`      | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                                                                                   |
+| `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                         |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
@@ -904,7 +905,7 @@ flowchart TD
 | `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
 | `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
 | `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
-| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, `expert`, `parent_job` and `session_id_known`                                                          |
+| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, `expert`, `parent_job` and `session_id_known`                       |
 | `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
 | `job_activity` | home        | read   | `auto`                    | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
 
@@ -977,6 +978,33 @@ flowchart LR
     S -->|ask open| R[wait another full threshold]
     R --> S
     E --> S
+```
+
+- **What Scout sees (activity summary).** Every job wake (`job_ended`, `job_quiet`,
+  `job_step_failed`) carries an `activity` fact from `activity_summary` in `job_activity.py`: plain
+  reads of the stored log, no model call, about 1,500 characters at most (`SUMMARY_CAP`). It holds
+  the step and failed counts, the step running now with how long, the last five commands with exit
+  codes, then each failed command (last three) with its exit code and the last three lines of its
+  output (each line cut at 100 characters). The running step and recent commands come first so the
+  cap never cuts them. A step is failed when its status is `failed` or it exited non-zero. A job with no
+  entries gets `no activity recorded`. The log is masked when written and `Jobs.wake_facts` masks
+  the finished text once more. `list_jobs` rows gain `summary`, a one-line form (`activity_line`, at
+  most 200 characters). Scout has no tool to read the whole log.
+- **Failed steps.** When a step turns failed, `JobActivity` calls `on_failed` once per step id and
+  `Jobs` emits `job_step_failed` (facts: job, step, exit, activity), keyed by the job. Failures
+  batch for 120 s and a newer one for the same job replaces the held one, so ten red commands in a
+  burst are one wake showing the latest; the cap is 4 an hour. When the job ends, `Jobs` calls
+  `Scheduler.drop` so a held `job_step_failed` or `job_quiet` for it is forgotten (no hook runs)
+  and `job_ended`, which carries the same summary, is the only wake.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+    A[step turns failed] --> F[job_step_failed, key job]
+    Q[job_quiet] --> W
+    F -->|120 s batch, newest replaces| W[wake with activity summary]
+    J[job ends] -->|Scheduler.drop| X[held failed and quiet events gone]
+    J --> E[job_ended with the same summary]
 ```
 
 - **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to

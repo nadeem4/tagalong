@@ -16,7 +16,7 @@ from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.guards import Hook
 from brain.masking import Masker
-from brain.memory import Memory
+from brain.memory import ActivityEntry, Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import Body, SayParams, Tool
@@ -1806,3 +1806,36 @@ async def test_wake_without_key_does_nothing():
     assert states(sent) == []
     assert session.history == []
     assert not memory.get_job("j1").reported  # told at a later start, once a key is set
+
+
+async def test_job_ended_wake_carries_the_activity_summary():
+    model = Gate(["ok"])
+    memory = Memory(":memory:")
+    session, _ = make(model, memory)
+    join(session, "desktop")
+    job = end_job(memory)
+    at = "2026-01-01T00:00:00+00:00"
+    memory.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
+    session.jobs._on_finished(job)
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Activity:\n    steps: 1, failed: 0" in text
+
+
+async def test_failures_inside_one_batch_window_wake_scout_once():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0)]
+    model = Gate(["ok"])
+    session, sent = make(model, kinds=None, now=lambda: clock[0])
+    join(session, "desktop")
+    at = "2026-01-01T00:00:00+00:00"
+    for n in range(10):
+        entry = ActivityEntry(n, n, at, "command", f"cmd{n}", "failed", str(n), 1)
+        session.jobs._step_failed("j1", entry)
+        clock[0] += datetime.timedelta(seconds=5)
+    assert states(sent) == []  # still inside the 120 s batch
+    clock[0] += datetime.timedelta(seconds=120)
+    session.scheduler.pump()
+    await idle(session)
+    assert states(sent) == ["started", "ended"]
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Event: job_step_failed" in text and "cmd9" in text and "cmd8" not in text

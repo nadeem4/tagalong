@@ -203,6 +203,7 @@ class FakeJobs:
         self.experts = []
         self.resumable = {}
         self.started = JobId("ab12cd34")
+        self.lines: dict[str, str] = {}
 
     def installed(self):
         return self.experts
@@ -231,6 +232,9 @@ class FakeJobs:
 
     def with_activity(self):
         return self.activity_jobs
+
+    def activity_line(self, job_id):
+        return self.lines.get(job_id, "")
 
     def activity_page(self, job_id, after_rev):
         self.calls.append(("activity_page", job_id, after_rev))
@@ -386,6 +390,16 @@ async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home,
     assert rows["j1"]["result"] == "R" * 1000 + "…"
     assert rows["j1"]["progress"] == "…" + "a" * 996 + "end"
     assert rows["j2"]["result"] == "short" and rows["j2"]["progress"] == "p" * 1000
+
+
+async def test_list_jobs_rows_carry_a_one_line_summary(home, mem):
+    mem.add_job("j1", "claude_code", "task", "C:/x", "default")
+    mem.add_job("j2", "claude_code", "task", "C:/x", "default")
+    home.jobs.rows = mem.list_jobs(20)
+    home.jobs.lines = {"j1": "3 steps, 1 failed; running: npm test"}
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["summary"] == "3 steps, 1 failed; running: npm test"
+    assert rows["j2"]["summary"] == ""
 
 
 async def test_stop_job_stops_and_refusal_is_rpc_error(home):

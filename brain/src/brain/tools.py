@@ -395,6 +395,7 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         for job in jobs.list():
             row = asdict(job)
             row["activity"] = job.id in watched
+            row["summary"] = jobs.activity_line(job.id)
             # The session id is an opaque handle; Scout only needs to know a follow-up can use it.
             row["session_id_known"] = bool(row.pop("session_id"))
             row["expert"] = job.agent
@@ -498,7 +499,8 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
             ToolSpec(
                 "list_jobs",
                 "Recent expert jobs (the last 20), newest first, with expert, state, latest "
-                "progress, parent_job (the job a follow-up continued) and session_id_known.",
+                "progress, a one-line summary of its steps, parent_job (the job a follow-up "
+                "continued) and session_id_known.",
                 {"type": "object", "properties": {}},
                 both,
                 effect="read",

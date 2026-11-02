@@ -501,6 +501,15 @@ so allow about that long before expecting a report.
    **Expected:** after about a minute with no new step or message Scout is woken once and may say
    it is still waiting, check on the job, or ask you. A job waiting on your permission does not
    wake Scout this way. Scout is not woken again for that job before another minute passes.
+   The wake shows a short activity summary, including the running step (`sleep 180`) and how long.
+7. **Action:** hand off a job whose work includes a failing command (for example "run `npm test`,
+   it is expected to fail once, then fix it"). **Expected:** within about two minutes of the first
+   failure Scout is woken once, with the failed command, its exit code and the last lines of its
+   output; several failures in that window give one wake, not one each. Scout may just wait.
+8. **Action:** hand off a job that fails a command and then finishes within a minute.
+   **Expected:** only the job-ended wake comes (the held failure wake is dropped), and it carries
+   the summary with the failed command listed. Ask Scout "what are my jobs": each row has a
+   one-line summary such as `5 steps, 1 failed`.
 
 ## Scout's timers (real brain)
 
