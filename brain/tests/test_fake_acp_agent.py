@@ -62,20 +62,24 @@ class Recorder:
 
 
 @asynccontextmanager
-async def running(tmp_path: Path, steps: list[dict], client: Recorder | None = None):
+async def running(
+    tmp_path: Path,
+    steps: list[dict],
+    client: Recorder | None = None,
+    meta: dict | None = None,
+    extra_env: dict | None = None,
+):
     script = tmp_path / "script.json"
     script.write_text(json.dumps(steps))
     log = tmp_path / "log.jsonl"
     client = client or Recorder()
+    env = {"FAKE_ACP_SCRIPT": str(script), "FAKE_ACP_LOG": str(log), **(extra_env or {})}
     async with acp.spawn_agent_process(
-        client,
-        sys.executable,
-        str(AGENT),
-        env={"FAKE_ACP_SCRIPT": str(script), "FAKE_ACP_LOG": str(log)},
-        use_unstable_protocol=True,
+        client, sys.executable, str(AGENT), env=env, use_unstable_protocol=True
     ) as (conn, process):
         caps = ClientCapabilities(
-            elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities())
+            elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities()),
+            field_meta=meta,
         )
         await conn.initialize(protocol_version=1, client_capabilities=caps)
         yield conn, process, client, log
@@ -354,3 +358,23 @@ async def test_tool_steps_reach_the_client(tmp_path):
         assert client.updates[0].raw_input == {"command": "ls"}
         assert client.updates[1].content[0].content.text == "a.txt"
         assert [e.status for e in client.updates[2].entries] == ["completed", "pending"]
+
+
+async def test_meta_only_agent_sends_terminal_data_only_when_advertised(tmp_path):
+    steps = [
+        {"tool": {"id": "t1", "title": "Run", "kind": "execute", "terminal": True}},
+        {"tool_update": {"id": "t1", "status": "completed", "terminal": {"output": "hi", "exit": 0}}},
+    ]
+    only = {"FAKE_ACP_META_ONLY": "1"}
+    async with running(tmp_path, steps, extra_env=only) as (conn, _p, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        assert all(u.field_meta is None for u in client.updates)
+    meta = {"terminal_output": True}
+    async with running(tmp_path, steps, meta=meta, extra_env=only) as (conn, _p, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        seen = [u.field_meta for u in client.updates]
+    assert seen[0] == {"terminal_info": {"terminal_id": "t1"}}
+    assert {"terminal_output": {"terminal_id": "t1", "data": "hi"}} in seen
+    assert {"terminal_exit": {"terminal_id": "t1", "exit_code": 0, "signal": None}} in seen

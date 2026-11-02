@@ -293,3 +293,10 @@ async def test_startup_that_never_answers_is_an_error_and_leaves_no_process(make
     with pytest.raises(ExpertError, match="did not answer"):
         await run.start(rig.folder)
     assert not alive(rig.host)
+
+
+async def test_initialize_advertises_terminal_meta(make_rig):
+    rig = make_rig()
+    await rig.run(Side()).start(rig.folder)
+    init = next(f for f in rig.frames() if f.get("method") == "initialize")
+    assert init["params"]["clientCapabilities"]["_meta"]["terminal_output"] is True
