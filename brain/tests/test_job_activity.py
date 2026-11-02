@@ -458,6 +458,28 @@ def test_summary_is_cut_to_the_cap_on_a_character_boundary(rig):
     text.encode()  # a clean string: no half character
 
 
+def test_running_step_survives_three_long_failures(rig):
+    rows = []
+    for i in range(1, 4):
+        output = "\n".join("x" * 200 for _ in range(5))
+        rows += [cmd("c" * 200 + str(i), str(i), 1, "failed"), outrow(output, str(i))]
+    rows.append(cmd("npm install", "9", None, "running", 34))
+    seed(rig.memory, rows)
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert len(text) <= job_activity.SUMMARY_CAP
+    assert "running: npm install, 34 min" in text
+    assert text.index("running:") < text.index("failed: c")
+
+
+def test_fit_keeps_earlier_lines_whole_and_cuts_only_the_last_with_an_ellipsis():
+    lines = ["a" * 40, "b" * 40, "c" * 40, "d" * 40]
+    text = job_activity._fit(lines, 100)
+    parts = text.split("\n")
+    assert parts[:2] == lines[:2]
+    assert parts[-1].endswith("…") and len(text) <= 100
+    assert "d" * 40 not in text
+
+
 def test_a_command_with_nonzero_exit_counts_as_failed_even_if_status_is_done(rig):
     seed(rig.memory, [cmd("make", "1", 2, "done")])
     text = job_activity.activity_summary(rig.memory, "j", NOW)

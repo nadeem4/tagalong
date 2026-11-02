@@ -1638,7 +1638,7 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     await until(lambda: rig.emitted)
     (event,) = rig.emitted
     assert (event.kind, event.key) == ("job_step_failed", f"job:{job_id}")
-    assert (event.facts["job"], event.facts["command"], event.facts["exit"]) == (
+    assert (event.facts["job"], event.facts["step"], event.facts["exit"]) == (
         job_id,
         "npm test",
         1,
@@ -1646,6 +1646,15 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     assert "failed: npm test (exit 1)" in event.facts["activity"]
     assert "boom" in event.facts["activity"]
     assert TOKEN not in str(event.facts)
+
+
+async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    text = "a\nb " + "z" * 500
+    entry = ActivityEntry(1, 1, "2026-01-01T00:00:00+00:00", "command", text, "failed", "s", 1)
+    rig.jobs._step_failed("j1", entry)
+    step = rig.emitted[-1].facts["step"]
+    assert "\n" not in step and 0 < len(step) <= 200
 
 
 async def test_job_end_drops_held_failed_and_quiet_events_for_that_job(make_rig):

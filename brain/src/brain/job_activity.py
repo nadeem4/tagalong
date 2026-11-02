@@ -25,6 +25,7 @@ LINE_CAP = 200  # characters of the one-line form in list_jobs
 FAILED_TAIL_LINES = 3  # last output lines shown under a failed command
 RECENT_COMMANDS = 5  # last commands listed with their exit codes
 FAILED_SHOWN = 3  # failed commands listed in full
+TAIL_CAP = 100  # one output line under a failed command
 _PART_CAP = 200  # one command or output line in the digest
 _STEP_KINDS = ("command", "edit", "read", "search", "other")
 
@@ -297,19 +298,21 @@ def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMM
         return "no activity recorded"
     failed = [e for e in steps if is_failed(e)]
     lines = [f"steps: {len(steps)}, failed: {len(failed)}"]
-    for entry in failed[-FAILED_SHOWN:]:
-        lines.append(f"failed: {_clip(entry.text)} ({_exit(entry)})")
-        tail = [ln for ln in outputs.get(entry.step or "", "").splitlines() if ln.strip()]
-        lines.extend(f"  {_clip(ln)}" for ln in tail[-FAILED_TAIL_LINES:])
-    commands = [e for e in steps if e.kind == "command"]
-    if commands:
-        lines.append("recent:")
-        lines.extend(f"  {_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:])
+    # What is running and the last commands come before the failure blocks: a wake cut at the
+    # cap loses the end of the text, and a timer wake needs the running step most.
     live = [e for e in steps if e.status in ("running", "pending")]
     if live:
         entry = live[-1]
         minutes = max(0, int((now - datetime.fromisoformat(entry.at)).total_seconds() // 60))
         lines.append(f"running: {_clip(entry.text)}, {minutes} min")
+    commands = [e for e in steps if e.kind == "command"]
+    if commands:
+        lines.append("recent:")
+        lines.extend(f"  {_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:])
+    for entry in failed[-FAILED_SHOWN:]:
+        lines.append(f"failed: {_clip(entry.text)} ({_exit(entry)})")
+        tail = [ln for ln in outputs.get(entry.step or "", "").splitlines() if ln.strip()]
+        lines.extend(f"  {_clip(ln, TAIL_CAP)}" for ln in tail[-FAILED_TAIL_LINES:])
     return _fit(lines, cap)
 
 
