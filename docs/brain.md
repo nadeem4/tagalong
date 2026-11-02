@@ -774,8 +774,9 @@ change nothing. `JobActivity` replaces (or appends to) the step's `output` entry
 command entry's `exit`: `0` gives `done`, any other code `failed` with `exit` set, and a signal
 (`exit_code` null) `failed` with `exit` null. Once an exit has decided the status, a later plain
 `completed` does not undo it. A secret split across delta chunks is still masked: the raw tail
-(at most `OUTPUT_CAP` characters per step) lives in memory only, and each write masks the whole
-accumulated text, then caps it. An unknown terminal id is ignored. An adapter that ignores the
+(at most `OUTPUT_CAP` plus `CARRY` characters per delta step, released at exit) lives in memory
+only, and each write masks the whole accumulated text, then drops the carry and caps it, so a cut
+never lands inside a secret and a trimmed output always starts with the cut marker. An exit for an unknown terminal id is dropped; output goes to the update's own tool call. An adapter that ignores the
 opt-in (Codex and Gemini untested) keeps the console text block, whose `console` fence is
 stripped, so the page shows the same text, with no `exit`.
 

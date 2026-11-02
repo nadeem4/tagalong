@@ -2,7 +2,7 @@
 
 One JobActivity per job. Every text is masked before it is stored and capped after, so no
 raw secret and no unbounded output reaches the database or a reader. Entries are written
-through Memory; the transport that serves them comes later.
+through Memory.
 """
 
 from collections.abc import Callable
@@ -14,6 +14,7 @@ KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", 
 STATUSES = ("pending", "running", "done", "failed")
 
 OUTPUT_CAP = 65536  # bytes of one command's output kept (the tail)
+CARRY = 1024  # extra raw chars kept so a cut never lands inside a secret (dropped after masking)
 SAY_CAP = 8192  # characters of one message
 ENTRY_CAP = 2000  # entries per job
 JOB_BYTES_CAP = 1_000_000  # text bytes per job
@@ -49,7 +50,7 @@ class JobActivity:
         self._steps: dict[str, ActivityEntry] = {}  # tool call id -> its command/edit/... entry
         self._outputs: dict[str, int] = {}  # tool call id -> seq of its output entry
         self._terminals: dict[str, str] = {}  # terminal id -> tool call id (terminal_info)
-        self._raw: dict[str, str] = {}  # tool call id -> raw output tail; memory only, never stored
+        self._raw: dict[str, str] = {}  # tool call id -> raw delta tail; memory only, never stored
         self._exited: set[str] = set()  # steps whose exit code already decided their status
         self._says: dict[object, tuple[int, str]] = {}  # message id -> (seq, raw text so far)
         self._last_say: object = None  # key of the message still being written, if any
@@ -114,9 +115,10 @@ class JobActivity:
             target = self._terminals.get(part.get("terminal_id"), step)
             if target not in self._steps:
                 continue
-            old = self._raw.get(target, "") if key.endswith("delta") else ""
-            self._raw[target] = (old + part["data"])[-OUTPUT_CAP:]
-            self._write_output(target, self._raw[target])
+            if key.endswith("delta"):
+                self._append_delta(target, part["data"])
+            else:
+                self._write_output(target, part["data"])
         done = meta.get("terminal_exit")
         if isinstance(done, dict):
             target = self._terminals.get(done.get("terminal_id"), done.get("terminal_id"))
@@ -128,11 +130,22 @@ class JobActivity:
         code = code if isinstance(code, int) and not isinstance(code, bool) else None
         status = "done" if code == 0 else "failed"
         self._exited.add(step)
+        self._raw.pop(step, None)
         if (old.status, old.exit) != (status, code):
             self._steps[step] = self._put(old.seq, old.kind, old.text, status, step, exit=code)
 
-    def _write_output(self, step: str, text: str) -> None:
-        out = self._put(self._outputs.get(step), "output", text, None, step, _cut_output)
+    def _append_delta(self, step: str, data: str) -> None:
+        """Keep a little more raw than the cap, so the cut is made after masking."""
+        raw = self._raw.get(step, "") + data
+        if len(raw) <= OUTPUT_CAP + CARRY:
+            self._raw[step] = raw
+            self._write_output(step, raw)
+            return
+        self._raw[step] = raw[-(OUTPUT_CAP + CARRY) :]
+        self._write_output(step, self._raw[step], _cut_trimmed)
+
+    def _write_output(self, step: str, text: str, cap: Callable[[str], str] | None = None) -> None:
+        out = self._put(self._outputs.get(step), "output", text, None, step, cap or _cut_output)
         self._outputs[step] = out.seq
 
     def _say(self, u) -> None:
@@ -224,3 +237,9 @@ def _cut_output(text: str) -> str:
     if len(text.encode()) <= OUTPUT_CAP:
         return text
     return CUT_MARKER + "\n" + text.encode()[-OUTPUT_CAP:].decode(errors="ignore")
+
+
+def _cut_trimmed(text: str) -> str:
+    """The text already lost its head: drop the unsafe carry, always say so."""
+    tail = text[CARRY:].encode()[-OUTPUT_CAP:].decode(errors="ignore")
+    return CUT_MARKER + chr(10) + tail

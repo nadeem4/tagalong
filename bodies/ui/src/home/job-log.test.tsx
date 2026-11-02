@@ -135,6 +135,8 @@ describe('JobLog', () => {
     );
     expect(screen.getByText('exit 0')).toHaveClass('job-log__exit', 'job-log__exit--ok');
     expect(screen.getByText('exit 2')).toHaveClass('job-log__exit', 'job-log__exit--err');
+    expect(screen.getByRole('img', { name: 'done' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'failed' })).toBeInTheDocument();
   });
 
   it('shows only the glyph when there is no exit code', () => {

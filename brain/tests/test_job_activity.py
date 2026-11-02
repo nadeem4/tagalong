@@ -338,7 +338,42 @@ def test_delta_output_stays_within_the_cap(rig):
     for _ in range(200):
         rig.log.on_update(out("t1", "x" * 1024, delta=True))
     [entry] = outputs(rig)
-    assert len(entry.text) <= job_activity.OUTPUT_CAP
+    assert entry.text.startswith(job_activity.CUT_MARKER)
+    assert len(entry.text) <= job_activity.OUTPUT_CAP + len(job_activity.CUT_MARKER) + 1
+
+
+def _real_rig(tmp_path):
+    return Rig(tmp_path, mask=Masker(lambda: []).mask)
+
+
+KEY = "sk-ant-api03-" + "B" * 40
+
+
+def test_cut_never_leaves_part_of_a_secret_on_replace(tmp_path):
+    rig = _real_rig(tmp_path)
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "y" * 100 + KEY + "x" * (job_activity.OUTPUT_CAP - 30)))
+    [entry] = outputs(rig)
+    assert "BBBB" not in entry.text
+
+
+def test_cut_never_leaves_part_of_a_secret_on_delta(tmp_path):
+    rig = _real_rig(tmp_path)
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "y" * 100 + KEY, delta=True))
+    # the head is trimmed at index 130, inside the key
+    keep = job_activity.OUTPUT_CAP + job_activity.CARRY
+    rig.log.on_update(out("t1", "x" * (keep + 130 - 100 - len(KEY)), delta=True))
+    [entry] = outputs(rig)
+    assert "BBBB" not in entry.text
+    assert entry.text.startswith(job_activity.CUT_MARKER)
+
+
+def test_raw_output_is_released_after_exit(rig):
+    rig.log.on_update(start("t1"))
+    rig.log.on_update(out("t1", "hi", delta=True))
+    rig.log.on_update(exited("t1", 0))
+    assert rig.log._raw == {}
 
 
 def test_without_meta_a_command_still_completes(rig):
