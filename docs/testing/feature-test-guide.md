@@ -301,6 +301,15 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     ask which. With no expert installed, Scout says so and offers to set one up. Automated tests
     cover all three on the fake agent with their own stripped env; this pass is the only real one.
 
+16. **Action:** after a job on an expert has finished, ask Scout for a follow-up ("now also add
+    tests") in the same folder, within five minutes and again after more than five.
+    **Expected:** Scout continues the earlier job: Home → Jobs shows the new job under the same
+    expert and folder, and Scout says whether the session was continued or started fresh (and
+    why: the expert cannot reopen sessions, or the session could not be loaded). Within the idle
+    period the same adapter process serves it. Asking to continue a job of another folder or
+    expert, or one still running, is refused with a plain reason. Automated tests cover resume,
+    the fallbacks and the idle stop on the fake agent; this pass is the only real one.
+
 ## Claude Code asks Scout first (real brain, real Claude Code)
 
 Needs the same setup as the hand-off section above, with the desktop connected.
