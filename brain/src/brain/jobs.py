@@ -22,7 +22,7 @@ from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import AskCtx, Guards, Hook
-from brain.job_activity import PAGE_LIMIT, JobActivity, activity_line, activity_summary
+from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.masking import mask_json
 from brain.memory import ActivityEntry, Job, Memory
 from brain.offers import Offers
@@ -375,7 +375,7 @@ class Jobs:
         """A command failed: tell Scout the facts (batched and capped by the scheduler)."""
         facts: dict[str, str | int] = {
             "job": job_id,
-            "command": entry.text[:200],
+            "step": _clip(entry.text),
             "exit": "" if entry.exit is None else entry.exit,
         }
         facts.update(self.wake_facts(job_id))

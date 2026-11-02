@@ -232,9 +232,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Jobs**: the jobs Scout has handed to Claude Code, with **Watch** (a read-only log of its steps),
   **Stop** for a running one and **Show result** for a finished one. Claude Code must be installed and signed in on this computer.
   A job has no time limit; if one shows no new step or message for 20 minutes (`TAGALONG_JOB_QUIET_MIN`), Scout is woken to decide whether to wait, check on it or ask you. Scout is also woken
-  (at most once every couple of minutes per job) when a command a job ran fails, and every such wake comes
-  with a short summary of what the job did: step counts, failed commands with their last output lines,
-  the latest commands and the step running now. Scout can tell a failure from normal work and may just wait.
+  (at most once every couple of minutes per job) when a step a job ran (usually a command) fails, and every such wake comes
+  with a short summary of what the job did: step counts, the step running now, the latest commands
+  and failed commands with their last output lines. Scout can tell a failure from normal work and may just wait.
   Scout also writes a short list of what it expects from each job (`watch_job`); you see it, read-only,
   under the job page's title, and Scout sees it again on every wake about the job.
 - **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
