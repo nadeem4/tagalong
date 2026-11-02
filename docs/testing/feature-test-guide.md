@@ -1762,6 +1762,24 @@ Brain tests only; nothing here installs anything.
 6. Install again over an existing expert and cut the network: the old `tools/claude-acp` and its
    `experts.json` entry are unchanged.
 
+### Log in an expert
+
+1. `cd brain && uv run pytest tests/test_setup_login.py -q` passes (the fake agent and a fake
+   terminal: no real window, browser or login).
+2. By hand on Windows with a real brain, Claude Code installed from a clean home (no
+   `~/.claude`): ask Scout to log it in. The Allow card shows `claude-acp`, the method
+   `claude-ai-login` and `opens: terminal window`, with no **Always allow**. Deny: no window opens.
+   Allow: a console window opens running the adapter's login; finish it in the browser it opens.
+   Scout says it worked (a `setup_login` event), `experts.json` shows `logged_in: true`, and
+   no code or link appeared in the chat.
+3. Close the window with X before finishing: within a moment Scout says the login did not finish
+   (the window was closed) and `logged_in` is false; it does not wait 10 minutes.
+   Ask again: a fresh window opens and the first never reports.
+4. With Claude Code already logged in, ask again: the tool refuses as already logged in and no
+   window opens.
+5. Leave the window open for ten minutes: Scout reports a timeout once.
+6. On a brain without a display (or not Windows): Scout tells you the command to run yourself.
+
 ## Not supported
 
 Do not test these here.

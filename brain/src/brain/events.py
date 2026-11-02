@@ -40,6 +40,7 @@ _KINDS = (
     EventKind("choice", batch_seconds=None, max_per_hour=None),
     EventKind("setup_progress", wakes=False),
     EventKind("setup_done", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_login", batch_seconds=None, max_per_hour=None),
     EventKind("focus", wakes=False),
     EventKind("tab", wakes=False),
     EventKind("download", wakes=False),
