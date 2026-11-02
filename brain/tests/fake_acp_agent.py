@@ -11,8 +11,8 @@ chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
 elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
-FAKE_ACP_LOAD=1 advertises and serves session/load; FAKE_ACP_AUTH (JSON list of
-{id, name, description?}) sets auth_methods, and new_session/authenticate then fail with
+FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail);
+FAKE_ACP_AUTH (JSON list of {id, name, description?}) sets auth_methods, and new_session/authenticate then fail with
 auth-required unless FAKE_ACP_LOGGED_IN=1 or the file named by FAKE_ACP_LOGIN_FILE exists.
 An entry with "type": "terminal" (and "args") is a terminal method, advertised only to a
 client that sent auth.terminal, like claude-acp. authenticate with a login file named
@@ -49,6 +49,7 @@ class FakeAgent:
         self.running: dict[str, asyncio.Task] = {}
         self.turn = 0
         self.stubborn = False
+        self.sessions = 0
 
     def on_connect(self, conn) -> None:
         self.conn = conn
@@ -93,16 +94,23 @@ class FakeAgent:
         # Method-not-found without the flag, like an adapter that cannot resume a session.
         if not os.environ.get("FAKE_ACP_LOAD"):
             raise acp.RequestError.method_not_found("session/load")
-        return schema.LoadSessionResponse()
+        if session_id.startswith("bad-"):  # a session the adapter no longer has
+            raise acp.RequestError.invalid_params({"session": session_id})
+        return schema.LoadSessionResponse(modes=self._modes())
 
     async def new_session(self, cwd, **kw):
         if self._needs_login():
             raise acp.RequestError.auth_required()
-        modes = schema.SessionModeState(
+        modes = self._modes()
+        # One id per session, so several sessions can share this process (the first is sess-1).
+        self.sessions += 1
+        return schema.NewSessionResponse(session_id=f"sess-{self.sessions}", modes=modes)
+
+    def _modes(self) -> schema.SessionModeState:
+        return schema.SessionModeState(
             current_mode_id="default",
             available_modes=[schema.SessionMode(id=i, name=n, description=d) for i, n, d in MODES],
         )
-        return schema.NewSessionResponse(session_id="sess-1", modes=modes)
 
     async def set_session_mode(self, session_id, mode_id, **kw):
         return schema.SetSessionModeResponse()

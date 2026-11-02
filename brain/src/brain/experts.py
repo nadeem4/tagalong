@@ -1,6 +1,7 @@
-"""ExpertRun: drives Claude Code in a folder over ACP, knowing nothing of asks or jobs.
+"""ExpertRun and ExpertHost: drive an expert in a folder over ACP, knowing nothing of asks or jobs.
 
-One session, reported through async callbacks: on_permission -> option id | None,
+One adapter process per expert (the host) serves its sessions; one session per run, reported
+through async callbacks: on_permission -> option id | None,
 on_question -> answer dict | None (None cancels), on_progress, on_end(done|error|stopped).
 Each expert's API key variables are stripped from the child so it runs on the user's own login.
 The adapter may be a .cmd shim with children, so teardown kills the tree if stdin close fails.
@@ -97,76 +98,130 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
-def make_run_for(timeout: float) -> Callable[..., "ExpertRun"]:
-    """The Jobs factory: one run of the given expert, with its command and its own env."""
+class ExpertHosts:
+    """The Jobs factory: one ExpertHost per installed expert, a session handle per job."""
 
-    def make(expert, **callbacks) -> "ExpertRun":
-        # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
-        path_first = Path(expert.command[0]).parent if expert.node == "private" else None
-        return ExpertRun(
-            command=expert.command,
-            expert_id=expert.id,
-            timeout=timeout,
-            path_first=path_first,
-            **callbacks,
-        )
-
-    return make
-
-
-class ExpertRun:
     def __init__(
         self,
+        timeout: float,
+        idle_s: float = 0.0,
         *,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    ) -> None:
+        self._timeout = timeout
+        self._idle_s = idle_s
+        self._sleep = sleep
+        self._hosts: dict[tuple, ExpertHost] = {}
+
+    def __call__(self, expert, **callbacks) -> "ExpertRun":
+        # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
+        path_first = Path(expert.command[0]).parent if expert.node == "private" else None
+        key = (expert.id, tuple(expert.command))  # a reinstall with a new command is a new host
+        host = self._hosts.get(key)
+        if host is None:
+            host = self._hosts[key] = ExpertHost(
+                expert.command, expert.id, path_first, idle_s=self._idle_s, sleep=self._sleep
+            )
+        return ExpertRun(host=host, timeout=self._timeout, **callbacks)
+
+    def can_resume(self, expert_id: str) -> bool | None:
+        """Whether this expert's adapter reopens sessions; None until it has been started once."""
+        known = [h.can_resume for (id_, _), h in self._hosts.items() if id_ == expert_id]
+        return next((k for k in known if k is not None), None)
+
+    async def shutdown(self) -> None:
+        for host in self._hosts.values():
+            with suppress(Exception):
+                await host.shutdown()
+
+
+def make_run_for(timeout: float, idle_s: float = 0.0) -> ExpertHosts:
+    return ExpertHosts(timeout, idle_s)
+
+
+class ExpertHost:
+    """One adapter process for one expert, shared by its sessions.
+
+    The process starts with the first session and stops idle_s after the last one ends (0 stops
+    it at once), so a follow-up soon after a job reuses a warm adapter. A crash fails every open
+    session through its own prompt call; the next session starts a new process.
+    """
+
+    def __init__(
+        self,
         command: list[str],
         expert_id: str = "custom",
         path_first: Path | None = None,
-        timeout: float,
-        on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
-        on_question: Callable[[Question], Awaitable[dict | None]],
-        on_progress: Callable[[str], Awaitable[None]],
-        on_end: Callable[[str, str, str | None], Awaitable[None]],
+        *,
+        idle_s: float = 0.0,
         grace: float = 3.0,
         # The real adapter needs ~5 s to load the user's plugins and MCP servers; 60 s leaves
         # room for a cold start without waiting forever on an adapter that never answers.
         startup_timeout: float = 60.0,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._command = command
         self._expert_id = expert_id
         self._path_first = path_first
-        self._timeout = timeout
+        self._idle_s = idle_s
         self._grace = grace
         self._startup_timeout = startup_timeout
-        self._on_permission = on_permission
-        self._on_question = on_question
-        self._on_progress = on_progress
-        self._on_end = on_end
+        self._sleep = sleep
+        self._sessions: dict[str, ExpertRun] = {}
+        self._opening = 0  # sessions being opened; the process must outlive them
+        self._lock = asyncio.Lock()
         self._stack: AsyncExitStack | None = None
-        self._conn = None
-        self._task: asyncio.Task | None = None
-        self._notes: list[str] = []
-        self._active = False
-        self._stopping = False
+        self._idle_task: asyncio.Task | None = None
         self._shutdown_task: asyncio.Future | None = None
-        self._asks: set[asyncio.Future] = set()
-        self._message_id: object = _NO_MESSAGE
+        self.conn = None
         self.process: asyncio.subprocess.Process | None = None
-        self.session_id = ""
-        self.progress = ""
-        self.result: str | None = None
+        self.can_resume: bool | None = None  # known after the first initialize
 
-    async def start(self, folder: Path) -> list[Mode]:
-        exe = shutil.which(self._command[0])
-        if exe is None:
-            raise ExpertError(f"command not found: {self._command[0]}")
-        # Explicit env: ours, minus the keys that would switch this expert off the user's login.
-        env = expert_env(self._expert_id, os.environ)
-        if self._path_first is not None:
-            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
-        self._stack = AsyncExitStack()
+    def _alive(self) -> bool:
+        return self.process is not None and self.process.returncode is None
+
+    async def open(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
+        """Start the process if needed and open the run's session (resumed when asked and able)."""
+        self._opening += 1
+        self._cancel_idle()
         try:
             async with asyncio.timeout(self._startup_timeout):
-                self._conn, self.process = await self._stack.enter_async_context(
+                await self._ensure()
+                modes = await self._open_session(run, folder, resume)
+        except TimeoutError:
+            await self._abort()
+            raise ExpertError(
+                f"The expert did not answer within {self._startup_timeout:g} s while starting."
+            ) from None
+        except BaseException:
+            await self._abort()
+            raise
+        finally:
+            self._opening -= 1
+        return modes
+
+    async def _abort(self) -> None:
+        # Only this opening session is left: nobody else needs the process.
+        if not self._sessions and self._opening == 1:
+            await self._shutdown()
+
+    async def _ensure(self) -> None:
+        async with self._lock:
+            if self._shutdown_task is not None:
+                await self._shutdown_task
+            if self._alive():
+                return
+            await self._shutdown()  # clear what a crashed process left behind
+            exe = shutil.which(self._command[0])
+            if exe is None:
+                raise ExpertError(f"command not found: {self._command[0]}")
+            # Explicit env: ours, minus the keys that would switch this expert off the user's login.
+            env = expert_env(self._expert_id, os.environ)
+            if self._path_first is not None:
+                env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
+            self._stack = AsyncExitStack()
+            try:
+                self.conn, self.process = await self._stack.enter_async_context(
                     acp.spawn_agent_process(
                         _Client(self),
                         exe,
@@ -180,28 +235,150 @@ class ExpertRun:
                 caps = ClientCapabilities(
                     elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities())
                 )
-                await self._conn.initialize(
+                init = await self.conn.initialize(
                     protocol_version=acp.PROTOCOL_VERSION, client_capabilities=caps
                 )
-                session = await self._conn.new_session(cwd=str(folder), mcp_servers=[])
-        except TimeoutError:
-            await self._shutdown()
-            raise ExpertError(
-                f"The expert did not answer within {self._startup_timeout:g} s while starting."
-            ) from None
-        except BaseException:
-            await self._shutdown()
-            raise
-        self.session_id = session.session_id
+            except BaseException:
+                await self._shutdown()
+                raise
+            load = getattr(init.agent_capabilities, "load_session", None)
+            self.can_resume = bool(load)
+
+    async def _open_session(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
+        session = None
+        if resume is not None:
+            run.resumed, run.fresh_reason = False, "expert cannot reopen sessions"
+            if self.can_resume:
+                try:
+                    session = await self.conn.load_session(
+                        cwd=str(folder), session_id=resume, mcp_servers=[]
+                    )
+                    run.resumed, run.fresh_reason = True, None
+                    run.session_id = resume
+                except acp.RequestError:  # the adapter no longer has it: start over
+                    run.fresh_reason = "session could not be loaded"
+        if session is None:
+            session = await self.conn.new_session(cwd=str(folder), mcp_servers=[])
+            run.session_id = session.session_id
+        self._sessions[run.session_id] = run
         modes = session.modes.available_modes if session.modes else []
         return [Mode(m.id, m.name, m.description or "") for m in modes]
+
+    async def release(self, run: "ExpertRun", broken: bool = False) -> None:
+        """A session ended: forget it, and stop the process now or after the idle period.
+
+        broken: it ended in error, so the process may be dead or wedged; never keep it warm."""
+        if self._sessions.get(run.session_id) is run:
+            del self._sessions[run.session_id]
+        if self._sessions or self._opening:
+            return
+        if self._idle_s <= 0 or broken or not self._alive():
+            await self._shutdown()
+        elif self._idle_task is None:
+            self._idle_task = asyncio.ensure_future(self._stop_when_idle())
+
+    async def _stop_when_idle(self) -> None:
+        try:
+            await self._sleep(self._idle_s)
+        finally:
+            self._idle_task = None
+        if not self._sessions and not self._opening:
+            await asyncio.shield(self._shutdown())
+
+    def _cancel_idle(self) -> None:
+        if self._idle_task is not None:
+            self._idle_task.cancel()
+            self._idle_task = None
+
+    def session_for(self, session_id: str | None) -> "ExpertRun | None":
+        """The run a frame belongs to; a lone session owns a frame that names none."""
+        if session_id is None and len(self._sessions) == 1:
+            return next(iter(self._sessions.values()))
+        return self._sessions.get(session_id)
+
+    async def shutdown(self) -> None:
+        self._cancel_idle()
+        await self._shutdown()
+
+    def _shutdown(self) -> asyncio.Future:
+        # One shared teardown: every caller awaits the same task, so nobody returns (or
+        # reports the end) before the process is gone.
+        if self._shutdown_task is None:
+            self._shutdown_task = asyncio.ensure_future(self._do_shutdown())
+        return self._shutdown_task
+
+    async def _do_shutdown(self) -> None:
+        stack, self._stack = self._stack, None
+        process = self.process
+        try:
+            if process is not None:
+                with suppress(Exception):
+                    process.stdin.close()  # the adapter exits by itself when stdin closes
+                try:
+                    await asyncio.wait_for(process.wait(), self._grace)
+                except TimeoutError:
+                    await kill_tree(process)
+        finally:
+            if stack is not None:
+                await stack.aclose()
+            self._shutdown_task = None
+
+
+class ExpertRun:
+    """One session on a host, with the callbacks of the job that owns it."""
+
+    def __init__(
+        self,
+        *,
+        host: ExpertHost | None = None,
+        command: list[str] | None = None,
+        expert_id: str = "custom",
+        path_first: Path | None = None,
+        timeout: float,
+        on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
+        on_question: Callable[[Question], Awaitable[dict | None]],
+        on_progress: Callable[[str], Awaitable[None]],
+        on_end: Callable[[str, str, str | None], Awaitable[None]],
+        grace: float = 3.0,
+        startup_timeout: float = 60.0,
+    ) -> None:
+        # Alone (no host given) the run owns a process that dies with its session.
+        self._host = host or ExpertHost(
+            command or [], expert_id, path_first, grace=grace, startup_timeout=startup_timeout
+        )
+        self._timeout = timeout
+        self._grace = grace
+        self._startup_timeout = startup_timeout
+        self._on_permission = on_permission
+        self._on_question = on_question
+        self._on_progress = on_progress
+        self._on_end = on_end
+        self._task: asyncio.Task | None = None
+        self._notes: list[str] = []
+        self._active = False
+        self._stopping = False
+        self._asks: set[asyncio.Future] = set()
+        self._message_id: object = _NO_MESSAGE
+        self.session_id = ""
+        self.progress = ""
+        self.result: str | None = None
+        # Set when a resume was asked: True = reopened, False = fresh session and why.
+        self.resumed: bool | None = None
+        self.fresh_reason: str | None = None
+
+    @property
+    def process(self) -> asyncio.subprocess.Process | None:
+        return self._host.process
+
+    async def start(self, folder: Path, resume: str | None = None) -> list[Mode]:
+        return await self._host.open(self, folder, resume)
 
     async def begin(self, mode_id: str, task: str) -> None:
         try:
             async with asyncio.timeout(self._startup_timeout):
-                await self._conn.set_session_mode(session_id=self.session_id, mode_id=mode_id)
+                await self._host.conn.set_session_mode(session_id=self.session_id, mode_id=mode_id)
         except TimeoutError:
-            await self._shutdown()
+            await self._host.shutdown()
             raise ExpertError(
                 f"The expert did not answer within {self._startup_timeout:g} s to a mode change."
             ) from None
@@ -220,19 +397,21 @@ class ExpertRun:
         # From inside on_end (or after the run) there is nothing to wait for, and a task
         # must not await itself.
         if task is None or task.done() or task is asyncio.current_task() or not self._active:
-            await self._shutdown()
+            await self._host.release(self)
             return
         if not self._stopping:
             self._stopping = True
             self._notes.clear()
             with suppress(Exception):
-                await self._conn.cancel(session_id=self.session_id)
+                await self._host.conn.cancel(session_id=self.session_id)
             # ACP: after session/cancel every pending ask must be answered as cancelled.
             for ask in list(self._asks):
                 ask.cancel()
         done, _ = await asyncio.wait({task}, timeout=self._grace)
         if not done:
-            await self._shutdown()  # the prompt call then fails and the run ends stopped
+            # A wedged adapter: the process goes (sessions sharing it end in error too), and the
+            # prompt call then fails so this run ends stopped.
+            await self._host.shutdown()
         await task
 
     async def close(self) -> None:
@@ -258,7 +437,7 @@ class ExpertRun:
             async with asyncio.timeout(self._timeout):
                 while True:
                     self._message_id = _NO_MESSAGE
-                    response = await self._conn.prompt(
+                    response = await self._host.conn.prompt(
                         session_id=self.session_id, prompt=[acp.text_block(prompt)]
                     )
                     reason = response.stop_reason
@@ -281,35 +460,13 @@ class ExpertRun:
         self._active = False
         self.result = self.progress or None
         try:
-            await self._shutdown()
+            await self._host.release(self, broken=state == "error")
         except Exception:
             log.exception("expert shutdown failed")
         try:
             await self._on_end(state, reason, self.result)
         except Exception:
             log.exception("expert on_end failed")
-
-    def _shutdown(self) -> asyncio.Future:
-        # One shared teardown: every caller awaits the same task, so nobody returns (or
-        # reports the end) before the process is gone.
-        if self._shutdown_task is None:
-            self._shutdown_task = asyncio.ensure_future(self._do_shutdown())
-        return self._shutdown_task
-
-    async def _do_shutdown(self) -> None:
-        stack, self._stack = self._stack, None
-        process = self.process
-        try:
-            if process is not None:
-                with suppress(Exception):
-                    process.stdin.close()  # the adapter exits by itself when stdin closes
-                try:
-                    await asyncio.wait_for(process.wait(), self._grace)
-                except TimeoutError:
-                    await kill_tree(process)
-        finally:
-            if stack is not None:
-                await stack.aclose()
 
     async def _message_chunk(self, message_id, text: str) -> None:
         if message_id != self._message_id:
@@ -320,26 +477,34 @@ class ExpertRun:
 
 
 class _Client:
-    """The ACP client interface; it only translates frames to ExpertRun's callbacks."""
+    """The ACP client interface; it routes each frame to the run that owns its session."""
 
-    def __init__(self, run: ExpertRun) -> None:
-        self._run = run
+    def __init__(self, host: ExpertHost) -> None:
+        self._host = host
 
     def on_connect(self, conn) -> None:
         pass
 
     async def session_update(self, session_id, update, **kw) -> None:
-        if update.session_update == "agent_message_chunk" and hasattr(update.content, "text"):
-            await self._run._message_chunk(update.message_id, update.content.text)
+        run = self._host.session_for(session_id)  # a replayed or unknown session is dropped
+        if (
+            run
+            and update.session_update == "agent_message_chunk"
+            and hasattr(update.content, "text")
+        ):
+            await run._message_chunk(update.message_id, update.content.text)
 
     async def request_permission(self, session_id, tool_call, options, **kw):
+        run = self._host.session_for(session_id)
+        if run is None:
+            return RequestPermissionResponse(outcome=DeniedOutcome(outcome="cancelled"))
         request = PermissionRequest(
             title=tool_call.title or "",
             kind=str(tool_call.kind or "other"),
             input=tool_call.raw_input if isinstance(tool_call.raw_input, dict) else {},
             options=[PermissionOption(o.option_id, o.name, str(o.kind)) for o in options],
         )
-        chosen = await self._run._ask(self._run._on_permission, request)
+        chosen = await run._ask(run._on_permission, request)
         outcome = (
             DeniedOutcome(outcome="cancelled")
             if chosen is None
@@ -348,9 +513,10 @@ class _Client:
         return RequestPermissionResponse(outcome=outcome)
 
     async def create_elicitation(self, message, mode, **kw):
-        answer = await self._run._ask(
-            self._run._on_question, Question(message, _fields(mode.requested_schema))
-        )
+        run = self._host.session_for(getattr(mode, "session_id", None))
+        if run is None:
+            return CancelElicitationResponse(action="cancel")
+        answer = await run._ask(run._on_question, Question(message, _fields(mode.requested_schema)))
         if answer is None:
             return CancelElicitationResponse(action="cancel")
         return AcceptElicitationResponse(action="accept", content=answer)

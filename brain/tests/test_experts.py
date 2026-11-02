@@ -398,9 +398,9 @@ def test_the_factory_puts_a_private_nodes_dir_first_and_leaves_others_alone(tmp_
             expert, on_permission=None, on_question=None, on_progress=None, on_end=None
         )
 
-    assert run_for("private")._path_first == tmp_path / "n"
-    assert run_for("system")._path_first is None
-    assert run_for(None)._path_first is None
+    assert run_for("private")._host._path_first == tmp_path / "n"
+    assert run_for("system")._host._path_first is None
+    assert run_for(None)._host._path_first is None
 
 
 async def test_kill_tree_ends_a_process_that_ignores_stdin_close():
@@ -523,7 +523,7 @@ async def test_on_end_failure_is_logged_not_raised_and_shutdown_failure_still_en
     async def failing():
         raise OSError("teardown broke")
 
-    run2._do_shutdown = failing
+    run2._host._do_shutdown = failing
     await run2.begin("default", "go")
     await finished(h2)
     assert h2.ends[0][0] == "done"
