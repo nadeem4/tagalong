@@ -968,6 +968,18 @@ shows them as Scout does.
   not count (the job waits for a person), and the clock stops when the run ends. Code only
   reports facts; whether to check on, nudge or stop the job is Scout's call.
 
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+    U[ACP update] -->|step, message or plan,<br/>not a heartbeat| C[quiet clock restarts]
+    C --> S[sleeper waits TAGALONG_JOB_QUIET_MIN]
+    S -->|nothing new, no ask open| E[job_quiet event]
+    E --> W[Scout decides: wait, check, nudge, ask or stop]
+    S -->|ask open| R[wait another full threshold]
+    R --> S
+    E --> S
+```
+
 - **What Scout sees (activity summary).** Every job wake (`job_ended`, `job_quiet`,
   `job_step_failed`) carries an `activity` fact from `activity_summary` in `job_activity.py`: plain
   reads of the stored log, no model call, about 1,500 characters at most (`SUMMARY_CAP`). It holds
@@ -992,18 +1004,6 @@ flowchart LR
     F -->|120 s batch, newest replaces| W[wake with activity summary]
     J[job ends] -->|Scheduler.drop| X[held failed and quiet events gone]
     J --> E[job_ended with the same summary]
-```
-
-```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
-flowchart LR
-    U[ACP update] -->|step, message or plan,<br/>not a heartbeat| C[quiet clock restarts]
-    C --> S[sleeper waits TAGALONG_JOB_QUIET_MIN]
-    S -->|nothing new, no ask open| E[job_quiet event]
-    E --> W[Scout decides: wait, check, nudge, ask or stop]
-    S -->|ask open| R[wait another full threshold]
-    R --> S
-    E --> S
 ```
 
 - **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to

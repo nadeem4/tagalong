@@ -92,8 +92,10 @@ class Jobs:
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
         drop: Callable[[str, str], None] = lambda kind, key: None,
     ) -> None:
+        self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
         self._memory = memory
@@ -253,7 +255,7 @@ class Jobs:
                 job_id,
                 self._memory,
                 lambda text: mask_json(self._guards, "job_activity", text),
-                lambda: datetime.now(UTC),
+                self._now,
                 on_change=lambda: self._activity_changed(job_id),
                 on_failed=lambda entry: self._step_failed(job_id, entry),
             )
@@ -349,7 +351,7 @@ class Jobs:
             began = datetime.fromisoformat(step.at)
             event_facts["running"] = step.text
             event_facts["running_minutes"] = max(
-                0, int((datetime.now(UTC) - began).total_seconds() // 60)
+                0, int((self._now() - began).total_seconds() // 60)
             )
         event_facts.update(self.wake_facts(job_id))
         self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
@@ -367,7 +369,7 @@ class Jobs:
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its
         stored log (so a job from before a restart has one too) and masked once more."""
-        summary = activity_summary(self._memory, job_id, datetime.now(UTC))
+        summary = activity_summary(self._memory, job_id, self._now())
         return {"activity": mask_json(self._guards, "job_summary", summary)}
 
     def note(self, job: Job) -> str:
@@ -376,7 +378,7 @@ class Jobs:
 
     def activity_line(self, job_id: str) -> str:
         """One line about a job's steps for list_jobs; empty when it recorded none."""
-        line = activity_line(self._memory, job_id, datetime.now(UTC))
+        line = activity_line(self._memory, job_id, self._now())
         return mask_json(self._guards, "job_summary", line) if line else ""
 
     def running_steps(self) -> list[dict]:

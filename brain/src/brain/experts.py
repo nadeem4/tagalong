@@ -145,6 +145,8 @@ class ExpertHosts:
     ) -> None:
         self._idle_s = idle_s
         self._quiet_s = quiet_s
+        # One sleep seam serves both the hosts' idle timers and the runs' quiet sleepers,
+        # so a test that injects it controls every wait the factory creates.
         self._sleep = sleep
         self._clock = clock
         self._hosts: dict[tuple, ExpertHost] = {}
@@ -479,23 +481,28 @@ class ExpertRun:
             raise
         finally:
             self._asks.discard(ask)
+            if not self._asks:  # time with an ask open never counts as quiet
+                self._quiet_from = max(self._quiet_from, self._clock())
 
     async def _drive(self, first: str) -> None:
         state, reason = "done", "end_turn"
         prompt = first
         try:
-            while True:
-                self._message_id = _NO_MESSAGE
-                response = await self._host.conn.prompt(
-                    session_id=self.session_id, prompt=[acp.text_block(prompt)]
-                )
-                reason = response.stop_reason
-                if self._stopping:
-                    state, reason = "stopped", "stopped"
-                    break
-                if not self._notes:
-                    break
-                prompt = self._notes.pop(0)
+            try:
+                while True:
+                    self._message_id = _NO_MESSAGE
+                    response = await self._host.conn.prompt(
+                        session_id=self.session_id, prompt=[acp.text_block(prompt)]
+                    )
+                    reason = response.stop_reason
+                    if self._stopping:
+                        state, reason = "stopped", "stopped"
+                        break
+                    if not self._notes:
+                        break
+                    prompt = self._notes.pop(0)
+            finally:
+                await self._stop_quiet()  # also when cancelled: no leaked sleeper
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
@@ -505,7 +512,6 @@ class ExpertRun:
                     f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__,
                 )
         self._active = False
-        await self._stop_quiet()
         self.result = self.progress or None
         try:
             await self._host.release(self, broken=state == "error")

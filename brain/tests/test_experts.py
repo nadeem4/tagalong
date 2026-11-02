@@ -744,13 +744,23 @@ async def test_it_rearms_a_full_threshold_after_the_emit():
 async def test_it_does_not_fire_while_an_ask_is_open():
     clock, facts = FakeClock(), []
     run = await quiet_run(clock, facts)
-    ask = asyncio.get_running_loop().create_future()
-    run._asks.add(ask)
+    release = asyncio.Event()
+
+    async def waiting(_):
+        await release.wait()
+
+    asking = asyncio.ensure_future(run._ask(waiting, None))
+    await asyncio.sleep(0)
     await clock.advance(1200)
-    await clock.advance(1200)
+    await clock.advance(1199)  # t=2399: the ask is still open
     assert facts == []
-    run._asks.clear()
-    await clock.advance(1200)  # a full threshold after the last check
+    release.set()  # answered at t=2399, one second before a check
+    await asking
+    await clock.advance(1)  # t=2400: the check finds the answer only just given
+    assert facts == []
+    await clock.advance(1198)  # t=3598
+    assert facts == []
+    await clock.advance(1)  # t=3599: a full threshold after the answer at 2399
     assert len(facts) == 1
     await run._stop_quiet()
 
@@ -814,3 +824,20 @@ async def test_a_run_without_on_quiet_starts_no_sleeper():
     )
     run._start_quiet()
     assert run._quiet_task is None
+
+
+async def test_cancelling_the_run_does_not_leak_the_sleeper():
+    clock, facts = FakeClock(), []
+    run = await quiet_run(clock, facts)
+
+    async def hang(**kw):
+        await asyncio.Event().wait()
+
+    run._host.conn = SimpleNamespace(prompt=hang)
+    sleeper = run._quiet_task
+    driving = asyncio.ensure_future(run._drive("go"))
+    await asyncio.sleep(0)
+    driving.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await driving
+    assert sleeper.done()

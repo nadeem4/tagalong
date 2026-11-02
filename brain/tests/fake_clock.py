@@ -1,4 +1,7 @@
-"""A clock and sleep the test moves by hand, so quiet-clock tests never wait in real time."""
+"""A clock and sleep the test moves by hand, so quiet-clock tests never wait in real time.
+
+advance() moves time and wakes every sleeper that has come due, then yields so the woken
+code runs before the test looks at the result."""
 
 import asyncio
 

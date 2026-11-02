@@ -123,6 +123,7 @@ class Rig:
         self.clock = FakeClock()  # the quiet clock of each run, moved by the test
         self.emitted: list = []
         self.dropped: list = []
+        self.wall = datetime.now(UTC)
         self.experts = [installed()] if experts is None else experts
         self.expert_ids: list[str] = []
         self.approvals = (
@@ -149,6 +150,7 @@ class Rig:
             setup_facts=setup_facts,
             emit=self.emitted.append,
             drop=lambda kind, key: self.dropped.append((kind, key, len(self.finished))),
+            now=lambda: self.wall,
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -1042,18 +1044,11 @@ STEP_THEN_HANG = [
 ]
 
 
-async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig, monkeypatch):
+async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), STEP_THEN_HANG)
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
-    started = datetime.now(UTC)
-
-    class Later(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return started + timedelta(minutes=34)
-
-    monkeypatch.setattr("brain.jobs.datetime", Later)
+    rig.wall += timedelta(minutes=34)
     await rig.clock.advance(1200)
     activity = rig.jobs.wake_facts(job_id)["activity"]
     assert rig.emitted == [
@@ -1071,6 +1066,14 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig, monkeyp
         )
     ]
     assert rig.memory.get_job(job_id).state == "running"  # code never stops a quiet job
+
+
+async def test_no_quiet_wake_after_the_job_ends(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "done"}])
+    await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.finished)
+    await rig.clock.advance(2 * 1200)
+    assert rig.emitted == []
 
 
 async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
