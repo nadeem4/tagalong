@@ -645,7 +645,8 @@ def _check_watch(items: object) -> list[dict]:
     for item in items:
         text = item.get("text") if isinstance(item, dict) else None
         done = item.get("done") if isinstance(item, dict) else None
-        if not isinstance(text, str) or not text.strip() or len(text) > WATCH_TEXT_MAX:
+        text = text.strip() if isinstance(text, str) else None
+        if not text or len(text) > WATCH_TEXT_MAX:
             raise JobError(f"Each watch item needs text of 1 to {WATCH_TEXT_MAX} characters.")
         if not isinstance(done, bool):
             raise JobError("Each watch item needs done as true or false.")
