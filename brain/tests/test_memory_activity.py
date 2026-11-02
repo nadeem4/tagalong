@@ -44,7 +44,7 @@ def test_trim_blanks_oldest_output_text_first(mem):
     for n in (2, 3, 4):
         mem.save_activity("j", _entry(n, n, "output", "a" * 400, step="s"))
     mem.trim_activity("j", 2000, 500)
-    rows = mem.activity_after("j", 0, 10)
+    rows = sorted(mem.activity_after("j", 0, 10), key=lambda r: r.seq)
     assert len(rows) == 4
     assert [r.text == "" for r in rows if r.kind == "output"] == [True, True, False]
 
@@ -67,3 +67,29 @@ def test_activity_survives_reopen(tmp_path):
     m = Memory(tmp_path / "t.db")
     assert m.activity_after("j", 0, 10)[0].text == "npm test"
     m.close()
+
+
+def test_trim_deletes_oversized_non_output_rows_by_bytes(mem):
+    for n in (1, 2, 3):
+        mem.save_activity("j", _entry(n, n, "say", "s" * 400))
+    mem.trim_activity("j", 2000, 700)
+    rows = sorted(mem.activity_after("j", 0, 10), key=lambda r: r.seq)
+    assert [r.seq for r in rows] == [0, 3]
+    assert sum(len(r.text.encode()) for r in rows) <= 700 + 100
+
+
+def test_trim_deletes_the_least_recently_written_not_the_lowest_seq(mem):
+    for n in (1, 2, 3):
+        mem.save_activity("j", _entry(n, n))
+    mem.save_activity("j", _entry(4, 1, text="updated"))  # seq 1 written last
+    mem.trim_activity("j", 2, 10_000_000)
+    rows = sorted(mem.activity_after("j", 0, 10), key=lambda r: r.seq)
+    assert [r.seq for r in rows] == [0, 1, 3]
+
+
+def test_blanking_output_bumps_rev_so_cursors_see_it(mem):
+    mem.save_activity("j", _entry(1, 1, "output", "a" * 400, step="s"))
+    mem.save_activity("j", _entry(2, 2, "output", "b" * 400, step="s"))
+    mem.trim_activity("j", 2000, 500)
+    changed = mem.activity_after("j", 2, 10)
+    assert [(r.seq, r.text) for r in changed] == [(1, "")]

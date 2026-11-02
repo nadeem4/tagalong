@@ -481,7 +481,7 @@ class Memory:
 
     def trim_activity(self, job_id: str, max_entries: int, max_bytes: int) -> None:
         """Keep a job's log inside its caps: blank the oldest output text first, then delete
-        the oldest rows, leaving one marker (seq 0) where they were."""
+        the least recently written rows, leaving one marker (seq 0) where they were."""
         total = self._db.execute(
             "SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB))), 0) FROM job_activity WHERE job_id=?",
             (job_id,),
@@ -496,21 +496,26 @@ class Memory:
                 if total <= max_bytes:
                     break
                 self._db.execute(
-                    "UPDATE job_activity SET text='' WHERE job_id=? AND seq=?", (job_id, seq)
+                    "UPDATE job_activity SET text='', rev=? WHERE job_id=? AND seq=?",
+                    (self.last_rev(job_id) + 1, job_id, seq),  # a new rev so readers refetch it
                 )
                 total -= size
-        seqs = [
-            r[0]
-            for r in self._db.execute(
-                "SELECT seq FROM job_activity WHERE job_id=? AND seq>0 ORDER BY seq", (job_id,)
-            )
-        ]
-        excess = len(seqs) - max_entries
-        if excess <= 0:
+        rows = self._db.execute(
+            "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_activity"
+            " WHERE job_id=? AND seq>0 ORDER BY rev",
+            (job_id,),
+        ).fetchall()
+        count, drop = len(rows), []
+        for seq, size in rows[:-1]:  # the newest row always stays
+            if count <= max_entries and total <= max_bytes:
+                break
+            drop.append(seq)
+            count -= 1
+            total -= size
+        if not drop:
             return
-        self._db.execute(
-            "DELETE FROM job_activity WHERE job_id=? AND seq>0 AND seq<=?",
-            (job_id, seqs[excess - 1]),
+        self._db.executemany(
+            "DELETE FROM job_activity WHERE job_id=? AND seq=?", [(job_id, s) for s in drop]
         )
         self.save_activity(
             job_id,
@@ -535,7 +540,22 @@ class Memory:
         return self._jobs("WHERE state='running'")
 
     def stop_running_on_start(self) -> None:
-        """No job survives a brain restart; mark the leftovers stopped."""
+        """No job survives a brain restart; mark the leftovers stopped, each log ending there."""
+        now = self._now().isoformat()
+        for job in self.running_jobs():
+            seq = self._db.execute(
+                "SELECT COALESCE(MAX(seq), 0) FROM job_activity WHERE job_id=?", (job.id,)
+            ).fetchone()[0]
+            self.save_activity(
+                job.id,
+                ActivityEntry(
+                    rev=self.last_rev(job.id) + 1,
+                    seq=seq + 1,
+                    at=now,
+                    kind="end",
+                    text="# stopped",
+                ),
+            )
         self._db.execute(
             "UPDATE jobs SET state='stopped', reason='brain restarted', ended_at=?"
             " WHERE state='running'",

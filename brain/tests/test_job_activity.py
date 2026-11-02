@@ -191,3 +191,45 @@ def test_running_step_is_the_latest_running_command(rig):
     assert rig.log.running_step().text == "ls"
     rig.log.on_update(progress("t1", "completed"))
     assert rig.log.running_step() is None
+
+
+def test_idless_messages_around_a_tool_call_are_separate_says(rig):
+    def chunk(t):
+        return schema.AgentMessageChunk(
+            session_update="agent_message_chunk", content=acp.text_block(t)
+        )
+
+    rig.log.on_update(chunk("before "))
+    rig.log.on_update(chunk("more"))
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    rig.log.on_update(chunk("after"))
+    assert [(e.kind, e.text) for e in rig.rows()] == [
+        ("say", "before more"),
+        ("command", "ls"),
+        ("say", "after"),
+    ]
+
+
+def test_latest_plan_survives_trim_after_an_in_place_update(rig, monkeypatch):
+    monkeypatch.setattr(job_activity, "ENTRY_CAP", 3)
+    rig.log.on_update(acp.update_plan([acp.plan_entry("a")]))
+    for n in range(3):
+        rig.log.on_update(start(f"r{n}", kind="read", title=f"r{n}"))
+    rig.log.on_update(acp.update_plan([acp.plan_entry("a", status="completed")]))
+    assert [e.text for e in rig.rows() if e.kind == "plan"] == ["[x] a"]
+
+
+def test_end_marks_open_steps_failed_when_stopped_or_errored(tmp_path):
+    for state, failed in [("stopped", True), ("error", True), ("done", False)]:
+        r = Rig(tmp_path / state)
+        r.log.on_update(start("t1", raw_input={"command": "ls"}))
+        r.log.on_update(start("t2", raw_input={"command": "pwd"}))
+        r.log.on_update(progress("t2", "completed"))
+        r.log.end(state, "why")
+        rows = r.rows()
+        assert [e.status for e in rows if e.kind == "command"] == [
+            "failed" if failed else "running",
+            "done",
+        ]
+        assert rows[-1].kind == "end"
+        r.memory.close()

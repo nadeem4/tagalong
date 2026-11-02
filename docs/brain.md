@@ -753,8 +753,12 @@ with the title, never an error.
 Every text is masked (`mask_json(guards, "job_activity", ...)`) on the whole accumulated text,
 then capped: a command's output keeps its last 64 KB behind `[earlier output cut]` (cut on a
 character boundary), a message 8,192 characters, a job 2,000 entries or 1 MB of text. Over the
-caps `Memory.trim_activity` blanks the oldest `output` text first, then deletes the oldest rows
-and keeps one marker. Nothing unmasked is stored. The log lives as long as its job row.
+caps `Memory.trim_activity` blanks the oldest `output` text first (bumping its `rev`), then
+deletes rows by entry count and by bytes, least recently written first (lowest `rev`, so a plan
+or step still being updated survives), and keeps one marker. Messages without an id join into one
+entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
+`running`/`pending` are marked `failed` before the `end` entry; a job stopped by a brain restart
+gets its `# stopped` entry too. Nothing unmasked is stored. The log lives as long as its job row.
 Reading it (a Home tool, `changed` pushes) is not built yet.
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that

@@ -597,10 +597,24 @@ async def test_updates_before_begin_are_not_forwarded(tmp_path):
     assert [u.tool_call_id for u in h.updates] == ["t1"]
 
 
+async def test_update_is_dropped_while_the_run_is_not_active(tmp_path):
+    h = Harness()
+    run = make_run(h, tmp_path, [TOOL])
+    await run._update(object())
+    assert h.updates == []
+    run._active = True
+    u = object()
+    await run._update(u)
+    assert h.updates == [u]
+
+
 async def test_two_runs_on_one_adapter_get_only_their_own_updates(tmp_path):
     ha, hb = Harness(), Harness()
     script = tmp_path / "script.json"
-    steps = [[{"tool": {"id": i, "title": i, "kind": "execute"}}] for i in ("a", "b")]
+    steps = [
+        [{"sleep": 0.3}, {"tool": {"id": "a", "title": "a", "kind": "execute"}}],
+        [{"tool": {"id": "b", "title": "b", "kind": "execute"}}],
+    ]
     script.write_text(json.dumps(steps))  # one list per prompt
     patch.setenv("FAKE_ACP_SCRIPT", str(script))
     patch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
@@ -623,8 +637,8 @@ async def test_two_runs_on_one_adapter_get_only_their_own_updates(tmp_path):
     await a.start(tmp_path)
     await b.start(tmp_path)
     await a.begin("default", "first")
+    await b.begin("default", "second")  # both prompts are in flight together
     await finished(ha)
-    await b.begin("default", "second")
     await finished(hb)
     assert [u.tool_call_id for u in ha.updates] == ["a"]
     assert [u.tool_call_id for u in hb.updates] == ["b"]

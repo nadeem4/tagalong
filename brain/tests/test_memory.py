@@ -730,3 +730,13 @@ def test_the_parent_job_column_is_added_to_an_older_database(tmp_path):
     m = Memory(path)
     assert m.get_job("a").parent_job is None
     m.close()
+
+
+def test_stop_running_on_start_writes_an_end_row(mem):
+    mem.add_job("a", "a", "t", "f", "m")
+    mem.add_job("b", "a", "t", "f", "m")
+    mem.update_job("b", state="done", ended_at="x")
+    mem.stop_running_on_start()
+    [end] = mem.activity_after("a", 0, 10)
+    assert (end.kind, end.text) == ("end", "# stopped")
+    assert mem.activity_after("b", 0, 10) == []

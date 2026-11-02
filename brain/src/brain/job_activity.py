@@ -49,6 +49,7 @@ class JobActivity:
         self._steps: dict[str, ActivityEntry] = {}  # tool call id -> its command/edit/... entry
         self._outputs: dict[str, int] = {}  # tool call id -> seq of its output entry
         self._says: dict[object, tuple[int, str]] = {}  # message id -> (seq, raw text so far)
+        self._last_say: object = None  # key of the message still being written, if any
         self._plan_seq: int | None = None
         self._wrote = False
 
@@ -66,6 +67,10 @@ class JobActivity:
 
     def end(self, state: str, reason: str) -> None:
         text = {"done": "# done", "stopped": "# stopped"}.get(state, f"# error: {reason}")
+        if state != "done":
+            for step, old in list(self._steps.items()):
+                if old.status in ("running", "pending"):
+                    self._steps[step] = self._put(old.seq, old.kind, old.text, "failed", step)
         self._put(None, "end", text)
         self._on_change()
 
@@ -74,6 +79,7 @@ class JobActivity:
         return max(running, key=lambda e: e.seq, default=None)
 
     def _tool(self, u) -> None:
+        self._last_say = None
         step = u.tool_call_id
         old = self._steps.get(step)
         status = _STATUS.get(str(u.status)) if u.status else None
@@ -94,12 +100,17 @@ class JobActivity:
         text = getattr(u.content, "text", None)
         if text is None:
             return
-        seq, raw = self._says.get(u.message_id, (None, ""))
+        key = u.message_id
+        if key is None and self._last_say is None:
+            self._says.pop(None, None)  # no id: chunks join only until a tool or plan intervenes
+        seq, raw = self._says.get(key, (None, ""))
         raw = (raw + text)[: SAY_CAP * 2]
         seq = self._put(seq, "say", raw, None, None, lambda t: t[:SAY_CAP]).seq
-        self._says[u.message_id] = (seq, raw)
+        self._says[key] = (seq, raw)
+        self._last_say = key if key is not None else "anon"
 
     def _plan(self, u) -> None:
+        self._last_say = None
         lines = [f"[{'x' if str(e.status) == 'completed' else ' '}] {e.content}" for e in u.entries]
         self._plan_seq = self._put(self._plan_seq, "plan", "\n".join(lines)).seq
 
