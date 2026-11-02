@@ -1875,3 +1875,121 @@ async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
     await idle(session)
     assert memory.list_timers() == []
     assert memory.get_job("j1").state == "stopped"
+
+
+# --- turn origin: who the running turn belongs to (JM5) ----------------------------------
+
+
+async def test_a_say_started_turn_is_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]))
+    assert session.owner_turn() is False  # nothing running
+    session.say("desktop", say("hi"))
+    assert session.owner_turn() is True
+    gate.set()
+    await finish(session)
+
+
+async def test_a_timer_wake_turn_is_not_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session._busy()
+    assert session.owner_turn() is False
+    gate.set()
+    await idle(session)
+
+
+async def test_an_owner_message_joining_a_wake_turn_makes_it_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session.owner_turn() is False
+    assert session.say("desktop", say("do it")).joined is True
+    assert session.owner_turn() is True
+    gate.set()
+    await idle(session)
+
+
+async def test_the_next_wake_after_an_owner_turn_is_not_an_owner_turn():
+    gate = asyncio.Event()
+    session, _ = make(Gate(["one", gate, "two"]), kinds=None)
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await idle(session)
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    assert session._busy()
+    assert session.owner_turn() is False
+    gate.set()
+    await idle(session)
+
+
+def nudge_call(job="j1"):
+    block = {
+        "type": "tool_use",
+        "id": "n1",
+        "name": "tell_expert",
+        "input": {"job": job, "note": "try the other way"},
+    }
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+def open_asks(sent):
+    return [p for m, p in sent if m == "ask" and p.get("state") == "open"]
+
+
+def tool_results(session):
+    return [
+        b["content"]
+        for m in session.history
+        if m["role"] == "user" and isinstance(m["content"], list)
+        for b in m["content"]
+        if b.get("type") == "tool_result"
+    ]
+
+
+async def test_a_nudge_the_owner_asked_for_runs_without_an_ask():
+    session, sent = make(Gate([nudge_call(), "sent"]))
+    join(session, "desktop")
+    session.say("desktop", say("tell the job to try the other way"))
+    await idle(session)
+    assert open_asks(sent) == []
+    assert "no job j1" in str(tool_results(session))  # the tool ran
+
+
+async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
+    session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    [ask] = open_asks(sent)
+    assert ask["tool"] == "tell_expert"
+    assert tool_results(session) == []  # held on the ask
+    session.cancel(session._turn_id)
+    await idle(session)
+
+
+async def test_a_nudge_after_the_owner_joins_a_wake_turn_runs_without_an_ask():
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    session.say("desktop", say("nudge it"))  # the owner steps into the wake turn
+    gate.set()
+    await idle(session)
+    assert open_asks(sent) == []
+    assert "no job j1" in str(tool_results(session))
+
+
+async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
+    session, sent = make(Gate(["hello", nudge_call(), "sent"]), kinds=None)
+    join(session, "desktop")
+    session.say("desktop", say("hi"))
+    await idle(session)
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
+    session.cancel(session._turn_id)
+    await idle(session)

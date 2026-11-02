@@ -1870,3 +1870,128 @@ async def test_ending_a_job_without_timers_does_not_rearm(make_rig):
     await finish(rig, job_id)
     await until(lambda: rig.finished)
     assert rig.timers_changed == 0
+
+
+# --- a follow-up Scout starts goes through the preference rule (JM5) ---------------------
+
+
+async def first_job(rig):
+    job = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, job)
+    return str(job)
+
+
+def continuing(make_rig, asks, side_check=None, **kw):
+    steps = [{"text": "ok"}]
+    return with_approvals(make_rig, asks, steps, side_check=side_check, load=True, **kw)
+
+
+def hand_off_rows(rig):
+    return [r for r in logged(rig) if r.tool == "hand_off"]
+
+
+async def test_owner_asked_continue_shows_the_card_and_never_runs_the_chain(make_rig):
+    check = FakeSideCheck(None)
+    rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=True)
+    assert check.facts == [] and hand_off_rows(rig) == []
+    assert rig.memory.get_job(second).mode == "auto"
+
+
+async def test_brain_started_continue_with_a_covering_preference_skips_the_card(make_rig):
+    asks = FakeAsks(Answer("Plan"))  # no second answer: the owner is never asked
+    check = FakeSideCheck()
+    rig = continuing(make_rig, asks, check)
+    check.result = pref_in(rig, "Nudging my jobs is fine")
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert len(asks.opened) == 1  # only the first card
+    assert rig.memory.get_job(second).mode == "plan" == rig.memory.get_job(first).mode
+    [row] = hand_off_rows(rig)
+    assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
+    assert row.group_key == f"claude_code:{rig.folder}"
+    [facts] = check.facts
+    assert (facts.source, facts.tool, facts.group_key) == (
+        "claude_code", "hand_off", f"claude_code:{rig.folder}",
+    )  # fmt: skip
+
+
+async def test_brain_started_continue_without_a_preference_shows_the_card(make_rig):
+    check = FakeSideCheck(None)
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = continuing(make_rig, asks, check)
+    rig.jobs._offers = offers = FakeOffers()
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert len(asks.opened) == 2 and asks.opened[1]["tool"] == "hand_off"
+    assert rig.memory.get_job(second).mode == "auto"  # the owner's pick, not the earlier mode
+    [row] = hand_off_rows(rig)
+    assert (row.outcome, row.decided_by) == ("approved", "person")
+    group = f"claude_code:{rig.folder}"
+    assert offers.considered == [(group, "claude_code", "hand_off")]
+
+
+async def test_brain_started_continue_card_cancel_starts_nothing_and_records_no_row(make_rig):
+    asks = FakeAsks(Answer("Plan"), Answer("cancel"))
+    rig = continuing(make_rig, asks, FakeSideCheck(None))
+    rig.jobs._offers = offers = FakeOffers()
+    first = await first_job(rig)
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert hand_off_rows(rig) == [] and offers.considered == []
+    assert len(rig.memory.list_jobs()) == 1
+
+
+async def test_brain_started_continue_with_nobody_online_is_not_started_and_logs_no_one(make_rig):
+    check = FakeSideCheck()
+    asks = FakeAsks(Answer("Plan"))
+    rig = continuing(make_rig, asks, check)
+    check.result = pref_in(rig)
+    first = await first_job(rig)
+    asks.online = False
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert check.facts == []  # nobody online skips the side-check
+    [row] = hand_off_rows(rig)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")
+    assert len(rig.memory.list_jobs()) == 1
+
+
+async def test_an_earlier_mode_missing_from_the_new_session_falls_back_to_the_card(make_rig):
+    check = FakeSideCheck()
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = continuing(make_rig, asks, check)
+    check.result = pref_in(rig)
+    first = await first_job(rig)
+    rig.memory.update_job(first, mode="gone")
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert len(asks.opened) == 2  # the card was shown instead of crashing
+    assert rig.memory.get_job(second).mode == "auto"
+
+
+async def test_a_new_job_without_continue_always_shows_the_card_even_on_a_brain_turn(make_rig):
+    check = FakeSideCheck()
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = continuing(make_rig, asks, check)
+    check.result = pref_in(rig)
+    await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    assert check.facts == [] and hand_off_rows(rig) == []
+    assert len(asks.opened) == 2 and rig.memory.get_job(second).mode == "auto"
+
+
+async def test_a_side_check_error_on_a_follow_up_falls_back_to_the_card(make_rig):
+    check = FakeSideCheck()
+
+    async def boom(facts):
+        raise RuntimeError("boom")
+
+    check.decide = boom
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = continuing(make_rig, asks, check)
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert len(asks.opened) == 2 and rig.memory.get_job(second).mode == "auto"
+    [row] = hand_off_rows(rig)
+    assert row.decided_by == "person"

@@ -373,15 +373,20 @@ def expert_rows(
     ]
 
 
-def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
+def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolSpec, Handler]]:
     """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
-    raises it as an RpcError so the body shows the same words."""
+    raises it as an RpcError so the body shows the same words. owner_turn says whether the
+    running turn is the owner's: a follow-up they asked for needs no ask."""
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
         try:
             job_id = await jobs.start(
-                args["task"], args["folder"], args.get("expert"), args.get("continue_job")
+                args["task"],
+                args["folder"],
+                args.get("expert"),
+                args.get("continue_job"),
+                owner_asked=owner_turn(),
             )
         except JobError as err:
             # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
@@ -519,7 +524,8 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
                 },
                 scout,
                 effect="change",
-                default_mode="auto",
+                default_mode="ask",
+                follow_up=True,
             ),
             tell_expert,
         ),

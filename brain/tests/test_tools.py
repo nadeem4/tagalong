@@ -181,14 +181,21 @@ def home(mem, tmp_path):
         notify("changed", {"what": "permissions"})  # as Session does
 
     jobs = FakeJobs()
-    tools = brain_tools(mem, notify) + home_tools(budget, lambda: box) + expert_tools(jobs)
+    owner = {"turn": True}  # whether the running turn is the owner's
+    tools = (
+        brain_tools(mem, notify)
+        + home_tools(budget, lambda: box)
+        + expert_tools(jobs, lambda: owner["turn"])
+    )
     box = Toolbox([BrainSource(tools), BodySource(bodies)], mem.permission_modes, save_mode)
     handlers = {spec.name: handler for spec, handler in tools}
 
     async def run(name, args=None):
         return await handlers[name](args or {})
 
-    return SimpleNamespace(run=run, sent=sent, bodies=bodies, box=box, budget=budget, jobs=jobs)
+    return SimpleNamespace(
+        run=run, sent=sent, bodies=bodies, box=box, budget=budget, jobs=jobs, owner=owner
+    )
 
 
 class FakeJobs:
@@ -196,6 +203,7 @@ class FakeJobs:
 
     def __init__(self):
         self.calls = []
+        self.owner_asked = None
         self.error = None
         self.rows = []
         self.activity_jobs = set()
@@ -212,8 +220,9 @@ class FakeJobs:
     def can_resume(self, expert_id):
         return self.resumable.get(expert_id)
 
-    async def start(self, task, folder, expert=None, continue_job=None):
+    async def start(self, task, folder, expert=None, continue_job=None, *, owner_asked=True):
         self.calls.append(("start", task, folder, expert, continue_job))
+        self.owner_asked = owner_asked
         if self.error:
             raise self.error
         return self.started
@@ -270,7 +279,7 @@ def test_expert_specs_audiences_effects_and_gate(home):
     assert specs["hand_off"].audience == scout and specs["hand_off"].effect == "change"
     assert specs["hand_off"].self_asks is True
     assert specs["tell_expert"].audience == scout and specs["tell_expert"].effect == "change"
-    assert specs["tell_expert"].default_mode == "auto"
+    assert specs["tell_expert"].default_mode == "ask" and specs["tell_expert"].follow_up is True
     assert specs["list_jobs"].audience == both and specs["list_jobs"].effect == "read"
     assert specs["stop_job"].audience == both and specs["stop_job"].effect == "change"
     assert specs["stop_job"].default_mode == "auto"
@@ -291,6 +300,19 @@ async def test_hand_off_reaches_jobs_start(home):
     out = await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
     assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None, None)]
     assert json.loads(out) == {"job": "ab12cd34", "session": "fresh", "why_fresh": None}
+
+
+async def test_home_permission_list_shows_tell_expert_as_ask(home):
+    rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert rows["tell_expert"]["mode"] == "ask"
+
+
+async def test_hand_off_tool_passes_the_turn_origin(home):
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
+    assert home.jobs.owner_asked is True
+    home.owner["turn"] = False  # a wake turn
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
+    assert home.jobs.owner_asked is False
 
 
 async def test_hand_off_continue_job_reports_the_session_facts(home):
