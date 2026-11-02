@@ -55,6 +55,8 @@ export interface FakeHostBridge extends HostBridge {
   /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
   activity: Record<string, JobActivityEntry[]>;
   running: RunningStep[];
+  /** How many times runningSteps was called. */
+  runningStepCalls: number;
   /** Every jobActivity call as [job, afterRev], in order. */
   readonly activityCalls: readonly (readonly [string, number])[];
   /** Home's Approvals history, newest first, and the preferences Scout follows; a test may swap them. */
@@ -326,10 +328,12 @@ export function createFakeHostBridge(
       return Promise.resolve(page);
     },
     runningSteps() {
+      fake.runningStepCalls += 1;
       return Promise.resolve(fake.running.map((step) => ({ ...step })));
     },
     activity: { ...options.activity },
     running: (options.runningSteps ?? []).map((step) => ({ ...step })),
+    runningStepCalls: 0,
     activityCalls,
     approvalRows: (options.approvalRows ?? []).map((row) => ({ ...row })),
     preferences: (options.preferences ?? []).map((row) => ({ ...row })),
