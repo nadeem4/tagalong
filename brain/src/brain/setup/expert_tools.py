@@ -1,9 +1,9 @@
-"""Scout's tools that change the machine: install an expert (and, later, log it in).
+"""Scout's tools that change the machine: install an expert and log it in.
 
 Each asks the person through the normal Allow card, with facts built here so the card names
 what will be downloaded. Only the person can allow it: no preference, no Always. An install
 runs in the background, outside the turn: the tool returns at once and the end arrives as a
-`setup_done` event of facts. Scout words them.
+`setup_done` event of facts; a login likewise ends in a `setup_login` event. Scout words them.
 """
 
 import asyncio
@@ -16,9 +16,11 @@ from brain.events import Event
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine, RunCmd
 from brain.setup.install import InstallError, install_card, install_expert
+from brain.setup.login import Failed, LoggedIn, LoginDriver, NotLoggedIn, Waiting, pick_method
 from brain.setup.net import GetJson
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore
+from brain.setup.terminal import NoTerminal
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
 
@@ -116,3 +118,51 @@ def _facts(err: Exception) -> tuple[str, str]:
     if isinstance(err, InstallError):
         return err.kind, err.detail
     return "registry_unavailable", str(err)
+
+
+def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler]]:
+    """`login_expert`: the person logs in on their own subscription, in a terminal window or the
+    browser the expert opens. No link or code passes through Scout. Like install, it asks every
+    time, and the window or browser opens only after the OK."""
+
+    def found(args: dict):
+        return ExpertStore(home).get(str(args.get("id")))
+
+    async def card(args: dict) -> dict:
+        expert = found(args)
+        if expert is None:
+            raise RpcError(ErrorCode.tool_failed, json.dumps({"error": "unknown_expert"}))
+        state = await driver.check(expert)
+        method = pick_method(state.methods) if isinstance(state, NotLoggedIn) else None
+        if method is None:
+            error = "already_logged_in" if isinstance(state, LoggedIn) else "no_login_method"
+            raise RpcError(ErrorCode.tool_failed, json.dumps({"error": error}))
+        opens = "terminal window" if method.kind == "terminal" else "browser"
+        return {"expert": expert.id, "method": method.id, "opens": opens}
+
+    async def login(args: dict) -> str:
+        expert = found(args)
+        if expert is None:
+            return json.dumps({"error": "unknown_expert", "detail": str(args.get("id"))})
+        try:
+            state = await driver.start(expert)
+        except NoTerminal as err:
+            return json.dumps({"error": "no_terminal", "command": err.command})
+        if isinstance(state, Waiting):
+            return json.dumps({"state": "waiting", "kind": state.kind})
+        if isinstance(state, Failed):
+            return json.dumps({"state": "failed", "detail": state.detail})
+        return json.dumps({"state": "logged_in" if isinstance(state, LoggedIn) else "unknown"})
+
+    spec = ToolSpec(
+        "login_expert",
+        "Log an installed expert in, by its id. Opens a terminal window or the browser for the "
+        "owner to sign in on their own subscription, after they allow it. It returns at once; "
+        "the end comes later as a setup_login event. Never ask for or relay a code or link.",
+        _ID_SCHEMA,
+        effect="change",
+        locked=True,
+        person_only=True,
+        card=card,
+    )
+    return [(spec, login)]

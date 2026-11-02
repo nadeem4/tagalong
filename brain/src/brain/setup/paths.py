@@ -21,3 +21,8 @@ def cache_file(home: Path, name: str) -> Path:
 
 def experts_file(home: Path) -> Path:
     return home / "experts.json"
+
+
+def login_done_file(home: Path, expert_id: str) -> Path:
+    """Where a login window's wrapper writes the exit code when the window's command ends."""
+    return home / "cache" / f"login-{expert_id}.done"

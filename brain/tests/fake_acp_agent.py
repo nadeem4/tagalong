@@ -13,8 +13,11 @@ wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": s
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
 FAKE_ACP_LOAD=1 advertises and serves session/load; FAKE_ACP_AUTH (JSON list of
 {id, name, description?}) sets auth_methods, and new_session/authenticate then fail with
-auth-required unless FAKE_ACP_LOGGED_IN=1. FAKE_ACP_AUTH='[]' means login
-is required with no methods advertised (claude-acp without auth.terminal).
+auth-required unless FAKE_ACP_LOGGED_IN=1 or the file named by FAKE_ACP_LOGIN_FILE exists.
+An entry with "type": "terminal" (and "args") is a terminal method, advertised only to a
+client that sent auth.terminal, like claude-acp. authenticate with a login file named
+creates it (a browser login finishing). FAKE_ACP_AUTH='[]' means login is required with
+no methods advertised.
 """
 
 import asyncio
@@ -54,20 +57,35 @@ class FakeAgent:
         if os.environ.get("FAKE_ACP_HANG_INIT"):
             await asyncio.Event().wait()  # an adapter that never answers the handshake
         auth = json.loads(os.environ.get("FAKE_ACP_AUTH", "[]"))
+        auth_caps = getattr(client_capabilities, "auth", None)
+        can_terminal = bool(auth_caps and auth_caps.terminal)
+        methods = [
+            schema.TerminalAuthMethod(**m)
+            if m.get("type") == "terminal"
+            else schema.AuthMethodAgent(**m)
+            for m in auth
+            if can_terminal or m.get("type") != "terminal"
+        ]
         return schema.InitializeResponse(
             protocol_version=1,
             agent_info=schema.Implementation(name="fake-acp", version="0"),
             agent_capabilities=schema.AgentCapabilities(
                 load_session=bool(os.environ.get("FAKE_ACP_LOAD"))
             ),
-            auth_methods=[schema.AuthMethodAgent(**m) for m in auth],
+            auth_methods=methods,
         )
 
     def _needs_login(self) -> bool:
+        marker = os.environ.get("FAKE_ACP_LOGIN_FILE")
+        if marker and Path(marker).exists():
+            return False
         return bool(os.environ.get("FAKE_ACP_AUTH")) and not os.environ.get("FAKE_ACP_LOGGED_IN")
 
     async def authenticate(self, method_id, **kw):
-        if self._needs_login():
+        marker = os.environ.get("FAKE_ACP_LOGIN_FILE")
+        if marker:  # the browser sign-in finished
+            Path(marker).write_text(method_id, encoding="utf-8")
+        elif self._needs_login():
             raise acp.RequestError.auth_required()
         return schema.AuthenticateResponse()
 
