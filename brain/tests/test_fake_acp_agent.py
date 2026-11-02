@@ -363,7 +363,13 @@ async def test_tool_steps_reach_the_client(tmp_path):
 async def test_meta_only_agent_sends_terminal_data_only_when_advertised(tmp_path):
     steps = [
         {"tool": {"id": "t1", "title": "Run", "kind": "execute", "terminal": True}},
-        {"tool_update": {"id": "t1", "status": "completed", "terminal": {"output": "hi", "exit": 0}}},
+        {
+            "tool_update": {
+                "id": "t1",
+                "status": "completed",
+                "terminal": {"output": "hi", "exit": 0},
+            }
+        },
     ]
     only = {"FAKE_ACP_META_ONLY": "1"}
     async with running(tmp_path, steps, extra_env=only) as (conn, _p, client, _log):
