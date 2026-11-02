@@ -16,7 +16,15 @@ from brain.events import Event
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine, RunCmd
 from brain.setup.install import InstallError, install_card, install_expert
-from brain.setup.login import Failed, LoggedIn, LoginDriver, NotLoggedIn, Waiting, pick_method
+from brain.setup.login import (
+    Failed,
+    LoggedIn,
+    LoginDriver,
+    NotLoggedIn,
+    Unknown,
+    Waiting,
+    pick_method,
+)
 from brain.setup.net import GetJson
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore
@@ -135,7 +143,12 @@ def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler
         state = await driver.check(expert)
         method = pick_method(state.methods) if isinstance(state, NotLoggedIn) else None
         if method is None:
-            error = "already_logged_in" if isinstance(state, LoggedIn) else "no_login_method"
+            if isinstance(state, LoggedIn):
+                error = "already_logged_in"
+            elif isinstance(state, Unknown):
+                error = "unknown"
+            else:
+                error = "no_login_method"
             raise RpcError(ErrorCode.tool_failed, json.dumps({"error": error}))
         opens = "terminal window" if method.kind == "terminal" else "browser"
         return {"expert": expert.id, "method": method.id, "opens": opens}

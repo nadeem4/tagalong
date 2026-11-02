@@ -4,6 +4,7 @@ Its own Node, installed expert packages, the registry cache and the installed-ex
 here so nothing touches the system Node, PATH or global npm.
 """
 
+import uuid
 from pathlib import Path
 
 
@@ -25,4 +26,5 @@ def experts_file(home: Path) -> Path:
 
 def login_done_file(home: Path, expert_id: str) -> Path:
     """Where a login window's wrapper writes the exit code when the window's command ends."""
-    return home / "cache" / f"login-{expert_id}.done"
+    # unique per start, so a window left over from an earlier login cannot end a newer wait
+    return home / "cache" / f"login-{expert_id}-{uuid.uuid4().hex[:8]}.done"

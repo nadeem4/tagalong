@@ -190,7 +190,6 @@ class LoginDriver:
         method = pick_method(state.methods)
         if method is None:
             return Failed("no subscription login method this computer can run")
-        await self._cancel(expert.id)
         if method.kind == "terminal":
             done = login_done_file(self._home, expert.id)
             done.parent.mkdir(parents=True, exist_ok=True)
@@ -202,6 +201,7 @@ class LoginDriver:
         else:
             wait = partial(self._wait_browser, expert, method)
             waiting = Waiting("browser")
+        await self._cancel(expert.id)  # only now: a failed opener must not end a working login
         self._tasks[expert.id] = task = asyncio.ensure_future(self._finish(expert, wait))
         task.add_done_callback(
             lambda t: self._tasks.get(expert.id) is t and self._tasks.pop(expert.id)
@@ -247,15 +247,18 @@ class LoginDriver:
             self._tell(expert.id, "failed", "timeout")
             return
         state = await self.check(expert)
-        if isinstance(state, LoggedIn):
-            self._store.set_login(expert.id, True)
-            self._tell(expert.id, "logged_in")
-        elif isinstance(state, Unknown):
-            self._store.set_login(expert.id, None)
-            self._tell(expert.id, "unknown", detail)
-        else:
-            self._store.set_login(expert.id, False)
-            self._tell(expert.id, "failed", detail or "still not logged in")
+        try:
+            if isinstance(state, LoggedIn):
+                self._store.set_login(expert.id, True)
+                self._tell(expert.id, "logged_in")
+            elif isinstance(state, Unknown):
+                self._store.set_login(expert.id, None)
+                self._tell(expert.id, "unknown", detail)
+            else:
+                self._store.set_login(expert.id, False)
+                self._tell(expert.id, "failed", detail or "still not logged in")
+        except OSError as err:
+            self._tell(expert.id, "failed", f"could not save the result: {err}")
 
     def _tell(self, expert_id: str, state: str, detail: str = "") -> None:
         facts: dict[str, str | int] = {"expert": expert_id, "state": state}

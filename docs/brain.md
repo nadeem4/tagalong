@@ -557,13 +557,16 @@ words what the person reads (guidance in `mind/soul.md`).
   browser one (`chat-gpt`, `oauth-personal`); never an API-key method. A terminal method opens a
   visible window (the `OpenTerminal` seam; `real_open_terminal` is Windows only: `cmd` with
   `CREATE_NEW_CONSOLE`) running the adapter's own command plus the method's args, with the
-  expert's env, wrapped so the exit code lands in `cache/login-<id>.done`; elsewhere it raises
-  `NoTerminal` and the tool answers `{error: "no_terminal", command}` so Scout can tell the person
+  expert's env, wrapped so the exit code lands in a done file, `cache/login-<id>-<random>.done`, new for every
+  start (a watcher writes `closed` there if the window is closed with X, so the login ends as
+  failed at once). Arguments or paths with `" % ! & | < > ^` are refused with `NoTerminal` too, as
+  cmd would act on them; elsewhere it raises `NoTerminal` and the tool answers `{error: "no_terminal", command}` so Scout can tell the person
   what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
   browser. The tool returns `{state: "waiting", kind}` at once; a background task waits (10
   minutes at most for the done file or the call), re-checks login, records it in `experts.json`
   and emits one waking `setup_login` event (`expert`, `state` = `logged_in`, `failed` or
-  `unknown`, and `detail`). A second login for the same expert cancels the first; shutdown cancels
+  `unknown`, and `detail`). A second login for the same expert cancels the first once its window has opened (a refused
+  window leaves the first running); the card says `unknown` when the check could not tell; shutdown cancels
   them all; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
   switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them), used

@@ -287,3 +287,80 @@ def login_tools(tmp_path, d):
     from brain.setup.expert_tools import login_tools as make
 
     return make(tmp_path, d)
+
+
+# --- review fixes -------------------------------------------------------------------------
+
+
+def test_terminal_line_refuses_characters_cmd_would_act_on():
+    with pytest.raises(NoTerminal):
+        terminal_line(["tool", "login"], Path("C:/R&D/done.txt"))
+    with pytest.raises(NoTerminal):
+        terminal_line(["tool", "100%"], Path("C:/h/done.txt"))
+
+
+async def test_closing_the_window_writes_a_closed_marker(tmp_path, monkeypatch):
+    class FakeProc:
+        def wait(self):
+            return 1  # the window went away without cmd writing the done file
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr("brain.setup.terminal.subprocess.Popen", lambda *a, **k: FakeProc())
+    done = tmp_path / "cache" / "d.done"
+    await real_open_terminal(["tool", "login"], os.environ, done)
+    await until(done.exists, timeout=5)
+    assert done.read_text() == "closed"
+
+
+async def test_a_closed_window_ends_the_login_as_failed(tmp_path, env):
+    d, events, _ = driver(tmp_path, Window(code="closed"))
+    await d.start(expert())
+    await until(lambda: events)
+    assert events[0].facts["state"] == "failed" and "closed" in str(events[0].facts["detail"])
+
+
+async def test_each_start_gets_its_own_done_file(tmp_path, env):
+    window = Window(write=False)
+    d, _, _ = driver(tmp_path, window)
+    await d.start(expert())
+    await d.start(expert())
+    assert window.calls[0][2] != window.calls[1][2]
+    await d.stop()
+
+
+async def test_a_failed_second_start_leaves_the_first_login_running(tmp_path, env):
+    window = Window(write=False)
+    d, events, _ = driver(tmp_path, window)
+    await d.start(expert())
+    d._open = _no_terminal
+    with pytest.raises(NoTerminal):
+        await d.start(expert())
+    env.write_text("x")  # the person logs in
+    window.calls[0][2].write_text("0")
+    await until(lambda: events)
+    assert events[0].facts["state"] == "logged_in"
+
+
+async def _no_terminal(argv, env, done_file):
+    raise NoTerminal(argv)
+
+
+async def test_a_store_failure_ends_the_login_as_failed(tmp_path, env, monkeypatch):
+    d, events, store = driver(tmp_path, Window(marker=env))
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "set_login", boom)
+    await d.start(expert())
+    await until(lambda: events)
+    assert events[0].facts["state"] == "failed" and "disk full" in str(events[0].facts["detail"])
+
+
+async def test_login_card_says_unknown_when_the_check_is_unknown(tmp_path):
+    d, _, _ = driver(tmp_path, Window())
+    ExpertStore(tmp_path).add(expert([sys.executable, "-c", "pass"], id="broken"))
+    spec, _ = login_tools(tmp_path, d)[0]
+    with pytest.raises(RpcError) as err:
+        await spec.card({"id": "broken"})
+    assert "unknown" in str(err.value) and "no_login_method" not in str(err.value)

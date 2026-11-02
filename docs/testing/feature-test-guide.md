@@ -1772,7 +1772,8 @@ Brain tests only; nothing here installs anything.
    Allow: a console window opens running the adapter's login; finish it in the browser it opens.
    Scout says it worked (a `setup_login` event), `experts.json` shows `logged_in: true`, and
    no code or link appeared in the chat.
-3. Close the window before finishing: Scout says the login did not finish and `logged_in` is false.
+3. Close the window with X before finishing: within a moment Scout says the login did not finish
+   (the window was closed) and `logged_in` is false; it does not wait 10 minutes.
    Ask again: a fresh window opens and the first never reports.
 4. With Claude Code already logged in, ask again: the tool refuses as already logged in and no
    window opens.
