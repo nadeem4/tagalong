@@ -1,6 +1,7 @@
 """Tests for the SQLite memory store: kinds rules, remember, replace, forget, open/migrate."""
 
 import sqlite3
+import sys
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
@@ -428,6 +429,48 @@ def test_job_round_trip(mem):
     )
     assert got.agent == "claude-code" and got.folder == "C:/p" and got.mode == "default"
     assert mem.get_job("nope") is None
+
+
+def _finished(mem, id, agent="claude-code", folder="C:/p", state="done", session="s"):
+    mem.add_job(id, agent, "t", folder, "default")
+    mem.update_job(id, state=state, session_id=session)
+
+
+def test_last_job_for_returns_the_newest_finished_job_with_a_session(mem):
+    _finished(mem, "j1", session="s1")
+    _finished(mem, "j2", session="s2")
+    assert mem.last_job_for("claude-code", "C:/p").id == "j2"
+
+
+def test_last_job_for_ignores_another_expert_and_another_folder(mem):
+    _finished(mem, "j1", agent="codex")
+    _finished(mem, "j2", folder="C:/other")
+    assert mem.last_job_for("claude-code", "C:/p") is None
+
+
+def test_last_job_for_ignores_running_jobs_and_jobs_without_a_session(mem):
+    _finished(mem, "j1", session="s1")
+    mem.add_job("j2", "claude-code", "t", "C:/p", "default")  # running
+    _finished(mem, "j3", session=None)
+    assert mem.last_job_for("claude-code", "C:/p").id == "j1"
+
+
+@pytest.mark.parametrize("state", ["stopped", "error"])
+def test_last_job_for_counts_stopped_and_error_jobs(mem, state):
+    _finished(mem, "j1", state=state)
+    assert mem.last_job_for("claude-code", "C:/p").id == "j1"
+
+
+def test_last_job_for_matches_folder_spelling_variants(mem):
+    _finished(mem, "j1", folder="/a/b")
+    assert mem.last_job_for("claude-code", "/a/b/").id == "j1"
+    if sys.platform == "win32":
+        _finished(mem, "j2", folder="C:\\Proj")
+        assert mem.last_job_for("claude-code", "c:\\proj").id == "j2"
+
+
+def test_last_job_for_is_none_when_nothing_matches(mem):
+    assert mem.last_job_for("claude-code", "C:/p") is None
 
 
 def test_update_job_keeps_only_the_last_2000_chars_of_progress(mem):

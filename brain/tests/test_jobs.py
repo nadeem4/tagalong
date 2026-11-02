@@ -2051,3 +2051,104 @@ async def test_a_side_check_error_on_a_follow_up_falls_back_to_the_card(make_rig
     assert len(asks.opened) == 2 and rig.memory.get_job(second).mode == "auto"
     [row] = hand_off_rows(rig)
     assert row.decided_by == "person"
+
+
+async def test_a_second_hand_off_in_the_same_folder_resumes_the_earlier_session(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder))
+    assert (second.session, second.why_fresh, second.parent_job) == ("continued", None, first)
+    loads = [f for f in rig.frames() if f.get("method") == "session/load"]
+    assert loads[0]["params"]["sessionId"] == rig.memory.get_job(first).session_id
+    assert rig.memory.get_job(second).parent_job == first
+
+
+async def test_implicit_continue_shows_the_mode_card_and_does_not_reuse_the_old_mode(make_rig):
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = make_rig(asks, [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder))
+    assert rig.memory.get_job(second).parent_job == first
+    assert len(asks.opened) == 2
+    assert rig.memory.get_job(second).mode == "auto"
+
+
+async def test_fresh_true_starts_a_new_session_and_leaves_parent_unset(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder), fresh=True)
+    assert (second.session, second.parent_job) == ("fresh", None)
+    assert rig.memory.get_job(second).parent_job is None
+    assert not any(f.get("method") == "session/load" for f in rig.frames())
+
+
+async def test_another_folder_or_another_expert_starts_fresh_with_no_parent(make_rig, tmp_path):
+    rig = make_rig(
+        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")),
+        [{"text": "ok"}],
+        experts=[installed(), installed("codex-acp")],
+        load=True,
+    )
+    first = await rig.jobs.start("one", str(rig.folder), "claude-acp")
+    await finish(rig, first)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    other_folder = await rig.jobs.start("two", str(elsewhere), "claude-acp")
+    other_expert = await rig.jobs.start("three", str(rig.folder), "codex-acp")
+    for job in (other_folder, other_expert):
+        assert (job.session, job.parent_job) == ("fresh", None)
+
+
+async def test_an_explicit_continue_job_beats_the_implicit_lookup(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True
+    )
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder))
+    await finish(rig, second)
+    third = await rig.jobs.start("three", str(rig.folder), continue_job=first)
+    assert third.parent_job == first
+
+
+async def test_continue_job_with_fresh_is_refused_plainly(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    with pytest.raises(JobError, match="pass continue_job or fresh, not both"):
+        await rig.jobs.start("two", str(rig.folder), continue_job=first, fresh=True)
+    assert len(rig.memory.list_jobs()) == 1
+
+
+async def test_implicit_continue_while_the_session_is_in_use_starts_fresh_with_the_reason(
+    make_rig,
+):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), load=True, shared=True)
+    first = await rig.jobs.start("one", str(rig.folder))  # hangs, so it holds its session
+    rig.memory.update_job(first, state="done")  # as if it had finished for the lookup
+    second = await rig.jobs.start("two", str(rig.folder))
+    assert second.parent_job == first
+    assert (second.session, second.why_fresh) == ("fresh", "session is in use by another job")
+
+
+async def test_an_expert_that_cannot_resume_falls_back_to_fresh_on_an_implicit_continue(
+    make_rig,
+):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    second = await rig.jobs.start("two", str(rig.folder))
+    assert (second.session, second.why_fresh) == ("fresh", "expert cannot reopen sessions")
+    assert second.parent_job == first
+
+
+async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
+    check = FakeSideCheck(None)
+    rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    assert rig.memory.get_job(second).parent_job == first
+    assert check.facts == [] and hand_off_rows(rig) == []

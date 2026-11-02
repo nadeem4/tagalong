@@ -557,6 +557,14 @@ class Memory:
         rows = self._jobs("WHERE id=?", (id,))
         return rows[0] if rows else None
 
+    def last_job_for(self, agent: str, folder: str) -> Job | None:
+        """The expert's newest finished job in this folder that saved a session. Folders compare
+        as paths (Windows ignores case, a trailing slash is nothing), not as SQL strings."""
+        rows = self._jobs(
+            "WHERE agent=? AND state!='running' AND session_id IS NOT NULL", (agent,), limit=50
+        )
+        return next((j for j in rows if Path(j.folder) == Path(folder)), None)
+
     def list_jobs(self, limit: int = 20) -> list[Job]:
         """Newest first."""
         return self._jobs(limit=limit)

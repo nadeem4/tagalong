@@ -387,6 +387,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 args.get("expert"),
                 args.get("continue_job"),
                 owner_asked=owner_turn(),
+                fresh=args.get("fresh") is True,
             )
         except JobError as err:
             # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
@@ -397,6 +398,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "job": str(job_id),
                 "session": getattr(job_id, "session", "fresh"),
                 "why_fresh": getattr(job_id, "why_fresh", None),
+                "parent_job": getattr(job_id, "parent_job", None),
             }
         )
 
@@ -471,14 +473,17 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "reports back when done. Use the folder the user named; if they did not name "
                 "one, ask them which folder first, never guess. The user picks how much freedom "
                 "the expert gets; this tool asks them itself. With several experts installed, "
-                "name one by its id from list_experts. To follow up on a finished job, pass its id "
-                "as continue_job (same folder, same expert): the expert reopens that session when "
-                "it can, else starts fresh. Either way write a short brief in your own words: the "
+                "name one by its id from list_experts. A hand-off continues that expert's last "
+                "finished session in the same folder when it can (the result says continued, "
+                "and parent_job names the job). Pass fresh: true for an unrelated task or when "
+                "the owner wants a clean start. To follow up on one particular job, pass its id "
+                "as continue_job (same folder, same expert). Either way write a short brief in "
+                "your own words: the "
                 "goal, how you will judge it done, that it tests its own work, and that it ends "
                 "with a summary of what changed, the test results and what is left. Leave "
                 "planning and splitting to the expert; never paste the chat or direct each step. "
                 "Then call watch_job with what you expect. Returns JSON: the job id, session "
-                "(continued or fresh) and why_fresh.",
+                "(continued or fresh), why_fresh and parent_job.",
                 {
                     "type": "object",
                     "properties": {
@@ -491,6 +496,10 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                         "continue_job": {
                             "type": "string",
                             "description": "A finished job's id to follow up on, from list_jobs.",
+                        },
+                        "fresh": {
+                            "type": "boolean",
+                            "description": "True to start a new session, not the folder's last.",
                         },
                     },
                     "required": ["task", "folder"],

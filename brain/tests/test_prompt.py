@@ -389,6 +389,11 @@ def test_soul_has_the_hand_off_guidance_and_no_template():
     assert "{" not in soul
 
 
+def test_soul_says_a_hand_off_continues_the_folders_session_and_names_fresh():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "fresh" in soul and "same folder" in soul
+
+
 def test_events_notes_mention_the_watch_list():
     events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
     assert events.count("Watching, when present") == 3

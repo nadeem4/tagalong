@@ -70,8 +70,15 @@ class JobError(Exception):
 class JobId(str):
     """A job id that also carries the session facts of its start, for the hand_off result."""
 
-    def __new__(cls, job_id: str, session: str = "fresh", why_fresh: str | None = None):
+    def __new__(
+        cls,
+        job_id: str,
+        session: str = "fresh",
+        why_fresh: str | None = None,
+        parent_job: str | None = None,
+    ):
         self = super().__new__(cls, job_id)
+        self.parent_job = parent_job  # the job whose session this one continues, if any
         self.session = session  # "continued" or "fresh"
         self.why_fresh = why_fresh
         return self
@@ -212,18 +219,25 @@ class Jobs:
         continue_job: str | None = None,
         *,
         owner_asked: bool = True,
+        fresh: bool = False,
     ) -> JobId:
         """Hand the task to an expert once the user picks a mode. Returns the job id.
 
         continue_job reopens that finished job's session (same expert, same folder); when the
         expert cannot, a fresh session starts and the result says why. owner_asked is False when
         Scout chose the follow-up on a wake: it then goes through the ask chain, and a covering
-        preference lets it reuse the earlier mode without a card."""
+        preference lets it reuse the earlier mode without a card. Without continue_job the
+        expert's last finished session in this folder is continued (its mode is not carried over,
+        the card is shown as for any new job); fresh=True skips that."""
+        if continue_job and fresh:
+            raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         chosen = await self._pick(earlier.agent if earlier else expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
+        if earlier is None and not fresh:
+            earlier = self._memory.last_job_for(chosen.id, str(path))
         running = self._memory.running_jobs()
         if len(running) + self._starting >= self._max_running:
             names = ", ".join(f"{j.id} ({j.task[:40]})" for j in running)
@@ -248,7 +262,7 @@ class Jobs:
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
             by_name = {m.name: m.id for m in modes}
-            scout_follow_up = earlier is not None and not owner_asked
+            scout_follow_up = continue_job is not None and not owner_asked
             mode_id = None
             # The chain runs only when the earlier mode can be reused, so a Scout row always
             # means a mode was chosen; otherwise the card is the owner's question as today.
@@ -379,10 +393,10 @@ class Jobs:
         if earlier is None:
             return JobId(job_id)
         if earlier.session_id is None:
-            return JobId(job_id, "fresh", "the earlier job saved no session")
+            return JobId(job_id, "fresh", "the earlier job saved no session", earlier.id)
         if run.resumed:
-            return JobId(job_id, "continued")
-        return JobId(job_id, "fresh", run.fresh_reason)
+            return JobId(job_id, "continued", None, earlier.id)
+        return JobId(job_id, "fresh", run.fresh_reason, earlier.id)
 
     def tell(self, job_id: str, note: str) -> None:
         run = self._running(job_id)

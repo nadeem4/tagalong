@@ -334,7 +334,8 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   owner's question: the chain's own person step answers at once so nothing is asked twice, and the
   card pick is logged as a person row and offered like any approval. A mode the new session does not
   offer shows the card without running the chain. A card that times out is logged `timed_out`; a
-  cancel leaves no row. A new job (no `continue_job`) always shows the card.
+  cancel leaves no row. A new job (no `continue_job`, including an implicit continue of the folder's
+  last session) always shows the card.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -749,11 +750,24 @@ output and exit codes under Jobs and tools).
 override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_IDLE_S, quiet_s=TAGALONG_JOB_QUIET_MIN * 60)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
+**One session per folder.** A `hand_off` without `continue_job` continues the expert's last
+finished session in that folder: `Memory.last_job_for(agent, folder)` returns the newest job of
+that expert that is not running and has a `session_id` (stopped and error jobs count; folders
+compare as paths, so case on Windows and a trailing slash do not matter). The job then starts as
+a follow-up of it: resume id, `parent_job`, and the same fallbacks to a fresh session (including
+`session is in use by another job` when a running job holds the session). The mode card is shown
+as for any new job and the old job's mode and permissions are not carried over, so the preference
+gate below never runs for it. `hand_off` takes `fresh: true` to skip the lookup (`parent_job`
+stays unset); `continue_job` together with `fresh` is refused (`pass continue_job or fresh, not
+both`). There is no setting or button for it: guidance lives in `mind/soul.md` and the tool
+description.
+
 **Follow-ups.** `hand_off` takes an optional `continue_job`, the id of a finished job. The new
 job must use the same expert and the same folder as that job, which must not be running; each
 mismatch is a `JobError` with a plain reason. It reopens the earlier job's saved session id when
 the expert can, and records the earlier job in `parent_job` so `list_jobs` shows the chain. The
-hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh"}`,
+hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh", "parent_job"}` (`parent_job` is the job
+whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
@@ -935,7 +949,7 @@ flowchart TD
 
 | Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                               |
 | -------------- | ----------- | ------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
+| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?}`. Returns JSON `{job, session, why_fresh, parent_job}`, or the plain reason it did not start                                       |
 | `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
 | `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note}`. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                             |
 | `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                             |
