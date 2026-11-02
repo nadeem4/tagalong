@@ -177,6 +177,9 @@ export const HOME_CSS = `
 .job-log__line { display: flex; gap: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .job-log__cmd { margin-top: ${t.space.md}px; font-weight: ${t.fontWeight.semibold}; }
 .job-log__meta { font-weight: 400; color: ${t.color.textMuted}; }
+.job-log__exit { font-weight: 400; }
+.job-log__exit--ok { color: ${t.ansi.green}; }
+.job-log__exit--err { color: ${t.ansi.red}; }
 .job-log__note { margin-left: 20px; color: ${t.color.textMuted}; }
 .job-log__glyph { flex: none; width: 12px; text-align: center; font-weight: ${t.fontWeight.bold}; }
 .job-log__glyph--done { color: ${t.ansi.green}; }

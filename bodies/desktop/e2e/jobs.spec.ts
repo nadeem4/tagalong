@@ -141,6 +141,21 @@ test('watching a job shows its log and follows new steps', async () => {
   await expect(home.getByRole('region', { name: 'Jobs' })).toContainText('Fix the build');
 });
 
+test('watching a job shows exit codes', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Watch Fix the build' }).click();
+  brain.pushActivity('job1', {
+    kind: 'command',
+    text: 'npm run lint',
+    status: 'failed',
+    step: 's10',
+    exit: 1,
+  });
+  await expect(home.getByRole('log')).toContainText('exit 1', { timeout: 15_000 });
+  await home.getByRole('button', { name: 'Jobs', exact: true }).last().click();
+});
+
 test('a changed jobs notice refreshes the list', async () => {
   // Answering the question made the brain add a second job and say only that jobs changed.
   const home = await windowFor('home');

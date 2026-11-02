@@ -495,7 +495,9 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   check, cross), output through a small SGR-only parser (`ansi.ts`: bold and the 16 colours; cursor
   moves and clears are dropped and `
 ` progress lines keep their last state), edits in sky,
-  reads and said lines muted (`# `), plans as `[x]` lines and the end line. A running command with
+  reads and said lines muted (`# `), plans as `[x]` lines and the end line. A command with an `exit` code
+  shows `exit N` after its text (green for 0, red otherwise); without one (a signal, or an adapter
+  that sends no exit) only the glyph. A running command with
   no output shows `running, N s` (from the step's `at` and the clock) and "output appears when the
   command finishes". The header has the task, the state chip, the elapsed time and **Stop** while
   running; the one-second clock runs only while the job does. The log is a focusable `role="log"`

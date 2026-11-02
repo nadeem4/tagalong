@@ -707,6 +707,9 @@ The registries: ACP `https://cdn.agentclientprotocol.com/registry/v1/latest/regi
 `https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest`. Samples of both
 are in `brain/tests/fixtures/`.
 
+The Claude row also reads the opt-in `clientCapabilities._meta.terminal_output` (see Terminal
+output and exit codes under Jobs and tools).
+
 ### Jobs and tools
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
@@ -760,6 +763,21 @@ or step still being updated survives), and keeps one marker. Messages without an
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
 `running`/`pending` are marked `failed` before the `end` entry; a job stopped by a brain restart
 gets its `# stopped` entry too. Nothing unmasked is stored. The log lives as long as its job row.
+
+**Terminal output and exit codes.** `ExpertHost` sends `clientCapabilities._meta =
+{"terminal_output": true}` (`CLIENT_META` in `experts.py`). Claude Code's adapter then sends a
+command's result as `_meta` instead of a console text block: `terminal_info {terminal_id}` on the
+tool call (the id equals the tool call id), `terminal_output {terminal_id, data}` (or
+`terminal_output_delta`, which appends) and `terminal_exit {terminal_id, exit_code, signal}`.
+Output arrives once, when the command finishes; the heartbeats before that carry nothing and
+change nothing. `JobActivity` replaces (or appends to) the step's `output` entry and sets the
+command entry's `exit`: `0` gives `done`, any other code `failed` with `exit` set, and a signal
+(`exit_code` null) `failed` with `exit` null. Once an exit has decided the status, a later plain
+`completed` does not undo it. A secret split across delta chunks is still masked: the raw tail
+(at most `OUTPUT_CAP` characters per step) lives in memory only, and each write masks the whole
+accumulated text, then caps it. An unknown terminal id is ignored. An adapter that ignores the
+opt-in (Codex and Gemini untested) keeps the console text block, whose `console` fence is
+stripped, so the page shows the same text, with no `exit`.
 
 **Serving the log.** Home reads it with the Home-only tool `job_activity` (it rides `call`, so the
 contract does not change). With `{job, after_rev}` it returns `{job, state, rev, entries, more,
