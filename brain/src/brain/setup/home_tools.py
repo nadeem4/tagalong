@@ -1,0 +1,231 @@
+"""Home's tools for the Connections page and the walkthrough: what is set up, and set it up.
+
+`setup_expert` and `setup_app` reuse Scout's install and login tools. The page passes
+`approved: false` and gets the Allow card (empty text, facts only); the tour's button press is
+the OK itself, so it passes `approved: true`. Progress is the latest `setup_progress` facts.
+"""
+
+import json
+import re
+from collections.abc import Awaitable, Callable
+from typing import Any
+
+from brain.asks import ASK_TIMEOUT_S, Answer
+from brain.events import Event
+from brain.protocol import ErrorCode, RpcError
+from brain.setup.env import is_tested
+from brain.setup.facts import Machine
+from brain.setup.registry import Listing, Registry, RegistryUnavailable, build_for
+from brain.setup.store import InstalledExpert
+from brain.toolbox import Handler, ToolSpec
+
+InspectFn = Callable[[], Awaitable[Machine]]
+AskFn = Callable[..., Awaitable[Answer]]
+RecordFn = Callable[..., None]
+_INSTALLABLE = ("npx", "binary")
+
+
+class SetupProgress:
+    """Remembers the running install's latest facts for `setup_overview`, then passes events on."""
+
+    def __init__(self, emit: Callable[[Event], None]) -> None:
+        self._emit = emit
+        self._current: dict | None = None
+        self._failed: dict | None = None  # the last install that failed, until the next try
+
+    def emit(self, event: Event) -> None:
+        if event.kind == "setup_progress":
+            self._current, self._failed = dict(event.facts), None
+        elif event.kind == "setup_done":
+            self._current = None
+            if event.facts.get("ok") is False:
+                self._failed = {
+                    "expert": event.facts.get("expert"),
+                    "error": event.facts.get("error"),
+                }
+        self._emit(event)
+
+    def current(self) -> dict | None:
+        return self._current
+
+    def failed(self) -> dict | None:
+        return self._failed
+
+
+def _numbers(version: str) -> tuple[int, ...] | None:
+    parts = re.findall(r"\d+", version)
+    return tuple(int(p) for p in parts) if parts else None
+
+
+def _newer(registry_version: str, installed: str) -> bool:
+    new, old = _numbers(registry_version), _numbers(installed)
+    return new is not None and old is not None and new > old
+
+
+def home_setup_tools(
+    registry: Registry,
+    inspect_fn: InspectFn,
+    experts: Callable[[], list[InstalledExpert]],
+    apps: Callable[[], list[dict]],
+    ask: AskFn,
+    record: RecordFn,
+    inner: list[tuple[ToolSpec, Handler]],
+    progress: SetupProgress,
+) -> list[tuple[ToolSpec, Handler]]:
+    by_name = {spec.name: (spec, handler) for spec, handler in inner}
+
+    async def listing(fetch: Callable[[], Awaitable[Listing]]) -> tuple[Listing | None, bool]:
+        try:
+            found = await fetch()
+        except RegistryUnavailable:
+            return None, True
+        return found, found.stale
+
+    def rows(found: Listing | None, machine: Machine, skip: set[str], kinds=None) -> list[dict]:
+        out = []
+        for e in found.entries if found else []:
+            dist = build_for(e, machine)
+            if dist is None or e.id in skip or e.name in skip or (kinds and dist.kind not in kinds):
+                continue
+            out.append(
+                {"id": e.id, "name": e.name, "version": e.version, "description": e.description}
+            )
+        return out
+
+    def state(expert: InstalledExpert, latest: dict[str, str]) -> str:
+        if expert.source == "custom":
+            return "ready"
+        if _newer(latest.get(expert.id, ""), expert.version):
+            return "needs_update"
+        return "ready" if expert.logged_in is True else "needs_login"
+
+    async def overview(args: dict) -> str:
+        machine = await inspect_fn()
+        acp, stale_acp = await listing(registry.acp_agents)
+        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(None))
+        latest = {e.id: e.version for e in acp.entries} if acp else {}
+        installed = experts()
+        return json.dumps(
+            {
+                "experts": [
+                    {
+                        "id": e.id,
+                        "name": e.name,
+                        "version": e.version,
+                        "state": state(e, latest),
+                        "tested": is_tested(e.id),
+                    }
+                    for e in installed
+                ],
+                "apps": apps(),
+                "browse_experts": rows(acp, machine, {e.id for e in installed}, _INSTALLABLE),
+                "browse_apps": rows(mcp, machine, {a["name"] for a in apps()}),
+                "stale": stale_acp or stale_mcp,
+                "progress": progress.current(),
+                "failed": progress.failed(),
+            }
+        )
+
+    async def run_with_card(tool: str, args: dict, approved: bool) -> str:
+        spec, handler = by_name[tool]
+        if not approved:
+            # The card's facts come from the same code Scout's own install uses; a failing card
+            # raises its tool error and nothing is asked or installed.
+            facts = await spec.card(args) if spec.card else dict(args)
+            summary = f"{tool} {json.dumps(facts, sort_keys=True, separators=(',', ':'))}"
+
+            # The same history the gate keeps, so these installs count in Home's approvals.
+            def log(outcome: str) -> None:
+                decided = "none" if outcome in ("no_one", "timed_out") else "person"
+                record(
+                    source="scout_tool",
+                    tool=tool,
+                    summary=summary,
+                    input=facts,
+                    group_key=tool,
+                    outcome=outcome,
+                    decided_by=decided,
+                )
+
+            try:
+                answer = await ask(
+                    text="",
+                    options=["allow", "deny"],
+                    tool=tool,
+                    input=facts,
+                    timeout=ASK_TIMEOUT_S,
+                )
+            except RpcError as err:
+                if err.code == ErrorCode.timeout:
+                    log("timed_out")
+                raise
+            outcome = {"allow": "approved", None: "no_one"}.get(answer.option, "refused")
+            log(outcome)
+            if outcome != "approved":
+                return json.dumps({"error": "denied"})
+        return await handler(args)
+
+    def parts(args: dict) -> tuple[dict, bool]:
+        return {k: v for k, v in args.items() if k != "approved"}, args.get("approved") is True
+
+    async def setup_expert(args: dict) -> str:
+        inner_args, approved = parts(args)
+        installed = {e.id: e for e in experts()}
+        found = installed.get(str(args.get("id")))
+        tool = "install_expert"
+        if found is not None:
+            acp, _ = await listing(registry.acp_agents)
+            latest = {e.id: e.version for e in acp.entries} if acp else {}
+            current = state(found, latest)
+            if current == "ready":
+                return json.dumps({"error": "already_ready", "detail": found.id})
+            if current == "needs_login":
+                tool = "login_expert"
+        return await run_with_card(tool, inner_args, approved)
+
+    async def setup_app(args: dict) -> str:
+        # Only the tour presses OK for an expert; an app always shows its card.
+        inner_args, _ = parts(args)
+        return await run_with_card("install_app", inner_args, False)
+
+    def schema(*extra: str) -> dict[str, Any]:
+        props: dict[str, Any] = {"id": {"type": "string"}, "approved": {"type": "boolean"}}
+        props.update({name: {"type": "string"} for name in extra})
+        return {"type": "object", "properties": props, "required": ["id", "approved"]}
+
+    home = frozenset({"home"})
+    return [
+        (
+            ToolSpec(
+                "setup_overview",
+                "What is set up: installed experts and apps with their state, what could be "
+                "added, and the running install's progress.",
+                {"type": "object", "properties": {}},
+                home,
+                effect="read",
+            ),
+            overview,
+        ),
+        (
+            ToolSpec(
+                "setup_expert",
+                "Install, update or log in an expert by id. approved false opens the Allow card.",
+                schema(),
+                home,
+                effect="change",
+                self_asks=True,
+            ),
+            setup_expert,
+        ),
+        (
+            ToolSpec(
+                "setup_app",
+                "Add an app from the registry by id. Always opens the Allow card.",
+                schema("query"),
+                home,
+                effect="change",
+                self_asks=True,
+            ),
+            setup_app,
+        ),
+    ]

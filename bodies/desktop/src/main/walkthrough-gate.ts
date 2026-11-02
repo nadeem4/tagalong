@@ -26,6 +26,8 @@ interface TourWindow {
   focus(): void;
   reloadAt(step: number): void;
   close(): void;
+  /** Whether an IPC event came from this window's own page. */
+  owns(event: unknown): boolean;
 }
 
 interface GateDeps {
@@ -59,6 +61,8 @@ export function createWalkthroughGate(deps: GateDeps) {
     openAtLaunch: () => open(undefined, true),
     close: () => tour?.close(),
     isOpen: () => tour !== null,
+    /** Whether an IPC event came from the open tour window; false when it is closed. */
+    fromTour: (event: unknown) => tour?.owns(event) ?? false,
     /** For a second launch, the tray or a hotkey while the tour is open: show it, do nothing else. */
     bringForward: () => tour?.focus(),
   };

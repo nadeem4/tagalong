@@ -29,8 +29,11 @@ class _Open:
     free_text: bool = False
 
 
+ASK_TIMEOUT_S = 300.0  # how long a permission ask waits for the person
+
+
 class Asks:
-    def __init__(self, bodies: Bodies, timeout: float = 300.0) -> None:
+    def __init__(self, bodies: Bodies, timeout: float = ASK_TIMEOUT_S) -> None:
         self._bodies = bodies
         self._timeout = timeout
         self._open: dict[str, _Open] = {}

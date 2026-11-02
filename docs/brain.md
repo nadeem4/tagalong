@@ -405,6 +405,24 @@ The first-run setup adds four more Home tools (never offered to Scout):
 | `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                                                                                                       |
 | `expert_status`   | `{}`              | `{"found": bool, "command": str, "experts": [...]}`: `found` is whether any expert is installed (or a custom command set); `experts` is the `list_experts` rows; `command` is the custom command, `""` if none. It starts nothing and sees no login |
 
+The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
+to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
+browse_experts, browse_apps, stale, progress, failed}`, where `state` is `ready`, `needs_login` or
+`needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
+the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
+(`{id, approved?}`, `self_asks`). With `approved` false they open the same Allow card Scout's
+`install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
+from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
+on Allow. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
+`setup_app` ignores `approved` and always opens it, and the desktop only forwards `true` from the
+tour window. Each answered card is written to the approvals history like the gate does (source
+`scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
+records nothing. An installed expert that needs login is logged in instead of reinstalled (a
+second press after the install: the install and the login are two presses, not one chained
+call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
+by name, as `install_app` does). Progress rides `changed {what:
+"setup"}`.
+
 - **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
   newline, one pair of quotes); a missing, non-string, empty, over-256-character or
   whitespace-holding key is `invalid_params` with the fixed text "set_api_key needs a key." The

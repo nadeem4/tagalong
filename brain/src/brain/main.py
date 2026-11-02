@@ -28,6 +28,7 @@ from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
+from brain.setup.home_tools import SetupProgress, home_setup_tools
 from brain.setup.install import NPM_TIMEOUT_S
 from brain.setup.login import LoginDriver
 from brain.setup.net import http_fetch, real_get_json
@@ -96,6 +97,7 @@ async def _run() -> None:
     inspect_machine = partial(inspect, config.data_dir)
     emit_event = lambda event: session.scheduler.emit(event)  # noqa: E731 - session exists later
     logins = LoginDriver(config.data_dir, experts, real_open_terminal, emit_event)
+    progress = SetupProgress(emit_event)
     expert_tools, stop_installs = expert_setup_tools(
         config.data_dir,
         registry,
@@ -104,7 +106,7 @@ async def _run() -> None:
         partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
         http_fetch,
         real_get_json,
-        emit_event,
+        progress.emit,
         bodies.notify,
     )
     app_tools = app_setup_tools(
@@ -120,6 +122,7 @@ async def _run() -> None:
         real_get_json,
         os.environ,
     )
+    login = login_tools(config.data_dir, logins)
     session = Session(
         model,
         budget,
@@ -138,7 +141,20 @@ async def _run() -> None:
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools
         + app_tools
-        + login_tools(config.data_dir, logins),
+        + login
+        + home_setup_tools(
+            registry,
+            inspect_machine,
+            lambda: all_experts(experts, config.expert_cmd),
+            lambda: [
+                {"id": r.id, "name": r.name, "state": apps.status(r.id).state}
+                for r in memory.list_apps()
+            ],
+            lambda **kw: session.asks.open(**kw),
+            lambda **kw: session.approvals.record(**kw),
+            expert_tools + app_tools + login,
+            progress,
+        ),
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),

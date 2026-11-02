@@ -9,6 +9,7 @@ export * from './apps';
 export * from './context';
 export * from './memory';
 export * from './pet';
+export * from './setup';
 export * from './status';
 export * from './turn-events';
 export * from './voice';
