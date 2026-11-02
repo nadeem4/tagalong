@@ -1329,3 +1329,56 @@ async def test_shutdown_stops_every_host(make_rig):
     assert process.returncode is None  # warm for the follow-up
     await rig.jobs.shutdown()
     assert process.returncode is not None
+
+
+TOKEN = "fake-token-12345678"
+
+
+def rows_of(rig, job_id):
+    return sorted(rig.memory.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
+
+
+async def test_a_jobs_steps_are_saved_masked(make_rig):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: [TOKEN])))
+    steps = [
+        {"tool": {"id": "t1", "title": "Run", "kind": "execute", "input": {"command": "npm test"}}},
+        {"tool_update": {"id": "t1", "status": "completed", "text": f"key {TOKEN}"}},
+    ]
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    command, output, end = rows_of(rig, job_id)
+    assert (command.kind, command.text, command.status) == ("command", "npm test", "done")
+    assert (output.kind, output.text) == ("output", "key [secret]")
+    assert (end.kind, end.text) == ("end", "# done")
+
+
+async def test_a_stopped_job_ends_its_log_with_stopped(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), HANG)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await rig.jobs.stop(job_id)
+    assert rows_of(rig, job_id)[-1].text == "# stopped"
+
+
+async def test_an_errored_job_ends_with_the_error_reason(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"crash": 3}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    end = rows_of(rig, job_id)[-1]
+    assert end.kind == "end" and end.text.startswith("# error: ")
+
+
+async def test_entries_belong_to_their_job(make_rig):
+    steps = [
+        [{"tool": {"id": "a", "title": "first", "kind": "execute"}}, {"sleep": 0.3}],
+        [{"tool": {"id": "b", "title": "second", "kind": "execute"}}],
+    ]
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), steps, shared=True)
+    one = await rig.jobs.start("one", str(rig.folder))
+    await until(lambda: rows_of(rig, one))
+    two = await rig.jobs.start("two", str(rig.folder))
+    await finish(rig, one)
+    await finish(rig, two)
+    texts = lambda job: [e.text for e in rows_of(rig, job) if e.kind == "command"]  # noqa: E731
+    assert texts(one) == ["first"] and texts(two) == ["second"]

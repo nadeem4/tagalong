@@ -32,6 +32,7 @@ class Harness:
         self.permissions: list = []
         self.questions: list = []
         self.progress: list[str] = []
+        self.updates: list = []
         self.ended: asyncio.Future = asyncio.get_running_loop().create_future()
         self.permission_answer: str | None = "allow-once"
         self.question_answer: dict | None = {"question_0": "Red"}
@@ -50,6 +51,9 @@ class Harness:
 
     async def on_progress(self, text: str) -> None:
         self.progress.append(text)
+
+    async def on_update(self, update) -> None:
+        self.updates.append(update)
 
     async def on_end(self, state: str, reason: str, result: str | None) -> None:
         self.ends.append((state, reason, result))
@@ -93,6 +97,7 @@ def make_run(
         on_question=h.on_question,
         on_progress=h.on_progress,
         on_end=h.on_end,
+        on_update=h.on_update,
         grace=grace,
     )
     return h.run
@@ -574,3 +579,52 @@ async def test_note_is_refused_once_stopping(tmp_path):
     await asyncio.sleep(0)
     assert run.note("late") is False
     await asyncio.wait_for(stopping, 15)
+
+
+TOOL = {"tool": {"id": "t1", "title": "Run", "kind": "execute", "input": {"command": "ls"}}}
+
+
+async def test_updates_before_begin_are_not_forwarded(tmp_path):
+    h = Harness()
+    patch.setenv("FAKE_ACP_LOAD", "1")
+    patch.setenv("FAKE_ACP_REPLAY", "1")
+    run = make_run(h, tmp_path, [TOOL])
+    await run.start(tmp_path, resume="sess-old")  # the adapter replays an old tool call here
+    await asyncio.sleep(0.2)
+    assert h.updates == []
+    await run.begin("default", "go")
+    await finished(h)
+    assert [u.tool_call_id for u in h.updates] == ["t1"]
+
+
+async def test_two_runs_on_one_adapter_get_only_their_own_updates(tmp_path):
+    ha, hb = Harness(), Harness()
+    script = tmp_path / "script.json"
+    steps = [[{"tool": {"id": i, "title": i, "kind": "execute"}}] for i in ("a", "b")]
+    script.write_text(json.dumps(steps))  # one list per prompt
+    patch.setenv("FAKE_ACP_SCRIPT", str(script))
+    patch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
+    host = ExpertHost([sys.executable, str(AGENT)], "custom", idle_s=0, grace=2)
+
+    def run_for(h):
+        h.run = ExpertRun(
+            host=host,
+            timeout=30,
+            on_permission=h.on_permission,
+            on_question=h.on_question,
+            on_progress=h.on_progress,
+            on_end=h.on_end,
+            on_update=h.on_update,
+            grace=2,
+        )
+        return h.run
+
+    a, b = run_for(ha), run_for(hb)
+    await a.start(tmp_path)
+    await b.start(tmp_path)
+    await a.begin("default", "first")
+    await finished(ha)
+    await b.begin("default", "second")
+    await finished(hb)
+    assert [u.tool_call_id for u in ha.updates] == ["a"]
+    assert [u.tool_call_id for u in hb.updates] == ["b"]

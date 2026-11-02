@@ -19,6 +19,7 @@ from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question
 from brain.guards import AskCtx, Guards, Hook
+from brain.job_activity import JobActivity
 from brain.masking import mask_json
 from brain.memory import Job, Memory
 from brain.offers import Offers
@@ -110,6 +111,7 @@ class Jobs:
             guards.add(person_ask())
         self._guards = guards
         self._runs: dict[str, ExpertRun] = {}
+        self._activity: dict[str, JobActivity] = {}
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[str, set[str]] = {}
         self._progress_sent: dict[str, float] = {}
@@ -211,6 +213,7 @@ class Jobs:
             on_question=lambda question: self._question(job_id, question),
             on_progress=lambda text: self._progress(job_id, text),
             on_end=lambda state, reason, result: self._end(job_id, state, reason, result),
+            on_update=lambda update: self._activity_update(job_id, update),
         )
         self._starting += 1
         slot_held = True  # released once the row exists, so a job never counts twice
@@ -235,6 +238,13 @@ class Jobs:
             parent = earlier.id if earlier else None
             self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             self._runs[job_id] = run
+            self._activity[job_id] = JobActivity(
+                job_id,
+                self._memory,
+                lambda text: mask_json(self._guards, "job_activity", text),
+                lambda: datetime.now(UTC),
+                on_change=lambda: None,  # the transport that tells bodies comes later
+            )
             handed_off = True
             self._starting -= 1
             slot_held = False
@@ -246,6 +256,7 @@ class Jobs:
                 message = str(exc) or type(exc).__name__
                 self._memory.update_job(job_id, state="error", reason=message, ended_at=_now())
                 self._runs.pop(job_id, None)
+                self._activity.pop(job_id, None)
                 self._changed()
                 await run.close()
                 if isinstance(exc, Exception):
@@ -440,10 +451,16 @@ class Jobs:
             self._progress_sent[job_id] = now
             self._changed()
 
+    async def _activity_update(self, job_id: str, update: object) -> None:
+        if activity := self._activity.get(job_id):
+            activity.on_update(update)
+
     async def _end(self, job_id: str, state: str, reason: str, result: str | None) -> None:
         result = mask_json(self._guards, "job_result", result)
         self._memory.update_job(job_id, state=state, reason=reason, result=result, ended_at=_now())
         self._runs.pop(job_id, None)
+        if activity := self._activity.pop(job_id, None):
+            activity.end(state, reason)
         self._progress_sent.pop(job_id, None)
         self._asks.cancel_all(self._ask_ids.pop(job_id, set()))
         if self._scout is not None:

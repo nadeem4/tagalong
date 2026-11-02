@@ -277,6 +277,9 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** the page lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens the result text.
+    The brain also keeps an activity log per job (steps, edits, messages, plan); nothing shows it
+    yet, so there is no manual check. Automated tests cover it on the fake agent (steps `tool`,
+    `tool_update`, `plan`): masking, size caps, resume replay and two jobs on one adapter.
 12. **Action:** with the bubble closed, start a Manual-mode job that needs permission (or asks a
     question; its card appears once Scout passes the question on or cannot answer it) and leave
     the relayed ask unanswered for a minute.

@@ -6,11 +6,15 @@ one JSON object per line. Needs only Python.
 
 The script may instead be a list of step lists, one per prompt (the last is reused).
 Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
-chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
+chunk | {"tool": {"id", "title", "kind"?, "input"?, "status"?, "locations"?: [paths]}} tool call
+start | {"tool_update": {"id", "status", "text"?}} tool call progress | {"plan": [{"content",
+"status"?}]} plan update | {"permission": {"title", "kind"?, "options"?}} ask and wait |
 {"question": {"message", "options": [labels]} or {"message", "questions": [...]}}
 elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
+FAKE_ACP_REPLAY=1 makes session/load replay one tool call (id "replayed") before answering,
+like an adapter replaying the old chat.
 FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail); "known" serves
 only ids this process created (a restarted adapter forgot the rest), "nomodes" answers
 without modes;
@@ -100,6 +104,10 @@ class FakeAgent:
             raise acp.RequestError.method_not_found("session/load")
         if session_id.startswith("bad-"):  # a session the adapter no longer has
             raise acp.RequestError.invalid_params({"session": session_id})
+        if os.environ.get("FAKE_ACP_REPLAY"):
+            await self.conn.session_update(
+                session_id, acp.start_tool_call("replayed", "Old", kind="execute")
+            )
         mode = os.environ["FAKE_ACP_LOAD"]
         if mode == "known" and session_id not in self.created:
             raise acp.RequestError.invalid_params({"session": session_id})
@@ -164,6 +172,16 @@ class FakeAgent:
                 await self.conn.session_update(
                     session_id, acp.update_agent_message_text(step["text"])
                 )
+            elif "tool" in step:
+                await self.conn.session_update(session_id, _tool_start(step["tool"]))
+            elif "tool_update" in step:
+                await self.conn.session_update(session_id, _tool_progress(step["tool_update"]))
+            elif "plan" in step:
+                entries = [
+                    acp.plan_entry(e["content"], status=e.get("status", "pending"))
+                    for e in step["plan"]
+                ]
+                await self.conn.session_update(session_id, acp.update_plan(entries))
             elif "permission" in step:
                 await self._ask_permission(session_id, step["permission"])
             elif "question" in step:
@@ -219,6 +237,24 @@ class FakeAgent:
             requested_schema={"type": "object", "properties": properties},
         )
         await self.conn.create_elicitation(spec["message"], mode)
+
+
+def _tool_start(spec: dict):
+    locations = [schema.ToolCallLocation(path=p) for p in spec.get("locations", [])]
+    return acp.start_tool_call(
+        spec["id"],
+        spec["title"],
+        kind=spec.get("kind", "other"),
+        status=spec.get("status", "in_progress"),
+        raw_input=spec.get("input"),
+        locations=locations or None,
+    )
+
+
+def _tool_progress(spec: dict):
+    text = spec.get("text")
+    content = [acp.tool_content(acp.text_block(text))] if text is not None else None
+    return acp.update_tool_call(spec["id"], status=spec["status"], content=content)
 
 
 def frame_logger(path: str):
