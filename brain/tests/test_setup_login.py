@@ -304,8 +304,7 @@ async def test_closing_the_window_writes_a_closed_marker(tmp_path, monkeypatch):
     monkeypatch.setattr("brain.setup.terminal.subprocess.Popen", lambda *a, **k: FakeProc())
     done = tmp_path / "cache" / "d.done"
     await real_open_terminal(["tool", "login"], os.environ, done)
-    await until(done.exists, timeout=5)
-    assert done.read_text() == "closed"
+    await until(lambda: done.exists() and done.read_text() == "closed", timeout=5)
 
 
 async def test_a_closed_window_ends_the_login_as_failed(tmp_path, env):
@@ -360,3 +359,18 @@ async def test_login_card_says_unknown_when_the_check_is_unknown(tmp_path):
     with pytest.raises(RpcError) as err:
         await spec.card({"id": "broken"})
     assert "unknown" in str(err.value) and "no_login_method" not in str(err.value)
+
+
+async def test_an_empty_done_file_is_waited_on_not_read_as_success(tmp_path):
+    # The writer creates the file before its text lands; an empty read must not pass as code 0.
+    d, _, _ = driver(tmp_path, Window())
+    done = tmp_path / "d.done"
+    done.write_text("")
+
+    async def fill() -> None:
+        await asyncio.sleep(0.05)
+        done.write_text("closed")
+
+    filler = asyncio.ensure_future(fill())
+    assert await d._wait_window(done) == "the window ended with exit code closed"
+    await filler

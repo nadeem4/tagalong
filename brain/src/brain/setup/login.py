@@ -151,6 +151,13 @@ async def _agent(expert: InstalledExpert) -> AsyncIterator[tuple[object, list[Me
             await asyncio.shield(kill_tree(process))
 
 
+def _read_code(done: Path) -> str:
+    try:
+        return done.read_text(encoding="utf-8", errors="replace").strip()
+    except FileNotFoundError:
+        return ""
+
+
 class LoginDriver:
     def __init__(
         self,
@@ -223,12 +230,13 @@ class LoginDriver:
         """'' when the window's command ended with 0, else what went wrong."""
         try:
             async with asyncio.timeout(self._timeout):
-                while not done.exists():
+                # Writers create the file before its text lands, and every writer writes
+                # something, so an empty file means "not yet", never success.
+                while not (code := _read_code(done)):
                     await asyncio.sleep(self._poll)
         except TimeoutError:
             return "timeout"
-        code = done.read_text(encoding="utf-8", errors="replace").strip()
-        return "" if code in ("", "0") else f"the window ended with exit code {code}"
+        return "" if code == "0" else f"the window ended with exit code {code}"
 
     async def _wait_browser(self, expert: InstalledExpert, method: Method) -> str:
         try:
