@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 brain = "brain.main:main"
+tagalong = "brain.cli:main"
 
 [build-system]
 requires = ["hatchling"]
