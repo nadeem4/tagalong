@@ -398,12 +398,11 @@ so there is one gate and no second path.
 
 The first-run setup adds four more Home tools (never offered to Scout):
 
-| Tool              | Input             | Result text (JSON)                                                                                                                                                                                                                                  |
-| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                                                                                                |
-| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment                                                                         |
-| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                                                                                                       |
-| `expert_status`   | `{}`              | `{"found": bool, "command": str, "experts": [...]}`: `found` is whether any expert is installed (or a custom command set); `experts` is the `list_experts` rows; `command` is the custom command, `""` if none. It starts nothing and sees no login |
+| Tool              | Input             | Result text (JSON)                                                                                                                                                          |
+| ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
+| `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
+| `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,

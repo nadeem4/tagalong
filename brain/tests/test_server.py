@@ -63,7 +63,7 @@ class KeylessModel:
 @pytest.fixture
 async def env(tmp_path):
     bodies = Bodies()
-    keys = KeySettings(tmp_path, KeylessModel(), bodies.notify, "none", fake_check, lambda: [])
+    keys = KeySettings(tmp_path, KeylessModel(), bodies.notify, "none", fake_check)
     session = Session(
         ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), keys=keys
     )
@@ -671,7 +671,6 @@ async def test_hello_lists_home_tools_as_contract_records(env):
     names = sorted(t["name"] for t in tools)
     assert names == [
         "edit_preference",
-        "expert_status",
         "forget",
         "key_status",
         "list_approvals",

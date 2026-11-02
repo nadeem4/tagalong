@@ -171,7 +171,13 @@ flowchart LR
   `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
   there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
   (**Yes, remove** or **Keep**) before `remove_app`.
-- **Cards**: the list sits in a "Connected apps" card, the form in an "Add an app" card.
+- **Cards**: the list sits in a "Connected apps" card, the form in an "Add an app" card. Above
+  them an **Experts** card (`experts-group.tsx`) lists installed experts with a state chip (Ready,
+  Needs login, Update available) and a **Log in** or **Update** button; **Browse and add**
+  (`browse-list.tsx`) lists what the registries offer, for experts and for apps, with an **Add**
+  button. These go through `setup_overview`, `setup_expert` and `setup_app` (see
+  [brain.md](brain.md#home-tools)): the button opens the same Allow card Scout's install opens, and
+  progress ("Installing 40%") rides `changed setup`.
 - **Add an app** (one form): a command on this PC (command, args, `NAME=value` env lines, which may
   be `${NAME}`) or a web address (https only; auth none, the app's own sign-in page, or a pasted
   key in a password field). The key is sent once, as `token`, and the field is cleared as soon as

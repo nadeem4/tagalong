@@ -17,7 +17,6 @@ export type {
   SpendToday,
   KeyStatus,
   KeyResult,
-  ExpertStatus,
 } from './host-bridge';
 
 export { CompanionBubble, GreetingLine } from './companion-bubble';

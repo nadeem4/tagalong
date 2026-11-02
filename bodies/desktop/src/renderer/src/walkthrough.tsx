@@ -30,7 +30,12 @@ const walkthroughHost: WalkthroughHost = {
   usageSummary: bridge.usageSummary,
   onBrainChanged: bridge.onBrainChanged,
   openWalkthrough: bridge.openWalkthrough,
-  expertStatus: () => host.expertStatus(),
+  setupOverview: bridge.setupOverview,
+  // The button press is the OK, so the tour asks for no card.
+  setupExpert: async (id) => {
+    const result = await bridge.setupExpert(id, true);
+    if (result.error !== undefined) throw new Error(result.error);
+  },
   openKeyPage: () => host.openKeyPage(),
   finishWalkthrough: (options) => host.finishWalkthrough(options),
   getSettings: async () => (await host.getHostView()).settings,

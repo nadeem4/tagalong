@@ -41,7 +41,6 @@ import type {
   BrowserFolder,
   CaptureNotice,
   EarsStatus,
-  ExpertStatus,
   HostView,
   ListeningState,
   SpeakSample,
@@ -253,7 +252,6 @@ const host: TagalongHostApi = {
     return () => void ipcRenderer.off(IPC.dropEvent, listener);
   },
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
-  expertStatus: () => ipcRenderer.invoke(IPC.expertStatus) as Promise<ExpertStatus>,
   finishWalkthrough: (options?: { close?: boolean }) =>
     ipcRenderer.invoke(IPC.walkthroughFinish, options) as Promise<void>,
   openKeyPage: () => ipcRenderer.invoke(IPC.keyOpenPage) as Promise<void>,

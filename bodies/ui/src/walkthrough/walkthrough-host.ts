@@ -1,11 +1,11 @@
 /**
- * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, the expert
- * check, finishing the tour, and the settings, voice, browser-folder and Home calls the steps use. Contains
+ * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, Claude Code
+ * set-up, finishing the tour, and the settings, voice, browser-folder and Home calls the steps use. Contains
  * WalkthroughHost and WalkthroughSettings.
  */
 
 import type { MicWatcher } from '../controls';
-import type { ExpertStatus, HostBridge } from '../host-bridge';
+import type { HostBridge } from '../host-bridge';
 
 /**
  * The slice of the host's settings the steps read and write. Plain strings: the host
@@ -38,9 +38,20 @@ export interface VoicePreview {
 
 export type WalkthroughHost = Pick<
   HostBridge,
-  'keyStatus' | 'setKey' | 'setDailyLimit' | 'onBrainChanged' | 'openWalkthrough' | 'usageSummary'
+  | 'keyStatus'
+  | 'setKey'
+  | 'setDailyLimit'
+  | 'onBrainChanged'
+  | 'openWalkthrough'
+  | 'usageSummary'
+  | 'setupOverview'
 > & {
-  expertStatus(): Promise<ExpertStatus>;
+  /**
+   * Sets an expert up (install, then log in) with the person's press as the OK, Tagalong's own
+   * Node included. Resolves when the brain took the job; progress comes through the overview.
+   * Rejects with a short token when the brain refused it.
+   */
+  setupExpert(id: string): Promise<void>;
   /** Marks the tour seen and closes its window. Only Finish and Skip (with a key) call it. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;

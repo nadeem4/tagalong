@@ -1,19 +1,41 @@
 /**
- * Home's Connections page: the apps the brain keeps over MCP. One row per app (status,
- * tool count, on/off, Restart, Remove) and one Add form. The brain owns the list and the keys;
- * this page only asks and reads again. Contains ConnectionsPanel and splitCommand; each row is connection-row.tsx.
+ * Home's Connections page, two groups. Apps: the ones the brain keeps over MCP, one row each
+ * (status, tool count, on/off, Restart, Remove) and one Add form. Experts: the installed coding
+ * agents and their state. Each group has a Browse and add list from the registries. The brain
+ * owns every list and the keys; this page only asks and reads again. Contains ConnectionsPanel
+ * and splitCommand; rows are connection-row.tsx, experts-group.tsx and browse-list.tsx.
  */
 
 import { useCallback, useEffect, useId, useState } from 'react';
-import type { AppAddParams, AppInfo } from '../shapes';
+import type { AppAddParams, AppInfo, SetupOverview, SetupResult } from '../shapes';
 import { failure } from '../failure';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
+import { BrowseList } from './browse-list';
 import { ConnectionRow, SAME_MACHINE } from './connection-row';
+import { ExpertsGroup } from './experts-group';
 
 type Status = { text: string; error: boolean } | null;
 
 const BRAIN_OFFLINE = 'brain offline';
+
+// The page's own words for what the brain answers with a short token. A refusal that is not a
+// problem (the person said no, it is already done) is a note; the rest are errors.
+const SETUP_REFUSALS: Record<string, Status & object> = {
+  denied: { text: 'Okay, nothing was changed.', error: false },
+  already_installing: { text: 'That is already being set up.', error: false },
+  already_ready: { text: 'That is already set up.', error: false },
+  already_added: { text: 'That app is already added.', error: false },
+  version_changed: {
+    text: 'The registry changed while you were deciding. Look at it again, then try once more.',
+    error: true,
+  },
+  registry_unavailable: {
+    text: 'Scout couldn’t reach the registry. Check your connection and try again.',
+    error: true,
+  },
+};
+const SETUP_FAILED: Status & object = { text: 'Setting that up didn’t work.', error: true };
 
 /** `npx -y "my server" C:/x` as a command and its arguments; quotes keep spaces. */
 function splitCommand(line: string): string[] {
@@ -42,8 +64,16 @@ export function ConnectionsPanel() {
   const [apps, setApps] = useState<AppInfo[] | null>(null);
   const [status, setStatus] = useState<Status>(null);
   const [offline, setOffline] = useState(false);
+  const [setup, setSetup] = useState<SetupOverview | null>(null);
+  const [asking, setAsking] = useState<ReadonlySet<string>>(new Set());
+
+  const reloadSetup = useCallback(() => {
+    // Quiet on failure: the apps list already says when the brain is away.
+    bridge.setupOverview().then(setSetup, () => setSetup(null));
+  }, [bridge]);
 
   const reload = useCallback(() => {
+    reloadSetup();
     bridge
       .listConnections()
       .then((latest) => {
@@ -55,7 +85,7 @@ export function ConnectionsPanel() {
         if (failure(error) === BRAIN_OFFLINE) setOffline(true);
         else setStatus({ text: failure(error), error: true });
       });
-  }, [bridge]);
+  }, [bridge, reloadSetup]);
   useEffect(reload, [reload]);
   useEffect(
     () =>
@@ -63,6 +93,11 @@ export function ConnectionsPanel() {
         if (event.type === 'connections.changed') reload();
       }),
     [bridge, reload],
+  );
+  // An install moves on (progress, done, failed): read the overview again.
+  useEffect(
+    () => bridge.onBrainChanged((what) => what === 'setup' && reloadSetup()),
+    [bridge, reloadSetup],
   );
 
   if (apps === null) return <p className="home-note">Loading connections…</p>;
@@ -83,6 +118,27 @@ export function ConnectionsPanel() {
       reload();
     }
   };
+
+  // The call returns once the person has answered the Allow card; until then the row waits.
+  const setUp = (id: string, call: () => Promise<SetupResult>): void => {
+    setAsking((now) => new Set(now).add(id));
+    void act(async () => {
+      try {
+        const { error } = await call();
+        if (error !== undefined) setStatus(SETUP_REFUSALS[error] ?? SETUP_FAILED);
+      } finally {
+        setAsking((now) => {
+          const next = new Set(now);
+          next.delete(id);
+          return next;
+        });
+      }
+    });
+  };
+
+  const nameOf = (expert: string): string =>
+    [...(setup?.experts ?? []), ...(setup?.browseExperts ?? [])].find((e) => e.id === expert)
+      ?.name ?? expert;
 
   const add = (params: AppAddParams): Promise<boolean> =>
     act(() => bridge.addConnection(params), `${params.name} added.`);
@@ -131,6 +187,35 @@ export function ConnectionsPanel() {
         )}
         {apps.length === 0 && !offline && <p className="tg-note">No apps yet. Add one below.</p>}
       </section>
+      <BrowseList
+        label="Browse apps"
+        items={setup?.browseApps ?? []}
+        progress={setup?.progress ?? null}
+        asking={asking}
+        onAdd={(id) => setUp(id, () => bridge.setupApp(id, false))}
+      />
+      {setup !== null && (
+        <>
+          {setup.failed !== null && (
+            <p className="tg-error" role="alert">
+              Setting up {nameOf(setup.failed.expert)} didn’t finish. Try again.
+            </p>
+          )}
+          <ExpertsGroup
+            experts={setup.experts}
+            progress={setup.progress}
+            asking={asking}
+            onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}
+          />
+          <BrowseList
+            label="Browse experts"
+            items={setup.browseExperts}
+            progress={setup.progress}
+            asking={asking}
+            onAdd={(id) => setUp(id, () => bridge.setupExpert(id, false))}
+          />
+        </>
+      )}
       <section className="home-card home-conns" aria-label="Add an app">
         <h2 className="home-card__label">ADD AN APP</h2>
         <details>

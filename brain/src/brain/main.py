@@ -88,7 +88,6 @@ async def _run() -> None:
         bodies.notify,
         "environment" if from_environment else "file" if key else "none",
         anthropic_check,
-        lambda: all_experts(experts, config.expert_cmd),
         on_key=secrets.clear,
     )
     for handler in logging.getLogger().handlers:  # every logger reaches disk or the console here

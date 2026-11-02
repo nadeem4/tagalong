@@ -134,8 +134,6 @@ desktop app. You need `uv` and an Anthropic key.
    `~/.tagalong/.env` with the other lines untouched, and the next `say` is answered without a
    restart.) Call `set_daily_limit` with `{"usd":0}`: `invalid_params`; with `{"usd":7.5}`:
    `{"limit_usd":7.5}`, `TAGALONG_DAILY_BUDGET_USD=7.5` in `.env` and `spend_today` shows 7.5.
-   Call `expert_status`: `{"found":false,"command":"","experts":[]}` with no expert installed and
-   no `TAGALONG_EXPERT_CMD`; with the override set, `found` is true and `experts` lists `custom`.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
    result and its turn ends at once with `reason: "over_budget"` and no deltas. The brain log
@@ -429,7 +427,7 @@ The automated version of steps 1 to 5 runs on the fake brain (`e2e/approvals.spe
 2. **Action:** after the history steps above, look at the summary strip and the filter buttons.
    **Expected:** the counts match `list_approvals`'s `counts`: asks, Scout answered, refused. Rows
    are grouped under Today (then Yesterday and dates), newest first, each with its time, what was
-   asked, its source (Claude Code expert, Scout tool or Connected app), who decided and a chip:
+   asked, its source (Expert, Scout tool or Connected app), who decided and a chip:
    Approved, Refused, Timed out or No one online.
 3. **Action:** press **Refused**, then **Decided by Scout**, then **All**.
    **Expected:** only the refused rows; only the rows Scout approved; all rows again.
@@ -1682,12 +1680,12 @@ with a fake key; the real check against Anthropic is done by hand here.
 
 The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
-1. **Action:** on step 6 with Claude Code's connector installed. **Expected:** "Claude Code's
-   connector is installed on this computer." and nothing about the login. Rename the command or
-   stop the brain, press **Check again**. **Expected:** "was not found" (Scout
-   installs the connector on request; nothing is installed ahead of time), or "Scout's brain is not running".
-   The page reads "For bigger jobs, Scout calls in an expert", shows a hand-off card and ends
-   with "More experts are coming."
+1. **Action:** on step 6 press **Set up Claude Code**. **Expected:** the stage words move on
+   (checking, Node, installing), then "Claude Code is set up." With the login missing the button
+   reads **Log in to Claude Code**; with the brain stopped the card says it can't check and
+   offers **Check again**. The page reads "For bigger jobs, Scout calls in an expert" and shows a
+   hand-off card. On Home's **Connections** page the **Experts** card lists Claude Code with its
+   state; **Browse and add** offers more, and each button opens an Allow card first.
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.

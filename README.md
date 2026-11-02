@@ -229,7 +229,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   Scout then says it took too long. Time spent in tools, or waiting for you to answer, does not count.
 - **Jobs**: the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show
   result** for a finished one. Claude Code must be installed and signed in on this computer.
-- **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
+- **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
   Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).

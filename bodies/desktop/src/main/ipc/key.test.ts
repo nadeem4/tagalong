@@ -114,10 +114,4 @@ describe('registerKeyIpc', () => {
     }
     expect(calls).toEqual([]);
   });
-
-  it('expert:status maps expert_status', async () => {
-    const { invoke, calls } = setup(() => text({ found: true, command: 'claude-agent-acp' }));
-    expect(await invoke(IPC.expertStatus)).toEqual({ found: true, command: 'claude-agent-acp' });
-    expect(calls).toEqual([['expert_status', {}]]);
-  });
 });

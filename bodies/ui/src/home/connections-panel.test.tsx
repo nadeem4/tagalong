@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppInfo } from '../shapes';
+import type { AppInfo, SetupOverview } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
@@ -318,5 +318,150 @@ describe('ConnectionsPanel', () => {
     await click(screen.getByRole('switch', { name: 'Scout can use Files' }));
     expect(await screen.findByRole('status')).toHaveTextContent(/may be out of date/i);
     expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
+  });
+});
+
+const CLAUDE = { id: 'claude-acp', name: 'Claude Code', version: '2.0', tested: true };
+const CODEX = { id: 'codex-acp', name: 'Codex', version: '1.0', description: 'OpenAI’s agent' };
+const NOTES = { id: 'acme/notes', name: 'notes', version: '1', description: 'Take notes' };
+
+function withSetup(setup: Partial<SetupOverview>) {
+  return createFakeHostBridge({ apps: [FILES], setup });
+}
+
+describe('ConnectionsPanel groups', () => {
+  it('shows the Apps and Experts groups', async () => {
+    await renderPanel(withSetup({ experts: [{ ...CLAUDE, state: 'ready' }] }));
+    expect(screen.getByRole('region', { name: 'Connected apps' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Experts' })).toBeInTheDocument();
+  });
+
+  it('each expert row shows its state and the action that fits it', async () => {
+    await renderPanel(
+      withSetup({
+        experts: [
+          { ...CLAUDE, state: 'needs_login' },
+          { ...CLAUDE, id: 'b', name: 'Beta', state: 'needs_update' },
+          { ...CLAUDE, id: 'c', name: 'Gamma', state: 'ready' },
+        ],
+      }),
+    );
+    const row = (name: string) => screen.getByRole('region', { name });
+    expect(within(row('Claude Code')).getByText('Needs login')).toBeInTheDocument();
+    expect(within(row('Claude Code')).getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(within(row('Beta')).getByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(within(row('Gamma')).getByText('Ready')).toBeInTheDocument();
+    expect(within(row('Gamma')).queryByRole('button')).toBeNull();
+  });
+
+  it('an untested expert is marked untested', async () => {
+    await renderPanel(
+      withSetup({
+        experts: [
+          { ...CLAUDE, state: 'ready' },
+          { ...CLAUDE, id: 'x', name: 'Xtra', tested: false, state: 'ready' },
+        ],
+      }),
+    );
+    expect(
+      within(screen.getByRole('region', { name: 'Xtra' })).getByText('Untested'),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Claude Code' })).queryByText('Untested'),
+    ).toBeNull();
+  });
+
+  it('Add on a browse row calls setupExpert or setupApp with approved false', async () => {
+    const bridge = withSetup({ browseExperts: [CODEX], browseApps: [NOTES] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    await click(screen.getByRole('button', { name: 'Add notes' }));
+    expect(bridge.setupCalls).toEqual([
+      { kind: 'expert', id: 'codex-acp', approved: false },
+      { kind: 'app', id: 'acme/notes', approved: false },
+    ]);
+  });
+
+  it('Set up on an expert row asks with approved false too', async () => {
+    const bridge = withSetup({ experts: [{ ...CLAUDE, state: 'needs_login' }] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Log in' }));
+    expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'claude-acp', approved: false }]);
+  });
+
+  it('progress disables the row’s button and shows the stage', async () => {
+    const bridge = withSetup({
+      browseExperts: [CODEX],
+      progress: { expert: 'codex-acp', stage: 'node', percent: 40 },
+    });
+    await renderPanel(bridge);
+    expect(screen.getByRole('button', { name: 'Add Codex' })).toBeDisabled();
+    expect(screen.getByText(/40%/)).toBeVisible();
+  });
+
+  it('reads the overview again when the brain says setup changed', async () => {
+    const bridge = withSetup({});
+    await renderPanel(bridge);
+    expect(screen.queryByRole('button', { name: 'Add Codex' })).toBeNull();
+    bridge.setup = { ...bridge.setup, browseExperts: [CODEX] };
+    await act(async () => {
+      bridge.emitChanged('setup');
+      await Promise.resolve();
+    });
+    expect(await screen.findByRole('button', { name: 'Add Codex' })).toBeInTheDocument();
+  });
+
+  it('a failed install is shown on the page by the expert’s name', async () => {
+    await renderPanel(
+      withSetup({ browseExperts: [CODEX], failed: { expert: 'codex-acp', error: 'integrity' } }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(/Codex/);
+    expect(screen.getByRole('alert')).not.toHaveTextContent('codex-acp');
+  });
+
+  it.each([
+    ['denied', /nothing was changed/i, false],
+    ['already_installing', /already being set up/i, false],
+    ['already_ready', /already set up/i, false],
+    ['already_added', /already added/i, false],
+    ['version_changed', /changed while you were deciding/i, true],
+    ['registry_unavailable', /couldn’t reach the registry/i, true],
+    ['something_new', /didn’t work/i, true],
+  ])('a %s refusal gets its own line', async (error, line, isError) => {
+    const bridge = createFakeHostBridge({
+      apps: [FILES],
+      setup: { browseExperts: [CODEX] },
+      setupResult: { error },
+    });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    const shown = await screen.findByText(line);
+    expect(shown).toHaveAttribute('role', isError ? 'alert' : 'status');
+  });
+
+  it('a call that succeeds leaves no line behind', async () => {
+    const bridge = withSetup({ browseExperts: [CODEX] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the offline note when the brain is away', async () => {
+    const bridge = createFakeHostBridge({ listFails: 'brain offline' });
+    await renderPanel(bridge);
+    expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
+    expect(screen.queryByRole('region', { name: 'Experts' })).toBeNull();
+  });
+
+  it('long names and many entries stay inside the page', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      ...CODEX,
+      id: `e${i}`,
+      name: `A very long expert name that keeps going and going ${i}`,
+      description: 'long '.repeat(80),
+    }));
+    await renderPanel(withSetup({ browseExperts: many }));
+    // The row holds its text to one line with an ellipsis (home-entry__title/preview rules).
+    expect(screen.getAllByRole('button', { name: /^Add A very long/ })).toHaveLength(30);
   });
 });
