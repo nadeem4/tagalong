@@ -2070,6 +2070,7 @@ async def test_implicit_continue_shows_the_mode_card_and_does_not_reuse_the_old_
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder))
+    assert rig.memory.get_job(second).parent_job == first
     assert len(asks.opened) == 2
     assert rig.memory.get_job(second).mode == "auto"
 
@@ -2147,6 +2148,7 @@ async def test_an_expert_that_cannot_resume_falls_back_to_fresh_on_an_implicit_c
 async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
     check = FakeSideCheck(None)
     rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
-    await first_job(rig)
-    await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    assert rig.memory.get_job(second).parent_job == first
     assert check.facts == [] and hand_off_rows(rig) == []

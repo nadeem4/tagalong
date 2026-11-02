@@ -357,6 +357,8 @@ async def test_hand_off_passes_fresh_to_jobs(home):
     assert home.jobs.fresh is False
     await home.run("hand_off", {"task": "t", "folder": "C:/p", "fresh": True})
     assert home.jobs.fresh is True
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "fresh": "false"})
+    assert home.jobs.fresh is False
 
 
 async def test_hand_off_passes_the_named_expert(home):

@@ -387,7 +387,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 args.get("expert"),
                 args.get("continue_job"),
                 owner_asked=owner_turn(),
-                fresh=bool(args.get("fresh")),
+                fresh=args.get("fresh") is True,
             )
         except JobError as err:
             # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
