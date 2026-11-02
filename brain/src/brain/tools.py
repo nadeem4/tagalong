@@ -421,7 +421,10 @@ def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
         _need_text("job_activity", args, "job")
         after = args.get("after_rev", 0)
         if not isinstance(after, int) or isinstance(after, bool) or after < 0:
-            raise RpcError(ErrorCode.invalid_params, "job_activity needs after_rev as a number.")
+            raise RpcError(
+                ErrorCode.invalid_params,
+                "job_activity needs after_rev as a non-negative whole number.",
+            )
         try:
             return json.dumps(jobs.activity_page(args["job"], after))
         except JobError as err:

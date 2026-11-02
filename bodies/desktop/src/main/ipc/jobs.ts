@@ -37,7 +37,8 @@ function parseRows(value: unknown): JobRow[] {
 
 // Page keys are single words, so the brain's page passes through once its shape is checked.
 function parsePage(value: unknown): JobActivityPage {
-  if (!Array.isArray((value as { entries?: unknown } | null)?.entries)) {
+  const page = value as { entries?: unknown; rev?: unknown } | null;
+  if (!Array.isArray(page?.entries) || typeof page?.rev !== 'number') {
     throw new Error('brain sent bad activity');
   }
   return value as JobActivityPage;
