@@ -17,7 +17,7 @@ from anthropic import AsyncAnthropic
 from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
-from brain.experts import make_run_for
+from brain.experts import ExpertHosts
 from brain.guardrails import Budget
 from brain.masking import Masker, SecretLogFilter
 from brain.memory import Memory
@@ -126,7 +126,7 @@ async def _run() -> None:
         bodies,
         config.step_cap,
         memory,
-        make_run=make_run_for(config.expert_timeout, config.expert_idle_s),
+        make_run=ExpertHosts(config.expert_timeout, config.expert_idle_s),
         experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,
         tokens=tokens,

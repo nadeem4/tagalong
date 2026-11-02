@@ -38,7 +38,7 @@ from brain.config import (
     DEFAULT_WAKES_PER_HOUR,
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
-from brain.experts import ExpertRun, make_run_for
+from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs, job_note
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
@@ -111,7 +111,7 @@ class Session:
             self.guards.add(mask_secrets(masker))
         notify = bodies.notify
         # main passes the installed experts and the timeout; the defaults keep tests short.
-        make_run = make_run or make_run_for(DEFAULT_EXPERT_TIMEOUT_S)
+        make_run = make_run or ExpertHosts(DEFAULT_EXPERT_TIMEOUT_S)
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         self.scheduler = Scheduler(

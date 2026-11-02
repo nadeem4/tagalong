@@ -40,13 +40,21 @@ class Side:
 
 
 class Rig:
-    def __init__(self, tmp_path, monkeypatch, steps, load: bool = False, idle_s: float = 300):
+    def __init__(
+        self,
+        tmp_path,
+        monkeypatch,
+        steps,
+        load: bool = False,
+        idle_s: float = 300,
+        load_mode: str = "1",
+    ):
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
         monkeypatch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
         if load:
-            monkeypatch.setenv("FAKE_ACP_LOAD", "1")
+            monkeypatch.setenv("FAKE_ACP_LOAD", load_mode)
         self.log = tmp_path / "log.jsonl"
         self.folder = tmp_path
         self.gate = asyncio.Event()  # the injected sleep: idle time passes when this is set
@@ -220,6 +228,34 @@ async def test_resume_falls_back_when_load_session_fails(make_rig):
     await run.start(rig.folder, resume="bad-1")
     assert run.resumed is False and run.fresh_reason == "session could not be loaded"
     assert run.session_id == "sess-1"
+
+
+async def test_two_concurrent_continues_of_one_session_never_cross_asks(make_rig):
+    steps = [
+        [{"permission": {"title": "A-ask"}}, {"hang": True}],
+        [{"permission": {"title": "B-ask"}}, {"hang": True}],
+    ]
+    rig = make_rig(steps, load=True)
+    sa, sb = Side(), Side()
+    a, b = rig.run(sa), rig.run(sb)
+    await a.start(rig.folder, resume="sess-9")
+    await b.start(rig.folder, resume="sess-9")
+    assert a.resumed is True and b.resumed is False
+    assert b.fresh_reason == "session is in use by another job"
+    assert a.session_id == "sess-9" and b.session_id != "sess-9"
+    await a.begin("default", "x")
+    await until(lambda: sa.permissions)
+    await b.begin("default", "y")
+    await until(lambda: sb.permissions)
+    assert sa.permissions == ["A-ask"] and sb.permissions == ["B-ask"]
+
+
+async def test_a_resumed_session_without_modes_falls_back_to_a_fresh_one(make_rig):
+    rig = make_rig(load=True, load_mode="nomodes")
+    run = rig.run(Side())
+    modes = await run.start(rig.folder, resume="sess-9")
+    assert run.resumed is False and run.fresh_reason == "session reported no modes"
+    assert run.session_id == "sess-1" and modes
 
 
 async def test_no_resume_asked_leaves_the_resume_facts_empty(make_rig):

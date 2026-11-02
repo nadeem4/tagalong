@@ -13,7 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from brain.experts import ExpertError, ExpertRun, Question, kill_tree, make_run_for
+from brain.experts import (
+    ExpertError,
+    ExpertHost,
+    ExpertHosts,
+    ExpertRun,
+    Question,
+    kill_tree,
+)
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 
@@ -55,22 +62,38 @@ class Harness:
 
 
 def make_run(
-    h: Harness, tmp_path: Path, steps, timeout: float = 30, command=None, **options
+    h: Harness,
+    tmp_path: Path,
+    steps,
+    timeout: float = 30,
+    command=None,
+    expert_id: str = "custom",
+    path_first=None,
+    grace: float = 2,
+    startup_timeout: float = 60,
 ) -> ExpertRun:
     script = tmp_path / "script.json"
     script.write_text(json.dumps(steps))
     # The fake reads its script and log from the environment it inherits through the runner.
     patch.setenv("FAKE_ACP_SCRIPT", str(script))
     patch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
-    options = {"grace": 2, **options}
+    # idle_s=0: the adapter dies with the one session, as these tests expect.
+    host = ExpertHost(
+        command or [sys.executable, str(AGENT)],
+        expert_id,
+        path_first,
+        idle_s=0,
+        grace=grace,
+        startup_timeout=startup_timeout,
+    )
     h.run = ExpertRun(
-        command=command or [sys.executable, str(AGENT)],
+        host=host,
         timeout=timeout,
         on_permission=h.on_permission,
         on_question=h.on_question,
         on_progress=h.on_progress,
         on_end=h.on_end,
-        **options,
+        grace=grace,
     )
     return h.run
 
@@ -394,7 +417,7 @@ def test_the_factory_puts_a_private_nodes_dir_first_and_leaves_others_alone(tmp_
         expert = InstalledExpert(
             "x", "x", "1", [str(tmp_path / "n" / "node.exe")], "registry", True, node
         )
-        return make_run_for(5)(
+        return ExpertHosts(5)(
             expert, on_permission=None, on_question=None, on_progress=None, on_end=None
         )
 

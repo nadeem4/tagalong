@@ -10,7 +10,7 @@ import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';
 
-// The brain's row is snake_case and carries fields Home never shows (session_id, reported).
+// The brain's row is snake_case and carries fields Home never shows (session_id_known, reported).
 function toRow(raw: Record<string, unknown>): JobRow {
   return {
     id: raw.id,

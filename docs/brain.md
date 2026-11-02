@@ -647,7 +647,7 @@ after the process is gone. A stop answers any pending permission or question as 
 
 `ExpertRun` is one session; the process belongs to an `ExpertHost`. Run alone (tests), a run
 builds its own host that stops with it, as above. `Jobs` gets its runs from `ExpertHosts`
-(`make_run_for(timeout, idle_s)`), which keeps one host per installed expert and command.
+(`ExpertHosts(timeout, idle_s)`), which keeps one host per installed expert and command.
 
 ### Hosts, sessions and resume
 
@@ -692,7 +692,7 @@ are in `brain/tests/fixtures/`.
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
 [Permissions and asks](#permissions-and-asks)). `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
-override) and the `ExpertRun` factory (`make_run_for(TAGALONG_EXPERT_TIMEOUT_S, TAGALONG_EXPERT_IDLE_S)`) and calls
+override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_TIMEOUT_S, TAGALONG_EXPERT_IDLE_S)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
 **Follow-ups.** `hand_off` takes an optional `continue_job`, the id of a finished job. The new
@@ -701,7 +701,8 @@ mismatch is a `JobError` with a plain reason. It reopens the earlier job's saved
 the expert can, and records the earlier job in `parent_job` so `list_jobs` shows the chain. The
 hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh"}`,
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
-`the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
+`session is in use by another job` (a second follow-up of one session runs fresh, so asks never
+cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
 never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
 `list_jobs` rows carry `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
@@ -810,10 +811,10 @@ flowchart TD
 
 | Tool           | Audience    | Effect | Gate                      | Does                                                                                                                                                                               |
 | -------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?}`. Returns `job <id> started`, or the plain reason it did not                                                                                              |
+| `hand_off`     | scout       | change | asks itself (`self_asks`) | `{task, folder, expert?, continue_job?}`. Returns JSON `{job, session, why_fresh}`, or the plain reason it did not start                                                           |
 | `list_experts` | scout, home | read   | `auto`                    | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
 | `tell_expert`  | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                                                                                                                         |
-| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress                                                                                                         |
+| `list_jobs`    | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, `expert`, `parent_job` and `session_id_known`                                                          |
 | `stop_job`     | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is

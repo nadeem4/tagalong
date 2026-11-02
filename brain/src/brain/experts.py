@@ -135,10 +135,6 @@ class ExpertHosts:
                 await host.shutdown()
 
 
-def make_run_for(timeout: float, idle_s: float = 0.0) -> ExpertHosts:
-    return ExpertHosts(timeout, idle_s)
-
-
 class ExpertHost:
     """One adapter process for one expert, shared by its sessions.
 
@@ -248,13 +244,20 @@ class ExpertHost:
         session = None
         if resume is not None:
             run.resumed, run.fresh_reason = False, "expert cannot reopen sessions"
-            if self.can_resume:
+            if resume in self._sessions:
+                # Another job holds it; sharing the id would cross their asks and progress.
+                run.fresh_reason = "session is in use by another job"
+            elif self.can_resume:
                 try:
-                    session = await self.conn.load_session(
+                    loaded = await self.conn.load_session(
                         cwd=str(folder), session_id=resume, mcp_servers=[]
                     )
-                    run.resumed, run.fresh_reason = True, None
-                    run.session_id = resume
+                    if loaded.modes and loaded.modes.available_modes:
+                        session = loaded
+                        run.resumed, run.fresh_reason = True, None
+                        run.session_id = resume
+                    else:  # no modes means the user could not pick one: start over
+                        run.fresh_reason = "session reported no modes"
                 except acp.RequestError:  # the adapter no longer has it: start over
                     run.fresh_reason = "session could not be loaded"
         if session is None:
@@ -281,7 +284,8 @@ class ExpertHost:
         try:
             await self._sleep(self._idle_s)
         finally:
-            self._idle_task = None
+            if self._idle_task is asyncio.current_task():
+                self._idle_task = None
         if not self._sessions and not self._opening:
             await asyncio.shield(self._shutdown())
 
@@ -330,10 +334,7 @@ class ExpertRun:
     def __init__(
         self,
         *,
-        host: ExpertHost | None = None,
-        command: list[str] | None = None,
-        expert_id: str = "custom",
-        path_first: Path | None = None,
+        host: ExpertHost,
         timeout: float,
         on_permission: Callable[[PermissionRequest], Awaitable[str | None]],
         on_question: Callable[[Question], Awaitable[dict | None]],
@@ -342,10 +343,7 @@ class ExpertRun:
         grace: float = 3.0,
         startup_timeout: float = 60.0,
     ) -> None:
-        # Alone (no host given) the run owns a process that dies with its session.
-        self._host = host or ExpertHost(
-            command or [], expert_id, path_first, grace=grace, startup_timeout=startup_timeout
-        )
+        self._host = host
         self._timeout = timeout
         self._grace = grace
         self._startup_timeout = startup_timeout
@@ -378,7 +376,7 @@ class ExpertRun:
             async with asyncio.timeout(self._startup_timeout):
                 await self._host.conn.set_session_mode(session_id=self.session_id, mode_id=mode_id)
         except TimeoutError:
-            await self._host.shutdown()
+            await self._host.release(self, broken=True)
             raise ExpertError(
                 f"The expert did not answer within {self._startup_timeout:g} s to a mode change."
             ) from None

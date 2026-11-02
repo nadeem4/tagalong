@@ -11,7 +11,9 @@ chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
 elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
-FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail);
+FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail); "known" serves
+only ids this process created (a restarted adapter forgot the rest), "nomodes" answers
+without modes;
 FAKE_ACP_AUTH (JSON list of {id, name, description?}) sets auth_methods, and
 new_session/authenticate then fail with
 auth-required unless FAKE_ACP_LOGGED_IN=1 or the file named by FAKE_ACP_LOGIN_FILE exists.
@@ -51,6 +53,7 @@ class FakeAgent:
         self.turn = 0
         self.stubborn = False
         self.sessions = 0
+        self.created: set[str] = set()
 
     def on_connect(self, conn) -> None:
         self.conn = conn
@@ -97,6 +100,11 @@ class FakeAgent:
             raise acp.RequestError.method_not_found("session/load")
         if session_id.startswith("bad-"):  # a session the adapter no longer has
             raise acp.RequestError.invalid_params({"session": session_id})
+        mode = os.environ["FAKE_ACP_LOAD"]
+        if mode == "known" and session_id not in self.created:
+            raise acp.RequestError.invalid_params({"session": session_id})
+        if mode == "nomodes":
+            return schema.LoadSessionResponse()
         return schema.LoadSessionResponse(modes=self._modes())
 
     async def new_session(self, cwd, **kw):
@@ -105,6 +113,7 @@ class FakeAgent:
         modes = self._modes()
         # One id per session, so several sessions can share this process (the first is sess-1).
         self.sessions += 1
+        self.created.add(f"sess-{self.sessions}")
         return schema.NewSessionResponse(session_id=f"sess-{self.sessions}", modes=modes)
 
     def _modes(self) -> schema.SessionModeState:

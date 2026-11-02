@@ -14,7 +14,7 @@ import pytest
 
 from brain.approvals import Approvals
 from brain.asks import Answer
-from brain.experts import ExpertHosts, ExpertRun, Question, QuestionField
+from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
@@ -102,14 +102,14 @@ class Rig:
         experts=None,
         setup_facts=None,
         shared: bool = False,
-        load: bool = False,
+        load: bool | str = False,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
         monkeypatch.setenv("FAKE_ACP_LOG", str(tmp_path / "log.jsonl"))
         if load:
-            monkeypatch.setenv("FAKE_ACP_LOAD", "1")
+            monkeypatch.setenv("FAKE_ACP_LOAD", "1" if load is True else load)
         self.log = tmp_path / "log.jsonl"
         self.folder = tmp_path / "proj"
         self.folder.mkdir()
@@ -148,9 +148,9 @@ class Rig:
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
         self.expert_ids.append(expert.id)
+        host = ExpertHost(expert.command, expert.id, idle_s=0, grace=2)
         run = ExpertRun(
-            command=expert.command,
-            expert_id=expert.id,
+            host=host,
             timeout=self.expert_timeout,
             grace=2,
             **callbacks,
@@ -1224,6 +1224,27 @@ async def test_a_session_the_adapter_lost_falls_back_to_fresh(make_rig):
     rig.memory.update_job(first, session_id="bad-1")
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
     assert (second.session, second.why_fresh) == ("fresh", "session could not be loaded")
+
+
+async def test_continuing_after_that_experts_adapter_died_leaves_the_other_expert_alone(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")),
+        [{"text": "ok"}],
+        experts=[installed(), installed("codex-acp")],
+        load="known",  # a restarted adapter knows none of the earlier session ids
+        shared=True,
+    )
+    first = await rig.jobs.start("one", str(rig.folder), "claude-acp")
+    other = await rig.jobs.start("two", str(rig.folder), "codex-acp")
+    await finish(rig, first)
+    await finish(rig, other)
+    hosts = {key[0]: host for key, host in rig.hosts._hosts.items()}
+    survivor = hosts["codex-acp"].process
+    await hosts["claude-acp"].shutdown()  # what the idle stop does
+    third = await rig.jobs.start("three", str(rig.folder), continue_job=first)
+    assert (third.session, third.why_fresh) == ("fresh", "session could not be loaded")
+    assert survivor.returncode is None and hosts["codex-acp"].process is survivor
+    assert rig.spawns() == 3
 
 
 async def test_a_job_that_saved_no_session_continues_fresh(make_rig):
