@@ -26,8 +26,8 @@ tagalong/
     examples/                       # sample frames shared by the TypeScript and Python tests
     ts/                             # @tagalong/contract: zod schemas for contract v1
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
-                                    # config.py, bodies.py, server.py, apps.py, app_tools.py and
-                                    # main.py (see docs/brain.md)
+                                    # config.py, bodies.py, server.py, apps.py, app_tools.py,
+                                    # main.py and cli.py (the `tagalong` command; see docs/brain.md)
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
@@ -147,6 +147,18 @@ uv run brain               # starts the websocket server (see docs/brain.md)
 ```
 
 The `brain` job in CI runs these commands, installing with `uv sync --locked`.
+
+On a brain machine with no screen (for example over SSH), set it up with the `tagalong` command
+instead of the app. It reads and writes the same data folder and never talks to a running brain:
+
+```bash
+uv run tagalong doctor                # what is here and what is missing
+uv run tagalong key set               # hidden prompt; or: echo "$KEY" | uv run tagalong key set --stdin
+uv run tagalong install claude-acp    # shows what it downloads, asks y/N (--yes skips)
+uv run tagalong login claude-acp      # a terminal window or the expert's browser step
+uv run tagalong apps add <registry-id>
+uv run brain                          # start (or restart) the brain afterwards
+```
 
 ### Coverage
 
