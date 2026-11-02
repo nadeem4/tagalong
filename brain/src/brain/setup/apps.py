@@ -82,7 +82,7 @@ def app_params(
         found = (which or shutil.which)("uvx")
         if found is None:
             raise InstallError("uv_missing", "uvx")
-        command, args = found, [spec]
+        command, args = found, ["--", spec]
     else:
         raise InstallError("unsupported", dist.kind)
     return {
@@ -126,10 +126,11 @@ def app_setup_tools(
             dist = build_for(entry, machine)
             if dist is None:
                 raise NoBuild(f"{machine.os}-{machine.arch}")
-            facts: dict = {"app": entry.id, "transport": "http", "node_download": None}
+            facts: dict = {"app": entry.id, "node_download": None}
             if dist.kind == "remote":
                 if dist.headers:
                     raise InstallError("needs_token", ",".join(dist.headers))
+                facts["transport"] = "http"
                 facts["host"] = urlsplit(dist.url or "").hostname or ""
                 return facts
             if dist.kind == "npx":
@@ -166,15 +167,16 @@ def app_setup_tools(
         machine = await inspect_fn()
         dist = build_for(entry, machine)
         try:
+            name = entry.name
+            existing = next((r for r in memory.list_apps() if r.name == name), None)
+            if existing is not None:
+                return fail("already_added", name, id=existing.id)
             if dist is not None and dist.kind == "npx" and usable_node(home, machine) is None:
                 await node_for(
                     home, machine, fetch, get_json, lambda step: None
                 )  # named on the card
                 machine = await inspect_fn()
             params = app_params(entry, dist, machine, home)
-            existing = next((r for r in memory.list_apps() if r.name == params["name"]), None)
-            if existing is not None:
-                return fail("already_added", params["name"], id=existing.id)
             row = await save_app(apps, memory, tokens, notify, params)
         except InstallError as err:
             return fail(err.kind, err.detail)
@@ -184,7 +186,10 @@ def app_setup_tools(
         if row.auth == "oauth":
             open_url = (opener or partial(browser_opener, bodies))(row.id)
             if open_url is not None:
-                await apps.sign_in(row.id, open_url)
+                try:
+                    await apps.sign_in(row.id, open_url)
+                except AppError as err:
+                    return fail("refused", str(err), id=row.id)
                 return json.dumps({**out, "status": "signing_in"})
             out["browser"] = False
         missing = [n for n in row.config.get("env", {}) if n != "PATH" and n not in env]

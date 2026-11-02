@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from brain.apps import AppStatus, TokenFile
+from brain.apps import AppError, AppStatus, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -141,7 +141,7 @@ async def test_uvx_entry_becomes_stdio_uvx_or_reports_uv_missing(tmp_path):
     e = (await entries(tmp_path))["acme/pytool"]
     params = app_params(e, dist(e), machine(), tmp_path, which=lambda n: f"/bin/{n}")
     assert params["config"]["command"] == "/bin/uvx"
-    assert params["config"]["args"] == ["pytool==0.4"]
+    assert params["config"]["args"] == ["--", "pytool==0.4"]
     with pytest.raises(InstallError) as err:
         app_params(e, dist(e), machine(), tmp_path, which=lambda n: None)
     assert err.value.kind == "uv_missing"
@@ -428,3 +428,26 @@ async def test_the_app_appears_in_list_apps_after_install(rig):
     }
     rows = json.loads(await handlers["list_apps"]({}))["apps"]
     assert [a["id"] for a in rows] == ["notes"]
+
+
+async def test_a_duplicate_downloads_no_node(rig, ensure):
+    r = rig(machine(ToolVersion("18.0.0", "x")))
+    await r.run()
+    calls_before = len(ensure)
+    # the private Node now exists, so remove it to prove the duplicate check runs first
+    import shutil
+
+    shutil.rmtree(node_dir(r.home))
+    again = await r.run()
+    assert again["error"] == "already_added" and len(ensure) == calls_before
+
+
+async def test_a_refused_sign_in_is_a_fact_with_the_app_id(rig):
+    r = rig(browser=True)
+
+    async def boom(app_id, open_url):
+        raise AppError("no sign-in here")
+
+    r.apps.sign_in = boom
+    out = await r.run("acme/cloud")
+    assert out["error"] == "refused" and out["id"] == "cloud"

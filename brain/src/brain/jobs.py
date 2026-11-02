@@ -109,10 +109,14 @@ class Jobs:
     def installed(self) -> list[InstalledExpert]:
         return self._experts()
 
-    async def _refusal(self, message: str, problem: str, expert: str | None = None) -> JobError:
+    async def _refusal(
+        self, message: str, problem: str, expert: str | None = None, **more: object
+    ) -> JobError:
         """A refusal Scout can act on: the problem, what is needed and what this machine and the
         registry offer. The facts source failing never hides the refusal itself."""
-        facts: dict = {"problem": problem, "needs": {"node_major": NODE_FLOOR}}
+        facts: dict = {"problem": problem, **more}
+        if problem in ("no_expert", "expert_missing_node"):
+            facts["needs"] = {"node_major": NODE_FLOOR}
         if expert is not None:
             facts["expert"] = expert
         if self._setup_facts is not None:
@@ -130,7 +134,9 @@ class Jobs:
             match = next((e for e in found if e.id == named), None)
             if match is None:
                 message = f"expert {named} is not installed; installed: {ids or 'none'}"
-                raise await self._refusal(message, "unknown_expert", named)
+                raise await self._refusal(
+                    message, "unknown_expert", named, installed=[e.id for e in found]
+                )
             return await self._usable(match)
         if not found:
             raise await self._refusal("no experts installed", "no_expert")

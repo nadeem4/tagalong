@@ -1803,7 +1803,9 @@ Brain tests only; nothing here installs anything.
    host and the variable names it needs. Deny: nothing is added. Allow: the app appears on
    Home's Connections list. A hosted app opens your browser to sign in when its server asks; a
    local one that needs a key reports the variable name, and no key value is stored anywhere (open
-   `tagalong.db`'s apps row: only `${NAME}`).
+   `tagalong.db`'s apps row: only `${NAME}`). The first start of a local `npx` app downloads its
+   package and can pass the 30 second connect timeout, so it may show `error` once: press
+   **Restart** and it connects.
 5. Ask for an app that needs a token header: Scout says it cannot add it itself.
 
 ## Not supported

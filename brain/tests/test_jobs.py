@@ -1123,6 +1123,8 @@ async def test_unknown_expert_carries_facts(make_rig):
         await rig.jobs.start("go", str(rig.folder), "gemini")
     assert _facts_of(err.value)["problem"] == "unknown_expert"
     assert _facts_of(err.value)["expert"] == "gemini"
+    assert _facts_of(err.value)["installed"] == ["claude-acp"]
+    assert "needs" not in _facts_of(err.value)
 
 
 async def test_a_not_logged_in_expert_is_a_fact_and_starts_nothing(make_rig):
@@ -1130,6 +1132,7 @@ async def test_a_not_logged_in_expert_is_a_fact_and_starts_nothing(make_rig):
     with pytest.raises(JobError) as err:
         await rig.jobs.start("go", str(rig.folder))
     assert _facts_of(err.value)["problem"] == "expert_not_logged_in"
+    assert "needs" not in _facts_of(err.value)
     assert _facts_of(err.value)["expert"] == "claude-acp"
     assert rig.runs == []
 
@@ -1140,6 +1143,7 @@ async def test_an_expert_whose_node_is_gone_is_a_fact(make_rig, tmp_path):
     with pytest.raises(JobError) as err:
         await rig.jobs.start("go", str(rig.folder))
     assert _facts_of(err.value)["problem"] == "expert_missing_node"
+    assert _facts_of(err.value)["needs"] == {"node_major": 22}
     assert rig.runs == []
 
 

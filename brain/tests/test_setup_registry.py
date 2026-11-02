@@ -278,3 +278,33 @@ async def test_setup_facts_offline_with_no_cache_is_empty_and_stale(tmp_path):
 
     facts = await setup_facts(registry(tmp_path, net), inspect_fn)
     assert facts["candidates"] == [] and facts["stale"] is True
+
+
+async def test_a_package_identifier_that_reads_as_an_option_is_dropped(tmp_path):
+    def pkg(kind, ident):
+        return {"registryType": kind, "identifier": ident, "version": "1"}
+
+    body = json.dumps(
+        {
+            "servers": [
+                {
+                    "server": {
+                        "name": "x/evil",
+                        "version": "1",
+                        "packages": [pkg("pypi", "--index-url=http://e")],
+                    }
+                },
+                {"server": {"name": "x/evil2", "version": "1", "packages": [pkg("npm", "-y")]}},
+                {
+                    "server": {
+                        "name": "x/ok",
+                        "version": "1",
+                        "packages": [pkg("npm", "@s/p-k.g"), pkg("pypi", "my_pkg-2")],
+                    }
+                },
+            ]
+        }
+    ).encode()
+    listing = await registry(tmp_path, Net(mcp=body)).mcp_servers(None)
+    assert [e.id for e in listing.entries] == ["x/ok"]
+    assert [d.package for d in listing.entries[0].distributions] == ["@s/p-k.g", "my_pkg-2"]

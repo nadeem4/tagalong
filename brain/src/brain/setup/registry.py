@@ -122,6 +122,10 @@ def _required(items: object, safe: str) -> tuple[str, ...]:
     )
 
 
+# An npm (scoped or not) or PyPI name; never starts with `-`, so it is not read as an option.
+_PACKAGE = re.compile(r"(@[\w.~-]+/)?[A-Za-z0-9][\w.~-]*")
+
+
 def _mcp_entry(raw: dict) -> RegistryEntry:
     server = raw["server"]
     if not (raw.get("_meta") or {}).get(_LATEST, {}).get("isLatest", True):
@@ -129,7 +133,7 @@ def _mcp_entry(raw: dict) -> RegistryEntry:
     out: list[Distribution] = []
     for package in server.get("packages") or []:
         kind = {"npm": "npx", "pypi": "uvx"}.get(package.get("registryType"))
-        if kind:
+        if kind and re.fullmatch(_PACKAGE, str(package.get("identifier"))):
             env = _required(package.get("environmentVariables"), r"[A-Za-z_]\w*")
             out.append(Distribution(kind, package["identifier"], package.get("version"), env=env))
     for remote in server.get("remotes") or []:

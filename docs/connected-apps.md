@@ -216,7 +216,10 @@ stored Auto skips it. After Allow it saves the app through the same code as `add
   Node if 22 or newer, else Tagalong's own, downloaded first) or `uvx` when it is installed
   (otherwise Scout is told `uv_missing`). Required environment variables are stored as `${NAME}`
   references; set the values in the brain's environment or `<TAGALONG_HOME>/.env` and restart the
-  app. Scout is told which are missing (`needs_env`).
+  app. Scout is told which are missing (`needs_env`). The first start of an `npx` app downloads
+  its package, which can exceed the 30 second connect timeout, so it may show `error` once;
+  Restart fixes it. A package name that could be read as an option (one starting with `-`) is
+  dropped from the registry listing, and `uvx` gets `--` before the package.
 - **Remote (hosted).** An http app with sign-in `oauth`: if the server asks for a sign-in, the
   browser opens through the existing flow (`app_oauth.py`). A server that requires a header
   (a token) is not added by Scout; add it by hand with a token from Home.
