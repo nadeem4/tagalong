@@ -16,17 +16,20 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
 
   useEffect(() => {
     let alive = true;
+    // A slow older reply must not overwrite a newer one.
+    let seq = 0;
     let lastRead = Number.NEGATIVE_INFINITY;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const read = (): void => {
       lastRead = Date.now();
+      const mine = ++seq;
       bridge.runningSteps().then(
         (steps) => {
-          if (alive) setStep(steps[0] ?? null);
+          if (alive && mine === seq) setStep(steps[0] ?? null);
         },
         (error: unknown) => {
           console.error('could not read running steps', error);
-          if (alive) setStep(null);
+          if (alive && mine === seq) setStep(null);
         },
       );
     };
@@ -55,7 +58,7 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
 export function JobLine({ step }: { step: RunningStep }) {
   const text = `${step.expert}: ${step.text}`;
   return (
-    <p className="bubble-jobline" data-testid="job-line" aria-live="off" title={text}>
+    <p className="bubble-status bubble-jobline" data-testid="job-line" aria-live="off" title={text}>
       {text}
     </p>
   );

@@ -982,7 +982,7 @@ const BUBBLE_CSS = `
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
 .bubble-jobline {
-  margin: 0; color: #C9CEE0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }
