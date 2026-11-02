@@ -92,7 +92,9 @@ class Jobs:
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._memory = memory
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
@@ -251,7 +253,7 @@ class Jobs:
                 job_id,
                 self._memory,
                 lambda text: mask_json(self._guards, "job_activity", text),
-                lambda: datetime.now(UTC),
+                self._now,
                 on_change=lambda: self._activity_changed(job_id),
             )
             handed_off = True
@@ -346,7 +348,7 @@ class Jobs:
             began = datetime.fromisoformat(step.at)
             event_facts["running"] = step.text
             event_facts["running_minutes"] = max(
-                0, int((datetime.now(UTC) - began).total_seconds() // 60)
+                0, int((self._now() - began).total_seconds() // 60)
             )
         self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
 
