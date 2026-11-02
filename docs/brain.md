@@ -319,25 +319,29 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   built-in default and general preferences never approve it. A tool stays in `ask` mode.
 - **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
   true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed
-  into it (a wake turn they join becomes theirs). It ends with the turn, so the next timer wake starts
+  into it (a wake turn they join becomes theirs once their message is drained into history, so a
+  nudge already in flight when they joined still asks). It ends with the turn, so the next timer wake starts
   as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
-  owner turn `tool_mode` waves it through (their message was the yes, no ask, no approvals row); on a
+  owner turn `tool_mode` waves it through (their message was the yes, no ask, no approvals row;
+  never for a `person_only` tool); on a
   wake turn it runs the normal chain (`anyone_online`, the side-check, the Allow card, with offers
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
   nobody online the nudge is refused ("Nobody was there to ask...") and Scout is told. `hand_off`
-  with an explicit `continue_job` on a wake turn runs the same chain first (source `claude_code`,
+  with an explicit `continue_job` on an owner turn skips the chain and shows the mode card as
+  always; on a wake turn it runs the same chain first (source `claude_code`,
   tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
-  and skips the mode card (Scout's row says `decided_by: "scout"`). Otherwise the mode card is the
+  and skips the mode card (Scout's row says `decided_by: "scout"`, no offer follows). Otherwise the mode card is the
   owner's question: the chain's own person step answers at once so nothing is asked twice, and the
   card pick is logged as a person row and offered like any approval. A mode the new session does not
-  offer shows the card. A new job (no `continue_job`, including an implicit continue of the folder's last session)
-  always shows the card.
+  offer shows the card without running the chain. A card that times out is logged `timed_out`; a
+  cancel leaves no row. A new job (no `continue_job`, including an implicit continue of the folder's
+  last session) always shows the card.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
   A[Scout calls tell_expert or hand_off continue_job] --> B{owner turn?}
-  B -- yes --> C[runs now, no ask, no row]
+  B -- yes --> C[tell_expert runs now, no ask, no row; hand_off shows the mode card]
   B -- no --> D{anyone online?}
   D -- no --> E[refused, row no_one]
   D -- yes --> F{preference covers it?}

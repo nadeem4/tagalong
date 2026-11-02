@@ -1985,11 +1985,45 @@ async def test_an_earlier_mode_missing_from_the_new_session_falls_back_to_the_ca
     asks = FakeAsks(Answer("Plan"), Answer("Auto"))
     rig = continuing(make_rig, asks, check)
     check.result = pref_in(rig)
+    rig.jobs._offers = offers = FakeOffers()
     first = await first_job(rig)
     rig.memory.update_job(first, mode="gone")
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
     assert len(asks.opened) == 2  # the card was shown instead of crashing
     assert rig.memory.get_job(second).mode == "auto"
+    assert check.facts == []  # no chain, so no orphan scout row
+    [row] = hand_off_rows(rig)
+    assert (row.outcome, row.decided_by) == ("approved", "person")
+    assert len(offers.considered) == 1
+
+
+async def test_a_covered_follow_up_is_not_offered_as_a_preference(make_rig):
+    check = FakeSideCheck()
+    rig = continuing(make_rig, FakeAsks(Answer("Plan")), check)
+    check.result = pref_in(rig)
+    rig.jobs._offers = offers = FakeOffers()
+    first = await first_job(rig)
+    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert offers.considered == []
+
+
+async def test_the_chain_sees_the_mode_being_reused(make_rig):
+    check = FakeSideCheck()
+    rig = continuing(make_rig, FakeAsks(Answer("Plan")), check)
+    check.result = pref_in(rig)
+    first = await first_job(rig)
+    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert check.facts[0].input == {"folder": str(rig.folder), "mode": "plan"}
+
+
+async def test_brain_started_continue_card_timeout_records_timed_out(make_rig):
+    timeout = RpcError(ErrorCode.timeout, "nobody answered the ask in time")
+    rig = continuing(make_rig, FakeAsks(Answer("Plan"), timeout), FakeSideCheck(None))
+    first = await first_job(rig)
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    [row] = hand_off_rows(rig)
+    assert (row.outcome, row.decided_by) == ("timed_out", "none")
 
 
 async def test_a_new_job_without_continue_always_shows_the_card_even_on_a_brain_turn(make_rig):

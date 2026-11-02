@@ -289,3 +289,9 @@ def test_tool_mode_stored_ask_is_waved_through_only_on_an_owner_turn():
     stored = {"t": "ask"}
     assert tool_mode(lambda: stored, lambda t: True).check(follow_up_ctx()).kind == "allow"
     assert tool_mode(lambda: stored, lambda t: False).check(follow_up_ctx()).kind == "ask"
+
+
+def test_tool_mode_asks_for_a_person_only_follow_up_even_on_an_owner_turn():
+    guard = tool_mode(lambda: {}, lambda turn_id: True)
+    ctx = tool_ctx(effect="change", default_mode="ask", follow_up=True, person_only=True)
+    assert guard.check(ctx).kind == "ask"

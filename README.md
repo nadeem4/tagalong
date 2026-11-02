@@ -87,8 +87,8 @@ one was there), for Scout's tools, connected-app tools and Claude Code's permiss
 preferences, starting with "Always ask me before risky actions". After you have allowed the same
 kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
 preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
-under that preference, then tells you which one. Anything unclear still comes to you. A nudge or follow-up you ask for in chat goes straight
-through; one Scout decides on itself (when a job goes quiet, say) is asked like any other action,
+under that preference, then tells you which one. Anything unclear still comes to you. A nudge you ask for in chat goes straight
+through (a follow-up you ask for still shows its mode card); one Scout decides on itself (when a job goes quiet, say) is asked like any other action,
 and a preference can cover it. Home's
 **Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
 

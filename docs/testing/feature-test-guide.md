@@ -353,7 +353,8 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     Scout starts on a wake asks you first (an Allow card for `tell_expert`, or the mode card for a
     `continue_job` follow-up). Save a preference that covers nudges and repeat: Scout proceeds, the
     row says it was Scout's decision, and a follow-up reuses the earlier mode with no card. Type a
-    message into a wake turn that is already running, then let Scout nudge: no ask. With the bubble
+    message into a wake turn that is already running: once it reaches Scout, the next nudge goes
+    through with no ask (a nudge already waiting on its card still asks). With the bubble
     closed (nobody online) the nudge is refused and Scout says so.
 
 ## Claude Code asks Scout first (real brain, real Claude Code)
