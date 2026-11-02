@@ -1043,11 +1043,11 @@ order), `repeat_s` (null for a one-off), `created_at`, `fired` (0 or 1) and `job
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
-| Tool           | Effect | Mode   | Does                                                                                                                                                        |
-| -------------- | ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                     |
+| Tool           | Effect | Mode   | Does                                                                                                                                                             |
+| -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                    |
 | `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
-| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                      |
+| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                           |
 
 `set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
 one of `in_minutes` (a number above 0, at most 525600, one year) or `at` (ISO 8601 with a UTC
