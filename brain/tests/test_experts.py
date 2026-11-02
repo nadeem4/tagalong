@@ -334,14 +334,33 @@ async def test_child_env_drops_the_two_key_variables_and_keeps_the_rest(tmp_path
     assert first["PATH_set"] is True
 
 
-async def test_missing_command_names_it_and_the_install_step(tmp_path):
+async def test_missing_command_is_a_fact_with_the_exe_and_no_install_hint(tmp_path):
     h = Harness()
     run = make_run(h, tmp_path, [], command=["tagalong-no-such-adapter"])
     with pytest.raises(ExpertError) as err:
         await run.start(tmp_path)
-    text = str(err.value)
-    assert "tagalong-no-such-adapter" in text
-    assert "npm install -g @agentclientprotocol/claude-agent-acp" in text
+    assert str(err.value) == "command not found: tagalong-no-such-adapter"
+
+
+@pytest.mark.parametrize(
+    ("expert_id", "gone", "kept"),
+    [
+        ("claude-acp", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"),
+        ("codex-acp", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"),
+        ("gemini", "GEMINI_API_KEY", "OPENAI_API_KEY"),
+    ],
+)
+async def test_each_expert_loses_only_its_own_keys(tmp_path, monkeypatch, expert_id, gone, kept):
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.setenv(key, "secret")
+    h = Harness()
+    run = make_run(h, tmp_path, [], expert_id=expert_id)
+    try:
+        await run.start(tmp_path)
+    finally:
+        await run.close()
+    env = json.loads((tmp_path / "log.jsonl").read_text().splitlines()[0])["env"]
+    assert env[gone] is None and env[kept] == "secret"
 
 
 async def test_kill_tree_ends_a_process_that_ignores_stdin_close():

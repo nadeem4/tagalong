@@ -219,7 +219,8 @@ async def main() -> None:
     observers = [frame_logger(log)] if log else []
     if log:
         # Lets tests prove which secrets reached the child and that the rest was inherited.
-        env = {k: os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+        keys = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY")
+        env = {k: os.environ.get(k) for k in keys}
         env["PATH_set"] = "PATH" in os.environ
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps({"env": env}) + "\n")

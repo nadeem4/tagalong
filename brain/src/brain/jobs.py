@@ -23,10 +23,12 @@ from brain.memory import Job, Memory
 from brain.offers import Offers
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
+from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
+# The approvals source and tool prefix for every expert's asks (memory.py constrains the value).
 AGENT = "claude_code"
 CANCEL = "cancel"
 HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
@@ -45,6 +47,7 @@ class Jobs:
         memory: Memory,
         asks: Asks,
         notify: Callable[[str, dict], None],
+        experts: Callable[[], list[InstalledExpert]],
         make_run: Callable[..., ExpertRun],
         max_running: int = 2,
         on_finished: Callable[[Job], object] = lambda job: None,
@@ -59,7 +62,8 @@ class Jobs:
         self._memory = memory
         self._asks = asks
         self._notify = notify
-        self._make_run = make_run  # called with the four callbacks as keywords
+        self._experts = experts  # read afresh: an install adds one while the brain runs
+        self._make_run = make_run  # called with the expert, then the four callbacks as keywords
         self._max_running = max_running
         self._on_finished = on_finished
         self._on_away = on_away  # an ask found nobody online: (job id, what it asked)
@@ -83,8 +87,27 @@ class Jobs:
     def startup(self) -> None:
         self._memory.stop_running_on_start()
 
-    async def start(self, task: str, folder: str) -> str:
-        """Hand the task to Claude Code once the user picks a mode. Returns the job id."""
+    def installed(self) -> list[InstalledExpert]:
+        return self._experts()
+
+    def _pick(self, named: str | None) -> InstalledExpert:
+        """The named expert, or the only one; the refusals are facts for the model to word."""
+        found = self._experts()
+        ids = ", ".join(e.id for e in found)
+        if named is not None:
+            match = next((e for e in found if e.id == named), None)
+            if match is None:
+                raise JobError(f"expert {named} is not installed; installed: {ids or 'none'}")
+            return match
+        if not found:
+            raise JobError("no experts installed")
+        if len(found) > 1:
+            raise JobError(f"several experts installed, name one: {ids}")
+        return found[0]
+
+    async def start(self, task: str, folder: str, expert: str | None = None) -> str:
+        """Hand the task to an expert once the user picks a mode. Returns the job id."""
+        chosen = self._pick(expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
@@ -94,6 +117,7 @@ class Jobs:
             raise JobError(f"{self._max_running} jobs are already running: {names}")
         job_id = uuid.uuid4().hex[:8]
         run = self._make_run(
+            chosen,
             on_permission=lambda request: self._permission(job_id, request),
             on_question=lambda question: self._question(job_id, question),
             on_progress=lambda text: self._progress(job_id, text),
@@ -118,7 +142,7 @@ class Jobs:
             mode_id = by_name.get(answer.option) if answer else None
             if mode_id is None:  # cancel, a timeout, or nobody online
                 raise JobError("not started")
-            self._memory.add_job(job_id, AGENT, task, str(path), mode_id)
+            self._memory.add_job(job_id, chosen.id, task, str(path), mode_id)
             self._runs[job_id] = run
             handed_off = True
             self._starting -= 1

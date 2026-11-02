@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import os
+import sys
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -28,7 +29,7 @@ from brain.setup.install import (
     install_card,
     install_expert,
 )
-from brain.setup.paths import node_dir, tools_dir
+from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
 from brain.toolbox import BrainSource, resolve_mode
@@ -613,4 +614,20 @@ async def test_a_refused_card_installs_nothing(tmp_path, ensure):
         await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert ExpertStore(tmp_path).list() == []
     assert not (tmp_path / "tools").exists()
+    await stop()
+
+
+async def test_install_refuses_when_the_registry_version_changed_after_the_card(
+    tmp_path, ensure, monkeypatch
+):
+    tools, emitted, _, stop = make_tools(tmp_path, Npm())
+    spec, handler = tools["install_expert"]
+    shown = await spec.card({"id": "claude-acp"})
+    assert shown["version"] == "0.99.1"
+    # The 24 h cache expired while the card was open, and the registry moved on.
+    cache_file(tmp_path, "acp").unlink()
+    monkeypatch.setattr(sys.modules[__name__], "ACP", ACP.replace(b"0.99.1", b"1.0.0"))
+    out = json.loads(await handler({"id": "claude-acp"}))
+    assert out == {"error": "version_changed", "detail": "0.99.1 -> 1.0.0"}
+    assert not [e for e in emitted if e.kind == "setup_done"]
     await stop()

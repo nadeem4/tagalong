@@ -49,6 +49,7 @@ def expert_setup_tools(
 ) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
     """The tools, and a `stop` that cancels running installs (each cleans up) at shutdown."""
     running: dict[str, asyncio.Task] = {}
+    shown: dict[str, str] = {}  # the version each Allow card named, until its install starts
 
     async def entry_for(args: dict) -> RegistryEntry | None:
         wanted = args.get("id")
@@ -63,7 +64,9 @@ def expert_setup_tools(
             entry = await entry_for(args)
             if entry is None:
                 raise InstallError("unknown_expert", str(args.get("id")))
-            return await install_card(entry, home, await inspect_fn(), get_json)
+            card_facts = await install_card(entry, home, await inspect_fn(), get_json)
+            shown[entry.id] = entry.version
+            return card_facts
         except (InstallError, RegistryUnavailable) as err:
             # Facts only, as the error text Scout reads; nothing was asked or installed.
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
@@ -96,6 +99,11 @@ def expert_setup_tools(
             return failure("unknown_expert", str(args.get("id")))
         if entry.id in running:
             return failure("already_installing", entry.id)
+        # The person allowed the version the card named; a registry that moved on since then
+        # needs a fresh card, not a silent install of something else.
+        was = shown.pop(entry.id, None)
+        if was is not None and was != entry.version:
+            return failure("version_changed", f"{was} -> {entry.version}")
         task = asyncio.ensure_future(run_install(entry))
         running[entry.id] = task
         task.add_done_callback(lambda _: running.pop(entry.id, None))

@@ -48,6 +48,12 @@ def _row(raw: dict) -> InstalledExpert:
     )
 
 
+def all_experts(store: "ExpertStore", custom_cmd: list[str]) -> list[InstalledExpert]:
+    """Installed experts plus the TAGALONG_EXPERT_CMD override as one expert called "custom"."""
+    custom = [InstalledExpert("custom", "Custom command", "", custom_cmd, "custom", None)]
+    return [*store.list(), *(custom if custom_cmd else [])]
+
+
 class ExpertStore:
     def __init__(self, home: Path) -> None:
         self._path = experts_file(home)

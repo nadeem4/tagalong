@@ -17,7 +17,7 @@ from anthropic import AsyncAnthropic
 from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
-from brain.experts import ExpertRun
+from brain.experts import make_run_for
 from brain.guardrails import Budget
 from brain.masking import Masker, SecretLogFilter
 from brain.memory import Memory
@@ -31,7 +31,7 @@ from brain.setup.install import NPM_TIMEOUT_S
 from brain.setup.login import LoginDriver
 from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
-from brain.setup.store import ExpertStore
+from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_tools
 from brain.tools import KeySettings, anthropic_check
@@ -75,7 +75,7 @@ async def _run() -> None:
     bodies = Bodies()
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
-    make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
+    experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
     secrets = cached(lambda: [*apps.secret_values(), os.environ.get("ANTHROPIC_API_KEY")], 1.0)
@@ -86,14 +86,13 @@ async def _run() -> None:
         bodies.notify,
         "environment" if from_environment else "file" if key else "none",
         anthropic_check,
-        config.expert_cmd,
+        lambda: all_experts(experts, config.expert_cmd),
         on_key=secrets.clear,
     )
     for handler in logging.getLogger().handlers:  # every logger reaches disk or the console here
         handler.addFilter(SecretLogFilter(masker))
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
-    experts = ExpertStore(config.data_dir)
     emit_event = lambda event: session.scheduler.emit(event)  # noqa: E731 - session exists later
     logins = LoginDriver(config.data_dir, experts, real_open_terminal, emit_event)
     expert_tools, stop_installs = expert_setup_tools(
@@ -113,7 +112,8 @@ async def _run() -> None:
         bodies,
         config.step_cap,
         memory,
-        make_run=make_run,
+        make_run=make_run_for(config.expert_timeout),
+        experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,

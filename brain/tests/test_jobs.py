@@ -20,9 +20,17 @@ from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
+from brain.setup.store import InstalledExpert
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 HANG = [{"text": "working"}, {"hang": True}]
+
+
+def installed(id="claude-acp", **kw) -> InstalledExpert:
+    base = dict(
+        id=id, name=id, version="1", command=[sys.executable, str(AGENT)], source="registry"
+    )
+    return InstalledExpert(**{**base, "logged_in": True, **kw})
 
 
 class FakeAsks:
@@ -91,6 +99,7 @@ class Rig:
         side_check=None,
         expert_timeout=30,
         guards=None,
+        experts=None,
     ) -> None:
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
@@ -106,6 +115,8 @@ class Rig:
         self.finished: list = []
         self.now = 0.0
         self.expert_timeout = expert_timeout
+        self.experts = [installed()] if experts is None else experts
+        self.expert_ids: list[str] = []
         self.approvals = (
             Approvals(self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC))
             if approvals
@@ -115,6 +126,7 @@ class Rig:
             self.memory,
             asks,
             lambda method, params: self.notes.append((method, params)),
+            lambda: self.experts,
             self.make_run,
             max_running=max_running,
             on_finished=self.finished.append,
@@ -125,9 +137,14 @@ class Rig:
             guards=guards,
         )
 
-    def make_run(self, **callbacks) -> ExpertRun:
+    def make_run(self, expert, **callbacks) -> ExpertRun:
+        self.expert_ids.append(expert.id)
         run = ExpertRun(
-            command=[sys.executable, str(AGENT)], timeout=self.expert_timeout, grace=2, **callbacks
+            command=expert.command,
+            expert_id=expert.id,
+            timeout=self.expert_timeout,
+            grace=2,
+            **callbacks,
         )
         self.runs.append(run)
         return run
@@ -251,8 +268,8 @@ async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_t
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), max_running=1)
     original = rig.make_run
 
-    def failing(**callbacks):
-        run = original(**callbacks)
+    def failing(expert, **callbacks):
+        run = original(expert, **callbacks)
 
         async def boom(mode_id, task):
             raise ConnectionError("connection lost")
@@ -276,8 +293,8 @@ async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
     rig = make_rig(FakeAsks())
     original = rig.make_run
 
-    def failing(**callbacks):
-        run = original(**callbacks)
+    def failing(expert, **callbacks):
+        run = original(expert, **callbacks)
 
         async def refuse(folder):
             raise RuntimeError("auth required")
@@ -297,8 +314,8 @@ async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_ri
     original = rig.make_run
     slow = []
 
-    def make(**callbacks):
-        run = original(**callbacks)
+    def make(expert, **callbacks):
+        run = original(expert, **callbacks)
         if not slow:
             slow.append(run)
             real = run.begin
@@ -1009,3 +1026,49 @@ async def test_expert_process_death_ends_failed_and_is_told(make_rig):
     assert rig.memory.get_job(job_id).state == "error"
     assert len(rig.finished) == 1
     assert "State: error" in job_note(rig.finished[0])
+
+
+async def test_one_installed_expert_is_used_without_naming_it(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    await rig.jobs.start("go", str(rig.folder))
+    assert rig.expert_ids == ["claude-acp"]
+
+
+async def test_two_installed_and_none_named_fails_with_the_ids(make_rig):
+    rig = make_rig(FakeAsks(), experts=[installed("claude-acp"), installed("codex-acp")])
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert "claude-acp" in str(err.value) and "codex-acp" in str(err.value)
+    assert rig.runs == [] and rig.asks.opened == []
+
+
+async def test_a_named_expert_is_used_and_recorded_as_the_rows_agent(make_rig):
+    rig = make_rig(
+        FakeAsks(Answer("Plan")), experts=[installed("claude-acp"), installed("codex-acp")]
+    )
+    job_id = await rig.jobs.start("go", str(rig.folder), "codex-acp")
+    assert rig.expert_ids == ["codex-acp"]
+    assert rig.memory.get_job(job_id).agent == "codex-acp"
+
+
+async def test_an_unknown_expert_is_a_fact_naming_what_is_installed(make_rig):
+    rig = make_rig(FakeAsks())
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder), "gemini")
+    assert "gemini" in str(err.value) and "claude-acp" in str(err.value)
+    assert rig.runs == []
+
+
+async def test_a_custom_command_alone_works_and_is_the_agent(make_rig):
+    custom = installed("custom", source="custom", logged_in=None)
+    rig = make_rig(FakeAsks(Answer("Plan")), experts=[custom])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    assert rig.memory.get_job(job_id).agent == "custom"
+
+
+async def test_no_experts_at_all_is_a_fact_not_wording(make_rig):
+    rig = make_rig(FakeAsks(), experts=[])
+    with pytest.raises(JobError) as err:
+        await rig.jobs.start("go", str(rig.folder))
+    assert str(err.value) == "no experts installed"
+    assert rig.runs == []
