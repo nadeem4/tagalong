@@ -517,7 +517,7 @@ async def anthropic_check(key: str) -> KeyCheck:
     return "ok"
 
 
-def _clean_key(raw: object) -> str | None:
+def clean_key(raw: object) -> str | None:
     """Trim a pasted key (spaces, a newline, one pair of quotes); None if it is not a key.
     Inner whitespace is refused so a key can never add a line to .env."""
     if not isinstance(raw, str):
@@ -633,7 +633,7 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
         # which is the key. Between the websocket and here: server._call validates CallParams
         # (tool and input) and answers with fixed text; Session.call_home and Toolbox.run only
         # pass the dict on, and their guards read the spec, not the values.
-        key = _clean_key(args.get("key") if isinstance(args, dict) else None)
+        key = clean_key(args.get("key") if isinstance(args, dict) else None)
         if key is None:
             raise RpcError(ErrorCode.invalid_params, "set_api_key needs a key.")
         if keys.source == "environment":

@@ -93,6 +93,59 @@ def app_params(
     }
 
 
+async def app_card(entry: RegistryEntry, home: Path, machine: Machine, get_json: GetJson) -> dict:
+    """What adding this entry would do, as facts for the Allow card (and the CLI's question):
+    host for a remote app; package, version and env names for a stdio one; any Node download.
+    Raises an InstallError fact when it cannot be added."""
+    dist = build_for(entry, machine)
+    if dist is None:
+        raise NoBuild(f"{machine.os}-{machine.arch}")
+    facts: dict = {"app": entry.id, "node_download": None}
+    if dist.kind == "remote":
+        if dist.headers:
+            raise InstallError("needs_token", ",".join(dist.headers))
+        facts["transport"] = "http"
+        facts["host"] = urlsplit(dist.url or "").hostname or ""
+        return facts
+    if dist.kind == "npx":
+        facts["node_download"] = await node_download_fact(home, machine, get_json)
+    elif dist.kind == "uvx" and shutil.which("uvx") is None:
+        raise InstallError("uv_missing", "uvx")
+    facts.update(
+        transport="stdio",
+        runs=dist.kind,
+        package=dist.package,
+        version=dist.version or entry.version,
+        env=list(dist.env),
+    )
+    return facts
+
+
+async def add_registry_app(
+    entry: RegistryEntry,
+    home: Path,
+    inspect_fn: InspectFn,
+    fetch: Fetch,
+    get_json: GetJson,
+    apps: Apps,
+    memory: Memory,
+    tokens: TokenFile,
+    notify: Callable[[str, dict], None],
+):
+    """Save the entry as an app row, fetching Node first if its package needs one. Raises
+    InstallError (already_added is checked first, so a repeat never downloads) or AppError."""
+    existing = next((r for r in memory.list_apps() if r.name == entry.name), None)
+    if existing is not None:
+        raise InstallError("already_added", entry.name, id=existing.id)
+    machine = await inspect_fn()
+    dist = build_for(entry, machine)
+    if dist is not None and dist.kind == "npx" and usable_node(home, machine) is None:
+        await node_for(home, machine, fetch, get_json, lambda step: None)  # named on the card
+        machine = await inspect_fn()
+    params = app_params(entry, dist, machine, home)
+    return await save_app(apps, memory, tokens, notify, params)
+
+
 def app_setup_tools(
     home: Path,
     registry: Registry,
@@ -122,29 +175,7 @@ def app_setup_tools(
             entry = await entry_for(args)
             if entry is None:
                 raise InstallError("unknown_app", str(args.get("id")))
-            machine = await inspect_fn()
-            dist = build_for(entry, machine)
-            if dist is None:
-                raise NoBuild(f"{machine.os}-{machine.arch}")
-            facts: dict = {"app": entry.id, "node_download": None}
-            if dist.kind == "remote":
-                if dist.headers:
-                    raise InstallError("needs_token", ",".join(dist.headers))
-                facts["transport"] = "http"
-                facts["host"] = urlsplit(dist.url or "").hostname or ""
-                return facts
-            if dist.kind == "npx":
-                facts["node_download"] = await node_download_fact(home, machine, get_json)
-            elif dist.kind == "uvx" and shutil.which("uvx") is None:
-                raise InstallError("uv_missing", "uvx")
-            facts.update(
-                transport="stdio",
-                runs=dist.kind,
-                package=dist.package,
-                version=dist.version or entry.version,
-                env=list(dist.env),
-            )
-            return facts
+            return await app_card(entry, home, await inspect_fn(), get_json)
         except (InstallError, RegistryUnavailable) as err:
             kind = err.kind if isinstance(err, InstallError) else "registry_unavailable"
             raise RpcError(ErrorCode.tool_failed, fail(kind, str(err))) from err
@@ -164,22 +195,12 @@ def app_setup_tools(
             return fail("registry_unavailable", str(err))
         if entry is None:
             return fail("unknown_app", str(args.get("id")))
-        machine = await inspect_fn()
-        dist = build_for(entry, machine)
         try:
-            name = entry.name
-            existing = next((r for r in memory.list_apps() if r.name == name), None)
-            if existing is not None:
-                return fail("already_added", name, id=existing.id)
-            if dist is not None and dist.kind == "npx" and usable_node(home, machine) is None:
-                await node_for(
-                    home, machine, fetch, get_json, lambda step: None
-                )  # named on the card
-                machine = await inspect_fn()
-            params = app_params(entry, dist, machine, home)
-            row = await save_app(apps, memory, tokens, notify, params)
+            row = await add_registry_app(
+                entry, home, inspect_fn, fetch, get_json, apps, memory, tokens, notify
+            )
         except InstallError as err:
-            return fail(err.kind, err.detail)
+            return fail(err.kind, err.detail, **({"id": err.id} if err.id else {}))
         except AppError as err:
             return fail("refused", str(err))
         out: dict = {"id": row.id, "transport": row.transport, "auth": row.auth}

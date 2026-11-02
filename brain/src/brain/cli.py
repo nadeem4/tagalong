@@ -14,31 +14,26 @@ import sys
 from collections.abc import Awaitable, Callable, MutableMapping
 from functools import partial
 from pathlib import Path
-from typing import TextIO
+from typing import NoReturn, TextIO
 
-from brain.app_tools import save_app
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.events import Event
 from brain.memory import Memory
-from brain.setup.apps import app_params
+from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
     NPM_TIMEOUT_S,
     InstallError,
-    NoBuild,
     install_card,
     install_expert,
-    node_download_fact,
-    node_for,
-    usable_node,
 )
 from brain.setup.login import LOGIN_TIMEOUT_S, Failed, LoggedIn, LoginDriver, Unknown
 from brain.setup.net import GetJson, http_fetch, real_get_json
-from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable, build_for
+from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import NoTerminal, OpenTerminal, real_open_terminal
-from brain.tools import KEY_NAME, _clean_key
+from brain.tools import KEY_NAME, clean_key
 from brain.voice.models import Fetch
 
 LOGIN_GRACE_S = 5.0  # past the driver's own wait, so its timeout event arrives first
@@ -48,8 +43,21 @@ class _Fail(Exception):
     """One fact line for the person; exits 1."""
 
 
+def _no_echo_error(parser: argparse.ArgumentParser) -> Callable[[str], NoReturn]:
+    """A usage error that never repeats stray arguments (a key must not be echoed)."""
+
+    def error(message: str) -> NoReturn:
+        if message.startswith("unrecognized arguments"):
+            message = "unrecognized arguments (a key is never taken as an argument)"
+        parser.print_usage(sys.stderr)
+        parser.exit(2, f"{parser.prog}: error: {message}\n")
+
+    return error
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="tagalong", description="Set up Tagalong on this machine.")
+    p.error = _no_echo_error(p)  # type: ignore[method-assign]
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("doctor", help="show what this machine has and what is missing")
     key = sub.add_parser("key", help="the Anthropic key").add_subparsers(dest="sub", required=True)
@@ -99,7 +107,7 @@ def main(
         elif args.cmd == "install":
             await _install(args, home, reg, machine, run, fetch, get_json, ask, out)
         elif args.cmd == "apps":
-            await _app_add(args, home, reg, machine, fetch, get_json, ask, out)
+            await _app_add(args, home, env, reg, machine, fetch, get_json, ask, out)
         else:
             await _login(args.expert_id, home, open_terminal, out)
 
@@ -160,7 +168,7 @@ async def _doctor(home: Path, env, reg: Registry, machine, out) -> None:
 
 def _key(home: Path, env, from_stdin: bool, stdin: TextIO, secret, out) -> None:
     raw = stdin.readline() if from_stdin else secret("Anthropic key: ")
-    key = _clean_key(raw)
+    key = clean_key(raw)
     if key is None:
         raise _Fail("that is not a key: nothing saved")
     # Not checked against the API here (that costs a call); the brain checks it when it uses it.
@@ -193,10 +201,8 @@ async def _install(args, home, reg, machine, run, fetch, get_json, ask, out) -> 
     seen: set[tuple] = set()
 
     def progress(step: dict) -> None:
-        mark = (
-            step["stage"],
-            (step.get("percent") or 0) // 25,
-        )  # a line per quarter, not per chunk
+        quarter = (step.get("percent") or 0) // 25  # a line per quarter, not per chunk
+        mark = (step["stage"], quarter)
         if mark not in seen:
             seen.add(mark)
             out(f"  {step['stage']}" + (f" {step['percent']}%" if "percent" in step else ""))
@@ -212,47 +218,40 @@ class _NoConnect:
         pass
 
 
-async def _app_add(args, home, reg, machine, fetch, get_json, ask, out) -> None:
+async def _app_add(args, home, env, reg, machine, fetch, get_json, ask, out) -> None:
     try:
         entry = await _entry(reg.mcp_servers(None), args.app_id, "app")
     except InstallError:  # not on the first page: ask the registry's search
         entry = await _entry(reg.mcp_servers(args.app_id), args.app_id, "app")
-    m = await machine()
-    dist = build_for(entry, m)
-    if dist is None:
-        raise NoBuild(f"{m.os}-{m.arch}")
-    params = None
-    if dist.kind == "npx":
-        download = await node_download_fact(home, m, get_json)
-        what = f"runs {dist.package}@{dist.version or entry.version} on Node"
+    card = await app_card(entry, home, await machine(), get_json)
+    if card["transport"] == "http":
+        what = f"talks to {card['host']}"
     else:
-        download = None
-        params = app_params(entry, dist, m, home)  # refuses a missing token or uvx early
-        what = f"talks to {params['config']['url']}" if dist.kind == "remote" else "runs a package"
+        what = f"runs {card['package']}@{card['version']} ({card['runs']})"
     out(f"add app {entry.id}: {what}")
+    node = card["node_download"]
     out(
-        f"  downloads Tagalong's own Node {download['version']} into {download['into']}"
-        if download
+        f"  downloads Tagalong's own Node {node['version']} into {node['into']}"
+        if node
         else "  no download"
     )
     if not _confirm(ask, args.yes):
         out("nothing added")
         return
-    if params is None:
-        if usable_node(home, m) is None:
-            await node_for(home, m, fetch, get_json, lambda step: None)
-            m = await machine()
-        params = app_params(entry, dist, m, home)
     memory = Memory(home / "tagalong.db")
-    if any(r.name == params["name"] for r in memory.list_apps()):
-        raise InstallError("already_added", params["name"])
-    row = await save_app(_NoConnect(), memory, TokenFile(home), lambda *a: None, params)
+    row = await add_registry_app(
+        entry, home, machine, fetch, get_json, _NoConnect(), memory, TokenFile(home), _ignore
+    )
     out(f"added {row.name}; it connects the next time the brain starts")
     if row.auth == "oauth":
         out("  it needs a sign in: do that from the Tagalong app, which opens a browser")
-    missing = [n for n in row.config.get("env", {}) if n != "PATH"]
+    missing = [n for n in row.config.get("env", {}) if n != "PATH" and n not in env]
     if missing:
         out(f"  set these in {home / '.env'}: {', '.join(missing)}")
+
+
+def _ignore(*_args) -> None:
+    pass
 
 
 async def _login(expert_id: str, home: Path, open_terminal: OpenTerminal, out) -> None:
@@ -284,6 +283,8 @@ async def _login(expert_id: str, home: Path, open_terminal: OpenTerminal, out) -
     out(f"finish signing in to {expert_id} in the {state.kind} that opened; waiting")
     try:
         await asyncio.wait_for(ended.wait(), LOGIN_TIMEOUT_S + LOGIN_GRACE_S)
+    except TimeoutError as err:
+        raise _Fail("failed: login timeout") from err
     finally:
         await driver.stop()
     facts = result[0].facts if result else {}

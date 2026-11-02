@@ -5,8 +5,10 @@ fake terminal and the fake ACP agent. No network, install, window or API call ha
 import asyncio
 import io
 import json
+import shutil
 import socket
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -33,7 +35,22 @@ MCP = json.dumps(
                     "version": "1.0",
                     "remotes": [{"type": "streamable-http", "url": "https://c.test/mcp"}],
                 }
-            }
+            },
+            {
+                "server": {
+                    "name": "acme/notes",
+                    "title": "notes",
+                    "version": "1.2.3",
+                    "packages": [
+                        {
+                            "registryType": "npm",
+                            "identifier": "@acme/notes",
+                            "version": "1.2.3",
+                            "environmentVariables": [{"name": "ACME_KEY", "isRequired": True}],
+                        }
+                    ],
+                }
+            },
         ]
     }
 ).encode()
@@ -68,6 +85,9 @@ class Rig:
         return CmdResult(0, "", "")
 
     async def inspect_fn(self):
+        private = node_dir(self.home) / "node.exe"  # a fake download leaves this behind
+        if private.exists():
+            return replace(self.mach, private_node=ToolVersion("22.12.0", str(private)))
         return self.mach
 
     def out(self, line="") -> None:
@@ -158,10 +178,11 @@ def test_unknown_subcommand_exits_2(tmp_path):
     assert stop.value.code == 2
 
 
-def test_the_key_is_never_accepted_as_an_argument(tmp_path):
+def test_the_key_is_never_accepted_as_an_argument(tmp_path, capsys):
     with pytest.raises(SystemExit) as stop:
         Rig(tmp_path).go("key", "set", "sk-ant-oops")
     assert stop.value.code == 2
+    assert "sk-ant-oops" not in capsys.readouterr().err  # the usage error must not echo it
 
 
 # ---- key set ----
@@ -265,6 +286,7 @@ def test_apps_add_maps_a_registry_entry_and_writes_the_app_row(tmp_path):
     rows = Memory(tmp_path / "tagalong.db").list_apps()
     assert [(r.name, r.transport, r.auth) for r in rows] == [("cloud", "http", "oauth")]
     assert "c.test" in rig.text  # the host is on the card
+    assert "https://c.test/mcp" not in rig.text  # the host only, like the Allow card
     assert "sign in" in rig.text.lower()  # the CLI cannot open the sign-in itself
 
 
@@ -279,6 +301,38 @@ def test_apps_add_twice_is_a_fact_not_a_second_row(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("apps", "add", "acme/cloud", "--yes") == 1
     assert "already_added" in rig.text
+
+
+def test_apps_add_npx_twice_never_downloads_again(tmp_path, monkeypatch):
+    calls = []
+
+    async def ensure(home, min_major, fetch, get_json, os_name, arch, on_progress):
+        calls.append(1)
+        root = node_dir(home)
+        node, npm = root / "node.exe", root / "node_modules" / "npm" / "bin" / "npm-cli.js"
+        npm.parent.mkdir(parents=True, exist_ok=True)
+        node.write_text("")
+        npm.write_text("")
+        return NodePaths(node, npm)
+
+    monkeypatch.setattr(install_mod, "ensure_node", ensure)
+    first = Rig(tmp_path)
+    assert first.go("apps", "add", "acme/notes", "--yes") == 0, first.text
+    shutil.rmtree(node_dir(tmp_path))  # Node gone again: a repeat must still not fetch it
+    rig = Rig(tmp_path)
+    assert rig.go("apps", "add", "acme/notes", "--yes") == 1
+    assert "already_added" in rig.text
+    assert len(calls) == 1
+
+
+def test_apps_add_lists_only_env_names_not_already_set(tmp_path, no_node_download):
+    rig = Rig(tmp_path)
+    assert rig.go("apps", "add", "acme/notes", "--yes") == 0
+    assert "ACME_KEY" in rig.text
+    rig = Rig(tmp_path / "b")
+    (tmp_path / "b").mkdir()
+    assert rig.go("apps", "add", "acme/notes", "--yes", env={"ACME_KEY": "x"}) == 0
+    assert "ACME_KEY" not in rig.text
 
 
 # ---- login ----
@@ -321,6 +375,21 @@ def test_login_where_no_window_can_open_prints_the_command(tmp_path, monkeypatch
     rig = Rig(tmp_path)
     assert rig.go("login", "claude-acp", open_terminal=none) == 1
     assert "run this yourself" in rig.text and "--a" in rig.text
+
+
+def test_login_that_times_out_is_a_fact_not_a_traceback(tmp_path, monkeypatch):
+    monkeypatch.delenv("FAKE_ACP_LOGGED_IN", raising=False)
+    monkeypatch.setenv("FAKE_ACP_AUTH", LOGIN_AUTH)
+    monkeypatch.setattr(cli, "LOGIN_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(cli, "LOGIN_GRACE_S", 0.0)
+    seed_expert(tmp_path)
+
+    async def window(argv, env, done_file):
+        await asyncio.sleep(5)  # the person never finishes
+
+    rig = Rig(tmp_path)
+    assert rig.go("login", "claude-acp", open_terminal=window) == 1
+    assert "login timeout" in rig.text
 
 
 def test_login_for_an_expert_not_installed_exits_1(tmp_path):
