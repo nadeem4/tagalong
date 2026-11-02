@@ -32,6 +32,11 @@ def test_job_ended_defaults():
     assert kind.wakes is True
 
 
+def test_job_quiet_is_unbatched_and_capped_at_three_an_hour():
+    kind = EVENT_KINDS["job_quiet"]
+    assert (kind.batch_seconds, kind.max_per_hour, kind.wakes) == (0, 3, True)
+
+
 def test_wake_text_lists_kind_note_time_and_facts():
     ev = Event("job_ended", {"report": "Job a1 ended."})
     text = wake_text(KIND, [(ev, AT)], "weigh it")

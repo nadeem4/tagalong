@@ -13,7 +13,7 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.events import EventKind
-from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField
+from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.guards import Hook
 from brain.masking import Masker
 from brain.memory import Memory
@@ -913,6 +913,16 @@ async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_
     for fact in ("j1", "fix the build", "C:/x", "done", "all good"):
         assert fact in text
     assert states(sent) == ["started", "ended"]
+
+
+async def test_a_quiet_job_wakes_the_model_with_the_facts():
+    model = Gate(["ok"])
+    session, _ = make(model, kinds=None)
+    join(session, "desktop")
+    await session.jobs._quiet("j1", QuietFacts(1200.0, True))
+    await idle(session)
+    text = model.seen[-1][-1]["content"][-1]["text"]
+    assert "Event: job_quiet" in text and "quiet_minutes: 20" in text and "j1" in text
 
 
 async def test_job_ended_default_batches_30_seconds():

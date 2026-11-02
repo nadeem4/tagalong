@@ -285,6 +285,18 @@ def test_per_kind_cap_holds_the_next_wake_until_the_window_frees():
     assert len(rig.starts) == 3
 
 
+def test_job_quiet_wakes_at_most_three_times_an_hour():
+    from brain.events import EVENT_KINDS
+
+    kinds = {"job_quiet": EVENT_KINDS["job_quiet"]}
+    rig = Rig(kinds=kinds)
+    rig.scheduler._notes = {"job_quiet": "note"}
+    for minute in (0, 10, 20, 30):
+        rig.t = T0 + timedelta(minutes=minute)
+        rig.scheduler.emit(ev("job_quiet", key="job:a", n=str(minute)))
+    assert len(rig.starts) == 3  # the fourth is held until the window frees
+
+
 def test_held_events_merge_into_one_wake_when_the_cap_frees():
     kinds = {"a": EventKind("a", batch_seconds=30, max_per_hour=1)}
     rig = Rig(kinds=kinds)

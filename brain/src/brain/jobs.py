@@ -19,7 +19,8 @@ from pathlib import Path
 from brain.approvals import Approvals
 from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
-from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question
+from brain.events import Event
+from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import AskCtx, Guards, Hook
 from brain.job_activity import PAGE_LIMIT, JobActivity
 from brain.masking import mask_json
@@ -90,7 +91,11 @@ class Jobs:
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
+        emit: Callable[[Event], None] = lambda event: None,
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
+        self._now = now  # wall time for activity stamps and how long a step has run
+        self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._memory = memory
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
@@ -219,6 +224,7 @@ class Jobs:
             on_progress=lambda text: self._progress(job_id, text),
             on_end=lambda state, reason, result: self._end(job_id, state, reason, result),
             on_update=lambda update: self._activity_update(job_id, update),
+            on_quiet=lambda facts: self._quiet(job_id, facts),
         )
         self._starting += 1
         slot_held = True  # released once the row exists, so a job never counts twice
@@ -247,7 +253,7 @@ class Jobs:
                 job_id,
                 self._memory,
                 lambda text: mask_json(self._guards, "job_activity", text),
-                lambda: datetime.now(UTC),
+                self._now,
                 on_change=lambda: self._activity_changed(job_id),
             )
             handed_off = True
@@ -327,6 +333,24 @@ class Jobs:
             "more": more,
             "watch": None,
         }
+
+    async def _quiet(self, job_id: str, facts: QuietFacts) -> None:
+        """A running job showed nothing new for the threshold: tell Scout the facts. Code never
+        stops or nudges it; Scout decides."""
+        event_facts: dict[str, str | int] = {
+            "job": job_id,
+            "quiet_minutes": int(facts.quiet_s // 60),
+            "adapter_alive": "yes" if facts.adapter_alive else "no",
+        }
+        activity = self._activity.get(job_id)
+        step = activity.running_step() if activity else None
+        if step is not None:
+            began = datetime.fromisoformat(step.at)
+            event_facts["running"] = step.text
+            event_facts["running_minutes"] = max(
+                0, int((self._now() - began).total_seconds() // 60)
+            )
+        self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
 
     def running_steps(self) -> list[dict]:
         """The step each running job is on now, for the bubble's one live line."""

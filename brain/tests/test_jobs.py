@@ -7,13 +7,15 @@ opens and how it maps the answers matters. No Node, no Claude Code, no network.
 import asyncio
 import json
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from fake_clock import FakeClock
 
 from brain.approvals import Approvals
 from brain.asks import Answer
+from brain.events import Event
 from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
@@ -97,7 +99,6 @@ class Rig:
         scout=None,
         approvals=False,
         side_check=None,
-        expert_timeout=30,
         guards=None,
         experts=None,
         setup_facts=None,
@@ -119,7 +120,9 @@ class Rig:
         self.runs: list[ExpertRun] = []
         self.finished: list = []
         self.now = 0.0
-        self.expert_timeout = expert_timeout
+        self.clock = FakeClock()  # the quiet clock of each run, moved by the test
+        self.emitted: list = []
+        self.wall = datetime.now(UTC)
         self.experts = [installed()] if experts is None else experts
         self.expert_ids: list[str] = []
         self.approvals = (
@@ -129,7 +132,7 @@ class Rig:
         )
         # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
         self.gate = asyncio.Event()
-        self.hosts = ExpertHosts(expert_timeout, 300, sleep=lambda s: self.gate.wait())
+        self.hosts = ExpertHosts(300, sleep=lambda s: self.gate.wait())
         self.jobs = Jobs(
             self.memory,
             asks,
@@ -144,6 +147,8 @@ class Rig:
             side_check=side_check,
             guards=guards,
             setup_facts=setup_facts,
+            emit=self.emitted.append,
+            now=lambda: self.wall,
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -151,7 +156,8 @@ class Rig:
         host = ExpertHost(expert.command, expert.id, idle_s=0, grace=2)
         run = ExpertRun(
             host=host,
-            timeout=self.expert_timeout,
+            sleep=self.clock.sleep,
+            clock=self.clock.clock,
             grace=2,
             **callbacks,
         )
@@ -1021,15 +1027,59 @@ async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
     assert "rm secret-file" not in caplog.text
 
 
-async def test_expert_that_hits_the_run_cap_ends_failed_and_is_told(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), expert_timeout=0.5)
+async def test_a_job_is_never_ended_for_taking_long(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
     job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.clock._waiters)
+    await rig.clock.advance(10 * 3600)  # ten hours later
+    assert rig.memory.get_job(job_id).state == "running"
+    assert not rig.finished and job_id in rig.jobs._runs
+
+
+STEP_THEN_HANG = [
+    {"tool": {"id": "a", "title": "Run", "kind": "execute", "input": {"command": "npm install"}}},
+    {"hang": True},
+]
+
+
+async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), STEP_THEN_HANG)
+    job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
+    rig.wall += timedelta(minutes=34)
+    await rig.clock.advance(1200)
+    assert rig.emitted == [
+        Event(
+            "job_quiet",
+            {
+                "job": job_id,
+                "quiet_minutes": 20,
+                "adapter_alive": "yes",
+                "running": "npm install",
+                "running_minutes": 34,
+            },
+            key=f"job:{job_id}",
+        )
+    ]
+    assert rig.memory.get_job(job_id).state == "running"  # code never stops a quiet job
+
+
+async def test_no_quiet_wake_after_the_job_ends(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "done"}])
+    await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.finished)
-    job = rig.memory.get_job(job_id)
-    assert (job.state, job.reason) == ("error", "timeout")
-    assert len(rig.finished) == 1  # on_finished is how Scout is woken
-    assert "State: error" in job_note(rig.finished[0]) and "timeout" in job_note(rig.finished[0])
-    assert not rig.jobs._runs  # the slot is free again
+    await rig.clock.advance(2 * 1200)
+    assert rig.emitted == []
+
+
+async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))  # HANG: one message, no tool call
+    job_id = await rig.jobs.start("fix it", str(rig.folder))
+    await until(lambda: rig.memory.activity_after(job_id, 0, 5) and rig.clock._waiters)
+    await rig.clock.advance(1200)
+    (event,) = rig.emitted
+    assert event.kind == "job_quiet" and event.key == f"job:{job_id}"
+    assert "running" not in event.facts and "running_minutes" not in event.facts
 
 
 async def test_expert_process_death_ends_failed_and_is_told(make_rig):

@@ -71,7 +71,6 @@ class Rig:
     def run(self, side: Side) -> ExpertRun:
         run = ExpertRun(
             host=self.host,
-            timeout=30,
             on_permission=side.on_permission,
             on_question=side.on_question,
             on_progress=side.on_progress,

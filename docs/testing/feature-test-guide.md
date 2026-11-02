@@ -174,7 +174,7 @@ desktop app. You need `uv` and an Anthropic key.
     answer an ask, because time inside tool calls is not counted. A new `say` works.
 14. **Action:** hand a task to an expert (`hand_off`), then close the body (quit the desktop) while
     it runs. Reopen the desktop after the expert has finished.
-    **Expected:** Scout tells you once that the expert finished (or stalled, or died). Repeat with
+    **Expected:** Scout tells you once that the expert finished (or died). Repeat with
     an expert that asks a question or for permission while the desktop is closed: when you reopen,
     Scout tells you what it asked. If the same expert asked twice while you were away, only the
     latest ask is told.
@@ -493,6 +493,14 @@ so allow about that long before expecting a report.
 4. **Action:** start a long job, stop the brain while it runs, then start the brain again.
    **Expected:** the job shows as stopped with reason "brain restarted". Scout reports it once after
    the restart (once the desktop is connected), and not again on the next restart.
+
+5. **Action:** hand off a job that works for more than 30 minutes (for example a long build).
+   **Expected:** it keeps running; nothing ends it for taking long.
+6. **Action:** stop the brain, set `TAGALONG_JOB_QUIET_MIN=1`, start it, and hand off a job that
+   runs one silent command for a few minutes (for example `sleep 180`).
+   **Expected:** after about a minute with no new step or message Scout is woken once and may say
+   it is still waiting, check on the job, or ask you. A job waiting on your permission does not
+   wake Scout this way. Scout is not woken again for that job before another minute passes.
 
 ## Scout's timers (real brain)
 

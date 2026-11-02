@@ -33,7 +33,7 @@ variable still works and is the developer path.
 | `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                             |
 | `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
 | `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                 |
-| `TAGALONG_EXPERT_TIMEOUT_S`    | `1800`            | Longest an expert run may take, in seconds                                                                                               |
+| `TAGALONG_JOB_QUIET_MIN`       | `20`              | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit        |
 | `TAGALONG_EXPERT_IDLE_S`       | `300`             | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                         |
 | `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
 | `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
@@ -650,8 +650,8 @@ adapter crash) or `stopped`.
 `ExpertRun` takes the expert's `command` and its `expert_id`; a missing executable raises
 `ExpertError("command not found: <exe>")`, a fact the model words. Experts come from
 the installed list (`setup/store.py`); `TAGALONG_EXPERT_CMD` adds one custom expert (id `custom`,
-source `custom`) beside them and works with none installed. `TAGALONG_EXPERT_TIMEOUT_S` sets the
-run limit. The override is split like a shell on Linux and macOS; on Windows backslashes are kept
+source `custom`) beside them and works with none installed. A job has no run limit; see the quiet
+clock below. The override is split like a shell on Linux and macOS; on Windows backslashes are kept
 (quote it if it has spaces). A question's `QuestionField` carries the key,
 title, the question's own text (`description`), the option labels and `multi` (a multi-select
 answers with a list of labels). The child gets the brain's environment through `setup/env.py` `expert_env(expert_id, ...)`,
@@ -714,7 +714,7 @@ output and exit codes under Jobs and tools).
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
 [Permissions and asks](#permissions-and-asks)). `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
-override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_TIMEOUT_S, TAGALONG_EXPERT_IDLE_S)`) and calls
+override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_IDLE_S, quiet_s=TAGALONG_JOB_QUIET_MIN * 60)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
 **Follow-ups.** `hand_off` takes an optional `continue_job`, the id of a finished job. The new
@@ -815,7 +815,7 @@ turn has started (a failed start leaves it unreported). At brain start every fin
 job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
 from the owner; the model decides whether to speak, and may say nothing.
 
-The person is told what an expert did even when they were away. A finished, stalled (run limit) or
+The person is told what an expert did even when they were away. A finished or
 dead expert arrives as `job_ended` and is held until a body is online, then told once. A question or
 permission an expert asked while nobody was online raises `job_question` with no question id, keyed
 by the job: nothing is open to answer, so the note tells the owner what the expert asked. The
@@ -824,20 +824,21 @@ offline ask from the same job replaces the first. This news is held in memory on
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind             | Batch window | Cap per hour | Note                                                                                                                            |
-| ---------------- | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `job_ended`      | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                 |
-| `timer`          | 0 s          | 6            | One of Scout's timers came due                                                                                                  |
-| `body_online`    | 0 s          | 2            | A body came back after 10+ minutes away                                                                                         |
-| `back`           | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                        |
-| `job_question`   | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap |
-| `choice`         | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                     |
-| `focus`          | none         | none         | Which window is in front (context, no wake)                                                                                     |
-| `tab`            | none         | none         | Which browser tab is in front (context, no wake)                                                                                |
-| `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                               |
-| `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                         |
-| `setup_done`     | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                      |
-| `setup_login`    | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                            |
+| Kind             | Batch window | Cap per hour | Note                                                                                                                                                                   |
+| ---------------- | ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `job_ended`      | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                        |
+| `job_quiet`      | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long) |
+| `timer`          | 0 s          | 6            | One of Scout's timers came due                                                                                                                                         |
+| `body_online`    | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                |
+| `back`           | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                               |
+| `job_question`   | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                        |
+| `choice`         | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                            |
+| `focus`          | none         | none         | Which window is in front (context, no wake)                                                                                                                            |
+| `tab`            | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                       |
+| `download`       | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                      |
+| `setup_progress` | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                |
+| `setup_done`     | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                                                             |
+| `setup_login`    | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                   |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
@@ -955,8 +956,29 @@ shows them as Scout does.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
   fails naming the running jobs. A result is capped at 20,000 characters and progress keeps its
   last 2,000 (it is a running tail). `list_jobs` trims each row for Scout's context: a result to
-  its first 1,000 characters and progress to its last 1,000, a trimmed end marked with `…`. The
-  run limit is `TAGALONG_EXPERT_TIMEOUT_S` (30 minutes by default).
+  its first 1,000 characters and progress to its last 1,000, a trimmed end marked with `…`. A job has
+  no run limit: code never ends a job for taking long.
+- **Quiet clock.** Each `ExpertRun` records the time of its last real activity: a new tool call,
+  a tool call that changes status or carries content or output, a message chunk or a plan. A
+  repeated status with no content is a heartbeat and does not count, so a stuck command is not
+  hidden. When `TAGALONG_JOB_QUIET_MIN` minutes (default 20) pass with none, `Jobs` emits
+  `job_quiet`, keyed by the job, and the clock restarts for a full threshold; Scout may reply
+  "wait" and is not asked again before then. Time with a permission or question ask open does
+  not count (the job waits for a person), and the clock stops when the run ends. Code only
+  reports facts; whether to check on, nudge or stop the job is Scout's call.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+    U[ACP update] -->|step, message or plan,<br/>not a heartbeat| C[quiet clock restarts]
+    C --> S[sleeper waits TAGALONG_JOB_QUIET_MIN]
+    S -->|nothing new, no ask open| E[job_quiet event]
+    E --> W[Scout decides: wait, check, nudge, ask or stop]
+    S -->|ask open| R[wait another full threshold]
+    R --> S
+    E --> S
+```
+
 - **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to
   one per 2 seconds, with no trailing notify, so a body may show slightly stale progress until
   the next change.
