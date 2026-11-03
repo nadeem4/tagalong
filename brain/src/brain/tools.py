@@ -461,7 +461,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 title=_text_arg(args, "title"),
             )
         except JobError as err:
-            # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
+            # Setup facts (ids and numbers) are facts only; Scout words them. Else the plain line.
             return json.dumps(err.facts) if err.facts else str(err)
         # Facts only; Scout words them. Without a continue, the session is simply fresh.
         return json.dumps(

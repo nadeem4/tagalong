@@ -18,8 +18,8 @@ _INSTALLABLE = ("npx", "binary")  # the kinds install_expert can place; others a
 
 
 async def setup_facts(registry: Registry, inspect_fn: InspectFn) -> dict:
-    """What a refused hand-off needs for Scout to recommend a fix: this machine in short tokens,
-    and the registry experts that can be set up here. Offline with no cache: none, `stale`."""
+    """Facts for a refused hand-off, no advice: this machine in short tokens and the registry
+    experts that can be set up here. Offline with no cache: none, `stale`."""
     machine = await inspect_fn()
     try:
         listing = await registry.acp_agents()

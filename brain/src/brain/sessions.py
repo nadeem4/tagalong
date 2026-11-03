@@ -43,6 +43,7 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
+from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
     interruption_block,
@@ -123,6 +124,8 @@ class Session:
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
     ) -> None:
         self._model = model
+        self._apps_live = apps  # read each turn for the capability picture
+        self._experts_live = experts or (lambda: [])
         # Set by main when voice is built; None answers `listen` with method_not_found.
         self.voice: VoiceHooks | None = None
         self._budget = budget
@@ -549,6 +552,7 @@ class Session:
                     self._latest("tab"),
                     self._latest("download"),
                     prefs,
+                    self._capabilities(),
                 ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
@@ -566,6 +570,24 @@ class Session:
         self._task = task
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead))
         return turn_id
+
+    def _capabilities(self) -> str:
+        """The picture of what Scout can do now, from live state, read once per system prompt."""
+        builtin = [s.name for s in self.toolbox.sources[0].specs() if "scout" in s.audience]
+        bodies = [
+            BodyCaps(b.id, b.kind, [t.name for t in self._bodies.tools(b.id)])
+            for b in self._bodies.online()
+        ]
+        apps = []
+        if self._apps_live is not None:
+            for app_id in self._apps_live.ids():
+                if self._apps_live.status(app_id).state != "connected":
+                    continue
+                tools = self._apps_live.tools(app_id)
+                purpose = next((t.description for t in tools if t.description), "")
+                apps.append(AppCaps(app_id, self._apps_live.name(app_id), purpose))
+        experts = [ExpertCaps(e.id, e.logged_in) for e in self._experts_live()]
+        return capability_picture(builtin, bodies, apps, experts)
 
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:

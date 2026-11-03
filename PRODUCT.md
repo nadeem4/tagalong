@@ -76,6 +76,9 @@ its result.
 ## Capabilities and Constraints
 
 - Scout thinks with an Anthropic API key set in the brain's environment.
+- Scout always knows what it can do (its own tools, each body's tools, your connected apps and
+  your experts) and routes by it: it answers, or uses its tools and apps, and hands over to an
+  expert only for a long or many-stepped job. It never assumes an expert has its own apps.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,

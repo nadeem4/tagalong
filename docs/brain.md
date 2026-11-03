@@ -89,7 +89,8 @@ the total can run a little low.
 | `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
 | `brain/src/brain/tools.py`          | The brain's own tools (memory, timer, Home incl. the key and limit tools, expert and question tools: `answer_expert`, `pass_question`) as specs and handlers for `BrainSource`                                                                                                             |
 | `brain/src/brain/mind/soul.md`      | Scout's character, the start of the system prompt                                                                                                                                                                                                                                          |
-| `brain/src/brain/mind/prompt.py`    | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                                                                                                                                              |
+| `brain/src/brain/mind/capabilities.py` | The capability picture: names and one-line purposes of what Scout can do now |
+| `brain/src/brain/mind/prompt.py`    | The system prompt (soul, local time, online bodies, capability picture, "What you know") and `say` content blocks                                                                                                                                                                                              |
 | `brain/src/brain/mind/turn.py`      | The thinking loop and the Anthropic streaming call (the client is built from the key on demand)                                                                                                                                                                                            |
 | `brain/src/brain/bodies.py`         | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                                                                                                                                                 |
 | `brain/src/brain/server.py`         | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer                                                                                                                           |
@@ -160,7 +161,7 @@ flowchart TD
 - A `say` while a turn runs joins it: the result has `joined: true` and the message is folded
   into the next step.
 - At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
-  prompt from Scout's soul, that "What you know" block, the local time (with its UTC offset), and the bodies online.
+  prompt from Scout's soul, that "What you know" block, the local time (with its UTC offset), the bodies online, and the capability picture.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
   `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`) and every online body's
@@ -289,6 +290,22 @@ report on a job wake all use this one path. The stored job report stays whole in
 Reports tab shows it in full. The newest 200 stored outputs are kept; older ones go at startup. The
 cap is a transport guardrail only: how to present a long result (gist first, detail on request, the
 short version in voice) is guidance in `mind/soul.md`, not code.
+
+## Capability picture and routing
+
+`mind/capabilities.py` builds `capability_picture(builtin, bodies, apps, experts)`, a short block
+at the end of the system prompt headed "What you can do:". It lists the brain's own tool names,
+each online body's tool names, each connected app with a one-line purpose (the first line of its
+first tool description; none if it has none) and each installed expert with its login state. Names
+and one-line purposes only: no schemas and no focus facts, sorted and capped at 40 lines, so the
+prompt stays small and byte-identical while the state is unchanged (cache friendly).
+`Session._capabilities()` reads live state on each prompt build.
+
+The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
+tools, a body's tools and connected apps; hand over to an expert only when one is installed and
+the job is long or many-stepped. An expert is never assumed to have its own Gmail or Calendar. When
+nothing covers a request Scout says what is missing and offers a connect with `choose`. The old
+"recommend an expert" path is gone, and the `hand_off` refusal facts carry no advice.
 
 ## Permissions and asks
 
@@ -1048,9 +1065,9 @@ line: `{problem, expert?, needs: {node_major: 22}, machine: {os, arch, node, pri
 claude_code}, candidates: [registry ids buildable here], stale}`. `problem` is `no_expert`,
 `unknown_expert`, `expert_not_logged_in` (the saved record says so; nothing is spawned) or
 `expert_missing_node` (the expert runs on a Node that is gone). All values are ids, versions and
-numbers, never sentences. Offline with no cache, `candidates` is empty and `stale` is true. Scout
-looks, recommends with `choose` and installs (`install_expert`, `install_app`) as `mind/soul.md`
-says; the Allow card still opens whatever preference is saved. The
+numbers, never sentences. Offline with no cache, `candidates` is empty and `stale` is true. They
+are facts only: `mind/soul.md` does not tell Scout to push an expert as the fix. Installs
+(`install_expert`, `install_app`) still open the Allow card whatever preference is saved. The
 row's `agent` is the expert id; its asks are logged and grouped by that id (`codex-acp:<folder>`; Claude Code keeps `claude_code:<folder>`), so a preference saved for one expert never approves another's. Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
 result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
 shows them as Scout does.
