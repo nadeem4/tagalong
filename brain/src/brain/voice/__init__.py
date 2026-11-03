@@ -1,7 +1,8 @@
 """The seam between the brain and its voice models.
 
 The server routes `listen`, `mic`, `unlisten` and `hush` here; the session reports spoken turns
-(`spoken`, `reply`, `turn_ended`); Home asks for a `sample`. Neither knows about models.
+(`spoken`, `reply`, `turn_ended`) and asks for a turn's `sentences`;
+Home asks for a `sample`. Neither knows about models.
 """
 
 from typing import Literal, Protocol
@@ -28,5 +29,7 @@ class VoiceHooks(Protocol):
     def reply(self, turn: str, body_id: str | None, params: dict) -> None: ...
 
     def turn_ended(self, turn: str) -> None: ...
+
+    def sentences(self, turn: str) -> list[str]: ...
 
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes: ...

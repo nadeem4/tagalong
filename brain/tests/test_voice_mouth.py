@@ -293,3 +293,84 @@ async def test_sample_is_a_wav_made_with_the_given_voice():
     wav = await m.sample("Hello there.", "af_bella", 0.9)
     assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE"
     assert tts.calls == [("Hello there.", "af_bella", 0.9)]
+
+
+async def test_speech_frames_are_numbered_from_one():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO}"})
+    m.reply("t", {"done": True})
+    await settle()
+    out = sent.speech()
+    assert [p.get("n") for p in out] == [1, 2, None]
+
+
+async def test_sentences_returns_what_was_sent_in_order():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO}"})
+    m.reply("t", {"done": True})
+    await settle()
+    assert m.sentences("t") == [ONE, TWO]
+
+
+async def test_sentences_survive_hush():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO}"})
+    m.reply("t", {"done": True})
+    await settle()
+    m.hush("d")
+    await settle()  # the cancelled task has ended and dropped the turn
+    assert m.sentences("t") == [ONE, TWO]
+
+
+async def test_sentences_of_an_unknown_turn_is_empty():
+    m, _ = mouth(Sent())
+    assert m.sentences("nope") == []
+
+
+async def test_only_the_newest_three_turns_are_kept():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    for i in range(4):
+        m.spoken(f"t{i}", "d", None, None)
+        m.reply(f"t{i}", {"delta": f"{ONE} "})
+        m.reply(f"t{i}", {"done": True})
+        await settle()
+    assert m.sentences("t0") == []
+    assert m.sentences("t3") == [ONE]
+
+
+async def test_sentences_include_those_made_but_not_yet_sent():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    await asyncio.sleep(0.01)
+    assert m.sentences("t")[:2] == [ONE, TWO]
+    assert len(m.sentences("t")) == 3
+    m.hush("d")
+
+
+async def test_unsent_sentences_survive_hush_once_the_cancelled_task_ended():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    await asyncio.sleep(0.01)
+    before = m.sentences("t")
+    assert len(before) == 3
+    m.hush("d")
+    await settle()
+    assert m.sentences("t") == before  # sent and unsent alike, each once

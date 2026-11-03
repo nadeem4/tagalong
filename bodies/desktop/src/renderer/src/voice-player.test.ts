@@ -1,12 +1,6 @@
-/** Tests for the system-voice pick, the speech player and onSystemVoice. */
+/** Tests for the system-voice pick, and the speech player. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  onSystemVoice,
-  pickSystemVoice,
-  previewVoice,
-  SpeechPlayer,
-  speakWithSystem,
-} from './voice-player';
+import { pickSystemVoice, previewVoice, SpeechPlayer, speakWithSystem } from './voice-player';
 
 const voice = (name: string, lang: string) => ({ name, lang });
 
@@ -62,13 +56,15 @@ function player(mouth: 'kokoro' | 'system' = 'kokoro') {
   const fake = fakeEngines();
   const states: { speaking: boolean; answering: boolean }[] = [];
   const hush = vi.fn();
+  const outputs: string[] = [];
   const p = new SpeechPlayer({
     engines: fake.engines,
     mouth: () => mouth,
+    output: { pause: () => void outputs.push('pause'), resume: () => void outputs.push('resume') },
     hush,
     onState: (state) => states.push(state),
   });
-  return { ...fake, p, states, hush };
+  return { ...fake, p, states, hush, outputs };
 }
 
 describe('SpeechPlayer', () => {
@@ -120,9 +116,83 @@ describe('SpeechPlayer', () => {
     await tick();
     expect(played).toEqual(['pcm@24000', 'pcm@24000']);
   });
+
+  describe('pause and what was heard', () => {
+    const sentence = (turn: string, n: number, text: string) => ({
+      turn,
+      n,
+      text,
+      pcm: 'AA==',
+      sampleRate: 24000,
+    });
+
+    it('pause holds the sound and speaking turns false; resume carries on', async () => {
+      const { p, outputs, states } = player();
+      p.enqueue(sentence('t1', 1, 'One.'));
+      await tick();
+      expect(p.speaking).toBe(true);
+      p.pause();
+      expect(outputs).toEqual(['pause']);
+      expect(p.speaking).toBe(false);
+      p.resume();
+      expect(outputs).toEqual(['pause', 'resume']);
+      expect(p.speaking).toBe(true);
+      // The panel's state stays "speaking" through a pause: the answer has not ended.
+      expect(states.at(-1)?.speaking).toBe(true);
+    });
+
+    it('counts the sentences played to the end, not the one cut or the ones waiting', async () => {
+      const { p, finish } = player();
+      p.enqueue(sentence('t1', 1, 'One.'));
+      p.enqueue(sentence('t1', 2, 'Two.'));
+      p.enqueue(sentence('t1', 3, 'Three.'));
+      await tick();
+      finish();
+      await tick();
+      p.pause();
+      expect(p.interruption()).toEqual({ turn: 't1', heard: 1 });
+      p.stop();
+      await tick();
+      expect(p.interruption()).toBeNull();
+    });
+
+    it('gives the sentence playing and the one before, never the queued ones', async () => {
+      const { p, finish } = player();
+      p.enqueue(sentence('t1', 1, 'One.'));
+      p.enqueue(sentence('t1', 2, 'Two.'));
+      p.enqueue(sentence('t1', 3, 'Three.'));
+      await tick();
+      expect(p.text()).toBe('One.');
+      finish();
+      await tick();
+      expect(p.text()).toBe('One. Two.');
+      finish();
+      await tick();
+      expect(p.text()).toBe('Two. Three.');
+      p.enqueue(sentence('t2', 1, 'Fresh.'));
+      expect(p.text()).toBe('Fresh.');
+    });
+
+    it('stop clears the pause so the next sentence plays', async () => {
+      const { p, outputs, played } = player();
+      p.enqueue(sentence('t1', 1, 'One.'));
+      await tick();
+      p.pause();
+      p.stop();
+      expect(outputs).toEqual(['pause', 'resume']);
+      p.enqueue(sentence('t2', 1, 'Next.'));
+      await tick();
+      expect(played).toHaveLength(2);
+      expect(p.speaking).toBe(true);
+    });
+
+    it('has nothing to report when nothing was spoken', () => {
+      expect(player().p.interruption()).toBeNull();
+    });
+  });
 });
 
-describe('speakWithSystem and onSystemVoice', () => {
+describe('speakWithSystem', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   function stubSpeech() {
@@ -150,21 +220,6 @@ describe('speakWithSystem and onSystemVoice', () => {
     expect(spoken[0]?.rate).toBe(1.3);
     spoken[0]?.onend();
     await playing;
-  });
-
-  it('says when the system voice starts and stops speaking, and a listener let go hears nothing', async () => {
-    const spoken = stubSpeech();
-    const heard: boolean[] = [];
-    const gone: boolean[] = [];
-    const off = onSystemVoice((speaking) => heard.push(speaking));
-    onSystemVoice((speaking) => gone.push(speaking))();
-    const playing = speakWithSystem('Hello there.', new AbortController().signal, 1);
-    expect(heard).toEqual([true]);
-    spoken[0]?.onend();
-    await playing;
-    expect(heard).toEqual([true, false]);
-    expect(gone).toEqual([]);
-    off();
   });
 });
 

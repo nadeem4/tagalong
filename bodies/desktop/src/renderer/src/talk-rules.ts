@@ -2,7 +2,7 @@
  * The pure rules behind talk.ts: when a question is over, what words to show, and saying a
  * microphone or ears failure once per run of failures, and when the follow-up window opens.
  * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes,
- * HeardInbox and NOTHING_HEARD.
+ * HeardInbox, CutMemory and NOTHING_HEARD.
  */
 import { STATUS_WORDS, addressedToScout } from '@tagalong/ui/shapes';
 import type { ListenMode } from '@tagalong/ui/shapes';
@@ -129,6 +129,37 @@ export class EarsNotes {
   }
 }
 
+/** What was heard of Scout's turn when the person spoke over it. */
+export interface Interrupted {
+  turn: string;
+  heard: number;
+}
+
+/**
+ * What the person heard of Scout when the talk key or mic button cut it off. The player
+ * forgets its turn the moment it stops, so it is read first and kept here for the question
+ * that follows. A second press, after the player is already quiet, keeps the first.
+ */
+export class CutMemory {
+  #kept: Interrupted | null = null;
+
+  /** Read before the player stops; null (nothing was playing) keeps what is held. */
+  note(heard: Interrupted | null): void {
+    this.#kept = heard ?? this.#kept;
+  }
+
+  /** Spent by the question that follows; `fallback` is what a paused player reports. */
+  take(fallback: Interrupted | null = null): Interrupted | undefined {
+    const heard = this.#kept ?? fallback;
+    this.#kept = null;
+    return heard ?? undefined;
+  }
+
+  clear(): void {
+    this.#kept = null;
+  }
+}
+
 /**
  * Where each heard question goes: to the bubble listening for it, or held until one does.
  * The bubble is not there while a one-line remark takes its place, nor while Scout is
@@ -137,25 +168,25 @@ export class EarsNotes {
  * replaces one not yet asked.
  */
 export class HeardInbox {
-  readonly #hearers = new Set<(text: string) => void>();
-  #held: string | null = null;
+  readonly #hearers = new Set<(text: string, interrupted?: Interrupted) => void>();
+  #held: { text: string; interrupted?: Interrupted } | null = null;
 
   /** The bubble listens; a question held is asked now, once. */
-  subscribe(hear: (text: string) => void): () => void {
+  subscribe(hear: (text: string, interrupted?: Interrupted) => void): () => void {
     this.#hearers.add(hear);
     const held = this.#held;
     this.#held = null;
-    if (held !== null) hear(held);
+    if (held !== null) hear(held.text, held.interrupted);
     return () => void this.#hearers.delete(hear);
   }
 
   /** True when a bubble took it; false when it is held for the next one. */
-  deliver(text: string): boolean {
+  deliver(text: string, interrupted?: Interrupted): boolean {
     if (this.#hearers.size === 0) {
-      this.#held = text;
+      this.#held = { text, ...(interrupted !== undefined ? { interrupted } : {}) };
       return false;
     }
-    for (const hear of this.#hearers) hear(text);
+    for (const hear of this.#hearers) hear(text, interrupted);
     return true;
   }
 }

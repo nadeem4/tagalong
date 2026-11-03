@@ -42,7 +42,9 @@ export interface BubbleTalk {
   /** Listening to the microphone, or turning what it heard into text. */
   state: 'idle' | 'listening' | 'hearing';
   /** Subscribes to each spoken question as it is heard; returns an unsubscribe function. */
-  onHeard: (handler: (text: string) => void) => () => void;
+  onHeard: (
+    handler: (text: string, interrupted?: { turn: string; heard: number }) => void,
+  ) => () => void;
   /** Subscribes to each start of listening, for barge-in; returns an unsubscribe function. */
   onListen?: (handler: () => void) => () => void;
   /** A line about the microphone: nothing heard, the model downloading, a failure. */
@@ -393,6 +395,7 @@ export function CompanionBubble({
     asSpoken = false,
     heard = asSpoken,
     withDrop = false,
+    interrupted?: { turn: string; heard: number },
   ): void => {
     keepShown();
     healthRun.current += 1;
@@ -416,6 +419,7 @@ export function CompanionBubble({
         ...(asSpoken ? { spoken: true } : {}),
         // Only a button on the drop card sends the dropped item, never a spoken ask.
         ...(withDrop ? { drop: true } : {}),
+        ...(interrupted !== undefined ? { interrupted } : {}),
       })
       .then(({ turnId }) => {
         mine.current ??= turnId;
@@ -469,12 +473,19 @@ export function CompanionBubble({
   };
 
   // A spoken question arrives from the host: ask it, once per new `seq`.
-  const askHeard = useEffectEvent((text: string) => {
+  const askHeard = useEffectEvent((text: string, interrupted?: { turn: string; heard: number }) => {
     if (text.trim() === '') return;
-    submit(text, snapshot === undefined ? undefined : without(snapshot, removed), true);
+    submit(
+      text,
+      snapshot === undefined ? undefined : without(snapshot, removed),
+      true,
+      true,
+      false,
+      interrupted,
+    );
   });
   const onHeard = talk?.onHeard;
-  useEffect(() => onHeard?.((text) => askHeard(text)), [onHeard]);
+  useEffect(() => onHeard?.((text, interrupted) => askHeard(text, interrupted)), [onHeard]);
 
   // Barge-in: talking over Scout stops the answer still streaming, not only its voice,
   // and nothing more of it is said.
