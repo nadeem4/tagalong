@@ -72,4 +72,26 @@ def test_output_is_capped_and_stable():
     out = picture(apps=apps)
     assert len(out.splitlines()) <= 40
     assert out == picture(apps=list(reversed(apps)))
-    assert "more" in out.splitlines()[-1]
+    assert "more apps" in out
+    assert out.splitlines()[-1] == "Experts: none installed"
+    assert "Built in: none" in out
+
+
+def test_experts_and_builtin_survive_many_apps():
+    apps = [AppCaps(f"a{i:03}", f"App {i}", "x") for i in range(200)]
+    out = picture(builtin=["remember"], apps=apps, experts=[ExpertCaps("claude-acp", True)])
+    assert "- claude-acp: signed in" in out
+    assert "Built in: remember" in out
+
+
+def test_long_lines_are_cut_whole_never_mid_name():
+    names = [f"tool_number_{i:03}" for i in range(60)]
+    out = picture(builtin=names, bodies=[BodyCaps("desk", "desktop", names)])
+    for line in out.splitlines():
+        assert len(line) <= 500
+        assert not line.endswith(("tool_number_0", "tool_n"))
+    built = next(ln for ln in out.splitlines() if ln.startswith("Built in:"))
+    assert built.endswith(("...", names[-1]))
+    assert all(
+        n in names for n in built.removeprefix("Built in: ").removesuffix(", ...").split(", ")
+    )

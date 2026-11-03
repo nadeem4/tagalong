@@ -111,7 +111,7 @@ def system_prompt(
     known = [f"What you know:\n{know}"] if know else []
     prefs = [preferences] if preferences else []
     caps = [capabilities] if capabilities else []
-    return "\n\n".join([_soul(), *known, *prefs, now_line, online, *caps])
+    return "\n\n".join([_soul(), *known, *prefs, *caps, online, now_line])
 
 
 def _text(text: str) -> dict[str, Any]:

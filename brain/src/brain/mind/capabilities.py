@@ -6,7 +6,7 @@ cacheable. No schemas and no focus facts: those change every turn and would brea
 
 from dataclasses import dataclass
 
-MAX_LINES = 40
+MAX_APPS = 20  # apps listed before "and K more"; every other group is always shown
 LINE_CHARS = 160
 
 
@@ -38,24 +38,38 @@ def _first_line(text: str) -> str:
     return lines[0].strip()[:LINE_CHARS] if lines else ""
 
 
+def _names(prefix: str, names: list[str]) -> str:
+    """`prefix` plus sorted names, cut at a comma (never mid-name) to stay one short line."""
+    out, rest = prefix, sorted(names)
+    for i, name in enumerate(rest):
+        piece = name if i == 0 else f", {name}"
+        if len(out) + len(piece) > LINE_CHARS * 3:
+            return out + ", ..."
+        out += piece
+    return out if rest else out + "none"
+
+
 def capability_picture(
     builtin: list[str],
     bodies: list[BodyCaps],
     apps: list[AppCaps],
     experts: list[ExpertCaps],
 ) -> str:
-    lines = ["What you can do:"]
-    built = ", ".join(sorted(builtin)) or "none"
-    lines.append(f"Built in: {built}"[: LINE_CHARS * 3])
+    lines = ["What you can do:", _names("Built in: ", builtin)]
     if bodies:
         lines.append("Bodies (what each can do on screen):")
-        for b in sorted(bodies, key=lambda b: b.id):
-            lines.append(f"- {b.id} ({b.kind}) tools: {', '.join(sorted(b.tools))}")
+        lines.extend(
+            _names(f"- {b.id} ({b.kind}) tools: ", b.tools)
+            for b in sorted(bodies, key=lambda b: b.id)
+        )
     if apps:
         lines.append("Apps connected:")
-        for a in sorted(apps, key=lambda a: a.id):
+        ordered = sorted(apps, key=lambda a: a.id)
+        for a in ordered[:MAX_APPS]:
             purpose = _first_line(a.purpose)
             lines.append(f"- {a.name} ({a.id}): {purpose}" if purpose else f"- {a.name} ({a.id})")
+        if len(ordered) > MAX_APPS:
+            lines.append(f"... and {len(ordered) - MAX_APPS} more apps not listed")
     else:
         lines.append("Apps connected: none")
     if experts:
@@ -67,7 +81,4 @@ def capability_picture(
         )
     else:
         lines.append("Experts: none installed")
-    if len(lines) > MAX_LINES:
-        hidden = len(lines) - (MAX_LINES - 1)
-        lines = [*lines[: MAX_LINES - 1], f"... and {hidden} more lines not shown"]
     return "\n".join(lines)
