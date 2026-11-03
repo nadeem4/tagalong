@@ -329,7 +329,7 @@ class Toolbox:
         record("approved")
         if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
-        elif self._offers is not None:
+        elif self._offers is not None and not spec.person_only:
             self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
