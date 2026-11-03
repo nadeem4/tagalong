@@ -48,7 +48,7 @@ export interface FakeHostBridge extends HostBridge {
   readonly limitsSet: readonly number[];
   readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
-  readonly permissionSets: readonly { tool: string; mode: 'ask' | 'auto' }[];
+  readonly permissionSets: readonly { tool: string; mode: 'off' | 'ask' | 'auto' }[];
   /** Home's Jobs rows; a test may swap them. */
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
@@ -146,7 +146,7 @@ export function createFakeHostBridge(
   const signIns: string[] = [];
   const removedConnections: string[] = [];
   const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
-  const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
+  const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];

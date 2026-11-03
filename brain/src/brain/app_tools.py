@@ -76,6 +76,7 @@ def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
         tool.description or "",
         tool.input_schema,
         effect=effect,
+        default_mode="ask",  # an app's own hints never open it: the person decides
         locked=locked,
     )
 

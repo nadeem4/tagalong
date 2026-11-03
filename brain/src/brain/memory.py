@@ -236,6 +236,16 @@ MIGRATIONS = (
         at TEXT NOT NULL
     );
     """,
+    # A tool can be Off (the third per-tool state): widen the CHECK, keeping every stored row.
+    """
+    CREATE TABLE permissions_new(
+        tool TEXT PRIMARY KEY,
+        mode TEXT NOT NULL CHECK(mode IN ('off','ask','auto'))
+    );
+    INSERT INTO permissions_new(tool, mode) SELECT tool, mode FROM permissions;
+    DROP TABLE permissions;
+    ALTER TABLE permissions_new RENAME TO permissions;
+    """,
 )
 
 DROPPED_MARKER = "[older steps dropped]"

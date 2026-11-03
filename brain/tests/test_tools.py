@@ -23,6 +23,7 @@ from brain.tools import (
     expert_tools,
     format_hits,
     home_tools,
+    output_tools,
     preference_tools,
     question_tools,
     timer_tools,
@@ -662,6 +663,7 @@ async def test_list_permissions_marks_locked_and_mode(home):
         "locked",
         "self_asks",
         "online",
+        "source",
     }
     assert by_name["remember"]["self_asks"] is False
     assert by_name["desktop__type_text"]["locked"] is True
@@ -1318,3 +1320,81 @@ async def test_list_jobs_shows_scouts_result(home, mem):
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
     assert rows["j1"]["scout_result"] == "R" * 1000 + "…"
     assert rows["j2"]["scout_result"] is None
+
+
+async def test_list_permissions_names_each_tools_source(home):
+    declare(home.bodies, "desktop", ("see_screen", "read", None))
+    by_name = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert by_name["remember"]["source"] == "built_in"
+    assert by_name["desktop__see_screen"]["source"] == "body:desktop"
+
+
+async def test_set_permission_off_hides_the_tool_and_lists_it_off(home):
+    declare(home.bodies, "desktop", ("see_screen", "read", None))
+    await home.run("set_permission", {"tool": "desktop__see_screen", "mode": "off"})
+    assert home.sent[-1] == ("changed", {"what": "permissions"})
+    assert "desktop__see_screen" not in [t["name"] for t in home.box.model_tools()]
+    row = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}[
+        "desktop__see_screen"
+    ]
+    assert row["mode"] == "off"
+
+
+async def test_set_permission_off_works_while_the_body_is_offline(home):
+    declare(home.bodies, "desktop", ("see_screen", "read", None))
+    drop(home.bodies, "desktop")
+    await home.run("set_permission", {"tool": "desktop__see_screen", "mode": "off"})
+    declare(home.bodies, "desktop", ("see_screen", "read", None))
+    assert "desktop__see_screen" not in [t["name"] for t in home.box.model_tools()]
+
+
+async def test_set_permission_off_survives_a_new_memory_on_the_same_file(tmp_path):
+    first = Memory(tmp_path / "m.db")
+    first.set_permission_mode("remember", "off")
+    first.close()
+    again = Memory(tmp_path / "m.db")
+    box = Toolbox(
+        [BrainSource(brain_tools(again))], again.permission_modes, again.set_permission_mode
+    )
+    assert "remember" not in [t["name"] for t in box.model_tools()]
+    again.close()
+
+
+# Spec table, built-in rows: memory, timers, read_output and jobs run without asking. Pinned
+# against the real declared specs so a changed default fails here.
+def test_built_in_defaults_match_the_spec_table(mem):
+    jobs = FakeJobs()
+    tools = (
+        brain_tools(mem)
+        + output_tools(OutputStore(mem, Guards(), 10))
+        + timer_tools(mem, _FakeTimers(), lambda: _T0)
+        + expert_tools(jobs, lambda: True)
+    )
+    box = Toolbox([BrainSource(tools)], mem.permission_modes, mem.set_permission_mode)
+    modes = {s.name: box.mode(s) for s in box.sources[0].specs() if "scout" in s.audience}
+    auto = {
+        "remember", "recall", "forget", "read_output", "set_timer", "list_timers",
+        "cancel_timer", "list_jobs", "job_report", "watch_job", "close_job",
+        "set_job_result", "list_experts", "hand_off", "stop_job",
+    }  # fmt: skip
+    assert {n: modes[n] for n in auto} == {n: "auto" for n in auto}
+
+
+def test_app_tools_default_to_ask_even_when_read_only(mem):
+    from test_app_tools import tool
+
+    from brain.app_tools import spec_for
+
+    box = Toolbox([], mem.permission_modes, mem.set_permission_mode)
+    assert box.mode(spec_for("lin", tool("list_issues", read_only=True))) == "ask"
+
+
+async def test_list_permissions_marks_an_app_tool_source(home):
+    from test_app_tools import FakeApps, tool
+
+    from brain.app_tools import AppSource
+
+    home.box.sources.append(AppSource(FakeApps([tool("list_issues", read_only=True)])))
+    by_name = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert by_name["lin__list_issues"]["source"] == "app:lin"
+    assert by_name["lin__list_issues"]["mode"] == "ask"

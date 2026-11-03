@@ -6,7 +6,14 @@ They guard the model_call hook; side-check and offer calls are never counted as 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from brain.builtin_guards import daily_budget, spend_guards, step_cap, tool_mode, wake_caps
+from brain.builtin_guards import (
+    daily_budget,
+    resolve_mode,
+    spend_guards,
+    step_cap,
+    tool_mode,
+    wake_caps,
+)
 from brain.events import EventKind
 from brain.guards import EmitCtx, Hook, ModelCallCtx, ToolCallCtx
 from brain.toolbox import ToolSpec
@@ -89,6 +96,21 @@ def test_tool_mode_default_mode_beats_effect():
     assert (
         tool_mode(lambda: {}).check(tool_ctx(effect="change", default_mode="auto")).kind == "allow"
     )
+
+
+def test_resolve_mode_off_beats_every_flag():
+    for kw in ({}, {"self_asks": True}, {"person_only": True}, {"locked": True}):
+        assert resolve_mode(ToolSpec("t", "d", {"type": "object"}, **kw), "off") == "off"
+
+
+def test_tool_mode_blocks_an_off_tool_with_a_plain_code():
+    v = tool_mode(lambda: {"t": "off"}).check(tool_ctx(effect="read"))
+    assert (v.kind, v.code) == ("block", "denied")
+    assert v.reason == "t is turned off by the owner."
+
+
+def test_tool_mode_off_does_not_block_home():
+    assert tool_mode(lambda: {"t": "off"}).check(tool_ctx("home", effect="read")).kind == "allow"
 
 
 # --- the ask chain: anyone_online, side_check_guard, person_ask ----------------------------

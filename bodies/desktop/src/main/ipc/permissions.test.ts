@@ -54,12 +54,24 @@ describe('registerPermissionsIpc', () => {
     expect(calls).toEqual([['set_permission', { tool: TOOL.name, mode: 'auto' }]]);
   });
 
+  it('sets a tool Off through the brain', async () => {
+    const { invoke, calls } = setup(() => text({ tool: TOOL.name, mode: 'off' }));
+    await invoke(IPC.setPermission, TOOL.name, 'off');
+    expect(calls).toEqual([['set_permission', { tool: TOOL.name, mode: 'off' }]]);
+  });
+
+  it('keeps an Off row and its source as the brain sent them', async () => {
+    const row = { ...TOOL, mode: 'off', source: 'body:desktop' };
+    const { invoke } = setup(() => text({ tools: [row] }));
+    expect(await invoke(IPC.listPermissions)).toEqual([row]);
+  });
+
   it('rejects when the brain refuses the change', async () => {
     const { invoke } = setup(() => Promise.reject(new RpcError(-32602, 'always asks')));
     await expect(invoke(IPC.setPermission, 'forget', 'auto')).rejects.toBeInstanceOf(RpcError);
   });
 
-  it('refuses a mode that is neither ask nor auto, without asking the brain', async () => {
+  it('refuses a mode that is none of off, ask or auto, without asking the brain', async () => {
     const { invoke, calls } = setup(() => []);
     await expect(invoke(IPC.setPermission, TOOL.name, 'never')).rejects.toThrow('bad mode');
     expect(calls).toEqual([]);

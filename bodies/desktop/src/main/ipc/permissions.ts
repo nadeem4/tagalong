@@ -22,7 +22,7 @@ export function registerPermissionsIpc(handle: IpcHandle, deps: { brain: BrainCa
   handle(IPC.listPermissions, async () => parseRows(await callJson(brain, 'list_permissions')));
   handle(IPC.setPermission, async (_event, tool: string, mode: string) => {
     // The brain would refuse it too; a page that sends anything else is not ours.
-    if (mode !== 'ask' && mode !== 'auto') throw new Error('bad mode');
+    if (mode !== 'off' && mode !== 'ask' && mode !== 'auto') throw new Error('bad mode');
     await brain.call('set_permission', { tool, mode });
   });
 }

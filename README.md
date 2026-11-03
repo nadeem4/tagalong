@@ -282,8 +282,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
-  does it without asking. A tool its body marks as always confirm is fixed on Ask,
-  and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
+  does it without asking. The brain also knows a third state, **Off**, which takes the tool away
+  from Scout so it routes around it (Home gets the Off switch in a coming change). A tool its body marks as always confirm is
+  fixed on Ask, and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
   instead of a switch, because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the

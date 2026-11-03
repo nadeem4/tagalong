@@ -35,7 +35,7 @@ from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
 from brain.setup.store import InstalledExpert
 from brain.timers import MIN_REPEAT_S, Timers
-from brain.toolbox import Handler, Toolbox, ToolSpec
+from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
 
 log = logging.getLogger("brain")
@@ -849,6 +849,9 @@ def home_tools(
     async def list_permissions(args: dict) -> str:
         box = toolbox()
         current = {s.name for source in box.sources for s in source.specs()}
+        origin = {  # name -> where it comes from, built once for the whole list
+            s.name: _origin(src, s.name) for src in box.sources for s in src.known_specs()
+        }
         rows = [
             {
                 "name": s.name,
@@ -858,11 +861,19 @@ def home_tools(
                 "locked": s.locked,
                 "self_asks": s.self_asks,
                 "online": s.name in current,
+                "source": origin[s.name],
             }
             for s in sorted(box.known_specs(), key=lambda s: s.name)
             if "scout" in s.audience
         ]
         return json.dumps({"tools": rows})
+
+    def _origin(source, name: str) -> str:
+        """Where a tool comes from, so Home can group: built_in, body:<id> or app:<id>."""
+        owner, sep, _ = name.partition(SEP)
+        if not sep:
+            return "built_in"
+        return f"{'app' if getattr(source, 'approval_source', '') == 'app' else 'body'}:{owner}"
 
     async def set_permission(args: dict) -> str:
         if not args.get("tool") or not args.get("mode"):
@@ -887,7 +898,8 @@ def home_tools(
         (
             ToolSpec(
                 "list_permissions",
-                "Every tool Scout may use, with its ask or auto mode and whether it is online.",
+                "Every tool Scout may use, with its off, ask or auto mode, where it comes from and "
+                "whether it is online.",
                 empty,
                 home,
                 effect="read",
@@ -897,12 +909,12 @@ def home_tools(
         (
             ToolSpec(
                 "set_permission",
-                "Set one tool to ask or auto.",
+                "Set one tool to off, ask or auto.",
                 {
                     "type": "object",
                     "properties": {
                         "tool": {"type": "string"},
-                        "mode": {"type": "string", "enum": ["ask", "auto"]},
+                        "mode": {"type": "string", "enum": ["off", "ask", "auto"]},
                     },
                     "required": ["tool", "mode"],
                 },

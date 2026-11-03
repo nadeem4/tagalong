@@ -1716,6 +1716,13 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
    switch off limits.
 5. **Live update.** Open Home, then answer **Always allow** on an ask for a tool in the list. **Expected:** the list updates without reopening Home.
+6. **Off.** Home has no Off switch yet, so use the brain's tool: with the desktop running, call
+   `set_permission` with `{"tool": "desktop__list_windows", "mode": "off"}` (for example from a
+   terminal websocket client). **Expected:** the Permissions list refreshes and shows its switch unchecked
+   (the same look as Ask until the Off switch arrives; do not press it, which would set Auto). Ask Scout what windows are open: it says it cannot see them, or uses another way, and
+   never errors. Quit and restart the brain and the desktop: it is still Off. Set it back to
+   `auto` and it works again. Automated: `test_toolbox.py`, `test_tools.py`, `test_memory.py`,
+   `test_builtin_guards.py`, `permissions.test.ts`.
 
 ## Log file
 

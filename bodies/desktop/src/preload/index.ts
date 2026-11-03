@@ -84,7 +84,7 @@ const bridge: PreloadBridge = {
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
   listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
-  setPermission: (tool: string, mode: 'ask' | 'auto') =>
+  setPermission: (tool: string, mode: 'off' | 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
