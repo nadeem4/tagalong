@@ -21,7 +21,7 @@ export const CONTROLS_CSS = `
   --tg-ctl-ink: ${t.color.text};
   --tg-ctl-muted: ${t.color.textMuted};
 }
-.tg-toggle:focus-visible, .tg-select select:focus-visible, .tg-slider input:focus-visible,
+.tg-toggle:focus-visible, .tg-three__option:focus-visible, .tg-select select:focus-visible, .tg-slider input:focus-visible,
 .tg-money input:focus-visible, .tg-money button:focus-visible, .tg-button:focus-visible {
   outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px;
 }
@@ -48,6 +48,21 @@ export const CONTROLS_CSS = `
   background: ${t.color.keycapFill}; box-shadow: 0 1px 2px ${t.color.line}; transition: transform 120ms;
 }
 .tg-toggle[aria-checked='true'] .tg-toggle__knob { transform: translateX(${t.size.toggleW - t.size.toggleH}px); }
+
+/* ThreeWay: one pill; the chosen word is filled in gold like an on Toggle. */
+.tg-three {
+  display: inline-flex; flex: none; padding: 2px; gap: 2px; box-sizing: border-box;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px; background: ${t.color.scrollbarThumb};
+}
+.tg-three__option {
+  min-width: 46px; height: ${t.size.toggleH - 6}px; padding: 0 ${t.space.md}px; border: 0;
+  border-radius: ${t.size.toggleH}px; background: transparent; color: ${t.color.panelText}; cursor: pointer;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.min}px; font-weight: ${t.fontWeight.semibold};
+  transition: background 120ms;
+}
+.tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-bg); }
+.tg-three__option[aria-checked='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
+.tg-three__option:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .tg-select { display: flex; flex-direction: column; gap: ${t.space.xs}px; min-width: 0; }
 .tg-select__label { color: var(--tg-ctl-muted); font-size: ${t.fontSize.small}px; }

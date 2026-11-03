@@ -53,8 +53,10 @@ export interface PermissionRow {
   /** The tool opens its own ask with the person, so the switch changes nothing (brain's flag). */
   self_asks?: boolean;
   online: boolean;
+  /** The tool always needs the person's yes: Off or Ask, never Auto (brain's flag). */
+  person_only: boolean;
   /** Where the tool comes from: `built_in`, `body:<id>` or `app:<id>`. */
-  source?: string;
+  source: string;
 }
 
 /** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */

@@ -1,6 +1,7 @@
 /**
- * Home's Permissions list on the fake brain: Settings shows each tool, a click on a switch
- * reaches the brain as set_permission, and a locked tool is marked risky.
+ * Home's Permissions list on the fake brain: Settings shows each tool under its source, a click
+ * on Off, Ask or Auto reaches the brain as set_permission, a locked tool is marked risky and a
+ * person-only tool never offers Auto.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,20 +53,44 @@ async function windowFor(name: string): Promise<Page> {
   throw new Error(`no ${name} window appeared`);
 }
 
-test('Home settings lists permissions and a switch reaches the brain', async () => {
+test('Home settings lists permissions by source and a click reaches the brain', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
 
   const card = home.getByRole('region', { name: 'Permissions' });
-  const move = card.getByRole('switch', { name: 'desktop__move_window' });
-  await expect(move).toHaveAttribute('aria-checked', 'false', { timeout: 30_000 });
+  const move = card.getByRole('radiogroup', { name: 'desktop__move_window' });
+  await expect(move.getByRole('radio', { name: 'Ask' })).toHaveAttribute('aria-checked', 'true', {
+    timeout: 30_000,
+  });
 
-  // A locked tool is marked risky; its switch works but warns before Auto.
-  await expect(card.getByRole('switch', { name: 'desktop__close_window' })).toBeEnabled();
+  // Tools sit under their source: built in, this desktop, the browser, each app.
+  const headings = card.getByRole('heading', { level: 3 });
+  await expect(headings).toHaveText(['Built in', 'This desktop', 'Browser', 'Gmail']);
+
+  // A person-only app tool never offers Auto; a tool of a body that is away is marked.
+  const mail = card.getByRole('radiogroup', { name: 'gmail__delete_mail' });
+  await expect(mail.getByRole('radio')).toHaveText(['Off', 'Ask']);
+  await expect(card).toContainText('Not connected');
+
+  // A locked tool is marked risky and warns before Auto.
   await expect(card).toContainText('Risky action');
+  const close = card.getByRole('radiogroup', { name: 'desktop__close_window' });
+  await close.getByRole('radio', { name: 'Auto' }).click();
+  await expect(card.getByRole('alert')).toContainText('no longer ask');
+  await card.getByRole('button', { name: 'Cancel' }).click();
+  expect(brain.permissionSets).toEqual([]);
 
-  await move.click();
-  await expect(move).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
-  expect(brain.permissionSets).toEqual([{ tool: 'desktop__move_window', mode: 'auto' }]);
+  await move.getByRole('radio', { name: 'Auto' }).click();
+  await expect(move.getByRole('radio', { name: 'Auto' })).toHaveAttribute('aria-checked', 'true', {
+    timeout: 15_000,
+  });
+  await move.getByRole('radio', { name: 'Off' }).click();
+  await expect(move.getByRole('radio', { name: 'Off' })).toHaveAttribute('aria-checked', 'true', {
+    timeout: 15_000,
+  });
+  expect(brain.permissionSets).toEqual([
+    { tool: 'desktop__move_window', mode: 'auto' },
+    { tool: 'desktop__move_window', mode: 'off' },
+  ]);
 });

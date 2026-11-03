@@ -230,13 +230,15 @@ describe('HomeView', () => {
         effect: 'read' as const,
         mode: 'auto' as const,
         locked: false,
+        person_only: false,
+        source: 'built_in',
         online: true,
       },
     ];
     renderHome(createFakeHostBridge({ pets: [SCOUT], permissions }), { page: 'settings' });
     expect(await screen.findByText('The settings form')).toBeVisible();
-    expect(await screen.findByRole('switch', { name: 'recall' })).toBeVisible();
+    expect(await screen.findByRole('radiogroup', { name: 'recall' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
-    expect(screen.queryByRole('switch', { name: 'recall' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'recall' })).toBeNull();
   });
 });

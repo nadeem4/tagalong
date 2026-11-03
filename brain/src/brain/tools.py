@@ -860,6 +860,7 @@ def home_tools(
                 "mode": box.mode(s),
                 "locked": s.locked,
                 "self_asks": s.self_asks,
+                "person_only": s.person_only,
                 "online": s.name in current,
                 "source": origin[s.name],
             }

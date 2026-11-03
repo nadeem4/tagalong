@@ -364,7 +364,7 @@ a body reconnecting. `resolve_mode` returns `off` before any other rule, so it a
 - `set_mode` looks in `known_specs`, so a tool of a body that is offline right now can be turned Off
   and stays Off when the body connects.
 
-`list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them.
+`list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them, and `person_only` so Home never offers Auto for a tool that always needs the person's yes.
 
 Shipped defaults match the design: built-in memory, timers, `read_output` and the job tools are
 `auto`; a body's reads are `auto` and its changes `ask` (the desktop's `open_url` and the browser's
@@ -500,18 +500,18 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                              | Result text (JSON)                                                                                                                                                      |
-| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                    |
-| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                 |
-| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                              |
-| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online", "source"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
-| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                            |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                        |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                          |
-| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                      |
-| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                 |
-| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                         |
+| Tool               | Input                              | Result text (JSON)                                                                                                                                                                     |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                   |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                             |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "online", "source"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                           |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                       |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                         |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                     |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                        |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 

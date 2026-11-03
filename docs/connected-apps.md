@@ -122,8 +122,8 @@ flowchart TD
 - **locked**: `destructiveHint`, or a whole word in the name (split on `_`, `-`, `.`, spaces and
   camelCase) of `send`, `delete`, `remove`, `destroy`, `trash`, `pay` or `charge`. A risky word wins
   over a read-only hint, since hints are the app's own claim. Locked tools ask every time until you
-  unlock one on Home: its switch is on and reads "Risky action", and turning it to **Auto** first
-  warns that Scout will no longer ask. Switch it back to **Ask** to undo.
+  unlock one on Home: it reads "Risky action", and choosing **Auto** first
+  warns that Scout will no longer ask. Choose **Ask** again to undo.
 
 Modes are the toolbox's usual ones (see [brain.md](brain.md)), but every app tool starts at `ask`,
 read-only ones too (`default_mode="ask"`): the app's own hint never lets a tool run unasked. The

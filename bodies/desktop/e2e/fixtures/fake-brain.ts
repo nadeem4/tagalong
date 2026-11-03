@@ -310,14 +310,29 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     ],
   };
   let running: unknown[] = [];
+  // Rows as list_permissions sends them: grouped by source on Home, each with what it allows.
   const permissions = [
+    {
+      name: 'recall',
+      description: 'Look up what Scout remembers',
+      effect: 'read',
+      mode: 'auto',
+      locked: false,
+      self_asks: false,
+      person_only: false,
+      online: true,
+      source: 'built_in',
+    },
     {
       name: 'desktop__move_window',
       description: 'Move a window on your desktop',
       effect: 'change',
       mode: 'ask',
       locked: false,
+      self_asks: false,
+      person_only: false,
       online: true,
+      source: 'body:desktop',
     },
     {
       name: 'desktop__close_window',
@@ -325,7 +340,32 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       effect: 'change',
       mode: 'ask',
       locked: true,
+      self_asks: false,
+      person_only: false,
       online: true,
+      source: 'body:desktop',
+    },
+    {
+      name: 'extension__open_tab',
+      description: 'Open a browser tab',
+      effect: 'change',
+      mode: 'ask',
+      locked: false,
+      self_asks: false,
+      person_only: false,
+      online: false,
+      source: 'body:extension',
+    },
+    {
+      name: 'gmail__delete_mail',
+      description: 'Delete an email',
+      effect: 'change',
+      mode: 'ask',
+      locked: true,
+      self_asks: false,
+      person_only: true,
+      online: true,
+      source: 'app:gmail',
     },
   ];
 
