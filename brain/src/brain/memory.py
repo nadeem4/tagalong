@@ -226,6 +226,16 @@ MIGRATIONS = (
     ALTER TABLE job_activity ADD COLUMN part TEXT NOT NULL DEFAULT 'p1';
     ALTER TABLE job_activity ADD COLUMN source TEXT;
     """,
+    # Long tool output, stored masked so Scout can read the rest of a capped preview by id.
+    """
+    CREATE TABLE tool_outputs(
+        id TEXT PRIMARY KEY,
+        tool TEXT NOT NULL,
+        chars INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        at TEXT NOT NULL
+    );
+    """,
 )
 
 DROPPED_MARKER = "[older steps dropped]"
@@ -354,7 +364,7 @@ _PART_COLUMNS = (
     " started_at, ended_at, folder"
 )
 _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
-JOB_RESULT_CAP = 20_000
+JOB_RESULT_CAP = 20_000  # characters of Scout's result; a storage safety, not a style rule
 JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
 
@@ -586,6 +596,10 @@ class Memory:
         """Scout's own title for a job; only a safety cap on storage, never a rewrite."""
         self.update_job(job_id, title=title[:JOB_TITLE_CAP])
 
+    def set_result(self, job_id: str, text: str) -> None:
+        """Scout's own words for the whole job; replaces the earlier one."""
+        self.update_job(job_id, scout_result=text[:JOB_RESULT_CAP])
+
     def close_job(self, job_id: str, at: str) -> None:
         """Mark the job closed: Scout judged the work done. Its state stays the last outcome."""
         self.update_job(job_id, closed_at=at)
@@ -600,12 +614,6 @@ class Memory:
         unknown = set(fields) - _JOB_FIELDS
         if unknown:
             raise ValueError(f"Unknown job fields: {', '.join(sorted(unknown))}")
-        if part_fields:
-            last = self._db.execute(
-                "SELECT id FROM job_parts WHERE job_id=? ORDER BY rowid DESC LIMIT 1", (id,)
-            ).fetchone()
-            if last:
-                self.update_part(id, last[0], **part_fields)
         if not fields:
             return
         sets = ", ".join(f"{k}=?" for k in fields)

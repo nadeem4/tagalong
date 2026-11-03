@@ -707,6 +707,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "tell_expert",
         "watch_job",
         "close_job",
+        "set_job_result",
         "list_experts",
         "list_jobs",
         "stop_job",
@@ -1232,3 +1233,35 @@ async def test_list_jobs_rows_have_title_and_closed_at(home, mem):
     assert (rows["j1"]["title"], rows["j1"]["closed_at"]) == ("first line", None)
     assert rows["j2"]["title"] == "Scout's title" and rows["j2"]["closed_at"]
     assert "closed" not in rows["j1"]
+
+
+# --- SP4: set_job_result -----------------------------------------------------------------
+
+
+async def test_set_job_result_saves_and_refusal_is_a_plain_line(home):
+    assert "j1" in await home.run("set_job_result", {"job": "j1", "text": "All done."})
+    assert home.jobs.calls[-1] == ("set_result", "j1", "All done.")
+    home.jobs.error = JobError("no job j9")
+    assert await home.run("set_job_result", {"job": "j9", "text": "x"}) == "no job j9"
+
+
+async def test_set_job_result_needs_a_job_and_text(home):
+    with pytest.raises(MemoryRefused):
+        await home.run("set_job_result", {"job": "j1"})
+
+
+def test_set_job_result_spec_is_scout_only_change_auto_and_guidance_only(home):
+    spec = expert_specs(home)["set_job_result"]
+    assert spec.audience == frozenset({"scout"})
+    assert (spec.effect, spec.default_mode) == ("change", "auto")
+    assert "your own words" in spec.description
+
+
+async def test_list_jobs_shows_scouts_result(home, mem):
+    mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
+    mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
+    mem.set_result("j1", "R" * 1500)
+    home.jobs.rows = mem.list_jobs(20)
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["scout_result"] == "R" * 1000 + "…"
+    assert rows["j2"]["scout_result"] is None

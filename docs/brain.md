@@ -262,7 +262,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Long text results.** Over `TAGALONG_TOOL_PREVIEW_CHARS` a text result reaches the model as a
-  preview plus an id, see [Long tool output](#long-tool-output).
+  preview plus an id, see [Long tool output](#long-tool-output). Only Scout's own calls are capped; Home's own calls are not.
 - **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
   oversized result is an error result. A part is over the limit above 5,000,000 bytes, and all
   parts of one result together above 20,000,000 bytes. An image or file part counts its decoded
@@ -815,7 +815,7 @@ whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
-never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
+never the chat; the expert's summary stays whole in its part's report, and `list_jobs` shows it capped at 4,000 characters).
 `list_jobs` rows carry `parts`, each with `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
 
@@ -998,16 +998,17 @@ flowchart TD
   H --> I[Scout decides: speak or stay silent]
 ```
 
-| Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                                                                                                                              |
-| -------------- | ----------- | ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start |
-| `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                |
-| `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                           |
-| `close_job`    | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                    |
-| `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                                                            |
-| `list_jobs`    | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                         |
-| `stop_job`     | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                              |
-| `job_activity` | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                   |
+| Tool             | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | ----------- | ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hand_off`       | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start |
+| `list_experts`   | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                |
+| `tell_expert`    | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                           |
+| `close_job`      | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                    |
+| `set_job_result` | scout       | change | `auto`                       | `{job, text}`. Scout's own result for the whole job (`Job.scout_result`): masked, replaceable, allowed on a closed job; stored up to 20,000 characters, no template or length rule. Unknown job: a plain refusal line. `list_jobs` rows carry it as `scout_result` (clipped to 1,000 characters). With none, nothing is invented                                  |
+| `watch_job`      | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                                                            |
+| `list_jobs`      | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                         |
+| `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                              |
+| `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                   |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
@@ -1099,6 +1100,41 @@ flowchart LR
   own reason and result; the job stays open until Scout closes it. A job closed while a part
   start is still waiting takes no part (re-checked just before the part is added). Parts may work in different folders; folder-session reuse looks up the part by
   expert and folder.
+- **Result.** `set_job_result {job, text}` stores Scout's own words for the whole job
+  (`Jobs.set_result`, `Memory.set_result`). The text is masked (`mask_json(guards, "job_result", ...)`),
+  then capped at 20,000 characters, a storage safety only. Calling it again replaces it, also after
+  `close_job`. Code never writes or checks a result: if Scout never calls it the job has none and the
+  page shows status and reports. Guidance lives in the tool description, `mind/soul.md` and the
+  `job_ended` note in `mind/events.md`.
+- **Scout's own steps.** Tool and app calls Scout makes while a turn works for a job land on that
+  job's timeline. `Toolbox.run`, the one gate every call passes, tells an `on_call` hook after each
+  call of a known tool: `(call, spec, source kind, status, result)` with status `ok`, `failed` (it
+  ran and raised) or `refused` (a guard or the ask stopped it). `Session` turns that into
+  `Jobs.record_step(job, source, text, status)`, which appends a `tool` entry in part `scout`
+  (the job-level part, not an expert's) with the job's shared `seq`, masked and clipped to 300
+  characters: what was tried (tool or app name plus the arguments), never the result. `source` is
+  `app:<app id>` for a connected app (the prefix of its `<app>__<tool>` name) and `scout:<tool>`
+  for the brain's own and body tools; expert steps carry no source. Status `ok` is stored as
+  `done`. Which calls count is mechanical: the turn must be bound to a job, and every call in it is
+  recorded except `set_job_result`, `watch_job` and `list_jobs`. A turn is bound when it is the wake
+  for exactly one job (`job_ended`, `job_quiet`, `job_step_failed`) or when a job tool
+  (`hand_off`, `tell_expert`, `stop_job`, `close_job`, `set_job_result`) ran fine, named a job and
+  the turn had none; the binding (`Session._turn_job`) ends with the turn. A batched wake that
+  carries several jobs binds to none: the first job tool decides. A timer that names a job does
+  not bind its wake turn. A job tool always records on the job it names, even when it was refused
+  or failed; plain tools go to the turn's job. An owner turn with no job in play records nothing.
+  Scout's steps are not counted in the wake's activity summary and never raise `job_step_failed`.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+  W[job wake or job tool] -->|binds| T[Session._turn_job]
+  C[any tool call] --> G[Toolbox.run gate]
+  G -->|on_call: call, spec, kind, status| S[Session._on_tool_call]
+  T --> S
+  S -->|record_step| J[Jobs] --> A[(job_activity, part scout, source)]
+```
+
 - **Watch list.** Right after `hand_off` returns the job id, Scout writes what it expects in its own
   words with `watch_job {job, items: [{text, done}]}`; it calls it again to tick an item or reword
   one. The call replaces the whole list: at most 10 items, text 1 to 200 characters, `done` a

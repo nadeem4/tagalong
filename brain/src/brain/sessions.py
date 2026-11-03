@@ -258,6 +258,7 @@ class Session:
         # The job the running turn works for: a wake about it, or a job tool named it. Tool and
         # app calls in the turn are recorded on that job's timeline. Cleared when the turn ends.
         self._turn_job: str | None = None
+        self._wake_jobs: set[str] = set()
         self._spoken: set[str] = set()  # running turns whose reply is read aloud
         # Each body's last `read_aloud` event: read every turn it shows aloud, in which voice, and
         # whether it uses its system voice. Kept across a reconnect; the body also resends it.
@@ -426,7 +427,10 @@ class Session:
 
         def started() -> None:
             if job:
-                self._turn_job = job
+                # A batched wake can carry several jobs: bind only when it is exactly one, else
+                # the first job tool of the turn decides.
+                self._wake_jobs.add(job)
+                self._turn_job = job if len(self._wake_jobs) == 1 else None
             if on_start is not None:
                 on_start()
 
@@ -441,7 +445,7 @@ class Session:
             return
         if spec.name in JOB_TOOLS:
             job = self._job_named(call, status, result)
-            if job is not None and self._turn_job is None:
+            if job is not None and self._turn_job is None and status == "ok":
                 self._turn_job = job
         else:
             job = self._turn_job
@@ -498,6 +502,7 @@ class Session:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
         self._turn_job = None
+        self._wake_jobs = set()
         self._owner_turn = started_by == "user"
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []

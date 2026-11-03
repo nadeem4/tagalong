@@ -537,7 +537,7 @@ def test_a_job_end_settles_the_parts_still_running(mem):
 
 def _seed_old_schema(path):
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO jobs(id, agent, task, folder, mode, state, reason, progress, result,"
@@ -1011,3 +1011,10 @@ def test_set_title_and_close_job_are_stored(mem):
     got = mem.get_job("j1")
     assert got.title == "x" * 200  # a storage safety cap only
     assert got.closed_at == "2026-02-01T00:00:00+00:00"
+
+
+def test_set_result_is_stored_and_replaced(mem):
+    mem.add_job("j1", "claude_code", "t", "C:/x", "default")
+    mem.set_result("j1", "one")
+    mem.set_result("j1", "two")
+    assert mem.get_job("j1").scout_result == "two"

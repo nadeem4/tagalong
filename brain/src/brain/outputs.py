@@ -43,7 +43,7 @@ class OutputStore:
         text = self._memory.get_output(output_id)
         if text is None:
             raise ValueError(f"No stored output with id {output_id}.")
-        size = self.cap if length is None else min(length, self.cap)
+        size = self.cap if length is None else max(1, min(length, self.cap))
         # `length` may ask for more than a page; one page is never above the cap.
         end = offset + size
         return {

@@ -57,7 +57,6 @@ PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most thi
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
 TITLE_FALLBACK_CHARS = 80
-RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in the row
 
 
 class JobError(Exception):
@@ -143,6 +142,7 @@ class Jobs:
         self._guards = guards
         self._runs: dict[str, dict[str, ExpertRun]] = {}  # job -> part -> its running expert
         self._activity: dict[str, dict[str, JobActivity]] = {}
+        self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[tuple[str, str], set[str]] = {}  # (job, part) -> its open asks
@@ -561,6 +561,31 @@ class Jobs:
         self._activity_changed(job_id)  # an open job page redraws its header
         return clean
 
+    def set_result(self, job_id: str, text: str) -> None:
+        """Store Scout's own result for the job (masked, replaceable, even after close). No
+        template or length rule: only the storage cap."""
+        if self._memory.get_job(job_id) is None:
+            raise JobError(f"no job {job_id}")
+        self._memory.set_result(job_id, mask_json(self._guards, "job_result", text))
+        self._activity_changed(job_id)  # an open job page redraws its overview
+
+    def record_step(self, job_id: str, source: str, text: str, status: str) -> None:
+        """A step Scout took itself for the job (its own tool or a connected app) joins the
+        timeline beside the experts' steps: what was tried and how it went, never the result."""
+        if self._memory.get_job(job_id) is None:
+            return
+        steps = self._scout_steps.get(job_id)
+        if steps is None:
+            steps = self._scout_steps[job_id] = JobActivity(
+                job_id,
+                self._memory,
+                lambda t: mask_json(self._guards, "job_activity", t),
+                self._now,
+                on_change=lambda: self._activity_changed(job_id),
+                part="scout",
+            )
+        steps.tool_step(source, text, status)
+
     def _part_fact(self, job_id: str, part: str) -> dict[str, str]:
         """Names the part in a wake, but only when the job has several and it matters which."""
         parts = self._memory.parts_of(job_id)
@@ -946,7 +971,9 @@ def job_title(job: Job) -> str:
     return job.task.strip()[:TITLE_FALLBACK_CHARS]
 
 
-def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
+def job_note(
+    job: Job, facts: dict[str, str] | None = None, outputs: OutputStore | None = None
+) -> str:
     """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides.
     Each extra fact (the activity summary) follows as its own block. A report over the preview
     cap arrives as a preview with an output id, like any long tool result."""
@@ -967,10 +994,8 @@ def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
         tag = f" ({part.id}, {part.agent}, {part.folder})" if many else ""
         if part.reason:
             lines.append(f"Reason{tag}: {part.reason}")
-        if part.report:
-            report = part.report[:RESULT_NOTE_CHARS]
-            if len(part.report) > RESULT_NOTE_CHARS:
-                report += "\n[trimmed]"
+        if part.report:  # the stored row keeps the report whole; each part gets its own id
+            report = preview(outputs, "job_report", part.report) if outputs else part.report
             lines.append(f"Result{tag}:\n{report}")
     for key, value in (facts or {}).items():
         lines.append(f"{key.capitalize()}:\n{value}")

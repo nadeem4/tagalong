@@ -417,6 +417,13 @@ def test_events_note_for_a_job_wake_says_the_job_stays_open():
     assert "part" in ended and "close_job" in ended
 
 
+def test_guidance_mentions_the_result_tool():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    ended = events.split("## job_ended")[1].split("##")[0]
+    assert "set_job_result" in soul and "set_job_result" in ended
+
+
 def test_soul_explains_the_interruption_block():
     soul = system_prompt(NOW, [])
     assert '<data kind="interruption">' in soul
@@ -428,6 +435,13 @@ def test_interruption_block_is_a_fenced_data_block_that_cannot_close_itself():
     assert block["text"].startswith('<data kind="interruption">')
     assert block["text"].count("</data>") == 1
     assert "spoken: One." in block["text"] and "unsaid: Two" in block["text"]
+
+
+def test_guidance_mentions_the_result_tool():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    ended = events.split("## job_ended")[1].split("##")[0]
+    assert "set_job_result" in soul and "set_job_result" in ended
 
 
 def test_soul_tells_scout_to_present_long_output_gist_first():

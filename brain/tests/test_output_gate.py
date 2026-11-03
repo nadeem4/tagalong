@@ -127,10 +127,12 @@ async def test_read_output_refuses_plainly(store):
         await handler({"id": "nope"})
     with pytest.raises(ValueError, match="offset"):
         await handler({"id": "nope", "offset": -3})
+    with pytest.raises(ValueError, match="id"):
+        await handler({"id": 7})
 
 
 def a_job(report):
-    part = JobPart("j1", "p1", "claude_code", "t", "done", None, None, "s", report, False, "a", "b")
+    part = JobPart("j1", "p1", "claude_code", "t", "done", None, None, "s", report, False, "a", "b", "C:/x")
     return Job("j1", "t", "C:/x", "default", "done", "a", "b", parts=[part])
 
 
@@ -150,3 +152,15 @@ def test_the_stored_report_is_not_changed_by_the_note(store):
     job = a_job("R" * 25)
     job_note(job, outputs=store)
     assert job.parts[-1].report == "R" * 25
+
+
+def test_each_part_of_a_job_gets_its_own_output_id(store):
+    def part(pid, agent, report):
+        return JobPart("j1", pid, agent, "t", "done", None, None, "s", report, False, "a", "b", "C:/x")
+
+    job = a_job("x")
+    job.parts = [part("p1", "claude_code", "A" * 25), part("p2", "gemini", "B" * 25)]
+    note = job_note(job, outputs=store)
+    assert "(p1, claude_code, C:/x)" in note and "(p2, gemini, C:/x)" in note
+    ids = [facts(chunk)["output_id"] for chunk in note.split("Result")[1:] if "{" in chunk]
+    assert len(set(ids)) == 2
