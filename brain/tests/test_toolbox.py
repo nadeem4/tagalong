@@ -1181,3 +1181,80 @@ async def test_a_stored_auto_nudge_runs_without_an_ask_on_a_brain_turn(mem):
     stored["tell_expert"] = "auto"  # the Home permission switch
     assert await box.run(nudge()) == "note queued for job j1"
     assert bodies.sent == []
+
+
+# --- SP4: on_call reports every call --------------------------------------------------------
+
+
+class RaisingSource(FakeSource):
+    async def run(self, call, tool):
+        raise RpcError(ErrorCode.tool_failed, "it broke")
+
+
+def _reporting_box(source, guards=None):
+    seen = []
+    box = RealToolbox(
+        [source],
+        lambda: {},
+        lambda n, m: None,
+        SimpleNamespace() if guards else None,
+        guards=guards,
+        on_call=lambda *a: seen.append(a),
+    )
+    return box, seen
+
+
+async def test_on_call_reports_an_ok_call_with_its_source_kind_and_result():
+    box, seen = _reporting_box(FakeSource([spec("a")]))
+    await box.run(call("a"))
+    [(reported, tool, kind, status, result)] = seen
+    assert (reported.name, tool.name, kind, status, result) == (
+        "a",
+        "a",
+        "scout_tool",
+        "ok",
+        "ran a",
+    )
+
+
+async def test_on_call_reports_a_failed_call_and_the_error_still_propagates():
+    box, seen = _reporting_box(RaisingSource([spec("a")]))
+    with pytest.raises(RpcError):
+        await box.run(call("a"))
+    assert [s[3] for s in seen] == ["failed"]
+
+
+async def test_on_call_reports_a_refused_call_as_refused():
+    guards = Guards()
+    guards.add(Guard("no", Hook.tool_call, lambda ctx: block("not today", "denied")))
+    box, seen = _reporting_box(FakeSource([spec("a")]), guards)
+    with pytest.raises(RpcError):
+        await box.run(call("a"))
+    assert [s[3] for s in seen] == ["refused"]
+
+
+async def test_on_call_reports_a_call_the_owner_denied_as_refused():
+    box, source, bodies, _ = gated()
+    seen = []
+    box._on_call = lambda *a: seen.append(a)
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
+    assert [s[3] for s in seen] == ["refused"]
+    assert source.ran == []
+
+
+async def test_on_call_ignores_unknown_tools_and_a_raising_hook_never_breaks_the_call():
+    box, seen = _reporting_box(FakeSource([spec("a")]))
+    with pytest.raises(RpcError):
+        await box.run(call("nope"))
+    assert seen == []
+    boxed = RealToolbox(
+        [FakeSource([spec("a")])],
+        lambda: {},
+        lambda n, m: None,
+        on_call=lambda *a: 1 / 0,
+    )
+    assert await boxed.run(call("a")) == "ran a"

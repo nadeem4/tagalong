@@ -10,8 +10,9 @@ from datetime import datetime
 
 from brain.memory import ActivityEntry, Memory
 
-KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", "end")
-STATUSES = ("pending", "running", "done", "failed")
+KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", "end", "tool")
+STATUSES = ("pending", "running", "done", "failed", "refused")
+TOOL_CAP = 300  # characters of one Scout tool or app step: what was tried, never the result
 
 OUTPUT_CAP = 65536  # bytes of one command's output kept (the tail)
 CARRY = 1024  # extra raw chars kept so a cut never lands inside a secret (dropped after masking)
@@ -193,6 +194,12 @@ class JobActivity:
         lines = [f"[{'x' if str(e.status) == 'completed' else ' '}] {e.content}" for e in u.entries]
         self._plan_seq = self._put(self._plan_seq, "plan", "\n".join(lines)).seq
 
+    def tool_step(self, source: str, text: str, status: str) -> ActivityEntry:
+        """One step Scout took itself (its own tool or a connected app) during the job."""
+        entry = self._put(None, "tool", text, status, cap=lambda t: t[:TOOL_CAP], source=source)
+        self._on_change()
+        return entry
+
     def _put(
         self,
         seq: int | None,
@@ -202,6 +209,7 @@ class JobActivity:
         step: str | None = None,
         cap: Callable[[str], str] = lambda t: t,
         exit: int | None = None,
+        source: str | None = None,
     ) -> ActivityEntry:
         """Write one entry (a new one when seq is None); masks first, then caps."""
         if seq is None:
@@ -219,6 +227,7 @@ class JobActivity:
             step=step,
             exit=exit,
             part=self._part,
+            source=source,
         )
         self._memory.save_activity(self._job, entry)
         self._memory.trim_activity(self._job, ENTRY_CAP, JOB_BYTES_CAP)

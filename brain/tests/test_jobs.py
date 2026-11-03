@@ -2375,6 +2375,92 @@ async def test_a_part_in_another_folder_does_not_borrow_the_jobs_first_session(m
     assert not any(f.get("method") == "session/load" for f in rig.frames())
 
 
+# --- SP4: Scout's result for a whole job ---------------------------------------------------
+
+
+async def test_set_result_stores_masked_text(make_rig):
+    rig = make_rig(FakeAsks(), guards=masking_guards())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.set_result("j1", f"Done. key {TOKEN}")
+    assert rig.memory.get_job("j1").scout_result == "Done. key [secret]"
+
+
+async def test_set_result_replaces_the_earlier_one(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.set_result("j1", "first")
+    rig.jobs.set_result("j1", "second")
+    assert rig.memory.get_job("j1").scout_result == "second"
+
+
+async def test_set_result_caps_stored_characters_only(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.set_result("j1", "x" * 30000)
+    assert len(rig.memory.get_job("j1").scout_result) == 20000
+
+
+async def test_set_result_on_unknown_job_raises_job_error(make_rig):
+    rig = make_rig(FakeAsks())
+    with pytest.raises(JobError, match="no job nope"):
+        rig.jobs.set_result("nope", "x")
+
+
+async def test_set_result_works_on_a_closed_job(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.memory.update_part("j1", "p1", state="done")
+    rig.memory.update_job("j1", state="done")
+    rig.jobs.close("j1")
+    rig.jobs.set_result("j1", "refined after close")
+    assert rig.memory.get_job("j1").scout_result == "refined after close"
+
+
+async def test_job_without_a_result_has_none(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    assert rig.memory.get_job("j1").scout_result is None
+
+
+# --- SP4: Scout's own steps on the timeline ------------------------------------------------
+
+
+async def test_record_step_appends_a_masked_tool_entry_and_notifies(make_rig):
+    rig = make_rig(FakeAsks(), guards=masking_guards())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.record_step("j1", "scout:recall", f"recall {TOKEN}", "done")
+    [entry] = rows_of(rig, "j1")
+    assert (entry.kind, entry.part, entry.source, entry.status) == (
+        "tool",
+        "scout",
+        "scout:recall",
+        "done",
+    )
+    assert TOKEN not in entry.text
+    assert ("changed", {"what": "job_activity"}) in rig.notes
+
+
+async def test_record_step_on_an_unknown_job_is_ignored(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.jobs.record_step("nope", "scout:recall", "recall", "done")
+    assert rig.memory.activity_after("nope", 0, 10) == []
+
+
+async def test_expert_and_scout_steps_interleave_in_order(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
+    rig.jobs.record_step("j1", "scout:recall", "one", "done")
+    rig.memory.save_activity(
+        "j1",
+        ActivityEntry(
+            2, rig.memory.max_seq("j1") + 1, "2026-01-01T00:00:00+00:00", "command", "ls"
+        ),
+    )
+    rig.jobs.record_step("j1", "app:files", "two", "done")
+    assert [(e.seq, e.part) for e in rows_of(rig, "j1")] == [(1, "scout"), (2, "p1"), (3, "scout")]
+    assert [e.text for e in rows_of(rig, "j1")][::2] == ["one", "two"]
+
+
 async def test_callbacks_fired_while_a_further_part_starts_file_under_that_part(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
     job = await rig.jobs.start("one", str(rig.folder))

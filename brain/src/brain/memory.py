@@ -354,7 +354,7 @@ _PART_COLUMNS = (
     " started_at, ended_at, folder"
 )
 _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
-JOB_RESULT_CAP = 20_000
+JOB_RESULT_CAP = 20_000  # characters of Scout's result; a storage safety, not a style rule
 JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
 
@@ -565,6 +565,10 @@ class Memory:
     def set_title(self, job_id: str, title: str) -> None:
         """Scout's own title for a job; only a safety cap on storage, never a rewrite."""
         self.update_job(job_id, title=title[:JOB_TITLE_CAP])
+
+    def set_result(self, job_id: str, text: str) -> None:
+        """Scout's own words for the whole job; replaces the earlier one."""
+        self.update_job(job_id, scout_result=text[:JOB_RESULT_CAP])
 
     def close_job(self, job_id: str, at: str) -> None:
         """Mark the job closed: Scout judged the work done. Its state stays the last outcome."""

@@ -246,6 +246,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   A job is Scout's piece of work: Scout gives it a title in its own words (the brief's first line
   when it has none), can add further expert hand-offs to it as parts (`hand_off` with `job`), and
   closes it with `close_job` when it judges the work done. A job Scout never closes stays open.
+  Scout writes the result of the whole job in its own words with `set_job_result` (what got done,
+  what needs you, the key files; no template, it can rewrite it later); a job with none shows no
+  summary. While Scout works on a job (it was woken about it, or it handed work to it), the
+  tools and connected apps it uses appear on the job's timeline beside the expert's steps,
+  labelled with the app or tool name.
 - **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.

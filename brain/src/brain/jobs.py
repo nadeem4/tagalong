@@ -140,6 +140,7 @@ class Jobs:
         self._guards = guards
         self._runs: dict[str, dict[str, ExpertRun]] = {}  # job -> part -> its running expert
         self._activity: dict[str, dict[str, JobActivity]] = {}
+        self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
         self._ask_ids: dict[tuple[str, str], set[str]] = {}  # (job, part) -> its open asks
@@ -557,6 +558,31 @@ class Jobs:
         self._memory.set_watch(job_id, clean)
         self._activity_changed(job_id)  # an open job page redraws its header
         return clean
+
+    def set_result(self, job_id: str, text: str) -> None:
+        """Store Scout's own result for the job (masked, replaceable, even after close). No
+        template or length rule: only the storage cap."""
+        if self._memory.get_job(job_id) is None:
+            raise JobError(f"no job {job_id}")
+        self._memory.set_result(job_id, mask_json(self._guards, "job_result", text))
+        self._activity_changed(job_id)  # an open job page redraws its overview
+
+    def record_step(self, job_id: str, source: str, text: str, status: str) -> None:
+        """A step Scout took itself for the job (its own tool or a connected app) joins the
+        timeline beside the experts' steps: what was tried and how it went, never the result."""
+        if self._memory.get_job(job_id) is None:
+            return
+        steps = self._scout_steps.get(job_id)
+        if steps is None:
+            steps = self._scout_steps[job_id] = JobActivity(
+                job_id,
+                self._memory,
+                lambda t: mask_json(self._guards, "job_activity", t),
+                self._now,
+                on_change=lambda: self._activity_changed(job_id),
+                part="scout",
+            )
+        steps.tool_step(source, text, status)
 
     def _part_fact(self, job_id: str, part: str) -> dict[str, str]:
         """Names the part in a wake, but only when the job has several and it matters which."""

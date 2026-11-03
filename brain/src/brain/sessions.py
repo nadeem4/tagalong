@@ -59,7 +59,7 @@ from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.timers import Timers
-from brain.toolbox import BodySource, BrainSource, Handler, Toolbox, ToolSpec
+from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
     KeySettings,
     brain_tools,
@@ -74,6 +74,13 @@ from brain.tools import (
 from brain.voice import VoiceHooks
 
 log = logging.getLogger("brain")
+
+# Tools that name a job: they bind an unbound turn to it and are recorded on it.
+JOB_TOOLS = frozenset({"hand_off", "tell_expert", "stop_job", "close_job", "set_job_result"})
+# Job bookkeeping Scout does about the job, not work for it: never on the timeline.
+BOOKKEEPING_TOOLS = frozenset({"set_job_result", "watch_job", "list_jobs"})
+_ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked, then clipped
+_STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
 
 @dataclass(frozen=True)
@@ -163,7 +170,7 @@ class Session:
             guards=self.guards,
             on_away=self._on_job_away,
             setup_facts=setup_facts,
-            emit=self.scheduler.emit,
+            emit=self._emit_job_event,
             drop=self.scheduler.drop,
             on_timers_changed=lambda: timers.changed(),
         )
@@ -216,6 +223,7 @@ class Session:
             side_check,
             offer,
             guards=self.guards,
+            on_call=self._on_tool_call,
         )
         self._now = now
         loaded = memory.load_messages()
@@ -236,6 +244,10 @@ class Session:
         )
         self._last_body: str | None = None  # where a wake turn goes first
         self._turn_body: str | None = None  # the body showing the running turn
+        # The job the running turn works for: a wake about it, or a job tool named it. Tool and
+        # app calls in the turn are recorded on that job's timeline. Cleared when the turn ends.
+        self._turn_job: str | None = None
+        self._wake_jobs: set[str] = set()
         self._spoken: set[str] = set()  # running turns whose reply is read aloud
         # Each body's last `read_aloud` event: read every turn it shows aloud, in which voice, and
         # whether it uses its system voice. Kept across a reconnect; the body also resends it.
@@ -391,10 +403,64 @@ class Session:
         self.scheduler.pump()  # also starts a wake that was waiting for a body
 
     def _on_job_finished(self, job: Job) -> None:
-        self.scheduler.emit(
+        self._emit_job_event(
             Event("job_ended", {"report": self.jobs.note(job)}, key=job.id),
             on_start=lambda: self._memory.mark_reported(job.id),
         )
+
+    def _emit_job_event(self, event: Event, **hooks) -> None:
+        """Emit a job's event; the wake turn it starts is bound to that job."""
+        key = event.key or ""
+        job = key[4:] if key.startswith("job:") else (key if event.kind == "job_ended" else "")
+        on_start = hooks.pop("on_start", None)
+
+        def started() -> None:
+            if job:
+                # A batched wake can carry several jobs: bind only when it is exactly one, else
+                # the first job tool of the turn decides.
+                self._wake_jobs.add(job)
+                self._turn_job = job if len(self._wake_jobs) == 1 else None
+            if on_start is not None:
+                on_start()
+
+        self.scheduler.emit(event, on_start=started, **hooks)
+
+    def _on_tool_call(
+        self, call: Call, spec: ToolSpec, kind: str, status: str, result: str | None
+    ) -> None:
+        """Put a tool or app call of a job-bound turn on that job's timeline. Which calls count
+        is mechanical: every one, except the job bookkeeping tools."""
+        if call.turn != self._turn_id:
+            return
+        if spec.name in JOB_TOOLS:
+            job = self._job_named(call, status, result)
+            if job is not None and self._turn_job is None and status == "ok":
+                self._turn_job = job
+        else:
+            job = self._turn_job
+        if job is None or spec.name in BOOKKEEPING_TOOLS:
+            return
+        name, _, short = spec.name.partition(SEP)
+        if kind == "app":
+            source, label = f"app:{name}", short
+        else:
+            source, label = f"scout:{spec.name}", spec.name
+        args = json.dumps(call.input, ensure_ascii=False, default=str)[:_ARGS_CAP]
+        text = f"{label} {args}" if call.input else label
+        self.jobs.record_step(job, source, text, _STEP_STATUS[status])
+
+    def _job_named(self, call: Call, status: str, result: str | None) -> str | None:
+        """The job a job tool worked on: the one in its arguments, or for a new hand-off the
+        one its result names. Only a job that exists."""
+        job = call.input.get("job")
+        if not isinstance(job, str) and call.name == "hand_off" and status == "ok":
+            try:
+                job = json.loads(result or "").get("job")
+            except (ValueError, AttributeError):
+                job = None
+        if isinstance(job, str) and self._memory.get_job(job) is not None:
+            return job
+        return None
 
     def _on_job_away(self, job_id: str, what: str) -> None:
         # No body was online to ask, so hold the news until one connects (no question id: nothing
@@ -424,6 +490,8 @@ class Session:
         closes is valid before anything is added. `cut` is what the owner talked over."""
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
+        self._turn_job = None
+        self._wake_jobs = set()
         self._owner_turn = started_by == "user"
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
@@ -543,6 +611,7 @@ class Session:
                 self._append_user([b for s in self._inbox for b in s])
                 self._inbox.clear()
             self._turn_id = None
+            self._turn_job = None
             self._owner_turn = False
             self._task = None
         self._last_turn = turn_id

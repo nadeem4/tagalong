@@ -164,7 +164,11 @@ class Toolbox:
         offers: Offers | None = None,
         guards: Guards | None = None,
         owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
+        on_call: Callable[[Call, ToolSpec, str, str, str | None], None] | None = None,
     ) -> None:
+        # Told after every call of a known tool: (call, spec, source kind, "ok" | "failed" |
+        # "refused", the text result when it ran). Never allowed to break the call.
+        self._on_call = on_call
         self.sources = sources  # brain source first, then the body and app sources
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
@@ -291,19 +295,43 @@ class Toolbox:
             self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
+        found: list = []  # [spec, source kind, ran?] once a servable tool is matched
+        try:
+            out = await self._run(call, caller, found)
+        except Exception:
+            if found:
+                self._report(call, found[0], found[1], "failed" if found[2] else "refused", None)
+            raise
+        if found:
+            self._report(call, found[0], found[1], "ok", out if isinstance(out, str) else None)
+        return out
+
+    def _report(
+        self, call: Call, spec: ToolSpec, kind: str, status: str, result: str | None
+    ) -> None:
+        if self._on_call is None:
+            return
+        try:
+            self._on_call(call, spec, kind, status, result)
+        except Exception:
+            log.exception("on_call hook failed")
+
+    async def _run(self, call: Call, caller: str, found: list) -> str | list[dict]:
         for source in self.sources:
             for spec in source.specs():
                 if spec.name == call.name:
                     if caller not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
+                    kind = getattr(source, "approval_source", "scout_tool")
+                    found[:] = [spec, kind, False]
                     if self._asks is not None:
-                        kind = getattr(source, "approval_source", "scout_tool")
                         ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
                         verdict = await self._guards.run(Hook.tool_call, ctx)
                         if verdict.kind in ("block", "stop"):
                             raise RpcError(_error_code(verdict.code), verdict.reason)
                         if verdict.kind == "ask":
                             await self._ask(call, spec, kind)
+                    found[2] = True
                     return await source.run(call, call.name)
         for source in self.sources:
             error = source.unavailable(call.name)
