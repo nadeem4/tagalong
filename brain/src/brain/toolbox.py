@@ -27,11 +27,14 @@ from brain.guards import AskCtx, Guards, Hook, ToolCallCtx
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
+from brain.outputs import OutputStore, preview
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
+# Results never capped again: read_output is how the capped rest is read, one page at a time.
+UNCAPPED = frozenset({"read_output"})
 NAME_MAX = 64  # the model API rejects longer tool names
 
 Handler = Callable[[dict], Awaitable[str]]
@@ -165,7 +168,10 @@ class Toolbox:
         guards: Guards | None = None,
         owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
         on_call: Callable[[Call, ToolSpec, str, str, str | None], None] | None = None,
+        outputs: OutputStore | None = None,
     ) -> None:
+        # Long text results reach the model as a capped preview; None leaves them whole.
+        self._outputs = outputs
         # Told after every call of a known tool: (call, spec, source kind, "ok" | "failed" |
         # "refused", the text result when it ran). Never allowed to break the call.
         self._on_call = on_call
@@ -304,6 +310,14 @@ class Toolbox:
             raise
         if found:
             self._report(call, found[0], found[1], "ok", out if isinstance(out, str) else None)
+        # Only what the model reads is capped: Home's own calls get their JSON whole.
+        if (
+            self._outputs is not None
+            and caller == "scout"
+            and isinstance(out, str)
+            and call.name not in UNCAPPED
+        ):
+            return preview(self._outputs, call.name, out)
         return out
 
     def _report(

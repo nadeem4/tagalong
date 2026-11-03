@@ -134,6 +134,7 @@ async def _run() -> None:
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
         turn_timeout=config.turn_timeout,
+        preview_chars=config.tool_preview_chars,
         masker=masker,
         keys=keys,
         setup_facts=partial(setup_facts, registry, inspect_machine),

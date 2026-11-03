@@ -554,6 +554,24 @@ so allow about that long before expecting a report.
    the summary with the failed command listed. Ask Scout "what are my jobs": each row has a
    one-line summary such as `5 steps, 1 failed`.
 
+## Long output (real brain)
+
+Needs the same setup as the hand-off section above.
+
+1. **Action:** ask Scout to hand off a job that writes a long report (for example "list every file
+   in this repo with a one-line guess at what it does") and wait for it to end.
+   **Expected:** Scout gives the gist first, laid out so it is easy to follow, not the whole report
+   pasted in; it offers the detail. The job's Reports tab still shows the full report.
+2. **Action:** say "give me the rest" (or name a part you want).
+   **Expected:** Scout reads more of the report (a `read_output` call, visible in the activity) and
+   answers from it.
+3. **Action:** with voice on, ask for the same long list aloud.
+   **Expected:** Scout says the short version and offers the rest; it does not read the list out in
+   full unasked.
+4. **Action:** set `TAGALONG_TOOL_PREVIEW_CHARS=200`, restart the brain and ask Scout to read a long
+   file with a connected app or with Claude Code.
+   **Expected:** Scout still answers, and fetches more only when it needs it.
+
 ## Scout's timers (real brain)
 
 Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so

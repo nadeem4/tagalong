@@ -9,6 +9,9 @@ import pytest
 from brain import memory
 from brain.memory import Memory, MemoryRefused
 
+# The schema before jobs held parts: what the old-database tests seed, whatever is added after.
+_PARTS_MIGRATION = next(i for i, m in enumerate(memory.MIGRATIONS) if "CREATE TABLE job_parts" in m)
+
 
 @pytest.fixture
 def mem(tmp_path):
@@ -534,7 +537,7 @@ def test_a_job_end_settles_the_parts_still_running(mem):
 
 def _seed_old_schema(path):
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO jobs(id, agent, task, folder, mode, state, reason, progress, result,"
@@ -724,7 +727,7 @@ def test_fired_timers_are_excluded_from_due_and_listed_separately(mem):
 def test_an_older_database_migrates_forward(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.close()
     m = Memory(path)
@@ -831,12 +834,12 @@ def test_offers_newest_first(mem):
 def test_migration_is_one_step_after_timers(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.close()
     m = Memory(path)
     v = m._db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == n + 1 == len(memory.MIGRATIONS)
+    assert v == len(memory.MIGRATIONS)
     assert any(p.builtin for p in m.list_preferences())
     m.close()
 
@@ -863,7 +866,7 @@ def test_approval_stores_the_preference_sentence_it_was_made_under(mem):
 def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO approvals(source, tool, summary, input, group_key, outcome, decided_by, at)"
@@ -885,7 +888,7 @@ def test_a_job_row_keeps_its_parent_job(mem):
 def test_the_parent_job_column_is_added_to_an_older_database(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
@@ -925,7 +928,7 @@ def test_set_watch_none_clears_it(mem):
 def test_an_old_database_gets_the_watch_column_by_migration(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
@@ -989,7 +992,7 @@ def test_stop_running_on_start_keeps_timers_of_finished_jobs_and_plain_timers(me
 def test_an_old_database_gets_the_job_id_column(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    n = len(memory.MIGRATIONS) - 1
+    n = _PARTS_MIGRATION
     db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
     db.execute(
         "INSERT INTO timers(note, next_at, created_at) VALUES ('n','2026-01-01T00:00:00+00:00','c')"

@@ -29,6 +29,7 @@ from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs, job_title
 from brain.memory import KINDS, Hit, JobPart, Memory, MemoryRefused
+from brain.outputs import OutputStore
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
@@ -209,6 +210,40 @@ def brain_tools(
             ),
             list_memories,
         ),
+    ]
+
+
+def output_tools(outputs: OutputStore) -> list[tuple[ToolSpec, Handler]]:
+    async def read_output(args: dict) -> str:
+        _need("read_output", args, "id")
+        if not isinstance(args["id"], str):
+            raise ValueError("id must be the output_id text from the preview header.")
+        offset = args.get("offset", 0)
+        if not isinstance(offset, int) or isinstance(offset, bool):
+            raise ValueError("offset must be a whole number.")
+        return json.dumps(outputs.page(args["id"], offset))
+
+    return [
+        (
+            ToolSpec(
+                "read_output",
+                "Read more of a long result that arrived as a preview. Pass the output_id from "
+                "its header and the offset to continue from (next_offset); you get one page and "
+                "its next_offset, which is null at the end.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "description": "The output_id of the preview."},
+                        "offset": {"type": "integer", "description": "Characters to skip."},
+                    },
+                    "required": ["id"],
+                },
+                frozenset({"scout"}),
+                effect="read",
+                default_mode="auto",
+            ),
+            read_output,
+        )
     ]
 
 

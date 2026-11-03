@@ -34,6 +34,7 @@ from brain.config import (
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
     DEFAULT_OFFER_WINDOW_DAYS,
+    DEFAULT_TOOL_PREVIEW_CHARS,
     DEFAULT_TURN_TIMEOUT_S,
     DEFAULT_WAKES_PER_HOUR,
 )
@@ -53,6 +54,7 @@ from brain.mind.prompt import (
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
+from brain.outputs import OutputStore
 from brain.protocol import ReadAloudData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.scheduler import Scheduler, WakeSkipped
@@ -66,6 +68,7 @@ from brain.tools import (
     choice_tools,
     expert_tools,
     home_tools,
+    output_tools,
     preference_tools,
     question_tools,
     timer_tools,
@@ -117,6 +120,7 @@ class Session:
         keys: KeySettings | None = None,
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
+        preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
     ) -> None:
         self._model = model
         # Set by main when voice is built; None answers `listen` with method_not_found.
@@ -132,6 +136,10 @@ class Session:
         self.guards.add(wake_caps(wakes_per_hour))
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
+        # Long tool results and expert reports reach the model as a capped preview; the full text
+        # is stored masked for read_output. Old rows go at startup.
+        outputs = OutputStore(memory, self.guards, preview_chars)
+        outputs.prune()
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
         make_run = make_run or ExpertHosts()
@@ -173,6 +181,7 @@ class Session:
             emit=self._emit_job_event,
             drop=self.scheduler.drop,
             on_timers_changed=lambda: timers.changed(),
+            outputs=outputs,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = self.timers = Timers(
@@ -185,6 +194,7 @@ class Session:
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
             + timer_tools(memory, timers, now)
+            + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
             + preference_tools(approvals, self._asks)
@@ -224,6 +234,7 @@ class Session:
             offer,
             guards=self.guards,
             on_call=self._on_tool_call,
+            outputs=outputs,
         )
         self._now = now
         loaded = memory.load_messages()
