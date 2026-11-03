@@ -274,8 +274,11 @@ class Toolbox:
             )
         return out
 
-    async def _ask(self, call: Call, spec: ToolSpec, source_kind: str) -> None:
-        """Gate step 3: run the ask chain; return only if the call may run."""
+    async def _ask(
+        self, call: Call, spec: ToolSpec, source_kind: str, job_id: str | None = None
+    ) -> None:
+        """Gate step 3: run the ask chain; return only if the call may run. `job_id` names the
+        expert job a call comes from, so its approval rows say so."""
         assert self._asks is not None
         approvals = self._approvals
 
@@ -289,6 +292,7 @@ class Toolbox:
                     group_key=spec.name,
                     outcome=outcome,
                     decided_by=decided_by,
+                    job_id=job_id,
                 )
 
         if spec.card is not None:
@@ -301,8 +305,9 @@ class Toolbox:
             call.input,
             spec.name,
             spec.locked,
-            call.turn,
+            call.turn or None,
             lambda: self._asks.permission(call, spec.name, spec.locked),
+            job_id=job_id,
             person_only=spec.person_only,
         )
         verdict = await self._guards.run(Hook.ask, ctx)
@@ -329,27 +334,30 @@ class Toolbox:
         record("approved")
         if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
-        elif self._offers is not None:
+        elif self._offers is not None and not spec.person_only:
             self._offers.consider(spec.name, source_kind, spec.name)
 
-    async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
+    async def run(
+        self, call: Call, caller: str = "scout", job_id: str | None = None
+    ) -> str | list[dict]:
         found: list = []  # [spec, source kind, ran?] once a servable tool is matched
         try:
-            out = await self._run(call, caller, found)
+            out = await self._run(call, caller, found, job_id)
         except Exception:
             if found:
                 self._report(call, found[0], found[1], "failed" if found[2] else "refused", None)
             raise
         if found:
             self._report(call, found[0], found[1], "ok", out if isinstance(out, str) else None)
-        # Only what the model reads is capped: Home's own calls get their JSON whole.
+        # Only what a model reads is capped: Home's own calls get their JSON whole.
         if (
             self._outputs is not None
-            and caller == "scout"
+            and caller in ("scout", "expert")
             and isinstance(out, str)
             and call.name not in UNCAPPED
         ):
-            return preview(self._outputs, call.name, out)
+            # An expert cannot call read_output, so it gets no id to follow.
+            return preview(self._outputs, call.name, out, readable=caller == "scout")
         return out
 
     def _report(
@@ -362,7 +370,9 @@ class Toolbox:
         except Exception:
             log.exception("on_call hook failed")
 
-    async def _run(self, call: Call, caller: str, found: list) -> str | list[dict]:
+    async def _run(
+        self, call: Call, caller: str, found: list, job_id: str | None
+    ) -> str | list[dict]:
         for source in self.sources:
             for spec in source.specs():
                 if spec.name == call.name:
@@ -375,7 +385,7 @@ class Toolbox:
                     if verdict.kind in ("block", "stop"):
                         raise RpcError(_error_code(verdict.code), verdict.reason)
                     if verdict.kind == "ask" and self._asks is not None:
-                        await self._ask(call, spec, kind)
+                        await self._ask(call, spec, kind, job_id)
                     found[2] = True
                     return await source.run(call, call.name)
         for source in self.sources:

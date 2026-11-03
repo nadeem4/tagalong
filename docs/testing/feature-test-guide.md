@@ -2044,6 +2044,18 @@ tagalong doctor` lists this machine, Node, npm and git, says there is no key and
 7. `uv run tagalong apps add <registry-id>` for a hosted app: the card shows its host, `y` adds
    it, and it says the sign-in is done from the app.
 
+### An expert reaches chosen apps through the brain (B26d)
+
+Nothing hands apps to a job from Scout yet (the next slice does), so this is checked by tests.
+
+1. `cd brain && uv run pytest tests/test_expert_apps.py tests/test_experts.py -q` passes (fakes
+   only: a real MCP client against the bridge on a fake app, and a fake ACP adapter).
+2. They show: only the chosen apps' tools are listed; another app's tool is "No tool named";
+   a wrong or missing token is a 401; an Ask-mode tool asks and its Approvals row names the job;
+   a secret in an answer comes back as `[secret]`; a revoked token stops working; `session/new`
+   carries the server only when the run has apps; the token is in the `session/new` frame and
+   in no other frame.
+
 ## Not supported
 
 Do not test these here.

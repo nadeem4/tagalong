@@ -18,6 +18,7 @@ like an adapter replaying the old chat.
 A tool may carry "terminal": true (adds terminal_info meta); a tool_update may carry
 "terminal": {"output", "delta"?, "exit"?, "signal"?}, sent as terminal_output/_exit meta
 (FAKE_ACP_META_ONLY=1: only to a client that advertised it, else as a console text block).
+FAKE_ACP_NO_HTTP=1 stops it advertising http MCP servers.
 FAKE_ACP_LOAD=1 advertises and serves session/load (ids starting "bad-" fail); "known" serves
 only ids this process created (a restarted adapter forgot the rest), "nomodes" answers
 without modes;
@@ -85,7 +86,11 @@ class FakeAgent:
             protocol_version=1,
             agent_info=schema.Implementation(name="fake-acp", version="0"),
             agent_capabilities=schema.AgentCapabilities(
-                load_session=bool(os.environ.get("FAKE_ACP_LOAD"))
+                load_session=bool(os.environ.get("FAKE_ACP_LOAD")),
+                # FAKE_ACP_NO_HTTP=1 plays an adapter that cannot take an http MCP server.
+                mcp_capabilities=schema.McpCapabilities(
+                    http=not os.environ.get("FAKE_ACP_NO_HTTP")
+                ),
             ),
             auth_methods=methods,
         )

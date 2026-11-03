@@ -58,13 +58,17 @@ class OutputStore:
         self._memory.prune_outputs(keep)
 
 
-def preview(store: OutputStore, tool: str, text: str) -> str:
+def preview(store: OutputStore, tool: str, text: str, readable: bool = True) -> str:
     """`text` untouched when within the cap; otherwise a facts header and the first `cap`
-    characters of the masked copy, which is stored whole."""
+    characters of the masked copy, which is stored whole. readable=False is for a reader
+    that cannot call read_output (an expert): no id or offset, only that it was cut."""
     if len(text) <= store.cap:
         return text
     stored = store.put(tool, text)
     shown = store.page(stored.id, 0)
+    if not readable:
+        facts = {"chars": stored.chars, "shown": len(shown["text"]), "truncated": True}
+        return json.dumps(facts) + "\n" + shown["text"]
     facts = {
         "output_id": stored.id,
         "chars": stored.chars,
