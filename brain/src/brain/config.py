@@ -24,6 +24,7 @@ DEFAULT_WAKES_PER_HOUR = 12
 DEFAULT_OFFER_MIN_APPROVALS = 3
 DEFAULT_OFFER_WINDOW_DAYS = 14
 DEFAULT_KEEP_ASKING_DAYS = 7
+DEFAULT_TOOL_PREVIEW_CHARS = 4000
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class Config:
     offer_min_approvals: int = DEFAULT_OFFER_MIN_APPROVALS
     offer_window_days: int = DEFAULT_OFFER_WINDOW_DAYS
     keep_asking_days: int = DEFAULT_KEEP_ASKING_DAYS
+    tool_preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS  # per tool result shown to the model
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -87,6 +89,9 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
             env, "TAGALONG_OFFER_WINDOW_DAYS", DEFAULT_OFFER_WINDOW_DAYS
         ),
         keep_asking_days=_positive_int(env, "TAGALONG_KEEP_ASKING_DAYS", DEFAULT_KEEP_ASKING_DAYS),
+        tool_preview_chars=_positive_int(
+            env, "TAGALONG_TOOL_PREVIEW_CHARS", DEFAULT_TOOL_PREVIEW_CHARS
+        ),
     )
 
 

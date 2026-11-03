@@ -2,6 +2,7 @@
 
 import base64
 import json
+import re
 from datetime import datetime
 from importlib.resources import files
 
@@ -434,3 +435,24 @@ def test_interruption_block_is_a_fenced_data_block_that_cannot_close_itself():
     assert block["text"].startswith('<data kind="interruption">')
     assert block["text"].count("</data>") == 1
     assert "spoken: One." in block["text"] and "unsaid: Two" in block["text"]
+
+
+def test_soul_tells_scout_to_present_long_output_gist_first():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "gist first" in soul and "In voice say the short version" in soul
+
+
+def test_soul_mentions_read_output_and_output_id():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "read_output" in soul and "output_id" in soul
+
+
+def test_job_wake_note_says_a_report_may_be_a_preview():
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    ended = events.split("## job_ended")[1].split("##")[0]
+    assert "preview" in ended and "read_output" in ended
+
+
+def test_soul_has_no_numeric_limits():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert not re.search(r"\d+\s+(words|lines|sentences)", soul)

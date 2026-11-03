@@ -37,6 +37,13 @@ Host-side files that feed these components: `bodies/desktop/src/renderer/src/pan
 
 ## How it works
 
+### Long answers
+
+The bubble shows what Scout writes; it does not cut or summarise anything. Scout's soul tells it to put the
+gist first, laid out so it is easy to follow, and give the detail when asked, so a long tool result or
+expert report (which reaches Scout as a capped preview, see [brain.md](brain.md#long-tool-output))
+appears as a short structured answer plus an offer of the rest.
+
 ### The HostBridge contract
 
 `HostBridge` (`host-bridge.ts`) is every call and notification a component may use. Four members

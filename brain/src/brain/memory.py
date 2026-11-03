@@ -226,6 +226,16 @@ MIGRATIONS = (
     ALTER TABLE job_activity ADD COLUMN part TEXT NOT NULL DEFAULT 'p1';
     ALTER TABLE job_activity ADD COLUMN source TEXT;
     """,
+    # Long tool output, stored masked so Scout can read the rest of a capped preview by id.
+    """
+    CREATE TABLE tool_outputs(
+        id TEXT PRIMARY KEY,
+        tool TEXT NOT NULL,
+        chars INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        at TEXT NOT NULL
+    );
+    """,
 )
 
 DROPPED_MARKER = "[older steps dropped]"
@@ -459,6 +469,26 @@ class Memory:
 
     def close(self) -> None:
         self._db.close()
+
+    def put_output(self, output_id: str, tool: str, text: str) -> None:
+        self._db.execute(
+            "INSERT INTO tool_outputs(id, tool, chars, text, at) VALUES (?, ?, ?, ?, ?)",
+            (output_id, tool, len(text), text, self._now().isoformat()),
+        )
+        self._db.commit()
+
+    def get_output(self, output_id: str) -> str | None:
+        row = self._db.execute("SELECT text FROM tool_outputs WHERE id=?", (output_id,)).fetchone()
+        return None if row is None else row[0]
+
+    def prune_outputs(self, keep: int) -> None:
+        """Keep the newest `keep` stored outputs (rowid order is insertion order)."""
+        self._db.execute(
+            "DELETE FROM tool_outputs WHERE rowid NOT IN "
+            "(SELECT rowid FROM tool_outputs ORDER BY rowid DESC LIMIT ?)",
+            (keep,),
+        )
+        self._db.commit()
 
     def permission_modes(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT tool, mode FROM permissions"))

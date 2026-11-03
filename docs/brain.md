@@ -24,22 +24,23 @@ the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it 
 `<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
 variable still works and is the developer path.
 
-| Variable                       | Default           | Meaning                                                                                                                                  |
-| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port                                                                                     |
-| `TAGALONG_HOME`                | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                       |
-| `TAGALONG_MODEL`               | `claude-opus-5-5` | Model Scout thinks with                                                                                                                  |
-| `TAGALONG_DAILY_BUDGET_USD`    | `5`               | Most Scout may spend per local day, in USD                                                                                               |
-| `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                             |
-| `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                    |
-| `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                 |
-| `TAGALONG_JOB_QUIET_MIN`       | `20`              | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit        |
-| `TAGALONG_EXPERT_IDLE_S`       | `300`             | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                         |
-| `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                 |
-| `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                  |
-| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`              | How far back those approvals are counted, in days (whole number, 1 or more)                                                              |
-| `TAGALONG_KEEP_ASKING_DAYS`    | `7`               | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                         |
-| `ANTHROPIC_API_KEY`            | none              | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset |
+| Variable                       | Default           | Meaning                                                                                                                                                    |
+| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port                                                                                                       |
+| `TAGALONG_HOME`                | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
+| `TAGALONG_MODEL`               | `claude-opus-5-5` | Model Scout thinks with                                                                                                                                    |
+| `TAGALONG_DAILY_BUDGET_USD`    | `5`               | Most Scout may spend per local day, in USD                                                                                                                 |
+| `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                                               |
+| `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
+| `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
+| `TAGALONG_JOB_QUIET_MIN`       | `20`              | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                          |
+| `TAGALONG_EXPERT_IDLE_S`       | `300`             | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                           |
+| `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                   |
+| `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                    |
+| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`              | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                |
+| `TAGALONG_KEEP_ASKING_DAYS`    | `7`               | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                           |
+| `TAGALONG_TOOL_PREVIEW_CHARS`  | `4000`            | Characters of one tool result (brain tool, connected app, expert report) Scout sees at once; the rest is read with `read_output` (whole number, 1 or more) |
+| `ANTHROPIC_API_KEY`            | none              | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                   |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -82,6 +83,7 @@ the total can run a little low.
 | `brain/src/brain/questions.py`      | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
 | `brain/src/brain/jobs.py`           | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
 | `brain/src/brain/job_activity.py`   | `JobActivity`: one per running job; turns ACP updates into masked, capped, stored activity entries                                                                                                                                                                                         |
+| `brain/src/brain/outputs.py`        | `OutputStore` and `preview`: a long tool result becomes a capped preview, the full text is stored masked for `read_output`                                                                                                                                                                 |
 | `brain/src/brain/apps.py`           | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
 | `brain/src/brain/app_oauth.py`      | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
 | `brain/src/brain/app_tools.py`      | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                                                                                                                                                       |
@@ -259,11 +261,34 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 - **Body calls.** `use` waits at most 30 s. On timeout or when the turn is cancelled the brain
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
+- **Long text results.** Over `TAGALONG_TOOL_PREVIEW_CHARS` a text result reaches the model as a
+  preview plus an id, see [Long tool output](#long-tool-output). Only Scout's own calls are capped; Home's own calls are not.
 - **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
   oversized result is an error result. A part is over the limit above 5,000,000 bytes, and all
   parts of one result together above 20,000,000 bytes. An image or file part counts its decoded
   size; a text part counts its UTF-8 bytes (not characters), so a body cannot send an unbounded
   page of text. Both give `over_limit`: "<tool> sent more data than allowed."
+
+### Long tool output
+
+One cap, at the gate. `Toolbox.run` measures each text result in characters (not the `read_output`
+result, and not image or other block results). At or under `TAGALONG_TOOL_PREVIEW_CHARS` (default 4000) it passes through untouched. One character over, `outputs.py` stores the whole text masked
+(the Masker, so a secret past the cap never shows in a later page) in the `tool_outputs` table and
+the model gets a facts header plus the first cap characters:
+
+```
+{"output_id": "9f2c...", "chars": 12840, "shown": 4000, "next_offset": 4000}
+<the first 4000 characters>
+```
+
+`read_output(id, offset)` is Scout's own auto tool: it returns one page (at most the cap) of the
+stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again.
+An unknown id or a negative offset is a plain refusal line; an offset past the end is an empty last
+page. Cuts are on characters, never mid-character. Brain tools, connected-app tools and an expert's
+report on a job wake all use this one path. The stored job report stays whole in the database, so the
+Reports tab shows it in full. The newest 200 stored outputs are kept; older ones go at startup. The
+cap is a transport guardrail only: how to present a long result (gist first, detail on request, the
+short version in voice) is guidance in `mind/soul.md`, not code.
 
 ## Permissions and asks
 
@@ -791,7 +816,7 @@ whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
-never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
+never the chat; the expert's summary stays whole in its part's report, and `list_jobs` shows it capped at 4,000 characters).
 `list_jobs` rows carry `parts`, each with `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
 
@@ -885,7 +910,8 @@ with the kind's name, its note on how to weigh it and the facts, so it is data, 
 start that raises is logged and the batch is dropped, never raised into the caller.
 
 When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
-state, reason, and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that
+state, reason and the newest part's report; a report over the preview cap arrives as a preview with
+an `output_id`, see [Long tool output](#long-tool-output)). `reported` is set once that
 turn has started (a failed start leaves it unreported). At brain start every finished unreported
 job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
 from the owner; the model decides whether to speak, and may say nothing.

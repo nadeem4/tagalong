@@ -29,6 +29,9 @@ The kinds table in `memory.py` is the only place caps and rules live.
 | `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind               |
 | `forget`   | Deletes one item by id                                                               |
 
+`read_output` (Scout's own) pages the stored copy of a long tool result by id; see
+[Long tool output](brain.md#long-tool-output).
+
 - The same text saved twice in a kind is one item.
 - A full kind, text over the cap, a wrong kind or an unknown id is refused with a plain sentence.
   The tool result is an error the model reads. Nothing is dropped silently.
@@ -40,6 +43,8 @@ The kinds table in `memory.py` is the only place caps and rules live.
 
 ### Prompt and storage
 
+- A second table, `tool_outputs` (id, tool, chars, text, at), holds long tool results stored masked
+  for `read_output`. The newest 200 are kept; older ones are deleted at startup.
 - At the start of each turn the brain reads the always-loaded kinds once. Every step of the turn
   puts them in the system prompt under "What you know", grouped as instructions, about the owner,
   and things to keep an eye on, each line `- [id] text`, with a `(cadence)` prefix on tracking items (`- [id] (daily) text`).
