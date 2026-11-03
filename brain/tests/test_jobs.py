@@ -9,6 +9,7 @@ import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fake_clock import FakeClock
@@ -88,6 +89,43 @@ class FakeScout:
         self.cancelled.append(job_id)
 
 
+class FakeBridge:
+    """Stands in for ExpertApps: notes each grant (job, apps) and each revoke."""
+
+    def __init__(self) -> None:
+        self.grants: list = []
+        self.revoked: list = []
+
+    async def grant(self, job_id, apps):
+        from acp.schema import HttpMcpServer
+
+        descriptor = HttpMcpServer(
+            type="http", name="tagalong", url="http://127.0.0.1:1/m", headers=[]
+        )
+        grant = SimpleNamespace(job_id=job_id, apps=tuple(apps), descriptor=descriptor)
+        self.grants.append(grant)
+        return grant
+
+    async def revoke(self, grant):
+        self.revoked.append(grant)
+
+
+class FakeConnectedApps:
+    """Stands in for Apps: ids, names and states, as Jobs reads them."""
+
+    def __init__(self, **states: str) -> None:
+        self.states = states
+
+    def ids(self):
+        return list(self.states)
+
+    def name(self, app_id):
+        return app_id.title()
+
+    def status(self, app_id):
+        return SimpleNamespace(state=self.states[app_id])
+
+
 class Rig:
     def __init__(
         self,
@@ -104,7 +142,9 @@ class Rig:
         setup_facts=None,
         shared: bool = False,
         load: bool | str = False,
+        apps=None,
     ) -> None:
+        self.bridge = FakeBridge()
         script = tmp_path / "script.json"
         script.write_text(json.dumps(steps))
         monkeypatch.setenv("FAKE_ACP_SCRIPT", str(script))
@@ -153,6 +193,7 @@ class Rig:
             drop=lambda kind, key: self.dropped.append((kind, key, len(self.finished))),
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
+            apps=apps,
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -163,6 +204,7 @@ class Rig:
             sleep=self.clock.sleep,
             clock=self.clock.clock,
             grace=2,
+            bridge=self.bridge,
             **callbacks,
         )
         self.runs.append(run)
@@ -2574,3 +2616,118 @@ async def test_two_concurrent_continuations_get_distinct_part_ids(make_rig):
     )
     assert {a.part, b.part} == {"p2", "p3"}
     assert {p.id for p in rig.memory.get_job(job).parts} == {"p1", "p2", "p3"}
+
+
+# B26e: a hand-off carries apps; the card lists them, the person may remove, Send approves.
+
+
+def apps_rig(make_rig, *answers, **kw):
+    apps = FakeConnectedApps(lin="connected", mail="connected", old="off", broken="error")
+    return make_rig(FakeAsks(*answers), apps=apps, **kw)
+
+
+async def test_an_unknown_or_unavailable_app_is_refused_plainly_and_starts_nothing(make_rig):
+    rig = apps_rig(make_rig)
+    for bad, words in (
+        ("nope", "no app nope"),
+        ("old", "old is not connected"),
+        ("broken", "broken is not connected"),
+    ):
+        with pytest.raises(JobError, match=words):
+            await rig.jobs.start("task", str(rig.folder), apps=["lin", bad])
+    assert rig.runs == [] and rig.asks.opened == [] and rig.bridge.grants == []
+
+
+async def test_the_card_lists_the_apps_with_names(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan"))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail", "lin"])
+    ask = rig.asks.opened[0]
+    assert ask["input"] == {
+        "folder": str(rig.folder),
+        "apps": [{"id": "lin", "name": "Lin"}, {"id": "mail", "name": "Mail"}],
+    }
+
+
+async def test_a_card_without_apps_keeps_the_old_input_and_no_mcp_server(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan"))
+    await rig.jobs.start("task", str(rig.folder))
+    assert rig.asks.opened[0]["input"] == {"folder": str(rig.folder)}
+    assert rig.bridge.grants == []
+
+
+async def test_send_with_every_app_kept_starts_the_job_with_them(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan"))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
+    assert [g.apps for g in rig.bridge.grants] == [("lin", "mail")]
+
+
+async def test_an_answer_with_a_removed_app_starts_the_job_without_it(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan", apps=("lin",)))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
+    assert [g.apps for g in rig.bridge.grants] == [("lin",)]
+    assert rig.bridge.revoked == []  # still held for the job
+
+
+async def test_removing_every_app_leaves_the_expert_no_bridge(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan", apps=()))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert len(rig.bridge.revoked) == 1 and rig.runs[0]._grant is None
+
+
+async def test_an_answer_cannot_add_an_app_that_was_not_on_the_card(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan", apps=("lin", "mail", "nope")))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert [g.apps for g in rig.bridge.grants] == [("lin",)]
+    assert rig.runs[0].apps == ("lin",)
+
+
+async def test_cancel_at_the_card_revokes_the_grant_and_starts_nothing(make_rig):
+    rig = apps_rig(make_rig, Answer("cancel"))
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert len(rig.bridge.revoked) == 1 and rig.memory.list_jobs() == []
+
+
+async def test_the_approvals_row_names_the_kept_apps(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan", apps=("mail",)), approvals=True)
+    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
+    [row] = hand_off_rows(rig)
+    assert (row.tool, row.outcome, row.decided_by) == ("hand_off", "approved", "person")
+    assert row.input["apps"] == ["mail"]
+
+
+async def test_a_scouts_follow_up_with_apps_shows_the_card_though_a_preference_covers(make_rig):
+    asks = FakeAsks(Answer("Plan"), Answer("Plan"))
+    check = FakeSideCheck()
+    rig = continuing(make_rig, asks, check, apps=FakeConnectedApps(lin="connected"))
+    check.result = pref_in(rig, "Nudging my jobs is fine")
+    first = await first_job(rig)
+    await rig.jobs.start(
+        "two", str(rig.folder), continue_job=first, owner_asked=False, apps=["lin"]
+    )
+    assert len(asks.opened) == 2 and check.facts == []
+    assert asks.opened[1]["input"]["apps"] == [{"id": "lin", "name": "Lin"}]
+    [row] = hand_off_rows(rig)
+    assert row.decided_by == "person" and row.input["apps"] == ["lin"]
+
+
+async def test_an_expert_that_cannot_take_apps_refuses_before_the_card(make_rig, monkeypatch):
+    monkeypatch.setenv("FAKE_ACP_NO_HTTP", "1")
+    rig = apps_rig(make_rig, Answer("Plan"))
+    with pytest.raises(JobError, match="can.t take connected apps"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert rig.asks.opened == [] and rig.memory.list_jobs() == []
+
+
+async def test_a_timeout_at_the_card_with_apps_revokes_the_grant(make_rig):
+    timeout = RpcError(ErrorCode.timeout, "nobody answered")
+    rig = apps_rig(make_rig, timeout)
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert len(rig.bridge.revoked) == 1 and rig.memory.list_jobs() == []
+
+
+async def test_send_marks_the_grant_sent(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan"))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert rig.bridge.grants[0].sent is True

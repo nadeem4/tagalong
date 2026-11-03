@@ -569,8 +569,11 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   permission ask (tool `claude_code:<title>`, its input shown, one button per Claude Code option),
   and a question (no tool: a "Your answer" field with Send, Enter also sends, plus a button per
   choice when it has any). A click answers through `answerJobAsk` (`ipc/connections.ts`), which
-  calls `BrainClient.answerWith(ask, option, text?)`, sending `answer { ask, option, text? }` with
-  the option's exact name. Typed text goes as both `option` and `text`, because the brain takes
+  calls `BrainClient.answerWith(ask, option, text?, apps?)`, sending `answer { ask, option, text?, apps? }`
+  with the option's exact name. A hand-off whose input carries `apps` (`[{ id, name }]`) lists them
+  on the card under "Apps this job may use" with a Remove button each (`turn-events.ts` lifts them
+  out of the summary into the card's `apps`); choosing a mode is Send and sends `apps` with the ids
+  still listed (an empty list when all were removed). Typed text goes as both `option` and `text`, because the brain takes
   an unlisted option only with free text. A closed ask removes its card; `not_found` is swallowed
   as for `approveTool`.
 - **`changed` notifications:** `index.ts` sends each one's `what` to every window on

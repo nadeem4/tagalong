@@ -356,6 +356,19 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
+    it("a hand-off ask's apps become the card's apps, not a line of JSON in its words", () => {
+      const apps = [{ id: 'lin', name: 'Linear' }];
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: 'Fix it', tool: 'hand_off', input: { folder: 'C:\\p', apps } }),
+      );
+      expect(e).toMatchObject({
+        type: 'connector.confirm',
+        apps,
+        summary: 'Fix it\nfolder: C:\\p',
+      });
+    });
+
     it("another expert's permission ask is labelled by that expert, not Scout", () => {
       const [e] = make().map(
         'ask',

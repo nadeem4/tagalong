@@ -842,9 +842,25 @@ the adapter's own message (for example that auth is required).
 ### Apps for an expert (the bridge)
 
 An expert never connects to an app itself and never holds an app's sign-in. When a job part is
-started with apps (`ExpertRun.apps`; nothing sets them from `hand_off` yet, that is the next
-slice), `ExpertRun` asks `ExpertApps` (`expert_apps.py`) for a grant and passes one MCP server in
-`new_session` / `load_session` `mcp_servers`. Without apps `mcp_servers` stays `[]`.
+started with apps (`ExpertRun.apps`, set from `hand_off`'s `apps`, see below), `ExpertRun` asks
+`ExpertApps` (`expert_apps.py`) for a grant and passes one MCP server in `new_session` /
+`load_session` `mcp_servers`. Without apps `mcp_servers` stays `[]`.
+
+**Hand-off carries apps (B26e).** `hand_off` takes `apps`, a list of connected app ids the job
+needs (none by default). `Jobs.start` refuses an id that is unknown ("no app x; connected apps:
+...") or not `connected` (off, needs sign-in, error) before anything starts. The mode card's
+`input` then carries `apps: [{id, name}]`, and the body lists them with a remove control. The
+adapter session is opened before the card (the modes come from it), so the grant is made for the
+offered apps and then narrowed: the answer's `apps` (contract: `answer.apps?: string[]`) is
+intersected with the offered ones, so an answer can only remove, never add. `ExpertRun.keep_apps`
+sets the grant to the kept apps, or revokes it when none are kept, all before the expert is given
+its task. Choosing a mode is Send, and Send is the approval for the kept apps: no per-app ask at
+start, while a risky tool call still asks through the bridge. An answer without `apps` keeps all.
+The Approvals row for the hand-off (written whenever apps were on the card) has
+`input.apps` set to the kept ids. A Scout follow-up on a wake never skips the card when it carries
+apps, even if a preference covers hand-offs. An expert that cannot take http MCP servers (or a
+brain with no bridge) is refused before the card ("this expert can't take connected apps"). The
+grant's `sent` flag is set by `keep_apps`; until then the bridge lists tools but refuses calls.
 
 - **One server, loopback only.** `ExpertApps` starts one HTTP MCP server (streamable, stateless,
   JSON replies) on `127.0.0.1` at a random port, the first time a grant is asked for. Each grant
@@ -1142,8 +1158,8 @@ shows them as Scout does.
 
 - **Hand-off ask.** `hand_off` needs an absolute folder that exists ("no folder at <path>"
   otherwise). It starts the adapter and opens an ask whose text is the task, with the folder as
-  its input and the modes the adapter reports plus `cancel` as options. A mode answer starts the
-  job. `cancel`, no answer in 5 minutes, or nobody online closes the adapter and returns "not
+  its input (and the offered `apps`, when it has any) and the modes the adapter reports plus
+  `cancel` as options. A mode answer starts the job, with only the apps the answer kept. `cancel`, no answer in 5 minutes, or nobody online closes the adapter and returns "not
   started". The tool asks for itself, so the gate adds no allow or deny ask, and Home can only turn it Off or back on (Ask)
   and cannot make it Auto.
 - **Relayed asks.** Claude Code's permission requests and questions become turn-less asks

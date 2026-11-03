@@ -63,7 +63,7 @@ const bridge: PreloadBridge = {
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
-  answerJobAsk: (approvalId: string, answer: { option: string; text?: string }) =>
+  answerJobAsk: (approvalId: string, answer: { option: string; text?: string; apps?: string[] }) =>
     ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
   setupOverview: (query?: string) =>

@@ -20,6 +20,9 @@ from brain.protocol import ErrorCode, RpcError
 class Answer:
     option: str | None  # None: nobody was online to ask
     text: str | None = None
+    apps: tuple[str, ...] | None = (
+        None  # a hand-off card's kept apps; None: the card was not edited
+    )
 
 
 @dataclass
@@ -119,7 +122,14 @@ class Asks:
                 entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
                 self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
 
-    def answer(self, ask_id: str, option: str, body_id: str, text: str | None = None) -> None:
+    def answer(
+        self,
+        ask_id: str,
+        option: str,
+        body_id: str,
+        text: str | None = None,
+        apps: Iterable[str] | None = None,
+    ) -> None:
         entry = self._open.get(ask_id)
         # A done future means the wait was cancelled or timed out and is about to close.
         if entry is None or entry.future.done():
@@ -127,7 +137,7 @@ class Asks:
         if option not in entry.params["options"] and not (entry.free_text and text):
             raise RpcError(ErrorCode.invalid_params, f"{option} is not offered by this ask")
         del self._open[ask_id]
-        entry.future.set_result(Answer(option, text))
+        entry.future.set_result(Answer(option, text, None if apps is None else tuple(apps)))
         closed = {"id": ask_id, "state": "closed", "reason": "answered"}
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
 

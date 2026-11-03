@@ -326,6 +326,15 @@ def test_say_voice_and_speed_edges():
     assert say.model_validate({"text": "hi"}).voice is None
 
 
+def test_answer_carries_an_optional_kept_apps_list():
+    answer = BODY_TO_BRAIN["answer"][0]
+    assert answer.model_validate({"ask": "a1", "option": "Plan"}).apps is None
+    assert answer.model_validate({"ask": "a1", "option": "Plan", "apps": ["lin"]}).apps == ["lin"]
+    assert answer.model_validate({"ask": "a1", "option": "Plan", "apps": []}).apps == []
+    with pytest.raises(ValidationError):
+        answer.model_validate({"ask": "a1", "option": "Plan", "apps": "lin"})
+
+
 def test_ask_open_accepts_free_text_and_recommended():
     params = {"seq": 1, "id": "a", "state": "open", "text": "t", "options": ["x", "y"]}
     ask = AskOpen.model_validate({**params, "free_text": True, "recommended": "y"})

@@ -195,10 +195,18 @@ export class BrainClient {
     return this.request('answer', { ask, option }).then(() => undefined);
   }
 
-  /** The answer to a job's ask: one of its own option names, or typed text for a question. */
-  answerWith(ask: string, option: string, text?: string): Promise<void> {
+  /**
+   * The answer to a job's ask: one of its own option names, or typed text for a question. A
+   * hand-off card also sends the apps the person kept.
+   */
+  answerWith(ask: string, option: string, text?: string, apps?: string[]): Promise<void> {
     if (this.status !== 'online') return Promise.reject(new BrainOffline());
-    const params = text === undefined ? { ask, option } : { ask, option, text };
+    const params = {
+      ask,
+      option,
+      ...(text === undefined ? {} : { text }),
+      ...(apps === undefined ? {} : { apps }),
+    };
     return this.request('answer', params).then(() => undefined);
   }
 

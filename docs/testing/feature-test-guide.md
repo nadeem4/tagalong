@@ -2061,7 +2061,7 @@ tagalong doctor` lists this machine, Node, npm and git, says there is no key and
 
 ### An expert reaches chosen apps through the brain (B26d)
 
-Nothing hands apps to a job from Scout yet (the next slice does), so this is checked by tests.
+Checked by tests; the hand-off side is in the next section.
 
 1. `cd brain && uv run pytest tests/test_expert_apps.py tests/test_experts.py -q` passes (fakes
    only: a real MCP client against the bridge on a fake app, and a fake ACP adapter).
@@ -2070,6 +2070,20 @@ Nothing hands apps to a job from Scout yet (the next slice does), so this is che
    a secret in an answer comes back as `[secret]`; a revoked token stops working; `session/new`
    carries the server only when the run has apps; the token is in the `session/new` frame and
    in no other frame.
+
+### A hand-off lists its apps and the person can remove some (B26e)
+
+Needs a connected app (Home, Connections) and an installed, logged-in expert.
+
+1. Automated: `cd brain && uv run pytest tests/test_jobs.py tests/test_asks.py tests/test_tools.py -q`
+   and `pnpm --filter @tagalong/ui test connector-confirm`, plus
+   `pnpm --filter @tagalong/desktop test:e2e -- jobs` (fake brain).
+2. By hand: ask Scout for a task that needs the app's data in a folder. The mode card lists the
+   app under "Apps this job may use" with a remove button per app.
+3. Remove the app and pick a mode: the job starts and the expert has no tool of that app (it says
+   so, or Scout fills the gap). Repeat without removing: the expert can use the app, a change
+   still asks, and Home's Approvals shows the hand-off row naming the app.
+4. `hand_off` with an app that is off or unknown is refused in plain words and no card appears.
 
 ## Not supported
 

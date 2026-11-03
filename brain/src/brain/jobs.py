@@ -10,7 +10,7 @@ import logging
 import shutil
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -112,7 +112,9 @@ class Jobs:
         drop: Callable[[str, str], None] = lambda kind, key: None,
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
+        apps=None,
     ) -> None:
+        self._apps = apps  # the connected apps (ids, names, state); None: none can be handed over
         self._outputs = outputs  # caps the report a wake carries; None leaves it whole
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
         self._now = now  # wall time for activity stamps and how long a step has run
@@ -234,6 +236,7 @@ class Jobs:
         fresh: bool = False,
         job: str | None = None,
         title: str | None = None,
+        apps: Sequence[str] = (),
     ) -> JobId:
         """Hand the task to an expert once the user picks a mode. Returns the job id.
 
@@ -243,7 +246,11 @@ class Jobs:
         preference lets it reuse the earlier mode without a card. Without continue_job the
         expert's last finished session in this folder is continued (its mode is not carried over,
         the card is shown as for any new job); fresh=True skips that. job adds a part to that open
-        job (title is then ignored); otherwise a new job opens with Scout's title, if any."""
+        job (title is then ignored); otherwise a new job opens with Scout's title, if any.
+
+        apps are connected app ids the expert may use through the brain. They are listed on the
+        card and the person may remove some; Send approves the rest, and the job starts with
+        only those. Unknown or unavailable ids are refused before anything starts."""
         if continue_job and fresh:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
@@ -255,6 +262,7 @@ class Jobs:
             if existing.closed_at:
                 raise JobError(f"job {job} is closed; open a new job instead")
         chosen = await self._pick(earlier_part.agent if earlier_part else expert)
+        offered = self._check_apps(apps)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
@@ -270,6 +278,7 @@ class Jobs:
             earlier_part=earlier_part,
             scout_follow_up=continue_job is not None and not owner_asked,
             new_job=job is None,
+            apps=offered,
         )
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
@@ -278,6 +287,23 @@ class Jobs:
             saved = self._memory.get_job(str(started))
             started.title = job_title(saved) if saved else None
         return started
+
+    def _check_apps(self, wanted: Sequence[str]) -> tuple[str, ...]:
+        """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable."""
+        offered = tuple(dict.fromkeys(wanted))
+        known = self._apps.ids() if self._apps is not None else []
+        for app_id in offered:
+            if app_id not in known:
+                raise JobError(f"no app {app_id}; connected apps: {', '.join(known) or 'none'}")
+            state = self._apps.status(app_id).state
+            if state != "connected":
+                raise JobError(
+                    f"{app_id} is not connected (it is {state}); it cannot be handed over"
+                )
+        return offered
+
+    def _card_apps(self, offered: tuple[str, ...]) -> list[dict]:
+        return [{"id": a, "name": self._apps.name(a)} for a in offered]
 
     async def _start_part(
         self,
@@ -290,6 +316,7 @@ class Jobs:
         earlier_part: JobPart | None = None,
         scout_follow_up: bool = False,
         new_job: bool = True,
+        apps: tuple[str, ...] = (),
     ) -> JobId:
         """The one seam that starts an expert run: a new job's first part, or (new_job False) a
         further part of an existing job."""
@@ -310,6 +337,7 @@ class Jobs:
             on_end=lambda state, reason, result: self._end(job_id, state, reason, result, part),
             on_update=lambda update: self._activity_update(job_id, update, part),
             on_quiet=lambda facts: self._quiet(job_id, facts, part),
+            apps=apps,
         )
         self._starting += 1
         slot_held = True  # released once the row exists, so a job never counts twice
@@ -320,12 +348,17 @@ class Jobs:
                 modes = await run.start(path, resume=resume)
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
+            if apps and not run.has_grant:
+                # No bridge or no http MCP: the card would promise apps the expert can't reach.
+                raise JobError("this expert can't take connected apps")
             by_name = {m.name: m.id for m in modes}
             mode_id = None
             # The chain runs only when the earlier mode can be reused, so a Scout row always
             # means a mode was chosen; otherwise the card is the owner's question as today.
+            # Apps on the card are the person's to approve, so a covering preference never skips it.
             if (
                 scout_follow_up
+                and not apps
                 and earlier.mode in by_name.values()
                 and await self._follow_up_ask(chosen, earlier, task, path)
             ):
@@ -333,11 +366,14 @@ class Jobs:
             if mode_id is None:
                 timed_out = False
                 answer = None
+                card: dict = {"folder": str(path)}
+                if apps:
+                    card["apps"] = self._card_apps(apps)
                 try:
                     answer = await self._open_ask(
                         text=task,
                         tool="hand_off",
-                        input={"folder": str(path)},
+                        input=card,
                         options=[*by_name, CANCEL],
                         timeout=HANDOFF_TIMEOUT_S,
                     )
@@ -348,8 +384,16 @@ class Jobs:
                     if scout_follow_up and timed_out:
                         self._record_hand_off(chosen, path, task, "timed_out", "none")
                     raise JobError("not started")
+                # Send is the approval for the apps still on the card; the answer can only narrow.
+                kept = apps
+                if apps and answer.apps is not None:
+                    kept = tuple(a for a in apps if a in answer.apps)
+                await run.keep_apps(kept)
+                logged = {"folder": str(path), **({"apps": list(kept)} if apps else {})}
                 if scout_follow_up:
-                    self._card_picked(chosen, task, path)
+                    self._card_picked(chosen, task, path, logged)
+                elif apps:
+                    self._record_hand_off(chosen, path, task, "approved", "person", logged)
             if new_job:
                 parent = earlier.id if earlier else None
                 self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
@@ -436,9 +480,11 @@ class Jobs:
             raise JobError("not started")
         return verdict.kind == "allow" and verdict.guard == "side_check"
 
-    def _card_picked(self, chosen: InstalledExpert, task: str, path: Path) -> None:
+    def _card_picked(
+        self, chosen: InstalledExpert, task: str, path: Path, tool_input: dict | None = None
+    ) -> None:
         """The owner picked a mode on the card for Scout's follow-up: log it, maybe offer."""
-        self._record_hand_off(chosen, path, task, "approved", "person")
+        self._record_hand_off(chosen, path, task, "approved", "person", tool_input)
         if self._offers is not None:
             self._offers.consider(f"{_prefix(chosen.id)}:{path}", AGENT, "hand_off")
 

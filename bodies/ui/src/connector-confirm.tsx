@@ -9,7 +9,7 @@ import { useState } from 'react';
 import type { ConnectorConfirmParams } from './shapes';
 
 type Decision = 'once' | 'always' | 'deny';
-export type JobAnswer = { option: string; text?: string };
+export type JobAnswer = { option: string; text?: string; apps?: string[] };
 
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
 
@@ -30,6 +30,8 @@ export function ConnectorConfirmCard({
   onReply: (answer: JobAnswer) => void;
 }) {
   const [typed, setTyped] = useState('');
+  // A hand-off's apps still on the card; choosing a mode (Send) approves exactly these.
+  const [kept, setKept] = useState(confirm.apps ?? []);
   const isAsk = confirm.options !== undefined;
   const isJob =
     confirm.question === true ||
@@ -53,6 +55,8 @@ export function ConnectorConfirmCard({
     const options = [...(confirm.options ?? [])].sort(
       (a, b) => Number(b === confirm.recommended) - Number(a === confirm.recommended),
     );
+    // Only a card that came with apps answers with a list, so other asks stay as they were.
+    const withApps = confirm.apps !== undefined ? { apps: kept.map((a) => a.id) } : {};
     return (
       <section className="card" aria-label={`${confirm.app} asks`}>
         <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
@@ -71,13 +75,31 @@ export function ConnectorConfirmCard({
             />
           </label>
         )}
+        {confirm.apps !== undefined && (
+          <div className="card-brief" role="group" aria-label="Apps this job may use">
+            <span>Apps this job may use{kept.length === 0 ? ': none' : ''}</span>
+            {kept.map((app) => (
+              <span key={app.id} className="bubble-tag">
+                {app.name}{' '}
+                <button
+                  type="button"
+                  className="bubble-quiet"
+                  aria-label={`Remove ${app.name}`}
+                  onClick={() => setKept(kept.filter((a) => a.id !== app.id))}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="bubble-choices" role="group" aria-label="Options">
           {options.map((option, i) => (
             <button
               key={option}
               type="button"
               className={`bubble-choice ${i === 0 ? 'bubble-primary' : 'bubble-quiet'}`}
-              onClick={() => onReply({ option })}
+              onClick={() => onReply({ option, ...withApps })}
             >
               <span>{option}</span>
               {option === confirm.recommended && (
