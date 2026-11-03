@@ -300,6 +300,21 @@ def test_body_tool_confirm_true_is_locked():
     assert Toolbox([BodySource(bodies)], {}).mode(s) == "ask"
 
 
+def test_body_tool_confirm_always_is_person_only_and_always_asks():
+    bodies = Bodies()
+    decl = [Tool(name="rm", description="d", input_schema={"type": "object"}, confirm="always")]
+    bodies.connect(
+        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+    )
+    (s,) = BodySource(bodies).specs()
+    assert s.locked and s.person_only
+    stored = {"desktop__rm": "auto"}
+    box = Toolbox([BodySource(bodies)], stored)
+    assert box.mode(s) == "ask"
+    with pytest.raises(RpcError):
+        box.set_mode("desktop__rm", "auto")
+
+
 def test_set_mode_saves_and_changes_mode():
     stored = {}
     box = Toolbox([FakeSource([spec("a")])], stored)
@@ -934,6 +949,19 @@ async def test_person_allow_once_is_offered_but_always_is_not(mem, choice, expec
     box._asks.answer(opened_asks(bodies)[0]["id"], choice, "desktop")
     await task
     assert offers.considered == expected  # "always" just made the tool Auto: no offer
+
+
+async def test_person_only_tool_approval_is_never_offered(mem):
+    # A confirm "always" tool can never be Auto, so offering to auto-approve it would be noise.
+    offers = FakeOffers()
+    box, source, bodies, _, _ = scouted(mem, FakeSideCheck(None))
+    source._specs = [ToolSpec("t", "t tool", {"type": "object"}, locked=True, person_only=True)]
+    box._offers = offers
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+    assert offers.considered == []
 
 
 async def test_refusal_and_scout_approval_are_not_offered(mem):

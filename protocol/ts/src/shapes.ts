@@ -48,7 +48,7 @@ export const Tool = z.object({
     .refine((n) => !n.includes('__'), 'tool names never contain __'),
   description: z.string(),
   input_schema: z.record(z.string(), z.unknown()),
-  confirm: z.boolean().optional(),
+  confirm: z.union([z.boolean(), z.literal('always')]).optional(),
   effect: z.enum(['read', 'change']).optional(),
 });
 export type Tool = z.infer<typeof Tool>;

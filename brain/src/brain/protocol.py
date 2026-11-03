@@ -99,7 +99,7 @@ class Tool(Model):
     name: Annotated[str, Field(pattern=r"^[a-z0-9_-]{1,48}$")]
     description: str
     input_schema: Input
-    confirm: bool | None = None
+    confirm: bool | Literal["always"] | None = None
     effect: Literal["read", "change"] | None = None
 
     @field_validator("name")

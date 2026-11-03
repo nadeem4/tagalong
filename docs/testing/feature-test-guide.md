@@ -486,6 +486,9 @@ history and preferences with `call` as in the section above.
    built-in "Always ask me before risky actions" default still exists.
    **Expected:** it still asks you. Scout does not look at it, and a general preference never
    approves it, even after the default is deleted. Only a preference that names that tool can.
+   A tool a body declares `confirm: "always"` (delete, overwrite) is stricter: its Home switch cannot
+   be set to Auto and even a preference that names it never approves it. (Pinned by brain tests until a
+   body declares one.)
 7. **Action:** on a fresh data folder with no preference of your own, approve several tools by
    hand.
    **Expected:** no delay, and `spend_today` does not rise from the asks (no look happens, only

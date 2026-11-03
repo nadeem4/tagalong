@@ -126,7 +126,9 @@ class BodySource:
                 tool.description,
                 tool.input_schema,
                 effect=tool.effect or "change",
-                locked=tool.confirm is True,
+                # "always" (delete, overwrite): person only, never Auto.
+                locked=tool.confirm is True or tool.confirm == "always",
+                person_only=tool.confirm == "always",
             )
             for body_id, tools in sorted(tools_by_body.items())
             for tool in tools
@@ -327,7 +329,7 @@ class Toolbox:
         record("approved")
         if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
-        elif self._offers is not None:
+        elif self._offers is not None and not spec.person_only:
             self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(self, call: Call, caller: str = "scout") -> str | list[dict]:
