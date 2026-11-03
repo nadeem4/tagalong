@@ -249,6 +249,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   summary. While Scout works on a job (it was woken about it, or it handed work to it), the
   tools and connected apps it uses appear on the job's timeline beside the expert's steps,
   labelled with the app or tool name.
+  The job page has three tabs: **Overview** (title, Scout's result as safe Markdown, when it
+  started and finished, how long it ran, and who worked on it), **Activity** (one timeline of every
+  step, labelled by expert, app or Scout tool, with times) and **Reports** (one collapsed report
+  per expert, read when you open it, rendered without any raw HTML). A running job opens on
+  Activity, a finished one on Overview.
 - **Connections**: the experts and apps Scout can use (Log in, Update or Add an expert here; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.

@@ -440,6 +440,7 @@ so there is one gate and no second path.
 | `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
 | `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 | `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only     |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Home only                           |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -852,11 +853,13 @@ stripped, so the page shows the same text, with no `exit`.
 
 **Serving the log.** Home reads it with the Home-only tool `job_activity` (it rides `call`, so the
 contract does not change). With `{job, after_rev}` it returns `{job, title, state, started_at,
-ended_at, closed_at, parts, rev, entries, more, watch}`, where `parts` is `[{id, expert, state,
+ended_at, closed_at, result, parts, rev, entries, more, watch}`, where `parts` is `[{id, expert, state,
 reason, started_at, ended_at}]` and each entry also carries `part` and `source`: the entries whose `rev` is above the cursor, in `rev` order, at most 500 (`more: true`
 when cut). `rev` is the cursor to send next; a body that missed notices or reconnected sends
 `after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
-masked when written, so serving does no second pass. An unknown job is `invalid_params`; a job
+masked when written, so serving does no second pass. `result` is Scout's `scout_result`. A part's full
+report is read separately, on demand, with the Home-only tool `job_report {job, part}` (`Jobs.part_report`), so
+the page stays small. An unknown job is `invalid_params`; a job
 from before the log existed has an empty page. `watch` is Scout's watch list for the job (see Watch
 list), or `null` when it has none. With no `job` it returns
 `{"running": [{job, expert, text, at}]}`: the latest running or pending step of each running job (`expert` is the
@@ -982,6 +985,7 @@ flowchart TD
 | `watch_job`      | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                           |
 | `list_jobs`      | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                        |
 | `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                             |
+| `job_report`     | home        | read   | `auto`                       | `{job, part}`. One part's report as `{"text"}` (`Jobs.part_report`); an unknown job or part is `invalid_params`; Scout never gets it                                                                                                                                                                                             |
 | `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                  |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is

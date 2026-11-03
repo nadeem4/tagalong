@@ -20,6 +20,7 @@ const JOB: JobRow = {
   startedAt: new Date(Date.now() - 5000).toISOString(),
   endedAt: null,
   closedAt: null,
+  scoutResult: null,
   parts: [],
   activity: true,
 };
@@ -96,6 +97,10 @@ describe('JobPage', () => {
         job,
         state: 'done',
         title: null,
+        started_at: done.startedAt,
+        ended_at: done.endedAt,
+        closed_at: null,
+        result: null,
         parts: [],
         rev: 2,
         entries: [step(1), step(2, { kind: 'end', text: '# done', status: null, step: null })],
@@ -103,6 +108,7 @@ describe('JobPage', () => {
         watch: null,
       });
     renderPage(bridge, done);
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
     expect(await screen.findByText('# done')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Stop/ })).toBeNull();
     expect(screen.getByText('Done')).toBeInTheDocument();
@@ -197,5 +203,97 @@ describe('JobPage', () => {
     });
     renderPage(bridge);
     expect(await screen.findByLabelText('running')).toHaveAttribute('data-motion', 'off');
+  });
+});
+
+describe('JobPage tabs', () => {
+  const page = (extra: Record<string, unknown> = {}) => ({
+    job: 'j1',
+    state: 'done',
+    title: 'Fix the flaky tests',
+    started_at: '2026-11-02T10:00:00Z',
+    ended_at: '2026-11-02T10:02:05Z',
+    closed_at: null,
+    result: 'Tests are green.',
+    parts: [
+      {
+        id: 'p1',
+        expert: 'Claude Code',
+        state: 'done',
+        reason: null,
+        started_at: '2026-11-02T10:00:00Z',
+        ended_at: '2026-11-02T10:02:05Z',
+      },
+    ],
+    rev: 1,
+    entries: [step(1)],
+    more: false,
+    watch: null,
+    ...extra,
+  });
+
+  it('shows three tabs and defaults by state', async () => {
+    const bridge = createFakeHostBridge({ jobs: [JOB], activity: { j1: [step(1)] } });
+    renderPage(bridge);
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Overview',
+      'Activity',
+      'Reports',
+    ]);
+    expect(screen.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('log')).toBeInTheDocument();
+  });
+
+  it('opens a finished job on Overview with title, result and times', async () => {
+    const done: JobRow = { ...JOB, state: 'done', endedAt: '2026-11-02T10:02:05Z' };
+    const bridge = createFakeHostBridge({ jobs: [done], activity: { j1: [step(1)] } });
+    bridge.jobActivity = () => Promise.resolve(page());
+    renderPage(bridge, done);
+    expect(await screen.findByText('Tests are green.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fix the flaky tests');
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Ran for').nextSibling).toHaveTextContent('2m 5s');
+  });
+
+  it("an old job falls back to the brief's first line and has no result prose", async () => {
+    const old: JobRow = {
+      ...JOB,
+      state: 'done',
+      task: 'Fix the tests\nthen the lint',
+      endedAt: '2026-11-02T10:02:05Z',
+    };
+    const bridge = createFakeHostBridge({ jobs: [old], activity: { j1: [] } });
+    renderPage(bridge, old);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Fix the tests$/);
+    expect(await screen.findByText(/Finished\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Scout.s result/)).toBeNull();
+  });
+
+  it('the chosen tab survives live updates', async () => {
+    const bridge = createFakeHostBridge({ jobs: [JOB], activity: { j1: [step(1)] } });
+    renderPage(bridge);
+    fireEvent.click(screen.getByRole('tab', { name: 'Reports' }));
+    bridge.activity.j1?.push(step(2));
+    act(() => bridge.emitChanged('job_activity'));
+    await waitFor(() => expect(bridge.activityCalls.length).toBeGreaterThan(1));
+    expect(screen.getByRole('tab', { name: 'Reports' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('timeline rows are labelled with who did the step', async () => {
+    const bridge = createFakeHostBridge({ jobs: [JOB], activity: { j1: [] } });
+    bridge.jobActivity = () =>
+      Promise.resolve(
+        page({
+          state: 'running',
+          ended_at: null,
+          entries: [
+            step(1),
+            step(2, { kind: 'tool', part: 'scout', source: 'app:files', text: 'read' }),
+          ],
+        }),
+      );
+    renderPage(bridge);
+    expect(await screen.findByText('files app')).toBeInTheDocument();
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
   });
 });

@@ -116,7 +116,55 @@ const JOB_STEPS = [
   { rev: 1, seq: 1, kind: 'command', text: 'npm test', status: 'done', step: 's1', exit: null },
   { rev: 2, seq: 2, kind: 'output', text: 'all green', status: null, step: 's1', exit: null },
   { rev: 3, seq: 3, kind: 'end', text: '# done', status: null, step: null, exit: null },
-].map((e) => ({ ...e, at: '2026-10-27T10:00:05Z' }));
+].map((e) => ({ ...e, at: '2026-10-27T10:00:05Z', part: 'p1', source: null }));
+
+// A finished job with two experts (parts) and a title and result Scout wrote.
+const TWO_PART_JOB = {
+  id: 'job2',
+  task: 'Ship the release notes',
+  folder: 'C:/work/app',
+  mode: 'ask',
+  state: 'done',
+  title: 'Release notes for 1.2',
+  scout_result: 'The notes are drafted and **reviewed**.',
+  started_at: '2026-10-27T09:00:00Z',
+  ended_at: '2026-10-27T09:04:00Z',
+  closed_at: '2026-10-27T09:05:00Z',
+  parts: ['p1', 'p2'].map((id, n) => ({
+    id,
+    expert: n === 0 ? 'Claude Code' : 'Gemini',
+    state: 'done',
+    reason: null,
+    progress: null,
+    result: null,
+    session_id_known: false,
+    started_at: `2026-10-27T09:0${n}:00Z`,
+    ended_at: `2026-10-27T09:0${n + 2}:00Z`,
+  })),
+  activity: true,
+} as Record<string, unknown>;
+const TWO_PART_REPORTS: Record<string, string> = {
+  'job2/p1': '## Drafted\n\nWrote the notes. <script>bad()</script>',
+  'job2/p2': 'Reviewed: **no changes needed**.',
+};
+const TWO_PART_STEPS = [
+  { rev: 1, seq: 1, kind: 'command', text: 'draft', status: 'done', part: 'p1', source: null },
+  {
+    rev: 2,
+    seq: 2,
+    kind: 'tool',
+    text: 'read changelog',
+    status: 'done',
+    part: 'scout',
+    source: 'app:files',
+  },
+  { rev: 3, seq: 3, kind: 'command', text: 'review', status: 'done', part: 'p2', source: null },
+].map((e) => ({
+  ...e,
+  at: '2026-10-27T09:01:00Z',
+  step: null,
+  exit: null,
+}));
 
 // A memory with one unbroken word, the worst case for the memory row's width.
 const LONG_FACT = `Remembers ${'supercalifragilistic'.repeat(8)} and a long story about the launch.`;
@@ -234,8 +282,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // and press Stop before it ends on its own.
   const SILENCE = Buffer.alloc(24_000 * 3 * 2).toString('base64');
   const sockets = new Set<WebSocket>();
-  const jobs: Record<string, unknown>[] = [{ ...JOB }];
-  const activity: Record<string, Record<string, unknown>[]> = { job1: [...JOB_STEPS] };
+  const jobs: Record<string, unknown>[] = [{ ...JOB }, { ...TWO_PART_JOB }];
+  const activity: Record<string, Record<string, unknown>[]> = {
+    job1: [...JOB_STEPS],
+    job2: [...TWO_PART_STEPS],
+  };
   const watches: Record<string, { text: string; done: boolean }[]> = {
     job1: [
       { text: 'tests pass', done: true },
@@ -434,6 +485,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             tool?: string;
             mode?: string;
             job?: string;
+            part?: string;
             after_rev?: number;
             id?: number;
             filter?: string;
@@ -443,20 +495,34 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         };
         let value: unknown = {};
         if (params.tool === 'list_jobs') value = { jobs };
-        else if (params.tool === 'job_activity') {
+        else if (params.tool === 'job_report') {
+          value = { text: TWO_PART_REPORTS[`${params.input?.job}/${params.input?.part}`] ?? null };
+        } else if (params.tool === 'job_activity') {
           // No job: the bubble's running steps (set by a test). A job: its steps after the cursor.
           const job = params.input?.job;
           if (job === undefined) value = { running };
           else {
             const rows = activity[job] ?? [];
+            const row = jobs.find((j) => j.id === job);
             const after = Number(params.input?.after_rev ?? 0);
             const rev = rows.reduce((top, e) => Math.max(top, Number(e.rev)), 0);
             const entries = rows.filter((e) => Number(e.rev) > after);
             value = {
               job,
               state: jobs.find((j) => j.id === job)?.state ?? 'done',
-              title: null,
-              parts: [],
+              title: row?.title ?? null,
+              started_at: row?.started_at ?? '2026-10-27T10:00:00Z',
+              ended_at: row?.ended_at ?? null,
+              closed_at: row?.closed_at ?? null,
+              result: row?.scout_result ?? null,
+              parts: ((row?.parts as Record<string, unknown>[] | undefined) ?? []).map((p) => ({
+                id: p.id,
+                expert: p.expert,
+                state: p.state,
+                reason: p.reason,
+                started_at: p.started_at,
+                ended_at: p.ended_at,
+              })),
               rev,
               entries,
               more: false,
@@ -599,6 +665,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         status: null,
         step: null,
         exit: null,
+        part: 'p1',
+        source: null,
         ...entry,
       });
       for (const socket of sockets) {

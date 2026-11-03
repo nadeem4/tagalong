@@ -180,6 +180,57 @@ export const HOME_CSS = `
   min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
   background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
 }
+.job-tabs { display: flex; gap: ${t.space.xs}px; border-bottom: 1px solid ${t.color.panelLine}; }
+.job-tabs__tab {
+  margin: 0 0 -1px; padding: ${t.space.md}px ${t.space.xl}px; border: 0; border-bottom: 2px solid transparent; background: none;
+  cursor: pointer; font: inherit; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted};
+}
+.job-tabs__tab:hover { color: ${t.color.panelText}; }
+.job-tabs__tab[aria-selected='true'] { color: ${t.color.panelText}; border-bottom-color: ${t.color.gold}; }
+.job-tabs__tab:focus-visible, .job-report__head:focus-visible, .job-overview__link:focus-visible {
+  outline: 2px solid ${t.color.link}; outline-offset: 2px; border-radius: ${t.radius.field}px;
+}
+.job-page__panel { display: flex; flex-direction: column; gap: ${t.space.xl}px; min-width: 0; }
+.job-overview { display: flex; flex-direction: column; gap: ${t.space.xxl}px; }
+.job-overview__h { margin: 0 0 ${t.space.md}px; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
+.job-overview__status { margin: 0; font-size: ${t.fontSize.field}px; color: ${t.color.panelMuted}; }
+.job-overview__link {
+  padding: 0; border: 0; background: none; cursor: pointer; font: inherit; color: ${t.color.link}; text-decoration: underline;
+}
+.job-overview__facts {
+  margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: ${t.space.xl}px;
+  padding-top: ${t.space.xl}px; border-top: 1px solid ${t.color.panelLine};
+}
+.job-overview__facts dt { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.job-overview__facts dd { margin: ${t.space.xxs}px 0 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; font-variant-numeric: tabular-nums; }
+.job-overview__who { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.job-reports { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.job-report { border-top: 1px solid ${t.color.panelLine}; }
+.job-report__head {
+  width: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.md}px ${t.space.lg}px; padding: ${t.space.lg}px 0;
+  border: 0; background: none; cursor: pointer; text-align: left; font: inherit; color: ${t.color.panelText};
+}
+.job-report__head::before { content: '\\203A' / ''; color: ${t.color.panelMuted}; transition: transform 120ms; }
+.job-report__head[aria-expanded='true']::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .job-report__head::before { transition: none; } }
+.job-report__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; overflow-wrap: anywhere; }
+.job-report__when { margin-left: auto; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.job-report__body { padding: 0 0 ${t.space.xl}px ${t.space.xxl}px; }
+.job-report__note { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; }
+.safe-md { font-size: ${t.fontSize.body}px; line-height: 1.55; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.safe-md > :first-child { margin-top: 0; }
+.safe-md > :last-child { margin-bottom: 0; }
+.safe-md h3, .safe-md h4, .safe-md h5, .safe-md h6 { margin: ${t.space.xl}px 0 ${t.space.sm}px; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
+.safe-md p, .safe-md ul, .safe-md ol, .safe-md pre, .safe-md blockquote { margin: 0 0 ${t.space.md}px; }
+.safe-md ul, .safe-md ol { padding-left: ${t.space.xxl}px; }
+.safe-md a { color: ${t.color.link}; }
+.safe-md code { font-family: ${t.font.mono}; font-size: ${t.fontSize.small}px; background: ${t.color.panelTile}; padding: 0 ${t.space.xs}px; border-radius: 4px; }
+.safe-md pre { overflow-x: auto; padding: ${t.space.md}px; background: ${t.color.panelTile}; border-radius: ${t.radius.field}px; }
+.safe-md pre code { background: none; padding: 0; white-space: pre; }
+.safe-md blockquote { padding-left: ${t.space.lg}px; border-left: 2px solid ${t.color.panelLine}; color: ${t.color.panelMuted}; }
+.job-log__who { display: flex; align-items: center; gap: ${t.space.md}px; margin-top: ${t.space.lg}px; color: ${t.color.textMuted}; }
+.job-log__who:first-child { margin-top: 0; }
+.job-log__chip { padding: 0 ${t.space.md}px; border-radius: 999px; border: 1px solid ${t.color.line}; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .job-log {
   /* Fills what the page's head leaves (the frame is a flex item), whatever the head's height. */
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;

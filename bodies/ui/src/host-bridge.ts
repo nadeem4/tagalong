@@ -65,6 +65,8 @@ export interface JobRow {
   startedAt: string;
   endedAt: string | null;
   closedAt: string | null;
+  /** Scout's own write-up of the job, or null until it writes one. */
+  scoutResult: string | null;
   /** One per expert hand-off, oldest first; an old job has exactly one. */
   parts: JobPartRow[];
   /** True when the brain kept steps for this job, so Home can offer to watch it. */
@@ -113,6 +115,11 @@ export interface JobActivityPage {
   job: string;
   state: string;
   title: string | null;
+  started_at: string;
+  ended_at: string | null;
+  closed_at: string | null;
+  /** Scout's own result for the job; null until it writes one. */
+  result: string | null;
   parts: JobPagePart[];
   rev: number;
   entries: JobActivityEntry[];
@@ -252,6 +259,8 @@ export interface HostBridge {
   stopJob(job: string): Promise<void>;
   /** A job's steps after `afterRev` (0 for all); rejects for an unknown job. */
   jobActivity(job: string, afterRev: number): Promise<JobActivityPage>;
+  /** One part's report (masked by the brain), or null if it has none; rejects for an unknown part. */
+  jobReport(job: string, part: string): Promise<string | null>;
   /** The step each running job is on; empty when none has started one. */
   runningSteps(): Promise<RunningStep[]>;
   /** Home's Approvals history, newest first; `before` is the `next` cursor of the page above. */

@@ -30,6 +30,7 @@ const RUNNING: JobRow = {
   startedAt: '2026-10-28T09:00:00.000Z',
   endedAt: null,
   closedAt: null,
+  scoutResult: null,
   parts: [part({ progress: 'Reading auth.ts' })],
   activity: false,
 };
@@ -151,7 +152,7 @@ describe('JobsPanel', () => {
     await rows();
     expect(screen.queryByRole('button', { name: 'Watch Fix the login bug' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Watch Watched job' }));
-    expect(await screen.findByRole('log')).toBeInTheDocument();
+    expect(await screen.findByRole('tablist')).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Jobs' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Back to Jobs' }));
     expect(await screen.findByRole('list', { name: 'Jobs' })).toBeInTheDocument();
@@ -163,7 +164,7 @@ describe('JobsPanel', () => {
     renderPanel(bridge);
     await rows();
     fireEvent.click(screen.getByRole('button', { name: 'Watch Watched job' }));
-    await screen.findByRole('log');
+    await screen.findByRole('tablist');
     expect(screen.getByRole('heading', { name: 'Watched job' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Back to Jobs' }));
     expect(await screen.findByRole('button', { name: 'Watch Watched job' })).toHaveFocus();

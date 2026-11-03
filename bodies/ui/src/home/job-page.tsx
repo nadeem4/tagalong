@@ -1,15 +1,20 @@
 /**
- * The job page in Home: one job's activity as a read-only log, live while the job runs. It pulls
- * the brain's job_activity by cursor on mount and on every `job_activity` notice, follows the
- * newest line until the person scrolls up, and offers Jump to latest. Scout's watch list shows
- * read-only in the header. Contains JobPage.
+ * The job page in Home: a title, state and Scout's watch list over three tabs (Overview,
+ * Activity, Reports). It pulls the brain's job_activity by cursor on mount and on every
+ * `job_activity` notice; the Activity log is live while the job runs, follows the newest line
+ * until the person scrolls up, and offers Jump to latest. The chosen tab is kept in this page's
+ * state, so live updates never reset it. Contains JobPage.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
-import { applyPage, emptyLog, type LogState } from './job-activity-state';
+import { applyPage, emptyLog, type LogState, type PartView } from './job-activity-state';
 import { JobLog } from './job-log';
+import { clock } from './job-time';
+import { JobTabs, panelId, tabId } from './job-tabs';
+import { OverviewTab } from './overview-tab';
+import { ReportsTab } from './reports-tab';
 import { WatchList } from './watch-list';
 
 const STATE_LABEL: Record<string, string> = {
@@ -21,10 +26,22 @@ const STATE_LABEL: Record<string, string> = {
 /** Within this many pixels of the end counts as "at the end". */
 const END_SLACK = 24;
 
-function clock(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(total / 60);
-  return minutes > 0 ? `${minutes}m ${total % 60}s` : `${total}s`;
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'reports', label: 'Reports' },
+];
+
+/** An old job has no title; its brief's first line stands in. */
+function headline(title: string | null, task: string): string {
+  return (
+    title?.trim() ||
+    task
+      .split(/\r?\n/)
+      .find((line) => line.trim() !== '')
+      ?.trim() ||
+    task
+  );
 }
 
 export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
@@ -33,6 +50,8 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
   const [failed, setFailed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [following, setFollowing] = useState(true);
+  // Chosen once from the state the page opens in; a job finishing under you does not move you.
+  const [tab, setTab] = useState(job.state === 'running' ? 'activity' : 'overview');
   const logRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const rev = useRef(0);
@@ -93,7 +112,7 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
   useLayoutEffect(() => {
     const el = logRef.current;
     if (following && el) el.scrollTop = el.scrollHeight;
-  }, [log.entries, following]);
+  }, [log.entries, following, tab]);
 
   const onScroll = (event: UIEvent<HTMLDivElement>): void => {
     const el = event.currentTarget;
@@ -113,8 +132,20 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
       .then(() => pull());
   };
 
-  const started = Date.parse(job.startedAt);
-  const ended = job.endedAt === null ? now : Date.parse(job.endedAt);
+  const startedAt = log.startedAt ?? job.startedAt;
+  const endedAt = log.startedAt === null ? job.endedAt : log.endedAt;
+  const parts: PartView[] =
+    log.parts ??
+    job.parts.map((p) => ({
+      id: p.id,
+      expert: p.expert,
+      state: p.state,
+      startedAt: p.startedAt,
+      endedAt: p.endedAt,
+    }));
+  const heading = headline(log.title ?? job.title, job.task);
+  const ended = endedAt === null ? now : Date.parse(endedAt);
+  const started = Date.parse(startedAt);
   return (
     <>
       <div className="home-head">
@@ -123,14 +154,14 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
         </button>
         <div className="job-page__title">
           <h1 className="home-title" ref={headingRef} tabIndex={-1}>
-            {job.task}
+            {heading}
           </h1>
           <span className={`job-row__state job-row__state--${log.state}`}>
             {STATE_LABEL[log.state] ?? log.state}
           </span>
           <span className="home-time job-page__time">{clock(ended - started)}</span>
           {running && (
-            <Button variant="secondary" aria-label={`Stop ${job.task}`} onClick={stop}>
+            <Button variant="secondary" aria-label={`Stop ${heading}`} onClick={stop}>
               Stop
             </Button>
           )}
@@ -143,13 +174,42 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
           again when the job changes.
         </p>
       )}
-      <div className="job-page__frame">
-        <JobLog entries={log.entries} now={now} logRef={logRef} onScroll={onScroll} />
-        {!following && (
-          <button type="button" className="job-page__jump" onClick={jumpToLatest}>
-            Jump to latest
-          </button>
+      <JobTabs tabs={TABS} selected={tab} onSelect={setTab} />
+      <div
+        role="tabpanel"
+        id={panelId(tab)}
+        aria-labelledby={tabId(tab)}
+        className={tab === 'activity' ? 'job-page__frame' : 'job-page__panel'}
+      >
+        {tab === 'overview' && (
+          <OverviewTab
+            state={log.state}
+            result={log.result ?? job.scoutResult}
+            parts={parts}
+            entries={log.entries}
+            startedAt={startedAt}
+            endedAt={endedAt}
+            now={now}
+            onReports={() => setTab('reports')}
+          />
         )}
+        {tab === 'activity' && (
+          <>
+            <JobLog
+              entries={log.entries}
+              now={now}
+              parts={parts}
+              logRef={logRef}
+              onScroll={onScroll}
+            />
+            {!following && (
+              <button type="button" className="job-page__jump" onClick={jumpToLatest}>
+                Jump to latest
+              </button>
+            )}
+          </>
+        )}
+        {tab === 'reports' && <ReportsTab job={job.id} parts={parts} now={now} />}
       </div>
     </>
   );

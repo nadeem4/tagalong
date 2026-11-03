@@ -60,6 +60,10 @@ export interface FakeHostBridge extends HostBridge {
   running: RunningStep[];
   /** How many times runningSteps was called. */
   runningStepCalls: number;
+  /** Part reports by `job/part`; a missing key is a part with no report. */
+  reports: Record<string, string | null>;
+  /** Every jobReport call as [job, part], in order. */
+  readonly reportCalls: readonly (readonly [string, string])[];
   /** Every jobActivity call as [job, afterRev], in order. */
   readonly activityCalls: readonly (readonly [string, number])[];
   /** Home's Approvals history, newest first, and the preferences Scout follows; a test may swap them. */
@@ -111,6 +115,7 @@ export function createFakeHostBridge(
     /** A job's steps by job id, and the running steps the bubble shows. */
     activity?: Record<string, JobActivityEntry[]>;
     watch?: Record<string, WatchItem[]>;
+    reports?: Record<string, string | null>;
     runningSteps?: RunningStep[];
     /** Home's Approvals history and preferences. */
     approvalRows?: ApprovalRow[];
@@ -141,6 +146,7 @@ export function createFakeHostBridge(
   const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   const jobStops: string[] = [];
   const activityCalls: [string, number][] = [];
+  const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
   const limitsSet: number[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
@@ -325,6 +331,10 @@ export function createFakeHostBridge(
         job,
         state: 'running',
         title: null,
+        started_at: fake.jobs.find((j) => j.id === job)?.startedAt ?? '',
+        ended_at: null,
+        closed_at: null,
+        result: null,
         parts: [],
         rev: all.reduce((top, e) => Math.max(top, e.rev), 0),
         entries,
@@ -333,12 +343,18 @@ export function createFakeHostBridge(
       };
       return Promise.resolve(page);
     },
+    jobReport(job, part) {
+      reportCalls.push([job, part]);
+      return Promise.resolve(fake.reports[`${job}/${part}`] ?? null);
+    },
     runningSteps() {
       fake.runningStepCalls += 1;
       return Promise.resolve(fake.running.map((step) => ({ ...step })));
     },
     activity: { ...options.activity },
     watch: { ...options.watch },
+    reports: { ...options.reports },
+    reportCalls,
     running: (options.runningSteps ?? []).map((step) => ({ ...step })),
     runningStepCalls: 0,
     activityCalls,

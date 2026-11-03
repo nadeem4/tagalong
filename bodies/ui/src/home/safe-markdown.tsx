@@ -5,7 +5,8 @@
  */
 import { Fragment, type ReactNode } from 'react';
 
-const INLINE = /(`[^`\n]+`)|(!?\[[^\]\n]*\]\((?:[^()\s]|\([^()\s]*\))*\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)/g;
+const INLINE =
+  /(`[^`\n]+`)|(!?\[[^\]\n]*\]\((?:[^()\s]|\([^()\s]*\))*\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)/g;
 const LINK = /^(!?)\[([^\]]*)\]\(((?:[^()\s]|\([^()\s]*\))*)\)$/;
 
 function inline(text: string): ReactNode[] {

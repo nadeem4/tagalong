@@ -25,6 +25,10 @@ const page = (rev: number, entries: JobActivityEntry[], state = 'running'): JobA
   job: 'j1',
   state,
   title: null,
+  started_at: '2026-11-02T10:00:00.000Z',
+  ended_at: null,
+  closed_at: null,
+  result: null,
   parts: [],
   rev,
   entries,
@@ -34,7 +38,7 @@ const page = (rev: number, entries: JobActivityEntry[], state = 'running'): JobA
 
 describe('applyPage', () => {
   it('starts empty at rev 0', () => {
-    expect(emptyLog()).toEqual({ entries: [], rev: 0, state: 'running', watch: null });
+    expect(emptyLog()).toMatchObject({ entries: [], rev: 0, state: 'running', watch: null });
   });
 
   it('keeps the part a step belongs to', () => {
