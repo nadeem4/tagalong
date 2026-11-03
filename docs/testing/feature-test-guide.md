@@ -1286,7 +1286,7 @@ database with `sqlite3` or DB Browser for SQLite.
 
 ## Window tools
 
-The desktop declares `list_windows`, `read_window_text`, `look_at_window` and `open_url` to the brain.
+The desktop declares `list_windows`, `read_window_text`, `look_at_window`, `open_url` and the file tools (see [Tidy a folder](#tidy-a-folder-with-no-expert-real-brain)) to the brain.
 These steps drive them with a contract-v1 test client; asking Scout "What windows do I have open?"
 is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
@@ -1710,6 +1710,26 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    the limit stopped the task and the person can raise it. The default limit may feel low once Scout
    researches; it is unchanged on purpose.
 5. Restart the brain: the chat resumes with the answers as text; no search results are replayed.
+
+## Tidy a folder with no expert _(real brain)_
+
+Needs the folder setting from B26c to run for real: until then the app passes no folders and every
+file tool refuses with "No folders chosen yet" (step 1 checks exactly that). Automated:
+`files.test.ts`, `body-tools.test.ts`.
+
+1. **No folder chosen.** Ask Scout to list your Downloads folder. **Expected:** it says no folder
+   is chosen and cannot touch files; nothing changes on disk.
+2. **List and read (after B26c, with Downloads chosen).** Ask "what is in my Downloads?" then "what
+   is in the newest text file?". **Expected:** Scout lists names and sizes and reads the text with
+   no ask (Auto), with no expert started. A picture or an installer is described as binary, not shown.
+3. **Move and rename.** Ask Scout to put the PDFs in a `Documents` folder inside the chosen folder
+   and to rename one. **Expected:** each asks first (Ask); after Allow the files move. Asking it to
+   move onto a name that exists is refused and both files stay.
+4. **Outside the folder.** Ask Scout to read a file in another folder, or use `..` in a path.
+   **Expected:** refused in plain words.
+5. **Delete and overwrite.** Ask Scout to delete a file. **Expected:** it asks with only Allow and
+   Deny, and after Allow the file is in the Recycle Bin, restorable. Same for overwriting a file's
+   content. In Home, Permissions: these two say "Always asks" and cannot be set to Auto.
 
 ## Permissions _(real brain)_
 

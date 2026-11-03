@@ -118,6 +118,23 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
   `desktop__open_url`, and it always asks first (`confirm`: there is no Always allow button; only its Home switch can unlock it).
 
+- **File tools.** `src/main/tools/files.ts` gives Scout `list_files`, `read_file`, `move_file`,
+  `rename_file`, `delete_file` and `write_file`, declared in `body-tools.ts` (the brain offers them
+  as `desktop__<tool>`). They work only inside the folders the person chose. `startBrain` takes a
+  `files` option with a `folders()` getter and a `trash(path)` seam; for now the app passes no
+  folders, so every call answers in plain text "No folders chosen yet" (the setting arrives in B26c).
+  Every path must be absolute; it is resolved, then `realpath`'d (the nearest existing parent for a
+  path that does not exist yet), and must sit inside a chosen folder (also `realpath`'d), so `..`,
+  symlinks and junctions cannot escape. On Windows the compare ignores case and accepts `/` or `\`.
+  A refusal is a text result, not an error, and so are common disk failures (across drives, no permission, in use), said in a sentence without paths; a link that leads nowhere is refused. `list_files` shows up to 200 entries with sizes;
+  `read_file` returns text cut at `maxChars` (default 20,000, at most 100,000) and only a notice for a binary file.
+  `move_file` (a folder as the target means "into it") and `rename_file` (a bare new name) never
+  overwrite: a clash is refused. `delete_file` sends the item to the Recycle Bin through
+  `shell.trashItem` and refuses a chosen folder itself. `write_file` replaces a file's content (the
+  parent folder must exist). List and read are reads (Auto by default); move and rename are changes
+  (Ask by default); delete and write are `confirm: "always"`: they always ask and cannot be set to Auto.
+  This is file access, not computer control: nothing clicks, types or drives another app.
+
 - **Body events.** `brain/body-events.ts` sends facts with `event` (`back`, `focus`, and the `read_aloud` setting from `readAloudEvent`); the brain decides whether
   they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
   returns after being away at least 5 minutes (`AWAY_AFTER_MS`, a screen lock counts), with whole

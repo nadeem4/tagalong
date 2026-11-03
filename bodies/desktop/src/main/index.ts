@@ -246,6 +246,8 @@ async function start(): Promise<void> {
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
     openExternal: (url) => shell.openExternal(url),
+    // No folder is chosen until the settings row (B26c) supplies them, so file tools refuse.
+    files: { folders: () => [], trash: (path) => shell.trashItem(path) },
     onNotification: (method, params) => {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {

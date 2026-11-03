@@ -31,23 +31,31 @@ function setup(overrides: Record<string, unknown> = {}) {
   };
   const onCapture = vi.fn();
   const openExternal = vi.fn(async (_url: string) => undefined);
+  const trash = vi.fn(async (_path: string) => undefined);
   const tools = bodyTools(
     platform as unknown as Platform,
     () => exclusions,
     onCapture,
     openExternal,
+    { folders: () => [], trash },
   );
-  return { platform, onCapture, openExternal, ...tools };
+  return { platform, onCapture, openExternal, trash, ...tools };
 }
 
 describe('bodyTools declarations', () => {
-  it('declares list_windows, read_window_text, look_at_window and open_url, all valid', () => {
+  it('declares the window tools, open_url and the file tools, all valid', () => {
     const { tools } = setup();
     expect(tools.map((t) => t.name)).toEqual([
       'list_windows',
       'read_window_text',
       'look_at_window',
       'open_url',
+      'list_files',
+      'read_file',
+      'move_file',
+      'rename_file',
+      'delete_file',
+      'write_file',
     ]);
     for (const tool of tools) expect(Tool.safeParse(tool).success).toBe(true);
   });
@@ -59,7 +67,37 @@ describe('bodyTools declarations', () => {
       ['read_window_text', 'read'],
       ['look_at_window', 'read'],
       ['open_url', 'change'],
+      ['list_files', 'read'],
+      ['read_file', 'read'],
+      ['move_file', 'change'],
+      ['rename_file', 'change'],
+      ['delete_file', 'change'],
+      ['write_file', 'change'],
     ]);
+  });
+});
+
+describe('file tool declarations', () => {
+  it('only delete and overwrite always ask; list, read, move and rename carry no confirm', () => {
+    const { tools } = setup();
+    const confirm = Object.fromEntries(
+      tools.filter((t) => /_files?$/.test(t.name)).map((t) => [t.name, t.confirm]),
+    );
+    expect(confirm).toEqual({
+      list_files: undefined,
+      read_file: undefined,
+      move_file: undefined,
+      rename_file: undefined,
+      delete_file: 'always',
+      write_file: 'always',
+    });
+  });
+
+  it('refuses in plain text while no folder is chosen, and never reaches the Recycle Bin', async () => {
+    const { run, trash } = setup();
+    const parts = await run('delete_file', { path: 'C:\\Users\\me\\Downloads\\a.txt' });
+    expect(parts).toEqual([{ type: 'text', text: expect.stringMatching(/no folders chosen/i) }]);
+    expect(trash).not.toHaveBeenCalled();
   });
 });
 
@@ -67,7 +105,7 @@ describe('open_url', () => {
   it('is declared confirm: true so Always allow can never switch the ask off', () => {
     const { tools } = setup();
     expect(tools.find((t) => t.name === 'open_url')?.confirm).toBe(true);
-    expect(tools.filter((t) => t.confirm).length).toBe(1);
+    expect(tools.filter((t) => t.confirm === true).length).toBe(1);
   });
 
   it('opens an https page in the browser', async () => {
