@@ -420,6 +420,20 @@ describe('BrainClient', () => {
     await expect(typed).resolves.toBeUndefined();
   });
 
+  it('answerWith sends the kept apps of a hand-off card, even none', async () => {
+    const { client, s } = await online();
+    const kept = client.answerWith('a1', 'Plan', undefined, ['lin']);
+    const first = s.sent.at(-1)!;
+    expect(first.params).toEqual({ ask: 'a1', option: 'Plan', apps: ['lin'] });
+    s.receive({ jsonrpc: '2.0', id: first.id, result: {} });
+    await kept;
+    const none = client.answerWith('a2', 'Plan', undefined, []);
+    const second = s.sent.at(-1)!;
+    expect(second.params).toEqual({ ask: 'a2', option: 'Plan', apps: [] });
+    s.receive({ jsonrpc: '2.0', id: second.id, result: {} });
+    await none;
+  });
+
   it('answerWith rejects BrainOffline when the brain is not online', async () => {
     const { client } = setup();
     await expect(client.answerWith('a1', 'Edit')).rejects.toBeInstanceOf(BrainOffline);

@@ -449,6 +449,9 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
+        apps = args.get("apps", [])
+        if not isinstance(apps, list) or not all(isinstance(a, str) for a in apps):
+            return "hand_off needs apps to be a list of connected app ids."
         try:
             job_id = await jobs.start(
                 args["task"],
@@ -459,6 +462,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 fresh=args.get("fresh") is True,
                 job=_text_arg(args, "job"),
                 title=_text_arg(args, "title"),
+                apps=apps,
             )
         except JobError as err:
             # Setup facts (ids and numbers) are facts only; Scout words them. Else the plain line.
@@ -577,6 +581,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "goal, how you will judge it done, that it tests its own work, and that it ends "
                 "with a summary of what changed, the test results and what is left. Leave "
                 "planning and splitting to the expert; never paste the chat or direct each step. "
+                "Pass apps (connected app ids) only for the apps the job needs: the person sees "
+                "them on the card and may remove some, and the expert reaches only those. "
                 "Then call watch_job with what you expect. A job is your piece of work: give a new "
                 "one a short title in your own words, and to start another part under a job "
                 "that is still open (another expert, or a next step) pass its id as job. Close "
@@ -606,6 +612,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                         "job": {
                             "type": "string",
                             "description": "An open job's id: add this hand-off as a part of it.",
+                        },
+                        "apps": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Connected app ids the job needs; none by default.",
                         },
                     },
                     "required": ["task", "folder"],

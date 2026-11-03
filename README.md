@@ -268,7 +268,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
   Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
-  An expert reaches the apps a job was given only through the brain, which asks you as usual and keeps every token.
+  An expert reaches the apps a job was given only through the brain, which asks you as usual and keeps every token. The hand-off card lists those apps and you can remove any before Send; Send approves the rest.
   - **Sign in**: an app that signs in with its own page shows **Needs sign-in** and a **Sign in**
     button. It opens the app's page in your browser; the chip reads **Waiting for the browser**
     until you finish (or five minutes pass). The brain and the browser must be on the same computer.

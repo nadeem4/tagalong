@@ -75,6 +75,14 @@ def test_soul_routes_by_what_it_can_do_and_no_longer_pushes_experts():
     assert "long or many-stepped" in soul
 
 
+def test_soul_has_the_hand_off_apps_rules():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "pass `apps`" in soul and "only the apps the job needs" in soul
+    assert "put the data in the brief" in soul
+    assert "paste it or connect" in soul
+    assert "an expert's question reaches you first" in soul
+
+
 def test_soul_offers_a_connect_for_a_missing_tool_and_carries_on_after():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert "`find_apps`" in soul and "`choose`" in soul and "Connect" in soul

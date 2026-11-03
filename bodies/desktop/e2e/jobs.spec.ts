@@ -84,6 +84,10 @@ test('a hand-off asks its mode, a relayed permission and a question with no turn
   const mode = panel.getByRole('region', { name: 'Scout asks' });
   await expect(mode).toBeVisible({ timeout: 30_000 });
   await expect(mode).toContainText('C:/work/app');
+  // The card lists the apps; removing one keeps it out of the answer.
+  await expect(mode).toContainText('Linear');
+  await mode.getByRole('button', { name: 'Remove Mail' }).click();
+  await expect(mode).not.toContainText('Mail');
   await mode.getByRole('button', { name: 'auto', exact: true }).click();
 
   const relayed = panel.getByRole('region', { name: 'Claude Code asks' });
@@ -99,7 +103,7 @@ test('a hand-off asks its mode, a relayed permission and a question with no turn
   await expect
     .poll(() => brain.answers, { timeout: 15_000 })
     .toEqual([
-      { ask: 'j1', option: 'auto' },
+      { ask: 'j1', option: 'auto', apps: ['lin'] },
       { ask: 'j2', option: 'Allow once' },
       { ask: 'j3', option: 'main', text: 'main' },
     ]);

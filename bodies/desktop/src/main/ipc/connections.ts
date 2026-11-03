@@ -25,7 +25,7 @@ interface ConnectionIpcDeps {
   /** The person's click on a card: the brain's `answer` for that ask. */
   answer: (ask: string, decision: 'once' | 'always' | 'deny') => Promise<void>;
   /** The answer to a Claude Code job's ask: its own option name, plus typed text for a question. */
-  reply: (ask: string, option: string, text?: string) => Promise<void>;
+  reply: (ask: string, option: string, text?: string, apps?: string[]) => Promise<void>;
 }
 
 /** The brain's `changed` for apps reaches the page as `connections.changed`, no payload. */
@@ -57,8 +57,8 @@ export function registerConnectionIpc(
   );
   handle(
     IPC.answerJobAsk,
-    async (_event, approvalId: string, a: { option: string; text?: string }) =>
-      unlessGone(() => reply(approvalId, a.option, a.text)),
+    async (_event, approvalId: string, a: { option: string; text?: string; apps?: string[] }) =>
+      unlessGone(() => reply(approvalId, a.option, a.text, a.apps)),
   );
   handle(IPC.listConnections, async () => AppsList.parse(await callJson(brain, 'list_apps')));
   // Parsed here so a bad form is refused before the brain hears of it; the page is not trusted.

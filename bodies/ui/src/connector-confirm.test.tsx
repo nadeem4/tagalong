@@ -226,6 +226,62 @@ describe('the connector confirm card', () => {
       expect(screen.queryByRole('region', { name: 'Scout asks' })).toBeNull();
     });
 
+    describe('a hand-off with apps', () => {
+      const withApps = () =>
+        jobAsk({
+          summary: 'Fix the login bug\nfolder: C:\\work\\app',
+          apps: [
+            { id: 'lin', name: 'Linear' },
+            { id: 'mail', name: 'Mail' },
+          ],
+        });
+
+      it('lists each app and sends them all when none is removed', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(withApps()));
+        const card = screen.getByRole('region', { name: 'Scout asks' });
+        expect(card).toHaveTextContent('Linear');
+        expect(card).toHaveTextContent('Mail');
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([
+          { approvalId: APPROVAL, option: 'Plan', apps: ['lin', 'mail'] },
+        ]);
+      });
+
+      it('removing an app takes it off the card and out of the answer', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(withApps()));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Mail' }));
+        const card = screen.getByRole('region', { name: 'Scout asks' });
+        expect(card).not.toHaveTextContent('Mail');
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([
+          { approvalId: APPROVAL, option: 'Plan', apps: ['lin'] },
+        ]);
+      });
+
+      it('removing every app sends an empty list, never the original', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(withApps()));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Linear' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Mail' }));
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'Plan', apps: [] }]);
+      });
+    });
+
     it('a relayed permission shows the tool, its input and its own options', async () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

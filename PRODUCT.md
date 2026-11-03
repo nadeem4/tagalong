@@ -85,7 +85,9 @@ its result.
   permissions and switchable Off). Each search costs a cent against the daily limit; when the limit
   stops a task Scout says so plainly. It never sends you to an expert for that.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
-  hands it a task for a folder on this computer; Home's Jobs page shows each one.
+  hands it a task for a folder on this computer; Home's Jobs page shows each one. When the task
+  needs a connected app, the Send card lists the apps; you can remove any, and Send is your
+  approval for the rest. The expert reaches only those, through Tagalong.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,
   authenticator apps, remote desktop) are never seen, titles included; your own exclusions add to
   them.

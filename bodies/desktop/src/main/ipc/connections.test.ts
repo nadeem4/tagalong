@@ -35,15 +35,15 @@ function setup(answer: (tool: string, input?: object) => Promise<unknown> | unkn
     },
   };
   const answers: [string, string][] = [];
-  const replies: [string, string, string | undefined][] = [];
+  const replies: [string, string, string | undefined, string[] | undefined][] = [];
   registerConnectionIpc(ipc.handle, {
     brain,
     answer: (ask, decision) => {
       answers.push([ask, decision]);
       return Promise.resolve();
     },
-    reply: (ask, option, text) => {
-      replies.push([ask, option, text]);
+    reply: (ask, option, text, apps) => {
+      replies.push([ask, option, text, apps]);
       return Promise.resolve();
     },
   });
@@ -56,9 +56,15 @@ describe('registerConnectionIpc', () => {
     await invoke(IPC.answerJobAsk, 'a1', { option: 'Edit' });
     await invoke(IPC.answerJobAsk, 'a2', { option: 'duckdb', text: 'duckdb' });
     expect(replies).toEqual([
-      ['a1', 'Edit', undefined],
-      ['a2', 'duckdb', 'duckdb'],
+      ['a1', 'Edit', undefined, undefined],
+      ['a2', 'duckdb', 'duckdb', undefined],
     ]);
+  });
+
+  it("passes the hand-off card's kept apps on with the answer", async () => {
+    const { invoke, replies } = setup();
+    await invoke(IPC.answerJobAsk, 'a1', { option: 'Plan', apps: ['lin'] });
+    expect(replies).toEqual([['a1', 'Plan', undefined, ['lin']]]);
   });
 
   it("answers Scout's ask on the brain", async () => {

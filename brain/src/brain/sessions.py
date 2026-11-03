@@ -187,6 +187,7 @@ class Session:
             drop=self.scheduler.drop,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
+            apps=apps,
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = self.timers = Timers(
@@ -615,8 +616,15 @@ class Session:
         if turn_id == self._turn_id and self._task is not None:
             self._task.cancel()
 
-    def answer(self, ask_id: str, option: str, body_id: str, text: str | None = None) -> None:
-        self._asks.answer(ask_id, option, body_id, text)
+    def answer(
+        self,
+        ask_id: str,
+        option: str,
+        body_id: str,
+        text: str | None = None,
+        apps: list[str] | None = None,
+    ) -> None:
+        self._asks.answer(ask_id, option, body_id, text, apps)
 
     @property
     def asks(self) -> Asks:

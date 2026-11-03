@@ -92,6 +92,8 @@ export const ConnectorConfirmParams = z.object({
   freeText: z.boolean().optional(),
   /** One of `options` the brain recommends: the card marks it and lists it first. */
   recommended: z.string().optional(),
+  /** A hand-off's apps: the card lists them, the person may remove some before choosing a mode. */
+  apps: z.array(z.object({ id: z.string().min(1), name: z.string() })).optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

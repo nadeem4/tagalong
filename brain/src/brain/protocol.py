@@ -244,6 +244,7 @@ class AnswerParams(Model):
     ask: Id
     option: str
     text: str | None = None
+    apps: list[str] | None = None  # a hand-off card's kept apps; the brain starts with only these
 
 
 class CancelTurnParams(Model):

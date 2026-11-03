@@ -92,7 +92,9 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     // when it has a tool, and a question for the person when it has none.
     const question = !p.confirm && p.tool === undefined;
     const tool = p.tool ?? 'question';
-    const input = Object.entries(p.input ?? {}).map(
+    // A hand-off's apps are a list on the card, not a line of JSON in its words.
+    const { apps, ...rest } = (p.input ?? {}) as { apps?: unknown } & Record<string, unknown>;
+    const input = Object.entries(rest).map(
       ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
     );
     // Scout's own words lead; with none, the tool and what it was given stand in. A job's ask
@@ -130,6 +132,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         ...(question ? { question: true } : {}),
         ...(p.free_text ? { freeText: true } : {}),
         ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
+        ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
       },
     ];
   }
