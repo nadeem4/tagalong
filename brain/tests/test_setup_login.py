@@ -327,6 +327,19 @@ async def test_login_tool_card_refuses_an_unknown_expert_and_a_finished_login(tm
         await spec.card({"id": "claude-acp"})
 
 
+async def test_a_card_that_finds_the_login_done_records_it_and_tells_the_ui(tmp_path, env):
+    # Home's Log in opens the card first; an already-done login must still flip the chip.
+    env.write_text("x")
+    told = []
+    d, _, store = driver(tmp_path, Window(), notify=lambda *a: told.append(a))
+    store.set_login("claude-acp", None)
+    spec, _ = login_tools(tmp_path, d)[0]
+    with pytest.raises(RpcError, match="already_logged_in"):
+        await spec.card({"id": "claude-acp"})
+    assert store.get("claude-acp").logged_in is True
+    assert told == [("changed", {"what": "setup"})]
+
+
 def login_tools(tmp_path, d):
     from brain.setup.expert_tools import login_tools as make
 

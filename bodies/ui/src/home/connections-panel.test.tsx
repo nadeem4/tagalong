@@ -409,6 +409,17 @@ describe('ConnectionsPanel groups', () => {
     expect(await screen.findByText('Already logged in.')).toBeVisible();
   });
 
+  it('a card that found the login done says so as a note', async () => {
+    const bridge = withSetup(
+      { experts: [{ ...CLAUDE, state: 'needs_login' }] },
+      { error: 'already_logged_in' },
+    );
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Log in' }));
+    expect(await screen.findByText('Already logged in.')).toBeVisible();
+    expect(screen.queryByText('Setting that up didn’t work.')).toBeNull();
+  });
+
   it('progress disables the row’s button and shows the stage', async () => {
     const bridge = withSetup({
       browseExperts: [CODEX],

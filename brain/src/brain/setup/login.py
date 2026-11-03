@@ -195,8 +195,7 @@ class LoginDriver:
         Raises NoTerminal where no window can open (Scout then gives the command)."""
         state = await self.check(expert)
         if isinstance(state, LoggedIn):
-            self._store.set_login(expert.id, True)
-            self._notify("changed", {"what": "setup"})
+            self.record_logged_in(expert.id)
         if not isinstance(state, NotLoggedIn):
             return state
         method = pick_method(state.methods)
@@ -219,6 +218,11 @@ class LoginDriver:
             lambda t: self._tasks.get(expert.id) is t and self._tasks.pop(expert.id)
         )
         return waiting
+
+    def record_logged_in(self, expert_id: str) -> None:
+        """A check found the login done: save it, and Home's chip and the tour reload."""
+        self._store.set_login(expert_id, True)
+        self._notify("changed", {"what": "setup"})
 
     async def stop(self) -> None:
         tasks = list(self._tasks.values())

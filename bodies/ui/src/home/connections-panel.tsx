@@ -26,6 +26,7 @@ const SETUP_REFUSALS: Record<string, Status & object> = {
   already_installing: { text: 'That is already being set up.', error: false },
   already_ready: { text: 'That is already set up.', error: false },
   already_added: { text: 'That app is already added.', error: false },
+  already_logged_in: { text: 'Already logged in.', error: false },
   version_changed: {
     text: 'The registry changed while you were deciding. Look at it again, then try once more.',
     error: true,

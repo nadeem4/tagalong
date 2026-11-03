@@ -485,7 +485,9 @@ the install's `setup_progress` and `setup_done` events), `setup_expert` and `set
 (`{id, approved?}`, `self_asks`). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
 from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
-on Allow. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
+on Allow. A card that refuses with an `{error: token}` (such as `already_logged_in`, when the
+check finds the login done; it saves that and sends `changed setup` first) is answered as that
+token, so Home words it; any other card failure stays a tool error. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
 `setup_app` ignores `approved` and always opens it, and the desktop only forwards `true` from the
 tour window. Each answered card is written to the approvals history like the gate does (source
 `scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
