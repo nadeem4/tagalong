@@ -5,26 +5,39 @@
  * Contains registerJobsIpc.
  */
 
-import type { JobActivityPage, JobRow, RunningStep } from '@tagalong/ui';
+import type { JobActivityPage, JobPartRow, JobRow, RunningStep } from '@tagalong/ui';
 import { IPC } from '../../shared/ipc';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';
 
-// The brain's row is snake_case and carries fields Home never shows (session_id_known, reported).
-function toRow(raw: Record<string, unknown>): JobRow {
+// The brain's row is snake_case and carries fields Home never shows (session_id_known, watch).
+function toPart(raw: Record<string, unknown>): JobPartRow {
   return {
     id: raw.id,
-    agent: raw.agent,
-    task: raw.task,
-    folder: raw.folder,
-    mode: raw.mode,
+    expert: raw.expert,
     state: raw.state,
     reason: raw.reason ?? null,
     progress: raw.progress ?? null,
     result: raw.result ?? null,
     startedAt: raw.started_at,
     endedAt: raw.ended_at ?? null,
+  } as JobPartRow;
+}
+
+function toRow(raw: Record<string, unknown>): JobRow {
+  const parts = Array.isArray(raw.parts) ? raw.parts : [];
+  return {
+    id: raw.id,
+    task: raw.task,
+    folder: raw.folder,
+    mode: raw.mode,
+    state: raw.state,
+    title: raw.title ?? null,
+    startedAt: raw.started_at,
+    endedAt: raw.ended_at ?? null,
+    closedAt: raw.closed_at ?? null,
+    parts: parts.map((part) => toPart(part as Record<string, unknown>)),
     activity: raw.activity === true,
   } as JobRow;
 }

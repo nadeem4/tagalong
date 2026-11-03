@@ -17,11 +17,15 @@ const entry = (
   status: 'running',
   step: `s${seq}`,
   exit: null,
+  part: 'p1',
+  source: null,
   ...extra,
 });
 const page = (rev: number, entries: JobActivityEntry[], state = 'running'): JobActivityPage => ({
   job: 'j1',
   state,
+  title: null,
+  parts: [],
   rev,
   entries,
   more: false,
@@ -31,6 +35,14 @@ const page = (rev: number, entries: JobActivityEntry[], state = 'running'): JobA
 describe('applyPage', () => {
   it('starts empty at rev 0', () => {
     expect(emptyLog()).toEqual({ entries: [], rev: 0, state: 'running', watch: null });
+  });
+
+  it('keeps the part a step belongs to', () => {
+    const log = applyPage(
+      emptyLog(),
+      page(2, [entry(1, 1), entry(2, 2, { part: 'p2', source: 'gemini' })]),
+    );
+    expect(log.entries.map((e) => e.part)).toEqual(['p1', 'p2']);
   });
 
   it('appends pages in seq order', () => {

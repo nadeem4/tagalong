@@ -478,7 +478,9 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
-  while running, reason when ended, and a Show result toggle once finished. **Stop** shows on
+  while running, reason when ended, and a Show result toggle once finished. A row carries its
+  `parts` (one per expert hand-off, `JobPartRow`); the panel shows the newest part's progress,
+  reason and result, and an old job has exactly one part. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   `jobActivity(job, afterRev)` and `runningSteps()` (host bridge) pull a job's steps by cursor and

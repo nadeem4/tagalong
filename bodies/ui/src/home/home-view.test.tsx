@@ -180,16 +180,15 @@ describe('HomeView', () => {
     const jobs = [
       {
         id: 'j1',
-        agent: 'claude-code',
         task: 'Fix the login bug',
         folder: 'C:\\code\\app',
         mode: 'edit',
         state: 'running',
-        reason: null,
-        progress: null,
-        result: null,
+        title: null,
         startedAt: '2026-10-28T09:00:00.000Z',
         endedAt: null,
+        closedAt: null,
+        parts: [],
         activity: false,
       },
     ];

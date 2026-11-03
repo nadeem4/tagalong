@@ -24,38 +24,60 @@ function setup(answer: (tool: string, input?: object) => Promise<unknown> | unkn
 // The brain's row as it sends it: snake_case, with fields Home does not show.
 const BRAIN_ROW = {
   id: 'j1',
-  agent: 'claude-code',
   task: 'fix the tests',
   folder: 'C:/work/app',
   mode: 'ask',
   state: 'running',
-  reason: null,
-  progress: 'reading files',
-  result: null,
-  session_id: 's1',
-  reported: false,
+  title: null,
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
+  closed_at: null,
+  watch: null,
+  parts: [
+    {
+      id: 'p1',
+      expert: 'claude-code',
+      state: 'running',
+      reason: null,
+      progress: 'reading files',
+      result: null,
+      session_id_known: true,
+      started_at: '2026-10-27T10:00:00Z',
+      ended_at: null,
+    },
+  ],
 };
 
 const JOB = {
   id: 'j1',
-  agent: 'claude-code',
   task: 'fix the tests',
   folder: 'C:/work/app',
   mode: 'ask',
   state: 'running',
-  reason: null,
-  progress: 'reading files',
-  result: null,
+  title: null,
   startedAt: '2026-10-27T10:00:00Z',
   endedAt: null,
+  closedAt: null,
+  parts: [
+    {
+      id: 'p1',
+      expert: 'claude-code',
+      state: 'running',
+      reason: null,
+      progress: 'reading files',
+      result: null,
+      startedAt: '2026-10-27T10:00:00Z',
+      endedAt: null,
+    },
+  ],
   activity: false,
 };
 
 const PAGE = {
   job: 'j1',
   state: 'running',
+  title: null,
+  parts: [],
   rev: 4,
   entries: [
     {
@@ -67,6 +89,8 @@ const PAGE = {
       status: 'running',
       step: 's1',
       exit: null,
+      part: 'p1',
+      source: null,
     },
   ],
   more: false,
@@ -78,6 +102,18 @@ describe('registerJobsIpc', () => {
     const { invoke, calls } = setup(() => text({ jobs: [BRAIN_ROW] }));
     expect(await invoke(IPC.listJobs)).toEqual([JOB]);
     expect(calls).toEqual([['list_jobs', {}]]);
+  });
+
+  it('maps every part of a job, oldest first', async () => {
+    const second = { ...BRAIN_ROW.parts[0], id: 'p2', expert: 'gemini', state: 'done' };
+    const { invoke } = setup(() =>
+      text({ jobs: [{ ...BRAIN_ROW, parts: [...BRAIN_ROW.parts, second] }] }),
+    );
+    const [row] = (await invoke(IPC.listJobs)) as (typeof JOB)[];
+    expect(row?.parts.map((p) => [p.id, p.expert])).toEqual([
+      ['p1', 'claude-code'],
+      ['p2', 'gemini'],
+    ]);
   });
 
   it('stops a job through the brain', async () => {

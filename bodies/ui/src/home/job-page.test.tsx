@@ -12,16 +12,15 @@ import { JobPage } from './job-page';
 
 const JOB: JobRow = {
   id: 'j1',
-  agent: 'claude-code',
   task: 'Fix the tests',
   folder: 'C:\\code\\app',
   mode: 'edit',
   state: 'running',
-  reason: null,
-  progress: null,
-  result: null,
+  title: null,
   startedAt: new Date(Date.now() - 5000).toISOString(),
   endedAt: null,
+  closedAt: null,
+  parts: [],
   activity: true,
 };
 const step = (seq: number, extra: Partial<JobActivityEntry> = {}): JobActivityEntry => ({
@@ -33,6 +32,8 @@ const step = (seq: number, extra: Partial<JobActivityEntry> = {}): JobActivityEn
   status: 'done',
   step: `s${seq}`,
   exit: null,
+  part: 'p1',
+  source: null,
   ...extra,
 });
 
@@ -94,6 +95,8 @@ describe('JobPage', () => {
       Promise.resolve({
         job,
         state: 'done',
+        title: null,
+        parts: [],
         rev: 2,
         entries: [step(1), step(2, { kind: 'end', text: '# done', status: null, step: null })],
         more: false,

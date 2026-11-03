@@ -18,6 +18,8 @@ const entry = (seq: number, extra: Partial<JobActivityEntry>): JobActivityEntry 
   status: null,
   step: null,
   exit: null,
+  part: 'p1',
+  source: null,
   ...extra,
 });
 

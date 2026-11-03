@@ -11,6 +11,7 @@ export type {
   HostBridge,
   JobActivityEntry,
   JobActivityPage,
+  JobPartRow,
   JobRow,
   RunningStep,
   WatchItem,

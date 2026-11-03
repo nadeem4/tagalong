@@ -57,18 +57,30 @@ export interface PermissionRow {
 /** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
 export interface JobRow {
   id: string;
-  agent: string;
   task: string;
   folder: string;
   mode: string;
+  state: string;
+  title: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  closedAt: string | null;
+  /** One per expert hand-off, oldest first; an old job has exactly one. */
+  parts: JobPartRow[];
+  /** True when the brain kept steps for this job, so Home can offer to watch it. */
+  activity: boolean;
+}
+
+/** One expert hand-off inside a job. */
+export interface JobPartRow {
+  id: string;
+  expert: string;
   state: string;
   reason: string | null;
   progress: string | null;
   result: string | null;
   startedAt: string;
   endedAt: string | null;
-  /** True when the brain kept steps for this job, so Home can offer to watch it. */
-  activity: boolean;
 }
 
 /** One step of a job, as the brain's job_activity sends it (text is already masked). */
@@ -81,12 +93,27 @@ export interface JobActivityEntry {
   status: string | null;
   step: string | null;
   exit: number | null;
+  /** Which part (expert hand-off) of the job the step belongs to. */
+  part: string;
+  source: string | null;
+}
+
+/** A part as the job page header shows it (no progress or result: the steps tell that). */
+export interface JobPagePart {
+  id: string;
+  expert: string;
+  state: string;
+  reason: string | null;
+  started_at: string;
+  ended_at: string | null;
 }
 
 /** A page of a job's steps after a cursor; pass `rev` back as the next `afterRev`. */
 export interface JobActivityPage {
   job: string;
   state: string;
+  title: string | null;
+  parts: JobPagePart[];
   rev: number;
   entries: JobActivityEntry[];
   more: boolean;

@@ -114,62 +114,69 @@ export function JobsPanel() {
         )}
         {jobs !== null && jobs.length > 0 && (
           <ul aria-label="Jobs" className="job-list" ref={listRef}>
-            {jobs.map((job) => (
-              <li key={job.id} className="job-row">
-                <div className="job-row__main">
-                  <span className="job-row__task" title={job.task}>
-                    {job.task}
-                  </span>
-                  <span className="job-row__meta">
-                    <span className={`job-row__state job-row__state--${job.state}`}>
-                      {STATE_LABEL[job.state] ?? job.state}
+            {jobs.map((job) => {
+              // One part until Scout splits a job; the row speaks for the newest one.
+              const part = job.parts[job.parts.length - 1];
+              const progress = part?.progress ?? null;
+              const reason = part?.reason ?? null;
+              const result = part?.result ?? null;
+              return (
+                <li key={job.id} className="job-row">
+                  <div className="job-row__main">
+                    <span className="job-row__task" title={job.task}>
+                      {job.task}
                     </span>
-                    <span className="job-row__where">
-                      {job.folder} · {job.mode} · <span className="home-time">{when(job)}</span>
+                    <span className="job-row__meta">
+                      <span className={`job-row__state job-row__state--${job.state}`}>
+                        {STATE_LABEL[job.state] ?? job.state}
+                      </span>
+                      <span className="job-row__where">
+                        {job.folder} · {job.mode} · <span className="home-time">{when(job)}</span>
+                      </span>
                     </span>
-                  </span>
-                  {job.state === 'running' && job.progress !== null && (
-                    <span className="job-row__text">{job.progress}</span>
+                    {job.state === 'running' && progress !== null && (
+                      <span className="job-row__text">{progress}</span>
+                    )}
+                    {reason !== null && job.state !== 'running' && (
+                      <span className="job-row__text">{reason}</span>
+                    )}
+                  </div>
+                  <div className="job-row__actions">
+                    {job.activity && (
+                      <Button
+                        variant="secondary"
+                        aria-label={`Watch ${job.task}`}
+                        data-watch={job.id}
+                        onClick={() => setWatching(job.id)}
+                      >
+                        Watch
+                      </Button>
+                    )}
+                    {job.state === 'running' && (
+                      <Button
+                        variant="secondary"
+                        aria-label={`Stop ${job.task}`}
+                        onClick={() => stop(job)}
+                      >
+                        Stop
+                      </Button>
+                    )}
+                    {job.state !== 'running' && result !== null && (
+                      <Button
+                        variant="secondary"
+                        aria-expanded={open.has(job.id)}
+                        onClick={() => toggle(job.id)}
+                      >
+                        {open.has(job.id) ? 'Hide result' : 'Show result'}
+                      </Button>
+                    )}
+                  </div>
+                  {open.has(job.id) && result !== null && (
+                    <pre className="job-row__result">{result}</pre>
                   )}
-                  {job.reason !== null && job.state !== 'running' && (
-                    <span className="job-row__text">{job.reason}</span>
-                  )}
-                </div>
-                <div className="job-row__actions">
-                  {job.activity && (
-                    <Button
-                      variant="secondary"
-                      aria-label={`Watch ${job.task}`}
-                      data-watch={job.id}
-                      onClick={() => setWatching(job.id)}
-                    >
-                      Watch
-                    </Button>
-                  )}
-                  {job.state === 'running' && (
-                    <Button
-                      variant="secondary"
-                      aria-label={`Stop ${job.task}`}
-                      onClick={() => stop(job)}
-                    >
-                      Stop
-                    </Button>
-                  )}
-                  {job.state !== 'running' && job.result !== null && (
-                    <Button
-                      variant="secondary"
-                      aria-expanded={open.has(job.id)}
-                      onClick={() => toggle(job.id)}
-                    >
-                      {open.has(job.id) ? 'Hide result' : 'Show result'}
-                    </Button>
-                  )}
-                </div>
-                {open.has(job.id) && job.result !== null && (
-                  <pre className="job-row__result">{job.result}</pre>
-                )}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
