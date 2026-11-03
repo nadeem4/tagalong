@@ -161,7 +161,8 @@ flowchart TD
 - A `say` while a turn runs joins it: the result has `joined: true` and the message is folded
   into the next step.
 - At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
-  prompt from Scout's soul, that "What you know" block, the local time (with its UTC offset), the bodies online, and the capability picture.
+  prompt from Scout's soul, that "What you know" block, the capability picture, the bodies online
+  and the local time (with its UTC offset), in that order.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
   `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`) and every online body's
@@ -294,7 +295,7 @@ short version in voice) is guidance in `mind/soul.md`, not code.
 ## Capability picture and routing
 
 `mind/capabilities.py` builds `capability_picture(builtin, bodies, apps, experts)`, a short block
-at the end of the system prompt headed "What you can do:". It lists the brain's own tool names,
+just before the bodies online and the clock in the system prompt, headed "What you can do:". It lists the brain's own tool names,
 each online body's tool names, each connected app with a one-line purpose (the first line of its
 first tool description; none if it has none) and each installed expert with its login state. Names
 and one-line purposes only: no schemas and no focus facts, sorted, with at most 20 apps listed (then "and K more"), so the
@@ -355,7 +356,7 @@ migration that keeps every saved row), so it holds for every body, survives a re
 a body reconnecting. `resolve_mode` returns `off` before any other rule, so it also beats `locked`,
 `self_asks` and `person_only`: those tools may be set Off (never Auto). Off does three things:
 
-- `Toolbox.active_specs()` skips the tool, and `model_tools()` (and, later, the capability picture)
+- `Toolbox.active_specs()` skips the tool, and `model_tools()` and the capability picture
   read only that list, so Scout never sees it and routes around it.
 - The `tool_mode` guard blocks a call to it with `denied` and "<name> is turned off by the owner.",
   for a model that still calls it. Home's own calls are not blocked. The guard chain now runs even
