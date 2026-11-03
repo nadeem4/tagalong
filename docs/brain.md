@@ -292,7 +292,8 @@ short version in voice) is guidance in `mind/soul.md`, not code.
 
 ## Permissions and asks
 
-Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a tool that
+Every tool has a mode: `off`, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a stored
+`off` first (see [Off](#off)); a tool that
 asks for itself (below) is `auto`; then the user's saved choice (a locked tool included); then a
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
@@ -314,7 +315,7 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 | Column | Holds                            |
 | ------ | -------------------------------- |
 | `tool` | The full tool name (primary key) |
-| `mode` | `ask` or `auto`                  |
+| `mode` | `off`, `ask` or `auto`           |
 
 No row means the tool's default applies. `Toolbox.set_mode` accepts `auto` for a locked tool: that
 is the explicit unlock, made with the Home switch (which warns first, see
@@ -324,6 +325,28 @@ locked. Flip it back to `ask` and the tool asks again. Only a tool that asks for
 A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
 its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
+
+### Off
+
+Off is the third per-tool state, stored in the same `permissions` table (the CHECK was widened by a
+migration that keeps every saved row), so it holds for every body, survives a restart and survives
+a body reconnecting. `resolve_mode` returns `off` before any other rule, so it also beats `locked`,
+`self_asks` and `person_only`: those tools may be set Off (never Auto). Off does three things:
+
+- `Toolbox.active_specs()` skips the tool, and `model_tools()` (and, later, the capability picture)
+  read only that list, so Scout never sees it and routes around it.
+- The `tool_mode` guard blocks a call to it with `denied` and "<name> is turned off by the owner.",
+  for a model that still calls it. Home's own calls are not blocked. The guard chain now runs even
+  for a toolbox with no `Asks`; only the ask itself needs one.
+- `set_mode` looks in `known_specs`, so a tool of a body that is offline right now can be turned Off
+  and stays Off when the body connects.
+
+`list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them.
+
+Shipped defaults match the design: built-in memory, timers, `read_output` and the job tools are
+`auto`; a body's reads are `auto` and its changes `ask` (the desktop's `open_url` and the browser's
+`tab_actions` ask); every app tool asks until changed. `test_tools.py` pins the built-in rows
+against the real specs and the body tests pin each body's declared `effect` and `confirm`.
 
 Expert jobs (Claude Code hand-offs) live in two tables of the same file. `jobs` holds the job: id, task, folder, mode, state (`running`, `done`, `error`, `stopped`), start and end times, `parent_job` (the job a follow-up continued), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and `closed_at` with `close_job`; the restart sweep also sets `closed_at`). `job_parts` holds one row per expert hand-off inside a job, keyed by job id and part id (`p1`, `p2`, ...): agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, and start and end times. `add_part(job_id, agent, task, folder, started_at)` takes the folder; the migration copies each old job's folder onto its part. A job's state is recomputed whenever a part ends: `running` while any part runs, otherwise the outcome of the part that ended last. Rows still `running` at brain start become `stopped` with reason `brain restarted`, parts and jobs alike, and those jobs are closed too (`closed_at` set) so they take no new parts. `update_job` takes job fields only; a part's reason, progress, report and session go through `update_part`. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`. A job from before parts existed opens as a closed job with one part, `p1`, carrying its steps, asks, report and times.
 
@@ -454,18 +477,18 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                              | Result text (JSON)                                                                                                                              |
-| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                            |
-| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                         |
-| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                      |
-| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only                     |
-| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                                                   |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                  |
-| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                              |
-| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                         |
-| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest |
+| Tool               | Input                              | Result text (JSON)                                                                                                                                                      |
+| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                    |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                 |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                              |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online", "source"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                            |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                        |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                          |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                      |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                 |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                         |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 

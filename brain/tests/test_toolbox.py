@@ -1258,3 +1258,68 @@ async def test_on_call_ignores_unknown_tools_and_a_raising_hook_never_breaks_the
         on_call=lambda *a: 1 / 0,
     )
     assert await boxed.run(call("a")) == "ran a"
+
+
+# --- Off: a third stored state that removes the tool for everyone ---------------------------
+
+
+def test_off_tool_leaves_model_tools_and_active_specs():
+    stored = {}
+    box = Toolbox([FakeSource([spec("a"), spec("b")])], stored)
+    box.set_mode("a", "off")
+    assert stored == {"a": "off"}
+    assert [t["name"] for t in box.model_tools()] == ["b"]
+    assert [s.name for s in box.active_specs()] == ["b"]
+    assert box.mode(spec("a")) == "off"
+
+
+async def test_off_tool_refused_plainly_even_without_asks():
+    src = FakeSource([spec("a")])
+    box = Toolbox([src], {"a": "off"})
+    with pytest.raises(RpcError) as e:
+        await box.run(call("a"))
+    assert e.value.code == ErrorCode.denied
+    assert str(e.value) == "a is turned off by the owner."
+    assert src.ran == []
+
+
+async def test_off_tool_still_runs_for_home():
+    box = Toolbox([FakeSource([spec("h", audience={"home"})])], {"h": "off"})
+    assert await box.run(call("h"), caller="home") == "ran h"
+
+
+def test_set_mode_off_allowed_for_self_asking_and_person_only_tools():
+    stored = {}
+    box = Toolbox(
+        [FakeSource([mode_spec("a", self_asks=True), mode_spec("b", person_only=True)])], stored
+    )
+    box.set_mode("a", "off")
+    box.set_mode("b", "off")
+    assert stored == {"a": "off", "b": "off"}
+    with pytest.raises(RpcError):
+        box.set_mode("b", "auto")
+
+
+def test_set_mode_off_for_a_tool_whose_body_is_offline():
+    stored = {}
+    box = Toolbox([FakeSource([spec("a")], offline={"a"})], stored)
+    box.set_mode("a", "off")
+    assert stored == {"a": "off"}
+
+
+def test_off_holds_when_a_body_reconnects():
+    bodies = Bodies()
+    stored = {"desktop__see_screen": "off"}
+    box = Toolbox([BodySource(bodies)], stored)
+    connect(bodies, "desktop")
+    assert box.model_tools() == []
+    bodies.disconnect("desktop", bodies._online["desktop"].peer)
+    connect(bodies, "desktop")
+    assert box.model_tools() == []
+    assert stored == {"desktop__see_screen": "off"}
+
+
+def test_set_mode_rejects_unknown_mode_text():
+    with pytest.raises(RpcError) as e:
+        Toolbox([FakeSource([spec("a")])]).set_mode("a", "maybe")
+    assert str(e.value) == "mode must be off, ask or auto."

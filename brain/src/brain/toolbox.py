@@ -184,7 +184,7 @@ class Toolbox:
         if guards is None:
             # Standalone toolbox: build the same chain the Session registers.
             guards = Guards()
-            guards.add(tool_mode(modes, owner_turn))
+            guards.add(tool_mode(modes, owner_turn))  # also refuses an Off tool
             if asks is not None:
                 guards.add(anyone_online(asks))
                 if side_check is not None and approvals is not None:
@@ -192,20 +192,35 @@ class Toolbox:
                 guards.add(person_ask())
         self._guards = guards
 
-    def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
+    def mode(self, spec: ToolSpec) -> Literal["off", "ask", "auto"]:
         return resolve_mode(spec, self._modes().get(spec.name))
 
     def set_mode(self, name: str, mode: str) -> None:
-        spec = next((s for src in self.sources for s in src.specs() if s.name == name), None)
+        # Known specs, so a tool of a body that is offline right now can still be set.
+        spec = next((s for s in self.known_specs() if s.name == name), None)
         if spec is None:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
-        if mode not in ("ask", "auto"):
-            raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
-        if spec.self_asks:
-            raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
-        if spec.person_only:
-            raise RpcError(ErrorCode.invalid_params, f"{name} always needs your yes.")
+        if mode not in ("off", "ask", "auto"):
+            raise RpcError(ErrorCode.invalid_params, "mode must be off, ask or auto.")
+        if mode != "off":  # Off is always the owner's to choose
+            if spec.self_asks:
+                raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
+            if spec.person_only:
+                raise RpcError(ErrorCode.invalid_params, f"{name} always needs your yes.")
         self._save_mode(name, mode)
+
+    def active_specs(self) -> list[ToolSpec]:
+        """Every servable tool that is not Off, sorted by name within each source.
+
+        The one place the model's tool list and the capability picture read, so Off removes a
+        tool from both.
+        """
+        return [
+            spec
+            for source in self.sources
+            for spec in sorted(source.specs(), key=lambda s: s.name)
+            if self.mode(spec) != "off"
+        ]
 
     def known_specs(self) -> list[ToolSpec]:
         return [spec for source in self.sources for spec in source.known_specs()]
@@ -226,20 +241,19 @@ class Toolbox:
 
     def model_tools(self) -> list[dict]:
         out = []
-        for source in self.sources:
-            for spec in sorted(source.specs(), key=lambda s: s.name):
-                if "scout" not in spec.audience:
-                    continue
-                if len(spec.name) > NAME_MAX:
-                    log.warning("tool name too long, dropped: %s", spec.name)
-                    continue
-                out.append(
-                    {
-                        "name": spec.name,
-                        "description": spec.description,
-                        "input_schema": spec.input_schema,
-                    }
-                )
+        for spec in self.active_specs():
+            if "scout" not in spec.audience:
+                continue
+            if len(spec.name) > NAME_MAX:
+                log.warning("tool name too long, dropped: %s", spec.name)
+                continue
+            out.append(
+                {
+                    "name": spec.name,
+                    "description": spec.description,
+                    "input_schema": spec.input_schema,
+                }
+            )
         return out
 
     async def _ask(self, call: Call, spec: ToolSpec, source_kind: str) -> None:
@@ -338,13 +352,12 @@ class Toolbox:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
                     kind = getattr(source, "approval_source", "scout_tool")
                     found[:] = [spec, kind, False]
-                    if self._asks is not None:
-                        ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
-                        verdict = await self._guards.run(Hook.tool_call, ctx)
-                        if verdict.kind in ("block", "stop"):
-                            raise RpcError(_error_code(verdict.code), verdict.reason)
-                        if verdict.kind == "ask":
-                            await self._ask(call, spec, kind)
+                    ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
+                    verdict = await self._guards.run(Hook.tool_call, ctx)
+                    if verdict.kind in ("block", "stop"):
+                        raise RpcError(_error_code(verdict.code), verdict.reason)
+                    if verdict.kind == "ask" and self._asks is not None:
+                        await self._ask(call, spec, kind)
                     found[2] = True
                     return await source.run(call, call.name)
         for source in self.sources:

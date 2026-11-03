@@ -54,7 +54,7 @@ export function PermissionsPanel() {
     document.getElementById(switchId(name))?.focus();
   };
 
-  const apply = (name: string, mode: 'ask' | 'auto'): void => {
+  const apply = (name: string, mode: 'off' | 'ask' | 'auto'): void => {
     closeWarning(name);
     void bridge
       .setPermission(name, mode)

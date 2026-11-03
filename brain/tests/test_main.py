@@ -293,6 +293,7 @@ def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError):
         asyncio.run(_run())
     toolbox = seen[0].toolbox
+    toolbox._modes = lambda: {}  # _run closed the memory the stored modes come from
     scout = {t["name"] for t in toolbox.model_tools()}
     home = {t.name for t in toolbox.home_tools()}
     names = {"inspect_machine", "find_experts", "find_apps", "install_expert", "login_expert"}

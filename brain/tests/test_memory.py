@@ -398,6 +398,31 @@ def test_set_permission_mode_rejects_other_modes(mem):
         mem.set_permission_mode("x", "maybe")
 
 
+def test_off_is_a_stored_permission_and_survives_reopen(tmp_path):
+    m = Memory(tmp_path / "o.db")
+    m.set_permission_mode("x", "off")
+    m.close()
+    m = Memory(tmp_path / "o.db")
+    assert m.permission_modes() == {"x": "off"}
+    m.close()
+
+
+def test_off_migration_keeps_rows_stored_before_it(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(str(path))
+    for script in memory.MIGRATIONS[:-1]:  # the schema as it was before Off existed
+        db.executescript(script)
+    db.execute("INSERT INTO permissions(tool, mode) VALUES ('x', 'auto')")
+    db.execute(f"PRAGMA user_version = {len(memory.MIGRATIONS) - 1}")
+    db.commit()
+    db.close()
+    m = Memory(path)
+    assert m.permission_modes() == {"x": "auto"}
+    m.set_permission_mode("x", "off")
+    assert m.permission_modes() == {"x": "off"}
+    m.close()
+
+
 # ---- jobs (8a2) ----
 
 

@@ -40,18 +40,21 @@ export interface KeyStatus {
 export type KeyResult = 'ok' | 'invalid' | 'unreachable' | 'offline';
 
 /**
- * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
- * (`auto`). A locked tool asks until set to auto on Home; an offline body's tool cannot be changed yet.
+ * One tool in Home's Permissions list: removed from Scout's toolbox (`off`), asked about before
+ * each use (`ask`) or just used (`auto`). A locked tool asks until set to auto on Home; `source`
+ * says where it comes from. An offline body's tool can still be set.
  */
 export interface PermissionRow {
   name: string;
   description: string;
   effect: 'read' | 'change';
-  mode: 'ask' | 'auto';
+  mode: 'off' | 'ask' | 'auto';
   locked: boolean;
   /** The tool opens its own ask with the person, so the switch changes nothing (brain's flag). */
   self_asks?: boolean;
   online: boolean;
+  /** Where the tool comes from: `built_in`, `body:<id>` or `app:<id>`. */
+  source?: string;
 }
 
 /** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
@@ -254,8 +257,8 @@ export interface HostBridge {
   usageSummary(): Promise<SpendToday>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
   listPermissions(): Promise<PermissionRow[]>;
-  /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
-  setPermission(tool: string, mode: 'ask' | 'auto'): Promise<void>;
+  /** Sets one tool to off, ask or auto; rejects when the brain refuses (a locked tool, say). */
+  setPermission(tool: string, mode: 'off' | 'ask' | 'auto'): Promise<void>;
   /** Home's Jobs panel: recent Claude Code jobs, newest first. */
   listJobs(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */

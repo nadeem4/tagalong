@@ -86,8 +86,10 @@ def spend_guards(budget, cap: int) -> Guards:
     return guards
 
 
-def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["ask", "auto"]:
+def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["off", "ask", "auto"]:
     """The mode a tool runs in; Home's permission list uses this too, so both always agree."""
+    if stored == "off":
+        return "off"  # the owner's switch beats every flag, self-asking and person-only too
     if spec.self_asks:
         return "auto"
     if spec.person_only:
@@ -108,7 +110,11 @@ def tool_mode(
     def check(ctx: ToolCallCtx) -> Verdict:
         if ctx.caller == "home":
             return ALLOW
-        if resolve_mode(ctx.spec, modes().get(ctx.spec.name)) == "ask":
+        mode = resolve_mode(ctx.spec, modes().get(ctx.spec.name))
+        if mode == "off":
+            # Plain words the model reads; it should route around, not retry.
+            return block(f"{ctx.spec.name} is turned off by the owner.", "denied")
+        if mode == "ask":
             # A follow-up the owner asked for in chat is already their yes; one Scout starts
             # on a wake goes through the ask chain.
             if ctx.spec.follow_up and not ctx.spec.person_only and owner_turn(ctx.turn_id):
