@@ -118,6 +118,9 @@ export const IPC = {
   // The first-run walkthrough: open it (at a step) or finish it.
   walkthroughOpen: 'tagalong:walkthrough:open',
   walkthroughFinish: 'tagalong:walkthrough:finish',
+  // The folders Scout's file tools may use: pick one to add, or remove one. Each answers the list.
+  fileFolderAdd: 'tagalong:file-folder:add',
+  fileFolderRemove: 'tagalong:file-folder:remove',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */
@@ -331,6 +334,10 @@ export interface TagalongHostApi {
   /** Finish or Skip: marks the walkthrough seen and closes its window. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;
+  /** Opens the folder picker and saves the choice; answers the folders now allowed. */
+  addFileFolder(): Promise<string[]>;
+  /** Takes one folder away at once (the next file call is refused); answers the folders left. */
+  removeFileFolder(path: string): Promise<string[]>;
   /** Sets or clears one of the panel's own marks: the mic failing, or Say “Scout”. */
   setStatusMark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): Promise<void>;
 }

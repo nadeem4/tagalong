@@ -76,6 +76,9 @@ export const SETTINGS_CSS = `
 .tg-chip--warn { background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
 .tg-chip--err { background: ${t.color.errFill}; color: ${t.color.errInk}; }
 .tg-chips { display: flex; flex-wrap: wrap; gap: ${t.space.sm}px; list-style: none; margin: ${t.space.md}px 0 0; padding: 0; }
+.tg-folders { list-style: none; margin: 0 0 ${t.space.md}px; padding: 0; display: grid; gap: ${t.space.sm}px; }
+.tg-folder { display: flex; align-items: center; justify-content: space-between; gap: ${t.space.md}px; }
+.tg-folder__path { overflow-wrap: anywhere; font-size: ${t.fontSize.min}px; }
 .tg-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: ${t.space.sm}px; margin: 0 0 ${t.space.lg}px; padding: 0; border: 0; }
 .tg-panel label.tg-choice {
   display: block; margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border: 2px solid ${t.color.panelLine};

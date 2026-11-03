@@ -79,6 +79,7 @@ import { registerSetupIpc } from './ipc/setup';
 import { registerSpendIpc } from './ipc/spend';
 import { readKeyStatus, registerKeyIpc } from './ipc/key';
 import { registerWalkthroughIpc } from './ipc/walkthrough';
+import { registerFileFoldersIpc } from './ipc/file-folders';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
@@ -246,8 +247,11 @@ async function start(): Promise<void> {
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
     openExternal: (url) => shell.openExternal(url),
-    // No folder is chosen until the settings row (B26c) supplies them, so file tools refuse.
-    files: { folders: () => [], trash: (path) => shell.trashItem(path) },
+    // Read live on every call, so removing a folder in Settings revokes access at once.
+    files: {
+      folders: () => desktop?.settings.fileFolders ?? settings.fileFolders,
+      trash: (path) => shell.trashItem(path),
+    },
     onNotification: (method, params) => {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {
@@ -824,6 +828,22 @@ function registerIpc(): void {
   registerKeyIpc(handle, {
     brain: required().brain,
     openExternal: (url) => shell.openExternal(url),
+  });
+  registerFileFoldersIpc(handle, {
+    pick: async () => {
+      const result = await dialog.showOpenDialog({
+        title: 'Choose a folder Scout may use',
+        properties: ['openDirectory'],
+      });
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    settingsStore: () => required().settingsStore,
+    onSaved: (saved) => {
+      required().settings = saved;
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
+      }
+    },
   });
   registerWalkthroughIpc(handle, {
     save: (patch) => {

@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 const SECTIONS = [
   { id: 'key', title: 'Anthropic key' },
   { id: 'privacy', title: 'Privacy' },
+  { id: 'files', title: 'Files Scout may use' },
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Add Scout to your browser' },
