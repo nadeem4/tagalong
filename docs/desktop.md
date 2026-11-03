@@ -126,8 +126,8 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
   Every path must be absolute; it is resolved, then `realpath`'d (the nearest existing parent for a
   path that does not exist yet), and must sit inside a chosen folder (also `realpath`'d), so `..`,
   symlinks and junctions cannot escape. On Windows the compare ignores case and accepts `/` or `\`.
-  A refusal is a text result, not an error. `list_files` shows up to 200 entries with sizes;
-  `read_file` returns text cut at `maxChars` (default 20,000) and only a notice for a binary file.
+  A refusal is a text result, not an error, and so are common disk failures (across drives, no permission, in use), said in a sentence without paths; a link that leads nowhere is refused. `list_files` shows up to 200 entries with sizes;
+  `read_file` returns text cut at `maxChars` (default 20,000, at most 100,000) and only a notice for a binary file.
   `move_file` (a folder as the target means "into it") and `rename_file` (a bare new name) never
   overwrite: a clash is refused. `delete_file` sends the item to the Recycle Bin through
   `shell.trashItem` and refuses a chosen folder itself. `write_file` replaces a file's content (the

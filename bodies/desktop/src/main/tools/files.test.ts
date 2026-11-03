@@ -16,6 +16,23 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Lets one test make rename fail the way a real disk can (for example across drives).
+const failRename = vi.hoisted(() => ({ code: null as string | null }));
+vi.mock('node:fs/promises', async (original) => {
+  const real = await original<typeof import('node:fs/promises')>();
+  return {
+    ...real,
+    rename: (...args: Parameters<typeof real.rename>) =>
+      failRename.code === null
+        ? real.rename(...args)
+        : Promise.reject(
+            Object.assign(new Error(`C:\\secret\\path ${failRename.code}`), {
+              code: failRename.code,
+            }),
+          ),
+  };
+});
 import { fileTools, isInside } from './files';
 
 let root: string;
@@ -39,6 +56,7 @@ beforeEach(() => {
   writeFileSync(join(outside, 'key.txt'), 'private');
   folders = [allowed];
   trash.mockClear();
+  failRename.code = null;
 });
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -58,6 +76,20 @@ describe('isInside (pure path rules)', () => {
     expect(isInside(dir, 'D:\\Users\\Me\\Downloads\\a.txt', true)).toBe(false);
     expect(isInside(dir, 'C:\\Users\\Me\\Downloads2\\a.txt', true)).toBe(false);
     expect(isInside(dir, 'C:\\Users\\Me\\Downloads\\..\\Secret', true)).toBe(false);
+  });
+
+  it('treats a child whose name merely starts with two dots as inside', () => {
+    expect(isInside('/home/u/Downloads', '/home/u/Downloads/..notes/a.txt', false)).toBe(true);
+    expect(isInside('C:\\Users\\Me', 'C:\\Users\\Me\\..notes', true)).toBe(true);
+  });
+
+  it('understands the long-path prefix on either side', () => {
+    const dir = 'C:\\Users\\Me\\Downloads';
+    const long = '\\\\?\\';
+    expect(isInside(long + dir, long + dir + '\\deep\\a.txt', true)).toBe(true);
+    expect(isInside(dir, long + dir + '\\a.txt', true)).toBe(true);
+    expect(isInside(long + dir, dir + '\\a.txt', true)).toBe(true);
+    expect(isInside(long + dir, long + 'C:\\Users\\Me\\Other\\a.txt', true)).toBe(false);
   });
 
   it('on POSIX stays case-sensitive', () => {
@@ -114,6 +146,15 @@ describe('folders', () => {
     expect(existsSync(join(outside, 'new.txt'))).toBe(false);
   });
 
+  it('refuses a dangling symlink inside the folder, so a write cannot follow it out', async () => {
+    // A junction needs no privilege on Windows; the file symlink is the case that matters on POSIX.
+    symlinkSync(join(outside, 'not-yet'), join(allowed, 'dangle'), 'junction');
+    expect(await call('write_file', { path: join(allowed, 'dangle'), content: 'x' })).toMatch(
+      /link/i,
+    );
+    expect(existsSync(join(outside, 'not-yet'))).toBe(false);
+  });
+
   it('allows a chosen folder that is itself reached through a link', async () => {
     const via = join(root, 'via');
     symlinkSync(allowed, via, 'junction');
@@ -149,6 +190,12 @@ describe('read_file', () => {
     const out = await call('read_file', { path: join(allowed, 'big.txt'), maxChars: 100 });
     expect(out).toMatch(/cut at 100/i);
     expect(out.length).toBeLessThan(400);
+  });
+
+  it('caps a huge maxChars request', async () => {
+    writeFileSync(join(allowed, 'huge.txt'), 'x'.repeat(150_000));
+    const out = await call('read_file', { path: join(allowed, 'huge.txt'), maxChars: 10_000_000 });
+    expect(out).toMatch(/cut at 100000/i);
   });
 
   it('gives a notice instead of binary bytes', async () => {
@@ -203,6 +250,12 @@ describe('move_file and rename_file', () => {
     expect(existsSync(join(allowed, 'c.txt'))).toBe(true);
   });
 
+  it.runIf(process.platform === 'win32')('allows a case-only rename on Windows', async () => {
+    await call('rename_file', { path: join(allowed, 'a.txt'), newName: 'A.txt' });
+    const names = (await call('list_files', { path: allowed })).split('\n');
+    expect(names.some((l) => l.startsWith('A.txt'))).toBe(true);
+  });
+
   it('refuses a new name that is a path', async () => {
     for (const newName of ['..\\x.txt', '../x.txt', 'sub/x.txt', '..', '']) {
       expect(await call('rename_file', { path: join(allowed, 'a.txt'), newName })).toMatch(
@@ -210,6 +263,29 @@ describe('move_file and rename_file', () => {
       );
     }
     expect(existsSync(join(allowed, 'a.txt'))).toBe(true);
+  });
+});
+
+describe('plain error sentences', () => {
+  it.each([
+    ['EXDEV', /across drives/i],
+    ['EACCES', /permission/i],
+    ['EPERM', /permission/i],
+    ['EBUSY', /in use/i],
+    ['ENOENT', /does not exist/i],
+  ])('maps %s to a sentence without the raw error or path', async (code, pattern) => {
+    failRename.code = code;
+    const out = await call('move_file', {
+      from: join(allowed, 'a.txt'),
+      to: join(allowed, 'z.txt'),
+    });
+    expect(out).toMatch(pattern);
+    expect(out).not.toMatch(/secret|EXDEV|EACCES|EPERM|EBUSY|ENOENT/);
+  });
+
+  it('maps a read of a folder (EISDIR) and a file used as a folder (ENOTDIR)', async () => {
+    expect(await call('read_file', { path: allowed })).toMatch(/folder/i);
+    expect(await call('list_files', { path: join(allowed, 'a.txt') })).toMatch(/not a folder/i);
   });
 });
 
