@@ -48,13 +48,14 @@ class Asks:
         params = {
             "id": ask_id,
             "state": "open",
-            "turn": call.turn,
             "text": call.text,
             "options": ["allow", "deny"] if locked else ["allow", "always", "deny"],
             "confirm": True,
             "tool": spec_name,
             "input": call.input,
         }
+        if call.turn:  # an expert's call belongs to no turn of Scout's
+            params["turn"] = call.turn
         entry = _Open(params, asyncio.get_running_loop().create_future())
         return (await self._wait(entry, self._timeout)).option or "deny"
 

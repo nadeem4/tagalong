@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import AsyncExitStack, suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -150,6 +150,7 @@ class ExpertHosts:
         self._sleep = sleep
         self._clock = clock
         self._hosts: dict[tuple, ExpertHost] = {}
+        self.bridge = None  # ExpertApps, set once the toolbox exists; None: no expert gets apps
 
     def __call__(self, expert, **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
@@ -161,7 +162,12 @@ class ExpertHosts:
                 expert.command, expert.id, path_first, idle_s=self._idle_s, sleep=self._sleep
             )
         return ExpertRun(
-            host=host, quiet_s=self._quiet_s, sleep=self._sleep, clock=self._clock, **callbacks
+            host=host,
+            quiet_s=self._quiet_s,
+            sleep=self._sleep,
+            clock=self._clock,
+            bridge=self.bridge,
+            **callbacks,
         )
 
     def can_resume(self, expert_id: str) -> bool | None:
@@ -173,6 +179,9 @@ class ExpertHosts:
         for host in self._hosts.values():
             with suppress(Exception):
                 await host.shutdown()
+        if self.bridge is not None:
+            with suppress(Exception):
+                await self.bridge.shutdown()
 
 
 class ExpertHost:
@@ -212,6 +221,7 @@ class ExpertHost:
         self.conn = None
         self.process: asyncio.subprocess.Process | None = None
         self.can_resume: bool | None = None  # known after the first initialize
+        self.http_mcp = False  # whether the agent takes an http MCP server; same moment
 
     def _alive(self) -> bool:
         return self.process is not None and self.process.returncode is None
@@ -225,11 +235,13 @@ class ExpertHost:
                 await self._ensure()
                 modes = await self._open_session(run, folder, resume)
         except TimeoutError:
+            await run.revoke_apps()
             await self._abort()
             raise ExpertError(
                 f"The expert did not answer within {self._startup_timeout:g} s while starting."
             ) from None
         except BaseException:
+            await run.revoke_apps()
             await self._abort()
             raise
         finally:
@@ -280,9 +292,12 @@ class ExpertHost:
                 raise
             load = getattr(init.agent_capabilities, "load_session", None)
             self.can_resume = bool(load)
+            mcp = getattr(init.agent_capabilities, "mcp_capabilities", None)
+            self.http_mcp = bool(getattr(mcp, "http", False))
 
     async def _open_session(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
         session = None
+        servers = await run.apps_server()
         if resume is not None:
             run.resumed, run.fresh_reason = False, "expert cannot reopen sessions"
             if resume in self._sessions:
@@ -291,7 +306,7 @@ class ExpertHost:
             elif self.can_resume:
                 try:
                     loaded = await self.conn.load_session(
-                        cwd=str(folder), session_id=resume, mcp_servers=[]
+                        cwd=str(folder), session_id=resume, mcp_servers=servers
                     )
                     if loaded.modes and loaded.modes.available_modes:
                         session = loaded
@@ -302,7 +317,7 @@ class ExpertHost:
                 except acp.RequestError:  # the adapter no longer has it: start over
                     run.fresh_reason = "session could not be loaded"
         if session is None:
-            session = await self.conn.new_session(cwd=str(folder), mcp_servers=[])
+            session = await self.conn.new_session(cwd=str(folder), mcp_servers=servers)
             run.session_id = session.session_id
         self._sessions[run.session_id] = run
         modes = session.modes.available_modes if session.modes else []
@@ -312,6 +327,7 @@ class ExpertHost:
         """A session ended: forget it, and stop the process now or after the idle period.
 
         broken: it ended in error, so the process may be dead or wedged; never keep it warm."""
+        await run.revoke_apps()  # the expert's token for the apps dies with its session
         if self._sessions.get(run.session_id) is run:
             del self._sessions[run.session_id]
         if self._sessions or self._opening:
@@ -387,8 +403,16 @@ class ExpertRun:
         clock: Callable[[], float] = time.monotonic,
         grace: float = 3.0,
         startup_timeout: float = 60.0,
+        apps: Sequence[str] = (),
+        bridge=None,
+        job_id: str | None = None,
     ) -> None:
         self._host = host
+        # The apps this part may reach, through the brain's bridge; none means no MCP server.
+        self.apps = tuple(apps)
+        self._bridge = bridge
+        self._job_id = job_id
+        self._grant = None
         self._on_quiet = on_quiet
         self._quiet_s = quiet_s
         self._sleep = sleep
@@ -420,6 +444,21 @@ class ExpertRun:
     @property
     def process(self) -> asyncio.subprocess.Process | None:
         return self._host.process
+
+    async def apps_server(self) -> list:
+        """The `mcp_servers` for this session: the bridge when apps were granted, else none."""
+        if not self.apps or self._bridge is None:
+            return []
+        if not self._host.http_mcp:
+            log.warning("expert does not accept http MCP servers; apps not offered to it")
+            return []
+        self._grant = await self._bridge.grant(self._job_id or "", self.apps)
+        return [self._grant.descriptor]
+
+    async def revoke_apps(self) -> None:
+        grant, self._grant = self._grant, None
+        if grant is not None:
+            await self._bridge.revoke(grant)
 
     async def start(self, folder: Path, resume: str | None = None) -> list[Mode]:
         return await self._host.open(self, folder, resume)
@@ -503,6 +542,12 @@ class ExpertRun:
                     prompt = self._notes.pop(0)
             finally:
                 await self._stop_quiet()  # also when cancelled: no leaked sleeper
+        except asyncio.CancelledError:
+            # Cancelled from outside: the session still ends, so its app token must die too.
+            self._active = False
+            with suppress(Exception):
+                await self._host.release(self, broken=True)
+            raise
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"

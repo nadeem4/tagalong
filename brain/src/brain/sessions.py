@@ -39,6 +39,7 @@ from brain.config import (
     DEFAULT_WAKES_PER_HOUR,
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
+from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
@@ -241,6 +242,9 @@ class Session:
             on_call=self._on_tool_call,
             outputs=outputs,
         )
+        if apps is not None and isinstance(make_run, ExpertHosts):
+            # Experts reach apps only through the brain, by the same gate as Scout's own calls.
+            make_run.bridge = ExpertApps(apps, lambda: self.toolbox, self.guards)
         self._now = now
         loaded = memory.load_messages()
         self.history: list = rebuild_history(loaded)

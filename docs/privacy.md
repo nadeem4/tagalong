@@ -227,6 +227,14 @@ when Scout calls one of their tools in a turn you started.
   the apps table, the repository or logs; see [connected apps](connected-apps.md) and the next
   section. **Disconnect** deletes them.
 
+### What an expert can reach
+
+An expert reaches an app only through a small server inside the brain, open on this computer
+(127.0.0.1) and nowhere else. It holds a one-job token that stops working when the job part ends;
+it never sees the app's sign-in, tokens or secrets, and it sees only the apps the job was given.
+Each change it tries asks you like one of Scout's, and the Approvals list names the job. What the
+app answers is masked before the expert reads it.
+
 ### What is masked on disk, what is not
 
 The Python brain replaces secrets with `[secret]` before text is saved:
