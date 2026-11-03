@@ -4,15 +4,18 @@ A fake registry body, a fake Apps and a stand-in for the private Node: no networ
 real MCP server. The Allow card goes through the real Toolbox so the gate itself is checked.
 """
 
+import asyncio
 import json
 import os
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from mcp.types import Tool
 
 from brain.apps import AppError, AppStatus, TokenFile
 from brain.bodies import Bodies
+from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.protocol import RpcError
@@ -181,22 +184,24 @@ class FakeApps:
     def __init__(self):
         self.restarted: list[str] = []
         self.signed_in: list[str] = []
-        self.state = "connected"
+        self.state, self.error = "connected", ""
+        self.tool_names = ["create_event", "list_events"]
 
     async def restart(self, app_id):
         self.restarted.append(app_id)
 
     async def sign_in(self, app_id, open_url):
         self.signed_in.append(app_id)
+        self.state = "connecting"  # the person has to finish in the browser
 
     def status(self, app_id):
-        return AppStatus(self.state)
+        return AppStatus(self.state, self.error)
 
     def ids(self):
         return list(self.restarted)
 
     def tools(self, app_id):
-        return []
+        return [Tool(name=n, inputSchema={"type": "object"}) for n in self.tool_names]
 
 
 class StubAsks:
@@ -228,6 +233,7 @@ class Rig:
         self.apps = FakeApps()
         self.bodies = Bodies()
         self.machine = mach
+        self.events: list[Event] = []
 
         async def get(url: str) -> bytes:
             return NODE_INDEX if url.endswith("index.json") else MCP
@@ -250,10 +256,11 @@ class Rig:
             no_fetch,
             get,
             env if env is not None else {},
+            self.events.append,
             wait_s=0.0,
             opener=lambda app_id: opens if browser else None,
         )
-        ((self.spec, self.handler),) = tools
+        (((self.spec, self.handler),), self.stop_watches) = tools
 
     async def run(self, app_id="acme/notes"):
         return json.loads(await self.handler({"id": app_id}))
@@ -451,3 +458,78 @@ async def test_a_refused_sign_in_is_a_fact_with_the_app_id(rig):
     r.apps.sign_in = boom
     out = await r.run("acme/cloud")
     assert out["error"] == "refused" and out["id"] == "cloud"
+
+
+# ---- a connected app is reported, so Scout can carry on (B25d) ----
+
+
+async def until(cond, seconds=3.0):
+    for _ in range(int(seconds / 0.05)):
+        if cond():
+            return
+        await asyncio.sleep(0.05)
+    raise AssertionError("condition not met")
+
+
+async def test_an_app_that_connects_in_the_turn_lists_its_tools_and_sends_no_event(rig):
+    r = rig(env={"ACME_KEY": "k"})
+    out = await r.run()
+    assert out["status"] == "connected" and out["tools"] == ["create_event", "list_events"]
+    assert out["tools_total"] == 2
+    await asyncio.sleep(0.1)
+    assert r.events == []  # the tool result already told Scout
+
+
+async def test_a_sign_in_that_finishes_later_sends_setup_done_with_the_app_and_tools(rig):
+    r = rig(browser=True)
+    out = await r.run("acme/cloud")
+    assert out["status"] == "signing_in" and r.events == []
+    r.apps.state = "connected"  # the person finished in the browser
+    await until(lambda: r.events)
+    (event,) = r.events
+    assert event.kind == "setup_done" and event.key == "cloud"
+    assert event.facts == {
+        "app": "cloud",
+        "name": "cloud",
+        "ok": True,
+        "state": "connected",
+        "tools": "create_event, list_events",
+        "tools_total": 2,
+    }
+
+
+async def test_a_sign_in_that_fails_sends_setup_done_with_the_state_and_no_tools(rig):
+    r = rig(browser=True)
+    await r.run("acme/cloud")
+    r.apps.state, r.apps.error = "needs-sign-in", "Sign in to acme/cloud again."
+    await until(lambda: r.events)
+    (event,) = r.events
+    assert event.facts["ok"] is False and event.facts["state"] == "needs-sign-in"
+    assert "tools" not in event.facts
+
+
+async def test_a_long_tool_list_is_capped_with_the_real_total(rig):
+    r = rig(env={"ACME_KEY": "k"})
+    r.apps.tool_names = [f"t{i}" for i in range(45)]
+    out = await r.run()
+    assert len(out["tools"]) == 30 and out["tools_total"] == 45
+
+
+async def test_a_watch_stopped_at_shutdown_emits_nothing(rig):
+    r = rig(browser=True)
+    await r.run("acme/cloud")  # signing in: a watch is waiting
+    await r.stop_watches()
+    r.apps.state = "off"  # what apps.shutdown() does next
+    await asyncio.sleep(0.5)
+    assert r.events == []
+
+
+def test_the_watch_outlasts_the_longest_connect_and_sign_in():
+    import inspect
+
+    from brain.apps import Apps
+    from brain.setup.apps import SIGN_IN_WAIT_S
+
+    params = inspect.signature(Apps.__init__).parameters
+    longest = params["signin_timeout"].default + params["connect_timeout"].default
+    assert SIGN_IN_WAIT_S > longest  # the watch must not give up before Apps does

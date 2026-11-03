@@ -8,6 +8,7 @@ from importlib.resources import files
 
 import pytest
 
+from brain.events import load_notes
 from brain.memory import Item, Preference
 from brain.mind.prompt import (
     interruption_block,
@@ -72,6 +73,20 @@ def test_soul_routes_by_what_it_can_do_and_no_longer_pushes_experts():
     assert "Routing" in soul
     assert "never assume an expert has its own" in soul.lower()
     assert "long or many-stepped" in soul
+
+
+def test_soul_offers_a_connect_for_a_missing_tool_and_carries_on_after():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "`find_apps`" in soul and "`choose`" in soul and "Connect" in soul
+    assert "Never offer an expert for a missing tool" in soul
+    assert "carry on with the request the owner first made" in soul.lower()
+
+
+def test_events_tell_scout_a_connected_app_resumes_the_earlier_request():
+    notes = load_notes()
+    assert "tools lists what it can do now" in notes["setup_done"]
+    assert "still in this conversation" in notes["setup_done"]
+    assert "still in this conversation" in notes["choice"]
 
 
 def item(id, kind, text, cadence=None):

@@ -312,6 +312,27 @@ the job is long or many-stepped. An expert is never assumed to have its own Gmai
 nothing covers a request Scout says what is missing and offers a connect with `choose`. The old
 "recommend an expert" path is gone, and the `hand_off` refusal facts carry no advice.
 
+### Missing tool: Connect, then carry on
+
+Code decides nothing about wording here. When no tool covers a request, `soul.md` has Scout check
+the connected apps, look with `find_apps` (each row carries the registry description, what the app
+is for), and offer a Connect with `choose` (the Connect option recommended with a reason), never an
+expert. The click comes back as a `choice` event; Scout then calls `install_app` (the person still
+sees the Allow card) and, once the app is connected, does the original request from its own
+conversation. Nothing is saved in between: the pending request is the live history, so a brain
+restart forgets it, by decision.
+
+How the end reaches Scout: `install_app` that connects within its wait returns `tools` (a list of
+the app's tool names, capped at 30) and `tools_total` (the real count, so a capped list is never
+taken as complete) in its result and sends no event. Only `signing_in`, and a `connecting` still
+pending after the 20 s wait, start a watch (up to 10 minutes, longer than Apps' own sign-in plus
+connect timeouts) that sends a waking `setup_done` event of `{app, name, ok, state, tools,
+tools_total}` (`tools` is a comma-joined string there; `detail` instead of both when it did not
+connect). `error` or `needs-sign-in` found by the wait come back in the result and send no event.
+At shutdown `stop_watches()` cancels pending watches before `apps.shutdown()`, so a watch never
+wakes Scout during teardown. The `mind/events.md` notes for `choice` and `setup_done` say the
+earlier request is still in the conversation and should be resumed.
+
 ## Permissions and asks
 
 Every tool has a mode: `off`, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a stored
@@ -727,7 +748,9 @@ words what the person reads (guidance in `mind/soul.md`).
   references and no value is stored; the result lists the ones the brain's environment lacks as
   `needs_env`. The card names the id, transport, package and version (or host), required env names
   and any Node download. The result is `{id, transport, auth, status}` where `status` is the app's
-  state after at most 20 s (`connected`, `connecting`, `needs-sign-in`, `error`) or `signing_in`;
+  state after at most 20 s (`connected`, with `tools` and `tools_total`; `connecting`,
+  `needs-sign-in`, `error`) or `signing_in`; only `signing_in` and a `connecting` still pending
+  end later in a `setup_done` event (see Missing tool: Connect, then carry on);
   failures are `{error, detail}` facts (`unknown_app`, `needs_token`, `no_build`, `node_missing`,
   `uv_missing`, `already_added`, `registry_unavailable`). Pass the same `query` as `find_apps` so
   the entry is in the cached page.
@@ -987,7 +1010,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                             |
 | `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                            |
 | `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                      |
-| `setup_done`      | none         | none         | An expert install ended (expert, ok, installed or error and detail); wakes Scout to say so                                                                                                   |
+| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools or detail); wakes Scout                                     |
 | `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                         |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with

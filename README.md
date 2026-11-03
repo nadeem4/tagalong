@@ -64,8 +64,10 @@ apps and your experts) and routes by it: it answers, or uses its tools and apps,
 an expert only for a long or many-stepped job. An expert is never assumed to have its own Gmail or
 Calendar. When no tool covers a request, Scout says what is missing and offers an app to connect,
 and installs it only after you choose and press Allow on a card that names what it will run and
-download. Apps from the MCP registry (local `npx` or `uvx` packages, or hosted ones that sign in
-through your browser) are added the same way as apps you add by hand; required keys are never
+download. Once the app is connected (even after a sign-in in your browser), Scout carries on with
+what you first asked, in the same conversation; restart the brain and it forgets the request. Apps
+from the MCP registry (local `npx` or `uvx` packages, or hosted ones that sign in through your
+browser) are added the same way as apps you add by hand; required keys are never
 stored, only their names.
 
 On a brain machine with no screen, `uv run tagalong doctor` shows what is set up and what is

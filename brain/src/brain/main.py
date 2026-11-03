@@ -110,7 +110,7 @@ async def _run() -> None:
         progress.emit,
         bodies.notify,
     )
-    app_tools = app_setup_tools(
+    app_tools, stop_watches = app_setup_tools(
         config.data_dir,
         registry,
         inspect_machine,
@@ -122,6 +122,7 @@ async def _run() -> None:
         http_fetch,
         real_get_json,
         os.environ,
+        emit_event,
     )
     login = login_tools(config.data_dir, logins)
     session = Session(
@@ -176,6 +177,7 @@ async def _run() -> None:
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
         await stop_installs()  # cancel running installs; each removes what it staged
+        await stop_watches()  # before apps.shutdown(), which would end each watch with an event
         await logins.stop()
         await session.jobs.shutdown()
         await apps.shutdown()
