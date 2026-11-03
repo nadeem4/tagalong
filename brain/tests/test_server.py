@@ -673,6 +673,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "edit_preference",
         "forget",
         "job_activity",
+        "job_report",
         "key_status",
         "list_approvals",
         "list_experts",

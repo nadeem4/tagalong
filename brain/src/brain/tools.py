@@ -514,6 +514,14 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         except JobError as err:
             raise RpcError(ErrorCode.invalid_params, str(err)) from err
 
+    async def job_report(args: dict) -> str:
+        """Home reads one part's report when the person expands it (Scout gets list_jobs)."""
+        _need_text("job_report", args, "job", "part")
+        try:
+            return json.dumps({"text": jobs.part_report(args["job"], args["part"])})
+        except JobError as err:
+            raise RpcError(ErrorCode.invalid_params, str(err)) from err
+
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
     job_id = {"type": "string", "description": "The job id from hand_off or list_jobs."}
     part_id = {"type": "string", "description": "Optional: one part of the job, from list_jobs."}
@@ -713,6 +721,21 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 default_mode="auto",
             ),
             job_activity,
+        ),
+        (
+            ToolSpec(
+                "job_report",
+                "One part of a job: the expert's full report, for the job page.",
+                {
+                    "type": "object",
+                    "properties": {"job": job_id, "part": part_id},
+                    "required": ["job", "part"],
+                },
+                frozenset({"home"}),
+                effect="read",
+                default_mode="auto",
+            ),
+            job_report,
         ),
     ]
 

@@ -1507,6 +1507,26 @@ async def test_activity_page_has_parts_and_job_times(make_rig):
     assert {e["part"] for e in page["entries"]} == {"p1"}
 
 
+async def test_activity_page_carries_the_scout_result(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
+    assert rig.jobs.activity_page("old", 0)["result"] is None
+    rig.jobs.set_result("old", "All shipped.")
+    assert rig.jobs.activity_page("old", 0)["result"] == "All shipped."
+
+
+async def test_part_report_returns_the_report_or_none_and_refuses_unknowns(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
+    assert rig.jobs.part_report("old", "p1") is None
+    rig.memory.update_part("old", "p1", report="Fixed it.")
+    assert rig.jobs.part_report("old", "p1") == "Fixed it."
+    with pytest.raises(JobError, match="no part p9"):
+        rig.jobs.part_report("old", "p9")
+    with pytest.raises(JobError, match="no job nope"):
+        rig.jobs.part_report("nope", "p1")
+
+
 async def test_activity_page_of_an_old_job_shows_one_part(make_rig):
     rig = make_rig(FakeAsks())
     rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")

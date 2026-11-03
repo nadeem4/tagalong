@@ -214,6 +214,7 @@ class FakeJobs:
         self.started = JobId("ab12cd34")
         self.lines: dict[str, str] = {}
         self.watch = None
+        self.reports: dict[tuple[str, str], str | None] = {}
 
     def installed(self):
         return self.experts
@@ -277,6 +278,12 @@ class FakeJobs:
             "more": False,
             "watch": self.watch,
         }
+
+    def part_report(self, job_id, part):
+        self.calls.append(("part_report", job_id, part))
+        if self.error:
+            raise self.error
+        return self.reports.get((job_id, part))
 
     def set_watch(self, job_id, items):
         self.calls.append(("set_watch", job_id, items))
@@ -722,6 +729,7 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
         "list_jobs",
         "stop_job",
         "job_activity",
+        "job_report",
         "list_memories",
         "spend_today",
         "list_permissions",
@@ -1082,6 +1090,31 @@ async def test_job_activity_without_a_job_lists_the_running_steps(home):
     home.jobs.steps = [{"job": "j1", "expert": "Claude Code", "text": "npm test", "at": "t"}]
     out = json.loads(await home.run("job_activity"))
     assert out == {"running": home.jobs.steps}
+
+
+async def test_job_report_returns_the_parts_masked_report(home):
+    home.jobs.reports = {("j1", "p2"): "# Done all green"}
+    out = json.loads(await home.run("job_report", {"job": "j1", "part": "p2"}))
+    assert out == {"text": "# Done all green"}
+    assert home.jobs.calls == [("part_report", "j1", "p2")]
+    home.jobs.reports = {}
+    assert json.loads(await home.run("job_report", {"job": "j1", "part": "p1"})) == {"text": None}
+
+
+async def test_job_report_unknown_part_errors_like_job_activity(home):
+    home.jobs.error = JobError("no part p9 in job j1")
+    with pytest.raises(RpcError) as err:
+        await home.run("job_report", {"job": "j1", "part": "p9"})
+    assert err.value.code == ErrorCode.invalid_params
+    with pytest.raises((MemoryRefused, RpcError)):
+        await home.run("job_report", {"job": "j1"})
+
+
+async def test_job_report_is_home_only_and_read_only(home):
+    spec = expert_specs(home)["job_report"]
+    assert spec.audience == frozenset({"home"}) and spec.effect == "read"
+    with pytest.raises(RpcError):  # Scout reads reports through list_jobs, not raw
+        await home.box.run(Call("c", "job_report", {"job": "j", "part": "p1"}, "", ""), "scout")
 
 
 async def test_job_activity_is_home_only_and_read_only(home):
