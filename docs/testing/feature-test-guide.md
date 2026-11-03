@@ -276,7 +276,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 11. **Action:** with a long job running, open Home → Jobs.
     **Expected:** the page lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
-    short job and let it finish: the row reads "Done" and **Show result** opens Scout's result (the expert's report if Scout wrote none) as formatted text.
+    short job and let it finish: the row reads "Done" and **Show result** opens Scout's result (the expert's report if Scout wrote none) as formatted text, in full (a result over 1,000 characters is not cut) and with Markdown tables drawn as tables.
     The brain also keeps an activity log per job (steps, edits, messages, plan) and serves it to
     Home by cursor (`job_activity`, with a throttled `changed`). Automated tests cover it on the
     fake agent (steps `tool`, `tool_update`, `plan`): masking, size caps, resume replay, two jobs

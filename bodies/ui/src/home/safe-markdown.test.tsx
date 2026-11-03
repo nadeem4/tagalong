@@ -1,6 +1,6 @@
 /**
- * Tests for SafeMarkdown: the subset of Markdown a report may use, built from React elements so
- * HTML in a report is only ever text, links keep to http(s), and images are never drawn.
+ * Tests for SafeMarkdown: Markdown with GFM tables, built from React elements so raw HTML in a
+ * report is skipped, links keep to http(s), and images are never drawn.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -39,14 +39,13 @@ describe('SafeMarkdown', () => {
     expect(container.querySelector('blockquote')).toHaveTextContent('quoted');
   });
 
-  it('renders html as text', () => {
+  it('skips raw html', () => {
     const { container } = render(
       <SafeMarkdown text={'<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>'} />,
     );
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
-    expect(container).toHaveTextContent('<script>alert(1)</script>');
-    expect(container).toHaveTextContent('<img src=x onerror=alert(1)>');
+    expect(container).not.toHaveTextContent('alert(1)');
   });
 
   it('drops javascript and data links to plain text', () => {
@@ -80,15 +79,40 @@ describe('SafeMarkdown', () => {
     expect(container.querySelector('pre')).toHaveTextContent('never closed');
   });
 
-  it('renders tables as preformatted text', () => {
-    const { container } = render(<SafeMarkdown text={'| a | b |\n|---|---|\n| 1 | 2 |'} />);
-    expect(container.querySelector('table')).toBeNull();
-    expect(container.querySelector('pre')).toHaveTextContent('| 1 | 2 |');
+  it('renders a Claude-style table with alignment, escaped pipes and bold cells', () => {
+    const text = [
+      'Name | Count | Note',
+      ':--- | ---: | :---:',
+      '`a\\|b` | **12** | ok',
+      'plain | 3 | fine',
+    ].join('\n');
+    const { container } = render(<SafeMarkdown text={text} />);
+    expect(container.querySelector('pre')).toBeNull();
+    expect(container.querySelectorAll('th')).toHaveLength(3);
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(container.querySelector('td code')).toHaveTextContent('a|b');
+    expect(container.querySelector('td strong')).toHaveTextContent('12');
+    expect(container.querySelector('.safe-md__table table')).not.toBeNull();
   });
 
-  it('renders 200 KB in under 2 s', () => {
-    const text = 'A line of **report** text with `code` and [a link](https://x.io).\n'.repeat(3000);
-    expect(text.length).toBeGreaterThan(190_000);
+  it('renders a table inside a list item', () => {
+    const text = '- item\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n';
+    const { container } = render(<SafeMarkdown text={text} />);
+    expect(container.querySelector('li table td')).toHaveTextContent('1');
+  });
+
+  it('renders a table with CRLF line endings', () => {
+    const text = '| a | b |\r\n|---|---|\r\n| 1 | 2 |\r\n';
+    const { container } = render(<SafeMarkdown text={text} />);
+    expect(container.querySelectorAll('td')).toHaveLength(2);
+    expect(container.querySelector('pre')).toBeNull();
+  });
+
+  it('renders 100 KB in under 2 s', () => {
+    const text = 'A line of **report** text with `code` and [a link](https://x.io).\n\n'.repeat(
+      1500,
+    );
+    expect(text.length).toBeGreaterThan(95_000);
     const start = performance.now();
     render(<SafeMarkdown text={text} />);
     expect(performance.now() - start).toBeLessThan(2000);

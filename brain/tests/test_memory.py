@@ -519,10 +519,10 @@ def test_add_job_makes_part_p1_and_add_part_numbers_on(mem):
 def test_update_part_changes_one_part_only_and_caps_text(mem):
     mem.add_job("j1", "a", "t", "f", "m")
     mem.add_part("j1", "b", "t2", "f", "x")
-    mem.update_part("j1", "p2", state="done", report="r" * 25_000, progress="q" * 5000)
+    mem.update_part("j1", "p2", state="done", report="r" * 1_100_000, progress="q" * 5000)
     p1, p2 = mem.parts_of("j1")
     assert (p1.state, p2.state) == ("running", "done")
-    assert len(p2.report) == 20_000 and len(p2.progress) == 2000
+    assert len(p2.report) == 1_000_000 and len(p2.progress) == 2000
     with pytest.raises(ValueError):
         mem.update_part("j1", "p2", nonsense=1)
 
@@ -648,11 +648,11 @@ def test_unreported_jobs_finished_only(mem):
     assert mem.get_job("seen").parts[-1].reported is True
 
 
-def test_job_result_capped_at_20000_and_progress_at_2000(mem):
+def test_job_result_capped_at_1m_and_progress_at_2000(mem):
     mem.add_job("j", "a", "t", "f", "m")
-    mem.update_part("j", "p1", report="x" * 25_000, progress="p" * 5000)
+    mem.update_part("j", "p1", report="x" * 1_100_000, progress="p" * 5000)
     got = mem.get_job("j")
-    assert len(got.parts[-1].report) == 20_000
+    assert len(got.parts[-1].report) == 1_000_000
     assert len(got.parts[-1].progress) == 2000
 
 

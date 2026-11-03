@@ -141,6 +141,42 @@ describe('JobsPanel', () => {
     expect(screen.queryByText('Notes are in CHANGELOG.md')).toBeNull();
   });
 
+  it('shows a long Scout result in full, not the row’s cut copy', async () => {
+    const full = `| a | b |
+|---|---|
+| 1 | 2 |
+
+${'z'.repeat(5000)}END`;
+    const cut: JobRow = { ...DONE, scoutResult: `${full.slice(0, 1000)}…` };
+    const bridge = createFakeHostBridge({
+      jobs: [cut],
+      activity: { j2: [] },
+      results: { j2: full },
+    });
+    renderPanel(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));
+    await waitFor(() => expect(screen.getByRole('table')).toBeVisible());
+    expect(screen.getByText(/END$/)).toBeVisible();
+    expect(document.body).not.toHaveTextContent('…');
+  });
+
+  it('shows a long part report in full when Scout wrote no result', async () => {
+    const full = `${'r'.repeat(5000)}END`;
+    const cut: JobRow = {
+      ...DONE,
+      parts: [part({ state: 'done', result: `${full.slice(0, 1000)}…` })],
+    };
+    const bridge = createFakeHostBridge({
+      jobs: [cut],
+      activity: { j2: [] },
+      reports: { 'j2/p1': full },
+    });
+    renderPanel(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));
+    expect(await screen.findByText(/END$/)).toBeVisible();
+    expect(bridge.reportCalls).toEqual([['j2', 'p1']]);
+  });
+
   it('falls back to the part report with no Scout result', async () => {
     renderPanel(createFakeHostBridge({ jobs: [DONE] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));

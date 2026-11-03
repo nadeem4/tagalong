@@ -480,7 +480,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
   while running, reason when ended, and a Show result toggle once finished. A row carries its
   `parts` (one per expert hand-off, `JobPartRow`); the panel shows the newest part's progress,
-  reason and result (Show result renders Scout's result as Markdown, and falls back to the part's report when Scout wrote none), and an old job has exactly one part. **Stop** shows on
+  reason and result (the row's text is Scout's compact copy, cut at 1,000 characters; **Show result** reads the whole text on open, `jobActivity`'s `result` with the part's `jobReport` as the fallback when Scout wrote none, and renders it as Markdown), and an old job has exactly one part. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   `jobActivity(job, afterRev)` and `runningSteps()` (host bridge) pull a job's steps by cursor and
@@ -521,8 +521,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`reports-tab.tsx`) lists one collapsed row per part and fetches `jobReport(job, part)` (IPC
   `jobs:report`, brain tool `job_report`) on the first expand only, with loading, a retry on failure
   and "has not written a report". `SafeMarkdown` (`safe-markdown.tsx`) builds React elements only:
-  no `dangerouslySetInnerHTML`, raw HTML shown as text, only http(s) links (new tab,
-  `noreferrer noopener`), images as their alt text, tables as preformatted text, headings from h3.
+  no `dangerouslySetInnerHTML`, a thin wrapper over react-markdown and remark-gfm: raw HTML skipped, only http(s) links (new tab,
+  `noreferrer noopener`), images as their alt text, real tables (a wide one scrolls inside its own box), headings from h3.
   A job without a title shows the first line of its brief. `e2e/jobs.spec.ts` also covers a
   two-expert job (`job2` on the fake brain) across all three tabs.
 - **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses

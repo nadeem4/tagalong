@@ -229,6 +229,10 @@ export const HOME_CSS = `
 .safe-md pre { overflow-x: auto; padding: ${t.space.md}px; background: ${t.color.panelTile}; border-radius: ${t.radius.field}px; }
 .safe-md pre code { background: none; padding: 0; white-space: pre; }
 .safe-md blockquote { padding-left: ${t.space.lg}px; border-left: 2px solid ${t.color.panelLine}; color: ${t.color.panelMuted}; }
+.safe-md__table { overflow-x: auto; margin: 0 0 ${t.space.md}px; }
+.safe-md table { border-collapse: collapse; font-size: ${t.fontSize.small}px; }
+.safe-md th, .safe-md td { padding: ${t.space.xs}px ${t.space.md}px; border: 1px solid ${t.color.panelLine}; text-align: left; vertical-align: top; }
+.safe-md th { background: ${t.color.panelTile}; color: ${t.color.panelMuted}; font-weight: ${t.fontWeight.semibold}; white-space: nowrap; }
 .job-log__who { display: flex; align-items: center; gap: ${t.space.md}px; margin-top: ${t.space.lg}px; color: ${t.color.textMuted}; }
 .job-log__who:first-child { margin-top: 0; }
 .job-log__chip { padding: 0 ${t.space.md}px; border-radius: 999px; border: 1px solid ${t.color.line}; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }

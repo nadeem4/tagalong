@@ -1060,9 +1060,12 @@ shows them as Scout does.
   offline after the question is queued, the question waits for a body to reconnect or for the job
   to time out.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
-  fails naming the running jobs. A result is capped at 20,000 characters and progress keeps its
-  last 2,000 (it is a running tail). `list_jobs` trims each row for Scout's context: a result to
-  its first 1,000 characters and progress to its last 1,000, a trimmed end marked with `…`. A job has
+  fails naming the running jobs. Stored text is kept whole: a report or Scout's result is capped only at
+  1,000,000 characters (a storage safety), and progress keeps its last 2,000 (it is a running
+  tail). Only Scout's copy is compact: `list_jobs` trims each row for Scout's context, a result
+  (and `scout_result`) to its first 1,000 characters and progress to its last 1,000, a trimmed
+  end marked with `…`. Home reads the whole text instead, from `job_activity`'s `result` and
+  `job_report`. A job has
   no run limit: code never ends a job for taking long.
 - **Quiet clock.** Each `ExpertRun` records the time of its last real activity: a new tool call,
   a tool call that changes status or carries content or output, a message chunk or a plan. A
@@ -1106,7 +1109,7 @@ flowchart LR
   expert and folder.
 - **Result.** `set_job_result {job, text}` stores Scout's own words for the whole job
   (`Jobs.set_result`, `Memory.set_result`). The text is masked (`mask_json(guards, "job_result", ...)`),
-  then capped at 20,000 characters, a storage safety only. Calling it again replaces it, also after
+  then capped at 1,000,000 characters, a storage safety only. Calling it again replaces it, also after
   `close_job`. Code never writes or checks a result: if Scout never calls it the job has none and the
   page shows status and reports. Guidance lives in the tool description, `mind/soul.md` and the
   `job_ended` note in `mind/events.md`.
