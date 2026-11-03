@@ -354,7 +354,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     option; the question card (when Scout passes the question on, see the next section) has a **Your answer** field and **Send** (Enter sends too). Typing
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
-    **Expected:** Claude Code's tool shows "Asks itself"; only **Off** is available.
+    **Expected:** Claude Code's tool shows "Asks itself" with **Off** and **Ask**, no **Auto**.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
     "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
     naming one.
@@ -1697,8 +1697,8 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 ## Permissions _(real brain)_
 
 1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card
-   with Scout's tools in groups (**Built in**, **This desktop**, **Browser** when the extension is
-   connected, then one group per connected app). Each tool has its name, one line on what it does
+   with Scout's tools in groups (**Built in**, then one group per connected body, such as the desktop or the
+   browser, titled by the name it gave, then one per connected app). Each tool has its name, one line on what it does
    and a control with **Off**, **Ask** and **Auto**, the current one filled in.
 2. **Auto.** Choose **Auto** for a tool Scout uses (for example moving a window), then ask Scout to
    use it. **Expected:** Scout stops asking and just does it. Choose **Ask**: it asks again.
@@ -1717,7 +1717,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    **Expected:** a body that is not connected has its tools dimmed and marked "Not connected"; you
    can still choose **Off**, **Ask** or **Auto** for them.
 5. **Live update.** Open Home, then answer **Always allow** on an ask for a tool in the list. **Expected:** the list updates without reopening Home.
-6. **Off.** With the desktop running, choose **Off** for **list_windows** under **This desktop**.
+6. **Off.** With the desktop running, choose **Off** for **list_windows** under the desktop's group.
    **Expected:** the row dims and **Off** is filled in. Ask Scout what windows are open: it says it
    cannot see them, or uses another way, and never errors. Quit and restart the brain and the
    desktop: it is still **Off**. Choose **Ask** (or **Auto**) and it works again. Automated:
@@ -1725,7 +1725,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    `permissions.test.ts`, `permissions-panel.test.tsx`, `three-way.test.tsx`, `permissions.spec.ts`.
 7. **Never Auto.** Find a tool that always needs your yes (for example a connected app's delete
    tool). **Expected:** it says "Always asks" and offers only **Off** and **Ask**. Claude Code's
-   own tool says "Asks itself" and only **Off** is available.
+   own tool says "Asks itself" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
 8. **Keyboard.** Tab into a tool's control, then press the arrow keys. **Expected:** the choice
    moves between **Off**, **Ask** and **Auto** (skipping any not offered) and the brain follows.
 

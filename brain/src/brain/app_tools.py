@@ -379,6 +379,10 @@ class AppSource:
     def __init__(self, apps: Apps) -> None:
         self._apps = apps
 
+    def label(self, app_id: str) -> str:
+        """The app's name, for Home's group heading."""
+        return self._apps.name(app_id)
+
     def specs(self) -> list[ToolSpec]:
         return [
             spec

@@ -111,6 +111,10 @@ class BodySource:
     def known_specs(self) -> list[ToolSpec]:
         return self._specs_of(self._bodies.known_tools())
 
+    def label(self, body_id: str) -> str:
+        """The body's declared name, for Home's group heading."""
+        return self._bodies.name(body_id)
+
     @staticmethod
     def _specs_of(tools_by_body: dict[str, list[Tool]]) -> list[ToolSpec]:
         return [
@@ -202,7 +206,7 @@ class Toolbox:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
         if mode not in ("off", "ask", "auto"):
             raise RpcError(ErrorCode.invalid_params, "mode must be off, ask or auto.")
-        if mode != "off":  # Off is always the owner's to choose
+        if mode == "auto":  # Off and Ask are always the owner's to choose
             if spec.self_asks:
                 raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
             if spec.person_only:

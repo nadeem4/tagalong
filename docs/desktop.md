@@ -468,15 +468,15 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
   pass through as the brain sends them, a mode other than `off`, `ask` or `auto` is refused before it
   reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
-  The card is a `home-card` like every Home panel. Tools sit in groups by the row's `source` (Built in, This desktop, Browser, then each app by name),
-  each tool with the shared `ThreeWay` control (`controls/three-way.tsx`, a radio group): Off, Ask and
+  The card is a `home-card` like every Home panel. Tools sit in groups by the row's `source` (Built in, then each body, then each app, titled by the row's `source_name`: the name the body declared or the app's name),
+  each tool with the shared `ThreeWay` control (`controls/three-way.tsx`, a radio group named by the visible tool name): Off, Ask and
   Auto, the brain's mode chosen. A `person_only` row shows only Off and Ask ("Always asks"); a locked tool shows
   "Risky action" and turning it to Auto asks you to confirm first; a tool that is Off is dimmed; a
   tool of an offline body is dimmed and marked "Not connected" but can still be set (the brain
   keeps a mode for its last-declared tools). The list reads again on `changed { what: "permissions" }`. The e2e
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
   checks the card. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
-  job) shows "Asks itself": only Off is enabled, Ask and Auto are not.
+  job) shows "Asks itself" with Off and Ask only (it reads as Ask while it is on; the brain's own mode for it is auto).
 - **Jobs panel:** Home's Jobs page (`bodies/ui/src/home/jobs-panel.tsx`)
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the

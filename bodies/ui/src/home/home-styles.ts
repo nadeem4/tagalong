@@ -114,7 +114,7 @@ export const HOME_CSS = `
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__form-host.tg-panel { padding: 0; background: transparent; }
 .perm-group { margin-top: ${t.space.xl}px; }
-.perm-group__title { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; letter-spacing: 0.06em; text-transform: uppercase; color: ${t.color.panelMuted}; }
+.perm-group__title { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; letter-spacing: ${t.letterSpacing.pixel}px; text-transform: uppercase; color: ${t.color.panelMuted}; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .perm-row {
   display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.xl}px;

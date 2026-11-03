@@ -232,6 +232,7 @@ describe('HomeView', () => {
         locked: false,
         person_only: false,
         source: 'built_in',
+        source_name: 'Built in',
         online: true,
       },
     ];

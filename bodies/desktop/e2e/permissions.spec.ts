@@ -59,23 +59,40 @@ test('Home settings lists permissions by source and a click reaches the brain', 
   const home = await windowFor('home');
 
   const card = home.getByRole('region', { name: 'Permissions' });
-  const move = card.getByRole('radiogroup', { name: 'desktop__move_window' });
+  const move = card.getByRole('radiogroup', { name: 'move_window' });
   await expect(move.getByRole('radio', { name: 'Ask' })).toHaveAttribute('aria-checked', 'true', {
     timeout: 30_000,
   });
 
   // Tools sit under their source: built in, this desktop, the browser, each app.
   const headings = card.getByRole('heading', { level: 3 });
-  await expect(headings).toHaveText(['Built in', 'This desktop', 'Browser', 'Gmail']);
+  await expect(headings).toHaveText(['Built in', 'Desktop', 'Chrome on work PC', 'Gmail']);
 
   // A person-only app tool never offers Auto; a tool of a body that is away is marked.
-  const mail = card.getByRole('radiogroup', { name: 'gmail__delete_mail' });
+  const mail = card.getByRole('radiogroup', { name: 'delete_mail' });
   await expect(mail.getByRole('radio')).toHaveText(['Off', 'Ask']);
   await expect(card).toContainText('Not connected');
 
+  // A tool that asks for itself offers Off and Ask, never Auto, and Off then Ask works.
+  const handOff = card.getByRole('radiogroup', { name: 'hand_off' });
+  await expect(handOff.getByRole('radio')).toHaveText(['Off', 'Ask']);
+  await handOff.getByRole('radio', { name: 'Off' }).click();
+  await expect(handOff.getByRole('radio', { name: 'Off' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+    { timeout: 15_000 },
+  );
+  await handOff.getByRole('radio', { name: 'Ask' }).click();
+  await expect(handOff.getByRole('radio', { name: 'Ask' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+    { timeout: 15_000 },
+  );
+  brain.permissionSets.length = 0;
+
   // A locked tool is marked risky and warns before Auto.
   await expect(card).toContainText('Risky action');
-  const close = card.getByRole('radiogroup', { name: 'desktop__close_window' });
+  const close = card.getByRole('radiogroup', { name: 'close_window' });
   await close.getByRole('radio', { name: 'Auto' }).click();
   await expect(card.getByRole('alert')).toContainText('no longer ask');
   await card.getByRole('button', { name: 'Cancel' }).click();

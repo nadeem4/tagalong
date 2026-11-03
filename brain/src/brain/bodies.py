@@ -89,11 +89,16 @@ class Bodies:
         self._outboxes: dict[str, Outbox] = {}
         self._online: dict[str, _Online] = {}
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
+        self._names: dict[str, str] = {}  # each body's declared name, kept after disconnect
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
         # waited for a body can start and a long absence can be noticed.
         self.on_connect: Callable[[str, float | None], None] | None = None
+
+    def name(self, body_id: str) -> str:
+        """The name a body declared, even after it left; its id if it never connected."""
+        return self._names.get(body_id, body_id)
 
     def connect(self, body: Body, tools: list[Tool], peer: Peer, last_seq: int | None) -> Joined:
         box = self._outboxes.setdefault(body.id, Outbox())
@@ -103,6 +108,7 @@ class Bodies:
             self._fail_pending(old.peer)
         self._online[body.id] = _Online(body, tools, peer)
         self._known[body.id] = tools
+        self._names[body.id] = body.name
         gone_at = self._offline_at.pop(body.id, None)
         away = None if gone_at is None else self._clock() - gone_at
         if self.on_connect is not None:

@@ -862,19 +862,22 @@ def home_tools(
                 "self_asks": s.self_asks,
                 "person_only": s.person_only,
                 "online": s.name in current,
-                "source": origin[s.name],
+                "source": origin[s.name][0],
+                "source_name": origin[s.name][1],
             }
             for s in sorted(box.known_specs(), key=lambda s: s.name)
             if "scout" in s.audience
         ]
         return json.dumps({"tools": rows})
 
-    def _origin(source, name: str) -> str:
-        """Where a tool comes from, so Home can group: built_in, body:<id> or app:<id>."""
+    def _origin(source, name: str) -> tuple[str, str]:
+        """Where a tool comes from, so Home can group: (built_in | body:<id> | app:<id>, a name)."""
         owner, sep, _ = name.partition(SEP)
         if not sep:
-            return "built_in"
-        return f"{'app' if getattr(source, 'approval_source', '') == 'app' else 'body'}:{owner}"
+            return "built_in", "Built in"
+        label = getattr(source, "label", None)
+        kind = "app" if getattr(source, "approval_source", "") == "app" else "body"
+        return f"{kind}:{owner}", label(owner) if label else owner
 
     async def set_permission(args: dict) -> str:
         if not args.get("tool") or not args.get("mode"):

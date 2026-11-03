@@ -25,19 +25,11 @@ function rank(source: string): number {
   return source.startsWith('body:') ? 2 : 3;
 }
 
-function titleOf(source: string): string {
-  if (source === 'built_in') return 'Built in';
-  if (source === 'body:desktop') return 'This desktop';
-  const [kind, id = ''] = source.split(':');
-  if (kind === 'body') return 'Browser';
-  return id.charAt(0).toUpperCase() + id.slice(1);
-}
-
 function groupBySource(rows: PermissionRow[]): Group[] {
   const bySource = new Map<string, PermissionRow[]>();
   for (const row of rows) bySource.set(row.source, [...(bySource.get(row.source) ?? []), row]);
   return [...bySource]
-    .map(([source, list]) => ({ source, title: titleOf(source), rows: list }))
+    .map(([source, list]) => ({ source, title: list[0]?.source_name ?? source, rows: list }))
     .sort((a, b) => rank(a.source) - rank(b.source) || a.title.localeCompare(b.title));
 }
 
@@ -47,15 +39,19 @@ function shortName(row: PermissionRow): string {
   return at < 0 ? row.name : row.name.slice(at + 2);
 }
 
-/** What the brain lets this tool be: a person-only tool never Auto, a self-asking one only Off. */
+/** What the brain lets this tool be: a person-only or self-asking tool is never Auto. */
 function optionsFor(row: PermissionRow): ThreeWayOption[] {
-  const selfAsks = row.self_asks === true;
   const options: ThreeWayOption[] = [
     { value: 'off', label: 'Off' },
-    { value: 'ask', label: 'Ask', disabled: selfAsks },
+    { value: 'ask', label: 'Ask' },
   ];
-  if (!row.person_only) options.push({ value: 'auto', label: 'Auto', disabled: selfAsks });
+  if (!row.person_only && row.self_asks !== true) options.push({ value: 'auto', label: 'Auto' });
   return options;
+}
+
+/** A self-asking tool reports auto (its own ask is the gate); Home shows that as Ask. */
+function shownMode(row: PermissionRow): Mode {
+  return row.self_asks === true && row.mode !== 'off' ? 'ask' : row.mode;
 }
 
 export function PermissionsPanel() {
@@ -161,8 +157,8 @@ export function PermissionsPanel() {
                       </span>
                       <span id={controlId(row.name)}>
                         <ThreeWay
-                          label={row.name}
-                          value={row.mode}
+                          labelledBy={labelId}
+                          value={shownMode(row)}
                           options={optionsFor(row)}
                           describedBy={warning === row.name ? `${labelId}-warning` : undefined}
                           onChange={(mode) => choose(row, mode as Mode)}

@@ -18,6 +18,7 @@ const MOVE: PermissionRow = {
   person_only: false,
   online: true,
   source: 'body:desktop',
+  source_name: 'Desktop',
 };
 const READ: PermissionRow = {
   name: 'recall',
@@ -28,6 +29,7 @@ const READ: PermissionRow = {
   person_only: false,
   online: true,
   source: 'built_in',
+  source_name: 'Built in',
 };
 const FORGET: PermissionRow = {
   name: 'forget',
@@ -38,6 +40,7 @@ const FORGET: PermissionRow = {
   person_only: false,
   online: true,
   source: 'built_in',
+  source_name: 'Built in',
 };
 const OFFLINE: PermissionRow = {
   name: 'extension__open_tab',
@@ -48,6 +51,7 @@ const OFFLINE: PermissionRow = {
   person_only: false,
   online: false,
   source: 'body:extension',
+  source_name: 'Chrome on work PC',
 };
 const MAIL: PermissionRow = {
   name: 'gmail__send_mail',
@@ -58,6 +62,7 @@ const MAIL: PermissionRow = {
   person_only: false,
   online: true,
   source: 'app:gmail',
+  source_name: 'Gmail',
 };
 
 function renderPanel(bridge: FakeHostBridge) {
@@ -68,7 +73,9 @@ function renderPanel(bridge: FakeHostBridge) {
   );
 }
 
-const group = (tool: string) => screen.findByRole('radiogroup', { name: tool });
+// The group is named by the visible tool name, without its source prefix.
+const group = (tool: string) =>
+  screen.findByRole('radiogroup', { name: tool.replace(/^.*__/, '') });
 const radio = (el: HTMLElement, name: string) => within(el).getByRole('radio', { name });
 
 describe('PermissionsPanel', () => {
@@ -78,12 +85,12 @@ describe('PermissionsPanel', () => {
     expect(screen.getByRole('region', { name: 'Permissions' })).toHaveClass('home-card');
   });
 
-  it('groups tools by source, in the order built in, desktop, browser, apps', async () => {
+  it('groups tools by source, titled with the name the body or app declared', async () => {
     renderPanel(createFakeHostBridge({ permissions: [MAIL, OFFLINE, MOVE, READ] }));
     await group(READ.name);
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(['Built in', 'This desktop', 'Browser', 'Gmail']);
-    const desktop = screen.getByRole('list', { name: 'This desktop' });
+    expect(headings).toEqual(['Built in', 'Desktop', 'Chrome on work PC', 'Gmail']);
+    const desktop = screen.getByRole('list', { name: 'Desktop' });
     expect(within(desktop).getAllByRole('listitem')).toHaveLength(1);
     expect(desktop).toHaveTextContent('move_window');
     expect(desktop).toHaveTextContent('Move a window on your desktop');
@@ -215,18 +222,24 @@ describe('PermissionsPanel', () => {
     expect(bridge.permissionSets).toEqual([]);
   });
 
-  it('lets a tool that asks itself be turned Off but not to Ask or Auto', async () => {
+  it('offers a tool that asks itself only Off and Ask, shown as Ask while it is on', async () => {
     const bridge = createFakeHostBridge({
       permissions: [{ ...READ, name: 'hand_off', self_asks: true }],
     });
     renderPanel(bridge);
     const handOff = await group('hand_off');
     expect(screen.getByText('Asks itself')).toBeInTheDocument();
-    expect(radio(handOff, 'Off')).toBeEnabled();
-    expect(radio(handOff, 'Ask')).toBeDisabled();
-    expect(radio(handOff, 'Auto')).toBeDisabled();
-    fireEvent.click(radio(handOff, 'Auto'));
-    expect(bridge.permissionSets).toEqual([]);
+    expect(
+      within(handOff)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Off', 'Ask']);
+    expect(radio(handOff, 'Ask')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(radio(handOff, 'Off'));
+    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'hand_off', mode: 'off' }]));
+    fireEvent.click(radio(handOff, 'Ask'));
+    await waitFor(() => expect(bridge.permissionSets).toHaveLength(2));
+    expect(bridge.permissionSets[1]).toEqual({ tool: 'hand_off', mode: 'ask' });
   });
 
   it('greys a tool of a body that is not connected and says so, but can still set it', async () => {

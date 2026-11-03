@@ -13,12 +13,16 @@ export interface ThreeWayOption {
 
 export function ThreeWay({
   label,
+  labelledBy,
   value,
   options,
   onChange,
   describedBy,
 }: {
-  label: string;
+  /** The group's name when no visible text names it. */
+  label?: string;
+  /** The id of visible text that names the group; wins over `label`. */
+  labelledBy?: string;
   value: string;
   options: ThreeWayOption[];
   onChange(next: string): void;
@@ -26,15 +30,30 @@ export function ThreeWay({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // Arrow keys land on the next enabled option and wrap round, as native radios do.
   const step = (from: number, by: 1 | -1): void => {
-    const next = options[from + by];
-    if (next === undefined || next.disabled === true) return;
-    onChange(next.value);
-    refs.current[from + by]?.focus();
+    for (let hops = 1; hops < options.length; hops += 1) {
+      const at = (from + by * hops + options.length * hops) % options.length;
+      const next = options[at];
+      if (next === undefined || next.disabled === true) continue;
+      onChange(next.value);
+      refs.current[at]?.focus();
+      return;
+    }
   };
 
+  // One tab stop: the chosen option, or the first enabled one when that is disabled or missing.
+  const chosen = options.find((option) => option.value === value && option.disabled !== true);
+  const stop = (chosen ?? options.find((option) => option.disabled !== true))?.value;
+
   return (
-    <div role="radiogroup" aria-label={label} aria-describedby={describedBy} className="tg-three">
+    <div
+      role="radiogroup"
+      aria-label={labelledBy === undefined ? label : undefined}
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      className="tg-three"
+    >
       {options.map((option, index) => (
         <button
           key={option.value}
@@ -44,7 +63,7 @@ export function ThreeWay({
           type="button"
           role="radio"
           aria-checked={option.value === value}
-          tabIndex={option.value === value ? 0 : -1}
+          tabIndex={option.value === stop ? 0 : -1}
           disabled={option.disabled === true}
           className="tg-three__option"
           onClick={() => {

@@ -665,7 +665,9 @@ async def test_list_permissions_marks_locked_and_mode(home):
         "person_only",
         "online",
         "source",
+        "source_name",
     }
+    assert by_name["remember"]["source_name"] == "Built in"
     assert by_name["remember"]["self_asks"] is False
     assert by_name["remember"]["person_only"] is False
     assert by_name["desktop__type_text"]["locked"] is True
@@ -686,7 +688,7 @@ async def test_list_permissions_reports_self_asks_and_set_permission_refuses(hom
     ]
     assert row["self_asks"] is True and row["locked"] is False and row["mode"] == "auto"
     with pytest.raises(RpcError) as err:
-        await home.run("set_permission", {"tool": "hand_off", "mode": "ask"})
+        await home.run("set_permission", {"tool": "hand_off", "mode": "auto"})
     assert err.value.code == ErrorCode.invalid_params
     assert home.sent == []
 
@@ -1400,3 +1402,18 @@ async def test_list_permissions_marks_an_app_tool_source(home):
     by_name = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
     assert by_name["lin__list_issues"]["source"] == "app:lin"
     assert by_name["lin__list_issues"]["mode"] == "ask"
+
+
+async def test_list_permissions_names_each_body_by_what_it_declared(home):
+    home.bodies.connect(
+        Body(id="chrome", kind="browser", name="Chrome on work PC"),
+        [Tool(name="open_tab", description="d", input_schema={"type": "object"})],
+        Quiet(),
+        None,
+    )
+    rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert rows["chrome__open_tab"]["source"] == "body:chrome"
+    assert rows["chrome__open_tab"]["source_name"] == "Chrome on work PC"
+    drop(home.bodies, "chrome")
+    rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert rows["chrome__open_tab"]["source_name"] == "Chrome on work PC"

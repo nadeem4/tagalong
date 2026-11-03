@@ -45,15 +45,42 @@ describe('ThreeWay', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('arrow keys move to the next enabled option and stop at a disabled one', () => {
+  it('arrow keys skip a disabled option and wrap round, as native radios do', () => {
     const onChange = vi.fn();
+    const options = [OPTIONS[0]!, { ...OPTIONS[1]!, disabled: true }, OPTIONS[2]!];
+    const { rerender } = render(
+      <ThreeWay label="x" value="off" options={options} onChange={onChange} />,
+    );
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Off' }), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenLastCalledWith('auto');
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Off' }), { key: 'ArrowLeft' });
+    expect(onChange).toHaveBeenLastCalledWith('auto'); // wraps from the first to the last
+    rerender(<ThreeWay label="x" value="auto" options={options} onChange={onChange} />);
+    fireEvent.keyDown(screen.getByRole('radio', { name: 'Auto' }), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenLastCalledWith('off'); // wraps from the last to the first
+    expect(onChange).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps one tab stop on an enabled option when the chosen one is disabled or missing', () => {
     const options = [OPTIONS[0]!, OPTIONS[1]!, { ...OPTIONS[2]!, disabled: true }];
-    render(<ThreeWay label="x" value="ask" options={options} onChange={onChange} />);
-    const ask = screen.getByRole('radio', { name: 'Ask' });
-    fireEvent.keyDown(ask, { key: 'ArrowRight' });
-    expect(onChange).not.toHaveBeenCalled();
-    fireEvent.keyDown(ask, { key: 'ArrowLeft' });
-    expect(onChange).toHaveBeenCalledWith('off');
+    const { rerender } = render(
+      <ThreeWay label="x" value="auto" options={options} onChange={() => {}} />,
+    );
+    expect(screen.getByRole('radio', { name: 'Off' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('radio', { name: 'Auto' })).toHaveAttribute('tabindex', '-1');
+    rerender(<ThreeWay label="x" value="nothing" options={options} onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: 'Off' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getAllByRole('radio').filter((r) => r.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it('is named by visible text when given its id', () => {
+    render(
+      <>
+        <span id="name">move_window</span>
+        <ThreeWay labelledBy="name" value="ask" options={OPTIONS} onChange={() => {}} />
+      </>,
+    );
+    expect(screen.getByRole('radiogroup', { name: 'move_window' })).toBeInTheDocument();
   });
 
   it('can be described by a note elsewhere on the page', () => {

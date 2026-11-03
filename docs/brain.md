@@ -343,10 +343,10 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 No row means the tool's default applies. `Toolbox.set_mode` accepts `auto` for a locked tool: that
 is the explicit unlock, made with the Home switch (which warns first, see
 [Home tools](#home-tools)), and a stored `auto` counts even if it was saved before the tool became
-locked. Flip it back to `ask` and the tool asks again. Only a tool that asks for itself is refused.
+locked. Flip it back to `ask` and the tool asks again. Only a tool that asks for itself or is person-only is refused Auto.
 
 A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
-its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
+its mode is `auto` unless Off; `Toolbox.set_mode` refuses Auto for it ("<name> asks for itself.") but accepts Off, and Ask (which puts it back to normal).
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
 ### Off
@@ -354,7 +354,7 @@ its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> ask
 Off is the third per-tool state, stored in the same `permissions` table (the CHECK was widened by a
 migration that keeps every saved row), so it holds for every body, survives a restart and survives
 a body reconnecting. `resolve_mode` returns `off` before any other rule, so it also beats `locked`,
-`self_asks` and `person_only`: those tools may be set Off (never Auto). Off does three things:
+`self_asks` and `person_only`: those tools may be set Off or Ask (never Auto). Off does three things:
 
 - `Toolbox.active_specs()` skips the tool, and `model_tools()` and the capability picture
   read only that list, so Scout never sees it and routes around it.
@@ -364,7 +364,7 @@ a body reconnecting. `resolve_mode` returns `off` before any other rule, so it a
 - `set_mode` looks in `known_specs`, so a tool of a body that is offline right now can be turned Off
   and stays Off when the body connects.
 
-`list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them, and `person_only` so Home never offers Auto for a tool that always needs the person's yes.
+`list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them, `source_name` (the body's declared name or the app's name; "Built in" for Scout's own) for the heading, and `person_only` so Home never offers Auto for a tool that always needs the person's yes.
 
 Shipped defaults match the design: built-in memory, timers, `read_output` and the job tools are
 `auto`; a body's reads are `auto` and its changes `ask` (the desktop's `open_url` and the browser's
@@ -500,18 +500,18 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                              | Result text (JSON)                                                                                                                                                                     |
-| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                   |
-| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                |
-| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                             |
-| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "online", "source"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
-| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                           |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                       |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                         |
-| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                     |
-| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                |
-| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                        |
+| Tool               | Input                              | Result text (JSON)                                                                                                                                                                                    |
+| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                                  |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                               |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                            |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                          |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                      |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                                        |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                    |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                               |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                       |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -1081,8 +1081,8 @@ shows them as Scout does.
   otherwise). It starts the adapter and opens an ask whose text is the task, with the folder as
   its input and the modes the adapter reports plus `cancel` as options. A mode answer starts the
   job. `cancel`, no answer in 5 minutes, or nobody online closes the adapter and returns "not
-  started". The tool asks for itself, so the gate adds no allow or deny ask, and Home cannot
-  change its mode.
+  started". The tool asks for itself, so the gate adds no allow or deny ask, and Home can only turn it Off or back on (Ask)
+  and cannot make it Auto.
 - **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
   (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
   closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`. Permission

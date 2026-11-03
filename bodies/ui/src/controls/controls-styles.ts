@@ -52,15 +52,15 @@ export const CONTROLS_CSS = `
 /* ThreeWay: one pill; the chosen word is filled in gold like an on Toggle. */
 .tg-three {
   display: inline-flex; flex: none; padding: 2px; gap: 2px; box-sizing: border-box;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px; background: ${t.color.scrollbarThumb};
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px; background: var(--tg-ctl-bg);
 }
 .tg-three__option {
-  min-width: 46px; height: ${t.size.toggleH - 6}px; padding: 0 ${t.space.md}px; border: 0;
-  border-radius: ${t.size.toggleH}px; background: transparent; color: ${t.color.panelText}; cursor: pointer;
+  min-width: 46px; height: ${t.size.toggleH}px; padding: 0 ${t.space.md}px; border: 0;
+  border-radius: ${t.size.toggleH}px; background: transparent; color: var(--tg-ctl-ink); cursor: pointer;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.min}px; font-weight: ${t.fontWeight.semibold};
   transition: background 120ms;
 }
-.tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-bg); }
+.tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-line); }
 .tg-three__option[aria-checked='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .tg-three__option:disabled { opacity: 0.4; cursor: not-allowed; }
 
