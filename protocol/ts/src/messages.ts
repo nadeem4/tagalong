@@ -38,6 +38,10 @@ export type HelloResult = z.infer<typeof HelloResult>;
 export const ToolsParams = z.object({ tools: z.array(Tool) });
 export type ToolsParams = z.infer<typeof ToolsParams>;
 
+// The owner talked over turn `turn` after the body had played `heard` of its sentences.
+export const Interrupted = z.object({ turn: Id, heard: z.int().nonnegative() });
+export type Interrupted = z.infer<typeof Interrupted>;
+
 export const SayParams = z
   .object({
     text: z.string().optional(),
@@ -46,6 +50,7 @@ export const SayParams = z
     spoken: z.boolean().optional(),
     voice: z.string().optional(),
     speed: z.number().min(0.5).max(2).optional(),
+    interrupted: Interrupted.optional(),
   })
   .refine((m) => m.text !== undefined || m.parts !== undefined, 'say needs text or parts');
 export type SayParams = z.infer<typeof SayParams>;
@@ -229,10 +234,11 @@ export const VoiceParams = z.object({
 export type VoiceParams = z.infer<typeof VoiceParams>;
 
 // One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
-// pcm and sample_rate come together; without them the body says `text` in its own voice.
+// n numbers the turn's sentences from 1. pcm and sample_rate come together; without them the body says `text` in its own voice.
 export const SpeechParams = z
   .object({
     turn: Id,
+    n: z.int().positive().optional(),
     text: z.string().optional(),
     pcm: z.string().optional(),
     sample_rate: z.int().positive().optional(),
@@ -242,7 +248,10 @@ export const SpeechParams = z
     (s) =>
       s.done === undefined
         ? s.text !== undefined
-        : s.text === undefined && s.pcm === undefined && s.sample_rate === undefined,
+        : s.text === undefined &&
+          s.pcm === undefined &&
+          s.sample_rate === undefined &&
+          s.n === undefined,
     'a speech has text or done: true, never both',
   )
   .refine((s) => (s.pcm === undefined) === (s.sample_rate === undefined), 'pcm needs sample_rate');

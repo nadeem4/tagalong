@@ -52,6 +52,8 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         text?: string;
         spoken?: boolean;
         drop?: boolean;
+        /** The person spoke over this turn after hearing `heard` of its sentences. */
+        interrupted?: { turn: string; heard: number };
       },
     ) => {
       const snapshot = deps.pendingSnapshot();
@@ -67,6 +69,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
         ...(spoken ? { spoken: true, voice: voice.voice, speed: voice.speed } : {}),
+        ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };
       try {
         const said = await deps.brain.say(say);

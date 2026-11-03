@@ -166,6 +166,12 @@ class ToolsParams(Model):
     tools: list[Tool]
 
 
+class Interrupted(Model):
+    # The owner talked over turn `turn` after the body had played `heard` of its sentences.
+    turn: Id
+    heard: Annotated[int, Field(ge=0)]
+
+
 class SayParams(Model):
     text: str | None = None
     parts: list[Part] | None = None
@@ -173,6 +179,7 @@ class SayParams(Model):
     spoken: bool | None = None
     voice: str | None = None
     speed: Annotated[float, Field(ge=0.5, le=2)] | None = None
+    interrupted: Interrupted | None = None
 
     @model_validator(mode="after")
     def _needs_text_or_parts(self) -> "SayParams":
@@ -381,9 +388,11 @@ class VoiceParams(Model):
 
 
 # One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
-# `pcm` and `sample_rate` come together; without them the body says `text` in its own voice.
+# `n` numbers the turn's sentences from 1. `pcm` and `sample_rate` come together; without
+# them the body says `text` in its own voice.
 class SpeechParams(Model):
     turn: Id
+    n: Annotated[int, Field(ge=1)] | None = None
     text: str | None = None
     pcm: str | None = None
     sample_rate: Annotated[int, Field(gt=0)] | None = None
@@ -392,7 +401,12 @@ class SpeechParams(Model):
     @model_validator(mode="after")
     def _shape(self) -> "SpeechParams":
         if self.done is not None:
-            if self.text is not None or self.pcm is not None or self.sample_rate is not None:
+            if (
+                self.text is not None
+                or self.pcm is not None
+                or self.sample_rate is not None
+                or self.n is not None
+            ):
                 raise ValueError("a speech done carries nothing else")
         elif self.text is None:
             raise ValueError("a speech has text or done: true")

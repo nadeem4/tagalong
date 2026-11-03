@@ -188,6 +188,8 @@ export interface AskInput {
    * drop card; the host reads the item then, and attaches it as `snapshot.dropped`.
    */
   drop?: boolean;
+  /** The person spoke over this turn after hearing `heard` of its sentences; the brain hands the unsaid rest to the model. */
+  interrupted?: { turn: string; heard: number };
 }
 
 /**
