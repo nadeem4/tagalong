@@ -440,8 +440,8 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem):
 
 async def test_list_jobs_rows_have_parts(home, mem):
     mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.update_job("j1", session_id="s-secret")
-    mem.add_part("j1", "gemini", "more", "2026-01-01T00:00:00+00:00")
+    mem.update_part("j1", "p1", session_id="s-secret")
+    mem.add_part("j1", "gemini", "more", "f", "2026-01-01T00:00:00+00:00")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default", parent_job="j1")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
@@ -455,7 +455,7 @@ async def test_list_jobs_rows_have_parts(home, mem):
 
 async def test_list_jobs_says_whether_a_part_has_a_session_but_never_shows_it(home, mem):
     mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.update_job("j1", session_id="s-secret")
+    mem.update_part("j1", "p1", session_id="s-secret")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
@@ -466,9 +466,9 @@ async def test_list_jobs_says_whether_a_part_has_a_session_but_never_shows_it(ho
 
 async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home, mem):
     mem.add_job("j1", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j1", result="R" * 1500, progress="a" * 1500 + "end")
+    mem.update_part("j1", "p1", report="R" * 1500, progress="a" * 1500 + "end")
     mem.add_job("j2", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j2", result="short", progress="p" * 1000)
+    mem.update_part("j2", "p1", report="short", progress="p" * 1000)
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
     one, two = rows["j1"]["parts"][0], rows["j2"]["parts"][0]

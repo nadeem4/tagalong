@@ -160,10 +160,12 @@ class Jobs:
             raise JobError(f"no job {job_id}")
         if earlier.state == "running":
             raise JobError(f"job {job_id} is still running; send it a note instead")
-        if expert is not None and expert != earlier.agent:
-            raise JobError(f"job {job_id} ran on {earlier.agent}, which is another expert")
-        if Path(folder) != Path(earlier.folder):
-            raise JobError(f"job {job_id} worked in {earlier.folder}, which is another folder")
+        ran_on = earlier.parts[-1].agent
+        if expert is not None and expert != ran_on:
+            raise JobError(f"job {job_id} ran on {ran_on}, which is another expert")
+        worked_in = earlier.parts[-1].folder or earlier.folder
+        if Path(folder) != Path(worked_in):
+            raise JobError(f"job {job_id} worked in {worked_in}, which is another folder")
         return earlier
 
     async def _refusal(
@@ -235,7 +237,7 @@ class Jobs:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         earlier_part = earlier.parts[-1] if earlier else None
-        chosen = await self._pick(earlier.agent if earlier else expert)
+        chosen = await self._pick(earlier_part.agent if earlier_part else expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
@@ -272,7 +274,8 @@ class Jobs:
         if len(running) + self._starting >= self._max_running:
             names = ", ".join(f"{j.id} ({p.task[:40]})" for j, p in running)
             raise JobError(f"{self._max_running} jobs are already running: {names}")
-        part = "p1"  # read late by the callbacks; set once the part row exists
+        # Named before the run exists so callbacks fired while it starts file under this part.
+        part = "p1" if new_job else self._memory.next_part_id(job_id)
         run = self._make_run(
             chosen,
             on_permission=lambda request: self._permission(job_id, request, part),
@@ -325,7 +328,9 @@ class Jobs:
                 parent = earlier.id if earlier else None
                 self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             else:
-                part = self._memory.add_part(job_id, chosen.id, task, _now())
+                part = self._memory.add_part(
+                    job_id, chosen.id, task, str(path), _now()
+                )  # == the id above
                 self._memory.update_job(job_id, state="running", ended_at=None)
             self._runs.setdefault(job_id, {})[part] = run
             self._activity.setdefault(job_id, {})[part] = JobActivity(
@@ -479,6 +484,7 @@ class Jobs:
                     "expert": p.agent,
                     "state": p.state,
                     "reason": p.reason,
+                    "folder": p.folder,
                     "started_at": p.started_at,
                     "ended_at": p.ended_at,
                 }
@@ -884,13 +890,16 @@ def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
         f"Folder: {job.folder}",
         f"State: {job.state}",
     ]
-    if job.reason:
-        lines.append(f"Reason: {job.reason}")
-    if job.result:
-        result = job.result[:RESULT_NOTE_CHARS]
-        if len(job.result) > RESULT_NOTE_CHARS:
-            result += "\n[trimmed]"
-        lines.append(f"Result:\n{result}")
+    many = len(job.parts) > 1
+    for part in job.parts:
+        tag = f" ({part.id}, {part.agent}, {part.folder})" if many else ""
+        if part.reason:
+            lines.append(f"Reason{tag}: {part.reason}")
+        if part.report:
+            report = part.report[:RESULT_NOTE_CHARS]
+            if len(part.report) > RESULT_NOTE_CHARS:
+                report += "\n[trimmed]"
+            lines.append(f"Result{tag}:\n{report}")
     for key, value in (facts or {}).items():
         lines.append(f"{key.capitalize()}:\n{value}")
     return "\n".join(lines)
