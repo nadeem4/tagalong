@@ -32,7 +32,7 @@ def use(name, **args):
     return Final([block], "tool_use", SimpleNamespace())
 
 
-def rig(steps):
+def rig(steps, memory=None):
     model = Gate(steps)
     bodies = Bodies()
     bodies.notify = lambda m, p: None
@@ -56,7 +56,7 @@ def rig(steps):
         Open(),
         bodies,
         10,
-        Memory(":memory:"),
+        memory or Memory(":memory:"),
         now=lambda: datetime.datetime(2026, 1, 1, 9, 0),
         kinds=KINDS,
         extra_tools=[(spec, install_app)],
@@ -108,8 +108,17 @@ async def test_a_missing_tool_is_offered_then_connected_then_the_request_resumes
 
 
 async def test_after_a_restart_nothing_resumes():
-    session, model, installs = rig([])
+    saved = Memory(":memory:")  # what the chat left behind: the request and the Connect offer
+    saved.save_messages(
+        [
+            {"role": "user", "content": [{"type": "text", "text": REQUEST}]},
+            {"role": "assistant", "content": [{"type": "text", "text": "Connect Calendar?"}]},
+        ]
+    )
+    session, model, installs = rig([], memory=saved)
     join(session, "desktop")
     session.scheduler.pump()
     await idle(session)
-    assert session.history == [] and model.seen == [] and installs == []
+    assert len(session.history) == 2  # rebuilt through mind/resume.py, as saved text only
+    assert session._task is None and model.seen == [] and installs == []
+    assert session.open_asks() == []  # the Connect question died with the old process

@@ -45,7 +45,9 @@ from brain.voice.models import Fetch
 
 InspectFn = Callable[[], Awaitable[Machine]]
 CONNECT_WAIT_S = 20.0  # how long install_app waits to report connected; a slow app stays connecting
-SIGN_IN_WAIT_S = 600.0  # how long to watch for a person finishing sign-in before giving up
+# How long to watch for a person finishing sign-in. Apps itself gives up after its signin_timeout
+# plus connect_timeout (300 + 30 by default), so this must stay above that sum (a test checks).
+SIGN_IN_WAIT_S = 600.0
 MAX_TOOLS_LISTED = 30
 
 
@@ -168,7 +170,10 @@ def app_setup_tools(
     wait_s: float = CONNECT_WAIT_S,
     sign_in_wait_s: float = SIGN_IN_WAIT_S,
     opener: Callable[[str], OpenUrl | None] | None = None,
-) -> list[tuple[ToolSpec, Handler]]:
+) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
+    """The tools, and a `stop_watches` that cancels pending connect watches at shutdown (a
+    cancelled watch emits nothing: nobody is left to wake)."""
+
     def fail(error: str, detail: str = "", **more) -> str:
         return json.dumps({"error": error, "detail": detail, **more})
 
@@ -196,8 +201,11 @@ def app_setup_tools(
             await asyncio.sleep(0.2)
         return apps.status(app_id).state
 
-    def tool_names(app_id: str) -> list[str]:
-        return [t.name for t in apps.tools(app_id)][:MAX_TOOLS_LISTED]
+    def tool_facts(app_id: str) -> tuple[list[str], int]:
+        """The first tool names, and how many there are in all, so Scout never claims the
+        capped list is complete."""
+        names = [t.name for t in apps.tools(app_id)]
+        return names[:MAX_TOOLS_LISTED], len(names)
 
     watching: set[asyncio.Task] = set()  # held so a watch is not collected mid-wait
 
@@ -215,7 +223,8 @@ def app_setup_tools(
             "state": status.state,
         }
         if status.state == "connected":
-            facts["tools"] = ", ".join(tool_names(app_id))
+            names, total = tool_facts(app_id)
+            facts["tools"], facts["tools_total"] = ", ".join(names), total
         elif status.error:
             facts["detail"] = status.error
         emit(Event("setup_done", facts, key=app_id))
@@ -256,7 +265,7 @@ def app_setup_tools(
             out["needs_env"] = missing
         out["status"] = await settle(row.id)
         if out["status"] == "connected":
-            out["tools"] = tool_names(row.id)
+            out["tools"], out["tools_total"] = tool_facts(row.id)
         elif out["status"] == "connecting":  # still starting: the end arrives as an event
             watch(row.id, row.name)
         return json.dumps(out)
@@ -278,4 +287,11 @@ def app_setup_tools(
         person_only=True,  # only the person allows it, every time
         card=card,
     )
-    return [(spec, install)]
+
+    async def stop_watches() -> None:
+        pending = list(watching)
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    return [(spec, install)], stop_watches

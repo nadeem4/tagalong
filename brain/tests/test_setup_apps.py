@@ -260,7 +260,7 @@ class Rig:
             wait_s=0.0,
             opener=lambda app_id: opens if browser else None,
         )
-        ((self.spec, self.handler),) = tools
+        (((self.spec, self.handler),), self.stop_watches) = tools
 
     async def run(self, app_id="acme/notes"):
         return json.loads(await self.handler({"id": app_id}))
@@ -475,6 +475,7 @@ async def test_an_app_that_connects_in_the_turn_lists_its_tools_and_sends_no_eve
     r = rig(env={"ACME_KEY": "k"})
     out = await r.run()
     assert out["status"] == "connected" and out["tools"] == ["create_event", "list_events"]
+    assert out["tools_total"] == 2
     await asyncio.sleep(0.1)
     assert r.events == []  # the tool result already told Scout
 
@@ -493,6 +494,7 @@ async def test_a_sign_in_that_finishes_later_sends_setup_done_with_the_app_and_t
         "ok": True,
         "state": "connected",
         "tools": "create_event, list_events",
+        "tools_total": 2,
     }
 
 
@@ -504,3 +506,30 @@ async def test_a_sign_in_that_fails_sends_setup_done_with_the_state_and_no_tools
     (event,) = r.events
     assert event.facts["ok"] is False and event.facts["state"] == "needs-sign-in"
     assert "tools" not in event.facts
+
+
+async def test_a_long_tool_list_is_capped_with_the_real_total(rig):
+    r = rig(env={"ACME_KEY": "k"})
+    r.apps.tool_names = [f"t{i}" for i in range(45)]
+    out = await r.run()
+    assert len(out["tools"]) == 30 and out["tools_total"] == 45
+
+
+async def test_a_watch_stopped_at_shutdown_emits_nothing(rig):
+    r = rig(browser=True)
+    await r.run("acme/cloud")  # signing in: a watch is waiting
+    await r.stop_watches()
+    r.apps.state = "off"  # what apps.shutdown() does next
+    await asyncio.sleep(0.5)
+    assert r.events == []
+
+
+def test_the_watch_outlasts_the_longest_connect_and_sign_in():
+    import inspect
+
+    from brain.apps import Apps
+    from brain.setup.apps import SIGN_IN_WAIT_S
+
+    params = inspect.signature(Apps.__init__).parameters
+    longest = params["signin_timeout"].default + params["connect_timeout"].default
+    assert SIGN_IN_WAIT_S > longest  # the watch must not give up before Apps does
