@@ -341,18 +341,19 @@ asks for itself (below) is `auto`; then the user's saved choice (a locked tool i
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                          | Default mode                                |
-| --------------------------------------------- | ------------------------------------------- |
-| Reads (`effect: "read"`), such as `list_jobs` | `auto`                                      |
-| Changes (`effect: "change"`)                  | `ask`                                       |
-| A connected app's tool, read-only too         | `ask` (`default_mode`), until you change it |
-| Memory tools (`remember`, `forget`)           | `auto`                                      |
-| Timer tools `set_timer` and `cancel_timer`    | `auto`                                      |
-| Expert tools `watch_job` and `stop_job`       | `auto`                                      |
-| `tell_expert` (`follow_up`)                   | `ask` on a wake turn, free on an owner turn |
-| `hand_off` (asks itself, see below)           | `auto`, no gate ask                         |
-| A body tool that does not declare effect      | `ask`                                       |
-| Locked (`confirm: true` from the body)        | `ask`, until you set it to `auto` on Home   |
+| Tool                                           | Default mode                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| Reads (`effect: "read"`), such as `list_jobs`  | `auto`                                                               |
+| Changes (`effect: "change"`)                   | `ask`                                                                |
+| A connected app's tool, read-only too          | `ask` (`default_mode`), until you change it                          |
+| Memory tools (`remember`, `forget`)            | `auto`                                                               |
+| Timer tools `set_timer` and `cancel_timer`     | `auto`                                                               |
+| Expert tools `watch_job` and `stop_job`        | `auto`                                                               |
+| `tell_expert` (`follow_up`)                    | `ask` on a wake turn, free on an owner turn                          |
+| `hand_off` (asks itself, see below)            | `auto`, no gate ask                                                  |
+| A body tool that does not declare effect       | `ask`                                                                |
+| Locked (`confirm: true` from the body)         | `ask`, until you set it to `auto` on Home                            |
+| Always-ask (`confirm: "always"` from the body) | `ask` every time; cannot be set to `auto`, no preference approves it |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 

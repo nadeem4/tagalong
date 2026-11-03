@@ -300,6 +300,21 @@ def test_body_tool_confirm_true_is_locked():
     assert Toolbox([BodySource(bodies)], {}).mode(s) == "ask"
 
 
+def test_body_tool_confirm_always_is_person_only_and_always_asks():
+    bodies = Bodies()
+    decl = [Tool(name="rm", description="d", input_schema={"type": "object"}, confirm="always")]
+    bodies.connect(
+        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+    )
+    (s,) = BodySource(bodies).specs()
+    assert s.locked and s.person_only
+    stored = {"desktop__rm": "auto"}
+    box = Toolbox([BodySource(bodies)], stored)
+    assert box.mode(s) == "ask"
+    with pytest.raises(RpcError):
+        box.set_mode("desktop__rm", "auto")
+
+
 def test_set_mode_saves_and_changes_mode():
     stored = {}
     box = Toolbox([FakeSource([spec("a")])], stored)

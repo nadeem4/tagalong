@@ -126,7 +126,9 @@ class BodySource:
                 tool.description,
                 tool.input_schema,
                 effect=tool.effect or "change",
-                locked=tool.confirm is True,
+                # "always" (delete, overwrite): person only, never Auto.
+                locked=tool.confirm is True or tool.confirm == "always",
+                person_only=tool.confirm == "always",
             )
             for body_id, tools in sorted(tools_by_body.items())
             for tool in tools

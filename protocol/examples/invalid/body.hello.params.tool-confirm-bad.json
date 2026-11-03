@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol": 1,
+    "body": { "id": "desktop", "kind": "desktop", "name": "Desktop" },
+    "tools": [
+      {
+        "name": "delete_file",
+        "description": "Delete a file",
+        "input_schema": { "type": "object" },
+        "confirm": "sometimes"
+      }
+    ]
+  }
+}
