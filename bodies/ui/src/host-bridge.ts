@@ -234,14 +234,18 @@ export interface HostBridge {
    * after the rest.
    */
   listConnections(): Promise<AppsList>;
-  /** Experts and apps with their state, what could be added, and a running install's progress. */
-  setupOverview(): Promise<SetupOverview>;
+  /**
+   * Experts and apps with their state, what could be added, and a running install's progress.
+   * A `query` searches the app registry; without one `browseApps` is its first page.
+   */
+  setupOverview(query?: string): Promise<SetupOverview>;
   /**
    * Installs, updates or logs in an expert. `approved` false opens the Allow card (Connections);
    * true means the person's press was the OK (the tour). Progress arrives as `changed setup`.
    */
   setupExpert(id: string, approved: boolean): Promise<SetupResult>;
-  setupApp(id: string, approved: boolean): Promise<SetupResult>;
+  /** `query` is the registry search the app was found with; the card needs it to find it again. */
+  setupApp(id: string, approved: boolean, query?: string): Promise<SetupResult>;
   addConnection(params: AppAddParams): Promise<{ id: string }>;
   setConnectionEnabled(id: string, enabled: boolean): Promise<unknown>;
   restartConnection(id: string): Promise<unknown>;

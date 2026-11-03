@@ -111,7 +111,9 @@ def home_setup_tools(
     async def overview(args: dict) -> str:
         machine = await inspect_fn()
         acp, stale_acp = await listing(registry.acp_agents)
-        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(None))
+        query = args.get("query")
+        query = query.strip() if isinstance(query, str) and query.strip() else None
+        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query))
         latest = {e.id: e.version for e in acp.entries} if acp else {}
         installed = experts()
         return json.dumps(
@@ -214,8 +216,9 @@ def home_setup_tools(
             ToolSpec(
                 "setup_overview",
                 "What is set up: installed experts and apps with their state, what could be "
-                "added, and the running install's progress.",
-                {"type": "object", "properties": {}},
+                "added (an optional query searches the app registry), and the running install's "
+                "progress.",
+                {"type": "object", "properties": {"query": {"type": "string"}}},
                 home,
                 effect="read",
             ),

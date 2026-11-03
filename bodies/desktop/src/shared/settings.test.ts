@@ -14,6 +14,7 @@ describe('Settings', () => {
     expect(Object.keys(Settings.parse({})).sort()).toEqual([
       'avatar',
       'captureExclusions',
+      'fileFolders',
       'hotkeys',
       'listening',
       'voice',
@@ -259,5 +260,34 @@ describe('Settings.listening', () => {
     expect(SettingsPatch.parse({ listening: { always: true } })).toEqual({
       listening: { always: true },
     });
+  });
+});
+
+describe('fileFolders', () => {
+  it('is empty by default: Scout may touch no folder until the person names one', () => {
+    expect(Settings.parse({}).fileFolders).toEqual([]);
+    expect(SETTINGS_DEFAULTS.fileFolders).toEqual([]);
+  });
+
+  it('keeps absolute folders, Windows or POSIX', () => {
+    const folders = ['C:\\Users\\me\\Downloads', '/home/me/docs', '\\\\nas\\share'];
+    expect(SettingsPatch.parse({ fileFolders: folders }).fileFolders).toEqual(folders);
+  });
+
+  it('refuses a relative, blank or non-string entry', () => {
+    for (const bad of ['', '   ', 'Downloads', '..\\x', './x', 42]) {
+      expect(SettingsPatch.safeParse({ fileFolders: [bad] }).success).toBe(false);
+    }
+  });
+
+  it('refuses Windows device paths but keeps a normal share', () => {
+    for (const bad of ['\\\\?\\C:\\x', '\\\\.\\PhysicalDrive0', '//?/C:/x', '//./pipe/x']) {
+      expect(SettingsPatch.safeParse({ fileFolders: [bad] }).success).toBe(false);
+    }
+    expect(SettingsPatch.safeParse({ fileFolders: ['\\\\server\\share'] }).success).toBe(true);
+  });
+
+  it('is left alone by a patch that does not mention it', () => {
+    expect(SettingsPatch.parse({ listening: { always: true } })).not.toHaveProperty('fileFolders');
   });
 });

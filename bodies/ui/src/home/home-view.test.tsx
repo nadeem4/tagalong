@@ -146,7 +146,7 @@ describe('HomeView', () => {
     const scout = await screen.findByRole('region', { name: 'Scout' });
     expect(scout).toHaveTextContent('Never at its blind spots.');
     expect(scout).not.toHaveTextContent('Thinks with');
-    expect(screen.queryByRole('region', { name: 'Experts' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'For long jobs' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Recent' })).toBeNull();
   });
 

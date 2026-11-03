@@ -84,6 +84,7 @@ its result.
 - Scout can search the web and read pages itself (Anthropic's own web tools, shown in Home's
   permissions and switchable Off). Each search costs a cent against the daily limit; when the limit
   stops a task Scout says so plainly. It never sends you to an expert for that.
+- The first-run tour and Home speak of jobs, not products: the tour's step six lists everyday jobs with a one-click Connect for the app each needs, and "Claude Code" shows only behind the optional line "For long jobs, Scout can also use an expert". Home lists experts by the kind of job, the product underneath.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one. When the task
   needs a connected app, the Send card lists the apps; you can remove any, and Send is your
@@ -117,7 +118,9 @@ its result.
 ## Evidence on Hand
 
 - Working Windows build with Scout, sight, voice, experts (Claude Code), connected
-  apps (MCP), Home and the Chrome extension.
+  apps (MCP), Home and the Chrome extension. Scout can list, read, move and rename files in
+  folders you choose, and delete or overwrite only after you say yes; this is file access,
+  not control of your mouse or keyboard.
 - No users, testimonials, metrics or press yet. Do not invent any.
 
 ## Product Principles

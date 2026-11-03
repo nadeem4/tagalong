@@ -7,7 +7,7 @@
 const ROUTES: readonly { name: string; detail: string }[] = [
   { name: 'Answers itself', detail: 'Questions and drafts' },
   { name: 'Uses your apps', detail: 'Calendar, notes, issues' },
-  { name: 'Brings in an expert', detail: 'Claude Code, for big jobs' },
+  { name: 'Brings in an expert', detail: 'For long jobs' },
 ];
 
 const APPS = ['Notion', 'GitHub', 'Linear', 'Google Calendar', 'Any MCP server'];

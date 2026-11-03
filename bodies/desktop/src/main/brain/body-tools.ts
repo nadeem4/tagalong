@@ -1,5 +1,6 @@
 /**
- * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window, open_url.
+ * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window, open_url,
+ * and the file tools (list_files, read_file, move_file, rename_file, delete_file, write_file).
  * Declared in `hello`, run when the brain sends `use`. Every run is bounded at 15 s, and any
  * capture that reads pixels raises the capture notice.
  */
@@ -11,6 +12,7 @@ import { captureNotice } from '../capture-notice';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { RpcError } from '@tagalong/contract';
+import { fileTools, type FileDeps } from '../tools/files';
 
 /**
  * How much of one window's text a read returns unless asked otherwise: roughly 2,000 tokens,
@@ -94,6 +96,100 @@ const tools: Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_files',
+    description:
+      'List the files and folders inside one folder the person has allowed, with sizes. ' +
+      'Takes a full path. Refuses anywhere outside the allowed folders.',
+    effect: 'read',
+    input_schema: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'Full path of a folder.' } },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'read_file',
+    description:
+      'Read a text file inside an allowed folder, cut at maxChars (default 20,000). A binary ' +
+      'file is not read; the result says so. Use it to see what a file is before moving it.',
+    effect: 'read',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full path of a file.' },
+        maxChars: { type: 'number', description: 'How much text to return at most.' },
+      },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'move_file',
+    description:
+      'Move a file or folder to another place inside the allowed folders. "to" is the new ' +
+      'full path, or an existing folder to move it into. Never overwrites: if the target ' +
+      'exists, nothing moves.',
+    effect: 'change',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Full path of the file or folder to move.' },
+        to: { type: 'string', description: 'New full path, or an existing folder.' },
+      },
+      required: ['from', 'to'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'rename_file',
+    description:
+      'Rename a file or folder in place (same folder, new name). Never overwrites: if the ' +
+      'name is taken, nothing changes.',
+    effect: 'change',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full path of the file or folder.' },
+        newName: { type: 'string', description: 'The new name only, not a path.' },
+      },
+      required: ['path', 'newName'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'delete_file',
+    description:
+      'Send a file or folder inside the allowed folders to the Recycle Bin, where the person ' +
+      'can restore it. It always asks first.',
+    effect: 'change',
+    // "always": no Always allow button and the brain never lets it be Auto.
+    confirm: 'always',
+    input_schema: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'Full path to delete.' } },
+      required: ['path'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'write_file',
+    description:
+      'Write text to a file inside the allowed folders, replacing what it holds now (the old ' +
+      'content is lost). Creates it if missing. It always asks first.',
+    effect: 'change',
+    confirm: 'always',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Full path of the file.' },
+        content: { type: 'string', description: 'The whole new content.' },
+      },
+      required: ['path', 'content'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function failed(message: string): RpcError {
@@ -109,6 +205,7 @@ export function bodyTools(
   exclusions: () => CaptureExclusions,
   onCapture: (notice: CaptureNotice) => void,
   openExternal: (url: string) => Promise<void>,
+  files: FileDeps,
 ): { tools: Tool[]; run: (tool: string, input: Record<string, unknown>) => Promise<Part[]> } {
   const announce = (blocked: CaptureBlock | null) =>
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
@@ -187,6 +284,7 @@ export function bodyTools(
     read_window_text: readWindowText,
     look_at_window: lookAtWindow,
     open_url: openUrl,
+    ...fileTools(files),
   };
 
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {

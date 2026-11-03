@@ -23,6 +23,8 @@ function render(status = '', statusIsError = false, view: HostView = VIEW): stri
         status={status}
         statusIsError={statusIsError}
         onSubmit={() => undefined}
+        onAddFolder={() => undefined}
+        onRemoveFolder={() => undefined}
       />
     </HostBridgeProvider>,
   );
@@ -56,7 +58,7 @@ describe('SettingsFormView', () => {
 
   it('draws every section as a home card', () => {
     const html = render();
-    expect(html.match(/<section [^>]*class="[^"]*home-card/g)).toHaveLength(5);
+    expect(html.match(/<section [^>]*class="[^"]*home-card/g)).toHaveLength(6);
   });
 
   it('shows the ask shortcut as keycaps, never CommandOrControl as text', () => {

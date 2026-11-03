@@ -149,7 +149,7 @@ its bodies fit together.
 
 ## First run
 
-Start Tagalong (it starts the brain if none is running). The first launch opens the walkthrough, a nine-step tour (the idea, what to ask, asking, talking, bigger jobs, the browser add-on, your limits), and Scout appears on your screen when you finish, skip or close it. The last step takes your Anthropic key: paste it, Tagalong checks it and your brain saves it, and Finish turns on once it is good. Skip jumps to that step when no key is set, and the tour comes back at the next launch if you close it part-way (change the key later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
+Start Tagalong (it starts the brain if none is running). The first launch opens the walkthrough, a nine-step tour (the idea, what to ask, asking, talking, everyday jobs, the browser add-on, your limits), and Scout appears on your screen when you finish, skip or close it. The last step takes your Anthropic key: paste it, Tagalong checks it and your brain saves it, and Finish turns on once it is good. Skip jumps to that step when no key is set, and the tour comes back at the next launch if you close it part-way (change the key later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 
@@ -294,6 +294,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
   body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
+  - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
+    **Add folder**; **Remove** takes it away at once.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
@@ -362,7 +364,9 @@ such as `.env` are refused.
 - The Python brain keeps the Anthropic key you enter in the app in its own data folder (a real `ANTHROPIC_API_KEY` in the environment wins, for developers); the desktop never stores it, and it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
-  applications. It changes things only through apps you connect, and only after you press
+  applications. Its file tools are file access only: they list, read, move and rename files
+  inside folders you chose (none until you choose one), and deleting (to the Recycle Bin) or
+  overwriting a file always asks first. It changes things only through apps you connect, and only after you press
   **Allow once**.
 - Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in

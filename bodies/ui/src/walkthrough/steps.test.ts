@@ -11,8 +11,8 @@ describe('STEPS', () => {
 });
 
 describe('side list names', () => {
-  it('names step 6 Bigger jobs and keeps its id', () => {
-    expect(STEPS.find((step) => step.id === 6)?.title).toBe('Bigger jobs');
+  it('names step 6 Everyday jobs and keeps its id', () => {
+    expect(STEPS.find((step) => step.id === 6)?.title).toBe('Everyday jobs');
     expect(STEPS.find((step) => step.id === 2)?.title).toBe('How it works');
   });
 });

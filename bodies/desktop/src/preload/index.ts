@@ -66,11 +66,12 @@ const bridge: PreloadBridge = {
   answerJobAsk: (approvalId: string, answer: { option: string; text?: string; apps?: string[] }) =>
     ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
-  setupOverview: () => ipcRenderer.invoke(IPC.setupOverview) as Promise<SetupOverview>,
+  setupOverview: (query?: string) =>
+    ipcRenderer.invoke(IPC.setupOverview, query) as Promise<SetupOverview>,
   setupExpert: (id: string, approved: boolean) =>
     ipcRenderer.invoke(IPC.setupExpert, id, approved) as Promise<SetupResult>,
-  setupApp: (id: string, approved: boolean) =>
-    ipcRenderer.invoke(IPC.setupApp, id, approved) as Promise<SetupResult>,
+  setupApp: (id: string, approved: boolean, query?: string) =>
+    ipcRenderer.invoke(IPC.setupApp, id, approved, query) as Promise<SetupResult>,
   addConnection: (params: AppAddParams) =>
     ipcRenderer.invoke(IPC.addConnection, params) as Promise<{ id: string }>,
   setConnectionEnabled: (id: string, enabled: boolean) =>
@@ -261,6 +262,8 @@ const host: TagalongHostApi = {
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
   finishWalkthrough: (options?: { close?: boolean }) =>
     ipcRenderer.invoke(IPC.walkthroughFinish, options) as Promise<void>,
+  addFileFolder: () => ipcRenderer.invoke(IPC.fileFolderAdd) as Promise<string[]>,
+  removeFileFolder: (path) => ipcRenderer.invoke(IPC.fileFolderRemove, path) as Promise<string[]>,
   openKeyPage: () => ipcRenderer.invoke(IPC.keyOpenPage) as Promise<void>,
   getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
   setStatusMark: (id, on) => ipcRenderer.invoke(IPC.setStatusMark, id, on) as Promise<void>,

@@ -1286,7 +1286,7 @@ database with `sqlite3` or DB Browser for SQLite.
 
 ## Window tools
 
-The desktop declares `list_windows`, `read_window_text`, `look_at_window` and `open_url` to the brain.
+The desktop declares `list_windows`, `read_window_text`, `look_at_window`, `open_url` and the file tools (see [Tidy a folder](#tidy-a-folder-with-no-expert-real-brain)) to the brain.
 These steps drive them with a contract-v1 test client; asking Scout "What windows do I have open?"
 is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
@@ -1711,6 +1711,29 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    researches; it is unchanged on purpose.
 5. Restart the brain: the chat resumes with the answers as text; no search results are replayed.
 
+## Tidy a folder with no expert _(real brain)_
+
+Folders come from Home → Settings → **Files Scout may use**; none by default. Automated:
+`files.test.ts`, `body-tools.test.ts`, `ipc/file-folders.test.ts`, `e2e/file-folders.spec.ts`.
+
+0. **Choose and remove.** Open Home → **Settings → Files Scout may use**. **Expected:** "No folders
+   yet." Press **Add folder**, pick your Downloads folder. **Expected:** its path is listed at once
+   (no Save needed) and is still there after restarting the app. Press **Remove** beside it.
+   **Expected:** the list is empty again, and the next file request in step 1 is refused.
+1. **No folder chosen.** Ask Scout to list your Downloads folder. **Expected:** it says no folder
+   is chosen and cannot touch files; nothing changes on disk.
+2. **List and read (with Downloads chosen).** Ask "what is in my Downloads?" then "what
+   is in the newest text file?". **Expected:** Scout lists names and sizes and reads the text with
+   no ask (Auto), with no expert started. A picture or an installer is described as binary, not shown.
+3. **Move and rename.** Ask Scout to put the PDFs in a `Documents` folder inside the chosen folder
+   and to rename one. **Expected:** each asks first (Ask); after Allow the files move. Asking it to
+   move onto a name that exists is refused and both files stay.
+4. **Outside the folder.** Ask Scout to read a file in another folder, or use `..` in a path.
+   **Expected:** refused in plain words.
+5. **Delete and overwrite.** Ask Scout to delete a file. **Expected:** it asks with only Allow and
+   Deny, and after Allow the file is in the Recycle Bin, restorable. Same for overwriting a file's
+   content. In Home, Permissions: these two say "Always asks" and cannot be set to Auto.
+
 ## Permissions _(real brain)_
 
 1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card
@@ -1826,7 +1849,7 @@ with a fake key; the real check against Anthropic is done by hand here.
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
    "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link (not on step 9) and the primary button; the side list (step 6 is "Bigger jobs") jumps only to steps you
+   link (not on step 9) and the primary button; the side list (step 6 is "Everyday jobs") jumps only to steps you
    have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
@@ -1847,11 +1870,23 @@ with a fake key; the real check against Anthropic is done by hand here.
 
 The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
-1. **Action:** on step 6 press **Set up Claude Code**. **Expected:** the stage words move on
+1. **Action:** on step 6 look at the page, then press **Connect Gmail** (and answer the Allow card).
+   **Expected:** the page reads "Scout does the everyday jobs" and lists five jobs ("Draft replies to
+   my inbox", "Plan my day around my calendar", "Research this and write me a summary", "Tidy this
+   folder", "Fix this code"); the word "Claude Code" appears nowhere yet. A job whose app is in the
+   registry has a **Connect** button; it reads "Connecting Gmail…" while the card is open, then
+   "Gmail is connected."; saying no shows "You said no, so nothing was added." and **Try Gmail again**.
+   The button is named after the registry entry found by searching the app's name (for example
+   Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
+   connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
+   Code" until the expert line is opened. Home's **Connections** page lists experts
+   under **FOR LONG JOBS**, each led by the kind of job ("Fix code and other long jobs") with the
+   product and version underneath.
+   Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
+   the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The page reads "For bigger jobs, Scout calls in an expert" and shows a
-   hand-off card. On Home's **Connections** page the **Experts** card lists Claude Code with its
+   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **FOR LONG JOBS** card lists Claude Code with its
    state; **Browse and add** offers more, and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are

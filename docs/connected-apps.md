@@ -174,7 +174,8 @@ flowchart LR
   there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
   (**Yes, remove** or **Keep**) before `remove_app`.
 - **Cards**: the list sits in a "Connected apps" card, the form in an "Add an app" card. Above
-  them an **Experts** card (`experts-group.tsx`) lists installed experts with a state chip (Ready,
+  them a **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led by the kind
+  of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip (Ready,
   Needs login, Update available) and a **Log in** or **Update** button; **Browse and add**
   (`browse-list.tsx`) lists what the registries offer, for experts and for apps, with an **Add**
   button. These go through `setup_overview`, `setup_expert` and `setup_app` (see

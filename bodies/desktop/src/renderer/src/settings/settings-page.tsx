@@ -7,6 +7,7 @@ import type { FormEvent } from 'react';
 import { Button, CONTROLS_CSS, SETTINGS_CSS } from '@tagalong/ui';
 import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
+import { FilesSection } from './files-section';
 import { KeySection } from './key-section';
 import { PrivacySection } from './privacy-section';
 import { SettingsUiContext } from './section';
@@ -16,7 +17,7 @@ import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: the Anthropic key, Privacy, Voice, Shortcuts, the browser. Main re-registers hotkeys on
+ * Sections in page order: the Anthropic key, Privacy, Files, Voice, Shortcuts, the browser. Main re-registers hotkeys on
  * save.
  */
 export function SettingsPage() {
@@ -87,6 +88,19 @@ export function SettingsPage() {
     );
   }
 
+  // Adding and removing a folder save at once (no Save press): the file tools read them live.
+  async function changeFolders(change: Promise<string[]>): Promise<void> {
+    try {
+      const fileFolders = await change;
+      setView((current) =>
+        current === null ? current : { ...current, settings: { ...current.settings, fileFolders } },
+      );
+    } catch (error) {
+      setStatus(String(error));
+      setStatusIsError(true);
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (view === null) return;
@@ -134,6 +148,8 @@ export function SettingsPage() {
       status={status}
       statusIsError={statusIsError}
       onSubmit={(event) => void save(event)}
+      onAddFolder={() => void changeFolders(window.tagalongHost.addFileFolder())}
+      onRemoveFolder={(folder) => void changeFolders(window.tagalongHost.removeFileFolder(folder))}
     />
   );
 }
@@ -149,6 +165,8 @@ export function SettingsFormView({
   status,
   statusIsError,
   onSubmit,
+  onAddFolder,
+  onRemoveFolder,
 }: {
   view: HostView;
   browserFolder: BrowserFolder | null;
@@ -156,6 +174,8 @@ export function SettingsFormView({
   status: string;
   statusIsError: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onAddFolder: () => void;
+  onRemoveFolder: (folder: string) => void;
 }) {
   const { settings } = view;
   return (
@@ -189,6 +209,11 @@ export function SettingsFormView({
           </div>
           <KeySection />
           <PrivacySection settings={settings} />
+          <FilesSection
+            folders={settings.fileFolders}
+            onAdd={onAddFolder}
+            onRemove={onRemoveFolder}
+          />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
