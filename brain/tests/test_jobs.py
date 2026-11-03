@@ -605,13 +605,12 @@ def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
     return Job(id, task, "C:/x", "default", state, "t0", "t1", parts=[part])
 
 
-def test_job_note_states_facts_and_trims_a_long_result():
+def test_job_note_states_facts_and_carries_the_report_whole():
     job = a_job("j1", "fix it", "done", "end_turn", "A" * 5000)
     note = job_note(job)
     for fact in ("j1", "fix it", "C:/x", "done", "end_turn"):
         assert fact in note
-    assert "A" * 4000 in note and "A" * 4001 not in note
-    assert note.endswith("[trimmed]")
+    assert "A" * 5000 in note and "[trimmed]" not in note  # the cap is the gate's (outputs.py)
 
 
 def test_job_note_without_a_result_or_reason():

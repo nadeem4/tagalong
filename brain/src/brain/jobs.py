@@ -26,6 +26,7 @@ from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, ac
 from brain.masking import mask_json
 from brain.memory import ActivityEntry, Job, JobPart, Memory
 from brain.offers import Offers
+from brain.outputs import OutputStore, preview
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
@@ -56,7 +57,6 @@ PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most thi
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
 TITLE_FALLBACK_CHARS = 80
-RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in the row
 
 
 class JobError(Exception):
@@ -109,7 +109,9 @@ class Jobs:
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         drop: Callable[[str, str], None] = lambda kind, key: None,
         on_timers_changed: Callable[[], None] = lambda: None,
+        outputs: OutputStore | None = None,
     ) -> None:
+        self._outputs = outputs  # caps the report a wake carries; None leaves it whole
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
@@ -608,7 +610,7 @@ class Jobs:
 
     def note(self, job: Job) -> str:
         """The wake text for a finished job: its row and the summary of its steps."""
-        return job_note(job, self.wake_facts(job.id))
+        return job_note(job, self.wake_facts(job.id), self._outputs)
 
     def activity_line(self, job_id: str) -> str:
         """One line about a job's steps for list_jobs; empty when it recorded none."""
@@ -944,9 +946,12 @@ def job_title(job: Job) -> str:
     return job.task.strip()[:TITLE_FALLBACK_CHARS]
 
 
-def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
+def job_note(
+    job: Job, facts: dict[str, str] | None = None, outputs: OutputStore | None = None
+) -> str:
     """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides.
-    Each extra fact (the activity summary) follows as its own block."""
+    Each extra fact (the activity summary) follows as its own block. A report over the preview
+    cap arrives as a preview with an output id, like any long tool result."""
     lines = [
         f"Job {job.id} ended.",
         f"Title: {job_title(job)}",
@@ -959,13 +964,12 @@ def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
         if ended:
             lines.append(f"Part: {max(ended, key=lambda p: p.ended_at).id}")
         lines.append("Parts: " + "; ".join(f"{p.id} {p.agent} {p.state}" for p in job.parts))
-    if job.reason:
-        lines.append(f"Reason: {job.reason}")
-    if job.result:
-        result = job.result[:RESULT_NOTE_CHARS]
-        if len(job.result) > RESULT_NOTE_CHARS:
-            result += "\n[trimmed]"
-        lines.append(f"Result:\n{result}")
+    newest = job.parts[-1] if job.parts else None
+    if newest and newest.reason:
+        lines.append(f"Reason: {newest.reason}")
+    if newest and newest.report:  # the stored row keeps the report whole
+        report = preview(outputs, "job_report", newest.report) if outputs else newest.report
+        lines.append(f"Result:\n{report}")
     for key, value in (facts or {}).items():
         lines.append(f"{key.capitalize()}:\n{value}")
     return "\n".join(lines)
