@@ -297,7 +297,16 @@ A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the 
 its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
-Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, start and end times and `parent_job` (the job a follow-up continued). Rows still `running` at brain start become `stopped` with reason `brain restarted`.
+Expert jobs (Claude Code hand-offs) live in two tables of the same file. `jobs` holds the job: id, task, folder, mode, state (`running`, `done`, `error`, `stopped`), start and end times, `parent_job` (the job a follow-up continued), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (kept for later slices; nothing writes them yet). `job_parts` holds one row per expert hand-off inside a job, keyed by job id and part id (`p1`, `p2`, ...): agent, task, state, reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, and start and end times. A job's state is recomputed whenever a part ends: `running` while any part runs, otherwise the outcome of the part that ended last. Rows still `running` at brain start become `stopped` with reason `brain restarted`, parts and jobs alike. A job from before parts existed opens as a closed job with one part, `p1`, carrying its steps, asks, report and times.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+erDiagram
+    jobs ||--|{ job_parts : "one per hand-off"
+    jobs ||--o{ job_activity : "one ordered log"
+    job_parts ||--o{ job_activity : "part, source"
+```
+
 When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-tools)).
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
@@ -426,7 +435,7 @@ so there is one gate and no second path.
 | `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
 | `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                            |
 | `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
-| `stop_job`         | `{"job": str}`                     | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 | `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only     |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
@@ -745,14 +754,21 @@ output and exit codes under Jobs and tools).
 
 ### Jobs and tools
 
-`Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
-[Permissions and asks](#permissions-and-asks)). `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
+`Jobs` (`jobs.py`) owns the running `ExpertRun`s, one per part (`_runs[job][part]`, with the
+activity logs and ask ids keyed the same way), and the rows of the `jobs` and `job_parts` tables
+(columns under [Permissions and asks](#permissions-and-asks)). `start()` checks the request and
+calls `_start_part`, the one place an expert run begins; it adds a part to the job and counts
+running parts against `max_running`. Callbacks (`permission`, `question`, `progress`, `quiet`,
+`end`) carry the part, so two parts of one job never share an ask. `tell_expert` and `stop_job`
+take an optional `part`: with several running parts `tell` must name one, and `stop` stops all
+of them unless one is named. The job's `JobId` carries `.part`. A wake about a job with more than
+one part names the part and its expert; `on_finished` fires only once no part is still running. `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
 override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_IDLE_S, quiet_s=TAGALONG_JOB_QUIET_MIN * 60)`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
 **One session per folder.** A `hand_off` without `continue_job` continues the expert's last
-finished session in that folder: `Memory.last_job_for(agent, folder)` returns the newest job of
-that expert that is not running and has a `session_id` (stopped and error jobs count; folders
+finished session in that folder: `Memory.last_part_for(agent, folder)` returns the newest job and
+part of that expert that is not running and has a `session_id` (stopped and error parts count; folders
 compare as paths, so case on Windows and a trailing slash do not matter). The job then starts as
 a follow-up of it: resume id, `parent_job`, and the same fallbacks to a fresh session (including
 `session is in use by another job` when a running job holds the session). The mode card is shown
@@ -772,15 +788,19 @@ with `why_fresh` one of `expert cannot reopen sessions`, `session could not be l
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
 never the chat; the expert's summary stays in `Job.result`, shown capped at 4,000 characters).
-`list_jobs` rows carry `expert` and `session_id_known` instead of the session id. The mode card
+`list_jobs` rows carry `parts`, each with `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
 
 **Activity log.** `job_activity.py` records what each running job did, so a body can show it
 later. `ExpertRun` forwards every ACP update of its session to `on_update` (through
 `ExpertRun._update`), but only after `begin`: a resumed session replays its old chat first, and
-that replay never reaches the log. `Jobs` creates one `JobActivity` per job when the row is
-inserted and ends it in `_end`; updates are keyed by the run found from the session id, so jobs
-sharing one adapter each get only their own steps.
+that replay never reaches the log. `Jobs` creates one `JobActivity` per part when the part starts
+and ends it in `_end`; updates are keyed by the run found from the session id, so jobs
+sharing one adapter each get only their own steps. All parts of a job write into one log: the
+`seq` counter continues from the job's highest (`Memory.max_seq`), each entry carries its `part`
+(and a `source`, empty for now), and the caps apply to the job as a whole. The wake summary
+(`activity_summary`) tags a step with its expert, `[gemini] make`, only when the job has more
+than one part, and keys a step's output by part and step id, since two experts can reuse an id.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -827,8 +847,9 @@ opt-in (Codex and Gemini untested) keeps the console text block, whose `console`
 stripped, so the page shows the same text, with no `exit`.
 
 **Serving the log.** Home reads it with the Home-only tool `job_activity` (it rides `call`, so the
-contract does not change). With `{job, after_rev}` it returns `{job, state, rev, entries, more,
-watch}`: the entries whose `rev` is above the cursor, in `rev` order, at most 500 (`more: true`
+contract does not change). With `{job, after_rev}` it returns `{job, title, state, started_at,
+ended_at, closed_at, parts, rev, entries, more, watch}`, where `parts` is `[{id, expert, state,
+reason, started_at, ended_at}]` and each entry also carries `part` and `source`: the entries whose `rev` is above the cursor, in `rev` order, at most 500 (`more: true`
 when cut). `rev` is the cursor to send next; a body that missed notices or reconnected sends
 `after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
 masked when written, so serving does no second pass. An unknown job is `invalid_params`; a job
@@ -947,15 +968,15 @@ flowchart TD
   H --> I[Scout decides: speak or stay silent]
 ```
 
-| Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                               |
-| -------------- | ----------- | ------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?}`. Returns JSON `{job, session, why_fresh, parent_job}`, or the plain reason it did not start                                       |
-| `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume |
-| `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note}`. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                             |
-| `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                             |
-| `list_jobs`    | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress, a one-line `summary` of its steps, Scout's `watch` list, `expert`, `parent_job` and `session_id_known` |
-| `stop_job`     | scout, home | change | `auto`                       | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`                                                                                                                |
-| `job_activity` | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                    |
+| Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                      |
+| -------------- | ----------- | ------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?}`. Returns JSON `{job, session, why_fresh, parent_job}`, or the plain reason it did not start                                                                                                              |
+| `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                        |
+| `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                   |
+| `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                    |
+| `list_jobs`    | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job` |
+| `stop_job`     | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                      |
+| `job_activity` | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                           |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,

@@ -28,7 +28,7 @@ from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs
-from brain.memory import KINDS, Hit, Memory, MemoryRefused
+from brain.memory import KINDS, Hit, JobPart, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
@@ -355,6 +355,34 @@ def timer_tools(
     ]
 
 
+def _part_arg(args: dict) -> dict:
+    """The optional `part` of tell_expert and stop_job, passed on only when given."""
+    part = args.get("part")
+    return {"part": part} if isinstance(part, str) and part else {}
+
+
+def _part_row(part: JobPart) -> dict:
+    """A part as list_jobs shows it. The session id is an opaque handle: Scout only needs to know
+    a follow-up can use it. Twenty full rows would flood Scout's context, so a result keeps its
+    start and a progress its tail."""
+    result, progress = part.report, part.progress
+    if result and len(result) > LIST_TEXT_CAP:
+        result = result[:LIST_TEXT_CAP] + "…"
+    if progress and len(progress) > LIST_TEXT_CAP:
+        progress = "…" + progress[-(LIST_TEXT_CAP - 1) :]
+    return {
+        "id": part.id,
+        "expert": part.agent,
+        "state": part.state,
+        "reason": part.reason,
+        "progress": progress,
+        "result": result,
+        "session_id_known": bool(part.session_id),
+        "started_at": part.started_at,
+        "ended_at": part.ended_at,
+    }
+
+
 def expert_rows(
     experts: list[InstalledExpert],
     can_resume: Callable[[str], bool | None] = lambda expert_id: None,
@@ -408,7 +436,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
     async def tell_expert(args: dict) -> str:
         _need_text("tell_expert", args, "job", "note")
         try:
-            jobs.tell(args["job"], args["note"])
+            jobs.tell(args["job"], args["note"], **_part_arg(args))
         except JobError as err:
             return str(err)
         return f"note queued for job {args['job']}"
@@ -428,21 +456,14 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             row = asdict(job)
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
-            # The session id is an opaque handle; Scout only needs to know a follow-up can use it.
-            row["session_id_known"] = bool(row.pop("session_id"))
-            row["expert"] = job.agent
-            # Twenty full rows would flood Scout's context: keep a result's start, a progress tail.
-            if row["result"] and len(row["result"]) > LIST_TEXT_CAP:
-                row["result"] = row["result"][:LIST_TEXT_CAP] + "…"
-            if row["progress"] and len(row["progress"]) > LIST_TEXT_CAP:
-                row["progress"] = "…" + row["progress"][-(LIST_TEXT_CAP - 1) :]
+            row["parts"] = [_part_row(p) for p in job.parts]
             rows.append(row)
         return json.dumps({"jobs": rows})
 
     async def stop_job(args: dict) -> str:
         _need_text("stop_job", args, "job")
         try:
-            await jobs.stop(args["job"])
+            await jobs.stop(args["job"], **_part_arg(args))
         except JobError as err:
             raise RpcError(ErrorCode.invalid_params, str(err)) from err
         return json.dumps({"job": args["job"], "stopping": True})
@@ -465,6 +486,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
 
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
     job_id = {"type": "string", "description": "The job id from hand_off or list_jobs."}
+    part_id = {"type": "string", "description": "Optional: one part of the job, from list_jobs."}
     return [
         (
             ToolSpec(
@@ -525,10 +547,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             ToolSpec(
                 "tell_expert",
                 "Send a follow-up note to a running Claude Code job. It is read after the "
-                "current step finishes.",
+                "current step finishes. When the job has several running parts, name one "
+                "with part (p1, p2, ...).",
                 {
                     "type": "object",
-                    "properties": {"job": job_id, "note": {"type": "string"}},
+                    "properties": {"job": job_id, "note": {"type": "string"}, "part": part_id},
                     "required": ["job", "note"],
                 },
                 scout,
@@ -574,9 +597,10 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         (
             ToolSpec(
                 "list_jobs",
-                "Recent expert jobs (the last 20), newest first, with expert, state, latest "
-                "progress, a one-line summary of its steps, your watch list for it, parent_job "
-                "(the job a follow-up continued) and session_id_known.",
+                "Recent expert jobs (the last 20), newest first. Each has its parts, one per "
+                "expert hand-off, with expert, state, latest progress, result and "
+                "session_id_known; plus a one-line summary of its steps, your watch list for "
+                "it and parent_job (the job a follow-up continued).",
                 {"type": "object", "properties": {}},
                 both,
                 effect="read",
@@ -586,8 +610,13 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         (
             ToolSpec(
                 "stop_job",
-                "Stop a running Claude Code job.",
-                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                "Stop a running Claude Code job: all its running parts, or only the one named "
+                "with part (p1, p2, ...).",
+                {
+                    "type": "object",
+                    "properties": {"job": job_id, "part": part_id},
+                    "required": ["job"],
+                },
                 both,
                 effect="change",
                 default_mode="auto",

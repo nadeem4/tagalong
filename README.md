@@ -168,7 +168,7 @@ moment") and it passes the note on. A new hand-off in a folder you already worke
 expert continues its last session there by itself, and Scout says so; ask Scout to start over for a
 clean one. The expert reopens the session when it can, and Scout says so when it starts fresh
 instead.
-The brain also records each job's steps (commands, edits, messages, plan) in a masked, size-capped
+A job holds one part per expert hand-off, so Scout can have more than one expert work on the same job (jobs from before open as a job with one part). The brain also records each job's steps (commands, edits, messages, plan) in a masked, size-capped
 log. Home's Jobs page shows it as a terminal-style page (with Scout's own short list of what it expects from the job, read-only, under the title), and while a job runs the bubble shows one quiet line with its current step (for example `Claude Code: npm test`).
 
 **Scout talks.** Scout reads its answers aloud, so you can look away. With the Voice setting
