@@ -133,7 +133,7 @@ describe('JobsPanel', () => {
     );
   });
 
-  it('shows Scout’s result as Markdown, and the part report when Scout wrote none', async () => {
+  it('shows Scout’s result as Markdown', async () => {
     const written: JobRow = { ...DONE, scoutResult: 'Notes are **ready**' };
     renderPanel(createFakeHostBridge({ jobs: [written] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));
