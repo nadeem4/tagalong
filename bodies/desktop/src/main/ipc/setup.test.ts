@@ -44,6 +44,27 @@ describe('setup IPC', () => {
     expect(overview.browseExperts[0]?.id).toBe('codex-acp');
   });
 
+  it('setupOverview passes a query on, and only a string one', async () => {
+    const { invoke, calls } = setup(() => text(OVERVIEW));
+    await invoke(IPC.setupOverview);
+    await invoke(IPC.setupOverview, 'gmail');
+    await expect(invoke(IPC.setupOverview, 5)).rejects.toThrow();
+    expect(calls).toEqual([
+      ['setup_overview', {}],
+      ['setup_overview', { query: 'gmail' }],
+    ]);
+  });
+
+  it('setupApp passes the search query the app was found with', async () => {
+    const { invoke, calls } = setup(() => text({}));
+    await invoke(IPC.setupApp, 'acme/cloud', false, 'gmail');
+    await invoke(IPC.setupApp, 'acme/cloud', false);
+    expect(calls).toEqual([
+      ['setup_app', { id: 'acme/cloud', approved: false, query: 'gmail' }],
+      ['setup_app', { id: 'acme/cloud', approved: false }],
+    ]);
+  });
+
   it('a brain error maps to the offline failure', async () => {
     const { invoke } = setup(() => Promise.reject(new BrainOffline()));
     await expect(invoke(IPC.setupOverview)).rejects.toThrow(/offline/);

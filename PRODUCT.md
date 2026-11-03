@@ -84,6 +84,7 @@ its result.
 - Scout can search the web and read pages itself (Anthropic's own web tools, shown in Home's
   permissions and switchable Off). Each search costs a cent against the daily limit; when the limit
   stops a task Scout says so plainly. It never sends you to an expert for that.
+- The first-run tour and Home speak of jobs, not products: the tour's step six lists everyday jobs with a one-click Connect for the app each needs, and "Claude Code" shows only behind the optional line "For long jobs, Scout can also use an expert". Home lists experts by the kind of job, the product underneath.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,

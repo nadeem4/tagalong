@@ -1849,7 +1849,7 @@ with a fake key; the real check against Anthropic is done by hand here.
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
    "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link (not on step 9) and the primary button; the side list (step 6 is "Bigger jobs") jumps only to steps you
+   link (not on step 9) and the primary button; the side list (step 6 is "Everyday jobs") jumps only to steps you
    have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
@@ -1870,11 +1870,23 @@ with a fake key; the real check against Anthropic is done by hand here.
 
 The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
-1. **Action:** on step 6 press **Set up Claude Code**. **Expected:** the stage words move on
+1. **Action:** on step 6 look at the page, then press **Connect Gmail** (and answer the Allow card).
+   **Expected:** the page reads "Scout does the everyday jobs" and lists five jobs ("Draft replies to
+   my inbox", "Plan my day around my calendar", "Research this and write me a summary", "Tidy this
+   folder", "Fix this code"); the word "Claude Code" appears nowhere yet. A job whose app is in the
+   registry has a **Connect** button; it reads "Connecting Gmail…" while the card is open, then
+   "Gmail is connected."; saying no shows "You said no, so nothing was added." and **Try Gmail again**.
+   The button is named after the registry entry found by searching the app's name (for example
+   Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
+   connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
+   Code" until the expert line is opened. Home's **Connections** page lists experts
+   under **FOR LONG JOBS**, each led by the kind of job ("Fix code and other long jobs") with the
+   product and version underneath.
+   Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
+   the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The page reads "For bigger jobs, Scout calls in an expert" and shows a
-   hand-off card. On Home's **Connections** page the **Experts** card lists Claude Code with its
+   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **FOR LONG JOBS** card lists Claude Code with its
    state; **Browse and add** offers more, and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are

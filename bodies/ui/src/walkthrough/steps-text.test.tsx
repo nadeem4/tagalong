@@ -77,7 +77,7 @@ describe('StepThree', () => {
       expect(item).toHaveTextContent(PROMPTS[index] ?? '');
     });
     expect(
-      screen.getByText(/Hands it to Claude Code and tells you when it’s done/),
+      screen.getByText(/Hands it to an expert and tells you when it’s done/),
     ).toBeInTheDocument();
   });
 

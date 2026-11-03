@@ -29,7 +29,7 @@ export const MOMENTS: readonly Moment[] = [
   {
     where: 'A bug in your project',
     ask: 'Fix this failing test',
-    outcome: 'Hands it to Claude Code and tells you when it’s done.',
+    outcome: 'Hands it to an expert and tells you when it’s done.',
   },
   {
     where: 'Anywhere',

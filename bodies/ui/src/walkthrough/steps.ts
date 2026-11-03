@@ -17,7 +17,7 @@ export const STEPS: readonly StepInfo[] = [
   { id: 3, title: 'What to ask', skippable: true },
   { id: 4, title: 'Asking', skippable: true },
   { id: 5, title: 'Voice', skippable: true },
-  { id: 6, title: 'Bigger jobs', skippable: true },
+  { id: 6, title: 'Everyday jobs', skippable: true },
   { id: 7, title: 'Browser', skippable: true },
   { id: 8, title: 'You’re in charge', skippable: true },
   { id: 9, title: 'API key', skippable: false },

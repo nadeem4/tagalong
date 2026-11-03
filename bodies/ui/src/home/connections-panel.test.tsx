@@ -333,7 +333,25 @@ describe('ConnectionsPanel groups', () => {
   it('shows the Apps and Experts groups', async () => {
     await renderPanel(withSetup({ experts: [{ ...CLAUDE, state: 'ready' }] }));
     expect(screen.getByRole('region', { name: 'Connected apps' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Experts' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'For long jobs' })).toBeInTheDocument();
+  });
+
+  it('an expert row leads with the kind of job and keeps the product underneath', async () => {
+    await renderPanel(
+      withSetup({
+        experts: [
+          { ...CLAUDE, state: 'ready' },
+          { ...CLAUDE, id: 'other', name: 'Beta', state: 'ready' },
+        ],
+      }),
+    );
+    const claude = screen.getByRole('region', { name: 'Claude Code' });
+    expect(within(claude).getByText('Fix code and other long jobs')).toBeVisible();
+    expect(within(claude).getByText('Claude Code · Version 2.0')).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Beta' })).getByText('Long, many-step jobs'),
+    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'FOR LONG JOBS' })).toBeVisible();
   });
 
   it('each expert row shows its state and the action that fits it', async () => {
@@ -481,7 +499,7 @@ describe('ConnectionsPanel groups', () => {
     const bridge = createFakeHostBridge({ listFails: 'brain offline' });
     await renderPanel(bridge);
     expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
-    expect(screen.queryByRole('region', { name: 'Experts' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'For long jobs' })).toBeNull();
   });
 
   it('long names and many entries stay inside the page', async () => {

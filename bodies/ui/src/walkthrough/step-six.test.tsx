@@ -1,8 +1,12 @@
-/** Tests for step 6: setting up Claude Code from the tour, and the hand-off preview. */
+/**
+ * Tests for step 6: the everyday jobs and their Connect, and Claude Code's setup behind the
+ * optional expert line.
+ */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { SetupOverview } from '../shapes';
+import { JOB_KINDS } from '../jobs-kinds';
 import { StepSix } from './step-six';
 import { makeWalkthroughHost } from './test-host';
 
@@ -21,16 +25,34 @@ const READY: SetupOverview = {
   browseExperts: [],
 };
 
-function hostWith(overview: SetupOverview) {
+const EXPERT_LINE = 'For long jobs, Scout can also use an expert';
+const GMAIL = { id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'd' };
+
+/** Renders the step and opens the optional expert line, where Claude Code's setup lives. */
+async function renderOpen(host: ReturnType<typeof hostWith>) {
+  const view = render(<StepSix host={host} />);
+  fireEvent.click(await screen.findByRole('button', { name: EXPERT_LINE }));
+  return view;
+}
+
+/** The registry answers a search by name, as the brain does; no query is its unrelated first page. */
+function hostWith(overview: SetupOverview, registry: SetupOverview['browseApps'] = []) {
   const host = makeWalkthroughHost();
-  host.setupOverview.mockResolvedValue(overview);
+  host.setupOverview.mockImplementation((query?: string) =>
+    Promise.resolve({
+      ...overview,
+      browseApps: registry.filter(
+        (a) => query !== undefined && a.name.toLowerCase().includes(query),
+      ),
+    }),
+  );
   return host;
 }
 
 describe('StepSix', () => {
   it('Set up Claude Code calls setupExpert once, even when pressed twice', async () => {
     const host = hostWith(EMPTY);
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     const button = await screen.findByRole('button', { name: 'Set up Claude Code' });
     fireEvent.click(button);
     fireEvent.click(button);
@@ -44,7 +66,7 @@ describe('StepSix', () => {
     host.setupExpert.mockReturnValue(
       new Promise<{ state?: string }>((resolve) => (finish = () => resolve({}))),
     );
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     const button = await screen.findByRole('button', { name: 'Set up Claude Code' });
     fireEvent.click(button);
     expect(button).toBeDisabled();
@@ -53,14 +75,14 @@ describe('StepSix', () => {
   });
 
   it('says the press is the OK, Tagalong’s own Node included', async () => {
-    render(<StepSix host={hostWith(EMPTY)} />);
+    await renderOpen(hostWith(EMPTY));
     await screen.findByRole('button', { name: 'Set up Claude Code' });
     expect(screen.getByText(/own copy of Node/)).toBeVisible();
   });
 
   it('sets nothing up until the button is pressed; the tour’s Next skips it', async () => {
     const host = hostWith(EMPTY);
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     await screen.findByRole('button', { name: 'Set up Claude Code' });
     expect(host.setupExpert).not.toHaveBeenCalled();
   });
@@ -70,7 +92,7 @@ describe('StepSix', () => {
       ...EMPTY,
       progress: { expert: 'claude-acp', stage: 'node', percent: 40 },
     });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     expect(await screen.findByText(/Getting Tagalong’s own Node/)).toBeVisible();
     expect(screen.getByText(/40%/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Set up Claude Code' })).not.toBeInTheDocument();
@@ -83,7 +105,7 @@ describe('StepSix', () => {
       changed = handler;
       return () => undefined;
     });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     await screen.findByRole('button', { name: 'Set up Claude Code' });
     host.setupOverview.mockResolvedValue(READY);
     act(() => changed('setup'));
@@ -95,7 +117,7 @@ describe('StepSix', () => {
       ...READY,
       experts: [{ ...READY.experts[0]!, state: 'needs_login' }],
     });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
     await waitFor(() => expect(host.setupExpert).toHaveBeenCalledWith('claude-acp'));
   });
@@ -111,7 +133,7 @@ describe('StepSix', () => {
       changed = handler;
       return () => undefined;
     });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
     expect(await screen.findByText(/Finish logging in in the window that opened/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Log in to Claude Code' })).toBeNull();
@@ -130,14 +152,14 @@ describe('StepSix', () => {
       host.setupOverview.mockResolvedValue(READY);
       return Promise.resolve({ state: 'logged_in' });
     });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
     expect(await screen.findByText(/Claude Code is set up/)).toBeVisible();
   });
 
   it('a failed install shows its reason in the step’s words and a retry', async () => {
     const host = hostWith({ ...EMPTY, failed: { expert: 'claude-acp', error: 'integrity' } });
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     expect(await screen.findByText(/checksum/)).toBeVisible();
     expect(screen.queryByText('integrity')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
@@ -147,7 +169,7 @@ describe('StepSix', () => {
   it('a refused press shows a retry', async () => {
     const host = hostWith(EMPTY);
     host.setupExpert.mockRejectedValue(new Error('no_build'));
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     fireEvent.click(await screen.findByRole('button', { name: 'Set up Claude Code' }));
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeVisible();
   });
@@ -155,36 +177,107 @@ describe('StepSix', () => {
   it('says so when the brain cannot answer', async () => {
     const host = makeWalkthroughHost();
     host.setupOverview.mockRejectedValue(new Error('offline'));
-    render(<StepSix host={host} />);
+    await renderOpen(host);
     await waitFor(() =>
       expect(screen.getByText(/Scout’s brain is not running/)).toBeInTheDocument(),
     );
   });
 
   it('shows no npm command anywhere and never claims the login works', async () => {
-    const { container } = render(<StepSix host={hostWith(EMPTY)} />);
+    const { container } = await renderOpen(hostWith(EMPTY));
     await screen.findByRole('button', { name: 'Set up Claude Code' });
     expect(container.textContent).not.toMatch(/npm install|logged in|login works|signed in/i);
     expect(screen.getByText(/runs on your own Claude login, not the API key/)).toBeInTheDocument();
   });
 
-  it('heading is about bigger jobs and shows the hand-off preview', async () => {
-    render(<StepSix host={hostWith(EMPTY)} />);
+  it('heading is about everyday jobs and shows the hand-off preview', async () => {
+    await renderOpen(hostWith(EMPTY));
     await screen.findByRole('button', { name: 'Set up Claude Code' });
-    expect(screen.getByText('Bigger jobs')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'For bigger jobs, Scout calls in an expert' }),
-    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Scout does the everyday jobs' })).toBeVisible();
     expect(screen.getByText('Hand this to Claude Code?')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getAllByRole('listitem')).toHaveLength(JOB_KINDS.length + 3);
   });
 
   it('says more experts are coming, without a list of future ones', async () => {
-    render(<StepSix host={hostWith(EMPTY)} />);
+    await renderOpen(hostWith(EMPTY));
     await screen.findByRole('button', { name: 'Set up Claude Code' });
     expect(screen.getByText('More experts are coming.')).toBeInTheDocument();
     for (const gone of ['Gemini CLI', 'Codex', 'Coming soon', 'Later']) {
       expect(screen.queryByText(gone, { exact: false })).not.toBeInTheDocument();
     }
+  });
+
+  it('lists the everyday jobs and never names Claude Code until the expert line is opened', async () => {
+    const { container } = render(<StepSix host={hostWith(EMPTY)} />);
+    await screen.findByRole('button', { name: EXPERT_LINE });
+    for (const job of JOB_KINDS) expect(screen.getByText(job.label)).toBeVisible();
+    expect(container.textContent).not.toMatch(/Claude Code/);
+    expect(screen.getByRole('button', { name: EXPERT_LINE })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: EXPERT_LINE }));
+    expect(screen.getByRole('button', { name: EXPERT_LINE })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('heading', { name: 'Claude Code' })).toBeVisible();
+  });
+
+  it('Connect runs the host call for the app the job needs, with progress', async () => {
+    const host = hostWith(EMPTY, [GMAIL]);
+    let finish: () => void = () => undefined;
+    host.setupApp.mockReturnValue(new Promise<{ state?: string }>((r) => (finish = () => r({}))));
+    render(<StepSix host={host} />);
+    const button = await screen.findByRole('button', { name: 'Connect Gmail' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(host.setupApp).toHaveBeenCalledTimes(1);
+    expect(host.setupApp).toHaveBeenCalledWith('io.example/gmail', 'gmail');
+    expect(await screen.findByText('Connecting Gmail…')).toBeVisible();
+    host.setupOverview.mockResolvedValue({
+      ...EMPTY,
+      apps: [{ id: 'a1', name: 'Gmail', state: 'connected' }],
+    });
+    await act(async () => finish());
+    expect(await screen.findByText('Gmail is connected.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Connect Gmail' })).toBeNull();
+  });
+
+  it('a refused Connect says so in plain words and offers it again', async () => {
+    const host = hostWith(EMPTY, [GMAIL]);
+    host.setupApp.mockRejectedValue(new Error('denied'));
+    render(<StepSix host={host} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect Gmail' }));
+    expect(await screen.findByText(/nothing was added/)).toBeVisible();
+    expect(screen.queryByText('denied')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Try Gmail again' })).toBeEnabled();
+  });
+
+  it('asks the registry once per job app, by name, and names the button after the match', async () => {
+    const host = hostWith(EMPTY, [
+      { id: 'io.example/cal', name: 'Fancy Calendar', version: '1', description: 'd' },
+    ]);
+    render(<StepSix host={host} />);
+    expect(await screen.findByRole('button', { name: 'Connect Fancy Calendar' })).toBeVisible();
+    const queries = host.setupOverview.mock.calls.map(([q]) => q).filter((q) => q !== undefined);
+    expect(queries.sort()).toEqual(['calendar', 'gmail']);
+  });
+
+  it('an app that is saved but not signed in says to finish in Home, not connected', async () => {
+    const host = hostWith({
+      ...EMPTY,
+      apps: [{ id: 'a1', name: 'Gmail', state: 'needs_sign_in' }],
+    });
+    render(<StepSix host={host} />);
+    expect(await screen.findByText('Finish Gmail in Home.')).toBeVisible();
+    expect(screen.queryByText('Gmail is connected.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Connect/ })).toBeNull();
+  });
+
+  it('an app the registry does not have shows no Connect button', async () => {
+    render(<StepSix host={hostWith(EMPTY)} />);
+    await screen.findByRole('button', { name: EXPERT_LINE });
+    expect(screen.queryByRole('button', { name: /^Connect/ })).toBeNull();
   });
 });

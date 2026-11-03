@@ -52,6 +52,8 @@ export interface FakeBrain {
   expertSetups: string[];
   /** The `approved` flag of each setup_expert call: the tour's press must send true. */
   expertApprovals: unknown[];
+  /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
+  appSetups: string[];
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
   /** What the desktop asked of the brain's ears and mouth, in order. */
@@ -274,7 +276,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const stops: string[] = [];
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
+  const appSetups: string[] = [];
   let expertInstalled = false;
+  let gmailConnected = false;
   const limits: number[] = [];
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
@@ -565,6 +569,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             filter?: string;
             usd?: number;
             approved?: boolean;
+            query?: string;
           };
         };
         let value: unknown = {};
@@ -654,13 +659,21 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                   },
                 ]
               : [],
-            apps: [],
+            apps: gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : [],
             browse_experts: [],
-            browse_apps: [],
+            // The registry answers a search by name; no query is a first page without Gmail.
+            browse_apps:
+              gmailConnected || !String(params.input?.query ?? '').includes('gmail')
+                ? []
+                : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             stale: false,
             progress: null,
             failed: null,
           };
+        } else if (params.tool === 'setup_app') {
+          appSetups.push(String(params.input?.id));
+          gmailConnected = true;
+          notify('changed', { what: 'setup' });
         } else if (params.tool === 'setup_expert') {
           expertSetups.push(String(params.input?.id));
           expertApprovals.push(params.input?.approved);
@@ -744,6 +757,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     stops,
     expertSetups,
     expertApprovals,
+    appSetups,
     removedPreferences,
     voice,
     pushActivity: (job, entry) => {

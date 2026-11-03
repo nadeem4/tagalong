@@ -52,6 +52,11 @@ export type WalkthroughHost = Pick<
    * Rejects with a short token when the brain refused it.
    */
   setupExpert(id: string): Promise<{ state?: string }>;
+  /**
+   * Connects an app by its registry id and the search query that found it; the brain shows its Allow card. Resolves once the app is
+   * saved. Rejects with a short token when it was refused or failed (for example `denied`).
+   */
+  setupApp(id: string, query: string): Promise<{ state?: string }>;
   /** Marks the tour seen and closes its window. Only Finish and Skip (with a key) call it. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;
