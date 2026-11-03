@@ -728,7 +728,13 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "One part of a job: the expert's full report, for the job page.",
                 {
                     "type": "object",
-                    "properties": {"job": job_id, "part": part_id},
+                    "properties": {
+                        "job": job_id,
+                        "part": {
+                            "type": "string",
+                            "description": "The part id (p1, p2...) from list_jobs.",
+                        },
+                    },
                     "required": ["job", "part"],
                 },
                 frozenset({"home"}),

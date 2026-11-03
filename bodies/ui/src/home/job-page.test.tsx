@@ -4,7 +4,7 @@
  * Jump to latest pill, and the spinner's reduced-motion switch.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HostBridgeProvider, type JobActivityEntry, type JobRow } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
@@ -293,7 +293,28 @@ describe('JobPage tabs', () => {
         }),
       );
     renderPage(bridge);
-    expect(await screen.findByText('files app')).toBeInTheDocument();
-    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    const log = await screen.findByRole('log');
+    expect(await within(log).findByText('files app')).toBeInTheDocument();
+    expect(within(log).getByText('Claude Code')).toBeInTheDocument();
+  });
+  it('keeps opened reports and the log mounted across a tab switch', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [JOB],
+      activity: { j1: [step(1)] },
+      reports: { 'j1/p1': 'Kept report' },
+    });
+    bridge.jobActivity = () => Promise.resolve(page({ state: 'running', ended_at: null }));
+    renderPage(bridge);
+    const log = await screen.findByRole('log');
+    fireEvent.click(screen.getByRole('tab', { name: 'Reports' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Claude Code/ }));
+    expect(await screen.findByText('Kept report')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Reports' }));
+    expect(screen.getByText('Kept report')).toBeVisible();
+    expect(bridge.reportCalls).toEqual([['j1', 'p1']]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
+    expect(screen.getByRole('log')).toBe(log);
+    expect(screen.getAllByRole('tabpanel', { hidden: true })).toHaveLength(3);
   });
 });

@@ -5,8 +5,9 @@
  */
 import { Fragment, type ReactNode } from 'react';
 
+// A link label may not hold `[`, so a line of unclosed brackets scans in linear time.
 const INLINE =
-  /(`[^`\n]+`)|(!?\[[^\]\n]*\]\((?:[^()\s]|\([^()\s]*\))*\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)/g;
+  /(`[^`\n]+`)|(!?\[[^[\]\n]*\]\((?:[^()\s]|\([^()\s]*\))*\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)/g;
 const LINK = /^(!?)\[([^\]]*)\]\(((?:[^()\s]|\([^()\s]*\))*)\)$/;
 
 function inline(text: string): ReactNode[] {

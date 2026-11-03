@@ -94,6 +94,12 @@ describe('SafeMarkdown', () => {
     expect(performance.now() - start).toBeLessThan(2000);
   });
 
+  it('renders 200 KB of unclosed brackets on one line in under 2 s', () => {
+    const start = performance.now();
+    render(<SafeMarkdown text={'['.repeat(200_000)} />);
+    expect(performance.now() - start).toBeLessThan(2000);
+  });
+
   it('never uses dangerouslySetInnerHTML', () => {
     const source = readFileSync(join(import.meta.dirname, 'safe-markdown.tsx'), 'utf8');
     expect(source).not.toMatch(/dangerously/i);

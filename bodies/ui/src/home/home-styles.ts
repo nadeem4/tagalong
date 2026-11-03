@@ -190,6 +190,7 @@ export const HOME_CSS = `
 .job-tabs__tab:focus-visible, .job-report__head:focus-visible, .job-overview__link:focus-visible {
   outline: 2px solid ${t.color.link}; outline-offset: 2px; border-radius: ${t.radius.field}px;
 }
+.job-page__frame[hidden], .job-page__panel[hidden] { display: none; }
 .job-page__panel { display: flex; flex-direction: column; gap: ${t.space.xl}px; min-width: 0; }
 .job-overview { display: flex; flex-direction: column; gap: ${t.space.xxl}px; }
 .job-overview__h { margin: 0 0 ${t.space.md}px; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }

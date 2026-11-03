@@ -526,9 +526,10 @@ class Jobs:
 
     def part_report(self, job_id: str, part: str) -> str | None:
         """One part's report for the job page's Reports tab (masked when it was saved)."""
-        if self._memory.get_job(job_id) is None:
+        job = self._memory.get_job(job_id)
+        if job is None:
             raise JobError(f"no job {job_id}")
-        for p in self._memory.parts_of(job_id):
+        for p in job.parts:
             if p.id == part:
                 return p.report
         raise JobError(f"no part {part} in job {job_id}")

@@ -177,39 +177,44 @@ export function JobPage({ job, onBack }: { job: JobRow; onBack: () => void }) {
       <JobTabs tabs={TABS} selected={tab} onSelect={setTab} />
       <div
         role="tabpanel"
-        id={panelId(tab)}
-        aria-labelledby={tabId(tab)}
-        className={tab === 'activity' ? 'job-page__frame' : 'job-page__panel'}
+        id={panelId('overview')}
+        aria-labelledby={tabId('overview')}
+        hidden={tab !== 'overview'}
+        className="job-page__panel"
       >
-        {tab === 'overview' && (
-          <OverviewTab
-            state={log.state}
-            result={log.result ?? job.scoutResult}
-            parts={parts}
-            entries={log.entries}
-            startedAt={startedAt}
-            endedAt={endedAt}
-            now={now}
-            onReports={() => setTab('reports')}
-          />
+        <OverviewTab
+          state={log.state}
+          result={log.result ?? job.scoutResult}
+          parts={parts}
+          entries={log.entries}
+          startedAt={startedAt}
+          endedAt={endedAt}
+          now={now}
+          onReports={() => setTab('reports')}
+        />
+      </div>
+      <div
+        role="tabpanel"
+        id={panelId('activity')}
+        aria-labelledby={tabId('activity')}
+        hidden={tab !== 'activity'}
+        className="job-page__frame"
+      >
+        <JobLog entries={log.entries} now={now} parts={parts} logRef={logRef} onScroll={onScroll} />
+        {!following && (
+          <button type="button" className="job-page__jump" onClick={jumpToLatest}>
+            Jump to latest
+          </button>
         )}
-        {tab === 'activity' && (
-          <>
-            <JobLog
-              entries={log.entries}
-              now={now}
-              parts={parts}
-              logRef={logRef}
-              onScroll={onScroll}
-            />
-            {!following && (
-              <button type="button" className="job-page__jump" onClick={jumpToLatest}>
-                Jump to latest
-              </button>
-            )}
-          </>
-        )}
-        {tab === 'reports' && <ReportsTab job={job.id} parts={parts} now={now} />}
+      </div>
+      <div
+        role="tabpanel"
+        id={panelId('reports')}
+        aria-labelledby={tabId('reports')}
+        hidden={tab !== 'reports'}
+        className="job-page__panel"
+      >
+        <ReportsTab job={job.id} parts={parts} now={now} />
       </div>
     </>
   );
