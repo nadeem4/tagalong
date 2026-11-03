@@ -455,6 +455,10 @@ class ExpertRun:
         self._grant = await self._bridge.grant(self._job_id or "", self.apps)
         return [self._grant.descriptor]
 
+    @property
+    def has_grant(self) -> bool:
+        return self._grant is not None
+
     async def keep_apps(self, kept: Sequence[str]) -> None:
         """Narrow the granted apps to the kept ones (the person's Send); none kept drops the
         bridge, so the session's token stops working before the expert is given its task."""
@@ -463,6 +467,7 @@ class ExpertRun:
             return
         if self.apps:
             self._grant.apps = self.apps
+            self._grant.sent = True
         else:
             await self.revoke_apps()
 

@@ -2709,3 +2709,25 @@ async def test_a_scouts_follow_up_with_apps_shows_the_card_though_a_preference_c
     assert asks.opened[1]["input"]["apps"] == [{"id": "lin", "name": "Lin"}]
     [row] = hand_off_rows(rig)
     assert row.decided_by == "person" and row.input["apps"] == ["lin"]
+
+
+async def test_an_expert_that_cannot_take_apps_refuses_before_the_card(make_rig, monkeypatch):
+    monkeypatch.setenv("FAKE_ACP_NO_HTTP", "1")
+    rig = apps_rig(make_rig, Answer("Plan"))
+    with pytest.raises(JobError, match="can.t take connected apps"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert rig.asks.opened == [] and rig.memory.list_jobs() == []
+
+
+async def test_a_timeout_at_the_card_with_apps_revokes_the_grant(make_rig):
+    timeout = RpcError(ErrorCode.timeout, "nobody answered")
+    rig = apps_rig(make_rig, timeout)
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert len(rig.bridge.revoked) == 1 and rig.memory.list_jobs() == []
+
+
+async def test_send_marks_the_grant_sent(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan"))
+    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
+    assert rig.bridge.grants[0].sent is True

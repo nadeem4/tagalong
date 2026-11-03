@@ -855,7 +855,9 @@ its task. Choosing a mode is Send, and Send is the approval for the kept apps: n
 start, while a risky tool call still asks through the bridge. An answer without `apps` keeps all.
 The Approvals row for the hand-off (written whenever apps were on the card) has
 `input.apps` set to the kept ids. A Scout follow-up on a wake never skips the card when it carries
-apps, even if a preference covers hand-offs.
+apps, even if a preference covers hand-offs. An expert that cannot take http MCP servers (or a
+brain with no bridge) is refused before the card ("this expert can't take connected apps"). The
+grant's `sent` flag is set by `keep_apps`; until then the bridge lists tools but refuses calls.
 
 - **One server, loopback only.** `ExpertApps` starts one HTTP MCP server (streamable, stateless,
   JSON replies) on `127.0.0.1` at a random port, the first time a grant is asked for. Each grant

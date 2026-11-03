@@ -348,6 +348,9 @@ class Jobs:
                 modes = await run.start(path, resume=resume)
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
+            if apps and not run.has_grant:
+                # No bridge or no http MCP: the card would promise apps the expert can't reach.
+                raise JobError("this expert can't take connected apps")
             by_name = {m.name: m.id for m in modes}
             mode_id = None
             # The chain runs only when the earlier mode can be reused, so a Scout row always

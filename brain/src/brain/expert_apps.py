@@ -49,6 +49,8 @@ class Grant:
     token: str
     descriptor: HttpMcpServer
     manager: StreamableHTTPSessionManager | None = None
+    # Set when the person sends the hand-off card; until then the token lists but never calls.
+    sent: bool = False
     _stop: asyncio.Event = field(default_factory=asyncio.Event)
     _task: asyncio.Task | None = None
 
@@ -169,6 +171,8 @@ class ExpertApps:
                 content=[types.TextContent(type="text", text=text)], is_error=is_error
             )
 
+        if not grant.sent:
+            return reply("Not available yet: the person has not sent this job.", True)
         # A name outside the grant is simply not there, whatever app it belongs to.
         if params.name not in {s.name for s in self._specs(grant)}:
             return reply(f"No tool named {params.name}.", True)

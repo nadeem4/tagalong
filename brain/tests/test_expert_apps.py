@@ -120,6 +120,7 @@ async def Client(descriptor, headers):  # noqa: N802
 
 async def test_only_the_chosen_apps_are_listed(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         names = sorted(t.name for t in (await s.list_tools()).tools)
     assert names == ["lin__create_issue", "lin__list_issues"]
@@ -127,6 +128,7 @@ async def test_only_the_chosen_apps_are_listed(rig):
 
 async def test_a_tool_of_another_app_is_not_found(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         out = await s.call_tool("mail__read_inbox", {})
     assert out.is_error
@@ -136,6 +138,7 @@ async def test_a_tool_of_another_app_is_not_found(rig):
 
 async def test_a_wrong_or_missing_token_is_refused(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with httpx2.AsyncClient() as http:
         for auth in ({"Authorization": "Bearer nope"}, {}):
             r = await http.post(grant.descriptor.url, headers=auth, json={})
@@ -145,6 +148,7 @@ async def test_a_wrong_or_missing_token_is_refused(rig):
 async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
     rig.memory.set_permission_mode("lin__list_issues", "auto")
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         out = await s.call_tool("lin__list_issues", {"q": "x"})
     text = out.content[0].text
@@ -156,6 +160,7 @@ async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
 
 async def test_a_change_tool_asks_and_the_approval_row_names_the_job(rig):
     grant = await rig.bridge.grant("job7", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         out = await s.call_tool("lin__create_issue", {"title": "t"})
     assert not out.is_error
@@ -168,6 +173,7 @@ async def test_a_change_tool_asks_and_the_approval_row_names_the_job(rig):
 
 async def test_an_ask_says_what_the_expert_wants_and_for_which_job(rig):
     grant = await rig.bridge.grant("job7", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         await s.call_tool("lin__create_issue", {"title": "t"})
     [text] = rig.asks.texts
@@ -176,6 +182,7 @@ async def test_an_ask_says_what_the_expert_wants_and_for_which_job(rig):
 
 async def test_a_non_ascii_authorization_header_is_a_401(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with httpx2.AsyncClient() as http:
         r = await http.post(
             grant.descriptor.url, headers={"Authorization": "Bearer café".encode()}, json={}
@@ -189,6 +196,7 @@ async def test_a_long_result_is_capped_without_an_output_id(tmp_path):
         rig.memory.set_permission_mode("lin__list_issues", "auto")
         rig.apps.reply = "x" * 500
         grant = await rig.bridge.grant("job1", ["lin"])
+        grant.sent = True  # the person has sent the card
         async with Client(grant.descriptor, headers_of(grant)) as s:
             out = await s.call_tool("lin__list_issues", {})
         text = out.content[0].text
@@ -203,6 +211,7 @@ async def test_a_refused_ask_never_runs_the_tool(tmp_path):
     rig = Rig(tmp_path, answer="deny")
     try:
         grant = await rig.bridge.grant("job1", ["lin"])
+        grant.sent = True  # the person has sent the card
         async with Client(grant.descriptor, headers_of(grant)) as s:
             out = await s.call_tool("lin__create_issue", {})
         assert out.is_error
@@ -215,6 +224,7 @@ async def test_a_refused_ask_never_runs_the_tool(tmp_path):
 async def test_an_off_tool_is_not_listed(rig):
     rig.memory.set_permission_mode("lin__create_issue", "off")
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         names = [t.name for t in (await s.list_tools()).tools]
     assert names == ["lin__list_issues"]
@@ -222,6 +232,7 @@ async def test_an_off_tool_is_not_listed(rig):
 
 async def test_the_token_dies_with_the_grant(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     other = await rig.bridge.grant("job2", ["mail"])
     await rig.bridge.revoke(grant)
     async with httpx2.AsyncClient() as http:
@@ -233,12 +244,14 @@ async def test_the_token_dies_with_the_grant(rig):
 
 async def test_the_bridge_listens_on_loopback_only(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     assert grant.descriptor.url.startswith("http://127.0.0.1:")
 
 
 async def test_no_app_secret_reaches_a_log_or_the_descriptor(rig, caplog):
     caplog.set_level(logging.DEBUG)
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         await s.call_tool("lin__list_issues", {})
     assert SECRET not in caplog.text
@@ -249,6 +262,7 @@ async def test_no_app_secret_reaches_a_log_or_the_descriptor(rig, caplog):
 
 async def test_shutdown_stops_serving(rig):
     grant = await rig.bridge.grant("job1", ["lin"])
+    grant.sent = True  # the person has sent the card
     await rig.bridge.shutdown()
     with pytest.raises(httpx2.HTTPError):
         async with httpx2.AsyncClient() as http:
@@ -260,3 +274,12 @@ async def test_a_second_grant_reuses_the_one_server(rig):
     b = await rig.bridge.grant("job2", ["lin"])
     assert a.descriptor.url == b.descriptor.url and a.token != b.token
     await asyncio.sleep(0)
+
+
+async def test_a_call_before_send_is_refused_but_listing_is_allowed(rig):
+    grant = await rig.bridge.grant("job1", ["lin"])
+    async with Client(grant.descriptor, headers_of(grant)) as s:
+        assert (await s.list_tools()).tools
+        out = await s.call_tool("lin__list_issues", {})
+    assert out.is_error and "not sent" in out.content[0].text
+    assert rig.apps.calls == []
