@@ -32,8 +32,9 @@ value. `Settings.parse({})` is the full set of defaults. Unknown keys are stripp
 | `captureExclusions` | `{ processNames: [], titlePatterns: [] }`                                                                                                            | Trimmed, non-blank entries; built-in blind spots are separate (`BLIND_SPOTS`)                                                           |
 | `voice`             | `{ enabled: true, voice: 'bm_george', speed: 0.95 }`                                                                                                 | `voice` in `VOICE_IDS` (`bm_george`, `bm_fable`); speed 0.7 to 1.3; optional `microphoneId`, `mouth` (`MOUTH_IDS`), `ears` (`EARS_IDS`) |
 | `listening`         | `{ always: false }`                                                                                                                                  |                                                                                                                                         |
+| `fileFolders`       | `[]`                                                                                                                                                 | Full folder paths (drive, UNC or `/`), trimmed; empty means Scout's file tools refuse. Added with the Settings picker, removed at once  |
 
-Those five are the whole schema. The schema has no secret fields.
+Those six are the whole schema. The schema has no secret fields.
 
 ### Unknown keys
 

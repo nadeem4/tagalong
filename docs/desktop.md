@@ -27,7 +27,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
 | `src/main/windows/`                        | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
-| `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                 |
+| `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                     |
 | `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
 | `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
 | `src/main/settings-store.ts`               | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
@@ -121,8 +121,13 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
 - **File tools.** `src/main/tools/files.ts` gives Scout `list_files`, `read_file`, `move_file`,
   `rename_file`, `delete_file` and `write_file`, declared in `body-tools.ts` (the brain offers them
   as `desktop__<tool>`). They work only inside the folders the person chose. `startBrain` takes a
-  `files` option with a `folders()` getter and a `trash(path)` seam; for now the app passes no
-  folders, so every call answers in plain text "No folders chosen yet" (the setting arrives in B26c).
+  `files` option with a `folders()` getter and a `trash(path)` seam; the app passes the
+  live `settings.fileFolders`, read on every call, so removing a folder refuses the very next call.
+  With none chosen (the default) every call answers in plain text "No folders chosen yet".
+  Settings, "Files Scout may use" (`renderer/src/settings/files-section.tsx`), adds a folder with the
+  system picker (`IPC.fileFolderAdd`, `dialog.showOpenDialog` in `index.ts`) and removes one
+  (`IPC.fileFolderRemove`); `ipc/file-folders.ts` saves each at once and broadcasts the settings,
+  with no Save press. The two calls are on `window.tagalongHost` (`addFileFolder`, `removeFileFolder`).
   Every path must be absolute; it is resolved, then `realpath`'d (the nearest existing parent for a
   path that does not exist yet), and must sit inside a chosen folder (also `realpath`'d), so `..`,
   symlinks and junctions cannot escape. On Windows the compare ignores case and accepts `/` or `\`.
@@ -216,7 +221,7 @@ Rules each module enforces:
   scale.
 - **Home.** Every tab renders in one `.home-page` box (920px at most, one inset), and each connection's On/Off is the shared `Toggle` (`role="switch"`). Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
-- **Settings form.** The Settings page of Home (`renderer/src/settings/settings-page.tsx`) has one **Save**, at the top beside the heading (its result shows to the left of it on the heading row; there is no footer). Each section is a `home-card`. Toggles, selects and the speed slider are the shared controls from `@tagalong/ui`; since they have no form name, the Voice section keeps `mouth`, `ears`, `voice`, `voiceSpeed`, `talkHotkey` and `microphoneId` (and `voiceEnabled` when on) in hidden inputs so `buildSettingsPatch` reads the same form fields as before. The three shortcuts show as keycaps (`Shortcut`, never `CommandOrControl`) with a Change button that reveals the text field holding the accelerator (a refused one opens it at once; at rest a hidden field carries it so Save still sends every key); an odd one such as `Foo+Bar` shows as plain keycaps. Check key and Set limit act alone (they never submit the form), and a key from the environment disables the key field. The Voice section also has the shared "Test your microphone" meter (`MicTest`): off until pressed, it shows the picked microphone's level, records and sends nothing, and stops on a second press, on a new device choice and when the Settings window loses focus.
+- **Settings form.** The Settings page of Home (`renderer/src/settings/settings-page.tsx`) has one **Save**, at the top beside the heading (its result shows to the left of it on the heading row; there is no footer). Each section is a `home-card` (key, Privacy, Files Scout may use, Voice, Shortcuts, browser). Toggles, selects and the speed slider are the shared controls from `@tagalong/ui`; since they have no form name, the Voice section keeps `mouth`, `ears`, `voice`, `voiceSpeed`, `talkHotkey` and `microphoneId` (and `voiceEnabled` when on) in hidden inputs so `buildSettingsPatch` reads the same form fields as before. The three shortcuts show as keycaps (`Shortcut`, never `CommandOrControl`) with a Change button that reveals the text field holding the accelerator (a refused one opens it at once; at rest a hidden field carries it so Save still sends every key); an odd one such as `Foo+Bar` shows as plain keycaps. Check key and Set limit act alone (they never submit the form), and a key from the environment disables the key field. The Voice section also has the shared "Test your microphone" meter (`MicTest`): off until pressed, it shows the picked microphone's level, records and sends nothing, and stops on a second press, on a new device choice and when the Settings window loses focus.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice` and `connections`; the `key` fix is not a page, so the renderer's `openFix('key')`
   calls `openWalkthrough(9)` instead.

@@ -294,6 +294,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
   body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
+  - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
+    **Add folder**; **Remove** takes it away at once.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.

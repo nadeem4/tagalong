@@ -1713,13 +1713,16 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Tidy a folder with no expert _(real brain)_
 
-Needs the folder setting from B26c to run for real: until then the app passes no folders and every
-file tool refuses with "No folders chosen yet" (step 1 checks exactly that). Automated:
-`files.test.ts`, `body-tools.test.ts`.
+Folders come from Home → Settings → **Files Scout may use**; none by default. Automated:
+`files.test.ts`, `body-tools.test.ts`, `ipc/file-folders.test.ts`, `e2e/file-folders.spec.ts`.
 
+0. **Choose and remove.** Open Home → **Settings → Files Scout may use**. **Expected:** "No folders
+   yet." Press **Add folder**, pick your Downloads folder. **Expected:** its path is listed at once
+   (no Save needed) and is still there after restarting the app. Press **Remove** beside it.
+   **Expected:** the list is empty again, and the next file request in step 1 is refused.
 1. **No folder chosen.** Ask Scout to list your Downloads folder. **Expected:** it says no folder
    is chosen and cannot touch files; nothing changes on disk.
-2. **List and read (after B26c, with Downloads chosen).** Ask "what is in my Downloads?" then "what
+2. **List and read (with Downloads chosen).** Ask "what is in my Downloads?" then "what
    is in the newest text file?". **Expected:** Scout lists names and sizes and reads the text with
    no ask (Auto), with no expert started. A picture or an installer is described as binary, not shown.
 3. **Move and rename.** Ask Scout to put the PDFs in a `Documents` folder inside the chosen folder

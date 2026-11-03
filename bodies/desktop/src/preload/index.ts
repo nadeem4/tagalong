@@ -261,6 +261,8 @@ const host: TagalongHostApi = {
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
   finishWalkthrough: (options?: { close?: boolean }) =>
     ipcRenderer.invoke(IPC.walkthroughFinish, options) as Promise<void>,
+  addFileFolder: () => ipcRenderer.invoke(IPC.fileFolderAdd) as Promise<string[]>,
+  removeFileFolder: (path) => ipcRenderer.invoke(IPC.fileFolderRemove, path) as Promise<string[]>,
   openKeyPage: () => ipcRenderer.invoke(IPC.keyOpenPage) as Promise<void>,
   getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
   setStatusMark: (id, on) => ipcRenderer.invoke(IPC.setStatusMark, id, on) as Promise<void>,

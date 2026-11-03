@@ -49,6 +49,8 @@ export const SETTINGS_DEFAULTS = {
   listening: { always: false },
   /** Whether the first-run walkthrough was finished or skipped. Closing it does not count. */
   walkthrough: { done: false },
+  /** The folders Scout's file tools may touch. None until the person names one. */
+  fileFolders: [] as string[],
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -61,6 +63,17 @@ export const MAX_VOICE_SPEED = 1.3;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
 const exclusionEntry = z.string().trim().min(1);
+
+/**
+ * A folder the person allowed: a non-blank absolute path (drive, UNC share or POSIX root).
+ * A relative one would mean a different folder depending on where the app was started.
+ */
+const folderEntry = z
+  .string()
+  .trim()
+  .regex(/^([a-zA-Z]:[\\/]|\\\\|\/)/, 'must be a full folder path')
+  // Device and raw-volume prefixes name devices, not folders a person picks.
+  .refine((value) => !/^[\\/]{2}[?.][\\/]/.test(value), 'must be a full folder path');
 
 /**
  * Windows a capture must refuse.
@@ -127,6 +140,8 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
   /** Set by Finish or Skip (with a key) only. */
   walkthrough: z.object({ done: z.boolean() }),
+  /** Folders Scout may list, read and change. Empty means the file tools refuse. */
+  fileFolders: z.array(folderEntry),
 };
 
 /** Unknown keys in settings.json are dropped on parse. */
@@ -140,6 +155,7 @@ export const Settings = z.object({
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   walkthrough: settingsFields.walkthrough.prefault({ ...SETTINGS_DEFAULTS.walkthrough }),
+  fileFolders: settingsFields.fileFolders.prefault([]),
 });
 export type Settings = z.infer<typeof Settings>;
 
