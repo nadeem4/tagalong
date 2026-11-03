@@ -145,6 +145,7 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
           text?: string;
           pcm?: string;
           sample_rate?: number;
+          n?: number;
           done?: true;
         };
         if (p.done === true) sendToPanel(IPC.speechDone, { turn: p.turn });
@@ -154,6 +155,7 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
             ...(p.text === undefined ? {} : { text: p.text }),
             ...(p.pcm === undefined ? {} : { pcm: p.pcm }),
             ...(p.sample_rate === undefined ? {} : { sampleRate: p.sample_rate }),
+            ...(p.n === undefined ? {} : { n: p.n }),
           });
         }
       }

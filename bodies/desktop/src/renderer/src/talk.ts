@@ -18,7 +18,7 @@ import {
   settles,
   shownPartial,
 } from './talk-rules';
-import { onSystemVoice } from './voice-player';
+import type { SpeechPlayer } from './voice-player';
 
 /** A question is never longer than this: the microphone closes on its own after it. */
 const MAX_LISTEN_MS = 30_000;
@@ -34,6 +34,8 @@ interface TalkOptions {
   speaking: boolean;
   /** A spoken answer is still streaming in: the window waits for all of it, not a gap. */
   answering: boolean;
+  /** Scout's voice: speech over it pauses it, and the words heard decide what happens next. */
+  player: Pick<SpeechPlayer, 'speaking' | 'pause' | 'resume' | 'text' | 'interruption' | 'stop'>;
 }
 
 /** One of the panel's marks on Scout, set or cleared in main; a failure is only logged. */
@@ -49,8 +51,8 @@ function mark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): void {
  * its frames stream to the ears in the brain, the words heard so far show as they
  * come, and letting go hands the question to the bubble. With Always listening switched on
  * (read at mount, so a launch with it on listens from the start) the microphone stays open
- * as well, closed during a call or full screen, while Scout is hidden and while the system
- * voice speaks, and only talk that starts with "Scout" is asked; the key and the mic button
+ * as well, closed during a call or full screen and while Scout is hidden (never muted while
+ * Scout speaks: speech over it pauses it), and only talk that starts with "Scout" is asked; the key and the mic button
  * still ask without the name. The microphone never opens otherwise.
  */
 export function useTalk(options: TalkOptions): {
@@ -120,6 +122,30 @@ export function useTalk(options: TalkOptions): {
       ears: (mode) => new RemoteEars(window.tagalongHost, mode),
       openMic: () => openMic(latest.current.microphoneId),
       onSpeechStart: bargeIn,
+      speaking: () => latest.current.player.speaking,
+      pause: () => latest.current.player.pause(),
+      resume: () => latest.current.player.resume(),
+      playingText: () => latest.current.player.text(),
+      // Words over Scout: told to the brain with how much was heard, which decides what next.
+      onInterrupt: (text) => {
+        const { player } = latest.current;
+        const heard = player.interruption();
+        player.stop();
+        cue.hushed();
+        micOk();
+        cue.asked();
+        done(null);
+        const noted =
+          heard === null
+            ? Promise.resolve()
+            : window.tagalongHost.noteInterruption(heard).catch((error: unknown) => {
+                console.warn('[talk] could not note the interruption', error);
+              });
+        // The note goes first; the question follows it to main.
+        void noted.then(() => {
+          if (!inbox.deliver(text)) latest.current.onBegin();
+        });
+      },
       onPartial: (text, mode) => {
         micOk();
         setPartial(shownPartial(text, mode));
@@ -261,9 +287,6 @@ export function useTalk(options: TalkOptions): {
   useEffect(() => {
     if (cue.update(options.speaking, options.answering)) controller.made.openFollowUp();
   }, [cue, controller, options.speaking, options.answering]);
-
-  // The system voice is not echo-cancelled: the ears stay deaf while it speaks.
-  useEffect(() => onSystemVoice((speaking) => controller.made.setDeaf(speaking)), [controller]);
 
   // The talk key went down (main's key hook sends it once per hold).
   useEffect(() => window.tagalongHost.onTalk((at) => control.act(ptt.press(at))), [control, ptt]);

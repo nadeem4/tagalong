@@ -150,6 +150,9 @@ stateDiagram-v2
 - A spoken question (`talk.onHeard`) asks with `asSpoken`, so the ask carries `spoken: true`. The
   brain speaks the answer and the panel plays it ([voice.md](voice.md)). After the turn completes
   the hints show "Hold <key> to reply".
+- **Talking over a spoken answer** (Always listening) does not go through `onListen`: the panel
+  pauses Scout, and words that are not noise or Scout's echo arrive as an ordinary heard question
+  whose `say` carries `interrupted` (see [Voice](voice.md#talking-over-scout)).
 - **Barge-in** (`talk.onListen` while running) interrupts the turn, clears `mine` and keeps what
   was said so far as `done`. The panel's `SpeechPlayer.stop()` tells the brain to `hush`.
 

@@ -2,5 +2,9 @@
   "jsonrpc": "2.0",
   "id": 2,
   "method": "say",
-  "params": { "text": "wait, not that one", "spoken": true, "interrupted": { "turn": "t1", "heard": 2 } }
+  "params": {
+    "text": "wait, not that one",
+    "spoken": true,
+    "interrupted": { "turn": "t1", "heard": 2 }
+  }
 }

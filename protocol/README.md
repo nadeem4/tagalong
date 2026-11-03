@@ -56,19 +56,19 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Body → brain
 
-| Method     | Kind         | Params                                                         | Result                                              |
-| ---------- | ------------ | -------------------------------------------------------------- | --------------------------------------------------- |
-| `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`           | `{ protocol, session, tools: Tool[], seq, resync }` |
-| `tools`    | request      | `{ tools: Tool[] }`                                            | `{}`                                                |
+| Method     | Kind         | Params                                                                                        | Result                                              |
+| ---------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`                                          | `{ protocol, session, tools: Tool[], seq, resync }` |
+| `tools`    | request      | `{ tools: Tool[] }`                                                                           | `{}`                                                |
 | `say`      | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed?, interrupted?: { turn, heard } }` | `{ turn, joined }`                                  |
-| `event`    | notification | `{ name, data? }`                                              |                                                     |
-| `call`     | request      | `{ tool, input }`                                              | `{ output: Part[] }`                                |
-| `answer`   | request      | `{ ask, option, text? }`                                       | `{}`                                                |
-| `cancel`   | notification | `{ turn }`                                                     |                                                     |
-| `listen`   | request      | `{ mode: "held" \| "always" }`                                 | `{}`                                                |
-| `mic`      | notification | `{ pcm }`                                                      |                                                     |
-| `unlisten` | notification | `{}`                                                           |                                                     |
-| `hush`     | notification | `{}`                                                           |                                                     |
+| `event`    | notification | `{ name, data? }`                                                                             |                                                     |
+| `call`     | request      | `{ tool, input }`                                                                             | `{ output: Part[] }`                                |
+| `answer`   | request      | `{ ask, option, text? }`                                                                      | `{}`                                                |
+| `cancel`   | notification | `{ turn }`                                                                                    |                                                     |
+| `listen`   | request      | `{ mode: "held" \| "always" }`                                                                | `{}`                                                |
+| `mic`      | notification | `{ pcm }`                                                                                     |                                                     |
+| `unlisten` | notification | `{}`                                                                                          |                                                     |
+| `hush`     | notification | `{}`                                                                                          |                                                     |
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; the Home tools, listed in the Home tools table of docs/brain.md), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
@@ -92,7 +92,7 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 | `approved` | notification | `{ seq, tool, text, preference }`                                                                                                                                       |                      |
 | `heard`    | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                                                     |                      |
 | `voice`    | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                                          |                      |
-| `speech`   | notification | `{ turn, n?, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                                               |                      |
+| `speech`   | notification | `{ turn, n?, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                                           |                      |
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.

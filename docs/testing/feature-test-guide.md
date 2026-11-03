@@ -912,6 +912,18 @@ stands in for a real one (the brain still needs to hear something).
 4. **Expected:** Scout stops and says nothing more of the old answer; the bubble keeps what was
    shown so far and no Stop button remains.
 
+### T.3b. Talking over Scout
+
+1. **Setup:** Always listening on; the Kokoro voice picked. Ask "Scout, tell me about this window
+   in detail" so the answer is long.
+2. **Action:** while Scout speaks, say "wait, not that" with no name.
+3. **Expected:** Scout pauses as you start, then answers or changes course using what it had and
+   had not said. It does not repeat the sentences you already heard.
+4. **Action:** repeat with the System voice picked in Settings (Scout talks).
+5. **Expected:** the same; the system voice is not muted-out, and Scout does not answer itself.
+6. **Action:** while Scout speaks, cough or tap the desk.
+7. **Expected:** Scout pauses for a moment, then carries on from the same spot, with nothing sent.
+
 ### T.4. Reply, never an open mic
 
 1. **Setup:** Always listening is off.

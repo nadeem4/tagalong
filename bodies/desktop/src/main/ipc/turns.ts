@@ -41,7 +41,15 @@ function droppedParts(dropped: Dropped): Part[] {
   return parts;
 }
 
+/** A noted interruption belongs to the question spoken right after it, not to a later one. */
+const INTERRUPTION_TTL_MS = 15_000;
+
 export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
+  let noted: { turn: string; heard: number; at: number } | null = null;
+  handle(IPC.noteInterruption, (_event, interruption: { turn: string; heard: number }) => {
+    noted = { ...interruption, at: Date.now() };
+  });
+
   handle(
     IPC.ask,
     async (
@@ -62,11 +70,18 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
       const windowTitle = snapshot?.app?.windowTitle;
       const voice = deps.voice();
       const spoken = input.spoken === true && voice.enabled;
+      // Spoken once: the next ask is a fresh question.
+      const interrupted =
+        noted !== null && Date.now() - noted.at < INTERRUPTION_TTL_MS
+          ? { turn: noted.turn, heard: noted.heard }
+          : null;
+      noted = null;
       const say: SayParams = {
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
         ...(spoken ? { spoken: true, voice: voice.voice, speed: voice.speed } : {}),
+        ...(interrupted !== null ? { interrupted } : {}),
       };
       try {
         const said = await deps.brain.say(say);

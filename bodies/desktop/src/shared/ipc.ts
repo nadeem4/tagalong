@@ -24,6 +24,8 @@ import type { FixTarget } from '@tagalong/ui/shapes';
 export const IPC = {
   ask: 'tagalong:ask',
   interrupt: 'tagalong:interrupt',
+  // The panel noted what it heard of Scout before the person spoke over it; the next ask carries it.
+  noteInterruption: 'tagalong:interruption',
   listPets: 'tagalong:pets:list',
   // Home.
   browserFolder: 'tagalong:browser:folder',
@@ -151,6 +153,8 @@ export interface SpeechChunk {
   text?: string;
   pcm?: string;
   sampleRate?: number;
+  /** 1-based number of this sentence within its turn. */
+  n?: number;
 }
 
 /** A Settings preview line, spoken by the brain's voice: a WAV, base64. */
@@ -280,6 +284,8 @@ export interface TagalongHostApi {
   speakSample(text: string, voice: string, speed: number): Promise<SpeakSample | null>;
   /** Scout stops speaking at once: tells the brain too. */
   hush(): Promise<void>;
+  /** What the person heard of Scout's turn before speaking over it; rides on the next ask. */
+  noteInterruption(interruption: { turn: string; heard: number }): Promise<void>;
   /** One sentence of a spoken reply, from the brain. */
   onSpeechChunk(handler: (chunk: SpeechChunk) => void): () => void;
   /** The brain has no more to say for this turn. */

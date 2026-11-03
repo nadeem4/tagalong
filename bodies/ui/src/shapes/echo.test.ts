@@ -15,9 +15,7 @@ describe('echoOf', () => {
   });
 
   it('is false when one word differs from what is playing', () => {
-    expect(echoOf('the files are deleted', 'I moved the files. The files are sorted.')).toBe(
-      false,
-    );
+    expect(echoOf('the files are deleted', 'I moved the files. The files are sorted.')).toBe(false);
   });
 
   it('is false when the words are all there but not in a row', () => {
