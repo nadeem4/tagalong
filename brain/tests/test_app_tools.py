@@ -110,7 +110,7 @@ def _mode(t: Tool) -> str:
 
 
 def test_toolbox_modes_follow_classification():
-    assert _mode(tool("list", read_only=True)) == "auto"
+    assert _mode(tool("list", read_only=True)) == "ask"  # apps ask until the person changes it
     assert _mode(tool("write")) == "ask"
     assert _mode(tool("sendEmail", read_only=True)) == "ask"
 

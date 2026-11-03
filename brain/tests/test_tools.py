@@ -1378,3 +1378,23 @@ def test_built_in_defaults_match_the_spec_table(mem):
         "set_job_result", "list_experts", "hand_off", "stop_job",
     }  # fmt: skip
     assert {n: modes[n] for n in auto} == {n: "auto" for n in auto}
+
+
+def test_app_tools_default_to_ask_even_when_read_only(mem):
+    from test_app_tools import tool
+
+    from brain.app_tools import spec_for
+
+    box = Toolbox([], mem.permission_modes, mem.set_permission_mode)
+    assert box.mode(spec_for("lin", tool("list_issues", read_only=True))) == "ask"
+
+
+async def test_list_permissions_marks_an_app_tool_source(home):
+    from test_app_tools import FakeApps, tool
+
+    from brain.app_tools import AppSource
+
+    home.box.sources.append(AppSource(FakeApps([tool("list_issues", read_only=True)])))
+    by_name = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+    assert by_name["lin__list_issues"]["source"] == "app:lin"
+    assert by_name["lin__list_issues"]["mode"] == "ask"

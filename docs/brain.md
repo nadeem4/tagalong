@@ -302,6 +302,7 @@ locked tool is `ask`; then the tool's own default; then the effect. The same fun
 | --------------------------------------------- | ------------------------------------------- |
 | Reads (`effect: "read"`), such as `list_jobs` | `auto`                                      |
 | Changes (`effect: "change"`)                  | `ask`                                       |
+| A connected app's tool, read-only too         | `ask` (`default_mode`), until you change it |
 | Memory tools (`remember`, `forget`)           | `auto`                                      |
 | Timer tools `set_timer` and `cancel_timer`    | `auto`                                      |
 | Expert tools `watch_job` and `stop_job`       | `auto`                                      |

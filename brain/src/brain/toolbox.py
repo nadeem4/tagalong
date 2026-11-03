@@ -215,11 +215,12 @@ class Toolbox:
         The one place the model's tool list and the capability picture read, so Off removes a
         tool from both.
         """
+        stored = self._modes()  # one read, not one per tool
         return [
             spec
             for source in self.sources
             for spec in sorted(source.specs(), key=lambda s: s.name)
-            if self.mode(spec) != "off"
+            if resolve_mode(spec, stored.get(spec.name)) != "off"
         ]
 
     def known_specs(self) -> list[ToolSpec]:

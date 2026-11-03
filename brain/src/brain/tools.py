@@ -849,6 +849,9 @@ def home_tools(
     async def list_permissions(args: dict) -> str:
         box = toolbox()
         current = {s.name for source in box.sources for s in source.specs()}
+        origin = {  # name -> where it comes from, built once for the whole list
+            s.name: _origin(src, s.name) for src in box.sources for s in src.known_specs()
+        }
         rows = [
             {
                 "name": s.name,
@@ -858,24 +861,19 @@ def home_tools(
                 "locked": s.locked,
                 "self_asks": s.self_asks,
                 "online": s.name in current,
-                "source": _source_of(s.name, box),
+                "source": origin[s.name],
             }
             for s in sorted(box.known_specs(), key=lambda s: s.name)
             if "scout" in s.audience
         ]
         return json.dumps({"tools": rows})
 
-    def _source_of(name: str, box: Toolbox) -> str:
+    def _origin(source, name: str) -> str:
         """Where a tool comes from, so Home can group: built_in, body:<id> or app:<id>."""
         owner, sep, _ = name.partition(SEP)
         if not sep:
             return "built_in"
-        is_app = any(
-            getattr(src, "approval_source", "") == "app"
-            and any(k.name == name for k in src.known_specs())
-            for src in box.sources
-        )
-        return f"{'app' if is_app else 'body'}:{owner}"
+        return f"{'app' if getattr(source, 'approval_source', '') == 'app' else 'body'}:{owner}"
 
     async def set_permission(args: dict) -> str:
         if not args.get("tool") or not args.get("mode"):

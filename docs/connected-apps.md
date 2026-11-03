@@ -116,7 +116,8 @@ flowchart TD
 
 `classify` reads the tool's own hints:
 
-- **read**: the tool says `readOnlyHint` and is not locked;
+- **read**: the tool says `readOnlyHint` and is not locked (this sets its effect only; it never
+  sets its mode);
 - **change**: anything else, including a tool with no hints at all;
 - **locked**: `destructiveHint`, or a whole word in the name (split on `_`, `-`, `.`, spaces and
   camelCase) of `send`, `delete`, `remove`, `destroy`, `trash`, `pay` or `charge`. A risky word wins
@@ -124,8 +125,9 @@ flowchart TD
   unlock one on Home: its switch is on and reads "Risky action", and turning it to **Auto** first
   warns that Scout will no longer ask. Switch it back to **Ask** to undo.
 
-Modes are the toolbox's usual ones (see [brain.md](brain.md)): reads `auto`, changes `ask`, and the
-user may save `auto` for a change, and for a locked one only through that Home switch.
+Modes are the toolbox's usual ones (see [brain.md](brain.md)), but every app tool starts at `ask`,
+read-only ones too (`default_mode="ask"`): the app's own hint never lets a tool run unasked. The
+user may save `auto` for any of them, and for a locked one only through that Home switch.
 
 ### Scout's side
 

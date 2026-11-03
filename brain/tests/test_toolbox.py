@@ -622,7 +622,7 @@ def test_app_tools_listed_and_long_names_cut():
 def test_app_tool_default_modes_and_locked():
     box = app_box()
     by_name = {s.name: s for s in box.sources[0].specs()}
-    assert box.mode(by_name["lin__get"]) == "auto"
+    assert box.mode(by_name["lin__get"]) == "ask"  # read-only too: apps ask until changed
     assert box.mode(by_name["lin__update"]) == "ask"
     assert box.mode(by_name["lin__delete_issue"]) == "ask"
     box.set_mode("lin__delete_issue", "auto")  # the Home switch unlocks it
