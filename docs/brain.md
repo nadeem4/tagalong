@@ -856,11 +856,19 @@ slice), `ExpertRun` asks `ExpertApps` (`expert_apps.py`) for a grant and passes 
   card carries no turn, and every approvals row records the job id. Home's Approvals therefore
   shows which job a change was for.
 - **Masked and capped.** The text that leaves is passed through the save guards (known secrets
-  become `[secret]`) and, past the preview size, capped like Scout's results (`outputs.preview`;
-  the rest is stored masked, but an expert has no `read_output`, so it sees the start only).
+  become `[secret]`) and, past the preview size, capped like Scout's results (`outputs.preview`).
+  An expert has no `read_output`, so it sees a capped preview with no `output_id`: a header with
+  `chars`, `shown` and `truncated`, then the start of the text.
+- **The ask names the job.** An Ask-mode call's text is the tool and its input plus
+  `(expert job <id>)`, plain data, so the person can tell who wants it.
+- **Only if the agent takes HTTP.** The descriptor is sent only when the agent's `initialize`
+  advertised `mcpCapabilities.http`; otherwise `mcp_servers` is `[]`, no token is minted and one
+  line is logged.
 - **Why HTTP.** Claude Code's adapter advertises `mcpCapabilities.http` and forwards an HTTP
   descriptor with its headers to Claude Code, so no helper process is needed. An expert that does
   not accept HTTP would need a stdio shim; none is built.
+- **Cancelled runs.** If a run's task is cancelled, its session is still released and the token
+  revoked.
 
 ### Expert adapters (spike, 2026-11-01)
 

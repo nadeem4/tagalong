@@ -354,7 +354,8 @@ class Toolbox:
             and isinstance(out, str)
             and call.name not in UNCAPPED
         ):
-            return preview(self._outputs, call.name, out)
+            # An expert cannot call read_output, so it gets no id to follow.
+            return preview(self._outputs, call.name, out, readable=caller == "scout")
         return out
 
     def _report(

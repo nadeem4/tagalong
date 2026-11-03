@@ -9,6 +9,7 @@ own sign-in and secrets stay here: the expert holds only a token that dies with 
 import asyncio
 import contextlib
 import hmac
+import json
 import logging
 import secrets
 import socket
@@ -123,9 +124,15 @@ class ExpertApps:
     async def _asgi(self, scope, receive, send) -> None:
         if scope["type"] != "http":
             return
-        sent = dict(scope["headers"]).get(b"authorization", b"").decode("latin-1")
+        # Bytes, so a non-ASCII header is just a mismatch (str would raise TypeError).
+        sent = dict(scope["headers"]).get(b"authorization", b"")
         grant = next(
-            (g for t, g in self._grants.items() if hmac.compare_digest(f"Bearer {t}", sent)), None
+            (
+                g
+                for t, g in self._grants.items()
+                if hmac.compare_digest(f"Bearer {t}".encode(), sent)
+            ),
+            None,
         )
         if grant is None:
             await PlainTextResponse("unauthorized", status_code=401)(scope, receive, send)
@@ -165,7 +172,10 @@ class ExpertApps:
         # A name outside the grant is simply not there, whatever app it belongs to.
         if params.name not in {s.name for s in self._specs(grant)}:
             return reply(f"No tool named {params.name}.", True)
-        call = Call(uuid.uuid4().hex, params.name, params.arguments or {}, "", "")
+        args = params.arguments or {}
+        # The ask's text is plain data (tool, input, job), so the person can see who wants what.
+        text = f"{params.name} {json.dumps(args, sort_keys=True, separators=(',', ':'))}"
+        call = Call(uuid.uuid4().hex, params.name, args, "", f"{text} (expert job {grant.job_id})")
         try:
             out = await self._toolbox().run(call, caller="expert", job_id=grant.job_id)
         except RpcError as exc:

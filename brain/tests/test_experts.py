@@ -913,6 +913,36 @@ async def test_the_bridge_token_reaches_the_expert_only_in_the_session_frame(tmp
     assert leaking == ["session/new"]  # not in a prompt, and no app secret travels at all
 
 
+async def test_an_agent_without_http_mcp_gets_no_servers(tmp_path, caplog):
+    patch.setenv("FAKE_ACP_NO_HTTP", "1")
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(h, tmp_path, [{"text": "ok"}], apps=("lin",), bridge=bridge, job_id="j1")
+    try:
+        await run.start(tmp_path)
+    finally:
+        await run.close()
+    assert new_session_frame(tmp_path)["params"]["mcpServers"] == []
+    assert bridge.granted == []  # no token minted for a server nobody can reach
+    assert "does not accept http MCP servers" in caplog.text
+
+
+async def test_a_cancelled_drive_still_revokes_the_grant(tmp_path):
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(h, tmp_path, [{"text": "ok"}], apps=("lin",), bridge=bridge, job_id="j1")
+    await run.start(tmp_path)
+
+    async def hang(**kw):
+        await asyncio.Event().wait()
+
+    run._host.conn = SimpleNamespace(prompt=hang)
+    driving = asyncio.ensure_future(run._drive("go"))
+    await asyncio.sleep(0)
+    driving.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await driving
+    assert len(bridge.revoked) == 1
+
+
 async def test_a_failed_start_still_revokes_the_grant(tmp_path):
     h, bridge = Harness(), FakeBridge()
     run = make_run(

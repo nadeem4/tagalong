@@ -23,6 +23,7 @@ from brain.expert_apps import ExpertApps
 from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
+from brain.outputs import OutputStore
 from brain.toolbox import Toolbox
 
 SECRET = "sk-live-0123456789abcdef"
@@ -63,17 +64,19 @@ class FakeAsks:
     def __init__(self, answer="allow"):
         self.answer = answer
         self.asked = []
+        self.texts = []
 
     def anyone_online(self):
         return True
 
     async def permission(self, call, spec_name, locked):
         self.asked.append((spec_name, call.turn))
+        self.texts.append(call.text)
         return self.answer
 
 
 class Rig:
-    def __init__(self, tmp_path, answer="allow"):
+    def __init__(self, tmp_path, answer="allow", cap=None):
         self.apps = FakeApps()
         self.memory = Memory(tmp_path / "t.db")
         self.guards = Guards()
@@ -88,6 +91,7 @@ class Rig:
             self.memory.set_permission_mode,
             self.asks,
             self.approvals,
+            outputs=OutputStore(self.memory, self.guards, cap) if cap else None,
         )
         self.bridge = ExpertApps(self.apps, lambda: self.toolbox, self.guards)
 
@@ -160,6 +164,39 @@ async def test_a_change_tool_asks_and_the_approval_row_names_the_job(rig):
     assert [(r.tool, r.job_id, r.outcome) for r in rows] == [
         ("lin__create_issue", "job7", "approved")
     ]
+
+
+async def test_an_ask_says_what_the_expert_wants_and_for_which_job(rig):
+    grant = await rig.bridge.grant("job7", ["lin"])
+    async with Client(grant.descriptor, headers_of(grant)) as s:
+        await s.call_tool("lin__create_issue", {"title": "t"})
+    [text] = rig.asks.texts
+    assert "lin__create_issue" in text and '"title"' in text and "job7" in text
+
+
+async def test_a_non_ascii_authorization_header_is_a_401(rig):
+    grant = await rig.bridge.grant("job1", ["lin"])
+    async with httpx2.AsyncClient() as http:
+        r = await http.post(
+            grant.descriptor.url, headers={"Authorization": "Bearer café".encode()}, json={}
+        )
+    assert r.status_code == 401
+
+
+async def test_a_long_result_is_capped_without_an_output_id(tmp_path):
+    rig = Rig(tmp_path, cap=50)
+    try:
+        rig.memory.set_permission_mode("lin__list_issues", "auto")
+        rig.apps.reply = "x" * 500
+        grant = await rig.bridge.grant("job1", ["lin"])
+        async with Client(grant.descriptor, headers_of(grant)) as s:
+            out = await s.call_tool("lin__list_issues", {})
+        text = out.content[0].text
+        assert "output_id" not in text and "read_output" not in text
+        assert '"truncated": true' in text and len(text) < 300
+    finally:
+        await rig.bridge.shutdown()
+        rig.memory.close()
 
 
 async def test_a_refused_ask_never_runs_the_tool(tmp_path):

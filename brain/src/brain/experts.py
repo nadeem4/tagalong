@@ -221,6 +221,7 @@ class ExpertHost:
         self.conn = None
         self.process: asyncio.subprocess.Process | None = None
         self.can_resume: bool | None = None  # known after the first initialize
+        self.http_mcp = False  # whether the agent takes an http MCP server; same moment
 
     def _alive(self) -> bool:
         return self.process is not None and self.process.returncode is None
@@ -291,6 +292,8 @@ class ExpertHost:
                 raise
             load = getattr(init.agent_capabilities, "load_session", None)
             self.can_resume = bool(load)
+            mcp = getattr(init.agent_capabilities, "mcp_capabilities", None)
+            self.http_mcp = bool(getattr(mcp, "http", False))
 
     async def _open_session(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
         session = None
@@ -446,6 +449,9 @@ class ExpertRun:
         """The `mcp_servers` for this session: the bridge when apps were granted, else none."""
         if not self.apps or self._bridge is None:
             return []
+        if not self._host.http_mcp:
+            log.warning("expert does not accept http MCP servers; apps not offered to it")
+            return []
         self._grant = await self._bridge.grant(self._job_id or "", self.apps)
         return [self._grant.descriptor]
 
@@ -536,6 +542,12 @@ class ExpertRun:
                     prompt = self._notes.pop(0)
             finally:
                 await self._stop_quiet()  # also when cancelled: no leaked sleeper
+        except asyncio.CancelledError:
+            # Cancelled from outside: the session still ends, so its app token must die too.
+            self._active = False
+            with suppress(Exception):
+                await self._host.release(self, broken=True)
+            raise
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
