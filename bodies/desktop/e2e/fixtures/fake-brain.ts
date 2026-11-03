@@ -16,8 +16,9 @@
  * live words, then the question once `unlisten` arrives; always: the whole question). A say
  * asked `spoken` is followed by `speech` frames, one sentence with a tiny silent clip, then
  * `speech {done}`; so is every say once the desktop sent `read_aloud {on: true}` (text only when
- * it also said `system_voice`). Listen, unlisten, hush, mic counts and read_aloud events are
- * recorded for the test.
+ * it also said `system_voice`); the sentence is numbered `n: 1`. Listen, unlisten, hush, mic
+ * counts, read_aloud events and every say's params are recorded for the test, and `hear` pushes
+ * a `heard` frame at will.
  */
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
@@ -63,7 +64,11 @@ export interface FakeBrain {
     spokenSays: number;
     /** Every `read_aloud` event the desktop sent, in order. */
     readAloud: Record<string, unknown>[];
+    /** The params of every `say` the desktop sent, in order. */
+    says: Record<string, unknown>[];
   };
+  /** The ears hear something now: a live `heard` frame to every connected body. */
+  hear(event: string, text?: string): void;
   /** Add a step to a job's activity log (new `rev`) and tell the bodies `changed: job_activity`. */
   pushActivity(
     job: string,
@@ -277,6 +282,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     mics: 0,
     spokenSays: 0,
     readAloud: [],
+    says: [],
   };
   // 3 s of silence at the mouth's 24 kHz: long enough for a test to see the panel speaking
   // and press Stop before it ends on its own.
@@ -387,6 +393,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           voice.readAloud.push({ ...readAloud });
         }
       } else if (msg.method === 'say') {
+        voice.says.push({ ...msg.params });
         const turn = `t${++turns}`;
         socket.send(
           JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { turn, joined: false } }),
@@ -403,7 +410,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             // The system voice gets text only: the real brain never loads its own voice for it.
             const audio =
               readAloud.system_voice === true ? {} : { pcm: SILENCE, sample_rate: 24000 };
-            live('speech', { turn, text: 'This is the fake brain.', ...audio });
+            live('speech', { turn, n: 1, text: 'This is the fake brain.', ...audio });
             live('speech', { turn, done: true });
           }
         };
@@ -696,6 +703,17 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       for (const socket of sockets) {
         socket.send(
           JSON.stringify({ jsonrpc: '2.0', method: 'changed', params: { seq: ++seq, what } }),
+        );
+      }
+    },
+    hear: (event, text) => {
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'heard',
+            params: { event, ...(text === undefined ? {} : { text }) },
+          }),
         );
       }
     },

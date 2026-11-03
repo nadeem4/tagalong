@@ -436,7 +436,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "why_fresh": getattr(job_id, "why_fresh", None),
                 "parent_job": getattr(job_id, "parent_job", None),
                 "part": getattr(job_id, "part", "p1"),
-                "title": _text_arg(args, "title") if not args.get("job") else None,
+                "title": getattr(job_id, "title", None),
             }
         )
 
@@ -483,7 +483,6 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
             row["title"] = job_title(job)
-            row["closed"] = bool(job.closed_at)
             row["parts"] = [_part_row(p) for p in job.parts]
             if (r := job.scout_result) and len(r) > LIST_TEXT_CAP:
                 row["scout_result"] = r[:LIST_TEXT_CAP] + "…"

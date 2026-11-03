@@ -106,8 +106,9 @@ export interface JobPagePart {
   expert: string;
   state: string;
   reason: string | null;
-  started_at: string;
-  ended_at: string | null;
+  folder: string;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 /** A page of a job's steps after a cursor; pass `rev` back as the next `afterRev`. */
@@ -115,9 +116,9 @@ export interface JobActivityPage {
   job: string;
   state: string;
   title: string | null;
-  started_at: string;
-  ended_at: string | null;
-  closed_at: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  closedAt: string | null;
   /** Scout's own result for the job; null until it writes one. */
   result: string | null;
   parts: JobPagePart[];
@@ -191,6 +192,8 @@ export interface AskInput {
    * drop card; the host reads the item then, and attaches it as `snapshot.dropped`.
    */
   drop?: boolean;
+  /** The person spoke over this turn after hearing `heard` of its sentences; the brain hands the unsaid rest to the model. */
+  interrupted?: { turn: string; heard: number };
 }
 
 /**

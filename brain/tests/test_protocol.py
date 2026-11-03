@@ -23,6 +23,8 @@ from brain.protocol import (
     ErrorObject,
     FocusData,
     ReadAloudData,
+    SayParams,
+    SpeechParams,
     TabData,
     Tool,
 )
@@ -335,3 +337,18 @@ def test_ask_open_rejects_recommended_not_in_options():
     params = {"seq": 1, "id": "a", "state": "open", "text": "t", "options": ["x", "y"]}
     with pytest.raises(ValidationError):
         AskOpen.model_validate({**params, "recommended": "z"})
+
+
+def test_say_interrupted_names_the_turn_and_sentences_heard() -> None:
+    p = SayParams.model_validate({"text": "hi", "interrupted": {"turn": "t1", "heard": 2}})
+    assert p.interrupted is not None and p.interrupted.heard == 2
+    with pytest.raises(ValidationError):
+        SayParams.model_validate({"text": "hi", "interrupted": {"turn": "t1", "heard": -1}})
+
+
+def test_speech_n_counts_from_one_and_not_on_done() -> None:
+    assert SpeechParams.model_validate({"turn": "t1", "n": 1, "text": "Hi."}).n == 1
+    with pytest.raises(ValidationError):
+        SpeechParams.model_validate({"turn": "t1", "n": 0, "text": "Hi."})
+    with pytest.raises(ValidationError):
+        SpeechParams.model_validate({"turn": "t1", "n": 1, "done": True})

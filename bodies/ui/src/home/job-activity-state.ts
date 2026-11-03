@@ -59,10 +59,10 @@ export function applyPage(log: LogState, page: JobActivityPage): LogState {
       id: p.id,
       expert: p.expert,
       state: p.state,
-      startedAt: p.started_at,
-      endedAt: p.ended_at,
+      startedAt: p.startedAt,
+      endedAt: p.endedAt,
     })),
-    startedAt: page.started_at,
-    endedAt: page.ended_at,
+    startedAt: page.startedAt,
+    endedAt: page.endedAt,
   };
 }

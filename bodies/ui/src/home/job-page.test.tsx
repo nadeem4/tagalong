@@ -97,9 +97,9 @@ describe('JobPage', () => {
         job,
         state: 'done',
         title: null,
-        started_at: done.startedAt,
-        ended_at: done.endedAt,
-        closed_at: null,
+        startedAt: 't',
+        endedAt: null,
+        closedAt: null,
         result: null,
         parts: [],
         rev: 2,
@@ -211,9 +211,9 @@ describe('JobPage tabs', () => {
     job: 'j1',
     state: 'done',
     title: 'Fix the flaky tests',
-    started_at: '2026-11-02T10:00:00Z',
-    ended_at: '2026-11-02T10:02:05Z',
-    closed_at: null,
+    startedAt: '2026-11-02T10:00:00Z',
+    endedAt: '2026-11-02T10:02:05Z',
+    closedAt: null,
     result: 'Tests are green.',
     parts: [
       {
@@ -221,8 +221,9 @@ describe('JobPage tabs', () => {
         expert: 'Claude Code',
         state: 'done',
         reason: null,
-        started_at: '2026-11-02T10:00:00Z',
-        ended_at: '2026-11-02T10:02:05Z',
+        folder: 'C:/work',
+        startedAt: '2026-11-02T10:00:00Z',
+        endedAt: '2026-11-02T10:02:05Z',
       },
     ],
     rev: 1,
@@ -285,7 +286,7 @@ describe('JobPage tabs', () => {
       Promise.resolve(
         page({
           state: 'running',
-          ended_at: null,
+          endedAt: null,
           entries: [
             step(1),
             step(2, { kind: 'tool', part: 'scout', source: 'app:files', text: 'read' }),
@@ -303,7 +304,7 @@ describe('JobPage tabs', () => {
       activity: { j1: [step(1)] },
       reports: { 'j1/p1': 'Kept report' },
     });
-    bridge.jobActivity = () => Promise.resolve(page({ state: 'running', ended_at: null }));
+    bridge.jobActivity = () => Promise.resolve(page({ state: 'running', endedAt: null }));
     renderPage(bridge);
     const log = await screen.findByRole('log');
     fireEvent.click(screen.getByRole('tab', { name: 'Reports' }));

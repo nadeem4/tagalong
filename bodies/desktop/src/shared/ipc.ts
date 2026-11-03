@@ -152,6 +152,8 @@ export interface SpeechChunk {
   text?: string;
   pcm?: string;
   sampleRate?: number;
+  /** 1-based number of this sentence within its turn. */
+  n?: number;
 }
 
 /** A Settings preview line, spoken by the brain's voice: a WAV, base64. */

@@ -155,8 +155,29 @@ describe('registerJobsIpc', () => {
 
   it('pulls a job page by cursor through the job_activity tool', async () => {
     const { invoke, calls } = setup(() => text(PAGE));
-    expect(await invoke(IPC.jobActivity, 'j1', 7)).toEqual(PAGE);
+    expect(await invoke(IPC.jobActivity, 'j1', 7)).toEqual({
+      ...PAGE,
+      startedAt: undefined,
+      endedAt: null,
+      closedAt: null,
+    });
     expect(calls).toEqual([['job_activity', { job: 'j1', after_rev: 7 }]]);
+  });
+
+  it('maps the job times and parts of a page to camelCase', async () => {
+    const part = { id: 'p1', expert: 'claude-acp', state: 'running', reason: null };
+    const { invoke } = setup(() =>
+      text({
+        ...PAGE,
+        started_at: 's',
+        ended_at: null,
+        closed_at: 'c',
+        parts: [{ ...part, started_at: 's1', ended_at: 'e1' }],
+      }),
+    );
+    const got = (await invoke(IPC.jobActivity, 'j1', 0)) as Record<string, unknown>;
+    expect([got.startedAt, got.endedAt, got.closedAt]).toEqual(['s', null, 'c']);
+    expect(got.parts).toEqual([{ ...part, startedAt: 's1', endedAt: 'e1' }]);
   });
 
   it("passes Scout's watch list through on the page", async () => {

@@ -94,6 +94,7 @@ function Panel() {
     microphoneId,
     speaking,
     answering,
+    player,
     onBegin: () => {
       player.stop();
       clearRemark();
