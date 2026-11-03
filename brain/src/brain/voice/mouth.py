@@ -22,6 +22,7 @@ log = logging.getLogger("brain")
 
 DEFAULT_VOICE = "bm_george"
 DEFAULT_SPEED = 1.0
+KEPT_TURNS = 3  # sentence logs kept, so a late interruption can still be answered
 
 
 class Tts(Protocol):
@@ -56,6 +57,13 @@ class Mouth:
         self._failed = False  # until the next spoken turn, which tries again
         self._synth = asyncio.Lock()  # the phonemizer is not thread-safe: one synth at a time
         self._turns: dict[str, _Turn] = {}
+        # What each turn sent, in order. Apart from `_turns` because a turn is dropped once its
+        # frames are out while the body may still be playing them.
+        self._sent: dict[str, list[str]] = {}
+
+    def sentences(self, turn: str) -> list[str]:
+        """The sentences sent to the body for `turn`; frame `n` is index `n - 1`."""
+        return list(self._sent.get(turn, []))
 
     def spoken(
         self,
@@ -137,7 +145,13 @@ class Mouth:
                 del self._turns[turn]
 
     async def _say(self, turn: str, st: _Turn, line: str) -> None:
-        frame: dict = {"turn": turn, "text": line}
+        log_ = self._sent.setdefault(turn, [])
+        if st.hushed:
+            return
+        log_.append(line)
+        while len(self._sent) > KEPT_TURNS:
+            del self._sent[next(iter(self._sent))]
+        frame: dict = {"turn": turn, "n": len(log_), "text": line}
         tts = None if st.system_voice else self._tts_now()
         if tts is not None:
             try:
