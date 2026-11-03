@@ -533,6 +533,14 @@ class Jobs:
         self._activity_changed(job_id)  # an open job page redraws its header
         return clean
 
+    def set_result(self, job_id: str, text: str) -> None:
+        """Store Scout's own result for the job (masked, replaceable, even after close). No
+        template or length rule: only the storage cap."""
+        if self._memory.get_job(job_id) is None:
+            raise JobError(f"no job {job_id}")
+        self._memory.set_result(job_id, mask_json(self._guards, "job_result", text))
+        self._activity_changed(job_id)  # an open job page redraws its overview
+
     def _part_fact(self, job_id: str, part: str) -> dict[str, str]:
         """Names the part in a wake, but only when the job has several and it matters which."""
         parts = self._memory.parts_of(job_id)

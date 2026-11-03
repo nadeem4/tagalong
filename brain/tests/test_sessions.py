@@ -19,7 +19,7 @@ from brain.masking import Masker
 from brain.memory import ActivityEntry, Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
-from brain.protocol import Body, SayParams, Tool
+from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
 from brain.sessions import Session
 from brain.toolbox import BrainSource, ToolSpec
 
@@ -2044,3 +2044,133 @@ async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
     assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
     session.cancel(session._turn_id)
     await idle(session)
+
+
+# --- SP4: tool and app steps of a job-bound turn join the job's timeline --------------------
+
+
+def tool_use(name, tool_id="s1", **input):
+    block = {"type": "tool_use", "id": tool_id, "name": name, "input": input}
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+class AppLike:
+    """A fake connected app: its tools are named app__tool and its approval source is app."""
+
+    approval_source = "app"
+
+    def __init__(self, fail=False):
+        self.fail = fail
+
+    def specs(self):
+        return [ToolSpec("files__list", "lists", {"type": "object"}, frozenset({"scout"}), effect="read")]
+
+    def known_specs(self):
+        return self.specs()
+
+    async def run(self, call, tool):
+        if self.fail:
+            raise RpcError(ErrorCode.tool_failed, "app down")
+        return "a.txt"
+
+    def unavailable(self, name):
+        return None
+
+
+def steps_of(memory, job_id="j1"):
+    return sorted(memory.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
+
+
+async def wake_with(steps, *, app=None, job=True):
+    """A job_ended wake for j1 whose model runs the scripted tool steps."""
+    memory = Memory(":memory:")
+    session, sent = make(Gate([*steps, "ok"]))
+    session._memory = memory
+    session.jobs._memory = memory
+    if app is not None:
+        session.toolbox.sources.insert(1, app)
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    await idle(session)
+    return session, memory
+
+
+async def test_wake_turn_tool_calls_are_recorded_on_the_job():
+    session, memory = await wake_with([tool_use("recall", query="x")])
+    [step] = steps_of(memory)
+    assert (step.kind, step.part, step.source, step.status) == ("tool", "scout", "scout:recall", "done")
+    assert "recall" in step.text and "x" in step.text
+
+
+async def test_app_tool_call_is_labelled_with_the_app_name():
+    session, memory = await wake_with([tool_use("files__list", path="C:/x")], app=AppLike())
+    [step] = steps_of(memory)
+    assert step.source == "app:files"
+    assert step.text.startswith("list")
+
+
+async def test_failed_and_refused_calls_are_recorded_with_status():
+    session, memory = await wake_with(
+        [tool_use("files__list", "a"), tool_use("recall", "b", query="y")], app=AppLike(fail=True)
+    )
+    first, second = steps_of(memory)
+    assert (first.source, first.status) == ("app:files", "failed")
+    assert second.status == "done"
+
+
+async def test_args_are_masked_in_the_entry():
+    memory = Memory(":memory:")
+    session, _ = make(Gate([tool_use("recall", query="fake-token-12345678"), "ok"]), memory,
+                      masker=Masker(lambda: ["fake-token-12345678"]))
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    await idle(session)
+    [step] = steps_of(memory)
+    assert "fake-token-12345678" not in step.text and "[secret]" in step.text
+
+
+async def test_bookkeeping_tools_are_not_recorded():
+    session, memory = await wake_with(
+        [tool_use("list_jobs", "a"), tool_use("watch_job", "b", job="j1", items=[]),
+         tool_use("set_job_result", "c", job="j1", text="done")]
+    )
+    assert steps_of(memory) == []
+    assert memory.get_job("j1").scout_result == "done"
+
+
+async def test_owner_turn_without_a_job_records_nothing():
+    memory = Memory(":memory:")
+    end_job(memory)
+    session, _ = make(Gate([tool_use("recall", query="x"), "ok"]), memory)
+    join(session, "desktop")
+    session.say("desktop", say("what do you remember"))
+    await idle(session)
+    assert steps_of(memory) == []
+
+
+async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_ends_with_the_turn():
+    memory = Memory(":memory:")
+    end_job(memory)
+    session, _ = make(Gate([tool_use("tell_expert", "a", job="j1", note="hi"),
+                            tool_use("recall", "b", query="x"), "ok", tool_use("recall", "c", query="z"), "ok"]), memory)
+    join(session, "desktop")
+    session.say("desktop", say("poke the job"))
+    await idle(session)
+    assert [s.source for s in steps_of(memory)] == ["scout:tell_expert", "scout:recall"]
+    assert session._turn_job is None
+    session.say("desktop", say("again"))
+    await idle(session)
+    assert len(steps_of(memory)) == 2  # the new turn is unbound
+
+
+async def test_a_job_tool_for_another_job_records_on_that_job_plain_tools_stay_on_the_turns_job():
+    memory = Memory(":memory:")
+    end_job(memory)
+    end_job(memory, "j2")
+    session, _ = make(Gate([tool_use("tell_expert", "a", job="j2", note="hi"),
+                            tool_use("recall", "b", query="x"), "ok"]), memory)
+    join(session, "desktop")
+    session.jobs._on_finished(memory.get_job("j1"))
+    await idle(session)
+    assert [s.source for s in steps_of(memory, "j2")] == ["scout:tell_expert"]
+    assert [s.source for s in steps_of(memory, "j1")] == ["scout:recall"]

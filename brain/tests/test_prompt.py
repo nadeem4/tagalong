@@ -408,3 +408,10 @@ def test_events_note_for_a_job_wake_says_the_job_stays_open():
     events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
     ended = events.split("## job_ended")[1].split("##")[0]
     assert "part" in ended and "close_job" in ended
+
+
+def test_guidance_mentions_the_result_tool():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    ended = events.split("## job_ended")[1].split("##")[0]
+    assert "set_job_result" in soul and "set_job_result" in ended
