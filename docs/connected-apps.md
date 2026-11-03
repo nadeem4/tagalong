@@ -253,6 +253,14 @@ stored Auto skips it. After Allow it saves the app through the same code as `add
 - App answers are fenced as data so the model reads them but never obeys them.
 - Arguments go to the app as Scout filled them in, after the user allowed the change.
 
+## On a job's timeline
+
+When Scout calls an app's tool while working for a job (a wake about it, or after it handed work
+to it), the call is a step on that job's timeline, labelled `app:<app id>` (the id before `__` in
+the tool's name), with the tool's short name and its masked, clipped arguments and a status of
+done, failed or refused. The app's result is never copied there. See Scout's own steps in
+[docs/brain.md](brain.md).
+
 ## Tests that pin it
 
 - `brain/tests/test_apps.py`: slugs, `${VAR}` expansion, validation (including a malformed or

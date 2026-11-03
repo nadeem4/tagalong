@@ -2063,7 +2063,11 @@ class AppLike:
         self.fail = fail
 
     def specs(self):
-        return [ToolSpec("files__list", "lists", {"type": "object"}, frozenset({"scout"}), effect="read")]
+        return [
+            ToolSpec(
+                "files__list", "lists", {"type": "object"}, frozenset({"scout"}), effect="read"
+            )
+        ]
 
     def known_specs(self):
         return self.specs()
@@ -2081,12 +2085,10 @@ def steps_of(memory, job_id="j1"):
     return sorted(memory.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
 
 
-async def wake_with(steps, *, app=None, job=True):
+async def wake_with(steps, *, app=None):
     """A job_ended wake for j1 whose model runs the scripted tool steps."""
     memory = Memory(":memory:")
-    session, sent = make(Gate([*steps, "ok"]))
-    session._memory = memory
-    session.jobs._memory = memory
+    session, _ = make(Gate([*steps, "ok"]), memory)
     if app is not None:
         session.toolbox.sources.insert(1, app)
     join(session, "desktop")
@@ -2098,7 +2100,12 @@ async def wake_with(steps, *, app=None, job=True):
 async def test_wake_turn_tool_calls_are_recorded_on_the_job():
     session, memory = await wake_with([tool_use("recall", query="x")])
     [step] = steps_of(memory)
-    assert (step.kind, step.part, step.source, step.status) == ("tool", "scout", "scout:recall", "done")
+    assert (step.kind, step.part, step.source, step.status) == (
+        "tool",
+        "scout",
+        "scout:recall",
+        "done",
+    )
     assert "recall" in step.text and "x" in step.text
 
 
@@ -2120,8 +2127,11 @@ async def test_failed_and_refused_calls_are_recorded_with_status():
 
 async def test_args_are_masked_in_the_entry():
     memory = Memory(":memory:")
-    session, _ = make(Gate([tool_use("recall", query="fake-token-12345678"), "ok"]), memory,
-                      masker=Masker(lambda: ["fake-token-12345678"]))
+    session, _ = make(
+        Gate([tool_use("recall", query="fake-token-12345678"), "ok"]),
+        memory,
+        masker=Masker(lambda: ["fake-token-12345678"]),
+    )
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await idle(session)
@@ -2131,8 +2141,11 @@ async def test_args_are_masked_in_the_entry():
 
 async def test_bookkeeping_tools_are_not_recorded():
     session, memory = await wake_with(
-        [tool_use("list_jobs", "a"), tool_use("watch_job", "b", job="j1", items=[]),
-         tool_use("set_job_result", "c", job="j1", text="done")]
+        [
+            tool_use("list_jobs", "a"),
+            tool_use("watch_job", "b", job="j1", items=[]),
+            tool_use("set_job_result", "c", job="j1", text="done"),
+        ]
     )
     assert steps_of(memory) == []
     assert memory.get_job("j1").scout_result == "done"
@@ -2141,6 +2154,7 @@ async def test_bookkeeping_tools_are_not_recorded():
 async def test_owner_turn_without_a_job_records_nothing():
     memory = Memory(":memory:")
     end_job(memory)
+    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
     session, _ = make(Gate([tool_use("recall", query="x"), "ok"]), memory)
     join(session, "desktop")
     session.say("desktop", say("what do you remember"))
@@ -2151,8 +2165,19 @@ async def test_owner_turn_without_a_job_records_nothing():
 async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_ends_with_the_turn():
     memory = Memory(":memory:")
     end_job(memory)
-    session, _ = make(Gate([tool_use("tell_expert", "a", job="j1", note="hi"),
-                            tool_use("recall", "b", query="x"), "ok", tool_use("recall", "c", query="z"), "ok"]), memory)
+    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
+    session, _ = make(
+        Gate(
+            [
+                tool_use("tell_expert", "a", job="j1", note="hi"),
+                tool_use("recall", "b", query="x"),
+                "ok",
+                tool_use("recall", "c", query="z"),
+                "ok",
+            ]
+        ),
+        memory,
+    )
     join(session, "desktop")
     session.say("desktop", say("poke the job"))
     await idle(session)
@@ -2166,11 +2191,15 @@ async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_e
 async def test_a_job_tool_for_another_job_records_on_that_job_plain_tools_stay_on_the_turns_job():
     memory = Memory(":memory:")
     end_job(memory)
+    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
     end_job(memory, "j2")
-    session, _ = make(Gate([tool_use("tell_expert", "a", job="j2", note="hi"),
-                            tool_use("recall", "b", query="x"), "ok"]), memory)
+    memory.mark_reported("j2")
+    session, _ = make(
+        Gate([tool_use("close_job", "a", job="j2"), tool_use("recall", "b", query="x"), "ok"]),
+        memory,
+    )
     join(session, "desktop")
     session.jobs._on_finished(memory.get_job("j1"))
     await idle(session)
-    assert [s.source for s in steps_of(memory, "j2")] == ["scout:tell_expert"]
+    assert [s.source for s in steps_of(memory, "j2")] == ["scout:close_job"]
     assert [s.source for s in steps_of(memory, "j1")] == ["scout:recall"]

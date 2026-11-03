@@ -2408,7 +2408,10 @@ async def test_record_step_appends_a_masked_tool_entry_and_notifies(make_rig):
     rig.jobs.record_step("j1", "scout:recall", f"recall {TOKEN}", "done")
     [entry] = rows_of(rig, "j1")
     assert (entry.kind, entry.part, entry.source, entry.status) == (
-        "tool", "scout", "scout:recall", "done",
+        "tool",
+        "scout",
+        "scout:recall",
+        "done",
     )
     assert TOKEN not in entry.text
     assert ("changed", {"what": "job_activity"}) in rig.notes
@@ -2425,7 +2428,10 @@ async def test_expert_and_scout_steps_interleave_in_order(make_rig):
     rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
     rig.jobs.record_step("j1", "scout:recall", "one", "done")
     rig.memory.save_activity(
-        "j1", ActivityEntry(2, rig.memory.max_seq("j1") + 1, "2026-01-01T00:00:00+00:00", "command", "ls")
+        "j1",
+        ActivityEntry(
+            2, rig.memory.max_seq("j1") + 1, "2026-01-01T00:00:00+00:00", "command", "ls"
+        ),
     )
     rig.jobs.record_step("j1", "app:files", "two", "done")
     assert [(e.seq, e.part) for e in rows_of(rig, "j1")] == [(1, "scout"), (2, "p1"), (3, "scout")]

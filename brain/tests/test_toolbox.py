@@ -1208,7 +1208,13 @@ async def test_on_call_reports_an_ok_call_with_its_source_kind_and_result():
     box, seen = _reporting_box(FakeSource([spec("a")]))
     await box.run(call("a"))
     [(reported, tool, kind, status, result)] = seen
-    assert (reported.name, tool.name, kind, status, result) == ("a", "a", "scout_tool", "ok", "ran a")
+    assert (reported.name, tool.name, kind, status, result) == (
+        "a",
+        "a",
+        "scout_tool",
+        "ok",
+        "ran a",
+    )
 
 
 async def test_on_call_reports_a_failed_call_and_the_error_still_propagates():
