@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import type { IpcMainInvokeEvent } from 'electron';
 import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
@@ -79,6 +80,7 @@ import { registerSetupIpc } from './ipc/setup';
 import { registerSpendIpc } from './ipc/spend';
 import { readKeyStatus, registerKeyIpc } from './ipc/key';
 import { registerWalkthroughIpc } from './ipc/walkthrough';
+import { registerFileFoldersIpc } from './ipc/file-folders';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
@@ -246,6 +248,11 @@ async function start(): Promise<void> {
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
     openExternal: (url) => shell.openExternal(url),
+    // Read live on every call, so removing a folder in Settings revokes access at once.
+    files: {
+      folders: () => desktop?.settings.fileFolders ?? settings.fileFolders,
+      trash: (path) => shell.trashItem(path),
+    },
     onNotification: (method, params) => {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {
@@ -822,6 +829,26 @@ function registerIpc(): void {
   registerKeyIpc(handle, {
     brain: required().brain,
     openExternal: (url) => shell.openExternal(url),
+  });
+  registerFileFoldersIpc(handle, {
+    pick: async (event) => {
+      const options = {
+        title: 'Choose a folder Scout may use',
+        properties: ['openDirectory' as const],
+      };
+      const owner = BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender);
+      const result = await (owner === null
+        ? dialog.showOpenDialog(options)
+        : dialog.showOpenDialog(owner, options));
+      return result.canceled ? null : (result.filePaths[0] ?? null);
+    },
+    settingsStore: () => required().settingsStore,
+    onSaved: (saved) => {
+      required().settings = saved;
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
+      }
+    },
   });
   registerWalkthroughIpc(handle, {
     save: (patch) => {

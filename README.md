@@ -268,6 +268,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
   Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
+  An expert reaches the apps a job was given only through the brain, which asks you as usual and keeps every token.
   - **Sign in**: an app that signs in with its own page shows **Needs sign-in** and a **Sign in**
     button. It opens the app's page in your browser; the chip reads **Waiting for the browser**
     until you finish (or five minutes pass). The brain and the browser must be on the same computer.
@@ -293,6 +294,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
   body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
+  - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
+    **Add folder**; **Remove** takes it away at once.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
@@ -361,7 +364,9 @@ such as `.env` are refused.
 - The Python brain keeps the Anthropic key you enter in the app in its own data folder (a real `ANTHROPIC_API_KEY` in the environment wins, for developers); the desktop never stores it, and it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
-  applications. It changes things only through apps you connect, and only after you press
+  applications. Its file tools are file access only: they list, read, move and rename files
+  inside folders you chose (none until you choose one), and deleting (to the Recycle Bin) or
+  overwriting a file always asks first. It changes things only through apps you connect, and only after you press
   **Allow once**.
 - Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in

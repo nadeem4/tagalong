@@ -259,6 +259,14 @@ to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-car
 - App answers are fenced as data so the model reads them but never obeys them.
 - Arguments go to the app as Scout filled them in, after the user allowed the change.
 
+## Experts reach apps through the brain
+
+An expert (Claude Code) never gets an app's token or url. A job part started with apps gets one
+local MCP server hosted by the brain (`expert_apps.py`, `127.0.0.1`, random port, a bearer token
+per job part) that lists only those apps' tools. Every call runs through the same gate as Scout's
+(Ask, Auto, Off, preferences) and is logged in Approvals with the job id; answers are masked and
+capped. The token ends with the job part. See [the bridge](brain.md#apps-for-an-expert-the-bridge).
+
 ## On a job's timeline
 
 When Scout calls an app's tool while working for a job (a wake about it, or after it handed work

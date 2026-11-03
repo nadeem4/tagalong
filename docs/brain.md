@@ -74,6 +74,7 @@ the total can run a little low.
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                           |
 | `brain/src/brain/offers.py`            | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                |
 | `brain/src/brain/mind/approvals.md`    | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                               |
+| `brain/src/brain/expert_apps.py`       | `ExpertApps`: the loopback MCP bridge that lets an expert reach chosen connected apps through the brain's gate; one token per job part                                                                                                                                                     |
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
@@ -341,18 +342,19 @@ asks for itself (below) is `auto`; then the user's saved choice (a locked tool i
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                          | Default mode                                |
-| --------------------------------------------- | ------------------------------------------- |
-| Reads (`effect: "read"`), such as `list_jobs` | `auto`                                      |
-| Changes (`effect: "change"`)                  | `ask`                                       |
-| A connected app's tool, read-only too         | `ask` (`default_mode`), until you change it |
-| Memory tools (`remember`, `forget`)           | `auto`                                      |
-| Timer tools `set_timer` and `cancel_timer`    | `auto`                                      |
-| Expert tools `watch_job` and `stop_job`       | `auto`                                      |
-| `tell_expert` (`follow_up`)                   | `ask` on a wake turn, free on an owner turn |
-| `hand_off` (asks itself, see below)           | `auto`, no gate ask                         |
-| A body tool that does not declare effect      | `ask`                                       |
-| Locked (`confirm: true` from the body)        | `ask`, until you set it to `auto` on Home   |
+| Tool                                           | Default mode                                                         |
+| ---------------------------------------------- | -------------------------------------------------------------------- |
+| Reads (`effect: "read"`), such as `list_jobs`  | `auto`                                                               |
+| Changes (`effect: "change"`)                   | `ask`                                                                |
+| A connected app's tool, read-only too          | `ask` (`default_mode`), until you change it                          |
+| Memory tools (`remember`, `forget`)            | `auto`                                                               |
+| Timer tools `set_timer` and `cancel_timer`     | `auto`                                                               |
+| Expert tools `watch_job` and `stop_job`        | `auto`                                                               |
+| `tell_expert` (`follow_up`)                    | `ask` on a wake turn, free on an owner turn                          |
+| `hand_off` (asks itself, see below)            | `auto`, no gate ask                                                  |
+| A body tool that does not declare effect       | `ask`                                                                |
+| Locked (`confirm: true` from the body)         | `ask`, until you set it to `auto` on Home                            |
+| Always-ask (`confirm: "always"` from the body) | `ask` every time; cannot be set to `auto`, no preference approves it |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -836,6 +838,41 @@ builds its own host that stops with it, as above. `Jobs` gets its runs from `Exp
 
 Claude Code runs on the user's own login. It must be logged in, or the first hand-off fails with
 the adapter's own message (for example that auth is required).
+
+### Apps for an expert (the bridge)
+
+An expert never connects to an app itself and never holds an app's sign-in. When a job part is
+started with apps (`ExpertRun.apps`; nothing sets them from `hand_off` yet, that is the next
+slice), `ExpertRun` asks `ExpertApps` (`expert_apps.py`) for a grant and passes one MCP server in
+`new_session` / `load_session` `mcp_servers`. Without apps `mcp_servers` stays `[]`.
+
+- **One server, loopback only.** `ExpertApps` starts one HTTP MCP server (streamable, stateless,
+  JSON replies) on `127.0.0.1` at a random port, the first time a grant is asked for. Each grant
+  has its own random bearer token, sent in the descriptor's `Authorization` header; a missing or
+  wrong token is a 401. The token is revoked when the part's session is released (it ended,
+  stopped, errored or failed to start) and the brain's exit revokes all.
+- **Only the chosen apps.** The grant lists the tools of its apps (`app__tool`, the names Scout
+  uses), skipping apps that are not connected and tools set to Off. A name outside the grant is
+  "No tool named ...", whichever app it belongs to.
+- **Same gate.** Each call is `Toolbox.run(call, caller="expert", job_id=...)`. App specs carry
+  the audience `expert` (no other tool does), so an expert reaches nothing else. The gate asks the
+  person exactly as it does for Scout (Ask or Auto, Off, preferences, the side-check), the ask
+  card carries no turn, and every approvals row records the job id. Home's Approvals therefore
+  shows which job a change was for.
+- **Masked and capped.** The text that leaves is passed through the save guards (known secrets
+  become `[secret]`) and, past the preview size, capped like Scout's results (`outputs.preview`).
+  An expert has no `read_output`, so it sees a capped preview with no `output_id`: a header with
+  `chars`, `shown` and `truncated`, then the start of the text.
+- **The ask names the job.** An Ask-mode call's text is the tool and its input plus
+  `(expert job <id>)`, plain data, so the person can tell who wants it.
+- **Only if the agent takes HTTP.** The descriptor is sent only when the agent's `initialize`
+  advertised `mcpCapabilities.http`; otherwise `mcp_servers` is `[]`, no token is minted and one
+  line is logged.
+- **Why HTTP.** Claude Code's adapter advertises `mcpCapabilities.http` and forwards an HTTP
+  descriptor with its headers to Claude Code, so no helper process is needed. An expert that does
+  not accept HTTP would need a stdio shim; none is built.
+- **Cancelled runs.** If a run's task is cancelled, its session is still released and the token
+  revoked.
 
 ### Expert adapters (spike, 2026-11-01)
 

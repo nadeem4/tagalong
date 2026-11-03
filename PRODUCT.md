@@ -116,7 +116,9 @@ its result.
 ## Evidence on Hand
 
 - Working Windows build with Scout, sight, voice, experts (Claude Code), connected
-  apps (MCP), Home and the Chrome extension.
+  apps (MCP), Home and the Chrome extension. Scout can list, read, move and rename files in
+  folders you choose, and delete or overwrite only after you say yes; this is file access,
+  not control of your mouse or keyboard.
 - No users, testimonials, metrics or press yet. Do not invent any.
 
 ## Product Principles

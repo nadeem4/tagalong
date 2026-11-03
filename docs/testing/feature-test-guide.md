@@ -486,6 +486,9 @@ history and preferences with `call` as in the section above.
    built-in "Always ask me before risky actions" default still exists.
    **Expected:** it still asks you. Scout does not look at it, and a general preference never
    approves it, even after the default is deleted. Only a preference that names that tool can.
+   A tool a body declares `confirm: "always"` (delete, overwrite) is stricter: its Home switch cannot
+   be set to Auto and even a preference that names it never approves it. (Pinned by brain tests until a
+   body declares one.)
 7. **Action:** on a fresh data folder with no preference of your own, approve several tools by
    hand.
    **Expected:** no delay, and `spend_today` does not rise from the asks (no look happens, only
@@ -1283,7 +1286,7 @@ database with `sqlite3` or DB Browser for SQLite.
 
 ## Window tools
 
-The desktop declares `list_windows`, `read_window_text`, `look_at_window` and `open_url` to the brain.
+The desktop declares `list_windows`, `read_window_text`, `look_at_window`, `open_url` and the file tools (see [Tidy a folder](#tidy-a-folder-with-no-expert-real-brain)) to the brain.
 These steps drive them with a contract-v1 test client; asking Scout "What windows do I have open?"
 is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 
@@ -1708,6 +1711,29 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    researches; it is unchanged on purpose.
 5. Restart the brain: the chat resumes with the answers as text; no search results are replayed.
 
+## Tidy a folder with no expert _(real brain)_
+
+Folders come from Home → Settings → **Files Scout may use**; none by default. Automated:
+`files.test.ts`, `body-tools.test.ts`, `ipc/file-folders.test.ts`, `e2e/file-folders.spec.ts`.
+
+0. **Choose and remove.** Open Home → **Settings → Files Scout may use**. **Expected:** "No folders
+   yet." Press **Add folder**, pick your Downloads folder. **Expected:** its path is listed at once
+   (no Save needed) and is still there after restarting the app. Press **Remove** beside it.
+   **Expected:** the list is empty again, and the next file request in step 1 is refused.
+1. **No folder chosen.** Ask Scout to list your Downloads folder. **Expected:** it says no folder
+   is chosen and cannot touch files; nothing changes on disk.
+2. **List and read (with Downloads chosen).** Ask "what is in my Downloads?" then "what
+   is in the newest text file?". **Expected:** Scout lists names and sizes and reads the text with
+   no ask (Auto), with no expert started. A picture or an installer is described as binary, not shown.
+3. **Move and rename.** Ask Scout to put the PDFs in a `Documents` folder inside the chosen folder
+   and to rename one. **Expected:** each asks first (Ask); after Allow the files move. Asking it to
+   move onto a name that exists is refused and both files stay.
+4. **Outside the folder.** Ask Scout to read a file in another folder, or use `..` in a path.
+   **Expected:** refused in plain words.
+5. **Delete and overwrite.** Ask Scout to delete a file. **Expected:** it asks with only Allow and
+   Deny, and after Allow the file is in the Recycle Bin, restorable. Same for overwriting a file's
+   content. In Home, Permissions: these two say "Always asks" and cannot be set to Auto.
+
 ## Permissions _(real brain)_
 
 1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card
@@ -2032,6 +2058,18 @@ tagalong doctor` lists this machine, Node, npm and git, says there is no key and
    ends with `logged in`; over SSH on a headless machine it prints the command to run yourself.
 7. `uv run tagalong apps add <registry-id>` for a hosted app: the card shows its host, `y` adds
    it, and it says the sign-in is done from the app.
+
+### An expert reaches chosen apps through the brain (B26d)
+
+Nothing hands apps to a job from Scout yet (the next slice does), so this is checked by tests.
+
+1. `cd brain && uv run pytest tests/test_expert_apps.py tests/test_experts.py -q` passes (fakes
+   only: a real MCP client against the bridge on a fake app, and a fake ACP adapter).
+2. They show: only the chosen apps' tools are listed; another app's tool is "No tool named";
+   a wrong or missing token is a 401; an Ask-mode tool asks and its Approvals row names the job;
+   a secret in an answer comes back as `[secret]`; a revoked token stops working; `session/new`
+   carries the server only when the run has apps; the token is in the `session/new` frame and
+   in no other frame.
 
 ## Not supported
 

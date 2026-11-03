@@ -46,14 +46,14 @@ def test_words_split_on_separators_and_camel_case():
     assert _words("a.b c_d") == ["a", "b", "c", "d"]
 
 
-def test_spec_for_builds_scout_only_spec():
+def test_spec_for_builds_a_spec_for_scout_and_experts():
     t = tool("list_files", read_only=True, description="Lists files")
     spec = spec_for("files", t)
     assert spec is not None
     assert spec.name == "files__list_files"
     assert spec.description == "Lists files"
     assert spec.input_schema == {"type": "object"}
-    assert spec.audience == frozenset({"scout"})
+    assert spec.audience == frozenset({"scout", "expert"})
     assert spec.effect == "read"
     assert not spec.locked
 
