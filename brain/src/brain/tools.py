@@ -27,7 +27,7 @@ from brain.asks import Asks
 from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
-from brain.jobs import JobError, Jobs
+from brain.jobs import JobError, Jobs, job_title
 from brain.memory import KINDS, Hit, JobPart, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
@@ -355,6 +355,12 @@ def timer_tools(
     ]
 
 
+def _text_arg(args: dict, key: str) -> str | None:
+    """An optional string argument; blank or not text reads as not given."""
+    value = args.get(key)
+    return value if isinstance(value, str) and value.strip() else None
+
+
 def _part_arg(args: dict) -> dict:
     """The optional `part` of tell_expert and stop_job, passed on only when given."""
     part = args.get("part")
@@ -416,6 +422,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 args.get("continue_job"),
                 owner_asked=owner_turn(),
                 fresh=args.get("fresh") is True,
+                job=_text_arg(args, "job"),
+                title=_text_arg(args, "title"),
             )
         except JobError as err:
             # Setup facts (ids and numbers) let Scout recommend a fix; else the plain line.
@@ -427,8 +435,18 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "session": getattr(job_id, "session", "fresh"),
                 "why_fresh": getattr(job_id, "why_fresh", None),
                 "parent_job": getattr(job_id, "parent_job", None),
+                "part": getattr(job_id, "part", "p1"),
+                "title": getattr(job_id, "title", None),
             }
         )
+
+    async def close_job(args: dict) -> str:
+        _need_text("close_job", args, "job")
+        try:
+            jobs.close(args["job"])
+        except JobError as err:
+            return str(err)
+        return f"job {args['job']} closed"
 
     async def list_experts(args: dict) -> str:
         return json.dumps({"experts": expert_rows(jobs.installed(), jobs.can_resume)})
@@ -456,6 +474,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             row = asdict(job)
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
+            row["title"] = job_title(job)
             row["parts"] = [_part_row(p) for p in job.parts]
             rows.append(row)
         return json.dumps({"jobs": rows})
@@ -504,8 +523,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "goal, how you will judge it done, that it tests its own work, and that it ends "
                 "with a summary of what changed, the test results and what is left. Leave "
                 "planning and splitting to the expert; never paste the chat or direct each step. "
-                "Then call watch_job with what you expect. Returns JSON: the job id, session "
-                "(continued or fresh), why_fresh and parent_job.",
+                "Then call watch_job with what you expect. A job is your piece of work: give a new "
+                "one a short title in your own words, and to start another part under a job "
+                "that is still open (another expert, or a next step) pass its id as job. Close "
+                "the job with close_job when you judge the work done. Returns JSON: the job id, "
+                "part, title, session (continued or fresh), why_fresh and parent_job.",
                 {
                     "type": "object",
                     "properties": {
@@ -523,6 +545,14 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                             "type": "boolean",
                             "description": "True to start a new session, not the folder's last.",
                         },
+                        "title": {
+                            "type": "string",
+                            "description": "A title for a new job, in your own words.",
+                        },
+                        "job": {
+                            "type": "string",
+                            "description": "An open job's id: add this hand-off as a part of it.",
+                        },
                     },
                     "required": ["task", "folder"],
                 },
@@ -531,6 +561,19 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 self_asks=True,
             ),
             hand_off,
+        ),
+        (
+            ToolSpec(
+                "close_job",
+                "Close a job when you judge its work done. It stays in the list with its last "
+                "outcome; a closed job takes no more parts. A job with a part still running "
+                "cannot be closed. A job you never close just stays open.",
+                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            close_job,
         ),
         (
             ToolSpec(
@@ -597,7 +640,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         (
             ToolSpec(
                 "list_jobs",
-                "Recent expert jobs (the last 20), newest first. Each has its parts, one per "
+                "Recent expert jobs (the last 20), newest first. Each has a title, whether it is "
+                "closed, and its parts, one per "
                 "expert hand-off, with expert, state, latest progress, result and "
                 "session_id_known; plus a one-line summary of its steps, your watch list for "
                 "it and parent_job (the job a follow-up continued).",

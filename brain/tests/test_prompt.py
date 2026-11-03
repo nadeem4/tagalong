@@ -405,6 +405,17 @@ def test_events_notes_mention_the_watch_list():
     assert events.count("Watching, when present") == 3
 
 
+def test_soul_mentions_titles_parts_and_closing():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "title" in soul and "close_job" in soul and "part" in soul
+
+
+def test_events_note_for_a_job_wake_says_the_job_stays_open():
+    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
+    ended = events.split("## job_ended")[1].split("##")[0]
+    assert "part" in ended and "close_job" in ended
+
+
 def test_soul_explains_the_interruption_block():
     soul = system_prompt(NOW, [])
     assert '<data kind="interruption">' in soul

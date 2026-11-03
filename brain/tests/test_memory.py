@@ -999,3 +999,12 @@ def test_an_old_database_gets_the_job_id_column(tmp_path):
     assert m.list_timers()[0].job_id is None
     assert m.add_timer("x", _t(9), job_id="j").job_id == "j"
     m.close()
+
+
+def test_set_title_and_close_job_are_stored(mem):
+    mem.add_job("j1", "claude-acp", "brief", "C:/p", "default")
+    mem.set_title("j1", "x" * 300)
+    mem.close_job("j1", "2026-02-01T00:00:00+00:00")
+    got = mem.get_job("j1")
+    assert got.title == "x" * 200  # a storage safety cap only
+    assert got.closed_at == "2026-02-01T00:00:00+00:00"

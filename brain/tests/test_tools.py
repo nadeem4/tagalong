@@ -222,14 +222,29 @@ class FakeJobs:
         return self.resumable.get(expert_id)
 
     async def start(
-        self, task, folder, expert=None, continue_job=None, *, owner_asked=True, fresh=False
+        self,
+        task,
+        folder,
+        expert=None,
+        continue_job=None,
+        *,
+        owner_asked=True,
+        fresh=False,
+        job=None,
+        title=None,
     ):
         self.calls.append(("start", task, folder, expert, continue_job))
         self.owner_asked = owner_asked
         self.fresh = fresh
+        self.job, self.title = job, title
         if self.error:
             raise self.error
         return self.started
+
+    def close(self, job_id):
+        self.calls.append(("close", job_id))
+        if self.error:
+            raise self.error
 
     def tell(self, job_id, note, part=None):
         self.calls.append(("tell", job_id, note) + ((part,) if part else ()))
@@ -298,6 +313,8 @@ def test_expert_model_tool_schemas(home):
         "expert",
         "continue_job",
         "fresh",
+        "title",
+        "job",
     }
     assert tools["hand_off"]["properties"]["fresh"]["type"] == "boolean"
     assert tools["tell_expert"]["required"] == ["job", "note"]
@@ -316,6 +333,8 @@ async def test_hand_off_reaches_jobs_start(home):
         "session": "fresh",
         "why_fresh": None,
         "parent_job": None,
+        "part": "p1",
+        "title": None,
     }
 
 
@@ -341,6 +360,8 @@ async def test_hand_off_continue_job_reports_the_session_facts(home):
         "session": "fresh",
         "why_fresh": "expert cannot reopen sessions",
         "parent_job": None,
+        "part": "p1",
+        "title": None,
     }
     home.jobs.started = JobId("n2", "continued", None, "n1")
     out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "n1"})
@@ -349,6 +370,8 @@ async def test_hand_off_continue_job_reports_the_session_facts(home):
         "session": "continued",
         "why_fresh": None,
         "parent_job": "n1",
+        "part": "p1",
+        "title": None,
     }
 
 
@@ -678,6 +701,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "hand_off",
         "tell_expert",
         "watch_job",
+        "close_job",
         "list_experts",
         "list_jobs",
         "stop_job",
@@ -1152,3 +1176,54 @@ async def test_list_timers_shows_the_job(mem, trun):
     await trun("set_timer", {"note": "p", "in_minutes": 20})
     rows = json.loads(await trun("list_timers", {}))["timers"]
     assert [r["job"] for r in rows] == ["j1", None]
+
+
+# ---- titles, parts and closing (SP3) ----
+
+
+async def test_hand_off_passes_title_and_job_through(home):
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "title": "Fix login", "job": "j1"})
+    assert (home.jobs.title, home.jobs.job) == ("Fix login", "j1")
+    await home.run("hand_off", {"task": "t", "folder": "C:/p"})
+    assert (home.jobs.title, home.jobs.job) == (None, None)
+
+
+async def test_hand_off_result_has_part_and_title(home):
+    home.jobs.started = JobId("j1", part="p2", title="Stored title")
+    out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "title": "T"}))
+    assert out["part"] == "p2" and out["title"] == "Stored title"  # the saved, masked one
+    home.jobs.started = JobId("j1", part="p3")  # attaching: Jobs sets no title
+    out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "job": "j1"}))
+    assert out["title"] is None  # attaching to a job names nothing
+
+
+async def test_close_job_tool_closes_and_refuses_with_a_plain_line(home):
+    assert "j1" in await home.run("close_job", {"job": "j1"})
+    assert home.jobs.calls[-1] == ("close", "j1")
+    home.jobs.error = JobError("job j1 is already closed")
+    assert await home.run("close_job", {"job": "j1"}) == "job j1 is already closed"
+
+
+def test_close_job_spec_is_scout_only_and_automatic(home):
+    spec = expert_specs(home)["close_job"]
+    assert spec.audience == frozenset({"scout"})
+    assert (spec.effect, spec.default_mode) == ("change", "auto")
+
+
+async def test_close_job_is_not_a_home_tool(home):
+    names = {t["name"] for t in home.box.model_tools()}
+    assert "close_job" in names
+    home_names = {s.name for s in expert_specs(home).values() if "home" in s.audience}
+    assert "close_job" not in home_names
+
+
+async def test_list_jobs_rows_have_title_and_closed_at(home, mem):
+    mem.add_job("j1", "codex-acp", "first line\nmore", "C:/x", "default")
+    mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
+    mem.set_title("j2", "Scout's title")
+    mem.close_job("j2", "2026-01-01T00:00:00+00:00")
+    home.jobs.rows = mem.list_jobs(20)
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert (rows["j1"]["title"], rows["j1"]["closed_at"]) == ("first line", None)
+    assert rows["j2"]["title"] == "Scout's title" and rows["j2"]["closed_at"]
+    assert "closed" not in rows["j1"]

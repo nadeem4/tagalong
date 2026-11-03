@@ -306,6 +306,11 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     box. Automated: `test_jobs.py` (`set_watch`, refusals, masking, `wake_facts`), `test_tools.py`,
     `test_memory.py` (the column and its migration), `watch-list.test.tsx`, `job-page.test.tsx`
     and `e2e/jobs.spec.ts` (`setWatch` on the fake brain).
+    **Title, parts, closing (manual):** ask Scout for a task that needs two experts (or two steps) in
+    one folder. **Expected:** Scout opens the job with a title of its own words, adds a second
+    hand-off to the same job id (`list_jobs` shows `p1`, `p2`), and calls `close_job` when it is
+    satisfied; a closed job refuses new parts. A job it never closes stays open and listed. Automated:
+    `test_jobs.py` (title, `job=`, close), `test_tools.py`, `test_memory.py`, `test_prompt.py`.
     **Exit codes (manual):** hand a job to Claude Code that runs a failing command (for example
     "run `node -e process.exit(2)` and tell me what happened"). **Expected:** its `$` line ends
     with a red cross and `exit 2`; a command that succeeds shows a green check and `exit 0`.
