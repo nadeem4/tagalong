@@ -95,7 +95,9 @@ async def _run() -> None:
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
     emit_event = lambda event: session.scheduler.emit(event)  # noqa: E731 - session exists later
-    logins = LoginDriver(config.data_dir, experts, real_open_terminal, emit_event)
+    logins = LoginDriver(
+        config.data_dir, experts, real_open_terminal, emit_event, notify=bodies.notify
+    )
     progress = SetupProgress(emit_event)
     expert_tools, stop_installs = expert_setup_tools(
         config.data_dir,

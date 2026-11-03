@@ -62,6 +62,15 @@ def _newer(registry_version: str, installed: str) -> bool:
     return new is not None and old is not None and new > old
 
 
+def _token(message: str) -> str | None:
+    """The `error` token of a tool's `{"error": ...}` answer, or None for any other text."""
+    try:
+        token = json.loads(message).get("error")
+    except (ValueError, AttributeError):
+        return None
+    return token if isinstance(token, str) else None
+
+
 def home_setup_tools(
     registry: Registry,
     inspect_fn: InspectFn,
@@ -130,8 +139,14 @@ def home_setup_tools(
         spec, handler = by_name[tool]
         if not approved:
             # The card's facts come from the same code Scout's own install uses; a failing card
-            # raises its tool error and nothing is asked or installed.
-            facts = await spec.card(args) if spec.card else dict(args)
+            # raises its tool error and nothing is asked or installed. A `{error: token}` one is
+            # answered instead, so Home words it like the tool's own refusals.
+            try:
+                facts = await spec.card(args) if spec.card else dict(args)
+            except RpcError as err:
+                if err.code == ErrorCode.tool_failed and (token := _token(err.message)):
+                    return json.dumps({"error": token})
+                raise
             summary = f"{tool} {json.dumps(facts, sort_keys=True, separators=(',', ':'))}"
 
             # The same history the gate keeps, so these installs count in Home's approvals.

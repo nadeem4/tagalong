@@ -152,6 +152,7 @@ def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler
         method = pick_method(state.methods) if isinstance(state, NotLoggedIn) else None
         if method is None:
             if isinstance(state, LoggedIn):
+                driver.record_logged_in(expert.id)
                 error = "already_logged_in"
             elif isinstance(state, Unknown):
                 error = "unknown"

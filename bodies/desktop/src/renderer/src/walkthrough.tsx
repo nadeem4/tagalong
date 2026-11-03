@@ -35,6 +35,7 @@ const walkthroughHost: WalkthroughHost = {
   setupExpert: async (id) => {
     const result = await bridge.setupExpert(id, true);
     if (result.error !== undefined) throw new Error(result.error);
+    return result;
   },
   openKeyPage: () => host.openKeyPage(),
   finishWalkthrough: (options) => host.finishWalkthrough(options),

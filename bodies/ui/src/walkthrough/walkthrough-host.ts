@@ -51,7 +51,7 @@ export type WalkthroughHost = Pick<
    * Node included. Resolves when the brain took the job; progress comes through the overview.
    * Rejects with a short token when the brain refused it.
    */
-  setupExpert(id: string): Promise<void>;
+  setupExpert(id: string): Promise<{ state?: string }>;
   /** Marks the tour seen and closes its window. Only Finish and Skip (with a key) call it. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;

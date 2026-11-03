@@ -26,6 +26,7 @@ const SETUP_REFUSALS: Record<string, Status & object> = {
   already_installing: { text: 'That is already being set up.', error: false },
   already_ready: { text: 'That is already set up.', error: false },
   already_added: { text: 'That app is already added.', error: false },
+  already_logged_in: { text: 'Already logged in.', error: false },
   version_changed: {
     text: 'The registry changed while you were deciding. Look at it again, then try once more.',
     error: true,
@@ -35,6 +36,7 @@ const SETUP_REFUSALS: Record<string, Status & object> = {
     error: true,
   },
 };
+const LOGIN_WAITING = 'Finish logging in in the window that opened.';
 const SETUP_FAILED: Status & object = { text: 'Setting that up didn’t work.', error: true };
 
 /** `npx -y "my server" C:/x` as a command and its arguments; quotes keep spaces. */
@@ -124,8 +126,10 @@ export function ConnectionsPanel() {
     setAsking((now) => new Set(now).add(id));
     void act(async () => {
       try {
-        const { error } = await call();
+        const { error, state } = await call();
         if (error !== undefined) setStatus(SETUP_REFUSALS[error] ?? SETUP_FAILED);
+        else if (state === 'waiting') setStatus({ text: LOGIN_WAITING, error: false });
+        else if (state === 'logged_in') setStatus({ text: 'Already logged in.', error: false });
       } finally {
         setAsking((now) => {
           const next = new Set(now);

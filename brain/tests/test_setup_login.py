@@ -7,6 +7,7 @@ writes the done file the way the real window's wrapper does.
 import asyncio
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -68,12 +69,16 @@ def env(tmp_path, monkeypatch):
     return marker
 
 
-def driver(tmp_path, window, timeout_s=10.0) -> tuple[LoginDriver, list[Event], ExpertStore]:
+def driver(
+    tmp_path, window, timeout_s=10.0, notify=None
+) -> tuple[LoginDriver, list[Event], ExpertStore]:
     store = ExpertStore(tmp_path)
     store.add(expert())
     events: list[Event] = []
     return (
-        LoginDriver(tmp_path, store, window, events.append, timeout_s=timeout_s, poll_s=0.01),
+        LoginDriver(
+            tmp_path, store, window, events.append, timeout_s=timeout_s, poll_s=0.01, notify=notify
+        ),
         events,
         store,
     )
@@ -93,6 +98,49 @@ async def test_already_logged_in_is_detected_without_opening_anything(tmp_path, 
     assert await d.start(expert()) == LoggedIn()
     assert window.calls == [] and events == []
     assert store.get("claude-acp").logged_in is True
+
+
+async def test_a_temp_folder_that_will_not_delete_does_not_hide_a_logged_in_check(
+    tmp_path, env, monkeypatch
+):
+    # Windows: the adapter still holds the scratch folder, so cleanup raises WinError 32.
+    env.write_text("x")
+
+    def locked(path, *args, **kwargs):
+        # What the real rmtree does: hand the PermissionError to the caller's handler.
+        err = PermissionError(32, "in use")
+        handler = kwargs.get("onexc") or kwargs.get("onerror")
+        if handler is None:
+            raise err
+        handler(os.unlink, path, err if "onexc" in kwargs else (PermissionError, err, None))
+
+    monkeypatch.setattr(shutil, "rmtree", locked)
+    d, _, _ = driver(tmp_path, Window())
+    assert await d.check(expert()) == LoggedIn()
+
+
+async def test_start_when_already_logged_in_tells_the_ui_and_opens_nothing(tmp_path, env):
+    env.write_text("x")
+    window, told = Window(), []
+    d, _, store = driver(tmp_path, window, notify=lambda *a: told.append(a))
+    assert await d.start(expert()) == LoggedIn()
+    assert window.calls == [] and store.get("claude-acp").logged_in is True
+    assert told == [("changed", {"what": "setup"})]
+
+
+async def test_the_end_of_a_login_tells_the_ui_to_reload(tmp_path, env):
+    told = []
+    d, events, _ = driver(tmp_path, Window(marker=env), notify=lambda *a: told.append(a))
+    await d.start(expert())
+    await until(lambda: events)
+    assert told == [("changed", {"what": "setup"})]
+
+
+async def test_a_login_tool_reports_already_logged_in(tmp_path, env):
+    env.write_text("x")
+    d, _, _ = driver(tmp_path, Window())
+    _, handler = login_tools(tmp_path, d)[0]
+    assert json.loads(await handler({"id": "claude-acp"})) == {"state": "logged_in"}
 
 
 async def test_terminal_method_opens_the_window_with_adapter_command_args_and_env(
@@ -277,6 +325,19 @@ async def test_login_tool_card_refuses_an_unknown_expert_and_a_finished_login(tm
     env.write_text("x")
     with pytest.raises(RpcError):
         await spec.card({"id": "claude-acp"})
+
+
+async def test_a_card_that_finds_the_login_done_records_it_and_tells_the_ui(tmp_path, env):
+    # Home's Log in opens the card first; an already-done login must still flip the chip.
+    env.write_text("x")
+    told = []
+    d, _, store = driver(tmp_path, Window(), notify=lambda *a: told.append(a))
+    store.set_login("claude-acp", None)
+    spec, _ = login_tools(tmp_path, d)[0]
+    with pytest.raises(RpcError, match="already_logged_in"):
+        await spec.card({"id": "claude-acp"})
+    assert store.get("claude-acp").logged_in is True
+    assert told == [("changed", {"what": "setup"})]
 
 
 def login_tools(tmp_path, d):

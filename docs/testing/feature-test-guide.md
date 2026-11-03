@@ -1820,10 +1820,10 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
 1. **Action:** on step 6 press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
-   reads **Log in to Claude Code**; with the brain stopped the card says it can't check and
+   reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
    offers **Check again**. The page reads "For bigger jobs, Scout calls in an expert" and shows a
    hand-off card. On Home's **Connections** page the **Experts** card lists Claude Code with its
-   state; **Browse and add** offers more, and each button opens an Allow card first.
+   state; **Browse and add** offers more, and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.

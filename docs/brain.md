@@ -485,7 +485,9 @@ the install's `setup_progress` and `setup_done` events), `setup_expert` and `set
 (`{id, approved?}`, `self_asks`). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
 from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
-on Allow. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
+on Allow. A card that refuses with an `{error: token}` (such as `already_logged_in`, when the
+check finds the login done; it saves that and sends `changed setup` first) is answered as that
+token, so Home words it; any other card failure stays a tool error. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
 `setup_app` ignores `approved` and always opens it, and the desktop only forwards `true` from the
 tour window. Each answered card is written to the approvals history like the gate does (source
 `scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
@@ -643,7 +645,7 @@ words what the person reads (guidance in `mind/soul.md`).
   code) shows `expert`, the chosen `method` and `opens` (`terminal window` or `browser`), so
   nothing opens before the OK. `LoginDriver.check` spawns the adapter with
   `clientCapabilities.auth.terminal = true` (without it Claude lists no methods), calls
-  `new_session` in a scratch folder and sends no prompt: success is logged in, an auth-required
+  `new_session` in a scratch folder and sends no prompt (a scratch folder the adapter still holds, as on Windows, never changes the answer: cleanup errors are ignored): success is logged in, an auth-required
   error is not logged in (with the advertised methods), anything else is unknown. `start` picks a
   subscription method: the terminal `claude-ai-login`, else the one terminal method, else a
   browser one (`chat-gpt`, `oauth-personal`); never an API-key method. A terminal method opens a
@@ -654,10 +656,10 @@ words what the person reads (guidance in `mind/soul.md`).
   failed at once). Arguments or paths with `" % ! & | < > ^` are refused with `NoTerminal` too, as
   cmd would act on them; elsewhere it raises `NoTerminal` and the tool answers `{error: "no_terminal", command}` so Scout can tell the person
   what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
-  browser. The tool returns `{state: "waiting", kind}` at once; a background task waits (10
+  browser. The tool returns `{state: "waiting", kind}` at once (or `{state: "logged_in"}` with nothing opened when the check says it is already done; the store is updated and the brain sends `changed setup`); a background task waits (10
   minutes at most for the done file or the call), re-checks login, records it in `experts.json`
   and emits one waking `setup_login` event (`expert`, `state` = `logged_in`, `failed` or
-  `unknown`, and `detail`). A second login for the same expert cancels the first once its window has opened (a refused
+  `unknown`, and `detail`) and sends `changed setup` so Home and the tour reload. A second login for the same expert cancels the first once its window has opened (a refused
   window leaves the first running); the card says `unknown` when the check could not tell; shutdown cancels
   them all; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would

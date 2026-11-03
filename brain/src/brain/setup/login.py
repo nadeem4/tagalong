@@ -167,9 +167,11 @@ class LoginDriver:
         emit: Callable[[Event], None],
         timeout_s: float = LOGIN_TIMEOUT_S,
         poll_s: float = 0.5,
+        notify: Callable[[str, dict], None] | None = None,
     ) -> None:
         self._home, self._store, self._open = home, store, open_terminal
         self._emit, self._timeout, self._poll = emit, timeout_s, poll_s
+        self._notify = notify or (lambda *_: None)
         self._tasks: dict[str, asyncio.Task] = {}
 
     async def check(self, expert: InstalledExpert) -> LoginState:
@@ -178,7 +180,9 @@ class LoginDriver:
         try:
             async with asyncio.timeout(CHECK_TIMEOUT_S):
                 async with _agent(expert) as (conn, methods):
-                    with tempfile.TemporaryDirectory() as scratch:
+                    # Windows: the adapter may still hold the folder, and a failed cleanup
+                    # must never turn a good check into Unknown.
+                    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as scratch:
                         await conn.new_session(cwd=scratch, mcp_servers=[])
             return LoggedIn()
         except acp.RequestError as err:
@@ -191,7 +195,7 @@ class LoginDriver:
         Raises NoTerminal where no window can open (Scout then gives the command)."""
         state = await self.check(expert)
         if isinstance(state, LoggedIn):
-            self._store.set_login(expert.id, True)
+            self.record_logged_in(expert.id)
         if not isinstance(state, NotLoggedIn):
             return state
         method = pick_method(state.methods)
@@ -214,6 +218,11 @@ class LoginDriver:
             lambda t: self._tasks.get(expert.id) is t and self._tasks.pop(expert.id)
         )
         return waiting
+
+    def record_logged_in(self, expert_id: str) -> None:
+        """A check found the login done: save it, and Home's chip and the tour reload."""
+        self._store.set_login(expert_id, True)
+        self._notify("changed", {"what": "setup"})
 
     async def stop(self) -> None:
         tasks = list(self._tasks.values())
@@ -273,3 +282,4 @@ class LoginDriver:
         if detail:
             facts["detail"] = detail
         self._emit(Event("setup_login", facts, key=expert_id))
+        self._notify("changed", {"what": "setup"})  # Home's chip and the tour reload

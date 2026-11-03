@@ -50,7 +50,7 @@ export function makeWalkthroughHost(
         failed: null,
       }),
     ),
-    setupExpert: vi.fn((_id: string) => Promise.resolve()),
+    setupExpert: vi.fn((_id: string): Promise<{ state?: string }> => Promise.resolve({})),
     finishWalkthrough: vi.fn(() => Promise.resolve()),
     openKeyPage: vi.fn(() => Promise.resolve()),
     getSettings: vi.fn(() => Promise.resolve(options.settings ?? SETTINGS)),

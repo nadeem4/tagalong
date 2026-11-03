@@ -189,6 +189,16 @@ async def test_a_card_failure_is_a_tool_error_and_nothing_runs(tmp_path):
     assert rig.ran == []
 
 
+async def test_a_card_refusal_token_is_answered_like_the_tool_s_own(tmp_path):
+    # Home maps `{error: token}` to its own words; a raised one would show raw JSON in red.
+    async def done(args):
+        raise RpcError(ErrorCode.tool_failed, json.dumps({"error": "already_logged_in"}))
+
+    rig = Rig(tmp_path, card=done)
+    out = await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
+    assert out == {"error": "already_logged_in"} and rig.asked == [] and rig.ran == []
+
+
 async def test_progress_is_readable_and_ends_null(tmp_path):
     rig = Rig(tmp_path)
     rig.progress.emit(

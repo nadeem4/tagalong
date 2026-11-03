@@ -55,6 +55,7 @@ export function StepSix({
 }) {
   const [view, setView] = useState<View>({ kind: 'checking' });
   const pressed = useRef(false); // a double press sends one call
+  const [waiting, setWaiting] = useState(false); // a login window is open
   const [busy, setBusy] = useState(false); // the same, for the button to show
   const { setupOverview, setupExpert, onBrainChanged } = host;
 
@@ -69,14 +70,28 @@ export function StepSix({
 
   useEffect(load, [load]);
   // The brain says `changed setup` as an install moves on; read the overview again each time.
-  useEffect(() => onBrainChanged((what) => what === 'setup' && load()), [onBrainChanged, load]);
+  useEffect(
+    () =>
+      onBrainChanged((what) => {
+        if (what !== 'setup') return;
+        setWaiting(false); // a login that ended says so the same way
+        load();
+      }),
+    [onBrainChanged, load],
+  );
 
   function press(): void {
     if (pressed.current) return;
     pressed.current = true;
     setBusy(true);
     setupExpert(EXPERT)
-      .then(load, () => setView({ kind: 'failed', reason: FAILED_GENERIC }))
+      .then(
+        (result) => {
+          setWaiting(result.state === 'waiting');
+          load();
+        },
+        () => setView({ kind: 'failed', reason: FAILED_GENERIC }),
+      )
       .finally(() => {
         pressed.current = false;
         setBusy(false);
@@ -124,7 +139,10 @@ export function StepSix({
                 </Button>
               </>
             )}
-            {view.kind === 'needs_login' && (
+            {view.kind === 'needs_login' && waiting && (
+              <p className="wt-help">Finish logging in in the window that opened.</p>
+            )}
+            {view.kind === 'needs_login' && !waiting && (
               <>
                 <p className="wt-help">
                   Claude Code is installed. It still needs you to sign in with your Claude login.
