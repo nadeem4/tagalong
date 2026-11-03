@@ -1010,7 +1010,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                             |
 | `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                            |
 | `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                      |
-| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools or detail); wakes Scout                                     |
+| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                                     |
 | `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                         |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
@@ -1297,6 +1297,25 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
+
+## Web search and fetch
+
+`web_tools.py` declares Anthropic's server-side `web_search_20260209` and `web_fetch_20260209`
+(dynamic filtering; no beta header, no separate code-execution tool) with `max_uses` 5 each, a cap
+on cost per request. `WebSource` makes them two ordinary `ToolSpec`s (read, Auto by default) that
+carry a `server_tool` declaration, so Home lists them, Off removes them from the model's list and
+the capability picture, and `Toolbox.model_tools()` sends the typed declaration instead of an
+`input_schema`. The brain never runs them: Anthropic returns the `server_tool_use` and
+`*_tool_result` blocks in the same reply (`pause_turn` is already continued by the loop), and
+`WebSource.run` refuses.
+
+Cost: tokens as usual (fetched pages are input tokens) plus `WEB_SEARCH_USD` (0.01, 10 USD per 1,000
+searches) per `usage.server_tool_use.web_search_requests`, added in `Budget.spend` (a missing field
+counts none). Fetch has no fee. The daily default is unchanged, so a research-heavy day can reach it
+sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` has Scout say so
+plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
+server blocks and text citations from the copy written to disk (the live history keeps them), so
+a resumed chat holds the answer text only, masked like any other message.
 
 ## Guardrails
 

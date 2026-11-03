@@ -81,6 +81,9 @@ its result.
   expert only for a long or many-stepped job. It never assumes an expert has its own apps. When
   nothing covers a request it offers an app to connect (one click, then Allow) and, once it is
   connected, carries on with the request in the same conversation.
+- Scout can search the web and read pages itself (Anthropic's own web tools, shown in Home's
+  permissions and switchable Off). Each search costs a cent against the daily limit; when the limit
+  stops a task Scout says so plainly. It never sends you to an expert for that.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,
