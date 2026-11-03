@@ -454,7 +454,10 @@ flowchart TD
 
 ### The mouth
 
-The brain speaks; the panel plays.
+The brain speaks; the panel plays. What Scout says aloud about a long result is its own call: the
+soul tells it to say the short version and offer the rest (a long list is never read in full
+unasked), and a long tool result reaches it as a capped preview (see
+[brain.md](brain.md#long-tool-output)).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

@@ -105,7 +105,9 @@ repeating check, no more often than every 5 minutes); they survive a brain resta
 notices when you come back after 5 minutes away or reopen the app after a long break, and knows
 which app is in front (never one you excluded, and none while sight is paused); it may greet you or
 stay silent, at most twice an hour per kind. When Claude Code asks a question during a job, Scout
-gets it first and answers from what it knows, or passes it to you. See [docs/brain.md](docs/brain.md).
+gets it first and answers from what it knows, or passes it to you. A long tool result or expert
+report reaches Scout as a preview of `TAGALONG_TOOL_PREVIEW_CHARS` characters (default 4000) and an id;
+Scout presents the gist first and reads more on request. See [docs/brain.md](docs/brain.md).
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the browser
 body.
