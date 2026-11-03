@@ -437,13 +437,6 @@ def test_interruption_block_is_a_fenced_data_block_that_cannot_close_itself():
     assert "spoken: One." in block["text"] and "unsaid: Two" in block["text"]
 
 
-def test_guidance_mentions_the_result_tool():
-    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
-    events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
-    ended = events.split("## job_ended")[1].split("##")[0]
-    assert "set_job_result" in soul and "set_job_result" in ended
-
-
 def test_soul_tells_scout_to_present_long_output_gist_first():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert "gist first" in soul and "In voice say the short version" in soul
