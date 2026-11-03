@@ -970,9 +970,10 @@ flowchart TD
 
 | Tool           | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                      |
 | -------------- | ----------- | ------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?}`. Returns JSON `{job, session, why_fresh, parent_job}`, or the plain reason it did not start                                                                                                              |
+| `hand_off`     | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}`, or the plain reason it did not start                                                                                                              |
 | `list_experts` | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                        |
 | `tell_expert`  | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                   |
+| `close_job`    | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part |
 | `watch_job`    | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                    |
 | `list_jobs`    | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job` |
 | `stop_job`     | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                      |
@@ -1059,6 +1060,14 @@ flowchart LR
   entries gets `no activity recorded`. The log is masked when written and `Jobs.wake_facts` masks
   the finished text once more. `list_jobs` rows gain `summary`, a one-line form (`activity_line`, at
   most 200 characters). Scout has no tool to read the whole log.
+- **Titles, parts and closing.** `hand_off` takes `title` (a new job) or `job` (add a part to an
+  open job). Scout's title is stored whole, masked, with only a 200-character storage cap
+  (`Memory.set_title`); a blank one is not stored, and `job_title(job)` falls back to the brief's
+  first line, clipped to 80 characters, for the jobs list and wake text. `Jobs.close` /
+  `Memory.close_job` set `closed_at`; code never closes a job, nor limits how Scout splits one. A
+  part ending wakes Scout with the part named and every part's state; the job stays open until
+  Scout closes it. Parts may work in different folders; folder-session reuse looks up the part by
+  expert and folder.
 - **Watch list.** Right after `hand_off` returns the job id, Scout writes what it expects in its own
   words with `watch_job {job, items: [{text, done}]}`; it calls it again to tick an item or reword
   one. The call replaces the whole list: at most 10 items, text 1 to 200 characters, `done` a
