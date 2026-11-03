@@ -174,7 +174,7 @@ export const HOME_CSS = `
   margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.field}px;
   background: ${t.color.errFill}; color: ${t.color.errInk}; font-size: ${t.fontSize.body}px;
 }
-.job-page__frame { position: relative; flex: 1 1 0; min-height: 280px; display: flex; flex-direction: column; }
+.job-page__frame { position: relative; flex: 1 1 0; min-height: 232px; display: flex; flex-direction: column; }
 .job-page__jump {
   position: absolute; left: 50%; bottom: ${t.space.lg}px; transform: translateX(-50%);
   min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
