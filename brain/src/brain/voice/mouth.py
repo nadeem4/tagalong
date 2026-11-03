@@ -42,10 +42,15 @@ class _Turn:
         self.voice = voice
         self.speed = speed
         self.queue: asyncio.Queue[str | None] = asyncio.Queue()  # None: no more sentences
-        self.stream = SpokenStream(self.queue.put_nowait)
+        self.unsent: list[str] = []  # sentences made but not yet sent: still Scout's to say
+        self.stream = SpokenStream(self._queued)
         self.ended = False
         self.hushed = False
         self.task: asyncio.Task | None = None
+
+    def _queued(self, line: str) -> None:
+        self.unsent.append(line)
+        self.queue.put_nowait(line)
 
 
 class Mouth:
@@ -62,8 +67,10 @@ class Mouth:
         self._sent: dict[str, list[str]] = {}
 
     def sentences(self, turn: str) -> list[str]:
-        """The sentences sent to the body for `turn`; frame `n` is index `n - 1`."""
-        return list(self._sent.get(turn, []))
+        """The sentences sent to the body for `turn` (frame `n` is index `n - 1`), then those
+        made but not yet sent, so a speaker cut off mid-reply still knows what was left."""
+        live = self._turns.get(turn)
+        return [*self._sent.get(turn, []), *(live.unsent if live is not None else [])]
 
     def spoken(
         self,
@@ -131,6 +138,7 @@ class Mouth:
                 line = await st.queue.get()
                 if line is None:
                     break
+                taken = 1
                 # Short lines already waiting are said together; one alone would come out clipped.
                 while len(line) < SHORT_LINE and not st.queue.empty():
                     nxt = st.queue.get_nowait()
@@ -138,20 +146,16 @@ class Mouth:
                         st.queue.put_nowait(None)
                         break
                     line = f"{line} {nxt}"
+                    taken += 1
                 await self._say(turn, st, line)
+                del st.unsent[:taken]
             self._send(st, {"turn": turn, "done": True})
         finally:
             if self._turns.get(turn) is st:  # a re-armed turn of the same id is not ours
                 del self._turns[turn]
 
     async def _say(self, turn: str, st: _Turn, line: str) -> None:
-        log_ = self._sent.setdefault(turn, [])
-        if st.hushed:
-            return
-        log_.append(line)
-        while len(self._sent) > KEPT_TURNS:
-            del self._sent[next(iter(self._sent))]
-        frame: dict = {"turn": turn, "n": len(log_), "text": line}
+        frame: dict = {"turn": turn, "text": line}
         tts = None if st.system_voice else self._tts_now()
         if tts is not None:
             try:
@@ -161,7 +165,14 @@ class Mouth:
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:
                 log.warning("speech synthesis failed", exc_info=True)  # the body says it instead
-        self._send(st, frame)
+        if st.hushed:
+            return
+        # Logged only once sent, so frame `n` and the log index agree; the log outlives the turn.
+        lines = self._sent.setdefault(turn, [])
+        lines.append(line)
+        while len(self._sent) > KEPT_TURNS:
+            del self._sent[next(iter(self._sent))]
+        self._send(st, {**frame, "n": len(lines)})
 
     def _tts_now(self) -> Tts | None:
         """The voice if it is ready. Otherwise start loading it (once): the sentence goes out as

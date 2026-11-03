@@ -347,3 +347,15 @@ async def test_only_the_newest_three_turns_are_kept():
         await settle()
     assert m.sentences("t0") == []
     assert m.sentences("t3") == [ONE]
+
+
+async def test_sentences_include_those_made_but_not_yet_sent():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    await asyncio.sleep(0.01)
+    assert m.sentences("t")[:2] == [ONE, TWO]
+    assert len(m.sentences("t")) == 3
+    m.hush("d")

@@ -388,7 +388,8 @@ class VoiceParams(Model):
 
 
 # One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
-# `n` numbers the turn's sentences from 1. `pcm` and `sample_rate` come together; without them the body says `text` in its own voice.
+# `n` numbers the turn's sentences from 1. `pcm` and `sample_rate` come together; without
+# them the body says `text` in its own voice.
 class SpeechParams(Model):
     turn: Id
     n: Annotated[int, Field(ge=1)] | None = None

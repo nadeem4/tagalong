@@ -126,6 +126,9 @@ class VoiceService:
     def turn_ended(self, turn: str) -> None:
         self._mouth.end_turn(turn)
 
+    def sentences(self, turn: str) -> list[str]:
+        return self._mouth.sentences(turn)
+
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
         return await self._mouth.sample(text, voice, speed)
 

@@ -10,6 +10,7 @@ import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
@@ -41,7 +42,14 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
-from brain.mind.prompt import render_know, render_preferences, system_prompt, user_content
+from brain.mind.prompt import (
+    INTERRUPTED_MARK,
+    interruption_block,
+    render_know,
+    render_preferences,
+    system_prompt,
+    user_content,
+)
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
@@ -66,6 +74,15 @@ from brain.tools import (
 from brain.voice import VoiceHooks
 
 log = logging.getLogger("brain")
+
+
+@dataclass(frozen=True)
+class Interruption:
+    """The owner talked over a spoken turn: what the body finished playing, and what was left."""
+
+    spoken: str
+    unsaid: str
+
 
 DEFAULT_OFFER_SETTINGS = OfferSettings(
     DEFAULT_OFFER_MIN_APPROVALS, DEFAULT_OFFER_WINDOW_DAYS, DEFAULT_KEEP_ASKING_DAYS
@@ -214,6 +231,9 @@ class Session:
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
         self._owner_turn = False
         self._task: asyncio.Task | None = None
+        self._last_turn: str | None = (
+            None  # the turn that ended last, which can still be spoken over
+        )
         self._last_body: str | None = None  # where a wake turn goes first
         self._turn_body: str | None = None  # the body showing the running turn
         self._spoken: set[str] = set()  # running turns whose reply is read aloud
@@ -233,6 +253,13 @@ class Session:
             shown_on = self._display_target()  # its answer must appear where someone can see it
         else:
             self._last_body = body_id
+        if params.interrupted is not None and self._ready():
+            after = self._task if self._busy() else None
+            cut = self.interrupt(params.interrupted.turn, params.interrupted.heard)
+            if cut is not None:
+                turn = self._start_turn(shown_on, content, after=after, cut=cut)
+                self._speak(turn, shown_on, params)
+                return SayResult(turn=turn, joined=False)
         # A finished task whose callback has not run yet is a dead turn: start a new one.
         if self._busy():
             self._inbox.append(content)
@@ -243,6 +270,41 @@ class Session:
         turn = self._start_turn(shown_on, content)
         self._speak(turn, shown_on, params)
         return SayResult(turn=turn, joined=False)
+
+    def interrupt(self, turn: str, heard: int) -> Interruption | None:
+        """The owner spoke over `turn` after the body played `heard` of its sentences. Stops what
+        is still being said and cancels the turn if it is running. Returns what was said and what
+        was left, or None when there is nothing to hand over: a turn this session no longer
+        knows, or one the owner heard to the end (then their words are a plain say)."""
+        live = turn == self._turn_id
+        if self.voice is None or not (live or (turn == self._last_turn and not self._busy())):
+            return None
+        sentences = self.voice.sentences(turn)
+        unsaid = " ".join(sentences[heard:])
+        if not unsaid:
+            return None
+        if self._turn_body is not None:
+            self.voice.hush(self._turn_body)  # queued sentences must not keep coming
+        if live and self._task is not None:
+            self._task.cancel()
+        return Interruption(" ".join(sentences[:heard]), unsaid)
+
+    def _record_cut(self, cut: Interruption) -> None:
+        """History keeps what the owner heard, marked as cut off, never the unsaid rest."""
+        text = (cut.spoken + "\n\n" if cut.spoken else "") + INTERRUPTED_MARK
+        block = {"type": "text", "text": text}
+        last = self.history[-1] if self.history else None
+        if last and last["role"] == "assistant" and isinstance(last["content"], list):
+            # The turn finished and wrote its reply in full; swap the words for the heard part.
+            last["content"] = [b for b in last["content"] if b.get("type") != "text"] + [block]
+            if self._saved == len(self.history):  # already on disk
+                try:
+                    self._memory.replace_last_message(self._masked(last))
+                except Exception:
+                    log.exception("could not rewrite the cut-off reply")
+        else:
+            # Cancelled before the reply was whole, so none was kept; keep the heard words.
+            self.history.append({"role": "assistant", "content": [block]})
 
     def _owner_joined(self) -> None:
         # The owner's words reached the model, so a nudge from here on is theirs; one already
@@ -349,16 +411,32 @@ class Session:
         return turn
 
     def _start_turn(
-        self, body_id: str | None, content: list, started_by: Literal["user", "brain"] = "user"
+        self,
+        body_id: str | None,
+        content: list,
+        started_by: Literal["user", "brain"] = "user",
+        *,
+        after: asyncio.Task | None = None,
+        cut: Interruption | None = None,
     ) -> str:
+        """`after` is a cancelled turn still winding down: this one waits for it, so the history it
+        closes is valid before anything is added. `cut` is what the owner talked over."""
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
         self._owner_turn = started_by == "user"
         self._turn_body = body_id
-        if self._inbox:  # says from the finished turn come before this newer one
-            self._append_user([b for s in self._inbox for b in s])
-            self._inbox.clear()
-        self._append_user(content)
+        lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
+
+        def prepare() -> None:
+            if cut is not None:
+                self._record_cut(cut)
+            if self._inbox:  # says from the finished turn come before this newer one
+                self._append_user([b for s in self._inbox for b in s])
+                self._inbox.clear()
+            self._append_user(lead + content)
+
+        if after is None:
+            prepare()
         # Read once per turn so the system prompt stays identical across its steps (cache).
         know = render_know(self._memory.always_loaded())
         prefs = render_preferences(self._memory.list_preferences())
@@ -375,8 +453,11 @@ class Session:
             if method == "reply" and turn_id in self._spoken and self.voice is not None:
                 self.voice.reply(turn_id, body_id, params)
 
-        task = asyncio.create_task(
-            run_turn(
+        async def run() -> str:
+            if after is not None:
+                await asyncio.wait({after})
+                prepare()
+            return await run_turn(
                 turn_id=turn_id,
                 body_id=body_id,
                 model=self._model,
@@ -400,9 +481,10 @@ class Session:
                 turn_timeout=self._turn_timeout,
                 on_owner_input=self._owner_joined,
             )
-        )
+
+        task = asyncio.create_task(run())
         self._task = task
-        task.add_done_callback(lambda t: self._ended(t, turn_id, body_id))
+        task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead))
         return turn_id
 
     def cancel(self, turn_id: str) -> None:
@@ -438,7 +520,16 @@ class Session:
         else:
             self.history.append({"role": "user", "content": content})
 
-    def _ended(self, task: asyncio.Task, turn_id: str, body_id: str) -> None:
+    def _drop_lead(self, lead: list) -> None:
+        """The interruption block is for its own turn only: out of history before it is saved."""
+        if not lead:
+            return
+        for message in self.history:
+            if message["role"] == "user" and isinstance(message["content"], list):
+                message["content"][:] = [b for b in message["content"] if not _is_in(b, lead)]
+
+    def _ended(self, task: asyncio.Task, turn_id: str, body_id: str, lead: list) -> None:
+        self._drop_lead(lead)
         if task.cancelled():
             reason = "cancelled"
         elif task.exception() is not None:
@@ -453,6 +544,7 @@ class Session:
             self._turn_id = None
             self._owner_turn = False
             self._task = None
+        self._last_turn = turn_id
         self._persist()
         if turn_id in self._spoken:
             self._spoken.discard(turn_id)
@@ -493,3 +585,7 @@ class Session:
                         self._memory.add_summary(text)
         except Exception:
             log.exception("could not save the chat")
+
+
+def _is_in(block: Any, blocks: list) -> bool:
+    return any(block is b for b in blocks)
