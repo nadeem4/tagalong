@@ -11,6 +11,7 @@ const tools = {
   exclusions: () => ({}) as CaptureExclusions,
   onCapture: noop,
   openExternal: async () => undefined,
+  files: { folders: () => [], trash: async () => undefined },
 };
 
 function setup(env: NodeJS.ProcessEnv) {
@@ -64,6 +65,12 @@ describe('startBrain', () => {
       'read_window_text',
       'look_at_window',
       'open_url',
+      'list_files',
+      'read_file',
+      'move_file',
+      'rename_file',
+      'delete_file',
+      'write_file',
     ]);
 
     const result = { protocol: 1, session: 's', tools: [], seq: 0, resync: false };

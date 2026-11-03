@@ -361,7 +361,9 @@ such as `.env` are refused.
 - The Python brain keeps the Anthropic key you enter in the app in its own data folder (a real `ANTHROPIC_API_KEY` in the environment wins, for developers); the desktop never stores it, and it is never saved to the database or logs.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
-  applications. It changes things only through apps you connect, and only after you press
+  applications. Its file tools are file access only: they list, read, move and rename files
+  inside folders you chose (none until you choose one), and deleting (to the Recycle Bin) or
+  overwriting a file always asks first. It changes things only through apps you connect, and only after you press
   **Allow once**.
 - Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
