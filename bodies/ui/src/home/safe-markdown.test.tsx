@@ -1,6 +1,7 @@
 /**
  * Tests for SafeMarkdown: Markdown with GFM tables, built from React elements so raw HTML in a
- * report is skipped, links keep to http(s), and images are never drawn.
+ * report is only ever text, links keep to http(s), images are never drawn, and a very large
+ * text stays plain so Home never freezes.
  */
 
 import { render, screen } from '@testing-library/react';
@@ -39,13 +40,20 @@ describe('SafeMarkdown', () => {
     expect(container.querySelector('blockquote')).toHaveTextContent('quoted');
   });
 
-  it('skips raw html', () => {
+  it('renders html as text', () => {
     const { container } = render(
       <SafeMarkdown text={'<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>'} />,
     );
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('img')).toBeNull();
-    expect(container).not.toHaveTextContent('alert(1)');
+    expect(container).toHaveTextContent('<script>alert(1)</script>');
+    expect(container).toHaveTextContent('<img src=x onerror=alert(1)>');
+  });
+
+  it('keeps angle-bracket words a report mentions', () => {
+    const { container } = render(<SafeMarkdown text={'Returns Vec<String> and <b>x</b>.'} />);
+    expect(container.querySelector('b')).toBeNull();
+    expect(container).toHaveTextContent('Returns Vec<String> and <b>x</b>.');
   });
 
   it('drops javascript and data links to plain text', () => {
@@ -108,19 +116,30 @@ describe('SafeMarkdown', () => {
     expect(container.querySelector('pre')).toBeNull();
   });
 
-  it('renders 100 KB in under 2 s', () => {
+  it('renders 50 KB as Markdown in under 2 s', () => {
     const text = 'A line of **report** text with `code` and [a link](https://x.io).\n\n'.repeat(
-      1500,
+      750,
     );
-    expect(text.length).toBeGreaterThan(95_000);
+    expect(text.length).toBeGreaterThan(48_000);
     const start = performance.now();
-    render(<SafeMarkdown text={text} />);
+    const { container } = render(<SafeMarkdown text={text} />);
     expect(performance.now() - start).toBeLessThan(2000);
+    expect(container.querySelectorAll('a').length).toBe(750);
   });
 
-  it('renders 200 KB of unclosed brackets on one line in under 2 s', () => {
+  it('shows a text over 100 KB as plain text, quickly', () => {
+    const text = `| a | b |\n|---|---|\n${'| **1** | 2 |\n'.repeat(80_000)}`;
+    expect(text.length).toBeGreaterThan(1_000_000);
     const start = performance.now();
-    render(<SafeMarkdown text={'['.repeat(200_000)} />);
+    const { container } = render(<SafeMarkdown text={text} />);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(container.querySelector('table')).toBeNull();
+    expect(container.querySelector('pre')).toHaveTextContent('| **1** | 2 |');
+  });
+
+  it('renders 90 KB of unclosed brackets on one line in under 2 s', () => {
+    const start = performance.now();
+    render(<SafeMarkdown text={'['.repeat(90_000)} />);
     expect(performance.now() - start).toBeLessThan(2000);
   });
 

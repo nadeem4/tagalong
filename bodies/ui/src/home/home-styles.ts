@@ -229,6 +229,7 @@ export const HOME_CSS = `
 .safe-md pre { overflow-x: auto; padding: ${t.space.md}px; background: ${t.color.panelTile}; border-radius: ${t.radius.field}px; }
 .safe-md pre code { background: none; padding: 0; white-space: pre; }
 .safe-md blockquote { padding-left: ${t.space.lg}px; border-left: 2px solid ${t.color.panelLine}; color: ${t.color.panelMuted}; }
+.safe-md .safe-md__plain { white-space: pre-wrap; overflow-wrap: anywhere; }
 .safe-md__table { overflow-x: auto; margin: 0 0 ${t.space.md}px; }
 .safe-md table { border-collapse: collapse; font-size: ${t.fontSize.small}px; }
 .safe-md th, .safe-md td { padding: ${t.space.xs}px ${t.space.md}px; border: 1px solid ${t.color.panelLine}; text-align: left; vertical-align: top; }

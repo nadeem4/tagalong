@@ -521,8 +521,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`reports-tab.tsx`) lists one collapsed row per part and fetches `jobReport(job, part)` (IPC
   `jobs:report`, brain tool `job_report`) on the first expand only, with loading, a retry on failure
   and "has not written a report". `SafeMarkdown` (`safe-markdown.tsx`) builds React elements only:
-  no `dangerouslySetInnerHTML`, a thin wrapper over react-markdown and remark-gfm: raw HTML skipped, only http(s) links (new tab,
-  `noreferrer noopener`), images as their alt text, real tables (a wide one scrolls inside its own box), headings from h3.
+  no `dangerouslySetInnerHTML`, a thin wrapper over react-markdown and remark-gfm: raw HTML shown as text, only http(s) links (new tab,
+  `noreferrer noopener`), images as their alt text, real tables (a wide one scrolls inside its own box), headings from h3; a text over 100,000 characters stays plain preformatted text so a huge result never freezes Home.
   A job without a title shows the first line of its brief. `e2e/jobs.spec.ts` also covers a
   two-expert job (`job2` on the fake brain) across all three tabs.
 - **Approvals page:** Home's Approvals page (`bodies/ui/src/home/approvals-view.tsx`) uses
