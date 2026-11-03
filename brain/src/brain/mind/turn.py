@@ -206,6 +206,7 @@ async def run_turn(
                 {"turn": turn_id, "call": call, "name": name, "state": "ended", "ok": False},
             )
         reason = "cancelled" if cancelled else "error"
+    _drop_unanswered_server_tool_use(history)
     if spoke:
         notify("reply", {"turn": turn_id, "body": body_id, "done": True})
     return reason
@@ -248,6 +249,24 @@ async def _run_tools(turn_id, calls, said, run_tool, notify, running) -> list[di
             task.cancel()  # no-op for finished tasks; stops stragglers when the turn is cancelled
         # A tool raising CancelledError leaves gather early; wait so no sibling outlives the turn.
         await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def _drop_unanswered_server_tool_use(history: list) -> None:
+    """A paused message can end on a server_tool_use whose result never came; the turn stopped
+    before the continuation, so drop it (and the message if nothing valid is left)."""
+    last = history[-1] if history else None
+    if not last or last["role"] != "assistant" or not isinstance(last["content"], list):
+        return
+    answered = {b.get("tool_use_id") for b in last["content"] if b.get("tool_use_id")}
+    kept = [
+        b for b in last["content"] if b.get("type") != "server_tool_use" or b.get("id") in answered
+    ]
+    if len(kept) == len(last["content"]):
+        return
+    if kept:
+        last["content"] = kept
+    else:
+        history.pop()
 
 
 def _close_dangling_tool_use(history: list) -> bool:

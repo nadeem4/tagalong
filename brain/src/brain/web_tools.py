@@ -9,7 +9,8 @@ from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import ToolSpec
 
-# Searches or fetches the model may make in one request; a cap on cost per question.
+# Searches or fetches the model may make in one request. Each pause_turn continuation is a new
+# request, so the real limit per question is the step cap times this.
 MAX_USES = 5
 
 # What a saved turn must not keep: the results can be pages long, and their encrypted parts

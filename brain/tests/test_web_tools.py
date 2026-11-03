@@ -81,6 +81,15 @@ def test_both_are_auto_by_default_and_known_to_home():
     }
 
 
+def test_ask_is_refused_for_a_server_tool_but_off_and_auto_work():
+    box = toolbox()
+    for name in ("web_search", "web_fetch"):
+        with pytest.raises(RpcError):
+            box.set_mode(name, "ask")
+        box.set_mode(name, "off")
+        box.set_mode(name, "auto")
+
+
 def test_off_hides_the_tool_from_the_model():
     assert [t["name"] for t in toolbox({"web_search": "off"}).model_tools()] == ["web_fetch"]
 

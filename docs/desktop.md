@@ -470,7 +470,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
   The card is a `home-card` like every Home panel. Tools sit in groups by the row's `source` (Built in, then each body, then each app, titled by the row's `source_name`: the name the body declared or the app's name),
   each tool with the shared `ThreeWay` control (`controls/three-way.tsx`, a radio group named by the visible tool name): Off, Ask and
-  Auto, the brain's mode chosen. A `person_only` row shows only Off and Ask ("Always asks"); a locked tool shows
+  Auto, the brain's mode chosen. A `server_tool` row (web search and fetch) shows only Off and Auto. A `person_only` row shows only Off and Ask ("Always asks"); a locked tool shows
   "Risky action" and turning it to Auto asks you to confirm first; a tool that is Off is dimmed; a
   tool of an offline body is dimmed and marked "Not connected" but can still be set (the brain
   keeps a mode for its last-declared tools). The list reads again on `changed { what: "permissions" }`. The e2e

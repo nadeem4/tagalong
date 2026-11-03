@@ -242,6 +242,20 @@ describe('PermissionsPanel', () => {
     expect(bridge.permissionSets[1]).toEqual({ tool: 'hand_off', mode: 'ask' });
   });
 
+  it('offers a server tool only Off and Auto, since Anthropic runs it and no ask can reach it', async () => {
+    const bridge = createFakeHostBridge({
+      permissions: [{ ...READ, name: 'web_search', mode: 'auto', server_tool: true }],
+    });
+    renderPanel(bridge);
+    const row = await group('web_search');
+    expect(
+      within(row)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Off', 'Auto']);
+    expect(radio(row, 'Auto')).toHaveAttribute('aria-checked', 'true');
+  });
+
   it('greys a tool of a body that is not connected and says so, but can still set it', async () => {
     const bridge = createFakeHostBridge({ permissions: [OFFLINE] });
     renderPanel(bridge);

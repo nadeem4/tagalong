@@ -861,6 +861,7 @@ def home_tools(
                 "locked": s.locked,
                 "self_asks": s.self_asks,
                 "person_only": s.person_only,
+                "server_tool": s.server_tool is not None,
                 "online": s.name in current,
                 "source": origin[s.name][0],
                 "source_name": origin[s.name][1],

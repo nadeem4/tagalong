@@ -16,8 +16,9 @@ PRICES = {
     "claude-haiku-5-5": (0.10, 0.50, 0.125, 0.01),
 }
 FALLBACK_PRICES = PRICES["claude-opus-5-5"]
-# USD per web search: 10 USD per 1,000 searches. Fetching a page has no fee of its own (its text
-# is billed as input tokens). Counted from usage.server_tool_use.web_search_requests.
+# USD per web search: 10 USD per 1,000 searches (platform.claude.com/docs/en/about-claude/pricing,
+# verified 2026-11-03). Fetching a page has no fee of its own (its text is billed as input
+# tokens). Counted from usage.server_tool_use.web_search_requests.
 WEB_SEARCH_USD = 0.01
 
 

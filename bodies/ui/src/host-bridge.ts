@@ -55,6 +55,8 @@ export interface PermissionRow {
   online: boolean;
   /** The tool always needs the person's yes: Off or Ask, never Auto (brain's flag). */
   person_only: boolean;
+  /** Anthropic runs the tool inside its reply, so no ask can reach it: Off or Auto, never Ask. */
+  server_tool?: boolean;
   /** Where the tool comes from: `built_in`, `body:<id>` or `app:<id>`. */
   source: string;
   /** The heading to group under: the body's declared name or the app's name. */

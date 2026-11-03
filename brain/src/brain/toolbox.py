@@ -209,6 +209,11 @@ class Toolbox:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
         if mode not in ("off", "ask", "auto"):
             raise RpcError(ErrorCode.invalid_params, "mode must be off, ask or auto.")
+        if mode == "ask" and spec.server_tool is not None:
+            # Anthropic runs it inside the reply, so it never reaches the gate to be asked.
+            raise RpcError(
+                ErrorCode.invalid_params, f"{name} runs on Anthropic's side; Off or Auto."
+            )
         if mode == "auto":  # Off and Ask are always the owner's to choose
             if spec.self_asks:
                 raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")

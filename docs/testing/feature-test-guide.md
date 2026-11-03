@@ -1701,6 +1701,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    cent per search plus the tokens.
 2. Give it a link and ask for the gist: it reads the page itself.
 3. Home, Permissions: `web_search` and `web_fetch` are listed as built-in tools, Auto. Set
+   Each shows only Off and Auto (no Ask: Anthropic runs them). Set
    `web_search` to Off and ask again: Scout says it cannot search and does not push an expert.
 4. Set the daily limit low in Settings and research until it is reached: Scout says plainly that
    the limit stopped the task and the person can raise it. The default limit may feel low once Scout
