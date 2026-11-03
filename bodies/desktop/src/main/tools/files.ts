@@ -4,7 +4,7 @@
  * realpath'd, so `..`, symlinks and junctions cannot walk out. Refusals come back as plain
  * text for Scout to relay; delete goes to the Recycle Bin through an injected seam.
  */
-import { open, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
+import { lstat, open, readdir, realpath, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Part } from '@tagalong/contract';
 
@@ -20,10 +20,21 @@ type Handler = (input: Record<string, unknown>) => Promise<Part[]>;
 const DEFAULT_READ_CHARS = 20_000;
 const MAX_LISTED = 200;
 const BINARY_SNIFF_BYTES = 8_000;
+const MAX_READ_CHARS = 100_000;
 
 const NO_FOLDERS =
   'No folders chosen yet: the person has not allowed Scout into any folder, so it cannot touch files.';
 const OUTSIDE = 'That path is outside the folders the person chose, so Scout cannot touch it.';
+
+const SAID: Record<string, string> = {
+  EXDEV: 'Moving across drives is not supported, so nothing was moved.',
+  ENOENT: 'That file or folder does not exist.',
+  EISDIR: 'That is a folder, not a file.',
+  ENOTDIR: 'That is not a folder.',
+  EACCES: 'Windows did not give permission for that.',
+  EPERM: 'Windows did not give permission for that.',
+  EBUSY: 'That file is in use by another program right now.',
+};
 
 /** A refusal: thrown inside a handler and turned into a plain text result by `guard`. */
 class Refusal extends Error {}
@@ -31,9 +42,13 @@ class Refusal extends Error {}
 /** Whether `target` is `folder` or below it. Windows ignores case and accepts / or \ . */
 export function isInside(folder: string, target: string, windows: boolean): boolean {
   const p = windows ? path.win32 : path.posix;
-  const fold = (s: string) => (windows ? s.toLowerCase() : s);
-  const rel = p.relative(fold(p.resolve(folder)), fold(p.resolve(target)));
-  return rel === '' || (!rel.startsWith('..') && !p.isAbsolute(rel));
+  // The \\?\ long-path prefix names the same place; drop it so both sides compare alike.
+  const norm = (s: string) => {
+    const bare = windows ? s.replace(/^\\\\\?\\(?=[a-z]:)/i, '') : s;
+    return windows ? p.resolve(bare).toLowerCase() : p.resolve(bare);
+  };
+  const rel = p.relative(norm(folder), norm(target));
+  return rel === '' || (rel !== '..' && !rel.startsWith('..' + p.sep) && !p.isAbsolute(rel));
 }
 
 /** realpath of a path that may not exist yet: the nearest existing parent, resolved, plus the rest. */
@@ -42,6 +57,16 @@ async function realish(p: string): Promise<string> {
     return await realpath(p);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    // realpath fails the same way for a missing file and for a link whose target is missing;
+    // a link could point out of the folder, so an entry that exists here is refused.
+    if (
+      await lstat(p).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      throw new Refusal('That path is a link that leads nowhere, so Scout will not use it.');
+    }
     const parent = path.dirname(p);
     if (parent === p) return p;
     return path.join(await realish(parent), path.basename(p));
@@ -97,6 +122,9 @@ export function fileTools(deps: FileDeps): Record<string, Handler> {
         return await run(input);
       } catch (error) {
         if (error instanceof Refusal) return text(error.message);
+        // Raw Node errors carry paths and codes; say the cause in a sentence instead.
+        const said = SAID[(error as NodeJS.ErrnoException).code ?? ''];
+        if (said !== undefined) return text(said);
         throw error;
       }
     };
@@ -125,9 +153,13 @@ export function fileTools(deps: FileDeps): Record<string, Handler> {
     const asked = input['maxChars'];
     const cap =
       typeof asked === 'number' && Number.isFinite(asked) && asked > 0
-        ? Math.floor(asked)
+        ? Math.min(Math.floor(asked), MAX_READ_CHARS)
         : DEFAULT_READ_CHARS;
-    const { size } = await stat(real);
+    const { size, isDirectory } = await stat(real).then((s) => ({
+      size: s.size,
+      isDirectory: s.isDirectory(),
+    }));
+    if (isDirectory) throw new Refusal('That is a folder, not a file.');
     // Read only what can matter: 4 bytes per character covers UTF-8, plus one to see the cut.
     const handle = await open(real, 'r');
     try {
@@ -159,11 +191,15 @@ export function fileTools(deps: FileDeps): Record<string, Handler> {
       await allow(target);
     }
     if (!(await exists(source))) throw new Refusal('That file does not exist.');
-    // Never overwrite: a clash is a refusal, not a choice made for the person.
-    if (await exists(target)) {
+    // On Windows a case-only rename (a.txt to A.txt) is the same file, not a clash.
+    const sameFile = windows && source.toLowerCase() === target.toLowerCase();
+    // Never overwrite: a clash is a refusal, not a choice made for the person. Checking then
+    // renaming leaves a tiny race; with one user at one desk that is acceptable.
+    if (!sameFile && (await exists(target))) {
       throw new Refusal(`${path.basename(target)} already exists there, so nothing was moved.`);
     }
-    await rename(source, target);
+    // realpath may have folded the case away; a case-only rename must use the name asked for.
+    await rename(source, sameFile ? path.resolve(to) : target);
     return text(`Moved to ${target}`);
   }
 

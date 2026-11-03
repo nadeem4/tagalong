@@ -951,6 +951,19 @@ async def test_person_allow_once_is_offered_but_always_is_not(mem, choice, expec
     assert offers.considered == expected  # "always" just made the tool Auto: no offer
 
 
+async def test_person_only_tool_approval_is_never_offered(mem):
+    # A confirm "always" tool can never be Auto, so offering to auto-approve it would be noise.
+    offers = FakeOffers()
+    box, source, bodies, _, _ = scouted(mem, FakeSideCheck(None))
+    source._specs = [ToolSpec("t", "t tool", {"type": "object"}, locked=True, person_only=True)]
+    box._offers = offers
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+    assert offers.considered == []
+
+
 async def test_refusal_and_scout_approval_are_not_offered(mem):
     offers = FakeOffers()
     box, bodies = offered(mem, offers=offers)
