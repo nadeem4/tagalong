@@ -55,6 +55,7 @@ HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
+TITLE_FALLBACK_CHARS = 80
 RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in the row
 
 
@@ -160,8 +161,9 @@ class Jobs:
             raise JobError(f"no job {job_id}")
         if earlier.state == "running":
             raise JobError(f"job {job_id} is still running; send it a note instead")
-        if expert is not None and expert != earlier.agent:
-            raise JobError(f"job {job_id} ran on {earlier.agent}, which is another expert")
+        last_agent = earlier.parts[-1].agent
+        if expert is not None and expert != last_agent:
+            raise JobError(f"job {job_id} ran on {last_agent}, which is another expert")
         if Path(folder) != Path(earlier.folder):
             raise JobError(f"job {job_id} worked in {earlier.folder}, which is another folder")
         return earlier
@@ -222,6 +224,8 @@ class Jobs:
         *,
         owner_asked: bool = True,
         fresh: bool = False,
+        job: str | None = None,
+        title: str | None = None,
     ) -> JobId:
         """Hand the task to an expert once the user picks a mode. Returns the job id.
 
@@ -230,27 +234,39 @@ class Jobs:
         Scout chose the follow-up on a wake: it then goes through the ask chain, and a covering
         preference lets it reuse the earlier mode without a card. Without continue_job the
         expert's last finished session in this folder is continued (its mode is not carried over,
-        the card is shown as for any new job); fresh=True skips that."""
+        the card is shown as for any new job); fresh=True skips that. job adds a part to that open
+        job (title is then ignored); otherwise a new job opens with Scout's title, if any."""
         if continue_job and fresh:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         earlier_part = earlier.parts[-1] if earlier else None
-        chosen = await self._pick(earlier.agent if earlier else expert)
+        if job is not None:
+            existing = self._memory.get_job(job)
+            if existing is None:
+                raise JobError(f"no job {job}")
+            if existing.closed_at:
+                raise JobError(f"job {job} is closed; open a new job instead")
+        chosen = await self._pick(earlier.parts[-1].agent if earlier else expert)
         path = Path(folder)
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
         if earlier is None and not fresh:
             found = self._memory.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
-        return await self._start_part(
-            uuid.uuid4().hex[:8],
+        started = await self._start_part(
+            job or uuid.uuid4().hex[:8],
             chosen,
             task,
             path,
             earlier=earlier,
             earlier_part=earlier_part,
             scout_follow_up=continue_job is not None and not owner_asked,
+            new_job=job is None,
         )
+        clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
+        if job is None and clean.strip():
+            self._memory.set_title(str(started), clean.strip())
+        return started
 
     async def _start_part(
         self,
@@ -429,6 +445,22 @@ class Jobs:
         if run.resumed:
             return JobId(job_id, "continued", None, parent, part)
         return JobId(job_id, "fresh", run.fresh_reason, parent, part)
+
+    def close(self, job_id: str) -> None:
+        """Scout judges the work done. A job with a running part cannot be closed."""
+        job = self._memory.get_job(job_id)
+        if job is None:
+            raise JobError(f"no job {job_id}")
+        if job.closed_at:
+            raise JobError(f"job {job_id} is already closed")
+        running = [p.id for p in job.parts if p.state == "running"]
+        if running:
+            raise JobError(
+                f"job {job_id} still running: {', '.join(running)}",
+                {"running_parts": running},
+            )
+        self._memory.close_job(job_id, _now())
+        self._changed()
 
     def tell(self, job_id: str, note: str, part: str | None = None) -> None:
         run = self._running(job_id, part, "name one")
@@ -875,15 +907,32 @@ def render_watch(items: list[dict] | None) -> str:
     return "\n".join(f"[{'x' if i['done'] else ' '}] {i['text']}" for i in items or [])
 
 
+def job_title(job: Job) -> str:
+    """Scout's title whole, or for a job without one the brief's first line (clipped: a brief can
+    be long)."""
+    if job.title and job.title.strip():
+        return job.title
+    for line in job.task.splitlines():
+        if line.strip():
+            return line.strip()[:TITLE_FALLBACK_CHARS]
+    return job.task.strip()[:TITLE_FALLBACK_CHARS]
+
+
 def job_note(job: Job, facts: dict[str, str] | None = None) -> str:
     """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides.
     Each extra fact (the activity summary) follows as its own block."""
     lines = [
         f"Job {job.id} ended.",
+        f"Title: {job_title(job)}",
         f"Task: {job.task}",
         f"Folder: {job.folder}",
         f"State: {job.state}",
     ]
+    if len(job.parts) > 1:  # facts only: which part ended last, and where each stands
+        ended = [p for p in job.parts if p.ended_at]
+        if ended:
+            lines.append(f"Part: {max(ended, key=lambda p: p.ended_at).id}")
+        lines.append("Parts: " + "; ".join(f"{p.id} {p.agent} {p.state}" for p in job.parts))
     if job.reason:
         lines.append(f"Reason: {job.reason}")
     if job.result:

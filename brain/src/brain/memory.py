@@ -382,6 +382,7 @@ _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported
 _PART_ALIASES = {"result": "report"}
 JOB_RESULT_CAP = 20_000
 JOB_PROGRESS_CAP = 2_000
+JOB_TITLE_CAP = 200
 
 
 def _parse_watch(raw: str | None) -> list[dict] | None:
@@ -573,6 +574,14 @@ class Memory:
             f"UPDATE job_parts SET {sets} WHERE job_id=? AND id=?",
             (*fields.values(), job_id, part_id),
         )
+
+    def set_title(self, job_id: str, title: str) -> None:
+        """Scout's own title for a job; only a safety cap on storage, never a rewrite."""
+        self.update_job(job_id, title=title[:JOB_TITLE_CAP])
+
+    def close_job(self, job_id: str, at: str) -> None:
+        """Mark the job closed: Scout judged the work done. Its state stays the last outcome."""
+        self.update_job(job_id, closed_at=at)
 
     def set_watch(self, job_id: str, items: list[dict] | None) -> None:
         """Replace Scout's watch list for a job; none or empty clears it."""

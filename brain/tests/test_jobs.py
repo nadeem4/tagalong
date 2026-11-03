@@ -2249,3 +2249,104 @@ async def test_folder_session_reuse_picks_the_part_that_has_the_session(make_rig
     assert (job.parent_job, job.session) == ("old", "continued")
     loads = [f for f in rig.frames() if f.get("method") == "session/load"]
     assert loads[0]["params"]["sessionId"] == "mine"
+
+
+# ---- titles, extra parts and closing (SP3) ----
+
+
+def test_job_title_falls_back_to_the_first_line_of_the_brief():
+    from brain.jobs import job_title
+
+    def job(**kw):
+        return Job("j", kw.pop("task", "x"), "f", "m", "done", "s", None, **kw)
+
+    assert job_title(job(title="Fix the login bug")) == "Fix the login bug"
+    long_title = "w " * 150
+    assert job_title(job(title=long_title)) == long_title  # Scout's words are not clipped
+    assert job_title(job(task="\n\nFirst line\nsecond")) == "First line"
+    assert job_title(job(task="a" * 200)) == "a" * 80
+    assert job_title(job(title="   ", task="brief")) == "brief"
+
+
+async def test_start_stores_a_masked_title(make_rig):
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
+    rig = make_rig(FakeAsks(Answer("Plan")), guards=guards)
+    job = await rig.jobs.start("go", str(rig.folder), title="Deploy with fake-token-12345678")
+    assert rig.memory.get_job(job).title == "Deploy with [secret]"
+
+
+async def test_blank_title_falls_back(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job = await rig.jobs.start("go\nmore", str(rig.folder), title="  ")
+    assert rig.memory.get_job(job).title is None
+
+
+async def test_start_with_job_adds_a_part_to_an_open_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}])
+    first = await rig.jobs.start("one", str(rig.folder), title="Mine")
+    await finish(rig, first)
+    two = await rig.jobs.start("two", str(rig.folder), job=str(first), title="ignored")
+    assert (str(two), two.part) == (str(first), "p2")
+    got = rig.memory.get_job(first)
+    assert [p.task for p in got.parts] == ["one", "two"]
+    assert got.title == "Mine"
+
+
+async def test_start_with_job_refuses_a_closed_or_unknown_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    first = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, first)
+    rig.jobs.close(str(first))
+    with pytest.raises(JobError, match="closed"):
+        await rig.jobs.start("two", str(rig.folder), job=str(first))
+    with pytest.raises(JobError, match="no job nope"):
+        await rig.jobs.start("two", str(rig.folder), job="nope")
+    assert len(rig.memory.get_job(first).parts) == 1
+
+
+async def test_close_sets_closed_at_and_keeps_state(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, job)
+    assert rig.memory.get_job(job).closed_at is None  # done, but Scout has not closed it
+    rig.jobs.close(str(job))
+    got = rig.memory.get_job(job)
+    assert got.closed_at and got.state == "done"
+    with pytest.raises(JobError, match="already closed"):
+        rig.jobs.close(str(job))
+    with pytest.raises(JobError, match="no job nope"):
+        rig.jobs.close("nope")
+
+
+async def test_close_refuses_while_a_part_runs(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    with pytest.raises(JobError, match="still running") as err:
+        rig.jobs.close(str(job))
+    assert err.value.facts == {"running_parts": ["p1"]}
+    assert rig.memory.get_job(job).closed_at is None
+
+
+async def test_part_end_wakes_scout_with_the_part_and_leaves_the_job_open(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}])
+    job = await rig.jobs.start("one", str(rig.folder), title="Two steps")
+    await finish(rig, job)
+    await until(lambda: len(rig.finished) == 1)
+    await rig.jobs.start("two", str(rig.folder), job=str(job))
+    await until(lambda: len(rig.finished) == 2)
+    note = rig.jobs.note(rig.finished[-1])
+    assert "Two steps" in note and "Part: p2" in note and "p1 claude-acp done" in note
+    assert rig.finished[-1].closed_at is None
+
+
+async def test_a_part_in_another_folder_does_not_borrow_the_jobs_first_session(make_rig, tmp_path):
+    asks = FakeAsks(Answer("Plan"), Answer("Plan"))
+    rig = make_rig(asks, [{"text": "ok"}], load=True)
+    other = tmp_path / "other"
+    other.mkdir()
+    job = await rig.jobs.start("one", str(rig.folder))
+    await until(lambda: len(rig.finished) == 1)
+    two = await rig.jobs.start("two", str(other), job=str(job))
+    assert (two.part, two.session) == ("p2", "fresh")  # the job's session belongs to its folder
+    assert not any(f.get("method") == "session/load" for f in rig.frames())
