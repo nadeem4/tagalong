@@ -261,6 +261,86 @@ def test_session_start_marks_running_jobs_stopped():
     assert job.state == "stopped" and job.parts[-1].reason == "brain restarted"
 
 
+class PictureApps:
+    """Just enough of Apps for the capability picture and the app source."""
+
+    def ids(self):
+        return ["gmail"]
+
+    def name(self, app_id):
+        return "Gmail"
+
+    def status(self, app_id):
+        return SimpleNamespace(state="connected")
+
+    def tools(self, app_id):
+        return [
+            SimpleNamespace(
+                name="send_mail",
+                description="Send an email.",
+                input_schema={"type": "object"},
+                annotations=None,
+            )
+        ]
+
+
+async def test_system_prompt_carries_the_capability_picture_of_live_state():
+    from brain.setup.store import InstalledExpert
+
+    model = Gate(["hi"])
+    bodies = Bodies()
+    session = Session(
+        model,
+        Open(),
+        bodies,
+        10,
+        Memory(":memory:"),
+        apps=PictureApps(),
+        tokens=SimpleNamespace(),
+        experts=lambda: [InstalledExpert("claude-acp", "Claude", "1", ["x"], "registry", False)],
+    )
+    bodies.notify = lambda m, p: None
+    tool = Tool(name="open_url", description="d", input_schema={"type": "object"})
+    bodies.connect(Body(id="desk", kind="desktop", name="PC"), [tool], QuietPeer(), None)
+    session.say("desk", say("hello"))
+    await finish(session)
+    prompt = model.systems[0]
+    assert "What you can do:" in prompt
+    assert "- desk (desktop) tools: open_url" in prompt
+    assert "- Gmail (gmail): Send an email." in prompt
+    assert "- claude-acp: needs sign-in" in prompt
+    assert "remember" in prompt.split("What you can do:")[1]
+
+
+async def test_a_tool_set_off_is_absent_from_the_capability_picture():
+    model = Gate(["hi"])
+    bodies = Bodies()
+    session = Session(
+        model,
+        Open(),
+        bodies,
+        10,
+        Memory(":memory:"),
+        apps=PictureApps(),
+        tokens=SimpleNamespace(),
+    )
+    bodies.notify = lambda m, p: None
+    tools = [
+        Tool(name="open_url", description="d", input_schema={"type": "object"}),
+        Tool(name="tab_read", description="d", input_schema={"type": "object"}),
+    ]
+    bodies.connect(Body(id="desk", kind="desktop", name="PC"), tools, QuietPeer(), None)
+    for name in ("desk__open_url", "gmail__send_mail", "set_timer"):
+        session.toolbox.set_mode(name, "off")
+    session.say("desk", say("hello"))
+    await finish(session)
+    picture = model.systems[0].split("What you can do:")[1]
+    assert "tab_read" in picture
+    assert "open_url" not in picture
+    assert "Gmail" not in picture
+    assert "set_timer" not in picture and "remember" in picture
+
+
 async def test_what_you_know_in_system_prompt():
     memory = Memory(":memory:")
     memory.remember("instruction", "answer in French")

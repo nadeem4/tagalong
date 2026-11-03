@@ -29,7 +29,7 @@ the way.
 Tagalong is **one companion for everything you do**: **Scout** sits on your screen. Scout sees what you are working on,
 answers, and when something needs real work it writes a brief and hands it to the right
 **expert** (Claude Code first; more experts later), then brings the answer back. It removes the
-copy, switch app, paste, ask, switch back loop. Scout never does the expert's work itself, and
+copy, switch app, paste, ask, switch back loop. Scout never does an expert's long job itself, and
 never hands anything over without you pressing Send.
 
 Success: people keep it running all day, ask it things they would otherwise not bother to ask, and
@@ -76,6 +76,9 @@ its result.
 ## Capabilities and Constraints
 
 - Scout thinks with an Anthropic API key set in the brain's environment.
+- Scout always knows what it can do (its own tools, each body's tools, your connected apps and
+  your experts) and routes by it: it answers, or uses its tools and apps, and hands over to an
+  expert only for a long or many-stepped job. It never assumes an expert has its own apps.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,

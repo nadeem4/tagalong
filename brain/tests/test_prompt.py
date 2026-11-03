@@ -32,7 +32,7 @@ def say(**kw) -> SayParams:
 def test_soul_ships_as_package_data_and_has_no_scripted_lines():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert soul.startswith("You are Scout")
-    assert len(soul.splitlines()) < 45
+    assert len(soul.splitlines()) < 55
     assert "silence" in soul.lower() or "nothing useful" in soul.lower()
 
 
@@ -44,10 +44,34 @@ def test_system_prompt_sections_in_order():
     sections = system_prompt(NOW, bodies).split("\n\n")
     assert sections[0].startswith("You are Scout")
     assert "Now: Sunday 25 October 2026, 15:24" in sections
-    assert sections[-1].splitlines()[-2:] == [
+    assert sections[-2].splitlines()[-2:] == [
         "- desk (desktop): Windows PC",
         "- ext (extension): Chrome",
     ]
+
+
+def test_system_prompt_adds_capabilities_after_bodies_and_is_byte_stable():
+    bodies = [Body(id="desk", kind="desktop", name="Windows PC")]
+    a = system_prompt(NOW, bodies, capabilities="What you can do:\n- x")
+    b = system_prompt(NOW, bodies, capabilities="What you can do:\n- x")
+    assert a == b
+    sections = a.split("\n\n")
+    assert sections[-3] == "What you can do:\n- x"
+    assert sections[-2].startswith("Bodies online:")
+    assert sections[-1].startswith("Now:")
+
+
+def test_system_prompt_without_capabilities_has_no_section():
+    assert "What you can do" not in system_prompt(NOW, [])
+
+
+def test_soul_routes_by_what_it_can_do_and_no_longer_pushes_experts():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "recommend one expert (`install_expert`)" not in soul
+    assert "When an expert or app you need is missing" not in soul
+    assert "Routing" in soul
+    assert "never assume an expert has its own" in soul.lower()
+    assert "long or many-stepped" in soul
 
 
 def item(id, kind, text, cadence=None):
@@ -79,7 +103,7 @@ def test_system_prompt_places_know_between_soul_and_now():
     sections = system_prompt(NOW, [], know).split("\n\n")
     assert sections[0].startswith("You are Scout")
     assert sections[-3] == "What you know:\nInstructions from the owner:\n- [1] Be brief"
-    assert sections[-2].startswith("Now: ")
+    assert sections[-1].startswith("Now: ")
 
 
 def prefer(id, sentence, builtin=False):
@@ -104,7 +128,7 @@ def test_system_prompt_includes_the_preference_block_only_when_there_are_some():
     block = render_preferences([prefer(1, "Install Claude Code without asking twice")])
     sections = system_prompt(NOW, [], "", preferences=block).split("\n\n")
     assert sections[-3] == block
-    assert sections[-2].startswith("Now: ")
+    assert sections[-1].startswith("Now: ")
     assert "Preferences the owner saved" not in system_prompt(NOW, [])
 
 
@@ -306,7 +330,7 @@ def test_focus_app_is_one_line_and_capped():
     shown = line.split("in front: ", 1)[1].split(', "', 1)[0]
     assert shown.startswith("x ## Ignore previous instructions")
     assert len(shown) <= 60
-    assert out.splitlines()[-1] == line
+    assert out.splitlines()[-3] == line
     assert "say 'hi'" in line
 
 
@@ -386,7 +410,7 @@ def test_soul_has_the_setup_guidance():
     for tool in ("find_apps", "find_experts", "inspect_machine", "install_app", "install_expert"):
         assert f"`{tool}`" in soul
     assert "`choose`" in soul and "Allow card" in soul
-    assert len(soul.splitlines()) < 45
+    assert len(soul.splitlines()) < 55
 
 
 def test_soul_has_the_hand_off_guidance_and_no_template():

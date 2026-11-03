@@ -43,6 +43,7 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
+from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
     interruption_block,
@@ -123,6 +124,8 @@ class Session:
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
     ) -> None:
         self._model = model
+        self._apps_live = apps  # read each turn for the capability picture
+        self._experts_live = experts or (lambda: [])
         # Set by main when voice is built; None answers `listen` with method_not_found.
         self.voice: VoiceHooks | None = None
         self._budget = budget
@@ -549,6 +552,7 @@ class Session:
                     self._latest("tab"),
                     self._latest("download"),
                     prefs,
+                    self._capabilities(),
                 ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
@@ -566,6 +570,40 @@ class Session:
         self._task = task
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead))
         return turn_id
+
+    def _capabilities(self) -> str:
+        """The picture of what Scout can do now, from live state, read once per system prompt.
+
+        Built from the toolbox's active specs grouped by source type, so a tool set Off drops out
+        of the picture exactly as it drops out of the model's tool list."""
+        active = {s.name for s in self.toolbox.active_specs()}
+        builtin: list[str] = []
+        by_body: dict[str, list[str]] = {}
+        by_app: dict[str, list[ToolSpec]] = {}
+        for source in self.toolbox.sources:
+            for spec in source.specs():
+                if spec.name not in active or "scout" not in spec.audience:
+                    continue
+                prefix, _, plain = spec.name.partition(SEP)
+                if isinstance(source, BodySource):
+                    by_body.setdefault(prefix, []).append(plain)
+                elif isinstance(source, AppSource):
+                    by_app.setdefault(prefix, []).append(spec)
+                else:
+                    builtin.append(spec.name)
+        bodies = [
+            BodyCaps(b.id, b.kind, by_body[b.id]) for b in self._bodies.online() if b.id in by_body
+        ]
+        apps = [
+            AppCaps(
+                app_id,
+                self._apps_live.name(app_id) if self._apps_live is not None else app_id,
+                next((sp.description for sp in specs if sp.description), ""),
+            )
+            for app_id, specs in by_app.items()
+        ]
+        experts = [ExpertCaps(e.id, e.logged_in) for e in self._experts_live()]
+        return capability_picture(builtin, bodies, apps, experts)
 
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:

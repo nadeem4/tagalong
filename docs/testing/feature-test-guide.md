@@ -1941,14 +1941,24 @@ Brain tests only; nothing here installs anything.
 5. Leave the window open for ten minutes: Scout reports a timeout once.
 6. On a brain without a display (or not Windows): Scout tells you the command to run yourself.
 
+### Scout knows what it can do and routes by it
+
+1. `cd brain && uv run pytest tests/test_capabilities.py tests/test_prompt.py tests/test_sessions.py -q`
+   passes (fakes only).
+2. By hand with no calendar app connected and no expert installed: ask Scout to put a meeting in
+   your calendar. Scout says plainly it has no calendar tool and may offer to connect one; it does
+   not recommend installing an expert.
+3. Connect an app, then ask a question it covers: Scout uses the app. With an expert installed,
+   ask for a small lookup: Scout does it itself rather than handing it over.
+
 ### Scout offers a missing expert or app
 
 1. `cd brain && uv run pytest tests/test_jobs.py tests/test_setup_apps.py tests/test_prompt.py -q`
    passes (fakes only: no network, install or API call).
 2. By hand with a real brain and no expert installed: ask Scout to hand a task to Claude Code in a
    folder. The refusal reaches Scout as facts; Scout says what is missing (for example Node 18
-   where 22 is needed), recommends one expert with a reason and asks with clickable choices. Pick
-   the recommendation: the install Allow card opens (naming the Node download), with no **Always**.
+   where 22 is needed) in its own words. Ask it to set up Claude Code: the install Allow card
+   opens (naming the Node download), with no **Always**.
 3. Save a preference that sounds like it covers installs, then ask again: the card still opens.
 4. Ask for an app that is not connected (for example one that reads your notes). Scout searches
    the registry, recommends one and asks. After you choose, the Allow card names the package or

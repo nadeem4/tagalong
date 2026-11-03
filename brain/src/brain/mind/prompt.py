@@ -95,6 +95,7 @@ def system_prompt(
     tabs: Facts | None = None,
     downloads: Facts | None = None,
     preferences: str = "",
+    capabilities: str = "",
 ) -> str:
     if bodies:
         lines = [
@@ -109,7 +110,8 @@ def system_prompt(
     now_line = f"Now: {now.strftime('%A %d %B %Y, %H:%M')}{offset}"
     known = [f"What you know:\n{know}"] if know else []
     prefs = [preferences] if preferences else []
-    return "\n\n".join([_soul(), *known, *prefs, now_line, online])
+    caps = [capabilities] if capabilities else []
+    return "\n\n".join([_soul(), *known, *prefs, *caps, online, now_line])
 
 
 def _text(text: str) -> dict[str, Any]:
