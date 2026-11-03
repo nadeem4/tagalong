@@ -83,7 +83,6 @@ _ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
 
-
 @dataclass(frozen=True)
 class Interruption:
     """The owner talked over a spoken turn: what the body finished playing, and what was left."""
