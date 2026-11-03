@@ -569,6 +569,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             filter?: string;
             usd?: number;
             approved?: boolean;
+            query?: string;
           };
         };
         let value: unknown = {};
@@ -660,9 +661,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               : [],
             apps: gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : [],
             browse_experts: [],
-            browse_apps: gmailConnected
-              ? []
-              : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
+            // The registry answers a search by name; no query is a first page without Gmail.
+            browse_apps:
+              gmailConnected || !String(params.input?.query ?? '').includes('gmail')
+                ? []
+                : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             stale: false,
             progress: null,
             failed: null,

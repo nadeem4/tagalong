@@ -546,7 +546,10 @@ The first-run setup adds four more Home tools (never offered to Scout):
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
-browse_experts, browse_apps, stale, progress, failed}`, where `state` is `ready`, `needs_login` or
+browse_experts, browse_apps, stale, progress, failed}`; an optional `query` searches the app
+registry, so `browse_apps` holds that search's entries instead of the registry's unfiltered first
+page (the tour asks once per job's app), and `setup_app` takes the same `query` so install_app can find
+the entry again), where `state` is `ready`, `needs_login` or
 `needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
 (`{id, approved?}`, `self_asks`). With `approved` false they open the same Allow card Scout's

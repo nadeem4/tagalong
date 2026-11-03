@@ -35,9 +35,17 @@ async function renderOpen(host: ReturnType<typeof hostWith>) {
   return view;
 }
 
-function hostWith(overview: SetupOverview) {
+/** The registry answers a search by name, as the brain does; no query is its unrelated first page. */
+function hostWith(overview: SetupOverview, registry: SetupOverview['browseApps'] = []) {
   const host = makeWalkthroughHost();
-  host.setupOverview.mockResolvedValue(overview);
+  host.setupOverview.mockImplementation((query?: string) =>
+    Promise.resolve({
+      ...overview,
+      browseApps: registry.filter(
+        (a) => query !== undefined && a.name.toLowerCase().includes(query),
+      ),
+    }),
+  );
   return host;
 }
 
@@ -217,7 +225,7 @@ describe('StepSix', () => {
   });
 
   it('Connect runs the host call for the app the job needs, with progress', async () => {
-    const host = hostWith({ ...EMPTY, browseApps: [GMAIL] });
+    const host = hostWith(EMPTY, [GMAIL]);
     let finish: () => void = () => undefined;
     host.setupApp.mockReturnValue(new Promise<{ state?: string }>((r) => (finish = () => r({}))));
     render(<StepSix host={host} />);
@@ -225,7 +233,7 @@ describe('StepSix', () => {
     fireEvent.click(button);
     fireEvent.click(button);
     expect(host.setupApp).toHaveBeenCalledTimes(1);
-    expect(host.setupApp).toHaveBeenCalledWith('io.example/gmail');
+    expect(host.setupApp).toHaveBeenCalledWith('io.example/gmail', 'gmail');
     expect(await screen.findByText('Connecting Gmail…')).toBeVisible();
     host.setupOverview.mockResolvedValue({
       ...EMPTY,
@@ -237,13 +245,34 @@ describe('StepSix', () => {
   });
 
   it('a refused Connect says so in plain words and offers it again', async () => {
-    const host = hostWith({ ...EMPTY, browseApps: [GMAIL] });
+    const host = hostWith(EMPTY, [GMAIL]);
     host.setupApp.mockRejectedValue(new Error('denied'));
     render(<StepSix host={host} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Connect Gmail' }));
     expect(await screen.findByText(/nothing was added/)).toBeVisible();
     expect(screen.queryByText('denied')).toBeNull();
     expect(await screen.findByRole('button', { name: 'Try Gmail again' })).toBeEnabled();
+  });
+
+  it('asks the registry once per job app, by name, and names the button after the match', async () => {
+    const host = hostWith(EMPTY, [
+      { id: 'io.example/cal', name: 'Fancy Calendar', version: '1', description: 'd' },
+    ]);
+    render(<StepSix host={host} />);
+    expect(await screen.findByRole('button', { name: 'Connect Fancy Calendar' })).toBeVisible();
+    const queries = host.setupOverview.mock.calls.map(([q]) => q).filter((q) => q !== undefined);
+    expect(queries.sort()).toEqual(['calendar', 'gmail']);
+  });
+
+  it('an app that is saved but not signed in says to finish in Home, not connected', async () => {
+    const host = hostWith({
+      ...EMPTY,
+      apps: [{ id: 'a1', name: 'Gmail', state: 'needs_sign_in' }],
+    });
+    render(<StepSix host={host} />);
+    expect(await screen.findByText('Finish Gmail in Home.')).toBeVisible();
+    expect(screen.queryByText('Gmail is connected.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Connect/ })).toBeNull();
   });
 
   it('an app the registry does not have shows no Connect button', async () => {

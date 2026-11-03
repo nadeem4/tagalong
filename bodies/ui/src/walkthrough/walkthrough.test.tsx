@@ -122,6 +122,25 @@ describe('Walkthrough', () => {
   });
 });
 
+describe('Walkthrough, a non-coder path', () => {
+  it('never says Claude Code on steps 1 to 6 unless the expert line is opened', async () => {
+    const { container } = render(<Walkthrough host={makeWalkthroughHost()} scout={SCOUT} />);
+    expect(container.textContent).not.toMatch(/Claude Code/);
+    fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
+    for (let step = 2; step <= 5; step += 1) {
+      await screen.findByRole('heading', { level: 1 });
+      expect(container.textContent, `step ${step}`).not.toMatch(/Claude Code/);
+      fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    }
+    await screen.findByRole('heading', { name: 'Scout does the everyday jobs' });
+    expect(container.textContent).not.toMatch(/Claude Code/);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'For long jobs, Scout can also use an expert' }),
+    );
+    expect(container.textContent).toMatch(/Claude Code/);
+  });
+});
+
 describe('Walkthrough, the end', () => {
   it('shows the placeholder-free steps 6 to 9', async () => {
     open(makeWalkthroughHost({ key: HAS_KEY }), 6);

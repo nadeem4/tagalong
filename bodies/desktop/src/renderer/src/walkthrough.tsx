@@ -38,8 +38,8 @@ const walkthroughHost: WalkthroughHost = {
     return result;
   },
   // An app always shows its Allow card (the brain's rule); the tour just waits for the answer.
-  setupApp: async (id) => {
-    const result = await bridge.setupApp(id, false);
+  setupApp: async (id, query) => {
+    const result = await bridge.setupApp(id, false, query);
     if (result.error !== undefined) throw new Error(result.error);
     return result;
   },

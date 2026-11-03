@@ -39,7 +39,7 @@ export function makeWalkthroughHost(
     usageSummary: vi.fn(() => Promise.resolve({ spentUsd: 0.42, limitUsd: 5 })),
     onBrainChanged: vi.fn((_handler: (what: string) => void) => () => undefined),
     openWalkthrough: vi.fn(() => Promise.resolve()),
-    setupOverview: vi.fn((): Promise<SetupOverview> =>
+    setupOverview: vi.fn((_query?: string): Promise<SetupOverview> =>
       Promise.resolve({
         experts: [],
         apps: [],
@@ -51,7 +51,9 @@ export function makeWalkthroughHost(
       }),
     ),
     setupExpert: vi.fn((_id: string): Promise<{ state?: string }> => Promise.resolve({})),
-    setupApp: vi.fn((_id: string): Promise<{ state?: string }> => Promise.resolve({})),
+    setupApp: vi.fn((_id: string, _query: string): Promise<{ state?: string }> =>
+      Promise.resolve({}),
+    ),
     finishWalkthrough: vi.fn(() => Promise.resolve()),
     openKeyPage: vi.fn(() => Promise.resolve()),
     getSettings: vi.fn(() => Promise.resolve(options.settings ?? SETTINGS)),

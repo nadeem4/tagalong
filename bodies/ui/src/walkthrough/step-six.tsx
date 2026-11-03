@@ -55,16 +55,27 @@ function viewOf(overview: SetupOverview): View {
   return { kind: 'missing' };
 }
 
-/** Whether a job's app is connected, can be connected from the registry, or is not offered. */
+/** A registry entry that matched a job's app search: its id and the name the button shows. */
+interface Match {
+  id: string;
+  name: string;
+}
+
+/**
+ * Where a job's app stands: connected, saved but not finished (needs a sign-in or a key, which
+ * Home does), offered by the registry for a one-click Connect, or not offered at all.
+ */
 function appOf(
   overview: SetupOverview | null,
+  matches: Record<string, Match | undefined>,
   key: string,
-): { state: 'connected' | 'available' | 'missing'; id?: string } {
-  if (overview === null) return { state: 'missing' };
+): { state: 'connected' | 'unfinished' | 'available' | 'missing'; match?: Match } {
   const has = (name: string) => name.toLowerCase().includes(key);
-  if (overview.apps.some((a) => has(a.name))) return { state: 'connected' };
-  const found = overview.browseApps.find((a) => has(a.id) || has(a.name));
-  return found === undefined ? { state: 'missing' } : { state: 'available', id: found.id };
+  const saved = overview?.apps.find((a) => has(a.name));
+  if (saved !== undefined)
+    return { state: saved.state === 'connected' ? 'connected' : 'unfinished' };
+  const match = matches[key];
+  return match === undefined ? { state: 'missing' } : { state: 'available', match };
 }
 
 export function StepSix({
@@ -77,6 +88,8 @@ export function StepSix({
   const [open, setOpen] = useState(false); // the optional expert line
   // Per app key: connecting now, or the plain words for why it did not connect.
   const [connect, setConnect] = useState<Record<string, { busy: boolean; error?: string }>>({});
+  // Per app key, the registry entry its own search found (asked once, on arrival).
+  const [matches, setMatches] = useState<Record<string, Match | undefined>>({});
   const connecting = useRef(new Set<string>()); // a double press sends one call
   const pressed = useRef(false); // a double press sends one call
   const [waiting, setWaiting] = useState(false); // a login window is open
@@ -97,6 +110,27 @@ export function StepSix({
   }, [setupOverview]);
 
   useEffect(load, [load]);
+  // The registry's first page rarely holds a given app, so each job's app is searched for by name.
+  useEffect(() => {
+    let live = true;
+    for (const job of JOB_KINDS) {
+      if (job.app === undefined) continue;
+      const { key } = job.app;
+      setupOverview(key).then(
+        (found) => {
+          const entry = found.browseApps.find(
+            (a) => a.id.toLowerCase().includes(key) || a.name.toLowerCase().includes(key),
+          );
+          if (live && entry !== undefined)
+            setMatches((m) => ({ ...m, [key]: { id: entry.id, name: entry.name } }));
+        },
+        () => undefined, // offline: the page already says so, and the job shows no button
+      );
+    }
+    return () => {
+      live = false;
+    };
+  }, [setupOverview]);
   // The brain says `changed setup` as an install moves on; read the overview again each time.
   useEffect(
     () =>
@@ -112,7 +146,7 @@ export function StepSix({
     if (connecting.current.has(key)) return;
     connecting.current.add(key);
     setConnect((c) => ({ ...c, [key]: { busy: true } }));
-    setupApp(id)
+    setupApp(id, key)
       .then(
         () => setConnect((c) => ({ ...c, [key]: { busy: false } })),
         (err: unknown) => {
@@ -160,7 +194,7 @@ export function StepSix({
       <ul className="wt-jobs">
         {JOB_KINDS.map((job) => {
           const wanted = job.app;
-          const app = wanted === undefined ? null : appOf(overview, wanted.key);
+          const app = wanted === undefined ? null : appOf(overview, matches, wanted.key);
           const state = wanted === undefined ? undefined : connect[wanted.key];
           return (
             <li key={job.label} className="wt-job">
@@ -180,19 +214,24 @@ export function StepSix({
                       {wanted.name} is connected.
                     </p>
                   )}
-                  {app.state === 'available' && state?.busy === true && (
+                  {app.state === 'unfinished' && (
                     <p className="wt-help" role="status">
-                      Connecting {wanted.name}…
+                      Finish {wanted.name} in Home.
                     </p>
                   )}
-                  {app.state === 'available' && state?.busy !== true && app.id !== undefined && (
+                  {app.match !== undefined && state?.busy === true && (
+                    <p className="wt-help" role="status">
+                      Connecting {app.match.name}…
+                    </p>
+                  )}
+                  {app.match !== undefined && state?.busy !== true && (
                     <Button
                       variant="quiet"
-                      onClick={() => connectApp(wanted.key, app.id as string)}
+                      onClick={() => connectApp(wanted.key, (app.match as Match).id)}
                     >
                       {state?.error === undefined
-                        ? `Connect ${wanted.name}`
-                        : `Try ${wanted.name} again`}
+                        ? `Connect ${app.match.name}`
+                        : `Try ${app.match.name} again`}
                     </Button>
                   )}
                 </div>

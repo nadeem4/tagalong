@@ -64,10 +64,12 @@ class Rig:
         self, tmp_path: Path, installed=(), apps=(), offline=False, answer="allow", card=None
     ):  # answer None: nobody online
         async def get(url: str) -> bytes:
+            self.urls.append(url)
             if offline:
                 raise OSError("down")
             return MCP if "modelcontext" in url else ACP
 
+        self.urls: list[str] = []
         self.progress = SetupProgress(lambda event: None)
         self.asked: list[dict] = []
         self.recorded: list[dict] = []
@@ -115,6 +117,15 @@ async def test_overview_lists_installed_and_browsable_with_states(tmp_path):
     assert [e["id"] for e in out["browse_experts"]] == ["codex-acp"]
     assert [a["id"] for a in out["browse_apps"]] == ["acme/cloud"]
     assert out["stale"] is False and out["progress"] is None
+
+
+async def test_overview_searches_the_app_registry_by_the_query(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.call("setup_overview", {"query": " Gmail "})
+    assert any("modelcontext" in u and u.endswith("&search=gmail") for u in rig.urls)
+    rig = Rig(tmp_path / "plain")
+    await rig.call("setup_overview")
+    assert not any("search=" in u for u in rig.urls)
 
 
 async def test_an_expert_not_logged_in_needs_login(tmp_path):

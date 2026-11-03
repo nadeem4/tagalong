@@ -1850,14 +1850,17 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    folder", "Fix this code"); the word "Claude Code" appears nowhere yet. A job whose app is in the
    registry has a **Connect** button; it reads "Connecting Gmail…" while the card is open, then
    "Gmail is connected."; saying no shows "You said no, so nothing was added." and **Try Gmail again**.
-   A job whose app the registry lacks shows no button. Home's **Connections** page lists experts
+   The button is named after the registry entry found by searching the app's name (for example
+   Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
+   connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
+   Code" until the expert line is opened. Home's **Connections** page lists experts
    under **FOR LONG JOBS**, each led by the kind of job ("Fix code and other long jobs") with the
    product and version underneath.
    Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
    the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **Experts** card lists Claude Code with its
+   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **FOR LONG JOBS** card lists Claude Code with its
    state; **Browse and add** offers more, and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are

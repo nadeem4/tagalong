@@ -333,7 +333,7 @@ describe('ConnectionsPanel groups', () => {
   it('shows the Apps and Experts groups', async () => {
     await renderPanel(withSetup({ experts: [{ ...CLAUDE, state: 'ready' }] }));
     expect(screen.getByRole('region', { name: 'Connected apps' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Experts' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'For long jobs' })).toBeInTheDocument();
   });
 
   it('an expert row leads with the kind of job and keeps the product underneath', async () => {
@@ -499,7 +499,7 @@ describe('ConnectionsPanel groups', () => {
     const bridge = createFakeHostBridge({ listFails: 'brain offline' });
     await renderPanel(bridge);
     expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
-    expect(screen.queryByRole('region', { name: 'Experts' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'For long jobs' })).toBeNull();
   });
 
   it('long names and many entries stay inside the page', async () => {

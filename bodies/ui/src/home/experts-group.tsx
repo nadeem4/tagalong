@@ -1,6 +1,7 @@
 /**
- * The Experts group on Home's Connections page: one row per installed expert, led by the kind of
- * job it does with the product underneath, its state and the action that fits it (Log in, Update), plus the stage words of a running install.
+ * The "For long jobs" group on Home's Connections page: one row per installed expert, led by the
+ * kind of job it does with the product underneath, then its state and the action that fits it
+ * (Log in, Update), plus the stage words of a running install.
  * Contains ExpertsGroup and stageWords. The brain sends short tokens; the words are this page's.
  */
 
@@ -50,7 +51,7 @@ export function ExpertsGroup({
   onAct: (id: string) => void;
 }) {
   return (
-    <section className="home-card" aria-label="Experts">
+    <section className="home-card" aria-label="For long jobs">
       <h2 className="home-card__label">FOR LONG JOBS</h2>
       {experts.length === 0 ? (
         <p className="tg-note">No experts yet. Add one below.</p>
