@@ -1386,8 +1386,10 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   already waiting are said together, because the voice clips a very short line.
 - **`Mouth`** (`voice/mouth.py`) keeps one task per spoken turn. It synthesises each sentence
   with `asyncio.to_thread`, so a slow voice never stalls the websocket or the ears, and sends
-  `speech {turn, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
-  base64). After the last sentence it sends `speech {turn, done: true}`.
+  `speech {turn, n, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
+  base64; `n` is the 1-based sentence number within the turn). After the last sentence it sends
+  `speech {turn, done: true}`. `Mouth.sentences(turn)` returns what was sent for the newest three
+  turns (frame `n` is index `n - 1`), then the sentences made but not yet sent; it survives a hush.
 - **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
   ready (first run downloads about 120 MB), and when it fails to load, sentences go out as `speech
 {turn, text}` with no `pcm`, so the body says them with its system voice. The mouth sends no
@@ -1402,6 +1404,18 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   so a spoken `say` that joins the turn after a hush speaks again (from the next delta). `unlisten`
   does not hush (a held-mode reply goes on being spoken) and `cancel` does not hush, so a body
   sends `hush` on Stop.
+- **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
+  [Voice](voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
+  the first `heard` sentences were said, the rest are the unsaid. The running turn is cancelled
+  (and the mouth hushed; it keeps the turn's sentence log through the hush, since a body's own
+  `hush` usually arrives first), and the new turn waits for it to wind down so history stays valid. The
+  saved history keeps only the spoken sentences, ending with `[interrupted: the owner spoke over
+this]` (`Memory.replace_last_message` rewrites the cut turn's message), never the unsaid. The
+  model sees the unsaid once, as a `<data kind="interruption">` block (`spoken:` and `unsaid:`)
+  before the owner's words, only for that next turn; `soul.md` says what the block means, and the
+  model decides whether to stop, answer, carry on or offer the rest. A stale or unknown `turn`, or
+  an empty unsaid on a turn that already ended, makes it a plain `say`; a turn still running is
+  cancelled even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
 - **The spoken note.** For a spoken `say` the user content gets one extra text block, after the
   content: "This reply will be read aloud ... you may open with one short sentence in your own
   words first." That sentence is the spoken ack; code never says it, there is no canned line and no

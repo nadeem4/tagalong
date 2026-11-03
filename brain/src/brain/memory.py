@@ -1047,20 +1047,23 @@ class Memory:
         self._db.execute("BEGIN IMMEDIATE")
         try:
             for m in messages:
-                texts: list[str] = []
-                content = m["content"]
-                if isinstance(content, str):
-                    texts.append(content)
-                else:
-                    content = [_clean_block(b, texts) for b in content]
+                content, text = _encode_message(m)
                 self._db.execute(
                     "INSERT INTO messages(at, role, content_json, text) VALUES (?,?,?,?)",
-                    (now, m["role"], json.dumps(content), "\n".join(t for t in texts if t)),
+                    (now, m["role"], content, text),
                 )
         except BaseException:
             self._db.execute("ROLLBACK")
             raise
         self._db.execute("COMMIT")
+
+    def replace_last_message(self, message: dict) -> None:
+        """Rewrite the newest saved message: a spoken-over reply keeps only what was said."""
+        content, text = _encode_message(message)
+        self._db.execute(
+            "UPDATE messages SET content_json=?, text=? WHERE id=(SELECT MAX(id) FROM messages)",
+            (content, text),
+        )
 
     def load_messages(self) -> list[dict]:
         rows = self._db.execute("SELECT role, content_json FROM messages ORDER BY id")
@@ -1092,3 +1095,14 @@ class Memory:
             )
             hits += [Hit(f"chat:{i}", "chat", at, t) for i, at, t in rows]
         return hits
+
+
+def _encode_message(m: dict) -> tuple[str, str]:
+    """The stored JSON of a message and its searchable text."""
+    texts: list[str] = []
+    content = m["content"]
+    if not isinstance(content, str):
+        content = [_clean_block(b, texts) for b in content]
+    else:
+        texts.append(content)
+    return json.dumps(content), "\n".join(t for t in texts if t)

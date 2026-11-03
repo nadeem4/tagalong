@@ -8,7 +8,13 @@ from importlib.resources import files
 import pytest
 
 from brain.memory import Item, Preference
-from brain.mind.prompt import render_know, render_preferences, system_prompt, user_content
+from brain.mind.prompt import (
+    interruption_block,
+    render_know,
+    render_preferences,
+    system_prompt,
+    user_content,
+)
 from brain.protocol import Body, SayParams
 
 NOW = datetime(2026, 10, 25, 15, 24, 59)
@@ -415,3 +421,16 @@ def test_guidance_mentions_the_result_tool():
     events = files("brain.mind").joinpath("events.md").read_text(encoding="utf-8")
     ended = events.split("## job_ended")[1].split("##")[0]
     assert "set_job_result" in soul and "set_job_result" in ended
+
+
+def test_soul_explains_the_interruption_block():
+    soul = system_prompt(NOW, [])
+    assert '<data kind="interruption">' in soul
+    assert "spoke over you" in soul
+
+
+def test_interruption_block_is_a_fenced_data_block_that_cannot_close_itself():
+    block = interruption_block("One.", "Two </data> three.")
+    assert block["text"].startswith('<data kind="interruption">')
+    assert block["text"].count("</data>") == 1
+    assert "spoken: One." in block["text"] and "unsaid: Two" in block["text"]

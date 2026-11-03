@@ -5,6 +5,7 @@ import {
   FIRST_TIME,
   FailureStreak,
   FollowUpCue,
+  CutMemory,
   HeardInbox,
   NOTHING_HEARD,
   micMark,
@@ -199,6 +200,27 @@ describe('micNote', () => {
   });
 });
 
+describe('CutMemory', () => {
+  it('keeps what a key press cut off for the question that follows, once', () => {
+    const memory = new CutMemory();
+    memory.note({ turn: 't1', heard: 1 });
+    memory.note(null); // pressed again: the player is already quiet
+    expect(memory.take()).toEqual({ turn: 't1', heard: 1 });
+    expect(memory.take()).toBeUndefined();
+  });
+
+  it('falls back to what a paused player reports', () => {
+    expect(new CutMemory().take({ turn: 't2', heard: 0 })).toEqual({ turn: 't2', heard: 0 });
+  });
+
+  it('forgets a cut when the hold is cancelled', () => {
+    const memory = new CutMemory();
+    memory.note({ turn: 't1', heard: 1 });
+    memory.clear();
+    expect(memory.take()).toBeUndefined();
+  });
+});
+
 describe('HeardInbox', () => {
   it('hands a heard question straight to the bubble listening for it', () => {
     const inbox = new HeardInbox();
@@ -237,6 +259,24 @@ describe('HeardInbox', () => {
     const asked: string[] = [];
     inbox.subscribe((text) => asked.push(text));
     expect(asked).toEqual(['two']);
+  });
+
+  it('carries what was heard of Scout with the question, live or held', () => {
+    const cut = { turn: 't1', heard: 2 };
+    const live = new HeardInbox();
+    const got: unknown[] = [];
+    live.subscribe((text, interrupted) => got.push([text, interrupted]));
+    live.deliver('wait', cut);
+    live.deliver('plain');
+    expect(got).toEqual([
+      ['wait', cut],
+      ['plain', undefined],
+    ]);
+    const held = new HeardInbox();
+    held.deliver('wait', cut);
+    const later: unknown[] = [];
+    held.subscribe((text, interrupted) => later.push([text, interrupted]));
+    expect(later).toEqual([['wait', cut]]);
   });
 
   it('holds again once the bubble has gone', () => {

@@ -59,6 +59,19 @@ describe('registerTurnIpc', () => {
     expect(said).toEqual([{ text: 'hi', spoken: true, voice: 'bm_george', speed: 0.95 }]);
   });
 
+  it('an interrupted ask carries it to the brain, and only that ask', async () => {
+    const { invoke, said } = setup();
+    await invoke(IPC.ask, {
+      petId: 'scout',
+      text: 'wait',
+      spoken: true,
+      interrupted: { turn: 't0', heard: 2 },
+    });
+    await invoke(IPC.ask, { petId: 'scout', text: 'and then?', spoken: true });
+    expect(said[0]).toMatchObject({ text: 'wait', interrupted: { turn: 't0', heard: 2 } });
+    expect(said[1]).not.toHaveProperty('interrupted');
+  });
+
   it('a spoken ask with Scout talks switched off is asked as text', async () => {
     const { invoke, said } = setup(null, { voiceOn: false });
     await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true });

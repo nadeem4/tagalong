@@ -3,7 +3,7 @@
 ## Purpose
 
 How Scout hears and speaks. This covers the talk key, the mic button, Always listening, the
-follow-up window, barge-in, and the system voice. **The brain does the hearing and the speaking**:
+follow-up window, talking over Scout (it pauses), and the system voice. **The brain does the hearing and the speaking**:
 it runs the speech models (Silero, Moonshine, Smart Turn and Kokoro; see
 [Brain ears](brain.md#brain-ears) and [Brain mouth](brain.md#brain-mouth)). The desktop only
 streams the microphone to the brain and plays what the brain sends back, so no speech model, ONNX
@@ -22,7 +22,7 @@ leaves it.
 | Always listening (main) | `bodies/desktop/src/main/always-listening.ts` (`AlwaysListening`, `listeningPaused`, `startListeningGuard`, `saveListening`), `markListening` in `bodies/desktop/src/main/status-marks.ts`                                                                                                                                                                                                                                            |
 | IPC and the bridge      | `bodies/desktop/src/main/ipc/voice.ts` (`createVoiceBridge`, `registerVoiceIpc`), `main/ipc/turns.ts` (spoken `say`, Stop sends `hush`), channels and types in `bodies/desktop/src/shared/ipc.ts`, the bridge in `bodies/desktop/src/preload/index.ts`                                                                                                                                                                                |
 | Renderer, hearing       | `bodies/desktop/src/renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`, `talk.ts` (`useTalk`), `talk-rules.ts`, `mic-failure.ts`, `voice-seam.ts`                                                                                                                                                                                                                                                                               |
-| Renderer, speaking      | `bodies/desktop/src/renderer/src/voice-player.ts` (`SpeechPlayer`, `previewVoice`, `playWav`, `speakWithSystem`, `onSystemVoice`, `pickSystemVoice`)                                                                                                                                                                                                                                                                                  |
+| Renderer, speaking      | `bodies/desktop/src/renderer/src/voice-player.ts` (`SpeechPlayer`, `previewVoice`, `playWav`, `speakWithSystem`, `pickSystemVoice`)                                                                                                                                                                                                                                                                                                   |
 | UI package              | `bodies/ui/src/voice/listen-controller.ts`, `push-to-talk.ts`                                                                                                                                                                                                                                                                                                                                                                         |
 | Wiring                  | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechPlayer` and `useTalk`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question as spoken, barge-in)                                                                                                                                                                                                                                                              |
 | Brain side              | The brain's ears and mouth: [brain.md](brain.md)                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -67,17 +67,17 @@ flowchart LR
 
 Contract v1 (see [protocol/README.md](../protocol/README.md)):
 
-| Frame                                        | Direction     | Meaning                                                                                                                                                |
-| -------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `listen { mode: 'held' or 'always' }`        | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words. |
-| `mic { pcm }`                                | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                          |
-| `unlisten`                                   | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                              |
-| `hush`                                       | body to brain | Notification: stop speaking now.                                                                                                                       |
-| `say { ..., spoken: true, voice, speed }`    | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                  |
-| `heard { event, text? }`                     | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                        |
-| `voice { status, message?, progress? }`      | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                       |
-| `speech { turn, text?, pcm?, sample_rate? }` | brain to body | One sentence: `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                |
-| `speech { turn, done: true }`                | brain to body | The last sentence of that turn has been sent.                                                                                                          |
+| Frame                                            | Direction     | Meaning                                                                                                                                                                |
+| ------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listen { mode: 'held' or 'always' }`            | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words.                 |
+| `mic { pcm }`                                    | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                                          |
+| `unlisten`                                       | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                                              |
+| `hush`                                           | body to brain | Notification: stop speaking now.                                                                                                                                       |
+| `say { ..., spoken: true, voice, speed }`        | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                                  |
+| `heard { event, text? }`                         | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                                        |
+| `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                       |
+| `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One sentence: `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice. |
+| `speech { turn, done: true }`                    | brain to body | The last sentence of that turn has been sent.                                                                                                                          |
 
 `heard`, `voice` and `speech` are live only (no `seq`), so they are not replayed after a
 reconnect. `createVoiceBridge` remembers the open listening mode (also when `listen` found the
@@ -179,14 +179,14 @@ Failures:
 - **`earsFailed()`** runs when the ears status says `failed`. It drops every question and ends the
   session. If an always session was running, it schedules a retry: 30 s at first (`retryMs`),
   doubling each time up to five minutes. Switching off cancels the retry. A question heard resets
-  the wait to 30 s. A `setAlways`, `setPaused` or `setDeaf` call starts a session again sooner.
+  the wait to 30 s. A `setAlways` or `setPaused` call starts a session again sooner.
 
 The always session (`#sync`):
 
-- One `always` session is open exactly while `always && !paused && !deaf`. A held session is left
+- One `always` session is open exactly while `always && !paused`. The mic is never muted while Scout speaks. A held session is left
   alone, because the key wins.
 - `setAlways(on)` is the person's switch. `setPaused(paused)` covers a call, full screen, the pets
-  or hidden. `setDeaf(deaf)` is true while the system voice speaks.
+  or hidden.
 - When an always session ends mid-turn after it had already cut Scout off, `onDropped` fires and
   its words leave the bubble.
 
@@ -194,8 +194,9 @@ Addressing in always mode (`#addressed`):
 
 - **Name required.** Only talk addressed to Scout counts (`addressedToScout`). While a released
   held question waits, nothing counts, because those words are the held question's.
-- **Bare speech.** A plain `speechStart` does nothing in always mode. Talk in the room must not
-  cut Scout off.
+- **Bare speech.** A plain `speechStart` with Scout quiet does nothing in always mode. Talk in the
+  room must not cut Scout off. With Scout speaking (`speaking()`), any `speechStart` calls `pause()`
+  instead, with no name needed; see [Talking over Scout](#talking-over-scout).
 - **Partials.** The first addressed `partial` of a turn calls `onSpeechStart` once (barge-in), and
   each addressed partial shows. A partial that may still grow into "stop listening"
   (`mightBeStop`, for example "Scout, st") neither cuts Scout off nor shows.
@@ -242,7 +243,12 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
   text…", and calls `release()`. With nothing pending it goes straight to `idle`.
 - **Always listening.** It reads `getListening()` at mount and follows `onListening`. It calls
   `setPaused` before `setAlways`, so switching on during a call never opens the mic for a moment.
-- **Deafness.** It passes `onSystemVoice` to `setDeaf`.
+- **Talking over Scout.** It passes the `SpeechPlayer`'s `speaking`, `pause`, `resume` and `text` to
+  the controller, and `onInterrupt` delivers the words like any heard question, with what was heard
+  of Scout (`interrupted {turn, heard}`) riding on the question itself. "Scout, stop listening"
+  over Scout still switches Always listening off (and cuts Scout off), and is not sent to the brain.
+  The talk key and mic button read `SpeechPlayer.interruption()` before the player stops
+  (`CutMemory` in `talk-rules.ts`), so a held question carries it too.
 - **Delivery.** A heard question goes through `HeardInbox`. If no bubble is mounted (a one-line
   hello or remark is up, or Scout is still waking), the question is held, the line
   gives way through `onBegin`, and the bubble asks it as it subscribes. Only the latest is held.
@@ -398,7 +404,8 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
 - **Held.** `hold()` (the talk key or the mic button) cuts Scout off at once. So does the ears'
   `speechStart` in a held session. Both go through `onBegin`, which calls `player.stop()` and clears
   any one-line hello or remark.
-- **Always.** Only the first addressed partial, or the addressed `turnEnd`, of a turn barges in.
+- **Always.** With Scout speaking, any speech pauses it (see Talking over Scout). With Scout quiet,
+  only the first addressed partial, or the addressed `turnEnd`, of a turn barges in.
 - **The bubble.** It subscribes to `talk.onListen`. If an answer is still streaming, the bubble
   calls `bridge.interrupt(turnId)`. It keeps the text shown so far and ignores the rest of the
   stopped turn.
@@ -406,12 +413,44 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
   the turn and then broadcasts the stop-voice event, and the panel's `player.stop()` sends `hush`.
   The Stop button, the stop key, the bubble's close and a barge-in all end in `player.stop()`.
 
-### Deafness while the system voice speaks
+### Talking over Scout
 
-Echo cancellation in `getUserMedia` removes Scout's own WebAudio playback, but not the system
-voice. While `speechSynthesis` speaks, `voice-player.ts` reports it through `onSystemVoice`.
-`useTalk` passes that to `setDeaf(true)`, which closes the always session.
-When the system voice stops, the session opens again. A held question is not affected.
+The mic stays open while Scout speaks, and the system voice no longer deafens it. Any speech over
+Scout pauses it; what the person said then decides what happens. The decision is mechanical
+where it can be and the brain's where it matters:
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart TD
+  A["speechStart while Scout speaks"] --> B["SpeechPlayer.pause: sound held, nothing lost"]
+  B --> C{"turnEnd text"}
+  C -->|"empty"| R["SpeechPlayer.resume"]
+  C -->|"echoOf: Scout's own words"| R
+  C -->|"other words"| D["read interruption {turn, heard}, player.stop"]
+  D --> E["say { text, interrupted: {turn, heard} }"]
+  E --> F["brain: cancel the turn, keep only what was said, hand over the unsaid once"]
+  F --> G["Scout decides: stop, answer, carry on or offer the rest"]
+```
+
+- **Pause is local.** `SpeechPlayer.pause()` suspends the WebAudio clock and pauses
+  `speechSynthesis`; `resume()` undoes it, and `stop()` clears a pause. A partial transcript
+  neither resumes nor sends; only the turn's end decides.
+- **Two mechanical resumes only.** Nothing transcribed (a cough), or the words are Scout's own
+  voice coming back: `echoOf(transcript, playingText)` is a plain match of at least two words,
+  in a row, inside the text of the turn being spoken. A lone word is never an echo, so a bare
+  "stop" always reaches Scout. No model and no word lists.
+- **What the brain gets.** `interrupted { turn, heard }`: `heard` is the number of sentences
+  played to the end (`SpeechPlayer.interruption()`, counted from the numbered `speech` frames).
+  It travels on the `ask` payload itself (`AskInput.interrupted`), so it can never attach to a
+  later question. The player's `stop()` hushes the brain first, so the mouth keeps the turn's
+  sentence log (sent and made-but-unsent) through the hush: the unsaid rest survives.
+  `SpeechPlayer.text()` (the echo check) is only the sentence playing and the one before it.
+- **What the brain does.** `Session.say` cancels that turn, saves only the sentences that were
+  said, marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid
+  sentences once, in a `<data kind="interruption">` block with the owner's words. See
+  [Brain](brain.md).
+- **Held questions** still cut Scout off at once, but send `interrupted` too, so the brain cuts
+  the turn and the model gets the unsaid rest.
 
 ### The mouth
 
@@ -445,7 +484,7 @@ flowchart LR
 - **A sentence that fails to play** is logged and the next one plays.
 - **The system voice.** `pickSystemVoice`: an `en-GB` voice named George first, then another
   British male name (`ryan|thomas|oliver|arthur|alfie|elliot|ethan|noah`), otherwise the system
-  default. While it speaks, the level is held at 0.5 and `onSystemVoice(true)` fires.
+  default. While it speaks, the level is held at 0.5.
   `getVoices()` is called once at load so the list is ready.
 - **Preview.** `previewVoice({ text, mouth, voice, speed })` is Settings' Preview button. For
   Kokoro it calls the brain's `speak_sample` tool through `IPC.speakSample` and plays the returned
@@ -606,17 +645,17 @@ The full statement is in `privacy.md`.
 
 ## Tests that pin it
 
-| Test                                                                                                                      | Pins                                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, offline failure, `hush`, `speak_sample`, the re-listen on reconnect, heard/voice/speech forwarding, addressing (follow-up, "stop", `mightBeStop`), marks. |
-| `bodies/desktop/src/main/ipc/turns.test.ts`                                                                               | A spoken ask carries `spoken`, `voice` and `speed`; a cancelled turn also stops the voice.                                                                                                          |
-| `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                          |
-| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                         |
-| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, barge-in once per turn, the follow-up window, deafness, retry back-off.                   |
-| `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                               |
-| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `chosenMouth`, `Pushable`.                                                                                                                        |
-| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                             |
-| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`                                               | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`.                                                                                                                            |
-| `bodies/desktop/src/renderer/src/voice-player.test.ts`                                                                    | `SpeechPlayer` order, answering and speaking state, stop dropping late chunks and sending `hush`, the system-voice fallback, `previewVoice`, system voice choice.                                   |
-| `bodies/desktop/e2e/smoke.spec.ts`                                                                                        | Talking to Scout on the fake brain's `heard` and `speech` frames and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint and a spoken `say`.                                       |
-| `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched (the brain gets `listen` and mic frames), a "Scout, ..." turn answered, then off again (`unlisten`).                                          |
+| Test                                                                                                                      | Pins                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, offline failure, `hush`, `speak_sample`, the re-listen on reconnect, heard/voice/speech forwarding, addressing (follow-up, "stop", `mightBeStop`), marks.                                    |
+| `bodies/desktop/src/main/ipc/turns.test.ts`                                                                               | A spoken ask carries `spoken`, `voice` and `speed`; a cancelled turn also stops the voice.                                                                                                                                             |
+| `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                                                             |
+| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                                                            |
+| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, barge-in once per turn, the follow-up window, speech over Scout (pause, resume on noise or echo, interrupt), retry back-off. |
+| `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                                                                  |
+| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `chosenMouth`, `Pushable`.                                                                                                                                                           |
+| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                                                                |
+| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`                                               | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`.                                                                                                                                                               |
+| `bodies/desktop/src/renderer/src/voice-player.test.ts`                                                                    | `SpeechPlayer` order, answering and speaking state, stop dropping late chunks and sending `hush`, pause and resume, the sentences played to the end, the turn's text, the system-voice fallback, `previewVoice`, system voice choice.  |
+| `bodies/desktop/e2e/smoke.spec.ts`                                                                                        | Talking to Scout on the fake brain's `heard` and `speech` frames and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint and a spoken `say`.                                                                          |
+| `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched (the brain gets `listen` and mic frames), a "Scout, ..." turn answered, then off again (`unlisten`).                                                                             |

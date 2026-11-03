@@ -759,13 +759,15 @@ describe('CompanionBubble voice', () => {
 describe('CompanionBubble, talking to Scout', () => {
   /** The host's side: a test says what was heard through `hear`. */
   const heard = () => {
-    const handlers = new Set<(text: string) => void>();
+    type Handler = (text: string, interrupted?: { turn: string; heard: number }) => void;
+    const handlers = new Set<Handler>();
     return {
-      onHeard: (handler: (text: string) => void) => {
+      onHeard: (handler: Handler) => {
         handlers.add(handler);
         return () => void handlers.delete(handler);
       },
-      hear: (text: string) => handlers.forEach((handler) => handler(text)),
+      hear: (text: string, interrupted?: { turn: string; heard: number }) =>
+        handlers.forEach((handler) => handler(text, interrupted)),
     };
   };
   const talk = (change: object = {}) => ({
@@ -905,6 +907,22 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getByRole('status')).toHaveTextContent('what is');
     // Live words change about three times a second: a screen reader is not told each one.
     expect(screen.getByText('what is')).toHaveAttribute('aria-live', 'off');
+  });
+
+  it('sends what was heard of Scout with a question spoken over it', async () => {
+    const bridge = createFakeHostBridge();
+    const host = heard();
+    renderBubble(bridge, { snapshot: SNAPSHOT, talk: talk({ onHeard: host.onHeard }) });
+    await act(async () => host.hear('wait', { turn: 't1', heard: 2 }));
+    expect(bridge.asks).toEqual([
+      {
+        petId: 'scout',
+        text: 'wait',
+        snapshot: SNAPSHOT,
+        spoken: true,
+        interrupted: { turn: 't1', heard: 2 },
+      },
+    ]);
   });
 
   it('asks what it heard as a spoken question, and hints at the reply once the answer is done', async () => {
