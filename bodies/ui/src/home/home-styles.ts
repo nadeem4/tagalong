@@ -147,7 +147,7 @@ export const HOME_CSS = `
 .job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
 .job-row__actions { display: flex; gap: ${t.space.lg}px; }
 .job-row__result {
-  grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
+  grid-column: 1 / -1; margin: ${t.space.md}px 0 0; padding: ${t.space.md}px; overflow-wrap: anywhere;
   font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
 }
 .job-page__back {

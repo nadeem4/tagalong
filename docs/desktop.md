@@ -480,7 +480,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
   while running, reason when ended, and a Show result toggle once finished. A row carries its
   `parts` (one per expert hand-off, `JobPartRow`); the panel shows the newest part's progress,
-  reason and result, and an old job has exactly one part. **Stop** shows on
+  reason and result (Show result renders Scout's result as Markdown, and falls back to the part's report when Scout wrote none), and an old job has exactly one part. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   `jobActivity(job, afterRev)` and `runningSteps()` (host bridge) pull a job's steps by cursor and

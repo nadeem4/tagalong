@@ -549,7 +549,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             raise RpcError(ErrorCode.invalid_params, str(err)) from err
 
     async def job_report(args: dict) -> str:
-        """Home reads one part's report when the person expands it (Scout gets list_jobs)."""
+        """One part's whole report. Home shows it as is; Scout's copy is previewed by the
+        Toolbox cap and read_output pages the rest."""
         _need_text("job_report", args, "job", "part")
         try:
             return json.dumps({"text": jobs.part_report(args["job"], args["part"])})
@@ -759,7 +760,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         (
             ToolSpec(
                 "job_report",
-                "One part of a job: the expert's full report, for the job page.",
+                "One part of a job: the expert's full report (list_jobs cuts reports short). "
+                "A long one arrives as a preview; read_output reads the rest.",
                 {
                     "type": "object",
                     "properties": {
@@ -771,7 +773,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                     },
                     "required": ["job", "part"],
                 },
-                frozenset({"home"}),
+                both,
                 effect="read",
                 default_mode="auto",
             ),

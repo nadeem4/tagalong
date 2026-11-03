@@ -325,7 +325,7 @@ A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the 
 its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
 `list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
-Expert jobs (Claude Code hand-offs) live in two tables of the same file. `jobs` holds the job: id, task, folder, mode, state (`running`, `done`, `error`, `stopped`), start and end times, `parent_job` (the job a follow-up continued), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (only the restart sweep writes `closed_at` so far; the rest are for later slices). `job_parts` holds one row per expert hand-off inside a job, keyed by job id and part id (`p1`, `p2`, ...): agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, and start and end times. `add_part(job_id, agent, task, folder, started_at)` takes the folder; the migration copies each old job's folder onto its part. A job's state is recomputed whenever a part ends: `running` while any part runs, otherwise the outcome of the part that ended last. Rows still `running` at brain start become `stopped` with reason `brain restarted`, parts and jobs alike, and those jobs are closed too (`closed_at` set) so they take no new parts. `update_job` takes job fields only; a part's reason, progress, report and session go through `update_part`. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note lists each part's reason and report (tagged with the part, its expert and its folder when there are several). A job from before parts existed opens as a closed job with one part, `p1`, carrying its steps, asks, report and times.
+Expert jobs (Claude Code hand-offs) live in two tables of the same file. `jobs` holds the job: id, task, folder, mode, state (`running`, `done`, `error`, `stopped`), start and end times, `parent_job` (the job a follow-up continued), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and `closed_at` with `close_job`; the restart sweep also sets `closed_at`). `job_parts` holds one row per expert hand-off inside a job, keyed by job id and part id (`p1`, `p2`, ...): agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, result (capped at 20,000 characters), session id, a `reported` flag, and start and end times. `add_part(job_id, agent, task, folder, started_at)` takes the folder; the migration copies each old job's folder onto its part. A job's state is recomputed whenever a part ends: `running` while any part runs, otherwise the outcome of the part that ended last. Rows still `running` at brain start become `stopped` with reason `brain restarted`, parts and jobs alike, and those jobs are closed too (`closed_at` set) so they take no new parts. `update_job` takes job fields only; a part's reason, progress, report and session go through `update_part`. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`. A job from before parts existed opens as a closed job with one part, `p1`, carrying its steps, asks, report and times.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -454,18 +454,18 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                              | Result text (JSON)                                                                                                          |
-| ------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
-| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
-| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
-| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
-| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                            |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
-| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
-| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only     |
-| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Home only                           |
+| Tool               | Input                              | Result text (JSON)                                                                                                                              |
+| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                            |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                         |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                      |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only                     |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                                                   |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                  |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                              |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                         |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -816,7 +816,7 @@ whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
-never the chat; the expert's summary stays whole in its part's report, and `list_jobs` shows it capped at 4,000 characters).
+never the chat; the expert's summary stays whole in its part's report, and `list_jobs` shows it cut at 1,000 characters; `job_report` reads it whole).
 `list_jobs` rows carry `parts`, each with `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
 
@@ -883,7 +883,7 @@ reason, folder, started_at, ended_at}]` and each entry also carries `part` and `
 when cut). `rev` is the cursor to send next; a body that missed notices or reconnected sends
 `after_rev: 0` and gets the whole log, and a repeat with the last `rev` returns nothing. Rows were
 masked when written, so serving does no second pass. `result` is Scout's `scout_result`. A part's full
-report is read separately, on demand, with the Home-only tool `job_report {job, part}` (`Jobs.part_report`), so
+report is read separately, on demand, with the tool `job_report {job, part}` (Home and Scout; Scout's copy is capped like any tool result) (`Jobs.part_report`), so
 the page stays small. An unknown job is `invalid_params`; a job
 from before the log existed has an empty page. `watch` is Scout's watch list for the job (see Watch
 list), or `null` when it has none. With no `job` it returns
@@ -910,7 +910,7 @@ with the kind's name, its note on how to weigh it and the facts, so it is data, 
 start that raises is logged and the batch is dropped, never raised into the caller.
 
 When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
-state, reason and the newest part's report; a report over the preview cap arrives as a preview with
+state, reason and the report of the part that just ended (other parts of a multi-part job appear as facts only: expert, folder, state, reason; Scout reads one with `job_report`); a report over the preview cap arrives as a preview with
 an `output_id`, see [Long tool output](#long-tool-output)). `reported` is set once that
 turn has started (a failed start leaves it unreported). At brain start every finished unreported
 job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
@@ -1012,6 +1012,7 @@ flowchart TD
 | `list_jobs`      | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                         |
 | `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                              |
 | `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                   |
+| `job_report`     | scout, home | read   | `auto`                       | `{job, part}`. One part's whole report as `{"text"}`. Scout's copy is previewed by the output cap, `read_output` pages the rest; Home gets it whole                                                                                                                                                                                                               |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,

@@ -133,6 +133,20 @@ describe('JobsPanel', () => {
     );
   });
 
+  it('shows Scout’s result as Markdown', async () => {
+    const written: JobRow = { ...DONE, scoutResult: 'Notes are **ready**' };
+    renderPanel(createFakeHostBridge({ jobs: [written] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));
+    expect(screen.getByText('ready').tagName).toBe('STRONG');
+    expect(screen.queryByText('Notes are in CHANGELOG.md')).toBeNull();
+  });
+
+  it('falls back to the part report with no Scout result', async () => {
+    renderPanel(createFakeHostBridge({ jobs: [DONE] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Show result' }));
+    expect(screen.getByText('Notes are in CHANGELOG.md')).toBeVisible();
+  });
+
   it('reads again when the brain says jobs changed, and only then', async () => {
     const bridge = createFakeHostBridge({ jobs: [RUNNING] });
     renderPanel(bridge);

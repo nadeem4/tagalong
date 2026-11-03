@@ -987,7 +987,8 @@ def job_note(
 ) -> str:
     """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides.
     Each extra fact (the activity summary) follows as its own block. A report over the preview
-    cap arrives as a preview with an output id, like any long tool result."""
+    cap arrives as a preview with an output id, like any long tool result. Only the part that just
+    ended brings its report: a repeat of earlier reports would grow every wake and store copies."""
     lines = [
         f"Job {job.id} ended.",
         f"Title: {job_title(job)}",
@@ -996,16 +997,19 @@ def job_note(
         f"State: {job.state}",
     ]
     many = len(job.parts) > 1
+    ended = [p for p in job.parts if p.ended_at]
+    last = max(ended, key=lambda p: p.ended_at) if ended else None
     if many:  # facts only: which part ended last, and where each stands
-        ended = [p for p in job.parts if p.ended_at]
-        if ended:
-            lines.append(f"Part: {max(ended, key=lambda p: p.ended_at).id}")
-        lines.append("Parts: " + "; ".join(f"{p.id} {p.agent} {p.state}" for p in job.parts))
+        if last:
+            lines.append(f"Part: {last.id}")
+        lines.append(
+            "Parts: " + "; ".join(f"{p.id} {p.agent} {p.folder} {p.state}" for p in job.parts)
+        )
     for part in job.parts:
         tag = f" ({part.id}, {part.agent}, {part.folder})" if many else ""
         if part.reason:
             lines.append(f"Reason{tag}: {part.reason}")
-        if part.report:  # the stored row keeps the report whole; each part gets its own id
+        if part.report and (not many or part is last):  # the stored row keeps it whole
             report = preview(outputs, "job_report", part.report) if outputs else part.report
             lines.append(f"Result{tag}:\n{report}")
     for key, value in (facts or {}).items():
