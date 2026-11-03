@@ -125,7 +125,7 @@ describe('Walkthrough', () => {
 describe('Walkthrough, the end', () => {
   it('shows the placeholder-free steps 6 to 9', async () => {
     open(makeWalkthroughHost({ key: HAS_KEY }), 6);
-    await screen.findByRole('heading', { name: 'For bigger jobs, Scout calls in an expert' });
+    await screen.findByRole('heading', { name: 'Scout does the everyday jobs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Let Scout read your browser tabs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));

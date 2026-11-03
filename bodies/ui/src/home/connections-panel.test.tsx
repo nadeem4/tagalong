@@ -336,6 +336,24 @@ describe('ConnectionsPanel groups', () => {
     expect(screen.getByRole('region', { name: 'Experts' })).toBeInTheDocument();
   });
 
+  it('an expert row leads with the kind of job and keeps the product underneath', async () => {
+    await renderPanel(
+      withSetup({
+        experts: [
+          { ...CLAUDE, state: 'ready' },
+          { ...CLAUDE, id: 'other', name: 'Beta', state: 'ready' },
+        ],
+      }),
+    );
+    const claude = screen.getByRole('region', { name: 'Claude Code' });
+    expect(within(claude).getByText('Fix code and other long jobs')).toBeVisible();
+    expect(within(claude).getByText('Claude Code · Version 2.0')).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Beta' })).getByText('Long, many-step jobs'),
+    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'FOR LONG JOBS' })).toBeVisible();
+  });
+
   it('each expert row shows its state and the action that fits it', async () => {
     await renderPanel(
       withSetup({

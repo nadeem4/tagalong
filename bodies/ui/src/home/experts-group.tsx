@@ -1,11 +1,12 @@
 /**
- * The Experts group on Home's Connections page: one row per installed expert with its state
- * and the action that fits it (Log in, Update), plus the stage words of a running install.
+ * The Experts group on Home's Connections page: one row per installed expert, led by the kind of
+ * job it does with the product underneath, its state and the action that fits it (Log in, Update), plus the stage words of a running install.
  * Contains ExpertsGroup and stageWords. The brain sends short tokens; the words are this page's.
  */
 
 import type { SetupExpert, SetupOverview } from '../shapes';
 import { Button } from '../controls/button';
+import { DEFAULT_EXPERT_JOB, EXPERT_JOB } from '../jobs-kinds';
 
 const STATE_WORDS: Record<SetupExpert['state'], string> = {
   ready: 'Ready',
@@ -50,7 +51,7 @@ export function ExpertsGroup({
 }) {
   return (
     <section className="home-card" aria-label="Experts">
-      <h2 className="home-card__label">EXPERTS</h2>
+      <h2 className="home-card__label">FOR LONG JOBS</h2>
       {experts.length === 0 ? (
         <p className="tg-note">No experts yet. Add one below.</p>
       ) : (
@@ -66,10 +67,11 @@ export function ExpertsGroup({
                       {expert.name.slice(0, 1).toUpperCase()}
                     </span>
                     <span className="home-entry__body">
-                      <span className="home-entry__title" title={expert.name}>
-                        {expert.name}
+                      <span className="home-entry__title">
+                        {EXPERT_JOB[expert.id] ?? DEFAULT_EXPERT_JOB}
                       </span>
-                      <span className="home-entry__preview">
+                      <span className="home-entry__preview" title={expert.name}>
+                        {expert.name} ·{' '}
                         {expert.version === '' ? 'Your own command' : `Version ${expert.version}`}
                       </span>
                     </span>

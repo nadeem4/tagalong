@@ -138,6 +138,14 @@ export const WALKTHROUGH_CSS = `
 .wt-switchrow { justify-content: space-between; flex-wrap: nowrap; padding: 12px 16px; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; }
 .wt-pair { display: flex; align-items: flex-end; gap: 8px; }
 .wt-pair > :first-child { flex: 1; min-width: 0; }
+.wt-jobs { list-style: none; margin: 24px 0 0; padding: 0; background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; }
+.wt-job { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; border-top: 1px solid ${t.color.panelLine}; }
+.wt-job:first-child { border-top: 0; }
+.wt-job h3 { margin: 0; font-size: 14px; font-weight: ${t.fontWeight.semibold}; }
+.wt-job__text { min-width: 0; }
+.wt-job__act { flex: none; max-width: 200px; text-align: right; }
+.wt-job__act .wt-help { margin: 0; }
+.wt-expert { margin-top: 8px; }
 .wt-sub-label { margin-top: 24px; color: ${t.color.panelMuted}; font-size: ${t.fontSize.min}px; }
 .wt-steplist { margin: 0; padding: 0; list-style: none; counter-reset: wt-s; display: flex; flex-direction: column; gap: 10px; }
 .wt-steplist li { counter-increment: wt-s; display: flex; align-items: center; gap: 12px; font-size: 14px; }

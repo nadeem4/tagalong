@@ -273,10 +273,21 @@ test('step 6 installs Claude Code on the fake brain and shows it ready', async (
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
   await nextTo(tour, 6);
+  await expect(tour.getByText('Claude Code')).toHaveCount(0); // hidden until the optional line opens
+  await tour.getByRole('button', { name: 'For long jobs, Scout can also use an expert' }).click();
   await tour.getByRole('button', { name: 'Set up Claude Code' }).click();
   await expect(tour.getByText('Claude Code is set up.')).toBeVisible({ timeout: 15_000 });
   expect(brain!.expertSetups).toEqual(['claude-acp']);
   expect(brain!.expertApprovals).toEqual([true]); // the press is the OK, so no Allow card
+});
+
+test('step 6 connects Gmail from its job on the fake brain', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 6);
+  await tour.getByRole('button', { name: 'Connect Gmail' }).click();
+  await expect(tour.getByText('Gmail is connected.')).toBeVisible({ timeout: 15_000 });
+  expect(brain!.appSetups).toEqual(['io.example/gmail']);
 });
 
 test('every step fits the window: footer in view, nothing wider than the page (150% scaling)', async () => {
