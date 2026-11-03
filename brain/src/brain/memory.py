@@ -380,10 +380,9 @@ _PART_COLUMNS = (
 _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
 # update_job names for what now lives on the newest part
 _PART_ALIASES = {"result": "report"}
-JOB_RESULT_CAP = 20_000
+JOB_RESULT_CAP = 20_000  # characters of Scout's result; a storage safety, not a style rule
 JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
-JOB_RESULT_CAP = 20_000  # characters of Scout's result; a storage safety, not a style rule
 
 
 def _parse_watch(raw: str | None) -> list[dict] | None:

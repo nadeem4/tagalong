@@ -2203,3 +2203,53 @@ async def test_a_job_tool_for_another_job_records_on_that_job_plain_tools_stay_o
     await idle(session)
     assert [s.source for s in steps_of(memory, "j2")] == ["scout:close_job"]
     assert [s.source for s in steps_of(memory, "j1")] == ["scout:recall"]
+
+
+async def test_a_batched_wake_for_two_jobs_binds_to_the_first_job_tool_not_the_last_event():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0)]
+    memory = Memory(":memory:")
+    session, _ = make(
+        Gate([tool_use("recall", "a", query="x"), tool_use("close_job", "b", job="j1"), "ok"]),
+        memory,
+        kinds=None,
+        now=lambda: clock[0],
+    )
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    session.jobs._on_finished(end_job(memory, "j2"))
+    clock[0] += datetime.timedelta(seconds=31)
+    session.scheduler.pump()
+    await idle(session)
+    # recall ran before any job was named, so it is unbound; close_job names j1 and lands there
+    assert [s.source for s in steps_of(memory, "j1")] == ["scout:close_job"]
+    assert steps_of(memory, "j2") == []
+
+
+async def test_a_refused_job_tool_still_records_on_its_job_but_does_not_bind_the_turn():
+    memory = Memory(":memory:")
+    session, _ = make(Gate(["ok"]), memory)
+    end_job(memory)
+    session._turn_id = "t"
+    session._on_tool_call(
+        SimpleNamespace(turn="t", name="close_job", input={"job": "j1"}),
+        ToolSpec("close_job", "d", {"type": "object"}, frozenset({"scout"}), effect="change"),
+        "scout_tool",
+        "refused",
+        None,
+    )
+    assert [(s.source, s.status) for s in steps_of(memory)] == [("scout:close_job", "refused")]
+    assert session._turn_job is None
+
+
+async def test_scouts_tool_steps_stay_out_of_the_summary_and_never_wake_for_a_failed_step():
+    memory = Memory(":memory:")
+    session, _ = make(Gate(["ok"]), memory)
+    end_job(memory)
+    memory.mark_reported("j1")
+    emitted = []
+    session.jobs._emit = lambda event, **hooks: emitted.append(event.kind)
+    session.jobs.record_step("j1", "app:files", "list", "failed")
+    session.jobs.record_step("j1", "scout:recall", "recall", "refused")
+    assert len(steps_of(memory)) == 2
+    assert "no activity recorded" in session.jobs.wake_facts("j1")["activity"]
+    assert "job_step_failed" not in emitted

@@ -1233,6 +1233,19 @@ async def test_on_call_reports_a_refused_call_as_refused():
     assert [s[3] for s in seen] == ["refused"]
 
 
+async def test_on_call_reports_a_call_the_owner_denied_as_refused():
+    box, source, bodies, _ = gated()
+    seen = []
+    box._on_call = lambda *a: seen.append(a)
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError):
+        await task
+    assert [s[3] for s in seen] == ["refused"]
+    assert source.ran == []
+
+
 async def test_on_call_ignores_unknown_tools_and_a_raising_hook_never_breaks_the_call():
     box, seen = _reporting_box(FakeSource([spec("a")]))
     with pytest.raises(RpcError):

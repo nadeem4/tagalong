@@ -1090,10 +1090,12 @@ flowchart LR
   for the brain's own and body tools; expert steps carry no source. Status `ok` is stored as
   `done`. Which calls count is mechanical: the turn must be bound to a job, and every call in it is
   recorded except `set_job_result`, `watch_job` and `list_jobs`. A turn is bound when it is the wake
-  for a job (`job_ended`, `job_quiet`, `job_step_failed`) or when a job tool (`hand_off`,
-  `tell_expert`, `stop_job`, `close_job`, `set_job_result`) named a job and the turn had none; the
-  binding (`Session._turn_job`) ends with the turn. A job tool always records on the job it
-  names; plain tools go to the turn's job. An owner turn with no job in play records nothing.
+  for exactly one job (`job_ended`, `job_quiet`, `job_step_failed`) or when a job tool
+  (`hand_off`, `tell_expert`, `stop_job`, `close_job`, `set_job_result`) ran fine, named a job and
+  the turn had none; the binding (`Session._turn_job`) ends with the turn. A batched wake that
+  carries several jobs binds to none: the first job tool decides. A timer that names a job does
+  not bind its wake turn. A job tool always records on the job it names, even when it was refused
+  or failed; plain tools go to the turn's job. An owner turn with no job in play records nothing.
   Scout's steps are not counted in the wake's activity summary and never raise `job_step_failed`.
 
 ```mermaid
