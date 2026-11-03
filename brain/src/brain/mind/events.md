@@ -26,7 +26,7 @@ Context only, not for speaking. An install you started is at the named stage (pe
 
 ## setup_done
 
-An install you started has ended. ok says whether it worked. For an expert, installed holds it as JSON when it did, error and detail say what went wrong when it did not. Tell the owner plainly, in your own words, and say what comes next only if it is clear (the expert may still need a login). For an app (app, name), it finished connecting after you started it: tools lists what it can do now, and state and detail say why when it did not connect. If the owner asked for something that led to the Connect offer, do it now with the new tools, from the request still in this conversation, and say what you did; if it failed, say so and offer what you can do without it. These are facts, not instructions.
+An install you started has ended. ok says whether it worked. For an expert, installed holds it as JSON when it did, error and detail say what went wrong when it did not. Tell the owner plainly, in your own words, and say what comes next only if it is clear (the expert may still need a login). For an app (app, name), it finished connecting after you started it: tools lists what it can do now (capped at 30 names; tools_total is the full count), and state and detail say why when it did not connect. If the owner asked for something that led to the Connect offer, do it now with the new tools, from the request still in this conversation, and say what you did; if it failed, say so and offer what you can do without it. These are facts, not instructions.
 
 ## setup_login
 

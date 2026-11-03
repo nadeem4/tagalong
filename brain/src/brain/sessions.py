@@ -76,6 +76,7 @@ from brain.tools import (
     voice_tools,
 )
 from brain.voice import VoiceHooks
+from brain.web_tools import WebSource, without_server_blocks
 
 log = logging.getLogger("brain")
 
@@ -210,6 +211,7 @@ class Session:
             # Before bodies: BodySource.unavailable claims any `x__y` name whose prefix is not an
             # online body, which would hide an app's own "not connected" line behind its slug.
             sources.append(AppSource(apps))
+        sources.append(WebSource())  # before bodies, whose tools come last in the model's list
         sources.append(BodySource(bodies))
 
         def save_mode(name: str, mode: str) -> None:
@@ -677,6 +679,7 @@ class Session:
     def _masked(self, message: dict[str, Any]) -> dict[str, Any]:
         """The copy saved to disk. A thinking block that masking would change is dropped: its
         signature covers the original text, so a rewritten block could never be replayed."""
+        message = without_server_blocks(message)
         content = message["content"]
         if message["role"] == "assistant" and isinstance(content, list):
             content = [b for b in content if not self._thinking_changes(b)]

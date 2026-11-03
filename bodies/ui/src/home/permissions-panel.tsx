@@ -39,12 +39,11 @@ function shortName(row: PermissionRow): string {
   return at < 0 ? row.name : row.name.slice(at + 2);
 }
 
-/** What the brain lets this tool be: a person-only or self-asking tool is never Auto. */
+/** What the brain lets this tool be: a person-only or self-asking tool is never Auto, and a
+ * server tool (run by Anthropic, never gated) is never Ask. */
 function optionsFor(row: PermissionRow): ThreeWayOption[] {
-  const options: ThreeWayOption[] = [
-    { value: 'off', label: 'Off' },
-    { value: 'ask', label: 'Ask' },
-  ];
+  const options: ThreeWayOption[] = [{ value: 'off', label: 'Off' }];
+  if (row.server_tool !== true) options.push({ value: 'ask', label: 'Ask' });
   if (!row.person_only && row.self_asks !== true) options.push({ value: 'auto', label: 'Auto' });
   return options;
 }

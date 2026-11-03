@@ -2336,3 +2336,34 @@ async def test_scouts_tool_steps_stay_out_of_the_summary_and_never_wake_for_a_fa
     assert len(steps_of(memory)) == 2
     assert "no activity recorded" in session.jobs.wake_facts("j1")["activity"]
     assert "job_step_failed" not in emitted
+
+
+def web_turn():
+    blocks = [
+        {"type": "text", "text": f"Found it, key {SECRET}.", "citations": [{"url": "https://x"}]},
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "q"}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": [{"url": "https://x"}]},
+    ]
+    return Final(blocks, "end_turn", SimpleNamespace())
+
+
+async def test_saved_turn_with_web_blocks_keeps_masked_text_only(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([web_turn()]), memory, masker=secret_masker())
+    session.say("desktop", say("look it up"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[-1]["content"] == [{"type": "text", "text": "Found it, key [secret]."}]
+    assert SECRET not in json.dumps(saved)
+    assert "server_tool_use" in json.dumps(session.history)  # the live turn keeps them
+    resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
+    assert resumed.history[-1]["content"] == saved[-1]["content"]
+
+
+async def test_web_tools_are_offered_and_listed_in_the_capability_picture():
+    model = Gate(["ok"])
+    session, _ = make(model)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    assert {"web_search", "web_fetch"} <= {t["name"] for t in model.tools[0]}
+    assert "web_search" in model.systems[0]

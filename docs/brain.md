@@ -521,18 +521,18 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                              | Result text (JSON)                                                                                                                                                                                    |
-| ------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                                  |
-| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                               |
-| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                            |
-| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
-| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                          |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                      |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                                        |
-| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                    |
-| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                               |
-| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                       |
+| Tool               | Input                              | Result text (JSON)                                                                                                                                                                                                   |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                                                 |
+| `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                                              |
+| `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                           |
+| `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
+| `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                         |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                     |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                                                       |
+| `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                   |
+| `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                                              |
+| `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                                      |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
@@ -1010,7 +1010,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                             |
 | `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                            |
 | `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                      |
-| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools or detail); wakes Scout                                     |
+| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                    |
 | `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                         |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
@@ -1297,6 +1297,34 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
+
+## Web search and fetch
+
+`web_tools.py` declares Anthropic's server-side `web_search_20260209` and `web_fetch_20260209`
+(dynamic filtering; no beta header, no separate code-execution tool) with `max_uses` 5 each per
+request. Each `pause_turn` continuation is a new request, so the real limit per question is the
+step cap times 5. The `_20260209` versions may not be supported on Haiku 5.5. `WebSource` makes them two ordinary `ToolSpec`s (read, Auto by default) that
+carry a `server_tool` declaration, so Home lists them, Off removes them from the model's list and
+the capability picture, and `Toolbox.model_tools()` sends the typed declaration instead of an
+`input_schema`. The brain never runs them: Anthropic returns the `server_tool_use` and
+`*_tool_result` blocks in the same reply (`pause_turn` is already continued by the loop), and
+`WebSource.run` refuses.
+
+Cost: tokens as usual (fetched pages are input tokens) plus `WEB_SEARCH_USD` (0.01: 10 USD per
+1,000 searches, per https://platform.claude.com/docs/en/about-claude/pricing, verified 2026-11-03)
+per `usage.server_tool_use.web_search_requests`, added in `Budget.spend` (a missing field
+counts none). Fetch has no extra charge. The daily default is unchanged, so a research-heavy day can reach it
+sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` has Scout say so
+plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
+server blocks and text citations from the copy written to disk (the live history keeps them), so
+a resumed chat holds the answer text only, masked like any other message. A paused message with
+only server blocks is saved as the withheld placeholder.
+
+Ask is meaningless for them (they never reach the gate): `Toolbox.set_mode` refuses `ask` for a
+spec with `server_tool`, `list_permissions` rows carry `server_tool`, and Home shows only Off and
+Auto. If a guard (budget, step cap, timeout, cancel) stops a turn right after a `pause_turn`,
+`run_turn` drops the trailing `server_tool_use` block with no result (and the message, if empty)
+so the next message gets valid history.
 
 ## Guardrails
 

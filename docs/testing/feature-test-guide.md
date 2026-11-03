@@ -1694,6 +1694,20 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    **Expected:** the row appears without reopening Home.
 5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit.
 
+## Web search and fetch _(real brain, real key: this spends a few cents)_
+
+1. Ask Scout something current ("what changed in the latest Node release?"). It searches and
+   answers with sources, with no expert offered. Home's Overview Spent today rises by about one
+   cent per search plus the tokens.
+2. Give it a link and ask for the gist: it reads the page itself.
+3. Home, Permissions: `web_search` and `web_fetch` are listed as built-in tools, Auto. Set
+   Each shows only Off and Auto (no Ask: Anthropic runs them). Set
+   `web_search` to Off and ask again: Scout says it cannot search and does not push an expert.
+4. Set the daily limit low in Settings and research until it is reached: Scout says plainly that
+   the limit stopped the task and the person can raise it. The default limit may feel low once Scout
+   researches; it is unchanged on purpose.
+5. Restart the brain: the chat resumes with the answers as text; no search results are replayed.
+
 ## Permissions _(real brain)_
 
 1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card

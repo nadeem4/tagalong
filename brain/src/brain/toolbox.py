@@ -59,6 +59,9 @@ class ToolSpec:
     # Facts built by code for the Allow card (and the approvals log) instead of the model's raw
     # input, e.g. what an install will download. The handler still gets the model's input.
     card: Callable[[dict], Awaitable[dict]] | None = None
+    # A tool Anthropic runs (web search): its typed declaration goes to the model as it is, and the
+    # brain never runs it.
+    server_tool: dict | None = None
 
 
 class Source(Protocol):
@@ -206,6 +209,11 @@ class Toolbox:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
         if mode not in ("off", "ask", "auto"):
             raise RpcError(ErrorCode.invalid_params, "mode must be off, ask or auto.")
+        if mode == "ask" and spec.server_tool is not None:
+            # Anthropic runs it inside the reply, so it never reaches the gate to be asked.
+            raise RpcError(
+                ErrorCode.invalid_params, f"{name} runs on Anthropic's side; Off or Auto."
+            )
         if mode == "auto":  # Off and Ask are always the owner's to choose
             if spec.self_asks:
                 raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
@@ -251,6 +259,9 @@ class Toolbox:
                 continue
             if len(spec.name) > NAME_MAX:
                 log.warning("tool name too long, dropped: %s", spec.name)
+                continue
+            if spec.server_tool is not None:
+                out.append(spec.server_tool)
                 continue
             out.append(
                 {

@@ -663,6 +663,7 @@ async def test_list_permissions_marks_locked_and_mode(home):
         "locked",
         "self_asks",
         "person_only",
+        "server_tool",
         "online",
         "source",
         "source_name",
@@ -670,6 +671,7 @@ async def test_list_permissions_marks_locked_and_mode(home):
     assert by_name["remember"]["source_name"] == "Built in"
     assert by_name["remember"]["self_asks"] is False
     assert by_name["remember"]["person_only"] is False
+    assert by_name["remember"]["server_tool"] is False
     assert by_name["desktop__type_text"]["locked"] is True
     assert by_name["desktop__type_text"]["mode"] == "ask"
     assert by_name["desktop__see_screen"]["locked"] is False

@@ -199,6 +199,34 @@ async def test_pause_turn_continues_without_user_message():
     assert [m["role"] for m in history] == ["user", "assistant", "assistant"]
 
 
+async def test_paused_turn_stopped_by_a_guard_drops_its_unanswered_server_tool_use():
+    content = [
+        {"type": "text", "text": "looking"},
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {}},
+    ]
+    paused = ([], Final(content, "pause_turn", SimpleNamespace()))
+    reason, history, _, _ = await go([paused, text_step("never")], step_cap=1)
+    assert reason == "step_cap"
+    assert history[-1] == {"role": "assistant", "content": [{"type": "text", "text": "looking"}]}
+
+
+async def test_paused_message_with_only_an_unanswered_server_block_is_dropped():
+    content = [{"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {}}]
+    paused = ([], Final(content, "pause_turn", SimpleNamespace()))
+    _, history, _, _ = await go([paused], step_cap=1)
+    assert history == [{"role": "user", "content": "go"}]
+
+
+async def test_answered_server_tool_use_is_kept():
+    content = [
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": []},
+    ]
+    paused = ([], Final(content, "pause_turn", SimpleNamespace()))
+    _, history, _, _ = await go([paused], step_cap=1)
+    assert history[-1]["content"] == content
+
+
 async def test_refusal_is_error():
     reason, _, sent, _ = await go([text_step("no", stop="refusal")])
     assert reason == "error"
