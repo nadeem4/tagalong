@@ -137,10 +137,18 @@ describe('SafeMarkdown', () => {
     expect(container.querySelector('pre')).toHaveTextContent('| **1** | 2 |');
   });
 
-  it('renders 90 KB of unclosed brackets on one line in under 2 s', () => {
-    const start = performance.now();
-    render(<SafeMarkdown text={'['.repeat(90_000)} />);
-    expect(performance.now() - start).toBeLessThan(2000);
+  it('renders unclosed brackets in linear time', () => {
+    // Ratio of two sizes, not a wall-clock limit: it holds on a slow CI machine or under coverage,
+    // yet a quadratic parse (4x the text, 16x the time) fails it.
+    const time = (size: number) => {
+      const start = performance.now();
+      render(<SafeMarkdown text={'['.repeat(size)} />);
+      return performance.now() - start;
+    };
+    time(20_000); // warm-up
+    const small = Math.max(time(22_000), 1);
+    const large = time(90_000);
+    expect(large / small).toBeLessThan(9);
   });
 
   it('never uses dangerouslySetInnerHTML', () => {
