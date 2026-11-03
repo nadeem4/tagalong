@@ -1909,6 +1909,19 @@ Brain tests only; nothing here installs anything.
    npm. Run it again: nothing is downloaded. Your own `node --version` and PATH are unchanged.
 3. Cut the network mid-download: no `runtime/node.part` is left and any earlier Node still works.
 
+### Missing tool becomes a Connect, then Scout carries on (real brain)
+
+1. `cd brain && uv run pytest tests/test_setup_apps.py tests/test_connect_and_carry_on.py -q`
+   passes (fakes only).
+2. By hand, Google Calendar not connected: ask Scout "put lunch with Sam on my calendar tomorrow".
+   Scout says it has no calendar and asks with clickable options, Connect Google Calendar
+   recommended; it does not offer an expert.
+3. Click Connect: the Allow card names the host and has no **Always**. Allow, finish the sign-in in
+   the browser: Scout says the app is connected and then adds the lunch, without being asked again.
+4. Ask again and click the other option, or deny the card: Scout says so plainly and offers what it
+   can do without the app.
+5. Restart the brain between the click and the sign-in: Scout does not resume the request.
+
 ### Install an expert
 
 1. `cd brain && uv run pytest tests/test_setup_store.py tests/test_setup_install.py -q` passes

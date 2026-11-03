@@ -218,7 +218,10 @@ connected by searching.
 `install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `locked`
 and `person_only`: the Allow card names the transport, the package and version (or the host), the
 environment variable names it needs and any Node download, and neither a saved preference nor a
-stored Auto skips it. After Allow it saves the app through the same code as `add_app`.
+stored Auto skips it. After Allow it saves the app through the same code as `add_app`. A connected
+app is reported with its tool names in the result; a sign-in or slow start that ends later sends
+a `setup_done` event (app, name, ok, state, tools), so Scout can carry on with the request that led
+to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-carry-on)).
 
 - **Local (`npx`, `uvx`).** A stdio app that runs by absolute path: Node's `npm exec` (the system
   Node if 22 or newer, else Tagalong's own, downloaded first) or `uvx` when it is installed

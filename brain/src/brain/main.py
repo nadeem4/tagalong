@@ -122,6 +122,7 @@ async def _run() -> None:
         http_fetch,
         real_get_json,
         os.environ,
+        emit_event,
     )
     login = login_tools(config.data_dir, logins)
     session = Session(
