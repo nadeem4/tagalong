@@ -78,13 +78,14 @@ class JobId(str):
         why_fresh: str | None = None,
         parent_job: str | None = None,
         part: str = "p1",
+        title: str | None = None,
     ):
         self = super().__new__(cls, job_id)
         self.part = part  # the part this start made
         self.parent_job = parent_job  # the job whose session this one continues, if any
         self.session = session  # "continued" or "fresh"
         self.why_fresh = why_fresh
-        self.title: str | None = None  # the saved, masked title of a job this start opened
+        self.title = title  # the saved, masked title of a job this start opened
         return self
 
 

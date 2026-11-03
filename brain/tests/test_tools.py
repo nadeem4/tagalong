@@ -1192,6 +1192,7 @@ async def test_hand_off_result_has_part_and_title(home):
     home.jobs.started = JobId("j1", part="p2", title="Stored title")
     out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "title": "T"}))
     assert out["part"] == "p2" and out["title"] == "Stored title"  # the saved, masked one
+    home.jobs.started = JobId("j1", part="p3")  # attaching: Jobs sets no title
     out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "job": "j1"}))
     assert out["title"] is None  # attaching to a job names nothing
 
