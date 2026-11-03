@@ -41,7 +41,9 @@ describe('StepSix', () => {
   it('disables the button while the press is in flight, and frees it after', async () => {
     const host = hostWith(EMPTY);
     let finish: () => void = () => undefined;
-    host.setupExpert.mockReturnValue(new Promise<void>((resolve) => (finish = resolve)));
+    host.setupExpert.mockReturnValue(
+      new Promise<{ state?: string }>((resolve) => (finish = () => resolve({}))),
+    );
     render(<StepSix host={host} />);
     const button = await screen.findByRole('button', { name: 'Set up Claude Code' });
     fireEvent.click(button);
@@ -96,6 +98,41 @@ describe('StepSix', () => {
     render(<StepSix host={host} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
     await waitFor(() => expect(host.setupExpert).toHaveBeenCalledWith('claude-acp'));
+  });
+
+  it('a login that is waiting says where to finish it, and a reload clears it', async () => {
+    const host = hostWith({
+      ...READY,
+      experts: [{ ...READY.experts[0]!, state: 'needs_login' }],
+    });
+    host.setupExpert.mockResolvedValue({ state: 'waiting' });
+    let changed: (what: string) => void = () => undefined;
+    host.onBrainChanged.mockImplementation((handler) => {
+      changed = handler;
+      return () => undefined;
+    });
+    render(<StepSix host={host} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
+    expect(await screen.findByText(/Finish logging in in the window that opened/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Log in to Claude Code' })).toBeNull();
+    host.setupOverview.mockResolvedValue(READY);
+    act(() => changed('setup'));
+    expect(await screen.findByText(/Claude Code is set up/)).toBeVisible();
+    expect(screen.queryByText(/Finish logging in/)).toBeNull();
+  });
+
+  it('a login that was already done reloads to ready', async () => {
+    const host = hostWith({
+      ...READY,
+      experts: [{ ...READY.experts[0]!, state: 'needs_login' }],
+    });
+    host.setupExpert.mockImplementation(() => {
+      host.setupOverview.mockResolvedValue(READY);
+      return Promise.resolve({ state: 'logged_in' });
+    });
+    render(<StepSix host={host} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Log in to Claude Code' }));
+    expect(await screen.findByText(/Claude Code is set up/)).toBeVisible();
   });
 
   it('a failed install shows its reason in the step’s words and a retry', async () => {

@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppInfo, SetupOverview } from '../shapes';
+import type { AppInfo, SetupOverview, SetupResult } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
@@ -325,8 +325,8 @@ const CLAUDE = { id: 'claude-acp', name: 'Claude Code', version: '2.0', tested: 
 const CODEX = { id: 'codex-acp', name: 'Codex', version: '1.0', description: 'OpenAI’s agent' };
 const NOTES = { id: 'acme/notes', name: 'notes', version: '1', description: 'Take notes' };
 
-function withSetup(setup: Partial<SetupOverview>) {
-  return createFakeHostBridge({ apps: [FILES], setup });
+function withSetup(setup: Partial<SetupOverview>, setupResult?: SetupResult) {
+  return createFakeHostBridge({ apps: [FILES], setup, ...(setupResult && { setupResult }) });
 }
 
 describe('ConnectionsPanel groups', () => {
@@ -387,6 +387,26 @@ describe('ConnectionsPanel groups', () => {
     await renderPanel(bridge);
     await click(screen.getByRole('button', { name: 'Log in' }));
     expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'claude-acp', approved: false }]);
+  });
+
+  it('a waiting login says where to finish it', async () => {
+    const bridge = withSetup(
+      { experts: [{ ...CLAUDE, state: 'needs_login' }] },
+      { state: 'waiting' },
+    );
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Log in' }));
+    expect(await screen.findByText(/Finish logging in in the window that opened/)).toBeVisible();
+  });
+
+  it('a login that was already done says so', async () => {
+    const bridge = withSetup(
+      { experts: [{ ...CLAUDE, state: 'needs_login' }] },
+      { state: 'logged_in' },
+    );
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Log in' }));
+    expect(await screen.findByText('Already logged in.')).toBeVisible();
   });
 
   it('progress disables the row’s button and shows the stage', async () => {

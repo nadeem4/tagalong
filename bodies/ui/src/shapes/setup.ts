@@ -55,4 +55,6 @@ export function parseSetupOverview(json: unknown): SetupOverview {
 /** What setting something up answers at once; `error` is a short token such as `denied`. */
 export interface SetupResult {
   error?: string;
+  /** A login's answer: `waiting` (a window or browser opened) or `logged_in` (nothing to do). */
+  state?: string;
 }
