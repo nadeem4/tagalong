@@ -520,12 +520,15 @@ def _seed_old_schema(path):
     db.execute(
         "INSERT INTO jobs(id, agent, task, folder, mode, state, reason, progress, result,"
         " session_id, reported, started_at, ended_at, parent_job, watch)"
-        " VALUES ('run','claude-acp','a','F','plan','running',NULL,'tail',NULL,'s0',0,'t0',NULL,NULL,NULL),"
-        " ('done','claude-acp','b','F','plan','done','end_turn','p','all fixed','s1',1,'t1','t2','run','[]'),"
+        " VALUES"
+        " ('run','claude-acp','a','F','plan','running',NULL,'tail',NULL,'s0',0,'t0',NULL,NULL,NULL),"
+        " ('done','claude-acp','b','F','plan','done','end_turn','p','all fixed','s1',1,'t1','t2',"
+        "'run','[]'),"
         " ('err','codex','c','G','plan','error','boom',NULL,NULL,NULL,0,'t3','t4',NULL,NULL)"
     )
     db.execute(
-        "INSERT INTO job_activity(job_id, rev, seq, at, kind, text) VALUES ('done',1,1,'t1','command','ls')"
+        "INSERT INTO job_activity(job_id, rev, seq, at, kind, text)"
+        " VALUES ('done',1,1,'t1','command','ls')"
     )
     db.close()
 

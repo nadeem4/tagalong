@@ -20,7 +20,7 @@ from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, Question
 from brain.guards import Guards
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
-from brain.memory import ActivityEntry, Job, Memory
+from brain.memory import ActivityEntry, Job, JobPart, Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 
@@ -597,22 +597,16 @@ async def test_startup_stops_leftover_running_rows(make_rig):
     assert (job.state, job.reason) == ("stopped", "brain restarted")
 
 
-def test_job_note_states_facts_and_trims_a_long_result():
-    job = Job(
-        "j1",
-        "claude_code",
-        "fix it",
-        "C:/x",
-        "default",
-        "done",
-        "end_turn",
-        None,
-        "A" * 5000,
-        "s1",
-        False,
-        "t0",
-        "t1",
+def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
+    """A stored one-part job, built by hand."""
+    part = JobPart(
+        id, "p1", "claude_code", task, state, reason, None, "s", report, reported, "t0", "t1"
     )
+    return Job(id, task, "C:/x", "default", state, "t0", "t1", parts=[part])
+
+
+def test_job_note_states_facts_and_trims_a_long_result():
+    job = a_job("j1", "fix it", "done", "end_turn", "A" * 5000)
     note = job_note(job)
     for fact in ("j1", "fix it", "C:/x", "done", "end_turn"):
         assert fact in note
@@ -621,21 +615,7 @@ def test_job_note_states_facts_and_trims_a_long_result():
 
 
 def test_job_note_without_a_result_or_reason():
-    job = Job(
-        "j2",
-        "claude_code",
-        "t",
-        "C:/x",
-        "default",
-        "stopped",
-        None,
-        None,
-        None,
-        None,
-        False,
-        "t0",
-        "t1",
-    )
+    job = a_job("j2", "t", "stopped")
     note = job_note(job)
     assert "stopped" in note and "[trimmed]" not in note
 
@@ -689,7 +669,7 @@ async def test_ask_with_nobody_online_skips_scout_and_cancels(make_rig):
 async def test_job_stopped_while_scout_thinks_opens_no_ask(make_rig, result):
     scout = FakeScout(result)
     rig = make_rig(FakeAsks(), scout=scout)
-    rig.jobs._runs["j1"] = object()  # a running job, stopped while Scout thinks
+    rig.jobs._runs["j1"] = {"p1": object()}  # a running job, stopped while Scout thinks
     scout.before_return = lambda: rig.jobs._runs.pop("j1")
     question = Question("Which?", [QuestionField("question_0", "Q", ["A"])])
     assert await rig.jobs._question("j1", question) is None
@@ -1507,11 +1487,31 @@ async def test_activity_page_returns_entries_after_the_cursor(make_rig):
     page = rig.jobs.activity_page(job_id, 0)
     assert page["job"] == job_id and page["state"] == "done" and page["more"] is False
     assert page["watch"] is None
-    assert {"rev", "seq", "at", "kind", "text", "status", "step", "exit"} == set(page["entries"][0])
+    keys = {"rev", "seq", "at", "kind", "text", "status", "step", "exit", "part", "source"}
+    assert keys == set(page["entries"][0])
     assert page["entries"][-1]["kind"] == "end"
     assert page["rev"] == max(e["rev"] for e in page["entries"])
     again = rig.jobs.activity_page(job_id, page["rev"])
     assert again["entries"] == [] and again["rev"] == page["rev"]
+
+
+async def test_activity_page_has_parts_and_job_times(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await finish(rig, job_id)
+    page = rig.jobs.activity_page(job_id, 0)
+    assert {"title", "started_at", "ended_at", "closed_at", "parts"} <= set(page)
+    [part] = page["parts"]
+    assert part["id"] == "p1" and part["state"] == "done"
+    assert set(part) == {"id", "expert", "state", "reason", "started_at", "ended_at"}
+    assert {e["part"] for e in page["entries"]} == {"p1"}
+
+
+async def test_activity_page_of_an_old_job_shows_one_part(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
+    page = rig.jobs.activity_page("old", 0)
+    assert [(p["id"], p["expert"]) for p in page["parts"]] == [("p1", "claude-acp")]
 
 
 async def test_activity_page_cuts_at_the_page_limit(make_rig, monkeypatch):
@@ -1717,9 +1717,7 @@ async def test_job_ended_note_carries_the_activity_summary_beside_the_result(mak
 
 
 def test_job_note_without_facts_is_unchanged():
-    job = Job(
-        "a1", "claude_code", "t", "C:/x", "default", "done", "", "p", "r", "s", True, "t0", "t1"
-    )
+    job = a_job("a1", "t", "done", "", "r", True)
     assert "Activity:" not in job_note(job)
     assert job_note(job, {"activity": "steps: 1"}).endswith("Activity:\nsteps: 1")
 
@@ -2152,3 +2150,102 @@ async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
     second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
     assert rig.memory.get_job(second).parent_job == first
     assert check.facts == [] and hand_off_rows(rig) == []
+
+
+# ---- parts (SP2) ----
+
+
+async def second_part(rig, job_id, task="two"):
+    """What SP3's tool will do: add a further part to a job that already exists."""
+    return await rig.jobs._start_part(job_id, installed(), task, rig.folder, new_job=False)
+
+
+async def test_start_creates_a_job_with_one_part(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    [part] = rig.memory.get_job(job).parts
+    assert (job.part, part.id, part.agent, part.task, part.state) == (
+        "p1",
+        "p1",
+        "claude-acp",
+        "one",
+        "running",
+    )
+    assert part.session_id
+
+
+async def test_part_end_updates_the_part_and_the_job_state(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    job = await rig.jobs.start("one", str(rig.folder))
+    await finish(rig, job)
+    got = rig.memory.get_job(job)
+    [part] = got.parts
+    assert (got.state, part.state) == ("done", "done")
+    assert part.report and part.ended_at == got.ended_at
+
+
+async def test_two_parts_running_keep_separate_asks_and_sessions(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    two = await second_part(rig, job)
+    assert two.part == "p2" and str(two) == str(job)
+    p1, p2 = rig.memory.get_job(job).parts
+    assert p1.session_id and p2.session_id
+    assert rig.jobs._runs[job]["p1"] is not rig.jobs._runs[job]["p2"]  # one expert process each
+    a1 = asyncio.create_task(rig.jobs._open_ask(job_id=job, part="p1", text="a"))
+    a2 = asyncio.create_task(rig.jobs._open_ask(job_id=job, part="p2", text="b"))
+    await until(lambda: len(rig.asks.open_ids) == 2)
+    await rig.jobs.stop(job, "p1")
+    await until(lambda: rig.memory.get_job(job).parts[0].state == "stopped")
+    got = rig.memory.get_job(job)
+    assert (got.state, got.parts[1].state) == ("running", "running")  # the job still runs
+    assert len(rig.asks.cancel_all_calls[-1]) == 1  # only p1's ask was cancelled
+    assert len(rig.jobs._ask_ids[(job, "p2")]) == 1
+    for task in (a1, a2):
+        task.cancel()
+
+
+async def test_tell_with_two_running_parts_needs_a_part(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    await second_part(rig, job)
+    with pytest.raises(JobError, match="several running parts: p1, p2; name one"):
+        rig.jobs.tell(job, "hello")
+    rig.jobs.tell(job, "hello", part="p2")
+
+
+async def test_stop_stops_all_running_parts(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    await second_part(rig, job)
+    await rig.jobs.stop(job)
+    await finish(rig, job)
+    got = rig.memory.get_job(job)
+    assert got.state == "stopped" and [p.state for p in got.parts] == ["stopped", "stopped"]
+    assert rig.jobs._runs == {} and len(rig.finished) == 1  # one report, after the last part
+
+
+async def test_restart_marks_running_parts_and_job_stopped_and_drops_timers(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("j1", "claude-acp", "t", str(rig.folder), "plan")
+    rig.memory.add_part("j1", "claude-acp", "t2", "now")
+    rig.memory.update_part("j1", "p1", state="done")
+    timer = rig.memory.add_timer("x", datetime(2030, 1, 1, tzinfo=UTC), job_id="j1")
+    rig.jobs.startup()
+    got = rig.memory.get_job("j1")
+    assert got.state == "stopped" and [p.state for p in got.parts] == ["done", "stopped"]
+    assert [e.part for e in rig.memory.activity_after("j1", 0, 10)] == ["p2"]
+    assert all(t.id != timer.id for t in rig.memory.list_timers())
+
+
+async def test_folder_session_reuse_picks_the_part_that_has_the_session(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.memory.add_job("old", "codex-acp", "t", str(rig.folder), "plan")
+    rig.memory.add_part("old", "claude-acp", "t2", "now")
+    rig.memory.update_part("old", "p1", state="done", session_id="other-expert")
+    rig.memory.update_part("old", "p2", state="done", session_id="mine")
+    rig.memory.update_job("old", state="done", ended_at="e")
+    job = await rig.jobs.start("again", str(rig.folder))
+    assert (job.parent_job, job.session) == ("old", "continued")
+    loads = [f for f in rig.frames() if f.get("method") == "session/load"]
+    assert loads[0]["params"]["sessionId"] == "mine"

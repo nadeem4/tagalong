@@ -561,3 +561,55 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
     frig.log.on_update(start("t1", raw_input={"command": "sleep 9"}))
     frig.log.end("stopped", "")
     assert frig.failed == []
+
+
+# --- parts (SP2): one ordered log per job, each step tagged with its part
+
+
+def two_part_logs(memory):
+    memory.add_job("j", "claude-code", "t", "/w", "work")
+    memory.add_part("j", "gemini", "t2", NOW.isoformat())
+
+    def log(part):
+        return JobActivity("j", memory, lambda t: t, lambda: NOW, lambda: None, part=part)
+
+    return log("p1"), log("p2")
+
+
+def test_entries_carry_their_part(rig):
+    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    assert {e.part for e in rig.rows()} == {"p1"}
+
+
+def test_two_parts_share_one_ordered_log(rig):
+    one, two = two_part_logs(rig.memory)
+    one.on_update(start("t1", raw_input={"command": "a"}))
+    two.on_update(start("t1", raw_input={"command": "b"}))
+    one.on_update(start("t2", raw_input={"command": "c"}))
+    got = [(e.seq, e.part, e.text) for e in rig.rows()]
+    assert got == [(1, "p1", "a"), (2, "p2", "b"), (3, "p1", "c")]
+
+
+def test_a_second_part_continues_the_jobs_seq(rig):
+    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.log.on_update(start("t1", raw_input={"command": "a"}))
+    later = JobActivity("j", rig.memory, lambda t: t, lambda: NOW, lambda: None, part="p2")
+    later.on_update(start("t1", raw_input={"command": "b"}))
+    assert [e.seq for e in rig.rows()] == [1, 2]
+
+
+def test_summary_names_the_expert_when_a_job_has_several_parts(rig):
+    one, two = two_part_logs(rig.memory)
+    one.on_update(start("t1", raw_input={"command": "npm test"}))
+    two.on_update(start("t1", raw_input={"command": "make"}))
+    two.on_update(progress("t1", "failed", "boom"))
+    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "[gemini] make" in text and "[claude-code] npm test" in text
+    assert "boom" in text
+
+
+def test_summary_of_a_one_part_job_has_no_expert_tag(rig):
+    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    assert "[" not in job_activity.activity_summary(rig.memory, "j", NOW)

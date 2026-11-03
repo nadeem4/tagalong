@@ -1200,7 +1200,7 @@ def answer_step(value="Blue"):
 
 def ask_expert(session, message="Which colour?"):
     """The expert asks as if job j1 were running; returns the task holding its answer."""
-    session.jobs._runs["j1"] = object()
+    session.jobs._runs["j1"] = {"p1": object()}
     field = QuestionField("question_0", "Colour", ["Red", "Blue"])
     return asyncio.create_task(session.jobs._question("j1", Question(message, [field])))
 
