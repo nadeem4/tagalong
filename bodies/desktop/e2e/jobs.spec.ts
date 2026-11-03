@@ -264,7 +264,7 @@ test('a two-expert job shows its parts in Reports and a labelled Activity', asyn
   await home.getByRole('button', { name: /Claude Code/ }).click();
   await expect(home.getByRole('heading', { name: 'Drafted' })).toBeVisible();
   await expect(home.locator('.job-report__body script')).toHaveCount(0);
-  await expect(home.locator('.job-report__body')).toContainText('<script>bad()</script>');
+  await expect(home.locator('#job-report-p1')).toContainText('<script>bad()</script>');
   await home.getByRole('button', { name: /Gemini/ }).click();
   await expect(home.getByText('no changes needed')).toBeVisible();
 });
