@@ -204,13 +204,13 @@ MIGRATIONS = (
         agent TEXT, task TEXT, state TEXT, reason TEXT, progress TEXT,
         session_id TEXT, report TEXT,
         reported INTEGER NOT NULL DEFAULT 0,
-        started_at TEXT, ended_at TEXT,
+        started_at TEXT, ended_at TEXT, folder TEXT,
         PRIMARY KEY(job_id, id)
     );
     INSERT INTO job_parts(job_id, id, agent, task, state, reason, progress, session_id, report,
-                          reported, started_at, ended_at)
+                          reported, started_at, ended_at, folder)
         SELECT id, 'p1', agent, task, state, reason, progress, session_id, result,
-               COALESCE(reported, 0), started_at, ended_at FROM jobs ORDER BY rowid;
+               COALESCE(reported, 0), started_at, ended_at, folder FROM jobs ORDER BY rowid;
     CREATE TABLE jobs_new(
         id TEXT PRIMARY KEY,
         task TEXT, folder TEXT, mode TEXT, state TEXT,
@@ -261,6 +261,7 @@ class JobPart:
     reported: bool
     started_at: str
     ended_at: str | None
+    folder: str  # parts of one job may work in different folders
 
 
 @dataclass(frozen=True)
@@ -278,31 +279,6 @@ class Job:
     scout_result: str | None = None
     closed_at: str | None = None
     parts: list[JobPart] = field(default_factory=list)
-
-    # The newest part's facts, for callers that treat a job as one expert's work.
-    @property
-    def agent(self) -> str:
-        return self.parts[-1].agent
-
-    @property
-    def reason(self) -> str | None:
-        return self.parts[-1].reason
-
-    @property
-    def progress(self) -> str | None:
-        return self.parts[-1].progress
-
-    @property
-    def result(self) -> str | None:
-        return self.parts[-1].report
-
-    @property
-    def session_id(self) -> str | None:
-        return self.parts[-1].session_id
-
-    @property
-    def reported(self) -> bool:
-        return all(p.reported for p in self.parts)
 
 
 @dataclass(frozen=True)
@@ -375,11 +351,9 @@ _JOB_COLUMNS = (
 _JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
 _PART_COLUMNS = (
     "job_id, id, agent, task, state, reason, progress, session_id, report, reported,"
-    " started_at, ended_at"
+    " started_at, ended_at, folder"
 )
 _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
-# update_job names for what now lives on the newest part
-_PART_ALIASES = {"result": "report"}
 JOB_RESULT_CAP = 20_000
 JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
@@ -526,7 +500,7 @@ class Memory:
             f"SELECT {_PART_COLUMNS} FROM job_parts WHERE job_id IN ({marks}) ORDER BY rowid",
             [r[0] for r in rows],
         ):
-            parts.setdefault(r[0], []).append(JobPart(*r[:9], bool(r[9]), r[10], r[11]))
+            parts.setdefault(r[0], []).append(JobPart(*r[:9], bool(r[9]), r[10], r[11], r[12]))
         return [
             Job(*r[:8], _parse_watch(r[8]), r[9], r[10], r[11], parts.get(r[0], [])) for r in rows
         ]
@@ -541,17 +515,30 @@ class Memory:
             " VALUES (?,?,?,?,'running',?,?)",
             (id, task, folder, mode, now, parent_job),
         )
-        self.add_part(id, agent, task, now)
+        self.add_part(id, agent, task, folder, now)
         return self._jobs("WHERE id=?", (id,))[0]
 
-    def add_part(self, job_id: str, agent: str, task: str, started_at: str) -> str:
-        """Add a running part to a job; returns its id (p1, p2, ...)."""
-        n = self._db.execute("SELECT COUNT(*) FROM job_parts WHERE job_id=?", (job_id,))
-        part_id = f"p{n.fetchone()[0] + 1}"
+    def next_part_id(self, job_id: str) -> str:
+        """The id the job's next part will get (p1, p2, ...), known before the part exists."""
+        rows = self._db.execute("SELECT id FROM job_parts WHERE job_id=?", (job_id,)).fetchall()
+        return f"p{max((int(r[0][1:]) for r in rows), default=0) + 1}"
+
+    def add_part(
+        self,
+        job_id: str,
+        agent: str,
+        task: str,
+        folder: str,
+        started_at: str,
+        part_id: str | None = None,
+    ) -> str:
+        """Add a running part to a job; returns its id (p1, p2, ...). part_id is one the caller
+        reserved earlier."""
+        part_id = part_id or self.next_part_id(job_id)
         self._db.execute(
-            "INSERT INTO job_parts(job_id, id, agent, task, state, started_at)"
-            " VALUES (?,?,?,?,'running',?)",
-            (job_id, part_id, agent, task, started_at),
+            "INSERT INTO job_parts(job_id, id, agent, task, state, started_at, folder)"
+            " VALUES (?,?,?,?,'running',?,?)",
+            (job_id, part_id, agent, task, started_at, folder),
         )
         return part_id
 
@@ -588,19 +575,11 @@ class Memory:
         self.update_job(job_id, watch=json.dumps(items) if items else None)
 
     def update_job(self, id: str, **fields) -> None:
-        """Job-level fields; reason, progress, result and session_id go to the newest part (the
-        one-expert job). Ending a job (a state other than running) settles its running parts."""
-        fields = {_PART_ALIASES.get(k, k): v for k, v in fields.items()}
-        part_fields = {k: fields.pop(k) for k in _PART_FIELDS - _JOB_FIELDS if k in fields}
+        """Job-level fields only (part fields go through update_part). Ending a job (a state
+        other than running) settles its running parts."""
         unknown = set(fields) - _JOB_FIELDS
         if unknown:
             raise ValueError(f"Unknown job fields: {', '.join(sorted(unknown))}")
-        if part_fields:
-            last = self._db.execute(
-                "SELECT id FROM job_parts WHERE job_id=? ORDER BY rowid DESC LIMIT 1", (id,)
-            ).fetchone()
-            if last:
-                self.update_part(id, last[0], **part_fields)
         if not fields:
             return
         sets = ", ".join(f"{k}=?" for k in fields)
@@ -712,14 +691,14 @@ class Memory:
         """The expert's newest finished part in this folder that saved a session. Folders compare
         as paths (Windows ignores case, a trailing slash is nothing), not as SQL strings."""
         rows = self._db.execute(
-            "SELECT job_id, id FROM job_parts"
+            "SELECT job_id, id, folder FROM job_parts"
             " WHERE agent=? AND state!='running' AND session_id IS NOT NULL"
             " ORDER BY rowid DESC LIMIT 50",
             (agent,),
         ).fetchall()
-        for job_id, part_id in rows:
+        for job_id, part_id, part_folder in rows:
             job = self.get_job(job_id)
-            if job is not None and Path(job.folder) == Path(folder):
+            if job is not None and Path(part_folder or job.folder) == Path(folder):
                 return job, next(p for p in job.parts if p.id == part_id)
         return None
 
@@ -758,7 +737,9 @@ class Memory:
             (now,),
         )
         self._db.execute(
-            "UPDATE jobs SET state='stopped', ended_at=? WHERE state='running'", (now,)
+            "UPDATE jobs SET state='stopped', ended_at=?, closed_at=COALESCE(closed_at, ?)"
+            " WHERE state='running'",
+            (now, now),
         )
 
     def unreported_jobs(self) -> list[Job]:

@@ -104,8 +104,9 @@ export interface JobPagePart {
   expert: string;
   state: string;
   reason: string | null;
-  started_at: string;
-  ended_at: string | null;
+  folder: string;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 /** A page of a job's steps after a cursor; pass `rev` back as the next `afterRev`. */
@@ -113,6 +114,9 @@ export interface JobActivityPage {
   job: string;
   state: string;
   title: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  closedAt: string | null;
   parts: JobPagePart[];
   rev: number;
   entries: JobActivityEntry[];
