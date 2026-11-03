@@ -71,7 +71,9 @@ const exclusionEntry = z.string().trim().min(1);
 const folderEntry = z
   .string()
   .trim()
-  .regex(/^([a-zA-Z]:[\\/]|\\\\|\/)/, 'must be a full folder path');
+  .regex(/^([a-zA-Z]:[\\/]|\\\\|\/)/, 'must be a full folder path')
+  // Device and raw-volume prefixes name devices, not folders a person picks.
+  .refine((value) => !/^[\\/]{2}[?.][\\/]/.test(value), 'must be a full folder path');
 
 /**
  * Windows a capture must refuse.

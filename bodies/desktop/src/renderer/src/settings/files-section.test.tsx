@@ -39,6 +39,7 @@ describe('FilesSection', () => {
   it('Add folder and Remove call back', () => {
     const onAdd = vi.fn();
     const onRemove = vi.fn();
+    vi.stubGlobal('document', { getElementById: () => null });
     const tree = walk(FilesSection({ folders: ['/a', '/b'], onAdd, onRemove }));
     const buttons = tree.filter((el) => el.props['onClick'] !== undefined);
     const add = buttons.find((el) => el.props['children'] === 'Add folder')!;
@@ -47,6 +48,21 @@ describe('FilesSection', () => {
     (remove.props['onClick'] as () => void)();
     expect(onAdd).toHaveBeenCalledOnce();
     expect(onRemove).toHaveBeenCalledWith('/b');
+  });
+
+  it('moves focus to Add folder after a Remove', () => {
+    const focus = vi.fn();
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'files-add' ? { focus } : null),
+    });
+    const tree = walk(FilesSection({ folders: ['/a'], onAdd: noop, onRemove: noop }));
+    const remove = tree.find((el) => el.props['aria-label'] === 'Remove /a')!;
+    (remove.props['onClick'] as () => void)();
+    vi.unstubAllGlobals();
+    expect(focus).toHaveBeenCalledOnce();
+    expect(
+      renderToStaticMarkup(<FilesSection folders={[]} onAdd={noop} onRemove={noop} />),
+    ).toContain('id="files-add"');
   });
 
   it('says what it does: delete goes to the Recycle Bin and removing takes access away', () => {

@@ -30,7 +30,11 @@ export function FilesSection({ folders, onAdd, onRemove }: FilesSectionProps) {
               <Button
                 variant="quiet"
                 aria-label={`Remove ${folder}`}
-                onClick={() => onRemove(folder)}
+                onClick={() => {
+                  onRemove(folder);
+                  // The Remove button is gone next: keep the keyboard on this section.
+                  document.getElementById('files-add')?.focus();
+                }}
               >
                 Remove
               </Button>
@@ -39,7 +43,7 @@ export function FilesSection({ folders, onAdd, onRemove }: FilesSectionProps) {
         </ul>
       )}
       <div className="tg-inline">
-        <Button variant="secondary" onClick={onAdd}>
+        <Button id="files-add" variant="secondary" onClick={onAdd}>
           Add folder
         </Button>
       </div>

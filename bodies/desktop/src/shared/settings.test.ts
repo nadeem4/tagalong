@@ -280,6 +280,13 @@ describe('fileFolders', () => {
     }
   });
 
+  it('refuses Windows device paths but keeps a normal share', () => {
+    for (const bad of ['\\\\?\\C:\\x', '\\\\.\\PhysicalDrive0', '//?/C:/x', '//./pipe/x']) {
+      expect(SettingsPatch.safeParse({ fileFolders: [bad] }).success).toBe(false);
+    }
+    expect(SettingsPatch.safeParse({ fileFolders: ['\\\\server\\share'] }).success).toBe(true);
+  });
+
   it('is left alone by a patch that does not mention it', () => {
     expect(SettingsPatch.parse({ listening: { always: true } })).not.toHaveProperty('fileFolders');
   });

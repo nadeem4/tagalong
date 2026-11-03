@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import type { IpcMainInvokeEvent } from 'electron';
 import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, powerMonitor, shell } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
@@ -830,11 +831,15 @@ function registerIpc(): void {
     openExternal: (url) => shell.openExternal(url),
   });
   registerFileFoldersIpc(handle, {
-    pick: async () => {
-      const result = await dialog.showOpenDialog({
+    pick: async (event) => {
+      const options = {
         title: 'Choose a folder Scout may use',
-        properties: ['openDirectory'],
-      });
+        properties: ['openDirectory' as const],
+      };
+      const owner = BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender);
+      const result = await (owner === null
+        ? dialog.showOpenDialog(options)
+        : dialog.showOpenDialog(owner, options));
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     settingsStore: () => required().settingsStore,

@@ -18,10 +18,11 @@ let store: SettingsStore;
 let picked: string | null;
 const onSaved = vi.fn();
 
-function setup() {
+function setup(windows = false, pick?: () => Promise<string | null>) {
   const ipc = fakeIpc();
   registerFileFoldersIpc(ipc.handle, {
-    pick: () => Promise.resolve(picked),
+    pick: pick ?? (() => Promise.resolve(picked)),
+    windows,
     settingsStore: () => store,
     onSaved,
   });
@@ -56,6 +57,35 @@ describe('registerFileFoldersIpc', () => {
     picked = join(dir, 'docs');
     await invoke(IPC.fileFolderAdd);
     expect(await invoke(IPC.fileFolderAdd)).toEqual([picked]);
+  });
+
+  it('keeps both folders when two adds overlap', async () => {
+    const answers = [join(dir, 'a'), join(dir, 'b')];
+    const resolvers: ((path: string) => void)[] = [];
+    const { invoke } = setup(false, () => new Promise((resolve) => resolvers.push(resolve)));
+    const first = invoke(IPC.fileFolderAdd);
+    const second = invoke(IPC.fileFolderAdd);
+    resolvers[0]!(answers[0]!);
+    await first;
+    resolvers[1]!(answers[1]!);
+    await second;
+    expect(store.get().fileFolders).toEqual(answers);
+  });
+
+  it('treats the same Windows folder in another case as a repeat, but not elsewhere', async () => {
+    const win = setup(true);
+    picked = 'C:\\Users\\Me\\Docs';
+    await win.invoke(IPC.fileFolderAdd);
+    picked = 'c:\\users\\me\\docs';
+    expect(await win.invoke(IPC.fileFolderAdd)).toEqual(['C:\\Users\\Me\\Docs']);
+  });
+
+  it('keeps folders that differ only by case on other systems', async () => {
+    const { invoke } = setup(false);
+    picked = '/Docs';
+    await invoke(IPC.fileFolderAdd);
+    picked = '/docs';
+    expect(await invoke(IPC.fileFolderAdd)).toEqual(['/Docs', '/docs']);
   });
 
   it('removes a folder and leaves the others', async () => {

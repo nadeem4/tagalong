@@ -10,8 +10,10 @@ import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 
 interface FileFoldersIpcDeps {
-  /** Opens the system folder picker; null when the person cancels. */
-  pick: () => Promise<string | null>;
+  /** Opens the system folder picker over the asking window; null when the person cancels. */
+  pick: (event: unknown) => Promise<string | null>;
+  /** Folder paths compare without case (Windows). Defaults to the running system. */
+  windows?: boolean;
   settingsStore: () => { get(): Settings; set(patch: SettingsPatch): Settings };
   /** Keeps the running copy of the settings and tells every open window. */
   onSaved: (settings: Settings) => void;
@@ -24,10 +26,15 @@ export function registerFileFoldersIpc(handle: IpcHandle, deps: FileFoldersIpcDe
     return saved.fileFolders;
   };
 
-  handle(IPC.fileFolderAdd, async () => {
+  const windows = deps.windows ?? process.platform === 'win32';
+  const same = (a: string, b: string): boolean =>
+    windows ? a.toLowerCase() === b.toLowerCase() : a === b;
+
+  handle(IPC.fileFolderAdd, async (event) => {
+    const chosen = await deps.pick(event);
+    // Read after the picker closes: another Add may have saved while it was open.
     const current = deps.settingsStore().get().fileFolders;
-    const chosen = await deps.pick();
-    if (chosen === null || current.includes(chosen)) return current;
+    if (chosen === null || current.some((folder) => same(folder, chosen))) return current;
     return save([...current, chosen]);
   });
 
