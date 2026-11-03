@@ -123,7 +123,8 @@ class Jobs:
         self._asks = asks
         self._notify = notify
         self._experts = experts  # read afresh: an install adds one while the brain runs
-        self._make_run = make_run  # called with the expert, then the four callbacks as keywords
+        # Called with the expert, then the job id and the callbacks as keywords.
+        self._make_run = make_run
         self._hosts = make_run if isinstance(make_run, ExpertHosts) else None
         self._max_running = max_running
         self._on_finished = on_finished
@@ -302,6 +303,7 @@ class Jobs:
         part = "p1" if new_job else self._reserve_part(job_id)
         run = self._make_run(
             chosen,
+            job_id=job_id,
             on_permission=lambda request: self._permission(job_id, request, part),
             on_question=lambda question: self._question(job_id, question, part),
             on_progress=lambda text: self._progress(job_id, text, part),

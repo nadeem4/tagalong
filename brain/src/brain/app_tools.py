@@ -66,7 +66,7 @@ def _tool_part(name: str, app_id: str) -> str:
 
 
 def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
-    """One MCP tool as a scout-only spec; None when it has no usable name."""
+    """One MCP tool as a spec for Scout and, via the bridge, an expert; None if it has no name."""
     part = _tool_part(tool.name, app_id)
     if not part:
         return None
@@ -75,6 +75,7 @@ def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
         f"{app_id}{SEP}{part}",
         tool.description or "",
         tool.input_schema,
+        frozenset({"scout", "expert"}),  # an expert reaches an app only through the bridge
         effect=effect,
         default_mode="ask",  # an app's own hints never open it: the person decides
         locked=locked,

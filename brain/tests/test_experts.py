@@ -76,6 +76,7 @@ def make_run(
     path_first=None,
     grace: float = 2,
     startup_timeout: float = 60,
+    **extra,
 ) -> ExpertRun:
     script = tmp_path / "script.json"
     script.write_text(json.dumps(steps))
@@ -99,6 +100,7 @@ def make_run(
         on_end=h.on_end,
         on_update=h.on_update,
         grace=grace,
+        **extra,
     )
     return h.run
 
@@ -841,3 +843,87 @@ async def test_cancelling_the_run_does_not_leak_the_sleeper():
     with pytest.raises(asyncio.CancelledError):
         await driving
     assert sleeper.done()
+
+
+class FakeBridge:
+    """Stands in for ExpertApps: hands out a descriptor and notes the revoke."""
+
+    TOKEN = "bridge-token-123"
+
+    def __init__(self) -> None:
+        self.granted: list[tuple] = []
+        self.revoked: list = []
+
+    async def grant(self, job_id, apps):
+        from acp.schema import HttpHeader, HttpMcpServer
+
+        self.granted.append((job_id, tuple(apps)))
+        descriptor = HttpMcpServer(
+            type="http",
+            name="tagalong",
+            url="http://127.0.0.1:1/mcp",
+            headers=[HttpHeader(name="Authorization", value=f"Bearer {self.TOKEN}")],
+        )
+        return SimpleNamespace(descriptor=descriptor)
+
+    async def revoke(self, grant):
+        self.revoked.append(grant)
+
+
+def new_session_frame(tmp_path: Path) -> dict:
+    return next(f for f in frames(tmp_path) if f.get("method") == "session/new")
+
+
+async def test_a_run_without_apps_gets_no_mcp_servers(tmp_path):
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(h, tmp_path, [{"text": "ok"}], bridge=bridge, job_id="j1")
+    try:
+        await run.start(tmp_path)
+    finally:
+        await run.close()
+    assert new_session_frame(tmp_path)["params"]["mcpServers"] == []
+    assert bridge.granted == []
+
+
+async def test_a_run_with_apps_gets_the_bridge_and_loses_it_when_it_ends(tmp_path):
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(h, tmp_path, [{"text": "ok"}], apps=("lin",), bridge=bridge, job_id="j1")
+    try:
+        await run.start(tmp_path)
+        assert bridge.revoked == []  # still held while the session lives
+    finally:
+        await run.close()
+    [server] = new_session_frame(tmp_path)["params"]["mcpServers"]
+    assert server["type"] == "http" and server["url"] == "http://127.0.0.1:1/mcp"
+    assert server["headers"] == [{"name": "Authorization", "value": f"Bearer {bridge.TOKEN}"}]
+    assert bridge.granted == [("j1", ("lin",))]
+    assert len(bridge.revoked) == 1
+
+
+async def test_the_bridge_token_reaches_the_expert_only_in_the_session_frame(tmp_path):
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(h, tmp_path, [{"text": "ok"}], apps=("lin",), bridge=bridge, job_id="j1")
+    try:
+        await run.start(tmp_path)
+        await run.begin("plan", "look at my issues")
+        await finished(h)
+    finally:
+        await run.close()
+    leaking = [f["method"] for f in frames(tmp_path) if bridge.TOKEN in json.dumps(f)]
+    assert leaking == ["session/new"]  # not in a prompt, and no app secret travels at all
+
+
+async def test_a_failed_start_still_revokes_the_grant(tmp_path):
+    h, bridge = Harness(), FakeBridge()
+    run = make_run(
+        h,
+        tmp_path,
+        [],
+        command=[sys.executable, "-c", "import sys; sys.exit(3)"],
+        apps=("lin",),
+        bridge=bridge,
+        job_id="j1",
+    )
+    with pytest.raises(Exception):  # noqa: B017 - any start failure
+        await run.start(tmp_path)
+    assert len(bridge.granted) == len(bridge.revoked)
