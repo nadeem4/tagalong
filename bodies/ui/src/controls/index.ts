@@ -1,6 +1,8 @@
 /** The shared controls and their sheet, re-exported by the package index. */
 export { Toggle } from './toggle';
 export { Select } from './select';
+export { ThreeWay } from './three-way';
+export type { ThreeWayOption } from './three-way';
 export { Slider } from './slider';
 export { MoneyField } from './money-field';
 export { Button } from './button';

@@ -310,14 +310,43 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     ],
   };
   let running: unknown[] = [];
+  // Rows as list_permissions sends them: grouped by source on Home, each with what it allows.
   const permissions = [
+    {
+      name: 'recall',
+      description: 'Look up what Scout remembers',
+      effect: 'read',
+      mode: 'auto',
+      locked: false,
+      self_asks: false,
+      person_only: false,
+      online: true,
+      source: 'built_in',
+      source_name: 'Built in',
+    },
+    {
+      name: 'hand_off',
+      description: 'Hand a job to an expert',
+      effect: 'change',
+      mode: 'auto',
+      locked: false,
+      self_asks: true,
+      person_only: false,
+      online: true,
+      source: 'built_in',
+      source_name: 'Built in',
+    },
     {
       name: 'desktop__move_window',
       description: 'Move a window on your desktop',
       effect: 'change',
       mode: 'ask',
       locked: false,
+      self_asks: false,
+      person_only: false,
       online: true,
+      source: 'body:desktop',
+      source_name: 'Desktop',
     },
     {
       name: 'desktop__close_window',
@@ -325,7 +354,35 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       effect: 'change',
       mode: 'ask',
       locked: true,
+      self_asks: false,
+      person_only: false,
       online: true,
+      source: 'body:desktop',
+      source_name: 'Desktop',
+    },
+    {
+      name: 'extension__open_tab',
+      description: 'Open a browser tab',
+      effect: 'change',
+      mode: 'ask',
+      locked: false,
+      self_asks: false,
+      person_only: false,
+      online: false,
+      source: 'body:extension',
+      source_name: 'Chrome on work PC',
+    },
+    {
+      name: 'gmail__delete_mail',
+      description: 'Delete an email',
+      effect: 'change',
+      mode: 'ask',
+      locked: true,
+      self_asks: false,
+      person_only: true,
+      online: true,
+      source: 'app:gmail',
+      source_name: 'Gmail',
     },
   ];
 
@@ -641,11 +698,20 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'list_permissions') value = { tools: permissions };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
-          if (row !== undefined) row.mode = String(params.input?.mode);
-          permissionSets.push({
-            tool: String(params.input?.tool),
-            mode: String(params.input?.mode),
-          });
+          const chosen = String(params.input?.mode);
+          permissionSets.push({ tool: String(params.input?.tool), mode: chosen });
+          if (chosen === 'auto' && (row?.person_only === true || row?.self_asks === true)) {
+            // Like the real brain: a tool that always asks never goes to Auto.
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: -32602, message: `${String(params.input?.tool)} always asks.` },
+              }),
+            );
+            return;
+          }
+          if (row !== undefined) row.mode = chosen;
           value = { tool: params.input?.tool, mode: params.input?.mode };
           notify('changed', { what: 'permissions' });
         }

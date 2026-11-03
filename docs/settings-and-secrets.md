@@ -134,7 +134,7 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see
 [brain.md](brain.md#run-it)).
 
-Tool permissions (Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
+Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
 brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
 

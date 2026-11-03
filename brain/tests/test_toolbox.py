@@ -322,15 +322,30 @@ def test_self_asking_tool_is_auto_even_when_locked_or_stored_ask():
     assert Toolbox([], {"a": "ask"}).mode(spec) == "auto"
 
 
-def test_set_mode_refuses_any_change_on_self_asking_tool():
+def test_set_mode_refuses_auto_on_self_asking_tool_but_accepts_ask():
     stored = {}
     box = Toolbox([FakeSource([mode_spec(self_asks=True)])], stored)
-    for mode in ("ask", "auto"):
-        with pytest.raises(RpcError) as e:
-            box.set_mode("a", mode)
-        assert e.value.code == ErrorCode.invalid_params
-        assert str(e.value) == "a asks for itself."
+    with pytest.raises(RpcError) as e:
+        box.set_mode("a", "auto")
+    assert e.value.code == ErrorCode.invalid_params
+    assert str(e.value) == "a asks for itself."
     assert stored == {}
+    box.set_mode("a", "ask")
+    assert stored == {"a": "ask"}
+
+
+def test_off_then_ask_gives_the_normal_mode_for_self_asking_and_person_only_tools():
+    stored = {}
+    a = mode_spec("a", self_asks=True)
+    b = mode_spec("b", person_only=True)
+    box = Toolbox([FakeSource([a, b])], stored)
+    for name in ("a", "b"):
+        box.set_mode(name, "off")
+    assert box.mode(a) == "off" and box.mode(b) == "off"
+    for name in ("a", "b"):
+        box.set_mode(name, "ask")
+    assert box.mode(a) == "auto"  # it asks for itself, so the gate stays open
+    assert box.mode(b) == "ask"
 
 
 def test_set_mode_unknown_tool():

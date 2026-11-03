@@ -466,14 +466,17 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   answering `{ spentUsd, limitUsd }`). Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
-  pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
+  pass through as the brain sends them, a mode other than `off`, `ask` or `auto` is refused before it
   reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
-  The card is a `home-card` like every Home panel. Each row has an Ask/Auto switch (the shared `Toggle`, on is Auto, with the word Ask or Auto beside it); a locked tool shows Ask and "Risky action", its switch works, and turning it to Auto asks you to confirm first; a
-  tool of an offline body is dimmed, marked "Not connected", and its switch is disabled (the brain
-  cannot set a mode for it yet). The list reads again on `changed { what: "permissions" }`. The e2e
+  The card is a `home-card` like every Home panel. Tools sit in groups by the row's `source` (Built in, then each body, then each app, titled by the row's `source_name`: the name the body declared or the app's name),
+  each tool with the shared `ThreeWay` control (`controls/three-way.tsx`, a radio group named by the visible tool name): Off, Ask and
+  Auto, the brain's mode chosen. A `person_only` row shows only Off and Ask ("Always asks"); a locked tool shows
+  "Risky action" and turning it to Auto asks you to confirm first; a tool that is Off is dimmed; a
+  tool of an offline body is dimmed and marked "Not connected" but can still be set (the brain
+  keeps a mode for its last-declared tools). The list reads again on `changed { what: "permissions" }`. The e2e
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
   checks the card. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
-  job) shows "Asks itself" with a disabled switch.
+  job) shows "Asks itself" with Off and Ask only (it reads as Ask while it is on; the brain's own mode for it is auto).
 - **Jobs panel:** Home's Jobs page (`bodies/ui/src/home/jobs-panel.tsx`)
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the

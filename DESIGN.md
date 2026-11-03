@@ -440,6 +440,7 @@ Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected nex
 
 - **Focus ring:** 2px, offset 2px; navy (`focusOnLight`) on light surfaces, Gold (`focusOnNavy`) under `.on-navy`. Hover and disabled states are real on every control.
 - **Toggle** (`Toggle`): `role="switch"` with `aria-checked`, a 44x24 pill with the word On or Off and a round knob; on is Gold. A native button, so Space and Enter work.
+- **Three-way** (`ThreeWay`): a segmented pill for two or three words (Off, Ask, Auto), a `radiogroup` of native buttons with `aria-checked` and one roving tab stop (the chosen option, else the first enabled one); arrows move to the next enabled option and wrap. Options are 24px tall (30px with the pill), the chosen one is Gold with Gold Ink, a disabled one is at 0.4 opacity. The group is named by visible text (`labelledBy`) when it has some.
 - **Select** (`Select`): a native select with a drawn chevron and its label above; 36px.
 - **Slider** (`Slider`): a native range (arrows, Home and End work) with the label above and the value beside it.
 - **Money field** (`MoneyField`): a `$` text field with minus and plus buttons (step 1, never below 0); typed text is not clamped, the caller validates; Enter commits.

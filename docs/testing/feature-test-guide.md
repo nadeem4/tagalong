@@ -354,7 +354,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     option; the question card (when Scout passes the question on, see the next section) has a **Your answer** field and **Send** (Enter sends too). Typing
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
-    **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
+    **Expected:** Claude Code's tool shows "Asks itself" with **Off** and **Ask**, no **Auto**.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
     "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
     naming one.
@@ -1696,33 +1696,38 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Permissions _(real brain)_
 
-1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card with
-   one row per Scout tool (name, one line on what it does, an **Ask** or **Auto** switch).
-2. **Auto.** Switch a tool Scout uses (for example moving a window) to **Auto**, then ask Scout to
-   use it. **Expected:** Scout stops asking and just does it. Switch it back to **Ask**: it asks
-   again.
+1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card
+   with Scout's tools in groups (**Built in**, then one group per connected body, such as the desktop or the
+   browser, titled by the name it gave, then one per connected app). Each tool has its name, one line on what it does
+   and a control with **Off**, **Ask** and **Auto**, the current one filled in.
+2. **Auto.** Choose **Auto** for a tool Scout uses (for example moving a window), then ask Scout to
+   use it. **Expected:** Scout stops asking and just does it. Choose **Ask**: it asks again.
 3. **Locked.** Find a tool its body marks as always confirm (one whose ask offers only Allow and
-   Deny). **Expected:** it reads **Ask**, says "Risky action", and its switch can be pressed.
+   Deny). **Expected:** it reads **Ask**, says "Risky action", and **Auto** can be pressed.
    Ask Scout to use it: it asks, with no **Always allow**.
-   1. Press the switch. **Expected:** a warning says it is a risky action and Scout will no longer
+   1. Press **Auto**. **Expected:** a warning says it is a risky action and Scout will no longer
       ask. **Cancel** leaves it on **Ask**; nothing changes.
-   2. Press the switch again and **Confirm**. **Expected:** it reads **Auto**; ask Scout to use it
+   2. Press **Auto** again and **Confirm**. **Expected:** it reads **Auto**; ask Scout to use it
       and it runs without asking.
-   3. Switch it back to **Ask** (no warning). **Expected:** it asks again.
+   3. Choose **Ask** (no warning). **Expected:** it asks again.
    4. With a preference of your own saved, remove the built-in "Always ask me before risky
       actions" default, then trigger the locked tool. **Expected:** it still asks; a general
       preference does not approve it. (A preference naming the tool comes from accepting Scout's offer for that tool.)
 4. **Offline body.** Quit the browser (or run with only the desktop).
-   **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
-   switch off limits.
+   **Expected:** a body that is not connected has its tools dimmed and marked "Not connected"; you
+   can still choose **Off**, **Ask** or **Auto** for them.
 5. **Live update.** Open Home, then answer **Always allow** on an ask for a tool in the list. **Expected:** the list updates without reopening Home.
-6. **Off.** Home has no Off switch yet, so use the brain's tool: with the desktop running, call
-   `set_permission` with `{"tool": "desktop__list_windows", "mode": "off"}` (for example from a
-   terminal websocket client). **Expected:** the Permissions list refreshes and shows its switch unchecked
-   (the same look as Ask until the Off switch arrives; do not press it, which would set Auto). Ask Scout what windows are open: it says it cannot see them, or uses another way, and
-   never errors. Quit and restart the brain and the desktop: it is still Off. Set it back to
-   `auto` and it works again. Automated: `test_toolbox.py`, `test_tools.py`, `test_memory.py`,
-   `test_builtin_guards.py`, `permissions.test.ts`.
+6. **Off.** With the desktop running, choose **Off** for **list_windows** under the desktop's group.
+   **Expected:** the row dims and **Off** is filled in. Ask Scout what windows are open: it says it
+   cannot see them, or uses another way, and never errors. Quit and restart the brain and the
+   desktop: it is still **Off**. Choose **Ask** (or **Auto**) and it works again. Automated:
+   `test_toolbox.py`, `test_tools.py`, `test_memory.py`, `test_builtin_guards.py`,
+   `permissions.test.ts`, `permissions-panel.test.tsx`, `three-way.test.tsx`, `permissions.spec.ts`.
+7. **Never Auto.** Find a tool that always needs your yes (for example a connected app's delete
+   tool). **Expected:** it says "Always asks" and offers only **Off** and **Ask**. Claude Code's
+   own tool says "Asks itself" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
+8. **Keyboard.** Tab into a tool's control, then press the arrow keys. **Expected:** the choice
+   moves between **Off**, **Ask** and **Auto** (skipping any not offered) and the brain follows.
 
 ## Log file
 

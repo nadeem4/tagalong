@@ -1,4 +1,7 @@
-/** Tests for PermissionsPanel: one row per tool, the Ask/Auto switch and the refetch on change. */
+/**
+ * Tests for PermissionsPanel: tools grouped by source, one Off/Ask/Auto control per tool, the
+ * options each tool allows, the risk warning, and the refetch when the brain says things changed.
+ */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,7 +15,10 @@ const MOVE: PermissionRow = {
   effect: 'change',
   mode: 'ask',
   locked: false,
+  person_only: false,
   online: true,
+  source: 'body:desktop',
+  source_name: 'Desktop',
 };
 const READ: PermissionRow = {
   name: 'recall',
@@ -20,7 +26,10 @@ const READ: PermissionRow = {
   effect: 'read',
   mode: 'auto',
   locked: false,
+  person_only: false,
   online: true,
+  source: 'built_in',
+  source_name: 'Built in',
 };
 const FORGET: PermissionRow = {
   name: 'forget',
@@ -28,7 +37,10 @@ const FORGET: PermissionRow = {
   effect: 'change',
   mode: 'ask',
   locked: true,
+  person_only: false,
   online: true,
+  source: 'built_in',
+  source_name: 'Built in',
 };
 const OFFLINE: PermissionRow = {
   name: 'extension__open_tab',
@@ -36,7 +48,21 @@ const OFFLINE: PermissionRow = {
   effect: 'change',
   mode: 'ask',
   locked: false,
+  person_only: false,
   online: false,
+  source: 'body:extension',
+  source_name: 'Chrome on work PC',
+};
+const MAIL: PermissionRow = {
+  name: 'gmail__send_mail',
+  description: 'Send an email',
+  effect: 'change',
+  mode: 'ask',
+  locked: false,
+  person_only: false,
+  online: true,
+  source: 'app:gmail',
+  source_name: 'Gmail',
 };
 
 function renderPanel(bridge: FakeHostBridge) {
@@ -47,68 +73,97 @@ function renderPanel(bridge: FakeHostBridge) {
   );
 }
 
-const rows = async () =>
-  within(await screen.findByRole('list', { name: 'Permissions' })).getAllByRole('listitem');
+// The group is named by the visible tool name, without its source prefix.
+const group = (tool: string) =>
+  screen.findByRole('radiogroup', { name: tool.replace(/^.*__/, '') });
+const radio = (el: HTMLElement, name: string) => within(el).getByRole('radio', { name });
 
 describe('PermissionsPanel', () => {
   it('sits in a home-card section labelled Permissions', async () => {
     renderPanel(createFakeHostBridge({ permissions: [MOVE] }));
-    await rows();
-    const card = screen.getByRole('region', { name: 'Permissions' });
-    expect(card).toHaveClass('home-card');
+    await group(MOVE.name);
+    expect(screen.getByRole('region', { name: 'Permissions' })).toHaveClass('home-card');
   });
 
-  it('uses the shared switch, not the old text button', async () => {
-    renderPanel(createFakeHostBridge({ permissions: [MOVE] }));
-    const toggle = await screen.findByRole('switch', { name: 'desktop__move_window' });
-    expect(toggle).toHaveClass('tg-toggle');
+  it('groups tools by source, titled with the name the body or app declared', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [MAIL, OFFLINE, MOVE, READ] }));
+    await group(READ.name);
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Built in', 'Desktop', 'Chrome on work PC', 'Gmail']);
+    const desktop = screen.getByRole('list', { name: 'Desktop' });
+    expect(within(desktop).getAllByRole('listitem')).toHaveLength(1);
+    expect(desktop).toHaveTextContent('move_window');
+    expect(desktop).toHaveTextContent('Move a window on your desktop');
   });
 
-  it('lists one row per tool with its description and switch state', async () => {
-    renderPanel(createFakeHostBridge({ permissions: [MOVE, READ] }));
-    const [move, read] = await rows();
-    expect(move).toHaveTextContent('desktop__move_window');
-    expect(move).toHaveTextContent('Move a window on your desktop');
-    expect(within(move!).getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-    expect(move).toHaveTextContent('Ask');
-    expect(within(read!).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-    expect(read).toHaveTextContent('Auto');
-    // The mode word lives on the switch alone, never beside it a second time.
-    expect(within(move!).getAllByText('Ask')).toHaveLength(1);
-    expect(within(read!).getAllByText('Auto')).toHaveLength(1);
+  it('keeps the brain order of tools inside a group', async () => {
+    const other = { ...READ, name: 'remember', description: 'Save a memory' };
+    renderPanel(createFakeHostBridge({ permissions: [READ, other] }));
+    await group(READ.name);
+    const items = within(screen.getByRole('list', { name: 'Built in' })).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('recall');
+    expect(items[1]).toHaveTextContent('remember');
   });
 
-  it('sets a tool to auto when its switch is clicked, then shows the new mode', async () => {
+  it('shows Off, Ask and Auto per tool with the brain mode chosen', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [MOVE, READ, { ...MAIL, mode: 'off' }] }));
+    const move = await group(MOVE.name);
+    expect(
+      within(move)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Off', 'Ask', 'Auto']);
+    expect(radio(move, 'Ask')).toHaveAttribute('aria-checked', 'true');
+    expect(radio(await group(READ.name), 'Auto')).toHaveAttribute('aria-checked', 'true');
+    expect(radio(await group(MAIL.name), 'Off')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('dims the text of a tool that is Off', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [{ ...MOVE, mode: 'off' }] }));
+    const row = (await group(MOVE.name)).closest('li');
+    expect(row).toHaveClass('perm-row--off');
+  });
+
+  it('sets a tool to Auto, then shows the new mode', async () => {
     const bridge = createFakeHostBridge({ permissions: [MOVE] });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'desktop__move_window' });
-    fireEvent.click(toggle);
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
-    expect(bridge.permissionSets).toEqual([{ tool: 'desktop__move_window', mode: 'auto' }]);
+    const move = await group(MOVE.name);
+    fireEvent.click(radio(move, 'Auto'));
+    await waitFor(() => expect(radio(move, 'Auto')).toHaveAttribute('aria-checked', 'true'));
+    expect(bridge.permissionSets).toEqual([{ tool: MOVE.name, mode: 'auto' }]);
   });
 
-  it('sets an auto tool back to ask', async () => {
+  it('turns a tool Off and back to Ask', async () => {
     const bridge = createFakeHostBridge({ permissions: [READ] });
     renderPanel(bridge);
-    fireEvent.click(await screen.findByRole('switch', { name: 'recall' }));
-    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'recall', mode: 'ask' }]));
+    const recall = await group(READ.name);
+    fireEvent.click(radio(recall, 'Off'));
+    await waitFor(() => expect(radio(recall, 'Off')).toHaveAttribute('aria-checked', 'true'));
+    fireEvent.click(radio(recall, 'Ask'));
+    await waitFor(() => expect(radio(recall, 'Ask')).toHaveAttribute('aria-checked', 'true'));
+    expect(bridge.permissionSets).toEqual([
+      { tool: 'recall', mode: 'off' },
+      { tool: 'recall', mode: 'ask' },
+    ]);
   });
 
-  it('shows a locked tool as Ask, marked risky, with an enabled switch', async () => {
+  it('never offers Auto for a person-only tool', async () => {
+    renderPanel(createFakeHostBridge({ permissions: [{ ...MAIL, person_only: true }] }));
+    const mail = await group(MAIL.name);
+    expect(
+      within(mail)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Off', 'Ask']);
+    expect(screen.getByText('Always asks')).toBeInTheDocument();
+  });
+
+  it('marks a locked tool risky and warns before Auto, calling nothing yet', async () => {
     const bridge = createFakeHostBridge({ permissions: [FORGET] });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'forget' });
-    expect(toggle).toBeEnabled();
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('Ask')).toBeInTheDocument();
+    const forget = await group(FORGET.name);
     expect(screen.getByText('Risky action')).toBeInTheDocument();
-    expect(screen.queryByText('Always asks')).toBeNull();
-  });
-
-  it('turning a locked tool to Auto shows a risk warning and does not call setPermission yet', async () => {
-    const bridge = createFakeHostBridge({ permissions: [FORGET] });
-    renderPanel(bridge);
-    fireEvent.click(await screen.findByRole('switch', { name: 'forget' }));
+    fireEvent.click(radio(forget, 'Auto'));
     const warning = await screen.findByRole('alert');
     expect(warning).toHaveTextContent(/risky action/i);
     expect(warning).toHaveTextContent(/no longer ask/i);
@@ -118,96 +173,98 @@ describe('PermissionsPanel', () => {
   it('confirming the warning calls setPermission with auto', async () => {
     const bridge = createFakeHostBridge({ permissions: [FORGET] });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'forget' });
-    fireEvent.click(toggle);
+    const forget = await group(FORGET.name);
+    fireEvent.click(radio(forget, 'Auto'));
     fireEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
     await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'forget', mode: 'auto' }]));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'));
+    await waitFor(() => expect(radio(forget, 'Auto')).toHaveAttribute('aria-checked', 'true'));
   });
 
-  it('cancelling the warning leaves the switch on Ask and calls nothing', async () => {
+  it('cancelling the warning leaves Ask chosen and calls nothing', async () => {
     const bridge = createFakeHostBridge({ permissions: [FORGET] });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'forget' });
-    fireEvent.click(toggle);
+    const forget = await group(FORGET.name);
+    fireEvent.click(radio(forget, 'Auto'));
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(radio(forget, 'Ask')).toHaveAttribute('aria-checked', 'true');
     expect(bridge.permissionSets).toEqual([]);
   });
 
-  it('turning a locked tool back to Ask needs no confirmation', async () => {
+  it('turning a locked tool Off or back to Ask needs no confirmation', async () => {
     const bridge = createFakeHostBridge({ permissions: [{ ...FORGET, mode: 'auto' }] });
     renderPanel(bridge);
-    fireEvent.click(await screen.findByRole('switch', { name: 'forget' }));
-    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'forget', mode: 'ask' }]));
+    const forget = await group(FORGET.name);
+    fireEvent.click(radio(forget, 'Off'));
+    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'forget', mode: 'off' }]));
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('an unlocked tool turns to Auto without a warning', async () => {
-    const bridge = createFakeHostBridge({ permissions: [MOVE] });
-    renderPanel(bridge);
-    fireEvent.click(await screen.findByRole('switch', { name: 'desktop__move_window' }));
-    await waitFor(() => expect(bridge.permissionSets).toHaveLength(1));
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-  it('puts focus on Cancel when the warning opens and describes the switch by it', async () => {
+  it('puts focus on Cancel when the warning opens and describes the control by it', async () => {
     renderPanel(createFakeHostBridge({ permissions: [FORGET] }));
-    const toggle = await screen.findByRole('switch', { name: 'forget' });
-    fireEvent.click(toggle);
+    const forget = await group(FORGET.name);
+    fireEvent.click(radio(forget, 'Auto'));
     const cancel = await screen.findByRole('button', { name: 'Cancel' });
     await waitFor(() => expect(cancel).toHaveFocus());
-    const warning = screen.getByRole('alert');
-    expect(toggle).toHaveAttribute('aria-describedby', warning.id);
+    expect(forget).toHaveAttribute('aria-describedby', screen.getByRole('alert').id);
   });
 
-  it('Escape cancels the warning, calls nothing and returns focus to the switch', async () => {
+  it('Escape cancels the warning, calls nothing and returns focus to the control', async () => {
     const bridge = createFakeHostBridge({ permissions: [FORGET] });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'forget' });
-    fireEvent.click(toggle);
+    const forget = await group(FORGET.name);
+    fireEvent.click(radio(forget, 'Auto'));
     fireEvent.keyDown(await screen.findByRole('button', { name: 'Cancel' }), { key: 'Escape' });
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(toggle).toHaveFocus();
-    expect(toggle).not.toHaveAttribute('aria-describedby');
+    expect(radio(forget, 'Ask')).toHaveFocus();
+    expect(forget).not.toHaveAttribute('aria-describedby');
     expect(bridge.permissionSets).toEqual([]);
   });
 
-  it('says a tool that asks itself does so, with the switch disabled', async () => {
+  it('offers a tool that asks itself only Off and Ask, shown as Ask while it is on', async () => {
     const bridge = createFakeHostBridge({
-      permissions: [{ ...MOVE, name: 'hand_off', self_asks: true }],
+      permissions: [{ ...READ, name: 'hand_off', self_asks: true }],
     });
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'hand_off' });
+    const handOff = await group('hand_off');
     expect(screen.getByText('Asks itself')).toBeInTheDocument();
-    expect(toggle).toBeDisabled();
-    fireEvent.click(toggle);
-    expect(bridge.permissionSets).toEqual([]);
+    expect(
+      within(handOff)
+        .getAllByRole('radio')
+        .map((r) => r.textContent),
+    ).toEqual(['Off', 'Ask']);
+    expect(radio(handOff, 'Ask')).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(radio(handOff, 'Off'));
+    await waitFor(() => expect(bridge.permissionSets).toEqual([{ tool: 'hand_off', mode: 'off' }]));
+    fireEvent.click(radio(handOff, 'Ask'));
+    await waitFor(() => expect(bridge.permissionSets).toHaveLength(2));
+    expect(bridge.permissionSets[1]).toEqual({ tool: 'hand_off', mode: 'ask' });
   });
 
-  it('marks an offline body’s tool Not connected and leaves its switch off limits', async () => {
+  it('greys a tool of a body that is not connected and says so, but can still set it', async () => {
     const bridge = createFakeHostBridge({ permissions: [OFFLINE] });
     renderPanel(bridge);
-    const [row] = await rows();
+    const tab = await group(OFFLINE.name);
+    const row = tab.closest('li');
     expect(row).toHaveTextContent('Not connected');
     expect(row).toHaveClass('perm-row--offline');
-    const toggle = within(row!).getByRole('switch');
-    expect(toggle).toBeDisabled();
-    fireEvent.click(toggle);
-    expect(bridge.permissionSets).toEqual([]);
+    fireEvent.click(radio(tab, 'Off'));
+    await waitFor(() =>
+      expect(bridge.permissionSets).toEqual([{ tool: OFFLINE.name, mode: 'off' }]),
+    );
   });
 
   it('reads again when the brain says permissions changed, and only then', async () => {
     const bridge = createFakeHostBridge({ permissions: [MOVE] });
     renderPanel(bridge);
-    await rows();
+    const move = await group(MOVE.name);
     bridge.permissions = [{ ...MOVE, mode: 'auto' }];
     act(() => bridge.emitChanged('memory'));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+    expect(radio(move, 'Ask')).toHaveAttribute('aria-checked', 'true');
     act(() => bridge.emitChanged('permissions'));
-    await waitFor(() => expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true'));
+    await waitFor(() => expect(radio(move, 'Auto')).toHaveAttribute('aria-checked', 'true'));
   });
 
   it('keeps the row and reads again when the brain refuses the change', async () => {
@@ -215,10 +272,10 @@ describe('PermissionsPanel', () => {
     bridge.setPermission = () => Promise.reject(new Error('refused'));
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     renderPanel(bridge);
-    const toggle = await screen.findByRole('switch', { name: 'desktop__move_window' });
-    fireEvent.click(toggle);
+    const move = await group(MOVE.name);
+    fireEvent.click(radio(move, 'Auto'));
     await waitFor(() => expect(errors).toHaveBeenCalledTimes(1));
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(radio(move, 'Ask')).toHaveAttribute('aria-checked', 'true');
     errors.mockRestore();
   });
 

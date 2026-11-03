@@ -284,11 +284,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
-  **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
-  does it without asking. The brain also knows a third state, **Off**, which takes the tool away
-  from Scout so it routes around it (Home gets the Off switch in a coming change). A tool its body marks as always confirm is
-  fixed on Ask, and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
-  instead of a switch, because Claude Code does its own asking.
+  **Permissions** lists every tool Scout can use, grouped by where it comes from (built in, then each connected
+  body by the name it gave, then each connected app), each with **Off**, **Ask** or **Auto**: Auto means
+  Scout does it without asking, Off takes the tool away so Scout routes around it. A tool that
+  always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
+  body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
