@@ -282,6 +282,11 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     fake agent (steps `tool`, `tool_update`, `plan`): masking, size caps, resume replay, two jobs
     on one adapter, the cursor pages, the 250 ms `changed` throttle and, in `e2e/jobs.spec.ts`,
     the desktop pull and the job page on the fake brain.
+    **Parts (SP2):** a job holds one part per expert hand-off. Automated: `test_jobs.py` (one part
+    per start, separate asks per part, `tell` needs a part when several run, `stop` stops all),
+    `test_memory.py` (the migration), `test_job_activity.py` (one ordered log, expert tags in the
+    wake summary). **Manual check:** open Home → Jobs on a database from before this change: an
+    old job opens as one part, with its steps, result and times intact.
     **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
     tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
     page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it

@@ -324,6 +324,11 @@ export function createFakeHostBridge(
       const page: JobActivityPage = {
         job,
         state: 'running',
+        title: null,
+        startedAt: '2026-10-27T10:00:00Z',
+        endedAt: null,
+        closedAt: null,
+        parts: [],
         rev: all.reduce((top, e) => Math.max(top, e.rev), 0),
         entries,
         more: false,

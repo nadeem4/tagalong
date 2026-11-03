@@ -478,12 +478,14 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
   brain sends them, each with its task, state, folder, mode, start time or duration, progress
-  while running, reason when ended, and a Show result toggle once finished. **Stop** shows on
+  while running, reason when ended, and a Show result toggle once finished. A row carries its
+  `parts` (one per expert hand-off, `JobPartRow`); the panel shows the newest part's progress,
+  reason and result, and an old job has exactly one part. **Stop** shows on
   running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
   panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
   `jobActivity(job, afterRev)` and `runningSteps()` (host bridge) pull a job's steps by cursor and
   the step each running job is on, through the brain tool `job_activity`; a bad job id or cursor is
-  refused before the brain. `e2e/jobs.spec.ts` covers the panel, the cursor pull and the job page
+  refused before the brain. The page's job times (`startedAt`, `endedAt`, `closedAt`) and its part rows (`JobPagePart`) are camelCase like `JobPartRow`; `ipc/jobs.ts` maps them from the brain's snake_case. `e2e/jobs.spec.ts` covers the panel, the cursor pull and the job page
   on the fake brain (`pushActivity` adds a step and sends `changed: job_activity`).
 - **Job page:** a job with `activity: true` has a **Watch** button; `JobsPanel` then renders
   `JobPage` (`bodies/ui/src/home/job-page.tsx`) in place of the list, with a "Back to Jobs" button (focus moves to the page heading on Watch and returns to that job's Watch button on back), so

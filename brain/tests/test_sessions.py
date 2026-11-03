@@ -258,7 +258,7 @@ def test_session_start_marks_running_jobs_stopped():
     memory.add_job("j1", "claude_code", "task", "C:/x", "default")
     session, _ = make(Gate([]), memory)
     job = session.jobs.list()[0]
-    assert job.state == "stopped" and job.reason == "brain restarted"
+    assert job.state == "stopped" and job.parts[-1].reason == "brain restarted"
 
 
 async def test_what_you_know_in_system_prompt():
@@ -755,12 +755,14 @@ async def test_wake_held_while_busy_runs_after_the_turn_ends():
     join(session, "desktop")
     session.say("desktop", say("a"))
     session.jobs._on_finished(end_job(memory))
-    assert states(sent) == [] and not memory.get_job("j1").reported  # the say turn still runs
+    assert (
+        states(sent) == [] and not memory.get_job("j1").parts[-1].reported
+    )  # the say turn still runs
     gate.set()
     await idle(session)
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert "Event: job_ended" in model.seen[-1][-1]["content"][-1]["text"]
-    assert memory.get_job("j1").reported
+    assert memory.get_job("j1").parts[-1].reported
     assert rebuild_history(memory.load_messages()) == session.history
 
 
@@ -871,7 +873,7 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert states(sent) == [] and not memory.get_job("j1").reported
+    assert states(sent) == [] and not memory.get_job("j1").parts[-1].reported
 
 
 async def test_say_during_a_wake_turn_joins_it():
@@ -894,7 +896,8 @@ async def test_say_during_a_wake_turn_joins_it():
 
 def end_job(memory, job_id="j1", result="all good", state="done"):
     memory.add_job(job_id, "claude_code", "fix the build", "C:/x", "default")
-    memory.update_job(job_id, state=state, reason="end_turn", result=result, ended_at="t")
+    memory.update_part(job_id, "p1", reason="end_turn", report=result)
+    memory.update_job(job_id, state=state, ended_at="t")
     return memory.get_job(job_id)
 
 
@@ -905,7 +908,7 @@ async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_
     join(session, "desktop")
     job = end_job(memory)
     session.jobs._on_finished(job)
-    assert memory.get_job("j1").reported  # the turn started right away
+    assert memory.get_job("j1").parts[-1].reported  # the turn started right away
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert text.startswith('<data kind="event">') and text.endswith("</data>")
@@ -931,10 +934,10 @@ async def test_job_ended_default_batches_30_seconds():
     session, sent = make(Gate(["ok"]), memory, kinds=None, now=lambda: clock[0])
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
-    assert states(sent) == [] and not memory.get_job("j1").reported
+    assert states(sent) == [] and not memory.get_job("j1").parts[-1].reported
     clock[0] += datetime.timedelta(seconds=30)
     session.scheduler.pump()
-    assert memory.get_job("j1").reported
+    assert memory.get_job("j1").parts[-1].reported
     await idle(session)
     assert states(sent) == ["started", "ended"]
 
@@ -943,9 +946,9 @@ async def test_not_reported_until_a_body_is_there_to_tell():
     memory = Memory(":memory:")
     session, _ = make(Gate(["ok"]), memory)
     session.jobs._on_finished(end_job(memory))
-    assert not memory.get_job("j1").reported
+    assert not memory.get_job("j1").parts[-1].reported
     join(session, "desktop")
-    assert memory.get_job("j1").reported
+    assert memory.get_job("j1").parts[-1].reported
     await idle(session)
 
 
@@ -1200,7 +1203,7 @@ def answer_step(value="Blue"):
 
 def ask_expert(session, message="Which colour?"):
     """The expert asks as if job j1 were running; returns the task holding its answer."""
-    session.jobs._runs["j1"] = object()
+    session.jobs._runs["j1"] = {"p1": object()}
     field = QuestionField("question_0", "Colour", ["Red", "Blue"])
     return asyncio.create_task(session.jobs._question("j1", Question(message, [field])))
 
@@ -1826,7 +1829,7 @@ async def test_wake_without_key_does_nothing():
     await settle()
     assert states(sent) == []
     assert session.history == []
-    assert not memory.get_job("j1").reported  # told at a later start, once a key is set
+    assert not memory.get_job("j1").parts[-1].reported  # told at a later start, once a key is set
 
 
 async def test_job_ended_wake_carries_the_activity_summary():

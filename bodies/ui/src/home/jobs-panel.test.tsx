@@ -5,22 +5,32 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HostBridgeProvider, type JobRow } from '../host-bridge';
+import { HostBridgeProvider, type JobPartRow, type JobRow } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { JobsPanel } from './jobs-panel';
 
+const part = (extra: Partial<JobPartRow> = {}): JobPartRow => ({
+  id: 'p1',
+  expert: 'claude-code',
+  state: 'running',
+  reason: null,
+  progress: null,
+  result: null,
+  startedAt: '2026-10-28T09:00:00.000Z',
+  endedAt: null,
+  ...extra,
+});
 const RUNNING: JobRow = {
   id: 'j1',
-  agent: 'claude-code',
   task: 'Fix the login bug',
   folder: 'C:\\code\\app',
   mode: 'edit',
   state: 'running',
-  reason: null,
-  progress: 'Reading auth.ts',
-  result: null,
+  title: null,
   startedAt: '2026-10-28T09:00:00.000Z',
   endedAt: null,
+  closedAt: null,
+  parts: [part({ progress: 'Reading auth.ts' })],
   activity: false,
 };
 const DONE: JobRow = {
@@ -29,8 +39,7 @@ const DONE: JobRow = {
   task: 'Write the release notes',
   mode: 'read',
   state: 'done',
-  progress: null,
-  result: 'Notes are in CHANGELOG.md',
+  parts: [part({ state: 'done', result: 'Notes are in CHANGELOG.md' })],
   endedAt: '2026-10-28T09:02:05.000Z',
 };
 const FAILED: JobRow = {
@@ -38,8 +47,7 @@ const FAILED: JobRow = {
   id: 'j3',
   task: 'Run the migration',
   state: 'error',
-  reason: 'Claude Code exited',
-  progress: null,
+  parts: [part({ state: 'error', reason: 'Claude Code exited' })],
   endedAt: '2026-10-28T09:00:10.000Z',
 };
 const STOPPED: JobRow = { ...FAILED, id: 'j4', task: 'Refactor', state: 'stopped' };

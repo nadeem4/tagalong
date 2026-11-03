@@ -5,26 +5,39 @@
  * Contains registerJobsIpc.
  */
 
-import type { JobActivityPage, JobRow, RunningStep } from '@tagalong/ui';
+import type { JobActivityPage, JobPartRow, JobRow, RunningStep } from '@tagalong/ui';
 import { IPC } from '../../shared/ipc';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';
 
-// The brain's row is snake_case and carries fields Home never shows (session_id_known, reported).
-function toRow(raw: Record<string, unknown>): JobRow {
+// The brain's row is snake_case and carries fields Home never shows (session_id_known, watch).
+function toPart(raw: Record<string, unknown>): JobPartRow {
   return {
     id: raw.id,
-    agent: raw.agent,
-    task: raw.task,
-    folder: raw.folder,
-    mode: raw.mode,
+    expert: raw.expert,
     state: raw.state,
     reason: raw.reason ?? null,
     progress: raw.progress ?? null,
     result: raw.result ?? null,
     startedAt: raw.started_at,
     endedAt: raw.ended_at ?? null,
+  } as JobPartRow;
+}
+
+function toRow(raw: Record<string, unknown>): JobRow {
+  const parts = Array.isArray(raw.parts) ? raw.parts : [];
+  return {
+    id: raw.id,
+    task: raw.task,
+    folder: raw.folder,
+    mode: raw.mode,
+    state: raw.state,
+    title: raw.title ?? null,
+    startedAt: raw.started_at,
+    endedAt: raw.ended_at ?? null,
+    closedAt: raw.closed_at ?? null,
+    parts: parts.map((part) => toPart(part as Record<string, unknown>)),
     activity: raw.activity === true,
   } as JobRow;
 }
@@ -35,13 +48,26 @@ function parseRows(value: unknown): JobRow[] {
   return list.map((raw) => toRow(raw as Record<string, unknown>));
 }
 
-// Page keys are single words, so the brain's page passes through once its shape is checked.
+// The page's job times and part rows are snake_case on the wire, camelCase for the UI; the
+// rest of its keys are single words and pass through once its shape is checked.
 function parsePage(value: unknown): JobActivityPage {
-  const page = value as { entries?: unknown; rev?: unknown } | null;
+  const page = value as Record<string, unknown> | null;
   if (!Array.isArray(page?.entries) || typeof page?.rev !== 'number') {
     throw new Error('brain sent bad activity');
   }
-  return value as JobActivityPage;
+  const { started_at, ended_at, closed_at, parts, ...rest } = page;
+  const list = Array.isArray(parts) ? (parts as Record<string, unknown>[]) : [];
+  return {
+    ...rest,
+    startedAt: started_at,
+    endedAt: ended_at ?? null,
+    closedAt: closed_at ?? null,
+    parts: list.map(({ started_at: s, ended_at: e, ...part }) => ({
+      ...part,
+      startedAt: s,
+      endedAt: e ?? null,
+    })),
+  } as JobActivityPage;
 }
 
 function parseRunning(value: unknown): RunningStep[] {

@@ -50,7 +50,9 @@ class JobActivity:
         now: Callable[[], datetime],
         on_change: Callable[[], None],
         on_failed: Callable[[ActivityEntry], None] = lambda entry: None,
+        part: str = "p1",
     ) -> None:
+        self._part = part  # every entry this writes belongs to this part of the job
         self._on_failed = on_failed  # called once per step id, after the update is written
         self._failed_seen: set[str] = set()
         self._touched: set[str] = set()
@@ -203,7 +205,9 @@ class JobActivity:
     ) -> ActivityEntry:
         """Write one entry (a new one when seq is None); masks first, then caps."""
         if seq is None:
-            self._seq += 1
+            # One counter per job, read from the store: other parts and Scout's own steps write
+            # to the same log. Never below our last, so a trimmed row's number is not reused.
+            self._seq = max(self._seq, self._memory.max_seq(self._job)) + 1
             seq = self._seq
         entry = ActivityEntry(
             rev=self._memory.last_rev(self._job) + 1,
@@ -214,6 +218,7 @@ class JobActivity:
             status=status,
             step=step,
             exit=exit,
+            part=self._part,
         )
         self._memory.save_activity(self._job, entry)
         self._memory.trim_activity(self._job, ENTRY_CAP, JOB_BYTES_CAP)
@@ -284,10 +289,21 @@ def _exit(entry: ActivityEntry) -> str:
     return f"exit {entry.exit}" if entry.exit is not None else (entry.status or "?")
 
 
-def _digest(memory: Memory, job_id: str) -> tuple[list[ActivityEntry], dict[str, str]]:
+def _digest(memory: Memory, job_id: str) -> tuple[list[ActivityEntry], dict[tuple[str, str], str]]:
     rows = sorted(memory.activity_after(job_id, 0, ENTRY_CAP), key=lambda e: e.seq)
-    outputs = {e.step: e.text for e in rows if e.kind == "output" and e.step}
+    # Two experts can reuse a step id, so an output belongs to its part's step.
+    outputs = {(e.part, e.step): e.text for e in rows if e.kind == "output" and e.step}
     return [e for e in rows if e.kind in _STEP_KINDS], outputs
+
+
+def _who(memory: Memory, job_id: str) -> dict[str, str]:
+    """part -> expert name, only when the job has several parts (else nothing needs naming)."""
+    parts = memory.parts_of(job_id)
+    return {p.id: p.agent for p in parts} if len(parts) > 1 else {}
+
+
+def _tag(who: dict[str, str], entry: ActivityEntry) -> str:
+    return f"[{who[entry.part]}] " if entry.part in who else ""
 
 
 def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMMARY_CAP) -> str:
@@ -296,6 +312,7 @@ def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMM
     steps, outputs = _digest(memory, job_id)
     if not steps:
         return "no activity recorded"
+    who = _who(memory, job_id)
     failed = [e for e in steps if is_failed(e)]
     lines = [f"steps: {len(steps)}, failed: {len(failed)}"]
     # What is running and the last commands come before the failure blocks: a wake cut at the
@@ -304,14 +321,17 @@ def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMM
     if live:
         entry = live[-1]
         minutes = max(0, int((now - datetime.fromisoformat(entry.at)).total_seconds() // 60))
-        lines.append(f"running: {_clip(entry.text)}, {minutes} min")
+        lines.append(f"running: {_tag(who, entry)}{_clip(entry.text)}, {minutes} min")
     commands = [e for e in steps if e.kind == "command"]
     if commands:
         lines.append("recent:")
-        lines.extend(f"  {_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:])
+        lines.extend(
+            f"  {_tag(who, e)}{_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:]
+        )
     for entry in failed[-FAILED_SHOWN:]:
-        lines.append(f"failed: {_clip(entry.text)} ({_exit(entry)})")
-        tail = [ln for ln in outputs.get(entry.step or "", "").splitlines() if ln.strip()]
+        lines.append(f"failed: {_tag(who, entry)}{_clip(entry.text)} ({_exit(entry)})")
+        out = outputs.get((entry.part, entry.step or ""), "")
+        tail = [ln for ln in out.splitlines() if ln.strip()]
         lines.extend(f"  {_clip(ln, TAIL_CAP)}" for ln in tail[-FAILED_TAIL_LINES:])
     return _fit(lines, cap)
 

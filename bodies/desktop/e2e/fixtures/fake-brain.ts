@@ -91,17 +91,28 @@ export interface FakeBrain {
 // One running Claude Code job, as the brain's list_jobs row (snake_case).
 const JOB = {
   id: 'job1',
-  agent: 'claude_code',
   // Long on purpose: Home must clip it, never widen the page (smoke.spec checks).
   task: 'Fix the build and then keep going through every failing check until the whole pipeline is green again',
   folder: 'C:/work/app',
   mode: 'ask',
   state: 'running',
-  reason: null,
-  progress: 'Reading the config',
-  result: null,
+  title: null,
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
+  closed_at: null,
+  parts: [
+    {
+      id: 'p1',
+      expert: 'claude_code',
+      state: 'running',
+      reason: null,
+      progress: 'Reading the config',
+      result: null,
+      session_id_known: false,
+      started_at: '2026-10-27T10:00:00Z',
+      ended_at: null,
+    },
+  ],
   activity: true,
 } as Record<string, unknown>;
 
@@ -451,6 +462,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             value = {
               job,
               state: jobs.find((j) => j.id === job)?.state ?? 'done',
+              title: null,
+              parts: [],
               rev,
               entries,
               more: false,
@@ -463,6 +476,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           if (row !== undefined) {
             row.state = 'stopped';
             row.ended_at = '2026-10-27T10:00:30Z';
+            for (const p of row.parts as Record<string, unknown>[]) p.state = 'stopped';
           }
           notify('changed', { what: 'jobs' });
         } else if (params.tool === 'key_status') {

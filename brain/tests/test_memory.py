@@ -416,67 +416,188 @@ def test_jobs_migration_keeps_existing_data(tmp_path):
 def test_job_round_trip(mem):
     job = mem.add_job("j1", "claude-code", "fix the test", "C:/p", "default")
     assert job.state == "running"
-    assert job.reported is False
+    assert job.parts[-1].reported is False
     assert job.ended_at is None
     assert job.started_at
-    mem.update_job("j1", state="done", progress="almost", result="all fixed", session_id="s1")
+    mem.update_part("j1", "p1", progress="almost", report="all fixed", session_id="s1")
+    mem.update_job("j1", state="done")
     got = mem.get_job("j1")
-    assert (got.state, got.progress, got.result, got.session_id) == (
+    part = got.parts[0]
+    assert (got.state, part.progress, part.report, part.session_id) == (
         "done",
         "almost",
         "all fixed",
         "s1",
     )
-    assert got.agent == "claude-code" and got.folder == "C:/p" and got.mode == "default"
+    assert part.agent == "claude-code" and got.folder == "C:/p" and got.mode == "default"
     assert mem.get_job("nope") is None
 
 
 def _finished(mem, id, agent="claude-code", folder="C:/p", state="done", session="s"):
     mem.add_job(id, agent, "t", folder, "default")
-    mem.update_job(id, state=state, session_id=session)
+    mem.update_part(id, "p1", session_id=session)
+    mem.update_job(id, state=state)
 
 
-def test_last_job_for_returns_the_newest_finished_job_with_a_session(mem):
+def test_last_part_for_returns_the_newest_finished_part_with_a_session(mem):
     _finished(mem, "j1", session="s1")
     _finished(mem, "j2", session="s2")
-    assert mem.last_job_for("claude-code", "C:/p").id == "j2"
+    job, part = mem.last_part_for("claude-code", "C:/p")
+    assert (job.id, part.id, part.session_id) == ("j2", "p1", "s2")
 
 
-def test_last_job_for_ignores_another_expert_and_another_folder(mem):
+def test_last_part_for_ignores_another_expert_and_another_folder(mem):
     _finished(mem, "j1", agent="codex")
     _finished(mem, "j2", folder="C:/other")
-    assert mem.last_job_for("claude-code", "C:/p") is None
+    assert mem.last_part_for("claude-code", "C:/p") is None
 
 
-def test_last_job_for_ignores_running_jobs_and_jobs_without_a_session(mem):
+def test_last_part_for_ignores_running_and_sessionless_parts(mem):
     _finished(mem, "j1", session="s1")
     mem.add_job("j2", "claude-code", "t", "C:/p", "default")  # running
     _finished(mem, "j3", session=None)
-    assert mem.last_job_for("claude-code", "C:/p").id == "j1"
+    assert mem.last_part_for("claude-code", "C:/p")[0].id == "j1"
 
 
 @pytest.mark.parametrize("state", ["stopped", "error"])
-def test_last_job_for_counts_stopped_and_error_jobs(mem, state):
+def test_last_part_for_counts_stopped_and_error_parts(mem, state):
     _finished(mem, "j1", state=state)
-    assert mem.last_job_for("claude-code", "C:/p").id == "j1"
+    assert mem.last_part_for("claude-code", "C:/p")[0].id == "j1"
 
 
-def test_last_job_for_matches_folder_spelling_variants(mem):
+def test_last_part_for_filters_on_the_parts_folder_not_the_jobs(mem):
+    mem.add_job("j1", "codex", "t", "C:/a", "m")
+    mem.add_part("j1", "codex", "t2", "C:/b", "x")
+    mem.update_part("j1", "p2", state="done", session_id="s-b")
+    mem.update_job("j1", state="done")
+    assert mem.last_part_for("codex", "C:/a") is None  # p2's session belongs to folder B
+    assert mem.last_part_for("codex", "C:/b")[1].id == "p2"
+    _finished(mem, "j2", agent="codex", folder="C:/a", session="s-a")
+    assert mem.last_part_for("codex", "C:/a")[1].session_id == "s-a"  # A to A still reuses
+
+
+def test_old_jobs_migrate_with_their_folder_on_the_part(mem):
+    mem.add_job("j9", "codex", "t", "C:/z", "m")
+    assert mem.get_job("j9").parts[0].folder == "C:/z"
+
+
+def test_last_part_for_picks_the_part_of_the_right_expert_in_a_mixed_job(mem):
+    mem.add_job("j1", "codex", "t", "C:/p", "default")
+    mem.add_part("j1", "claude-code", "second", "C:/p", "2026-01-02")
+    mem.update_part("j1", "p1", state="done", session_id="sx")
+    mem.update_part("j1", "p2", state="done", session_id="sy")
+    job, part = mem.last_part_for("claude-code", "C:/p")
+    assert (job.id, part.id, part.session_id) == ("j1", "p2", "sy")
+
+
+def test_last_part_for_matches_folder_spelling_variants(mem):
     _finished(mem, "j1", folder="/a/b")
-    assert mem.last_job_for("claude-code", "/a/b/").id == "j1"
+    assert mem.last_part_for("claude-code", "/a/b/")[0].id == "j1"
     if sys.platform == "win32":
-        _finished(mem, "j2", folder="C:\\Proj")
-        assert mem.last_job_for("claude-code", "c:\\proj").id == "j2"
+        _finished(mem, "j2", folder="C:\Proj")
+        assert mem.last_part_for("claude-code", "c:\proj")[0].id == "j2"
 
 
-def test_last_job_for_is_none_when_nothing_matches(mem):
-    assert mem.last_job_for("claude-code", "C:/p") is None
+def test_last_part_for_is_none_when_nothing_matches(mem):
+    assert mem.last_part_for("claude-code", "C:/p") is None
+
+
+def test_add_job_makes_part_p1_and_add_part_numbers_on(mem):
+    job = mem.add_job("j1", "claude-code", "brief", "C:/p", "default")
+    assert [(p.id, p.agent, p.task, p.state) for p in job.parts] == [
+        ("p1", "claude-code", "brief", "running")
+    ]
+    assert mem.add_part("j1", "codex", "second brief", "f", "2026-01-02") == "p2"
+    assert mem.add_part("j1", "codex", "third", "f", "2026-01-03") == "p3"
+    assert [p.id for p in mem.parts_of("j1")] == ["p1", "p2", "p3"]
+    assert mem.get_job("j1").parts[1].agent == "codex"
+
+
+def test_update_part_changes_one_part_only_and_caps_text(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.add_part("j1", "b", "t2", "f", "x")
+    mem.update_part("j1", "p2", state="done", report="r" * 25_000, progress="q" * 5000)
+    p1, p2 = mem.parts_of("j1")
+    assert (p1.state, p2.state) == ("running", "done")
+    assert len(p2.report) == 20_000 and len(p2.progress) == 2000
+    with pytest.raises(ValueError):
+        mem.update_part("j1", "p2", nonsense=1)
+
+
+def test_a_job_end_settles_the_parts_still_running(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.add_part("j1", "a", "t2", "f", "x")
+    mem.update_part("j1", "p1", state="done")
+    mem.update_job("j1", state="stopped", ended_at="e")
+    assert [(p.state, p.ended_at) for p in mem.parts_of("j1")] == [("done", None), ("stopped", "e")]
+
+
+def _seed_old_schema(path):
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.execute(
+        "INSERT INTO jobs(id, agent, task, folder, mode, state, reason, progress, result,"
+        " session_id, reported, started_at, ended_at, parent_job, watch)"
+        " VALUES"
+        " ('run','claude-acp','a','F','plan','running',NULL,'tail',NULL,'s0',0,'t0',"
+        "NULL,NULL,NULL),"
+        " ('done','claude-acp','b','F','plan','done','end_turn','p','all fixed','s1',1,'t1','t2',"
+        "'run','[]'),"
+        " ('err','codex','c','G','plan','error','boom',NULL,NULL,NULL,0,'t3','t4',NULL,NULL)"
+    )
+    db.execute(
+        "INSERT INTO job_activity(job_id, rev, seq, at, kind, text)"
+        " VALUES ('done',1,1,'t1','command','ls')"
+    )
+    db.close()
+
+
+def test_migration_turns_every_job_into_a_one_part_job(tmp_path):
+    path = tmp_path / "old.db"
+    _seed_old_schema(path)
+    m = Memory(path)
+    run, done, err = (m.get_job(i) for i in ("run", "done", "err"))
+    assert [(p.id, p.agent, p.task, p.state, p.progress, p.session_id) for p in run.parts] == [
+        ("p1", "claude-acp", "a", "running", "tail", "s0")
+    ]
+    assert run.closed_at is None and run.state == "running"
+    (p,) = done.parts
+    assert (p.reason, p.report, p.reported, p.started_at, p.ended_at) == (
+        "end_turn",
+        "all fixed",
+        True,
+        "t1",
+        "t2",
+    )
+    assert (done.closed_at, done.parent_job, done.watch, done.folder) == ("t2", "run", [], "F")
+    assert (err.state, err.closed_at, err.parts[0].reason) == ("error", "t4", "boom")
+    assert [j.id for j in m.list_jobs()] == ["err", "done", "run"]
+    m.close()
+
+
+def test_migration_keeps_activity_under_p1(tmp_path):
+    path = tmp_path / "old.db"
+    _seed_old_schema(path)
+    m = Memory(path)
+    [row] = m.activity_after("done", 0, 10)
+    assert (row.text, row.part, row.source) == ("ls", "p1", None)
+    m.close()
+
+
+def test_migration_is_idempotent(tmp_path):
+    path = tmp_path / "old.db"
+    _seed_old_schema(path)
+    Memory(path).close()
+    m = Memory(path)
+    assert [len(j.parts) for j in m.list_jobs()] == [1, 1, 1]
+    m.close()
 
 
 def test_update_job_keeps_only_the_last_2000_chars_of_progress(mem):
     mem.add_job("j1", "a", "t", "f", "m")
-    mem.update_job("j1", progress="x" * 5000 + "tail")
-    got = mem.get_job("j1").progress
+    mem.update_part("j1", "p1", progress="x" * 5000 + "tail")
+    got = mem.get_job("j1").parts[-1].progress
     assert len(got) == 2000 and got.endswith("tail")
 
 
@@ -506,9 +627,10 @@ def test_stop_running_on_start_only_touches_running(mem):
     mem.update_job("b", state="done", ended_at="x")
     mem.stop_running_on_start()
     a, b = mem.get_job("a"), mem.get_job("b")
-    assert (a.state, a.reason) == ("stopped", "brain restarted")
+    assert (a.state, a.parts[-1].reason) == ("stopped", "brain restarted")
     assert a.ended_at
-    assert (b.state, b.reason, b.ended_at) == ("done", None, "x")
+    assert (b.state, b.parts[-1].reason, b.ended_at) == ("done", None, "x")
+    assert a.closed_at and b.closed_at is None  # a stopped job takes no new parts
 
 
 def test_unreported_jobs_finished_only(mem):
@@ -520,15 +642,15 @@ def test_unreported_jobs_finished_only(mem):
     mem.update_job("seen", state="done")
     mem.mark_reported("seen")
     assert {j.id for j in mem.unreported_jobs()} == {"done", "err", "stop"}
-    assert mem.get_job("seen").reported is True
+    assert mem.get_job("seen").parts[-1].reported is True
 
 
 def test_job_result_capped_at_20000_and_progress_at_2000(mem):
     mem.add_job("j", "a", "t", "f", "m")
-    mem.update_job("j", result="x" * 25_000, progress="p" * 5000)
+    mem.update_part("j", "p1", report="x" * 25_000, progress="p" * 5000)
     got = mem.get_job("j")
-    assert len(got.result) == 20_000
-    assert len(got.progress) == 2000
+    assert len(got.parts[-1].report) == 20_000
+    assert len(got.parts[-1].progress) == 2000
 
 
 # ---- timers (10b) ----

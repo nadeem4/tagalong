@@ -231,13 +231,13 @@ class FakeJobs:
             raise self.error
         return self.started
 
-    def tell(self, job_id, note):
-        self.calls.append(("tell", job_id, note))
+    def tell(self, job_id, note, part=None):
+        self.calls.append(("tell", job_id, note) + ((part,) if part else ()))
         if self.error:
             raise self.error
 
-    async def stop(self, job_id):
-        self.calls.append(("stop", job_id))
+    async def stop(self, job_id, part=None):
+        self.calls.append(("stop", job_id) + ((part,) if part else ()))
         if self.error:
             raise self.error
 
@@ -415,6 +415,12 @@ async def test_tell_expert_queues_a_note(home):
     assert "j1" in out
 
 
+async def test_tell_expert_and_stop_job_can_name_a_part(home):
+    await home.run("tell_expert", {"job": "j1", "note": "n", "part": "p2"})
+    await home.run("stop_job", {"job": "j1", "part": "p2"})
+    assert home.jobs.calls == [("tell", "j1", "n", "p2"), ("stop", "j1", "p2")]
+
+
 async def test_tell_expert_refusal_is_a_plain_line(home):
     home.jobs.error = JobError("job j1 is not running")
     assert await home.run("tell_expert", {"job": "j1", "note": "n"}) == "job j1 is not running"
@@ -425,32 +431,50 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem):
     home.jobs.rows = mem.list_jobs(20)
     out = json.loads(await home.run("list_jobs"))
     assert [j["id"] for j in out["jobs"]] == ["j1"]
-    assert {"task", "folder", "mode", "state", "progress", "result", "started_at"} <= set(
+    assert {"task", "folder", "mode", "state", "started_at", "title", "closed_at", "parts"} <= set(
         out["jobs"][0]
     )
+    # The expert, its progress and result moved into the parts; nothing is duplicated up here.
+    assert not {"expert", "progress", "result", "reason", "session_id"} & set(out["jobs"][0])
 
 
-async def test_list_jobs_shows_the_expert_the_parent_and_whether_a_session_is_known(home, mem):
+async def test_list_jobs_rows_have_parts(home, mem):
     mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.update_job("j1", session_id="s-secret")
+    mem.update_part("j1", "p1", session_id="s-secret")
+    mem.add_part("j1", "gemini", "more", "f", "2026-01-01T00:00:00+00:00")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default", parent_job="j1")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
-    assert rows["j1"]["expert"] == "codex-acp" and rows["j1"]["session_id_known"] is True
-    assert rows["j2"]["session_id_known"] is False and rows["j2"]["parent_job"] == "j1"
-    assert "session_id" not in rows["j1"]  # an opaque handle Scout never needs to see
+    assert [p["id"] for p in rows["j1"]["parts"]] == ["p1", "p2"]
+    assert [p["expert"] for p in rows["j1"]["parts"]] == ["codex-acp", "gemini"]
+    assert {"state", "reason", "progress", "result", "started_at", "ended_at"} <= set(
+        rows["j1"]["parts"][0]
+    )
+    assert rows["j2"]["parent_job"] == "j1"
+
+
+async def test_list_jobs_says_whether_a_part_has_a_session_but_never_shows_it(home, mem):
+    mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
+    mem.update_part("j1", "p1", session_id="s-secret")
+    mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
+    home.jobs.rows = mem.list_jobs(20)
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["parts"][0]["session_id_known"] is True
+    assert rows["j2"]["parts"][0]["session_id_known"] is False
+    assert "s-secret" not in json.dumps(rows)  # an opaque handle Scout never needs to see
 
 
 async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home, mem):
     mem.add_job("j1", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j1", result="R" * 1500, progress="a" * 1500 + "end")
+    mem.update_part("j1", "p1", report="R" * 1500, progress="a" * 1500 + "end")
     mem.add_job("j2", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j2", result="short", progress="p" * 1000)
+    mem.update_part("j2", "p1", report="short", progress="p" * 1000)
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
-    assert rows["j1"]["result"] == "R" * 1000 + "…"
-    assert rows["j1"]["progress"] == "…" + "a" * 996 + "end"
-    assert rows["j2"]["result"] == "short" and rows["j2"]["progress"] == "p" * 1000
+    one, two = rows["j1"]["parts"][0], rows["j2"]["parts"][0]
+    assert one["result"] == "R" * 1000 + "…"
+    assert one["progress"] == "…" + "a" * 996 + "end"
+    assert two["result"] == "short" and two["progress"] == "p" * 1000
 
 
 async def test_list_jobs_rows_carry_a_one_line_summary(home, mem):
