@@ -188,6 +188,7 @@ describe('HomeView', () => {
         startedAt: '2026-10-28T09:00:00.000Z',
         endedAt: null,
         closedAt: null,
+        scoutResult: null,
         parts: [],
         activity: false,
       },

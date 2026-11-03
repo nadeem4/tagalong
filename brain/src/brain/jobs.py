@@ -532,6 +532,7 @@ class Jobs:
             "started_at": job.started_at,
             "ended_at": job.ended_at,
             "closed_at": job.closed_at,
+            "result": job.scout_result,
             "parts": [
                 {
                     "id": p.id,
@@ -549,6 +550,16 @@ class Jobs:
             "more": more,
             "watch": job.watch,
         }
+
+    def part_report(self, job_id: str, part: str) -> str | None:
+        """One part's report for the job page's Reports tab (masked when it was saved)."""
+        job = self._memory.get_job(job_id)
+        if job is None:
+            raise JobError(f"no job {job_id}")
+        for p in job.parts:
+            if p.id == part:
+                return p.report
+        raise JobError(f"no part {part} in job {job_id}")
 
     def set_watch(self, job_id: str, items: object) -> list[dict]:
         """Replace Scout's watch list for a job. A bad shape is refused with a plain line and the

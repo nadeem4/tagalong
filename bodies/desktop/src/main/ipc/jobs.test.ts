@@ -32,6 +32,7 @@ const BRAIN_ROW = {
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
   closed_at: null,
+  scout_result: null,
   watch: null,
   parts: [
     {
@@ -58,6 +59,7 @@ const JOB = {
   startedAt: '2026-10-27T10:00:00Z',
   endedAt: null,
   closedAt: null,
+  scoutResult: null,
   parts: [
     {
       id: 'p1',
@@ -216,9 +218,25 @@ describe('registerJobsIpc', () => {
     await expect(invoke(IPC.runningSteps)).rejects.toThrow('brain sent bad running steps');
   });
 
-  it('handles its four channels and nothing else', () => {
+  it("reads one part's report through the job_report tool", async () => {
+    const { invoke, calls } = setup(() => text({ text: '# Done' }));
+    expect(await invoke(IPC.jobReport, 'j1', 'p2')).toBe('# Done');
+    expect(calls).toEqual([['job_report', { job: 'j1', part: 'p2' }]]);
+    const none = setup(() => text({ text: null }));
+    expect(await none.invoke(IPC.jobReport, 'j1', 'p1')).toBeNull();
+  });
+
+  it('refuses a bad id for a report and a report that is not text', async () => {
+    const { invoke, calls } = setup(() => text({ text: 5 }));
+    await expect(invoke(IPC.jobReport, '', 'p1')).rejects.toThrow('bad job id');
+    await expect(invoke(IPC.jobReport, 'j1', 7)).rejects.toThrow('bad part id');
+    expect(calls).toEqual([]);
+    await expect(invoke(IPC.jobReport, 'j1', 'p1')).rejects.toThrow('brain sent bad report');
+  });
+
+  it('handles its five channels and nothing else', () => {
     expect(setup(() => []).channels()).toEqual(
-      [IPC.listJobs, IPC.stopJob, IPC.jobActivity, IPC.runningSteps].sort(),
+      [IPC.listJobs, IPC.stopJob, IPC.jobActivity, IPC.jobReport, IPC.runningSteps].sort(),
     );
   });
 });

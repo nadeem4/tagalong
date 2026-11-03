@@ -91,6 +91,8 @@ const bridge: PreloadBridge = {
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
   jobActivity: (job: string, afterRev: number) =>
     ipcRenderer.invoke(IPC.jobActivity, job, afterRev) as Promise<JobActivityPage>,
+  jobReport: (job: string, part: string) =>
+    ipcRenderer.invoke(IPC.jobReport, job, part) as Promise<string | null>,
   runningSteps: () => ipcRenderer.invoke(IPC.runningSteps) as Promise<RunningStep[]>,
   listApprovals: (filter: 'all' | 'scout' | 'refused', before?: number) =>
     ipcRenderer.invoke(IPC.listApprovals, filter, before) as Promise<{

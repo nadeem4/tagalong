@@ -46,6 +46,7 @@ export const IPC = {
   listJobs: 'tagalong:jobs:list',
   stopJob: 'tagalong:jobs:stop',
   jobActivity: 'tagalong:jobs:activity',
+  jobReport: 'tagalong:jobs:report',
   runningSteps: 'tagalong:jobs:running-steps',
   usageSummary: 'tagalong:usage:summary',
   turnEvent: 'tagalong:turn-event',

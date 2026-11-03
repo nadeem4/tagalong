@@ -37,6 +37,7 @@ function toRow(raw: Record<string, unknown>): JobRow {
     startedAt: raw.started_at,
     endedAt: raw.ended_at ?? null,
     closedAt: raw.closed_at ?? null,
+    scoutResult: raw.scout_result ?? null,
     parts: parts.map((part) => toPart(part as Record<string, unknown>)),
     activity: raw.activity === true,
   } as JobRow;
@@ -90,6 +91,14 @@ export function registerJobsIpc(handle: IpcHandle, deps: { brain: BrainCall }): 
       throw new Error('bad cursor');
     }
     return parsePage(await callJson(brain, 'job_activity', { job, after_rev: afterRev }));
+  });
+  handle(IPC.jobReport, async (_event, job: unknown, part: unknown) => {
+    if (typeof job !== 'string' || job === '') throw new Error('bad job id');
+    if (typeof part !== 'string' || part === '') throw new Error('bad part id');
+    const text = ((await callJson(brain, 'job_report', { job, part })) as { text?: unknown } | null)
+      ?.text;
+    if (text !== null && typeof text !== 'string') throw new Error('brain sent bad report');
+    return text;
   });
   handle(IPC.runningSteps, async () => parseRunning(await callJson(brain, 'job_activity')));
 }

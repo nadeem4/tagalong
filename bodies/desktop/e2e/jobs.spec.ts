@@ -124,6 +124,8 @@ test('watching a job shows its log, follows new steps and shows exit codes', asy
   await home.getByRole('button', { name: 'Jobs', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
 
+  // An earlier test stopped job1, so the page may open on Overview: pick Activity.
+  await home.getByRole('tab', { name: 'Activity' }).click();
   const log = home.getByRole('log');
   await expect(log).toContainText('$ npm test', { timeout: 15_000 });
   await expect(log).toContainText('all green');
@@ -185,6 +187,7 @@ test('a long watch list never pushes the log or its pill off the screen', async 
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Jobs', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
+  await home.getByRole('tab', { name: 'Activity' }).click();
   const items = Array.from({ length: 10 }, (_, i) => ({
     text: `expectation ${i + 1}`,
     done: i < 3,
@@ -232,4 +235,36 @@ test("the bubble shows a running job's latest step", async () => {
 
   brain.setRunning([], 'jobs');
   await expect(line).toHaveCount(0, { timeout: 15_000 });
+});
+
+test('a two-expert job shows its parts in Reports and a labelled Activity', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Watch Ship the release notes' }).click();
+
+  await expect(home.getByRole('heading', { level: 1 })).toHaveText('Release notes for 1.2', {
+    timeout: 15_000,
+  });
+  await expect(home.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(home.getByText('reviewed', { exact: true })).toBeVisible();
+  await expect(home.getByRole('list').filter({ hasText: 'files (app)' })).toContainText('Gemini');
+
+  await home.getByRole('tab', { name: 'Activity' }).click();
+  const log = home.getByRole('log');
+  await expect(log).toContainText('Claude Code');
+  await expect(log).toContainText('files app');
+  await expect(log).toContainText('Gemini');
+
+  await home.getByRole('tab', { name: 'Reports' }).click();
+  const heads = home.getByRole('button', { expanded: false });
+  await expect(heads).toHaveCount(2);
+  await home.getByRole('button', { name: /Claude Code/ }).click();
+  await expect(home.getByRole('heading', { name: 'Drafted' })).toBeVisible();
+  await expect(home.locator('.job-report__body script')).toHaveCount(0);
+  await expect(home.locator('#job-report-p1')).toContainText('<script>bad()</script>');
+  await home.getByRole('button', { name: /Gemini/ }).click();
+  await expect(home.getByText('no changes needed')).toBeVisible();
 });

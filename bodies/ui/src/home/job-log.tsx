@@ -1,12 +1,15 @@
 /**
  * The job page's read-only log: a dark, monospace list of what the expert did, one block per
  * step (command with a status glyph, its output, edits, reads, what it said, its plan, the end
- * line). Plain React with no terminal emulator, so nothing can be typed into it.
- * Contains JobLog.
+ * line). Plain React with no terminal emulator, so nothing can be typed into it. Whenever the
+ * steps change hands (an expert, an app, a Scout tool) a small header names who and when.
+ * Contains JobLog and labelOf.
  */
 import { Fragment, memo, type RefObject, type UIEvent } from 'react';
 import type { JobActivityEntry } from '../host-bridge';
 import { collapseCarriageReturns, parseAnsi } from './ansi';
+import type { PartView } from './job-activity-state';
+import { localTime } from './job-time';
 
 const GLYPH: Record<string, string> = { done: '✓', failed: '✗', pending: '·', running: '◐' };
 const GLYPH_NAME: Record<string, string> = { pending: 'waiting' };
@@ -55,14 +58,92 @@ function elapsed(at: string, now: number): string {
   return `running, ${Math.max(0, Math.floor((now - Date.parse(at)) / 1000))} s`;
 }
 
+/** Who a step is from: an app, one of Scout's tools, Scout itself, or the part's expert. */
+export function labelOf(e: JobActivityEntry, parts: PartView[] | null): string {
+  if (e.source?.startsWith('app:')) return `${e.source.slice(4)} app`;
+  if (e.source?.startsWith('scout:')) return `Scout: ${e.source.slice(6)}`;
+  if (e.part === 'scout') return 'Scout';
+  return parts?.find((p) => p.id === e.part)?.expert ?? e.part;
+}
+
+function Step({
+  e,
+  withOutput,
+  now,
+}: {
+  e: JobActivityEntry;
+  withOutput: Set<string | null>;
+  now: number;
+}) {
+  switch (e.kind) {
+    case 'command': {
+      const waiting = e.status === 'running' && !withOutput.has(e.step);
+      return (
+        <Fragment key={e.seq}>
+          <div className="job-log__line job-log__cmd">
+            <Glyph status={e.status} />
+            <span>{`$ ${e.text}`}</span>
+            {e.exit !== null && (
+              <span
+                className={`job-log__exit job-log__exit--${e.exit === 0 ? 'ok' : 'err'}`}
+              >{`exit ${e.exit}`}</span>
+            )}
+            {e.status === 'running' && <span className="job-log__meta">{elapsed(e.at, now)}</span>}
+          </div>
+          {waiting && <div className="job-log__note">output appears when the command finishes</div>}
+        </Fragment>
+      );
+    }
+    case 'output':
+      return <Output key={e.seq} text={e.text} />;
+    case 'edit':
+      return (
+        <div key={e.seq} className="job-log__line job-log__edit">
+          <Glyph status={e.status} />
+          <span>{e.text}</span>
+        </div>
+      );
+    case 'say':
+      return (
+        <div key={e.seq} className="job-log__say">
+          {e.text.split('\n').map((line, i) => (
+            <div key={i}>{`# ${line}`}</div>
+          ))}
+        </div>
+      );
+    case 'plan':
+      return (
+        <pre key={e.seq} className="job-log__plan">
+          {e.text}
+        </pre>
+      );
+    case 'end':
+      return (
+        <div key={e.seq} className="job-log__line job-log__end">
+          {e.text}
+        </div>
+      );
+    default:
+      // read, search, other and the "[older steps dropped]" marker
+      return (
+        <div key={e.seq} className="job-log__line job-log__quiet">
+          <Glyph status={e.status} />
+          <span>{e.text}</span>
+        </div>
+      );
+  }
+}
+
 export function JobLog({
   entries,
   now,
+  parts = null,
   logRef,
   onScroll,
 }: {
   entries: JobActivityEntry[];
   now: number;
+  parts?: PartView[] | null;
   logRef?: RefObject<HTMLDivElement | null>;
   onScroll?: (event: UIEvent<HTMLDivElement>) => void;
 }) {
@@ -77,68 +158,20 @@ export function JobLog({
       tabIndex={0}
       onScroll={onScroll}
     >
-      {entries.map((e) => {
-        switch (e.kind) {
-          case 'command': {
-            const waiting = e.status === 'running' && !withOutput.has(e.step);
-            return (
-              <Fragment key={e.seq}>
-                <div className="job-log__line job-log__cmd">
-                  <Glyph status={e.status} />
-                  <span>{`$ ${e.text}`}</span>
-                  {e.exit !== null && (
-                    <span
-                      className={`job-log__exit job-log__exit--${e.exit === 0 ? 'ok' : 'err'}`}
-                    >{`exit ${e.exit}`}</span>
-                  )}
-                  {e.status === 'running' && (
-                    <span className="job-log__meta">{elapsed(e.at, now)}</span>
-                  )}
-                </div>
-                {waiting && (
-                  <div className="job-log__note">output appears when the command finishes</div>
-                )}
-              </Fragment>
-            );
-          }
-          case 'output':
-            return <Output key={e.seq} text={e.text} />;
-          case 'edit':
-            return (
-              <div key={e.seq} className="job-log__line job-log__edit">
-                <Glyph status={e.status} />
-                <span>{e.text}</span>
+      {entries.map((e, i) => {
+        const label = labelOf(e, parts);
+        const prev = entries[i - 1];
+        return (
+          <Fragment key={e.seq}>
+            {(prev === undefined || labelOf(prev, parts) !== label) && (
+              <div className="job-log__who">
+                <span className="job-log__chip">{label}</span>
+                <time dateTime={e.at}>{localTime(e.at)}</time>
               </div>
-            );
-          case 'say':
-            return (
-              <div key={e.seq} className="job-log__say">
-                {e.text.split('\n').map((line, i) => (
-                  <div key={i}>{`# ${line}`}</div>
-                ))}
-              </div>
-            );
-          case 'plan':
-            return (
-              <pre key={e.seq} className="job-log__plan">
-                {e.text}
-              </pre>
-            );
-          case 'end':
-            return (
-              <div key={e.seq} className="job-log__line job-log__end">
-                {e.text}
-              </div>
-            );
-          default:
-            // read, search, other and the "[older steps dropped]" marker
-            return (
-              <div key={e.seq} className="job-log__line job-log__quiet">
-                <Glyph status={e.status} />
-                <span>{e.text}</span>
-              </div>
-            );
-        }
+            )}
+            <Step e={e} withOutput={withOutput} now={now} />
+          </Fragment>
+        );
       })}
     </div>
   );

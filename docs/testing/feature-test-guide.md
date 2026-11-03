@@ -321,6 +321,16 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     nothing. Automated: `test_jobs.py` (`set_result`, `record_step`), `test_tools.py`,
     `test_toolbox.py` (`on_call`), `test_job_activity.py` (`tool_step`), `test_sessions.py`
     (turn-to-job binding, labels, masking) and `test_prompt.py`.
+    **Job page tabs (manual):** hand two experts' work to one job (or open a finished job), then
+    Watch it. **Expected:** three tabs; a running job opens on Activity, a finished one on Overview
+    (title, Scout's result, started, finished, ran for, who worked). Activity is one timeline with a
+    label whenever the actor changes (the expert, `files app`, `Scout: remember`) and a time. Reports
+    has one collapsed row per expert; opening one shows its report with Markdown formatting, and a
+    `<script>` in it appears as text, never runs; a `javascript:` link is not a link. Arrow keys
+    move between tabs. An old job (no title) shows its brief's first line. Automated:
+    `job-tabs.test.tsx`, `overview-tab.test.tsx`, `reports-tab.test.tsx`, `safe-markdown.test.tsx`,
+    `job-page.test.tsx`, `jobs.test.ts` (`jobReport`), `test_jobs.py` (`part_report`),
+    `test_tools.py` (`job_report`) and `e2e/jobs.spec.ts` (two-expert job).
     **Exit codes (manual):** hand a job to Claude Code that runs a failing command (for example
     "run `node -e process.exit(2)` and tell me what happened"). **Expected:** its `$` line ends
     with a red cross and `exit 2`; a command that succeeds shows a green check and `exit 0`.
