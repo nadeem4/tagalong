@@ -156,12 +156,19 @@ describe('SpeechPlayer', () => {
       expect(p.interruption()).toBeNull();
     });
 
-    it('gives the words of the turn so far, to tell Scout from an echo', async () => {
-      const { p } = player();
+    it('gives the sentence playing and the one before, never the queued ones', async () => {
+      const { p, finish } = player();
       p.enqueue(sentence('t1', 1, 'One.'));
       p.enqueue(sentence('t1', 2, 'Two.'));
+      p.enqueue(sentence('t1', 3, 'Three.'));
+      await tick();
+      expect(p.text()).toBe('One.');
+      finish();
       await tick();
       expect(p.text()).toBe('One. Two.');
+      finish();
+      await tick();
+      expect(p.text()).toBe('Two. Three.');
       p.enqueue(sentence('t2', 1, 'Fresh.'));
       expect(p.text()).toBe('Fresh.');
     });

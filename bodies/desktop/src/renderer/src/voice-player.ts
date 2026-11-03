@@ -220,9 +220,13 @@ export class SpeechPlayer {
     return turn !== null && live ? { turn, heard: played } : null;
   }
 
-  /** The words of the turn's sentences so far, to tell Scout's own echo from the person. */
+  /**
+   * The sentence playing and the one before it, to tell Scout's own echo from the person.
+   * Queued sentences are not in the room yet, so the mic cannot have heard them.
+   */
   text(): string {
-    return this.record.texts.join(' ');
+    const { texts, played } = this.record;
+    return texts.slice(Math.max(0, played - 1), played + 1).join(' ');
   }
 
   /** Silences Scout now: this sentence, the rest, and the brain's. */

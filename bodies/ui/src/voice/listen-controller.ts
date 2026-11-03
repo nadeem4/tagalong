@@ -301,6 +301,15 @@ export class ListenController {
       this.#options.resume?.();
       return;
     }
+    // "Scout, stop listening" still switches listening off, and cuts Scout off while at it.
+    const named = addressedToScout(heard);
+    if (named !== null && isStopListening(named)) {
+      this.closeFollowUp();
+      this.#options.onSpeechStart();
+      this.#options.onStopListening();
+      this.#options.onDropped();
+      return;
+    }
     // Words over Scout need no name; they answer or cut in, and the window is spent.
     this.closeFollowUp();
     this.#resetRetry();
@@ -337,7 +346,6 @@ export class ListenController {
       if (!session.live || text === undefined || text === '') return;
       // A paused Scout waits for the turn's end: a partial neither resumes nor sends.
       if (session.paused) return;
-      if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       this.#options.onPartial(text, mode);
     });

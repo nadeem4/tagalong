@@ -11,6 +11,7 @@ import {
   EarsNotes,
   FailureStreak,
   FollowUpCue,
+  CutMemory,
   HeardInbox,
   NOTHING_HEARD,
   micMark,
@@ -103,8 +104,15 @@ export function useTalk(options: TalkOptions): {
     return () => void listeners.delete(handler);
   });
 
+  // What the person heard of Scout when they talked over it with the key or the mic button;
+  // the question that follows carries it.
+  const [cut] = useState(() => new CutMemory());
+
   const [controller] = useState(() => {
     const bargeIn = (): void => {
+      // What was heard of Scout is read before the player stops: the question that follows
+      // carries it, so the brain can hand the unsaid rest to the model.
+      cut.note(latest.current.player.interruption());
       // Talking over Scout: its answer is cut off, so it opens no follow-up window.
       cue.hushed();
       latest.current.onBegin();
@@ -129,22 +137,13 @@ export function useTalk(options: TalkOptions): {
       // Words over Scout: told to the brain with how much was heard, which decides what next.
       onInterrupt: (text) => {
         const { player } = latest.current;
-        const heard = player.interruption();
+        const heard = cut.take(player.interruption());
         player.stop();
         cue.hushed();
         micOk();
         cue.asked();
         done(null);
-        const noted =
-          heard === null
-            ? Promise.resolve()
-            : window.tagalongHost.noteInterruption(heard).catch((error: unknown) => {
-                console.warn('[talk] could not note the interruption', error);
-              });
-        // The note goes first; the question follows it to main.
-        void noted.then(() => {
-          if (!inbox.deliver(text)) latest.current.onBegin();
-        });
+        if (!inbox.deliver(text, heard)) latest.current.onBegin();
       },
       onPartial: (text, mode) => {
         micOk();
@@ -154,9 +153,10 @@ export function useTalk(options: TalkOptions): {
         micOk();
         cue.asked();
         done(null);
+        const heard = cut.take();
         // No bubble to ask it (a one-line remark is up): the line
         // gives way and the bubble that mounts asks the question held for it.
-        if (!inbox.deliver(text)) latest.current.onBegin();
+        if (!inbox.deliver(text, heard)) latest.current.onBegin();
       },
       onNothingHeard: () => done(NOTHING_HEARD),
       onMicFailed: (error) => {
@@ -234,6 +234,7 @@ export function useTalk(options: TalkOptions): {
     };
     // The bubble closed: the question goes, always listening goes on.
     const cancel = (): void => {
+      cut.clear();
       cue.hushed();
       controller.made.cancel();
       quiet();

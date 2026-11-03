@@ -36,7 +36,10 @@ class _Sender(Protocol):
 
 
 class _Turn:
-    def __init__(self, body_id: str, voice: str, speed: float, system_voice: bool) -> None:
+    def __init__(
+        self, turn: str, body_id: str, voice: str, speed: float, system_voice: bool
+    ) -> None:
+        self.turn = turn
         self.body_id = body_id
         self.system_voice = system_voice
         self.voice = voice
@@ -86,7 +89,7 @@ class Mouth:
         if body_id is None or (live is not None and not live.hushed):
             return  # already speaking this turn; a hushed one is replaced below
         self._failed = False
-        st = _Turn(body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED, system_voice)
+        st = _Turn(turn, body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED, system_voice)
         st.task = asyncio.get_running_loop().create_task(self._run(turn, st))
         self._turns[turn] = st
 
@@ -111,6 +114,11 @@ class Mouth:
         for st in self._turns.values():
             if st.body_id == body_id and not st.hushed:
                 st.hushed = True
+                # The task is cancelled and drops the turn: what was made but not yet sent
+                # moves to the log first, so the interruption can still hand it over.
+                if st.unsent:
+                    self._sent.setdefault(st.turn, []).extend(st.unsent)
+                    st.unsent.clear()
                 if st.task is not None:
                     st.task.cancel()
 

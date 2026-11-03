@@ -1339,13 +1339,15 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
 - **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
   [Voice](voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
   the first `heard` sentences were said, the rest are the unsaid. The running turn is cancelled
-  (and the mouth hushed), and the new turn waits for it to wind down so history stays valid. The
+  (and the mouth hushed; it keeps the turn's sentence log through the hush, since a body's own
+  `hush` usually arrives first), and the new turn waits for it to wind down so history stays valid. The
   saved history keeps only the spoken sentences, ending with `[interrupted: the owner spoke over
 this]` (`Memory.replace_last_message` rewrites the cut turn's message), never the unsaid. The
   model sees the unsaid once, as a `<data kind="interruption">` block (`spoken:` and `unsaid:`)
   before the owner's words, only for that next turn; `soul.md` says what the block means, and the
   model decides whether to stop, answer, carry on or offer the rest. A stale or unknown `turn`, or
-  an empty unsaid, makes it a plain `say`. The echo guard lives in the body (`echoOf`), not here.
+  an empty unsaid on a turn that already ended, makes it a plain `say`; a turn still running is
+  cancelled even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
 - **The spoken note.** For a spoken `say` the user content gets one extra text block, after the
   content: "This reply will be read aloud ... you may open with one short sentence in your own
   words first." That sentence is the spoken ack; code never says it, there is no canned line and no

@@ -404,6 +404,19 @@ describe('ListenController, always', () => {
       expect(interrupt.mock.calls).toEqual([['stop']]);
     });
 
+    it('"Scout, stop listening" over Scout switches listening off and cuts Scout off', async () => {
+      const { controller, ears, interrupt, resume, calls } = talking();
+      controller.setAlways(true);
+      await tick();
+      ears.say('speechStart');
+      ears.say('turnEnd', 'Scout, stop listening');
+      expect(calls.stop).toHaveBeenCalledOnce();
+      expect(calls.speechStart).toHaveBeenCalledOnce(); // playback ends, as before pausing
+      expect(interrupt).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+      expect(calls.heard).not.toHaveBeenCalled();
+    });
+
     it('a partial neither resumes nor sends', async () => {
       const { controller, ears, resume, interrupt, calls } = talking();
       controller.setAlways(true);

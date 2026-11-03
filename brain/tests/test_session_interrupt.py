@@ -199,3 +199,15 @@ async def test_history_stays_valid_after_a_cancel_mid_tool_call():
         if b.get("type") == "tool_result"
     ]
     assert uses == answers
+
+
+async def test_a_running_turn_is_cut_even_when_nothing_is_left_unsaid():
+    # Everything made so far was heard, but the model is still going: the turn is cancelled.
+    session, sent, voice, model, first, second = await talk_over_a_running_turn(heard=3)
+    assert second.joined is False and second.turn != first.turn
+    ended = {p["turn"]: p["reason"] for m, p in sent if m == "turn" and p["state"] == "ended"}
+    assert ended[first.turn] == "cancelled"
+    assert session.history[1]["content"] == [
+        {"type": "text", "text": f"One. Two. Three.\n\n{MARK}"}
+    ]
+    assert voice.hushed == ["desktop"]

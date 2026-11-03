@@ -244,8 +244,11 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
 - **Always listening.** It reads `getListening()` at mount and follows `onListening`. It calls
   `setPaused` before `setAlways`, so switching on during a call never opens the mic for a moment.
 - **Talking over Scout.** It passes the `SpeechPlayer`'s `speaking`, `pause`, `resume` and `text` to
-  the controller, and `onInterrupt` tells main what was heard (`IPC.noteInterruption`) before the
-  words are delivered like any heard question.
+  the controller, and `onInterrupt` delivers the words like any heard question, with what was heard
+  of Scout (`interrupted {turn, heard}`) riding on the question itself. "Scout, stop listening"
+  over Scout still switches Always listening off (and cuts Scout off), and is not sent to the brain.
+  The talk key and mic button read `SpeechPlayer.interruption()` before the player stops
+  (`CutMemory` in `talk-rules.ts`), so a held question carries it too.
 - **Delivery.** A heard question goes through `HeardInbox`. If no bubble is mounted (a one-line
   hello or remark is up, or Scout is still waking), the question is held, the line
   gives way through `onBegin`, and the bubble asks it as it subscribes. Only the latest is held.
@@ -423,7 +426,7 @@ flowchart TD
   B --> C{"turnEnd text"}
   C -->|"empty"| R["SpeechPlayer.resume"]
   C -->|"echoOf: Scout's own words"| R
-  C -->|"other words"| D["noteInterruption {turn, heard}, player.stop"]
+  C -->|"other words"| D["read interruption {turn, heard}, player.stop"]
   D --> E["say { text, interrupted: {turn, heard} }"]
   E --> F["brain: cancel the turn, keep only what was said, hand over the unsaid once"]
   F --> G["Scout decides: stop, answer, carry on or offer the rest"]
@@ -438,12 +441,16 @@ flowchart TD
   "stop" always reaches Scout. No model and no word lists.
 - **What the brain gets.** `interrupted { turn, heard }`: `heard` is the number of sentences
   played to the end (`SpeechPlayer.interruption()`, counted from the numbered `speech` frames).
-  Main holds it from `noteInterruption` for 15 s and attaches it to the next `ask`, once.
+  It travels on the `ask` payload itself (`AskInput.interrupted`), so it can never attach to a
+  later question. The player's `stop()` hushes the brain first, so the mouth keeps the turn's
+  sentence log (sent and made-but-unsent) through the hush: the unsaid rest survives.
+  `SpeechPlayer.text()` (the echo check) is only the sentence playing and the one before it.
 - **What the brain does.** `Session.say` cancels that turn, saves only the sentences that were
   said, marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid
   sentences once, in a `<data kind="interruption">` block with the owner's words. See
   [Brain](brain.md).
-- **Held questions** keep the old behaviour: the key or button cuts Scout off at once.
+- **Held questions** still cut Scout off at once, but send `interrupted` too, so the brain cuts
+  the turn and the model gets the unsaid rest.
 
 ### The mouth
 
@@ -529,7 +536,6 @@ From `IPC` in `bodies/desktop/src/shared/ipc.ts`. Handlers are in `main/ipc/voic
 | `tagalong:voice:mic-frame`                       | send           | `Float32Array`                                           | Copied into a `Float32Array` if needed, converted to 16-bit, sent as `mic`. Never kept.                                                                      |
 | `tagalong:voice:ears-stop`                       | invoke         | none                                                     | The brain's `unlisten`.                                                                                                                                      |
 | `tagalong:voice:hush`                            | invoke         | none                                                     | The brain's `hush`.                                                                                                                                          |
-| `tagalong:interruption`                          | invoke         | `{ turn, heard }`                                        | What was heard of Scout's turn before the person spoke over it; main attaches it to the next `ask`'s `say` as `interrupted`, once, within 15 s.              |
 | `tagalong:voice:speak-sample`                    | invoke         | `(text, voice, speed)` returning `SpeakSample` or `null` | The brain's `speak_sample` tool. `null` when it cannot speak.                                                                                                |
 | `tagalong:voice:ears-event`                      | main → windows | `{ event, text? }`                                       | Every window. From `heard`.                                                                                                                                  |
 | `tagalong:voice:ears-status`                     | main → windows | `EarsStatus`                                             | Every window. From `voice`, or a failed `listen`.                                                                                                            |

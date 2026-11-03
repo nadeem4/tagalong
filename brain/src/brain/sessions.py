@@ -281,7 +281,8 @@ class Session:
             return None
         sentences = self.voice.sentences(turn)
         unsaid = " ".join(sentences[heard:])
-        if not unsaid:
+        # A turn still running is cut even with nothing unsaid: the model has more to come.
+        if not unsaid and not (live and self._busy()):
             return None
         if self._turn_body is not None:
             self.voice.hush(self._turn_body)  # queued sentences must not keep coming

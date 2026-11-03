@@ -923,6 +923,10 @@ stands in for a real one (the brain still needs to hear something).
 5. **Expected:** the same; the system voice is not muted-out, and Scout does not answer itself.
 6. **Action:** while Scout speaks, cough or tap the desk.
 7. **Expected:** Scout pauses for a moment, then carries on from the same spot, with nothing sent.
+8. **Action:** while Scout speaks, hold the talk key and ask "wait, skip that".
+9. **Expected:** Scout stops at once and, like in step 2, answers knowing what it had and had not said.
+10. **Action:** while Scout speaks, say "Scout, stop listening".
+11. **Expected:** Scout stops and Always listening switches off.
 
 ### T.4. Reply, never an open mic
 

@@ -188,8 +188,6 @@ const host: TagalongHostApi = {
   speakSample: (text, voice, speed) =>
     ipcRenderer.invoke(IPC.speakSample, text, voice, speed) as Promise<SpeakSample | null>,
   hush: () => ipcRenderer.invoke(IPC.hush) as Promise<void>,
-  noteInterruption: (interruption: { turn: string; heard: number }) =>
-    ipcRenderer.invoke(IPC.noteInterruption, interruption) as Promise<void>,
   onSpeechChunk: (handler) => {
     const listener = (_event: IpcRendererEvent, chunk: SpeechChunk): void => handler(chunk);
     ipcRenderer.on(IPC.speechChunk, listener);

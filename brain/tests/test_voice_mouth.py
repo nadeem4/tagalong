@@ -328,6 +328,7 @@ async def test_sentences_survive_hush():
     m.reply("t", {"done": True})
     await settle()
     m.hush("d")
+    await settle()  # the cancelled task has ended and dropped the turn
     assert m.sentences("t") == [ONE, TWO]
 
 
@@ -359,3 +360,17 @@ async def test_sentences_include_those_made_but_not_yet_sent():
     assert m.sentences("t")[:2] == [ONE, TWO]
     assert len(m.sentences("t")) == 3
     m.hush("d")
+
+
+async def test_unsent_sentences_survive_hush_once_the_cancelled_task_ended():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    await asyncio.sleep(0.01)
+    before = m.sentences("t")
+    assert len(before) == 3
+    m.hush("d")
+    await settle()
+    assert m.sentences("t") == before  # sent and unsent alike, each once

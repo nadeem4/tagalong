@@ -1,6 +1,6 @@
 /** Tests for the turn IPC: ask and interrupt go to the brain. */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { SayParams } from '@tagalong/contract';
 import type { ContextSnapshot } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
@@ -59,26 +59,17 @@ describe('registerTurnIpc', () => {
     expect(said).toEqual([{ text: 'hi', spoken: true, voice: 'bm_george', speed: 0.95 }]);
   });
 
-  it('a noted interruption rides on the next ask once, then is spent', async () => {
+  it('an interrupted ask carries it to the brain, and only that ask', async () => {
     const { invoke, said } = setup();
-    await invoke(IPC.noteInterruption, { turn: 't0', heard: 2 });
-    await invoke(IPC.ask, { petId: 'scout', text: 'wait', spoken: true });
+    await invoke(IPC.ask, {
+      petId: 'scout',
+      text: 'wait',
+      spoken: true,
+      interrupted: { turn: 't0', heard: 2 },
+    });
     await invoke(IPC.ask, { petId: 'scout', text: 'and then?', spoken: true });
     expect(said[0]).toMatchObject({ text: 'wait', interrupted: { turn: 't0', heard: 2 } });
     expect(said[1]).not.toHaveProperty('interrupted');
-  });
-
-  it('an interruption nobody asked after for a while is forgotten', async () => {
-    vi.useFakeTimers();
-    try {
-      const { invoke, said } = setup();
-      await invoke(IPC.noteInterruption, { turn: 't0', heard: 1 });
-      vi.advanceTimersByTime(30_000);
-      await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true });
-      expect(said[0]).not.toHaveProperty('interrupted');
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('a spoken ask with Scout talks switched off is asked as text', async () => {
