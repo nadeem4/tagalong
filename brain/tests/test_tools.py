@@ -10,9 +10,11 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.guardrails import Budget
+from brain.guards import Guards
 from brain.jobs import JobError, JobId
 from brain.memory import Hit, Memory, MemoryRefused
 from brain.mind.turn import Call
+from brain.outputs import OutputStore
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
 from brain.tools import (
@@ -718,6 +720,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "list_experts",
         "list_jobs",
         "stop_job",
+        "job_report",
     }
 
 
@@ -1110,11 +1113,20 @@ async def test_job_report_unknown_part_errors_like_job_activity(home):
         await home.run("job_report", {"job": "j1"})
 
 
-async def test_job_report_is_home_only_and_read_only(home):
+async def test_job_report_is_read_only_for_scout_and_home(home):
     spec = expert_specs(home)["job_report"]
-    assert spec.audience == frozenset({"home"}) and spec.effect == "read"
-    with pytest.raises(RpcError):  # Scout reads reports through list_jobs, not raw
-        await home.box.run(Call("c", "job_report", {"job": "j", "part": "p1"}, "", ""), "scout")
+    assert spec.audience == frozenset({"scout", "home"}) and spec.effect == "read"
+    assert "job_report" in {t["name"] for t in home.box.model_tools()}
+
+
+async def test_scouts_job_report_goes_through_the_output_cap(home, mem):
+    home.jobs.reports = {("j1", "p1"): "R" * 50}
+    home.box._outputs = OutputStore(mem, Guards(), 10)
+    call = Call("c", "job_report", {"job": "j1", "part": "p1"}, "", "")
+    scout = await home.box.run(call, "scout")
+    head, body = scout.split(chr(10), 1)
+    assert "output_id" in head and len(body) == 10
+    assert json.loads(await home.box.run(call, "home")) == {"text": "R" * 50}  # Home gets it whole
 
 
 async def test_job_activity_is_home_only_and_read_only(home):

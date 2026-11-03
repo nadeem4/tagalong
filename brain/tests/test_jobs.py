@@ -2378,7 +2378,7 @@ async def test_part_end_wakes_scout_with_the_part_and_leaves_the_job_open(make_r
     await rig.jobs.start("two", str(rig.folder), job=str(job))
     await until(lambda: len(rig.finished) == 2)
     note = rig.jobs.note(rig.finished[-1])
-    assert "Two steps" in note and "Part: p2" in note and "p1 claude-acp done" in note
+    assert "Two steps" in note and "Part: p2" in note and f"p1 claude-acp {rig.folder} done" in note
     assert rig.finished[-1].closed_at is None
 
 
@@ -2502,16 +2502,16 @@ async def test_callbacks_fired_while_a_further_part_starts_file_under_that_part(
     assert filed[0] == "p2"
 
 
-async def test_note_for_a_job_with_two_parts_reports_each_part(make_rig):
+async def test_note_for_a_job_with_two_parts_reports_only_the_one_that_ended(make_rig):
     rig = make_rig(FakeAsks())
     rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
     rig.memory.add_part("j1", "gemini", "t2", "f", "now")
-    rig.memory.update_part("j1", "p1", report="first words")
-    rig.memory.update_part("j1", "p2", report="second words")
     rig.memory.update_job("j1", state="done", ended_at="2026-01-01")
+    rig.memory.update_part("j1", "p1", report="first words", ended_at="2026-01-01")
+    rig.memory.update_part("j1", "p2", report="second words", ended_at="2026-01-02")
     note = rig.jobs.note(rig.memory.get_job("j1"))
-    assert "first words" in note and "second words" in note
-    assert "p1, claude_code" in note and "p2, gemini" in note
+    assert "second words" in note and "first words" not in note
+    assert "p2, gemini, f" in note and "p1, claude_code" not in note
 
 
 async def test_start_result_carries_the_stored_masked_title(make_rig):

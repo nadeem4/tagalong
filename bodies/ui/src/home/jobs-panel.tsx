@@ -9,6 +9,7 @@ import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
 import { JobPage } from './job-page';
+import { SafeMarkdown } from './safe-markdown';
 
 const STATE_LABEL: Record<string, string> = {
   running: 'Running',
@@ -119,7 +120,8 @@ export function JobsPanel() {
               const part = job.parts[job.parts.length - 1];
               const progress = part?.progress ?? null;
               const reason = part?.reason ?? null;
-              const result = part?.result ?? null;
+              // Scout's own result when it wrote one; the expert's report is the fallback.
+              const result = job.scoutResult ?? part?.result ?? null;
               return (
                 <li key={job.id} className="job-row">
                   <div className="job-row__main">
@@ -172,7 +174,9 @@ export function JobsPanel() {
                     )}
                   </div>
                   {open.has(job.id) && result !== null && (
-                    <pre className="job-row__result">{result}</pre>
+                    <div className="job-row__result">
+                      <SafeMarkdown text={result} />
+                    </div>
                   )}
                 </li>
               );

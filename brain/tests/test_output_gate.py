@@ -158,9 +158,28 @@ def test_the_stored_report_is_not_changed_by_the_note(store):
     assert job.parts[-1].report == "R" * 25
 
 
-def test_each_part_of_a_job_gets_its_own_output_id(store):
-    job = a_job("", [a_part("p1", "claude_code", "A" * 25), a_part("p2", "gemini", "B" * 25)])
-    note = job_note(job, outputs=store)
-    assert "(p1, claude_code, C:/x)" in note and "(p2, gemini, C:/x)" in note
-    ids = [facts(chunk.split("\n", 1)[1])["output_id"] for chunk in note.split("Result")[1:]]
-    assert len(set(ids)) == 2
+def test_a_wake_carries_only_the_part_that_just_ended_as_a_report(store):
+    parts = [
+        JobPart(
+            "j1",
+            f"p{n}",
+            "claude_code",
+            "t",
+            "done",
+            None,
+            None,
+            "s",
+            chr(64 + n) * 25,
+            False,
+            "a",
+            f"b{n}",
+            f"C:/x{n}",
+        )
+        for n in (1, 2, 3)
+    ]
+    note = job_note(a_job("", parts), outputs=store)
+    assert note.count("Result") == 1 and "(p3, claude_code, C:/x3)" in note.split("Result")[1]
+    assert "A" * 10 not in note and "B" * 10 not in note
+    for n in (1, 2, 3):  # the other parts stay as facts
+        assert f"p{n} claude_code C:/x{n} done" in note
+    assert note.count("output_id") == 1  # one new stored copy, not one per part

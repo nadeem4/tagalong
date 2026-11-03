@@ -113,3 +113,11 @@ def test_config_reads_tool_preview_chars_and_rejects_zero(tmp_path):
     assert load_config({**base, "TAGALONG_TOOL_PREVIEW_CHARS": "50"}).tool_preview_chars == 50
     with pytest.raises(ValueError):
         load_config({**base, "TAGALONG_TOOL_PREVIEW_CHARS": "0"})
+
+
+def test_page_length_is_clamped_between_one_and_the_cap(store):
+    oid = store.put("t", "a" * 30).id
+    assert len(store.page(oid, 0, 0)["text"]) == 1
+    assert len(store.page(oid, 0, -5)["text"]) == 1
+    assert len(store.page(oid, 0, CAP + 20)["text"]) == CAP
+    assert len(store.page(oid, 0, 4)["text"]) == 4

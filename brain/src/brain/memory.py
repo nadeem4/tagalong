@@ -302,7 +302,7 @@ class ActivityEntry:
     step: str | None = None
     exit: int | None = None
     part: str = "p1"
-    source: str | None = None  # who did it, when not the part's expert (SP4)
+    source: str | None = None  # who did it, when not the part's expert
 
 
 @dataclass(frozen=True)
