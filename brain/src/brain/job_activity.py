@@ -227,7 +227,6 @@ class JobActivity:
             step=step,
             exit=exit,
             part=self._part,
-            source=source,
         )
         self._memory.save_activity(self._job, entry)
         self._memory.trim_activity(self._job, ENTRY_CAP, JOB_BYTES_CAP)

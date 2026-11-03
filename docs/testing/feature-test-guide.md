@@ -311,16 +311,6 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     hand-off to the same job id (`list_jobs` shows `p1`, `p2`), and calls `close_job` when it is
     satisfied; a closed job refuses new parts. A job it never closes stays open and listed. Automated:
     `test_jobs.py` (title, `job=`, close), `test_tools.py`, `test_memory.py`, `test_prompt.py`.
-    **Result and Scout's steps (manual):** hand a job to Claude Code, and when it ends let Scout
-    answer the wake. **Expected:** Scout calls `set_job_result` with a short result in its own
-    words (`list_jobs` shows it as `scout_result`); calling it again replaces it, and a job it never
-    wrote one for has none. If Scout used a connected app or one of its own tools in that turn
-    (ask it to check your calendar for the job), the job's activity shows those steps in order with
-    the other steps, labelled `app:<app>` or `scout:<tool>`; a refused or failed call shows its
-    status, and a token in the arguments shows as `[secret]`. A chat turn about no job adds
-    nothing. Automated: `test_jobs.py` (`set_result`, `record_step`), `test_tools.py`,
-    `test_toolbox.py` (`on_call`), `test_job_activity.py` (`tool_step`), `test_sessions.py`
-    (turn-to-job binding, labels, masking) and `test_prompt.py`.
     **Exit codes (manual):** hand a job to Claude Code that runs a failing command (for example
     "run `node -e process.exit(2)` and tell me what happened"). **Expected:** its `$` line ends
     with a red cross and `exit 2`; a command that succeeds shows a green check and `exit 0`.

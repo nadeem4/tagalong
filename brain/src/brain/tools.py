@@ -29,7 +29,6 @@ from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs, job_title
 from brain.memory import KINDS, Hit, JobPart, Memory, MemoryRefused
-from brain.outputs import OutputStore
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
@@ -469,7 +468,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "why_fresh": getattr(job_id, "why_fresh", None),
                 "parent_job": getattr(job_id, "parent_job", None),
                 "part": getattr(job_id, "part", "p1"),
-                "title": _text_arg(args, "title") if not args.get("job") else None,
+                "title": getattr(job_id, "title", None),
             }
         )
 
@@ -480,14 +479,6 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         except JobError as err:
             return str(err)
         return f"job {args['job']} closed"
-
-    async def set_job_result(args: dict) -> str:
-        _need_text("set_job_result", args, "job", "text")
-        try:
-            jobs.set_result(args["job"], args["text"])
-        except JobError as err:
-            return str(err)
-        return f"result saved for job {args['job']}"
 
     async def list_experts(args: dict) -> str:
         return json.dumps({"experts": expert_rows(jobs.installed(), jobs.can_resume)})
@@ -516,10 +507,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
             row["title"] = job_title(job)
-            row["closed"] = bool(job.closed_at)
             row["parts"] = [_part_row(p) for p in job.parts]
-            if (r := job.scout_result) and len(r) > LIST_TEXT_CAP:
-                row["scout_result"] = r[:LIST_TEXT_CAP] + "…"
             rows.append(row)
         return json.dumps({"jobs": rows})
 
@@ -618,28 +606,6 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 default_mode="auto",
             ),
             close_job,
-        ),
-        (
-            ToolSpec(
-                "set_job_result",
-                "Write the result of a whole job in your own words: what got done, what needs "
-                "the owner, and the key files or links. It is what the owner sees first on the "
-                "job page. Call it again to replace it, even after the job is closed. This is "
-                "guidance only: no format or length is required. A job with no result shows "
-                "only its status and reports.",
-                {
-                    "type": "object",
-                    "properties": {
-                        "job": job_id,
-                        "text": {"type": "string", "description": "Your result, in your words."},
-                    },
-                    "required": ["job", "text"],
-                },
-                scout,
-                effect="change",
-                default_mode="auto",
-            ),
-            set_job_result,
         ),
         (
             ToolSpec(

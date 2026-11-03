@@ -568,7 +568,7 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
 
 def two_part_logs(memory):
     memory.add_job("j", "claude-code", "t", "/w", "work")
-    memory.add_part("j", "gemini", "t2", NOW.isoformat())
+    memory.add_part("j", "gemini", "t2", "f", NOW.isoformat())
 
     def log(part):
         return JobActivity("j", memory, lambda t: t, lambda: NOW, lambda: None, part=part)
@@ -613,42 +613,3 @@ def test_summary_of_a_one_part_job_has_no_expert_tag(rig):
     rig.memory.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "ls"}))
     assert "[" not in job_activity.activity_summary(rig.memory, "j", NOW)
-
-
-def test_tool_step_is_a_masked_capped_tool_entry_with_its_source(tmp_path):
-    r = Rig(tmp_path, mask=lambda t: t.replace(SECRET, "[secret]"))
-    scout = JobActivity(
-        "j",
-        r.memory,
-        r.log._mask,
-        lambda: datetime(2026, 1, 1, tzinfo=UTC),
-        r.log._on_change,
-        part="scout",
-    )
-    entry = scout.tool_step("app:files", f"files list {SECRET} " + "x" * 500, "done")
-    assert (entry.kind, entry.part, entry.source, entry.status) == (
-        "tool",
-        "scout",
-        "app:files",
-        "done",
-    )
-    assert SECRET not in entry.text and "[secret]" in entry.text
-    assert len(entry.text) <= job_activity.TOOL_CAP
-    r.memory.close()
-
-
-def test_tool_steps_share_the_jobs_counter_with_expert_steps(rig):
-    rig.log.on_update(start("t1"))
-    scout = JobActivity(
-        "j",
-        rig.memory,
-        lambda t: t,
-        lambda: datetime(2026, 1, 1, tzinfo=UTC),
-        lambda: None,
-        part="scout",
-    )
-    scout.tool_step("scout:recall", "recall x", "done")
-    rig.log.on_update(progress("t1"))
-    rig.log.on_update(start("t2"))
-    assert [e.seq for e in rig.rows()] == [1, 2, 3]
-    assert [e.part for e in rig.rows()] == ["p1", "scout", "p1"]

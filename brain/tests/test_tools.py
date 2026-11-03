@@ -468,8 +468,8 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem):
 
 async def test_list_jobs_rows_have_parts(home, mem):
     mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.update_job("j1", session_id="s-secret")
-    mem.add_part("j1", "gemini", "more", "2026-01-01T00:00:00+00:00")
+    mem.update_part("j1", "p1", session_id="s-secret")
+    mem.add_part("j1", "gemini", "more", "f", "2026-01-01T00:00:00+00:00")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default", parent_job="j1")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
@@ -483,7 +483,7 @@ async def test_list_jobs_rows_have_parts(home, mem):
 
 async def test_list_jobs_says_whether_a_part_has_a_session_but_never_shows_it(home, mem):
     mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.update_job("j1", session_id="s-secret")
+    mem.update_part("j1", "p1", session_id="s-secret")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
@@ -494,9 +494,9 @@ async def test_list_jobs_says_whether_a_part_has_a_session_but_never_shows_it(ho
 
 async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home, mem):
     mem.add_job("j1", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j1", result="R" * 1500, progress="a" * 1500 + "end")
+    mem.update_part("j1", "p1", report="R" * 1500, progress="a" * 1500 + "end")
     mem.add_job("j2", "claude_code", "task", "C:/x", "default")
-    mem.update_job("j2", result="short", progress="p" * 1000)
+    mem.update_part("j2", "p1", report="short", progress="p" * 1000)
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
     one, two = rows["j1"]["parts"][0], rows["j2"]["parts"][0]
@@ -707,7 +707,6 @@ def test_home_tools_are_not_in_model_tools(home):
         "tell_expert",
         "watch_job",
         "close_job",
-        "set_job_result",
         "list_experts",
         "list_jobs",
         "stop_job",
@@ -1195,9 +1194,12 @@ async def test_hand_off_passes_title_and_job_through(home):
 
 
 async def test_hand_off_result_has_part_and_title(home):
-    home.jobs.started = JobId("j1", part="p2")
+    home.jobs.started = JobId("j1", part="p2", title="Stored title")
     out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "title": "T"}))
-    assert out["part"] == "p2" and out["title"] == "T"
+    assert out["part"] == "p2" and out["title"] == "Stored title"  # the saved, masked one
+    home.jobs.started = JobId("j1", part="p3")  # attaching: Jobs sets no title
+    out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "job": "j1"}))
+    assert out["title"] is None  # attaching to a job names nothing
 
 
 async def test_close_job_tool_closes_and_refuses_with_a_plain_line(home):
@@ -1220,44 +1222,13 @@ async def test_close_job_is_not_a_home_tool(home):
     assert "close_job" not in home_names
 
 
-async def test_list_jobs_rows_have_title_and_closed(home, mem):
+async def test_list_jobs_rows_have_title_and_closed_at(home, mem):
     mem.add_job("j1", "codex-acp", "first line\nmore", "C:/x", "default")
     mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
     mem.set_title("j2", "Scout's title")
     mem.close_job("j2", "2026-01-01T00:00:00+00:00")
     home.jobs.rows = mem.list_jobs(20)
     rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
-    assert (rows["j1"]["title"], rows["j1"]["closed"]) == ("first line", False)
-    assert (rows["j2"]["title"], rows["j2"]["closed"]) == ("Scout's title", True)
-
-
-# --- SP4: set_job_result -----------------------------------------------------------------
-
-
-async def test_set_job_result_saves_and_refusal_is_a_plain_line(home):
-    assert "j1" in await home.run("set_job_result", {"job": "j1", "text": "All done."})
-    assert home.jobs.calls[-1] == ("set_result", "j1", "All done.")
-    home.jobs.error = JobError("no job j9")
-    assert await home.run("set_job_result", {"job": "j9", "text": "x"}) == "no job j9"
-
-
-async def test_set_job_result_needs_a_job_and_text(home):
-    with pytest.raises(MemoryRefused):
-        await home.run("set_job_result", {"job": "j1"})
-
-
-def test_set_job_result_spec_is_scout_only_change_auto_and_guidance_only(home):
-    spec = expert_specs(home)["set_job_result"]
-    assert spec.audience == frozenset({"scout"})
-    assert (spec.effect, spec.default_mode) == ("change", "auto")
-    assert "your own words" in spec.description
-
-
-async def test_list_jobs_shows_scouts_result(home, mem):
-    mem.add_job("j1", "codex-acp", "task", "C:/x", "default")
-    mem.add_job("j2", "codex-acp", "task", "C:/x", "default")
-    mem.set_result("j1", "R" * 1500)
-    home.jobs.rows = mem.list_jobs(20)
-    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
-    assert rows["j1"]["scout_result"] == "R" * 1000 + "…"
-    assert rows["j2"]["scout_result"] is None
+    assert (rows["j1"]["title"], rows["j1"]["closed_at"]) == ("first line", None)
+    assert rows["j2"]["title"] == "Scout's title" and rows["j2"]["closed_at"]
+    assert "closed" not in rows["j1"]
