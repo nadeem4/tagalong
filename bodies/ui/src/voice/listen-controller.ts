@@ -4,7 +4,7 @@
  * ListenController and ListenMic. Used by the desktop renderer's talk wiring.
  */
 
-import { FOLLOW_UP_MS, addressedToScout, isStopListening, mightBeStop } from '../shapes';
+import { FOLLOW_UP_MS, addressedToScout, echoOf, isStopListening, mightBeStop } from '../shapes';
 import type { Ears, ListenMode, MicStream } from '../shapes';
 
 /** The open microphone, as the controller needs it: its frames, and a way to close it. */
@@ -13,8 +13,18 @@ export type ListenMic = MicStream & { close(): void };
 export interface ListenControllerOptions {
   ears(mode: ListenMode): Ears;
   openMic(): Promise<ListenMic>;
-  /** Speech started: Scout stops talking. */
+  /** Speech started in a held question: Scout stops talking. */
   onSpeechStart(): void;
+  /** Scout's voice is playing right now (not paused). Absent: it never is. */
+  speaking?(): boolean;
+  /** Any speech over Scout pauses it; the body keeps the audio where it was. */
+  pause?(): void;
+  /** The speech was noise or Scout's own echo: it carries on from where it paused. */
+  resume?(): void;
+  /** The words of what Scout is saying, to tell its echo from the person. */
+  playingText?(): string;
+  /** Words were spoken over Scout (not its echo): they go to the brain, which decides. */
+  onInterrupt?(text: string): void;
   /** The words heard so far, and the session's mode: held words are shown as said. */
   onPartial(text: string, mode: ListenMode): void;
   onHeard(text: string): void;
@@ -70,13 +80,17 @@ interface Session {
   released: boolean;
   /** Always: this turn was addressed to Scout and has already cut it off. */
   barged: boolean;
+  /** Always: speech started over Scout and paused it; the turn's end decides what next. */
+  paused: boolean;
 }
 
 /**
  * When the microphone is open, and what happens to what it hears. The mic opens on `hold`
  * (the talk key, the mic button) and closes on `release` or `cancel`; with Always listening
  * on (`setAlways`) it stays open, except during a call or full screen, or with the pets hidden
- * (`setPaused`), and while the system voice speaks (`setDeaf`). The talk key still asks
+ * (`setPaused`); it is never muted while Scout speaks. Any speech over Scout pauses it, and
+ * the turn's end decides: nothing or Scout's own echo resumes it, other words go to the brain
+ * (`onInterrupt`), which decides what happens next. The talk key still asks
  * without the name then: the always session ends for the held question and comes back after
  * it. Nothing heard after a session ends reaches the bubble.
  */
@@ -92,7 +106,6 @@ export class ListenController {
   #taken = false;
   #always = false;
   #paused = false;
-  #deaf = false;
   /** The wait before the next retry after the ears failed, and the cancel of one pending. */
   #retryMs: number;
   #cancelRetry: (() => void) | null = null;
@@ -221,18 +234,12 @@ export class ListenController {
     this.#options.onFollowUp?.(false);
   }
 
-  /** The system voice is not echo-cancelled: while it speaks, nothing heard counts. */
-  setDeaf(deaf: boolean): void {
-    this.#deaf = deaf;
-    this.#sync();
-  }
-
   /**
    * Opens or closes the always session to match. A held session is left alone (the key wins);
    * stopping always listening keeps released questions waiting for their words.
    */
   #sync(): void {
-    const wanted = this.#always && !this.#paused && !this.#deaf;
+    const wanted = this.#always && !this.#paused;
     const session = this.#session;
     if (wanted && session === null) this.#start('always');
     else if (!wanted && session?.mode === 'always') this.#end();
@@ -252,6 +259,8 @@ export class ListenController {
     if (session === null) return;
     this.#session = null;
     session.live = false;
+    // A session that paused Scout and ends before deciding must not leave it paused.
+    this.#carryOn(session);
     void session.mic.then((mic) => mic?.close());
     // A mic that never opened never listened: a stop now could end another session.
     if (session.opened) session.ears.stop();
@@ -278,6 +287,26 @@ export class ListenController {
     return question;
   }
 
+  #carryOn(session: Session): void {
+    if (!session.paused) return;
+    session.paused = false;
+    this.#options.resume?.();
+  }
+
+  /** The turn that paused Scout ended: noise and echo let it carry on, words go to the brain. */
+  #decide(session: Session, text: string): void {
+    session.paused = false;
+    const heard = text.trim();
+    if (heard === '' || echoOf(heard, this.#options.playingText?.() ?? '')) {
+      this.#options.resume?.();
+      return;
+    }
+    // Words over Scout need no name; they answer or cut in, and the window is spent.
+    this.closeFollowUp();
+    this.#resetRetry();
+    this.#options.onInterrupt?.(heard);
+  }
+
   #start(mode: ListenMode): void {
     const ears = this.#options.ears(mode);
     const session: Session = {
@@ -288,19 +317,37 @@ export class ListenController {
       live: true,
       released: false,
       barged: false,
+      paused: false,
     };
     ears.on('speechStart', () => {
-      // Always: talk in the room must not cut Scout off; only its name does.
-      if (session.live && mode === 'held') this.#options.onSpeechStart();
+      if (!session.live) return;
+      if (mode === 'held') {
+        this.#options.onSpeechStart();
+        return;
+      }
+      // Always: any speech over Scout pauses it. Talk with Scout quiet is not cut off by it.
+      if (!session.paused && !this.#taken && this.#released.size === 0) {
+        if (this.#options.speaking?.() === true) {
+          session.paused = true;
+          this.#options.pause?.();
+        }
+      }
     });
     ears.on('partial', (text) => {
       if (!session.live || text === undefined || text === '') return;
+      // A paused Scout waits for the turn's end: a partial neither resumes nor sends.
+      if (session.paused) return;
+      if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       this.#options.onPartial(text, mode);
     });
     ears.on('turnEnd', (text = '') => {
       if (!session.live) return;
       if (mode === 'always') {
+        if (session.paused) {
+          this.#decide(session, text);
+          return;
+        }
         const barged = session.barged;
         const question = this.#addressed(session, text);
         session.barged = false;
