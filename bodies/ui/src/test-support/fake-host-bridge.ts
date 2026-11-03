@@ -60,6 +60,8 @@ export interface FakeHostBridge extends HostBridge {
   running: RunningStep[];
   /** How many times runningSteps was called. */
   runningStepCalls: number;
+  /** Scout's full result by job id, as a job's activity page carries it. */
+  results: Record<string, string>;
   /** Part reports by `job/part`; a missing key is a part with no report. */
   reports: Record<string, string | null>;
   /** Every jobReport call as [job, part], in order. */
@@ -116,6 +118,7 @@ export function createFakeHostBridge(
     activity?: Record<string, JobActivityEntry[]>;
     watch?: Record<string, WatchItem[]>;
     reports?: Record<string, string | null>;
+    results?: Record<string, string>;
     runningSteps?: RunningStep[];
     /** Home's Approvals history and preferences. */
     approvalRows?: ApprovalRow[];
@@ -334,7 +337,7 @@ export function createFakeHostBridge(
         startedAt: '2026-10-27T10:00:00Z',
         endedAt: null,
         closedAt: null,
-        result: null,
+        result: fake.results[job] ?? null,
         parts: [],
         rev: all.reduce((top, e) => Math.max(top, e.rev), 0),
         entries,
@@ -354,6 +357,7 @@ export function createFakeHostBridge(
     activity: { ...options.activity },
     watch: { ...options.watch },
     reports: { ...options.reports },
+    results: { ...options.results },
     reportCalls,
     running: (options.runningSteps ?? []).map((step) => ({ ...step })),
     runningStepCalls: 0,

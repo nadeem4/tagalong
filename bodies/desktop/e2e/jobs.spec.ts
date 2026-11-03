@@ -237,6 +237,16 @@ test("the bubble shows a running job's latest step", async () => {
   await expect(line).toHaveCount(0, { timeout: 15_000 });
 });
 
+test('Show result reads the whole long result and draws its table', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  const row = home.getByRole('listitem').filter({ hasText: 'Ship the release notes' });
+  await row.getByRole('button', { name: 'Show result' }).click();
+  await expect(row.getByRole('cell', { name: 'a.md' })).toBeVisible({ timeout: 15_000 });
+  await expect(row.getByText(/The very end\.$/)).toBeVisible();
+  await expect(row).not.toContainText('…');
+});
+
 test('a two-expert job shows its parts in Reports and a labelled Activity', async () => {
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Jobs', exact: true }).click();

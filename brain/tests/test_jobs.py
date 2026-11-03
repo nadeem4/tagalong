@@ -1535,6 +1535,17 @@ async def test_activity_page_carries_the_scout_result(make_rig):
     assert rig.jobs.activity_page("old", 0)["result"] == "All shipped."
 
 
+async def test_home_path_returns_a_long_result_and_report_in_full(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
+    long = "x" * 5000
+    rig.jobs.set_result("old", long)
+    rig.memory.update_part("old", "p1", report=long)
+    page_result = rig.jobs.activity_page("old", 0)["result"]
+    assert page_result == long and "…" not in page_result
+    assert rig.jobs.part_report("old", "p1") == long
+
+
 async def test_part_report_returns_the_report_or_none_and_refuses_unknowns(make_rig):
     rig = make_rig(FakeAsks())
     rig.memory.add_job("old", "claude-acp", "t", str(rig.folder), "default")
@@ -2415,8 +2426,8 @@ async def test_set_result_replaces_the_earlier_one(make_rig):
 async def test_set_result_caps_stored_characters_only(make_rig):
     rig = make_rig(FakeAsks())
     rig.memory.add_job("j1", "claude_code", "t", str(rig.folder), "default")
-    rig.jobs.set_result("j1", "x" * 30000)
-    assert len(rig.memory.get_job("j1").scout_result) == 20000
+    rig.jobs.set_result("j1", "x" * 1_100_000)
+    assert len(rig.memory.get_job("j1").scout_result) == 1_000_000
 
 
 async def test_set_result_on_unknown_job_raises_job_error(make_rig):

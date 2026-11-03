@@ -364,7 +364,7 @@ _PART_COLUMNS = (
     " started_at, ended_at, folder"
 )
 _PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
-JOB_RESULT_CAP = 20_000  # characters of Scout's result; a storage safety, not a style rule
+JOB_RESULT_CAP = 1_000_000  # characters kept of a report or Scout result; a storage safety only
 JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
 

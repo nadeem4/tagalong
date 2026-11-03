@@ -38,6 +38,9 @@ export function JobsPanel() {
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [watching, setWatching] = useState<string | null>(null);
+  // The whole result by job id. The list rows are Scout's compact copy (cut at 1000 characters);
+  // Home reads the full text when a row opens, and shows the row's copy until it arrives.
+  const [full, setFull] = useState<Readonly<Record<string, string>>>({});
 
   const refresh = useCallback(() => {
     bridge
@@ -67,12 +70,26 @@ export function JobsPanel() {
       .then(refresh);
   };
 
-  const toggle = (id: string): void =>
+  const loadFull = (job: JobRow): void => {
+    const part = job.parts[job.parts.length - 1];
+    // A cursor past every step: the page then carries Scout's result and no entries.
+    bridge
+      .jobActivity(job.id, Number.MAX_SAFE_INTEGER)
+      .then((page) => page.result ?? (part ? bridge.jobReport(job.id, part.id) : null))
+      .then((text) => {
+        if (text !== null) setFull((current) => ({ ...current, [job.id]: text }));
+      })
+      .catch((error: unknown) => console.error('could not read the full result', error));
+  };
+
+  const toggle = (job: JobRow): void => {
+    if (!open.has(job.id)) loadFull(job);
     setOpen((current) => {
       const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
+      if (!next.delete(job.id)) next.add(job.id);
       return next;
     });
+  };
 
   // Coming back from a job page, focus returns to that job's Watch button.
   const listRef = useRef<HTMLUListElement>(null);
@@ -167,7 +184,7 @@ export function JobsPanel() {
                       <Button
                         variant="secondary"
                         aria-expanded={open.has(job.id)}
-                        onClick={() => toggle(job.id)}
+                        onClick={() => toggle(job)}
                       >
                         {open.has(job.id) ? 'Hide result' : 'Show result'}
                       </Button>
@@ -175,7 +192,7 @@ export function JobsPanel() {
                   </div>
                   {open.has(job.id) && result !== null && (
                     <div className="job-row__result">
-                      <SafeMarkdown text={result} />
+                      <SafeMarkdown text={full[job.id] ?? result} />
                     </div>
                   )}
                 </li>

@@ -514,6 +514,14 @@ async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home,
     assert two["result"] == "short" and two["progress"] == "p" * 1000
 
 
+async def test_list_jobs_still_trims_scout_result_for_scout(home, mem):
+    mem.add_job("j1", "claude_code", "task", "C:/x", "default")
+    mem.set_result("j1", "S" * 5000)
+    home.jobs.rows = mem.list_jobs(20)
+    (row,) = json.loads(await home.run("list_jobs"))["jobs"]
+    assert row["scout_result"] == "S" * 1000 + "…"
+
+
 async def test_list_jobs_rows_carry_a_one_line_summary(home, mem):
     mem.add_job("j1", "claude_code", "task", "C:/x", "default")
     mem.add_job("j2", "claude_code", "task", "C:/x", "default")

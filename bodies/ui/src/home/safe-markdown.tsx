@@ -1,116 +1,79 @@
 /**
- * Safe Markdown for reports and Scout's result: a small line-based parser that builds React
- * elements only, so HTML in a report is shown as text. Links keep to http(s), images are never
- * drawn (their alt text is kept), tables stay preformatted. Contains SafeMarkdown.
+ * Safe Markdown for reports and Scout's result: react-markdown with GFM (so tables are tables),
+ * which builds React elements only. Raw HTML is shown as text, links keep to http(s), images are
+ * never drawn (their alt text is kept) and headings start at h3 under the page's own headings.
+ * A text over PLAIN_OVER stays plain so a huge result never freezes Home. Contains SafeMarkdown.
  */
-import { Fragment, type ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
+import Markdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-// A link label may not hold `[`, so a line of unclosed brackets scans in linear time.
-const INLINE =
-  /(`[^`\n]+`)|(!?\[[^[\]\n]*\]\((?:[^()\s]|\([^()\s]*\))*\))|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)/g;
-const LINK = /^(!?)\[([^\]]*)\]\(((?:[^()\s]|\([^()\s]*\))*)\)$/;
+type Props = { children?: ReactNode };
 
-function inline(text: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  let last = 0;
-  let key = 0;
-  for (const m of text.matchAll(INLINE)) {
-    const at = m.index;
-    if (at > last) out.push(text.slice(last, at));
-    const raw = m[0];
-    if (m[1]) out.push(<code key={key++}>{raw.slice(1, -1)}</code>);
-    else if (m[2]) {
-      const [, image, label, href] = LINK.exec(raw) ?? [];
-      if (image === '' && /^https?:\/\//i.test(href ?? '')) {
-        out.push(
-          <a key={key++} href={href} target="_blank" rel="noreferrer noopener">
-            {label}
-          </a>,
-        );
-      } else out.push(label);
-    } else if (m[3]) out.push(<strong key={key++}>{raw.slice(2, -2)}</strong>);
-    else out.push(<em key={key++}>{raw.slice(1, -1)}</em>);
-    last = at + raw.length;
+// Parsing grows to seconds near the 1,000,000-character result cap; plain text stays instant.
+const PLAIN_OVER = 100_000;
+
+type MdNode = { type: string; children?: MdNode[] };
+
+// Raw HTML becomes its own text, never markup and never dropped: a report saying Vec<String>
+// or quoting a <script> tag keeps every character.
+const htmlAsText = () => (tree: MdNode) => {
+  const walk = (node: MdNode): void => {
+    if (node.type === 'html') node.type = 'text';
+    node.children?.forEach(walk);
+  };
+  walk(tree);
+};
+
+// Report headings sit under the page's h1 and tab heading, so # becomes h3 (h6 stays h6).
+const heading = (tag: 'h3' | 'h4' | 'h5' | 'h6') => {
+  const Tag = tag;
+  return ({ children }: Props) => <Tag>{children}</Tag>;
+};
+
+const COMPONENTS: Components = {
+  h1: heading('h3'),
+  h2: heading('h4'),
+  h3: heading('h5'),
+  h4: heading('h6'),
+  h5: heading('h6'),
+  h6: heading('h6'),
+  a: ({ href, children }: Props & { href?: string | undefined }) =>
+    /^https?:\/\//i.test(href ?? '') ? (
+      <a href={href} target="_blank" rel="noreferrer noopener">
+        {children}
+      </a>
+    ) : (
+      <>{children}</>
+    ),
+  img: ({ alt }: { alt?: string | undefined }) => <>{alt ?? ''}</>,
+  // A wide table scrolls inside its own box instead of stretching the page.
+  table: ({ children }: Props) => (
+    <div className="safe-md__table">
+      <table>{children}</table>
+    </div>
+  ),
+};
+
+// Memoised: the jobs list re-renders on every refresh, and an open result need not parse again.
+export const SafeMarkdown = memo(function SafeMarkdown({ text }: { text: string }) {
+  if (text.length > PLAIN_OVER) {
+    return (
+      <div className="safe-md">
+        <pre className="safe-md__plain">{text}</pre>
+      </div>
+    );
   }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
-
-const BULLET = /^\s*[-*+]\s+(.*)$/;
-const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
-const HEADING = /^(#{1,6})\s+(.*)$/;
-const isTable = (line: string): boolean => /^\s*\|.*\|\s*$/.test(line);
-
-function blocks(text: string): ReactNode[] {
-  const lines = text.replace(/\r\n?/g, '\n').split('\n');
-  const out: ReactNode[] = [];
-  let i = 0;
-  let key = 0;
-  const startsBlock = (line: string): boolean =>
-    line.trim() === '' ||
-    line.startsWith('```') ||
-    HEADING.test(line) ||
-    BULLET.test(line) ||
-    NUMBERED.test(line) ||
-    line.startsWith('>') ||
-    isTable(line);
-  while (i < lines.length) {
-    const line = lines[i] ?? '';
-    if (line.trim() === '') {
-      i++;
-    } else if (line.startsWith('```')) {
-      const code: string[] = [];
-      i++;
-      while (i < lines.length && !(lines[i] ?? '').startsWith('```')) code.push(lines[i++] ?? '');
-      i++; // the closing fence, if there was one
-      out.push(
-        <pre key={key++}>
-          <code>{code.join('\n')}</code>
-        </pre>,
-      );
-    } else if (HEADING.test(line)) {
-      const [, hashes, body] = HEADING.exec(line) ?? [];
-      // Report headings sit under the page's own h1 and tab heading, so they start at h3.
-      const Tag = `h${Math.min(6, (hashes?.length ?? 1) + 2)}` as 'h3';
-      out.push(<Tag key={key++}>{inline(body ?? '')}</Tag>);
-      i++;
-    } else if (BULLET.test(line) || NUMBERED.test(line)) {
-      const ordered = NUMBERED.test(line) && !BULLET.test(line);
-      const re = ordered ? NUMBERED : BULLET;
-      const items: ReactNode[] = [];
-      while (i < lines.length && re.test(lines[i] ?? '')) {
-        items.push(<li key={items.length}>{inline(re.exec(lines[i] ?? '')?.[1] ?? '')}</li>);
-        i++;
-      }
-      out.push(ordered ? <ol key={key++}>{items}</ol> : <ul key={key++}>{items}</ul>);
-    } else if (line.startsWith('>')) {
-      const quote: string[] = [];
-      while (i < lines.length && (lines[i] ?? '').startsWith('>')) {
-        quote.push((lines[i++] ?? '').replace(/^>\s?/, ''));
-      }
-      out.push(<blockquote key={key++}>{inline(quote.join(' '))}</blockquote>);
-    } else if (isTable(line)) {
-      const rows: string[] = [];
-      while (i < lines.length && isTable(lines[i] ?? '')) rows.push(lines[i++] ?? '');
-      out.push(<pre key={key++}>{rows.join('\n')}</pre>);
-    } else {
-      const para: string[] = [];
-      while (i < lines.length && !startsBlock(lines[i] ?? '')) para.push(lines[i++] ?? '');
-      out.push(
-        <p key={key++}>
-          {para.map((p, n) => (
-            <Fragment key={n}>
-              {n > 0 && ' '}
-              {inline(p)}
-            </Fragment>
-          ))}
-        </p>,
-      );
-    }
-  }
-  return out;
-}
-
-export function SafeMarkdown({ text }: { text: string }) {
-  return <div className="safe-md">{blocks(text)}</div>;
-}
+  return (
+    <div className="safe-md">
+      <Markdown
+        remarkPlugins={[remarkGfm, htmlAsText]}
+        components={COMPONENTS}
+        // Unsafe schemes never become a url; the link component then drops them to text.
+        urlTransform={(url) => (/^https?:\/\//i.test(url) ? url : '')}
+      >
+        {text}
+      </Markdown>
+    </div>
+  );
+});

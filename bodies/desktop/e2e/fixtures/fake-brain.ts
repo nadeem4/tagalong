@@ -123,6 +123,16 @@ const JOB_STEPS = [
   { rev: 3, seq: 3, kind: 'end', text: '# done', status: null, step: null, exit: null },
 ].map((e) => ({ ...e, at: '2026-10-27T10:00:05Z', part: 'p1', source: null }));
 
+// Scout's long result for the two-expert job: a table and more than the 1000 characters the
+// brain's list_jobs keeps for Scout (job_activity carries the whole text for Home).
+const LONG_RESULT = `The notes are drafted and **reviewed**.
+
+| File | Change |
+|---|---|
+| a.md | new |
+
+${'More detail. '.repeat(120)}The very end.`;
+
 // A finished job with two experts (parts) and a title and result Scout wrote.
 const TWO_PART_JOB = {
   id: 'job2',
@@ -131,7 +141,7 @@ const TWO_PART_JOB = {
   mode: 'ask',
   state: 'done',
   title: 'Release notes for 1.2',
-  scout_result: 'The notes are drafted and **reviewed**.',
+  scout_result: LONG_RESULT,
   started_at: '2026-10-27T09:00:00Z',
   ended_at: '2026-10-27T09:04:00Z',
   closed_at: '2026-10-27T09:05:00Z',
@@ -501,8 +511,16 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           };
         };
         let value: unknown = {};
-        if (params.tool === 'list_jobs') value = { jobs };
-        else if (params.tool === 'job_report') {
+        if (params.tool === 'list_jobs') {
+          // Like the brain: Scout's copy of a long result is cut with an ellipsis.
+          value = {
+            jobs: jobs.map((j) =>
+              typeof j.scout_result === 'string' && j.scout_result.length > 1000
+                ? { ...j, scout_result: `${j.scout_result.slice(0, 1000)}…` }
+                : j,
+            ),
+          };
+        } else if (params.tool === 'job_report') {
           value = { text: TWO_PART_REPORTS[`${params.input?.job}/${params.input?.part}`] ?? null };
         } else if (params.tool === 'job_activity') {
           // No job: the bubble's running steps (set by a test). A job: its steps after the cursor.
