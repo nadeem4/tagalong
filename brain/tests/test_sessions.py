@@ -312,6 +312,35 @@ async def test_system_prompt_carries_the_capability_picture_of_live_state():
     assert "remember" in prompt.split("What you can do:")[1]
 
 
+async def test_a_tool_set_off_is_absent_from_the_capability_picture():
+    model = Gate(["hi"])
+    bodies = Bodies()
+    session = Session(
+        model,
+        Open(),
+        bodies,
+        10,
+        Memory(":memory:"),
+        apps=PictureApps(),
+        tokens=SimpleNamespace(),
+    )
+    bodies.notify = lambda m, p: None
+    tools = [
+        Tool(name="open_url", description="d", input_schema={"type": "object"}),
+        Tool(name="tab_read", description="d", input_schema={"type": "object"}),
+    ]
+    bodies.connect(Body(id="desk", kind="desktop", name="PC"), tools, QuietPeer(), None)
+    for name in ("desk__open_url", "gmail__send_mail", "set_timer"):
+        session.toolbox.set_mode(name, "off")
+    session.say("desk", say("hello"))
+    await finish(session)
+    picture = model.systems[0].split("What you can do:")[1]
+    assert "tab_read" in picture
+    assert "open_url" not in picture
+    assert "Gmail" not in picture
+    assert "set_timer" not in picture and "remember" in picture
+
+
 async def test_what_you_know_in_system_prompt():
     memory = Memory(":memory:")
     memory.remember("instruction", "answer in French")

@@ -572,20 +572,36 @@ class Session:
         return turn_id
 
     def _capabilities(self) -> str:
-        """The picture of what Scout can do now, from live state, read once per system prompt."""
-        builtin = [s.name for s in self.toolbox.sources[0].specs() if "scout" in s.audience]
-        bodies = [
-            BodyCaps(b.id, b.kind, [t.name for t in self._bodies.tools(b.id)])
-            for b in self._bodies.online()
-        ]
-        apps = []
-        if self._apps_live is not None:
-            for app_id in self._apps_live.ids():
-                if self._apps_live.status(app_id).state != "connected":
+        """The picture of what Scout can do now, from live state, read once per system prompt.
+
+        Built from the toolbox's active specs grouped by source type, so a tool set Off drops out
+        of the picture exactly as it drops out of the model's tool list."""
+        active = {s.name for s in self.toolbox.active_specs()}
+        builtin: list[str] = []
+        by_body: dict[str, list[str]] = {}
+        by_app: dict[str, list[ToolSpec]] = {}
+        for source in self.toolbox.sources:
+            for spec in source.specs():
+                if spec.name not in active or "scout" not in spec.audience:
                     continue
-                tools = self._apps_live.tools(app_id)
-                purpose = next((t.description for t in tools if t.description), "")
-                apps.append(AppCaps(app_id, self._apps_live.name(app_id), purpose))
+                prefix, _, plain = spec.name.partition(SEP)
+                if isinstance(source, BodySource):
+                    by_body.setdefault(prefix, []).append(plain)
+                elif isinstance(source, AppSource):
+                    by_app.setdefault(prefix, []).append(spec)
+                else:
+                    builtin.append(spec.name)
+        bodies = [
+            BodyCaps(b.id, b.kind, by_body[b.id]) for b in self._bodies.online() if b.id in by_body
+        ]
+        apps = [
+            AppCaps(
+                app_id,
+                self._apps_live.name(app_id) if self._apps_live is not None else app_id,
+                next((sp.description for sp in specs if sp.description), ""),
+            )
+            for app_id, specs in by_app.items()
+        ]
         experts = [ExpertCaps(e.id, e.logged_in) for e in self._experts_live()]
         return capability_picture(builtin, bodies, apps, experts)
 

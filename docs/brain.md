@@ -301,7 +301,9 @@ and one-line purposes only: no schemas and no focus facts, sorted, with at most 
 prompt stays small and identical while the state is unchanged. Placed before the bodies and the
 clock, which change more often. The brain sets no `cache_control` yet, so this only keeps a future
 cache prefix long.
-`Session._capabilities()` reads live state on each prompt build.
+`Session._capabilities()` reads `Toolbox.active_specs()` on each prompt build and groups the
+specs by source type (brain, body, app), so a tool set Off drops out of the picture as it does from
+the model's tool list.
 
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
 tools, a body's tools and connected apps; hand over to an expert only when one is installed and
