@@ -1,7 +1,7 @@
 /**
  * Scout's voice in a renderer window: SpeechPlayer plays the sentences the brain speaks (its
- * Kokoro audio, or the system voice for text only), and onSystemVoice tells the ears when the
- * un-cancellable system voice speaks.
+ * Kokoro audio, or the system voice for text only), pauses and resumes it when the person
+ * speaks over Scout, and knows how much of a turn was heard.
  */
 import type { SpeechChunk } from '../../shared/ipc';
 
@@ -92,21 +92,17 @@ export async function playWav(base64: string, signal: AbortSignal): Promise<void
   await playBuffer(buffer, signal);
 }
 
-/** Whether the system voice is speaking: the one voice echo cancellation cannot remove. */
-let systemSpeaking = false;
-const systemListeners = new Set<(speaking: boolean) => void>();
-
-/** Hears each start and end of the system voice; the function returned stops listening. */
-export function onSystemVoice(listener: (speaking: boolean) => void): () => void {
-  systemListeners.add(listener);
-  return () => void systemListeners.delete(listener);
-}
-
-function setSystemSpeaking(speaking: boolean): void {
-  if (systemSpeaking === speaking) return;
-  systemSpeaking = speaking;
-  for (const listener of [...systemListeners]) listener(speaking);
-}
+/** Holds or releases whatever sound is playing: WebAudio's clock, and the system voice. */
+const speakers = {
+  pause(): void {
+    void context?.suspend();
+    if (typeof speechSynthesis !== 'undefined') speechSynthesis.pause();
+  },
+  resume(): void {
+    void context?.resume();
+    if (typeof speechSynthesis !== 'undefined') speechSynthesis.resume();
+  },
+};
 
 /** The system voice: when the brain sends text only, or Settings picks it. */
 export function speakWithSystem(text: string, signal: AbortSignal, rate: number): Promise<void> {
@@ -126,12 +122,8 @@ export function speakWithSystem(text: string, signal: AbortSignal, rate: number)
       { once: true },
     );
     setLevel(0.5);
-    setSystemSpeaking(true);
     speechSynthesis.speak(utterance);
-  }).finally(() => {
-    setLevel(0);
-    setSystemSpeaking(false);
-  });
+  }).finally(() => setLevel(0));
 }
 
 // The system's voice list fills in asynchronously; asking once early has it ready.
@@ -145,6 +137,8 @@ interface Engines {
 interface PlayerOptions {
   /** Defaults to WebAudio and the system voice; tests pass fakes. */
   engines?: Engines;
+  /** Holds and releases the sound that is playing; tests pass a fake. */
+  output?: { pause(): void; resume(): void };
   /** Who speaks, as Settings has it: the brain's Kokoro audio, or the system voice. */
   mouth: () => 'kokoro' | 'system';
   /** The system voice's speed. */
@@ -170,12 +164,21 @@ export class SpeechPlayer {
   /** The turn stop() silenced: its late sentences are dropped. */
   private silenced: string | null = null;
   private last = { speaking: false, answering: false };
+  private paused = false;
+  /** The turn last spoken: its sentences' words, and how many played to the end. */
+  private record: { turn: string | null; texts: string[]; played: number } = {
+    turn: null,
+    texts: [],
+    played: 0,
+  };
 
   constructor(private readonly options: PlayerOptions) {}
 
   enqueue(chunk: SpeechChunk): void {
     if (chunk.turn === this.silenced) return;
     this.silenced = null;
+    if (this.record.turn !== chunk.turn) this.record = { turn: chunk.turn, texts: [], played: 0 };
+    if (chunk.text !== undefined) this.record.texts.push(chunk.text);
     this.answeringTurn = chunk.turn;
     this.queue.push(chunk);
     void this.pump();
@@ -188,12 +191,56 @@ export class SpeechPlayer {
     this.emit();
   }
 
+  /** Scout's voice is sounding right now: a sentence is playing and not held. */
+  get speaking(): boolean {
+    return this.playing && !this.paused;
+  }
+
+  /** The person spoke over Scout: the sound holds where it is, and nothing is lost. */
+  pause(): void {
+    if (this.paused || !this.playing) return;
+    this.paused = true;
+    (this.options.output ?? speakers).pause();
+  }
+
+  /** It was noise or Scout's own echo: carry on from the same spot. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    (this.options.output ?? speakers).resume();
+  }
+
+  /**
+   * What the person heard of the turn being spoken, for the brain: the number of sentences
+   * played to the end. Null when nothing of a turn is playing or waiting.
+   */
+  interruption(): { turn: string; heard: number } | null {
+    const { turn, played } = this.record;
+    const live = this.playing || this.queue.length > 0 || this.answeringTurn !== null;
+    return turn !== null && live ? { turn, heard: played } : null;
+  }
+
+  /**
+   * The sentence playing and the one before it, to tell Scout's own echo from the person.
+   * Queued sentences are not in the room yet, so the mic cannot have heard them.
+   */
+  text(): string {
+    const { texts, played } = this.record;
+    return texts.slice(Math.max(0, played - 1), played + 1).join(' ');
+  }
+
   /** Silences Scout now: this sentence, the rest, and the brain's. */
   stop(): void {
+    if (this.paused) {
+      // The sound is held: let it go, or the next sentence would start frozen.
+      this.paused = false;
+      (this.options.output ?? speakers).resume();
+    }
     this.silenced = this.answeringTurn ?? this.queue[0]?.turn ?? this.silenced;
     this.queue = [];
     this.answeringTurn = null;
     this.playing = false;
+    this.record = { turn: null, texts: [], played: 0 };
     this.abort.abort();
     this.abort = new AbortController();
     this.options.hush();
@@ -208,7 +255,9 @@ export class SpeechPlayer {
         this.playing = true;
         this.emit();
         try {
-          await this.play(chunk, this.abort.signal);
+          const signal = this.abort.signal;
+          await this.play(chunk, signal);
+          if (!signal.aborted) this.record.played += 1;
         } catch {
           // A sentence that cannot play is skipped; the next one still speaks.
         }

@@ -386,9 +386,9 @@ Nothing is said aloud about it.
   turns to an outline until that window is no longer in front. It is the front window that
   counts: a Teams window in front pauses listening even with no
   call, and a call behind another window does not.
-- **Deaf while the system voice speaks.** The system voice is not echo-cancelled, so Scout
-  ignores what it hears while that voice is speaking. Kokoro is echo-cancelled,
-  so you can interrupt it by saying "Scout".
+- **Talking over Scout.** The microphone is never muted while Scout speaks. Any speech over
+  Scout pauses it, with no name needed. If what was heard is nothing, or is Scout's own voice
+  coming back, Scout carries on; otherwise your words go to Scout, who decides what happens next.
 - **Hold-to-talk and the mic button need no name**, in every case, also while Always listening
   is on: that question is asked as said, then listening carries on.
 - **Closing the bubble does not stop listening.** It drops a question being asked; switch Always

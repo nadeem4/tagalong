@@ -568,7 +568,7 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
 
 def two_part_logs(memory):
     memory.add_job("j", "claude-code", "t", "/w", "work")
-    memory.add_part("j", "gemini", "t2", NOW.isoformat())
+    memory.add_part("j", "gemini", "t2", "f", NOW.isoformat())
 
     def log(part):
         return JobActivity("j", memory, lambda t: t, lambda: NOW, lambda: None, part=part)

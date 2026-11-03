@@ -48,13 +48,26 @@ function parseRows(value: unknown): JobRow[] {
   return list.map((raw) => toRow(raw as Record<string, unknown>));
 }
 
-// Page keys are single words, so the brain's page passes through once its shape is checked.
+// The page's job times and part rows are snake_case on the wire, camelCase for the UI; the
+// rest of its keys are single words and pass through once its shape is checked.
 function parsePage(value: unknown): JobActivityPage {
-  const page = value as { entries?: unknown; rev?: unknown } | null;
+  const page = value as Record<string, unknown> | null;
   if (!Array.isArray(page?.entries) || typeof page?.rev !== 'number') {
     throw new Error('brain sent bad activity');
   }
-  return value as JobActivityPage;
+  const { started_at, ended_at, closed_at, parts, ...rest } = page;
+  const list = Array.isArray(parts) ? (parts as Record<string, unknown>[]) : [];
+  return {
+    ...rest,
+    startedAt: started_at,
+    endedAt: ended_at ?? null,
+    closedAt: closed_at ?? null,
+    parts: list.map(({ started_at: s, ended_at: e, ...part }) => ({
+      ...part,
+      startedAt: s,
+      endedAt: e ?? null,
+    })),
+  } as JobActivityPage;
 }
 
 function parseRunning(value: unknown): RunningStep[] {

@@ -162,6 +162,26 @@ SPOKEN_NOTE = (
 )
 
 
+# Saved in place of a reply the owner spoke over, after the part they heard.
+INTERRUPTED_MARK = "[interrupted: the owner spoke over this]"
+
+
+def interruption_block(spoken: str, unsaid: str) -> dict[str, Any]:
+    """What Scout had said and what was left, for the one turn that follows the owner talking
+    over it. Data for the model to weigh (soul.md says how); code never decides what happens."""
+    body = f"spoken: {spoken}\nunsaid: {unsaid}"
+    body = re.sub(r"</(?=data)", "&lt;/", body, flags=re.IGNORECASE)
+    return _text(f'<data kind="interruption">\n{body}\n</data>')
+
+
+def is_interruption_block(block: Any) -> bool:
+    return (
+        isinstance(block, dict)
+        and block.get("type") == "text"
+        and str(block.get("text", "")).startswith('<data kind="interruption">')
+    )
+
+
 def user_content(params: SayParams) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     if params.text:
