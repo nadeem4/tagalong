@@ -113,7 +113,7 @@ def test_other_events_and_odd_facts_are_ignored(parts):
     store, clock, events, _ = parts
     deck(store)
     service = svc(store, clock, events)
-    service.saw(Event("back", {"body": "desktop"}))
+    service.saw(Event("download", {"body": "desktop"}))  # `back` now brings the daily digest
     service.saw(Event("focus", {}))
     service.saw(Event("tab", {"title": 5}))
     assert events == []

@@ -84,6 +84,11 @@ its result.
 - Scout can search the web and read pages itself (Anthropic's own web tools, shown in Home's
   permissions and switchable Off). Each search costs a cent against the daily limit; when the limit
   stops a task Scout says so plainly. It never sends you to an expert for that.
+- Loops: with the mail switch on, Scout turns mail into open loops (a reply you owe, one you wait
+  on), holds them quietly and brings one up only when you open the thing it is about, when it falls
+  due, or when it is truly urgent, offering Show, Done and Later. Done and Later only change
+  Scout's own list; Scout can leave a draft reply for you to send and never sends mail or changes
+  your mailbox. There is no inbox screen.
 - The first-run tour and Home speak of jobs, not products: the tour's step six lists everyday jobs with a one-click Connect for the app each needs, and "Claude Code" shows only behind the optional line "For long jobs, Scout can also use an expert". Home lists experts by the kind of job, the product underneath.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
   hands it a task for a folder on this computer; Home's Jobs page shows each one. When the task

@@ -678,6 +678,29 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
    `TAGALONG_LOOP_STALE_DAYS` becomes stale and arrives in one wake listing the stale loops.
 5. Focus and tab events still never wake Scout by themselves.
 
+## Show, Done, Later and a drafted reply (automated; the journey by hand with real Gmail)
+
+Automated: `cd brain && uv run pytest tests/test_loops_tools.py tests/test_prompt.py -q` on fakes,
+including the Priya journey. By hand, with a real brain, Gmail connected and the mail switch On:
+
+1. **Action:** have someone mail you "slide 7 of the Q4 pricing deck uses last year's numbers; I need
+   the final by Thursday noon", wait a poll, then open `Q4 pricing.pptx`.
+   **Expected:** Scout offers Show, Done and Later with one recommended; before that, nothing.
+2. **Action:** choose Show.
+   **Expected:** Scout gives the gist of the thread, not the whole mail.
+3. **Action:** choose Later and say "in 2 minutes".
+   **Expected:** the loop leaves the open list and Scout brings it back about 2 minutes later.
+4. **Action:** choose Done.
+   **Expected:** Scout offers a drafted reply; say yes. A draft appears in Gmail's Drafts and nothing
+   is sent. The mail itself has no new label, is not archived and keeps its read state.
+5. **Action:** ask "what's waiting on me?"
+   **Expected:** Scout answers from the open loops.
+6. **Action:** say "you should have told me about the invoice mail".
+   **Expected:** Scout saves a preference, visible under Home, What Scout remembers.
+7. **Action:** after a day with new held loops, step away for a while and return.
+   **Expected:** at most one short line from Scout about what it held, once that day; none on a day
+   when nothing was held.
+
 ## Scout's timers (real brain)
 
 Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so

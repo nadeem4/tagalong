@@ -33,7 +33,7 @@ def say(**kw) -> SayParams:
 def test_soul_ships_as_package_data_and_has_no_scripted_lines():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert soul.startswith("You are Scout")
-    assert len(soul.splitlines()) < 55
+    assert len(soul.splitlines()) < 65
     assert "silence" in soul.lower() or "nothing useful" in soul.lower()
 
 
@@ -95,6 +95,29 @@ def test_events_tell_scout_a_connected_app_resumes_the_earlier_request():
     assert "tools lists what it can do now" in notes["setup_done"]
     assert "still in this conversation" in notes["setup_done"]
     assert "still in this conversation" in notes["choice"]
+
+
+def test_soul_has_a_loops_section_that_names_the_loop_tools_and_no_scripted_lines():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    section = soul.split("\nLoops\n", 1)[1]
+    for name in ("loops_open", "loop_show", "loop_done", "loop_later", "loop_draft"):
+        assert f"`{name}`" in section
+    assert "`loop_keep`" in section and "`loop_drop`" in section
+    assert "`choose`" in section and "you never send" in section
+    assert section.count('"') == 2  # only the brief's "Loop <id>:" prefix is quoted text
+
+
+def test_soul_teaches_that_a_you_should_have_told_me_is_remembered():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    section = soul.split("\nLoops\n", 1)[1]
+    assert "should have told them" in section and "`remember`" in section
+
+
+def test_loop_event_notes_cover_later_digest_and_a_job_for_a_loop():
+    notes = load_notes()
+    assert "- later:" in notes["loop"] and "- digest:" in notes["loop"]
+    assert 'starts with "Loop <id>:"' in notes["job_ended"]
+    assert "loop_draft" in notes["job_ended"]
 
 
 def item(id, kind, text, cadence=None):
@@ -433,7 +456,7 @@ def test_soul_has_the_setup_guidance():
     for tool in ("find_apps", "find_experts", "inspect_machine", "install_app", "install_expert"):
         assert f"`{tool}`" in soul
     assert "`choose`" in soul and "Allow card" in soul
-    assert len(soul.splitlines()) < 55
+    assert len(soul.splitlines()) < 65
 
 
 def test_soul_has_the_hand_off_guidance_and_no_template():

@@ -417,7 +417,7 @@ class Session:
             return
         event = from_body(body_id, name, data)
         if event is not None:
-            if self.loops is not None and event.kind in ("focus", "tab"):
+            if self.loops is not None and event.kind in ("focus", "tab", "back"):
                 try:
                     self.loops.saw(event)
                 except Exception:  # a store error must not stop the wake path
@@ -428,6 +428,11 @@ class Session:
         kind = next((b.kind for b in self._bodies.online() if b.id == body_id), None)
         event = from_connect(body_id, away, kind)
         if event is not None:
+            if self.loops is not None:  # the day's first return also brings the held-today line
+                try:
+                    self.loops.saw(event)
+                except Exception:
+                    log.exception("loops.saw failed")
             self.scheduler.emit(event)
         self.scheduler.pump()  # also starts a wake that was waiting for a body
 

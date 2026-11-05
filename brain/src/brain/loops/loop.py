@@ -31,3 +31,5 @@ class Loop:
     history: list[dict] = field(default_factory=list)
     created: datetime | None = None
     updated: datetime | None = None
+    # Set while status is snoozed: when it comes back (Later). `due` stays the real deadline.
+    snoozed_until: datetime | None = None

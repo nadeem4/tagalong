@@ -284,7 +284,9 @@ then). The loops service reads through `Apps.call` directly, so the toolbox gate
 the switch is the consent. The Gmail adapter (`loops/sources/gmail.py`) may call only
 `search_threads` and `get_thread` to read and `create_draft` to draft; it refuses any other tool, so
 `send_message` and everything that changes the mailbox (labels, archive, read state, delete) is out
-of reach. An app qualifies when its tool list has all three names. Mail text goes to the model that
+of reach. `get_thread` also serves Show (one thread, read again on demand) and `create_draft` serves
+Scout's `loop_draft`, which leaves a draft for the person to send; nothing else is called. An app
+qualifies when its tool list has all three names. Mail text goes to the model that
 reads it (Haiku) and a loop keeps only a title, what is asked, people and anchors, masked for
 secrets.
 
@@ -297,6 +299,8 @@ secrets.
 - `brain/tests/test_loops_gmail.py`: the Gmail adapter against the fake server (items after a time,
   unanswered only, sent mail, missing fields, only the allowed tools) and a fake mailbox of 3
   unanswered, 1 answered and 1 bulk mail becoming 3 loops.
+- `brain/tests/test_loops_tools.py`: Scout's loop tools, including that Done reaches no mail tool and
+  a draft reaches only `create_draft`.
 - `brain/tests/test_apps.py` also pins the secret split, the merge at connect and
   clearing every key on remove.
 - `brain/tests/test_app_oauth.py`: token storage, the loopback listener, and sign-in against a
