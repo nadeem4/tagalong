@@ -128,6 +128,21 @@ export const HOME_CSS = `
 .perm-row__note { font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text,
 .perm-row--off .perm-row__name, .perm-row--off .perm-row__text { opacity: 0.6; }
+.loops-app { display: flex; flex-direction: column; gap: ${t.space.xs}px; padding-top: ${t.space.md}px; border-top: 1px solid ${t.color.panelLine}; }
+.loops-app__row { display: flex; align-items: center; justify-content: space-between; gap: ${t.space.xl}px; }
+.loops-app__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
+.home-card p.loops-app__note { font-size: ${t.fontSize.small}px; }
+.home-card p.loops-app__note--warn { color: ${t.color.panelText}; }
+.loops-held { margin-top: ${t.space.md}px; }
+.loops-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.loops-row { display: flex; align-items: center; gap: ${t.space.xl}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine}; }
+.loops-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.loops-row__title { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.loops-row__asks { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
+.loops-row__meta { display: flex; flex-wrap: wrap; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.loops-row__meta > span + span::before { content: "·"; margin: 0 ${t.space.sm}px; }
+.loops-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.md}px; }
+.loops-confirm p { flex: 1 1 100%; color: ${t.color.panelText}; }
 .job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .job-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: ${t.space.xl}px;

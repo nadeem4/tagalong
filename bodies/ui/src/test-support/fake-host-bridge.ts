@@ -6,6 +6,7 @@
 import type {
   AppAddParams,
   AppInfo,
+  LoopsState,
   Pet,
   MemoryEntry,
   SetupOverview,
@@ -49,6 +50,10 @@ export interface FakeHostBridge extends HostBridge {
   readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'off' | 'ask' | 'auto' }[];
+  /** Home's loops state; the loops calls edit it, a test may swap it. */
+  loops: LoopsState;
+  /** Every loops call made, in order: `set gmail on`, `forget id`, `wipe`. */
+  readonly loopCalls: readonly string[];
   /** Home's Jobs rows; a test may swap them. */
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
@@ -117,6 +122,8 @@ export function createFakeHostBridge(
     memories?: MemoryEntry[];
     /** Home's Permissions rows. */
     permissions?: PermissionRow[];
+    /** Home's loops state. */
+    loops?: LoopsState;
     /** Home's Jobs rows. */
     jobs?: JobRow[];
     /** A job's steps by job id, and the running steps the bubble shows. */
@@ -152,6 +159,7 @@ export function createFakeHostBridge(
   const removedConnections: string[] = [];
   const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
+  const loopCalls: string[] = [];
   const jobStops: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
@@ -268,6 +276,29 @@ export function createFakeHostBridge(
       const before = fake.memories.length;
       fake.memories = fake.memories.filter((memory) => memory.id !== id);
       return Promise.resolve(fake.memories.length < before);
+    },
+    loops: options.loops ?? { apps: [], loops: [] },
+    loopCalls,
+    loopsState() {
+      return Promise.resolve(structuredClone(fake.loops));
+    },
+    setLoopsOn(app, on) {
+      loopCalls.push(`set ${app} ${on ? 'on' : 'off'}`);
+      fake.loops = {
+        ...fake.loops,
+        apps: fake.loops.apps.map((a) => (a.id === app ? { ...a, on } : a)),
+      };
+      return Promise.resolve();
+    },
+    forgetLoop(id) {
+      loopCalls.push(`forget ${id}`);
+      fake.loops = { ...fake.loops, loops: fake.loops.loops.filter((l) => l.id !== id) };
+      return Promise.resolve();
+    },
+    wipeLoops() {
+      loopCalls.push('wipe');
+      fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };
+      return Promise.resolve();
     },
     permissions: (options.permissions ?? []).map((row) => ({ ...row })),
     permissionSets,

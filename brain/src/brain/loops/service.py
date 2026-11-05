@@ -49,6 +49,7 @@ class LoopService:
         apps=None,  # Apps: builds the mail source for a connected app on `enable`
         poll_s: float = 300,
         stale_days: int = 7,
+        notify: Callable[[str, dict], None] = lambda kind, data: None,
     ) -> None:
         self._store = store
         self._emit = emit
@@ -57,6 +58,7 @@ class LoopService:
         self._apps = apps
         self._poll_s = poll_s
         self._stale_days = stale_days
+        self._notify = notify  # tells Home the Held list or a switch changed
         self._sent: dict[str, list[datetime]] = {}  # reason -> recent wakes, for throttles
         self._handle: asyncio.TimerHandle | None = None
         self._sources: dict[str, Source] = {}
@@ -176,13 +178,13 @@ class LoopService:
     def enable(self, app_id: str, source: Source | None = None) -> None:
         """Switch mail reading on for one app: the first poll runs now, then every poll_s."""
         if source is None:
-            names = {t.name for t in self._apps.tools(app_id)} if self._apps else set()
-            if not GmailSource.matches(names):
+            if not self.can_read(app_id):
                 raise ValueError(f"{app_id} is not a mail app Scout can read.")
             source = GmailSource(app_id, self._apps.call)  # direct: the switch is the consent
         self.disable(app_id)
         self._sources[app_id] = source
         self._schedule(app_id, 0)
+        self._notify("changed", {"what": "loops"})
 
     def disable(self, app_id: str) -> None:
         """Switch off: polling stops; loops already held stay."""
@@ -193,6 +195,27 @@ class LoopService:
         task = self._tasks.pop(app_id, None)
         if task:
             task.cancel()
+        self._notify("changed", {"what": "loops"})
+
+    def can_read(self, app_id: str) -> bool:
+        """Whether this connected app is a mail app Scout can read (the switch is offered)."""
+        names = {t.name for t in self._apps.tools(app_id)} if self._apps else set()
+        return GmailSource.matches(names)
+
+    def all_loops(self) -> list[Loop]:
+        """Every loop the store holds, whatever its status, for the Held list."""
+        return self._store.list()
+
+    def is_on(self, app_id: str) -> bool:
+        return app_id in self._sources
+
+    def forget(self, loop_id: str) -> bool:
+        """Delete one loop; False when there is none."""
+        if self._store.get(loop_id) is None:
+            return False
+        self._store.forget(loop_id)
+        self._notify("changed", {"what": "loops"})
+        return True
 
     def wipe(self) -> None:
         """Stop and wipe: every switch off, every loop and every cursor deleted."""
@@ -201,6 +224,7 @@ class LoopService:
         self._store.wipe()
         self._fails.clear()
         self._unread.clear()
+        self._notify("changed", {"what": "loops"})
 
     def unread_since(self, app_id: str) -> datetime | None:
         """When mail stopped being read (allowance spent or the app kept failing), if it has."""
@@ -221,6 +245,7 @@ class LoopService:
     async def _cycle(self, app_id: str) -> None:
         try:
             await self.poll(app_id)
+            self._notify("changed", {"what": "loops"})  # new loops, or the unread line moved
             self.fire_due()  # the poll tick also sweeps quiet and stale loops
         except Exception:  # a bad poll must not end the polling
             log.exception("loops poll failed for %s", app_id)

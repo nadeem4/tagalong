@@ -11,6 +11,7 @@ import type {
   AppsList,
   ContextSnapshot,
   FixTarget,
+  LoopsState,
   MemoryEntry,
   Pet,
   SetupOverview,
@@ -269,6 +270,17 @@ export interface HostBridge {
   openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
   usageSummary(): Promise<SpendToday>;
+  /**
+   * Home's Held list: the mail apps the loops switch is offered for and every loop held. Changes
+   * arrive as `changed loops`. Rejects while the brain is away.
+   */
+  loopsState(): Promise<LoopsState>;
+  /** Switches reading one mail app for loops on or off; off keeps the loops held. */
+  setLoopsOn(app: string, on: boolean): Promise<void>;
+  /** Deletes one held loop. */
+  forgetLoop(id: string): Promise<void>;
+  /** Stop and wipe: every switch off, every loop and mail cursor deleted. */
+  wipeLoops(): Promise<void>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
   listPermissions(): Promise<PermissionRow[]>;
   /** Sets one tool to off, ask or auto; rejects when the brain refuses (a locked tool, say). */

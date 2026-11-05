@@ -585,10 +585,34 @@ Needs the same setup as the hand-off section above.
    file with a connected app or with Claude Code.
    **Expected:** Scout still answers, and fetches more only when it needs it.
 
+## The mail switch and the Held list (fake brain, then real)
+
+Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the desktop ipc test
+(`ipc/loops.test.ts`), `cd brain && uv run pytest tests/test_loops_home_tools.py -q`, and the e2e
+`e2e/loops.spec.ts` on the fake brain. By hand, with a real brain and Gmail connected:
+
+1. **Action:** open Home, Connections, scroll to "Read my mail for loops".
+   **Expected:** the Gmail switch is Off, the list says "Nothing is held.", and no line about mail
+   leaving yet. With no mail app connected the card says to connect Gmail and shows no switch.
+2. **Action:** turn the switch On.
+   **Expected:** the line "Your mail goes to Anthropic to be read. The loops it finds stay on this
+   computer." appears; within a minute or two held rows appear (title, what it asks, You owe or
+   Waiting on them, people, due, status), none showing mail text.
+3. **Action:** press Forget on one row.
+   **Expected:** only that row goes.
+4. **Action:** turn the switch Off, then On again.
+   **Expected:** Off stops reading and the rows stay; On reads again without duplicating them.
+5. **Action:** press Stop and wipe, then Cancel.
+   **Expected:** an in-page warning (not a browser dialog) appears and Cancel changes nothing.
+6. **Action:** press Stop and wipe, then Wipe.
+   **Expected:** the switch is Off and the list is empty. Restart the brain: the switch is Off.
+7. **Action:** (spend the reader allowance, or disconnect Gmail for three polls) with the switch On.
+   **Expected:** "Mail unread since HH:MM" shows under the switch and goes after a good poll.
+
 ## A due loop wakes Scout (real brain)
 
-Loops have no Home switch yet (it comes with a later slice), so this needs a test row put in the database
-by hand. Stop the brain first.
+A due time needs a loop to exist, and the switch only makes loops from real mail, so this needs a test row
+put in the database by hand. Stop the brain first.
 
 1. **Action:** in `tagalong.db` run this, with the due time (UTC) a minute or two ahead:
    `INSERT INTO loops(id, source, ref, title, asks, direction, people, due, quiet_after, anchors,
@@ -617,7 +641,7 @@ Nothing feeds the reader mail yet, so there is nothing to click. It is covered b
 
 ## Gmail becomes loops (automated only)
 
-There is no Home switch yet, so there is nothing to click. It is covered by
+The click-through is in "The mail switch and the Held list" below. This part is covered by
 `cd brain && uv run pytest tests/test_loops_poll.py tests/test_loops_gmail.py tests/test_config.py -q`
 on a fake mail server and a scripted reader; no real mail or model is touched:
 

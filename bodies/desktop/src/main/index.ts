@@ -74,6 +74,7 @@ import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
 import { registerBrainLinkIpc } from './ipc/brain-link';
+import { registerLoopsIpc } from './ipc/loops';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSetupIpc } from './ipc/setup';
@@ -874,6 +875,7 @@ function registerIpc(): void {
   });
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });
+  registerLoopsIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
   registerBrainLinkIpc(handle, { brain: required().brain });

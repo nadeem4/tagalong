@@ -420,6 +420,21 @@ day, for Home's **Spend** card and the daily budget.
 - **Stays on this computer.** Nothing about it is sent anywhere; prices come from a table built into
   the brain, so working out a cost makes no network call.
 
+## Your mail: the loops switch
+
+- **Off until you turn it on.** Home, Connections, "Read my mail for loops", one switch per Gmail
+  account you connected. While it is off Scout reads no mail. Turning it on reads the last 14 days
+  of mail you have not answered, then new and sent mail every few minutes.
+- **What leaves.** Each mail is sent to Anthropic (a small model) so it can be read for what is
+  waiting on you. Bulk mail is skipped before that. Scout only reads and drafts: it never sends,
+  and it never changes your mailbox (no labels, archive or read marks).
+- **What is held.** The brain keeps a short note per open thing (a title, what it asks, who, when
+  it is due, its status) in its own database on this computer, with secrets masked. Not the mail
+  itself. Home's Held list shows every one of them.
+- **Forget and wipe.** Forget deletes one held loop. Stop and wipe (it asks first) turns mail
+  reading off and deletes every held loop and the place it had reached in your mail. Turning the
+  switch off alone stops reading and keeps what is held.
+
 ## What Scout remembers: see it, delete it
 
 Scout keeps what it learns about you (facts, preferences, and short summaries of long
