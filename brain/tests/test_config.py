@@ -275,3 +275,14 @@ def test_reader_defaults_and_overrides():
 def test_bad_reader_allowance_raises(value):
     with pytest.raises(ValueError, match="TAGALONG_READER_DAILY_USD"):
         load_config({"TAGALONG_READER_DAILY_USD": value})
+
+
+def test_loop_poll_default_and_override():
+    assert load_config({}).loop_poll_s == 300
+    assert load_config({"TAGALONG_LOOP_POLL_S": "60"}).loop_poll_s == 60
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-5"])
+def test_bad_loop_poll_raises(value):
+    with pytest.raises(ValueError, match="TAGALONG_LOOP_POLL_S"):
+        load_config({"TAGALONG_LOOP_POLL_S": value})

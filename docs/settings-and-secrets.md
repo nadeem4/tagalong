@@ -153,6 +153,10 @@ daily limit) and `TAGALONG_READER_MODEL` (default `claude-haiku-5-5`). Both are 
 from the environment or `.env`; there is no Home control for them yet. See
 [Loops](brain.md#loops).
 
+`TAGALONG_LOOP_POLL_S` (default 300) is how many seconds pass between reads of a mail app that is
+switched on for loops. A zero, negative or non-numeric value stops the brain at start. The 14-day
+first read is fixed in code, not a setting.
+
 Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
 (Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped

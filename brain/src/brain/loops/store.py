@@ -101,11 +101,13 @@ class LoopStore:
             (status, _iso(self._now()), loop_id),
         )
 
-    def add_history(self, loop_id: str, note: str) -> None:
+    def add_history(self, loop_id: str, note: str, mail_at: datetime | None = None) -> None:
         loop = self.get(loop_id)
         if loop is None:
             return
         entry = {"at": _iso(self._now()), "note": self._mask(note)}
+        if mail_at:  # when the mail itself arrived, so a later reply can be compared with it
+            entry["mail_at"] = _iso(mail_at)
         self._db.execute(
             "UPDATE loops SET history = ? WHERE id = ?",
             (json.dumps([*loop.history, entry]), loop_id),
@@ -135,6 +137,20 @@ class LoopStore:
             " ON CONFLICT(app_id) DO UPDATE SET value = excluded.value",
             (app_id, value),
         )
+
+    # Two more places per app share the cursor table under a prefixed key: where the sent scan
+    # got to, and whether the unanswered-only backfill finished.
+    def sent_cursor(self, app_id: str) -> str | None:
+        return self.cursor(f"sent:{app_id}")
+
+    def set_sent_cursor(self, app_id: str, value: str) -> None:
+        self.set_cursor(f"sent:{app_id}", value)
+
+    def backfilled(self, app_id: str) -> bool:
+        return self.cursor(f"backfill:{app_id}") is not None
+
+    def set_backfilled(self, app_id: str) -> None:
+        self.set_cursor(f"backfill:{app_id}", "done")
 
     def forget(self, loop_id: str) -> None:
         self._db.execute("DELETE FROM loop_surfaced WHERE loop_id = ?", (loop_id,))

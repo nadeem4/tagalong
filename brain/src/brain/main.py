@@ -199,6 +199,8 @@ async def _run() -> None:
         emit_event,
         lambda: datetime.now(UTC),
         reader,
+        apps,
+        config.loop_poll_s,
     )
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:

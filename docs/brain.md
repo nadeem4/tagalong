@@ -32,6 +32,7 @@ variable still works and is the developer path.
 | `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                                                                                 |
 | `TAGALONG_READER_MODEL`        | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
 | `TAGALONG_READER_DAILY_USD`    | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
+| `TAGALONG_LOOP_POLL_S`         | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                |
 | `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                                               |
 | `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
 | `TAGALONG_EXPERT_CMD`          | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
@@ -1361,8 +1362,8 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
 ## Loops
 
 A loop is something left open that Scout holds for the person: a reply they owe, a promise
-someone made them. This first part has the shape, the store and the deadline clock; nothing reads
-mail yet, so nothing creates a loop outside tests.
+someone made them. This part has the shape, the store, the deadline clock and the mail source; no
+mail app is switched on yet, so nothing creates a loop outside tests.
 
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
@@ -1401,6 +1402,39 @@ mail yet, so nothing creates a loop outside tests.
     separate from Scout's. Each call spends from it. When it is spent, or the model has no key,
     `read` raises `ReaderStopped` without a call so the service can show "mail unread since"; the
     day roll starts it again. The one key set in Home feeds both models.
+- **Mail source** (`loops/source.py`, `loops/sources/gmail.py`, the poll in `loops/service.py`).
+  `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
+  `wipe` stops everything and deletes every loop and cursor). It is built but not yet wired to a
+  Home switch: nothing calls `enable` until the Home slice, so the switch stays off.
+  - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
+    `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
+    `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
+    directly (the switch is the consent, so the toolbox gate is not involved). Any other tool name is
+    refused in the adapter, so loops cannot send mail (`send_message`) or change the mailbox.
+    `matches` is true for a connected app whose tools include all three, so a second Gmail account
+    is just a second app id.
+  - _Poll._ The first poll after the switch reads 14 days back (`BACKFILL_DAYS`, a constant), unanswered
+    threads only: a thread whose last message is the person's own is skipped (a stop mid-backfill
+    keeps that rule on resume until the backfill has finished). Every page of a search is read, by its
+    next-page token. After it a cursor (the date of the last mail handled, per app, in the store)
+    keeps place, and each poll reads from the cursor. A poll repeats every `TAGALONG_LOOP_POLL_S` seconds (default 300) by `call_later`, never
+    two at once for an app. The cursor moves after each mail, so a stop loses nothing and reads
+    nothing twice.
+  - _Mail to loops._ Each mail passes the pre-filter (bulk costs no model call), then the reader with
+    the open loops of the same thread. `new` and `update` save through (source, ref), so a follow-up
+    on a thread updates its loop and never makes a second one; new mail on a thread whose loop was done
+    reopens it. `close` marks the loop done. Each note in a loop's history carries when its mail
+    arrived.
+  - _Related loops._ In v1 a mail is matched to its loop by thread only: a reply on a new thread
+    makes a new loop.
+  - _Self-close._ After reading, each poll scans the person's sent mail since its own sent cursor: a sent
+    message newer than the last mail on that thread closes an `i_owe` loop, in code with no model
+    call. The reader's own `close` (the sender withdrew) is the other way a loop closes.
+  - _When reading stops._ If the reader's allowance is spent mid-poll, the poll stops, the cursor
+    stays on the last mail read, and `unread_since(app)` returns when it stopped; the next poll resumes
+    there once the allowance is back. If the app errors, is disconnected or answers badly (any failure), the poll tries again at the
+    next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
+    it. Nothing here raises into the brain.
 
 ## Web search and fetch
 

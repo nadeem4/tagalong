@@ -587,7 +587,7 @@ Needs the same setup as the hand-off section above.
 
 ## A due loop wakes Scout (real brain)
 
-Loops have no way in yet (mail reading comes later), so this needs a test row put in the database
+Loops have no Home switch yet (it comes with a later slice), so this needs a test row put in the database
 by hand. Stop the brain first.
 
 1. **Action:** in `tagalong.db` run this, with the due time (UTC) a minute or two ahead:
@@ -614,6 +614,27 @@ Nothing feeds the reader mail yet, so there is nothing to click. It is covered b
 4. With the reader's own daily allowance spent it refuses without a call, then works after the day
    rolls. `TAGALONG_READER_DAILY_USD` and `TAGALONG_READER_MODEL` have defaults 0.5 and
    `claude-haiku-5-5`; a bad allowance stops the brain at start.
+
+## Gmail becomes loops (automated only)
+
+There is no Home switch yet, so there is nothing to click. It is covered by
+`cd brain && uv run pytest tests/test_loops_poll.py tests/test_loops_gmail.py tests/test_config.py -q`
+on a fake mail server and a scripted reader; no real mail or model is touched:
+
+1. Switched off, nothing is read. Switched on, the first poll reads 14 days back, unanswered
+   threads only (a thread whose last message is the person's own is skipped), then reads from a
+   cursor every `TAGALONG_LOOP_POLL_S` seconds until switched off.
+2. A fake mailbox of 3 unanswered, 1 answered and 1 bulk mail gives 3 loops, and the bulk one costs no
+   model call.
+3. A second mail on a known thread updates its loop; it never makes a second one.
+4. A reply the person sent after the last mail on a thread closes an "I owe" loop; an older sent mail
+   does not; the reader's `close` also closes it.
+5. With the reader allowance spent mid-read the poll stops with "unread since" set, the cursor stays
+   on the last mail read, and the next poll resumes without losing or re-reading mail.
+6. An app error or disconnect retries at the next interval and flags "unread since" after three
+   failures in a row; a bad poll never crashes the brain.
+7. Stop and wipe deletes every loop and the cursor; switching on again reads 14 days back again.
+8. Only `search_threads`, `get_thread` and `create_draft` are ever called; `send_message` is not.
 
 ## Scout's timers (real brain)
 
