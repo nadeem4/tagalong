@@ -42,6 +42,7 @@ from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
+from brain.loops.service import LoopService
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Job, Memory, _compaction_text
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
@@ -130,6 +131,8 @@ class Session:
         self._experts_live = experts or (lambda: [])
         # Set by main when voice is built; None answers `listen` with method_not_found.
         self.voice: VoiceHooks | None = None
+        # Set by main: the loops service, which also hears focus and tab to surface held loops.
+        self.loops: LoopService | None = None
         self._budget = budget
         self._bodies = bodies
         self._step_cap = step_cap
@@ -414,6 +417,8 @@ class Session:
             return
         event = from_body(body_id, name, data)
         if event is not None:
+            if self.loops is not None and event.kind in ("focus", "tab"):
+                self.loops.saw(event)
             self.scheduler.emit(event)
 
     def _on_connect(self, body_id: str, away: float | None) -> None:

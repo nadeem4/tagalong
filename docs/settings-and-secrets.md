@@ -157,6 +157,10 @@ from the environment or `.env`; there is no Home control for them yet. See
 switched on for loops. A zero, negative or non-numeric value stops the brain at start. The 14-day
 first read is fixed in code, not a setting.
 
+`TAGALONG_LOOP_STALE_DAYS` (default 7) is how many days a held loop may go untouched before the
+brain marks it stale and hands it to Scout in one batched wake. A zero, negative or non-numeric
+value stops the brain at start.
+
 Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
 (Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped

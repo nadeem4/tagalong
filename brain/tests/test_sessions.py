@@ -1139,6 +1139,40 @@ async def test_focus_event_does_not_wake_scout():
     assert states(sent) == []
 
 
+class SeenLoops:
+    def __init__(self):
+        self.seen = []
+
+    def saw(self, event):
+        self.seen.append(event)
+
+
+async def test_focus_and_tab_also_reach_the_loops_service_and_stay_non_waking():
+    model = Gate([])
+    session, sent = make(model, kinds=None)
+    join(session, "desktop")
+    session.loops = SeenLoops()
+    session.body_event("desktop", "focus", {"app": "Code", "title": "Q4 pricing.pptx"})
+    session.body_event("browser", "tab", {"title": "Doc", "url": "https://x.test/a"})
+    await settle()
+    assert [(e.kind, e.facts["title"]) for e in session.loops.seen] == [
+        ("focus", "Q4 pricing.pptx"),
+        ("tab", "Doc"),
+    ]
+    assert states(sent) == [] and model.seen == []
+
+
+async def test_other_events_and_bad_frames_do_not_reach_the_loops_service():
+    session, sent = make(Gate([]), kinds=None)
+    join(session, "desktop")
+    session.loops = SeenLoops()
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    session.body_event("desktop", "focus", {"app": 5})
+    session.body_event("desktop", "nope", None)
+    await settle()
+    assert session.loops.seen == []
+
+
 class Tick:
     def __init__(self):
         self.now = 0.0

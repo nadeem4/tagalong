@@ -1,8 +1,10 @@
-"""LoopService: wakes Scout when a held loop comes due, and reads mail while the switch is on.
+"""LoopService: wakes Scout when a held loop matters, and reads mail while the switch is on.
 
-Code decides when; Scout decides whether and what to say. A due loop fires once per due
-time (recorded in the store, so a restart never repeats it), through the same event path
-timers use. The arming mirrors Timers: one call_later, re-checked at least hourly.
+Code decides when; Scout decides whether and what to say. A loop surfaces on context (the
+window or tab matches an anchor), its due time, urgent mail, a quiet they-owe, or a stale
+sweep. Each surface is recorded in the store (so a restart or a second focus never repeats
+it) and goes through the same event path timers use; context, urgent and quiet are also
+throttled per reason. The arming mirrors Timers: one call_later, re-checked at least hourly.
 Mail: `enable(app)` starts a poll per app (the first poll reads the last 14 days, unanswered
 only, until it finishes; then a cursor keeps place); each mail goes through the pre-filter and
 the reader into the store; the person's own sent mail closes an "I owe" loop in code.
@@ -20,20 +22,21 @@ from brain.loops.reader import Change, MailItem, Reader, ReaderStopped, prefilte
 from brain.loops.source import Source
 from brain.loops.sources.gmail import GmailSource
 from brain.loops.store import LoopStore
+from brain.loops.triggers import context, due, quiet, stale, urgent
 
 log = logging.getLogger(__name__)
 
 # Re-check at least hourly so a wall-clock change cannot strand the timer.
 _MAX_SLEEP_S = 3600
 _DUE_STATUSES = ("held", "snoozed")
-_OPEN = ("held", "surfaced", "snoozed")
+_OPEN = ("held", "surfaced", "snoozed", "stale")
+_CONTEXT_STATUSES = ("held", "surfaced")  # a snoozed loop waits for its time, not for a window
+# Per reason: (wakes, within seconds), counted across all loops, so Held cannot become noise.
+# Due and stale are not here: a deadline must not be lost, and stale is one batched wake.
+_THROTTLE = {"context": (1, 600), "urgent": (2, 3600), "quiet": (2, 3600)}
+_URGENT_FRESH = timedelta(hours=24)  # a backfilled old mail flagged urgent is not urgent now
 BACKFILL_DAYS = 14  # the first read goes this far back; a constant, not a setting
 _FAILS_BEFORE_UNREAD = 3  # consecutive failed polls before "mail unread since" shows
-
-
-def _due_anchor(loop: Loop) -> str:
-    # Keyed by the due time, so moving a deadline lets it fire again.
-    return f"due:{loop.due.isoformat()}" if loop.due else ""
 
 
 class LoopService:
@@ -45,6 +48,7 @@ class LoopService:
         reader: Reader | None = None,
         apps=None,  # Apps: builds the mail source for a connected app on `enable`
         poll_s: float = 300,
+        stale_days: int = 7,
     ) -> None:
         self._store = store
         self._emit = emit
@@ -52,6 +56,8 @@ class LoopService:
         self._reader = reader
         self._apps = apps
         self._poll_s = poll_s
+        self._stale_days = stale_days
+        self._sent: dict[str, list[datetime]] = {}  # reason -> recent wakes, for throttles
         self._handle: asyncio.TimerHandle | None = None
         self._sources: dict[str, Source] = {}
         self._polls: dict[str, asyncio.TimerHandle] = {}
@@ -67,22 +73,71 @@ class LoopService:
         self.fire_due()
 
     def fire_due(self) -> None:
+        """Announce what has come due or gone quiet, sweep stale loops, and arm the next time."""
         now = self._now()
-        for loop in self._unfired():
-            assert loop.due is not None
-            if loop.due <= now:
-                # Marked before emitting: a crash after this loses one wake, never repeats it.
-                self._store.mark_surfaced(
-                    loop.id, _due_anchor(loop), now.astimezone().date().isoformat()
-                )  # the local day
-                self._emit(Event("loop", self._facts(loop, "due"), key=f"loop:{loop.id}"))
+        waiting = self._with_status(_DUE_STATUSES)
+        for loop in due.pending(waiting):
+            if loop.due <= now:  # type: ignore[operator]
+                self._surface(loop, "due", due.anchor(loop))
+        for loop in quiet.ripe(waiting, now):
+            if self._take("quiet"):
+                self._surface(loop, "quiet", quiet.anchor(loop))
+        self._sweep_stale(now)
         self._arm()
 
-    def _unfired(self) -> list[Loop]:
-        loops = [lp for s in _DUE_STATUSES for lp in self._store.list(s) if lp.due]
-        return sorted(
-            (lp for lp in loops if _due_anchor(lp) not in lp.surfaced), key=lambda lp: lp.due
-        )  # type: ignore[arg-type, return-value]
+    def saw(self, event: Event) -> None:
+        """A focus or tab event: surface a held loop whose anchor matches the window or page.
+
+        One loop per anchor per local day, one wake per throttle window. A throttled match is
+        not used up, so it can still surface on a later focus."""
+        if event.kind not in ("focus", "tab"):
+            return
+        app, title, url = (str(event.facts.get(k) or "") for k in ("app", "title", "url"))
+        if context.mail_in_front(app, title, url):
+            return
+        today = self._today()
+        for loop in self._with_status(_CONTEXT_STATUSES):
+            anchor = context.find(loop, title, url)
+            if anchor is None or loop.surfaced.get(f"ctx:{anchor}") == today:
+                continue
+            if self._take("context"):
+                self._surface(loop, "context", f"ctx:{anchor}", {"anchor": anchor})
+            return
+
+    def _surface(
+        self, loop: Loop, reason: str, key: str, extra: dict[str, str | int] | None = None
+    ) -> None:
+        # Marked before emitting: a crash after this loses one wake, never repeats it.
+        self._store.mark_surfaced(loop.id, key, self._today())
+        facts = {**self._facts(loop, reason), **(extra or {})}
+        self._emit(Event("loop", facts, key=f"loop:{loop.id}"))
+
+    def _take(self, reason: str) -> bool:
+        """Whether this reason may wake now; if so, counts it."""
+        limit, within = _THROTTLE[reason]
+        now = self._now()
+        recent = [t for t in self._sent.get(reason, []) if (now - t).total_seconds() < within]
+        if len(recent) >= limit:
+            self._sent[reason] = recent
+            return False
+        self._sent[reason] = [*recent, now]
+        return True
+
+    def _sweep_stale(self, now: datetime) -> None:
+        found = stale.ripe(self._store.list("held"), now, self._stale_days)
+        if not found:
+            return
+        for loop in found:
+            self._store.set_status(loop.id, "stale")
+        lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in found)
+        facts: dict[str, str | int] = {"reason": "stale", "count": len(found), "loops": lines}
+        self._emit(Event("loop", facts, key=f"loop-stale:{now.isoformat()}"))
+
+    def _today(self) -> str:
+        return self._now().astimezone().date().isoformat()  # the local day
+
+    def _with_status(self, statuses: tuple[str, ...]) -> list[Loop]:
+        return [lp for s in statuses for lp in self._store.list(s)]
 
     @staticmethod
     def _facts(loop: Loop, reason: str) -> dict[str, str | int]:
@@ -107,10 +162,13 @@ class LoopService:
             running = asyncio.get_running_loop()
         except RuntimeError:
             return
-        pending = self._unfired()
-        if not pending:
+        waiting = self._with_status(_DUE_STATUSES)
+        times = [lp.due for lp in due.pending(waiting)] + [
+            lp.quiet_after for lp in quiet.pending(waiting)
+        ]
+        if not times:
             return
-        delay = (pending[0].due - self._now()).total_seconds()  # type: ignore[operator]
+        delay = (min(times) - self._now()).total_seconds()  # type: ignore[type-var]
         self._handle = running.call_later(min(max(delay, 0), _MAX_SLEEP_S), self.fire_due)
 
     # --- mail ---
@@ -163,6 +221,7 @@ class LoopService:
     async def _cycle(self, app_id: str) -> None:
         try:
             await self.poll(app_id)
+            self.fire_due()  # the poll tick also sweeps quiet and stale loops
         except Exception:  # a bad poll must not end the polling
             log.exception("loops poll failed for %s", app_id)
         finally:
@@ -218,14 +277,18 @@ class LoopService:
                 self._save(self._merged(current, change), item)
         elif change.kind == "new":
             known = related[0] if related else None
-            self._save(self._from_change(item, change, known), item)
+            saved = self._save(self._from_change(item, change, known), item)
+            fresh = item.date >= self._now() - _URGENT_FRESH
+            if fresh and urgent.fresh(saved, change.urgent) and self._take("urgent"):
+                self._surface(saved, "urgent", urgent.ANCHOR)
 
-    def _save(self, loop: Loop, item: MailItem) -> None:
+    def _save(self, loop: Loop, item: MailItem) -> Loop:
         saved = self._store.save(loop)
-        if saved.status == "done":
+        if saved.status in ("done", "stale"):
             self._store.set_status(saved.id, "held")  # new mail on a finished thread reopens it
         self._store.add_history(saved.id, f"mail from {item.sender}", item.date)
         self.changed()
+        return saved
 
     @staticmethod
     def _from_change(item: MailItem, change: Change, known: Loop | None) -> Loop:

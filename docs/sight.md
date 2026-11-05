@@ -285,6 +285,15 @@ rebuilds the tray menu and sets the tooltip to `Tagalong — sight is paused`. A
 later reads the state with `IPC.getSightPaused`. The focus watch and the listening guard
 also check the pause before listing. Drops are not refused by a pause: they are handed over.
 
+### Focus and tab also feed loops
+
+The window titles the focus watch reports (`focus`: app and title) and the tab changes the browser
+body reports (`tab`: title and address) are handed to the brain's loops service as well as to the
+event queue. If one matches an anchor of a loop Scout is holding (the deck a mail asked about, the
+page it linked), Scout may speak up, at most once per loop and anchor a day. No new screen read is
+made: only titles and addresses already sent,; the focus watch is off while sight is paused. See
+[brain.md](brain.md#loops).
+
 ### Dropping things on Scout
 
 A drop is something handed over, not a screen read, and is covered in [bubble.md](bubble.md). What

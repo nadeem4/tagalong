@@ -636,6 +636,25 @@ on a fake mail server and a scripted reader; no real mail or model is touched:
 7. Stop and wipe deletes every loop and the cursor; switching on again reads 14 days back again.
 8. Only `search_threads`, `get_thread` and `create_draft` are ever called; `send_message` is not.
 
+## Loops surface on context, due, urgent, quiet and stale (automated only)
+
+There is no Home switch yet, so there is no real mail to click through. It is covered by
+`cd brain && uv run pytest tests/test_loops_triggers.py tests/test_loops_surface.py tests/test_loops_service.py tests/test_sessions.py -q`
+on fakes. To see it by hand, add a loop with an anchor to a test store and open the window:
+
+1. **Action:** a loop is held with the anchor `Q4 pricing deck`; open `Q4 pricing.pptx` (or any
+   window whose title has "Q4" and "pricing").
+   **Expected:** Scout may speak, in its own words, once; opening the deck again the same day says
+   nothing; the next day it can speak again. With the mail app in front it never speaks.
+2. **Action:** open a window titled `Untitled` or `Inbox`, or a loop whose only anchor is one word.
+   **Expected:** nothing; those never match.
+3. **Action:** open two matching windows within ten minutes.
+   **Expected:** one wake; the second matching window can surface later, after ten minutes.
+4. An urgent mail from the last day wakes Scout at once, at most twice an hour; an older mail
+   flagged urgent does not. A `they_owe` loop past its quiet time wakes once. A loop untouched for
+   `TAGALONG_LOOP_STALE_DAYS` becomes stale and arrives in one wake listing the stale loops.
+5. Focus and tab events still never wake Scout by themselves.
+
 ## Scout's timers (real brain)
 
 Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so

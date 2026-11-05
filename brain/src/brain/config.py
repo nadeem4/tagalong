@@ -19,6 +19,7 @@ DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_READER_MODEL = "claude-haiku-5-5"
 DEFAULT_READER_DAILY_USD = 0.5
 DEFAULT_LOOP_POLL_S = 300  # how often a switched-on mail app is read for loops
+DEFAULT_LOOP_STALE_DAYS = 7  # a held loop untouched this long goes to one stale wake
 DEFAULT_STEP_CAP = 25
 DEFAULT_JOB_QUIET_MIN = 20.0
 DEFAULT_EXPERT_IDLE_S = 300.0
@@ -41,6 +42,7 @@ class Config:
     reader_model: str = DEFAULT_READER_MODEL  # reads mail for loops; its own allowance
     reader_daily_usd: float = DEFAULT_READER_DAILY_USD
     loop_poll_s: int = DEFAULT_LOOP_POLL_S
+    loop_stale_days: int = DEFAULT_LOOP_STALE_DAYS
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
     job_quiet_min: float = DEFAULT_JOB_QUIET_MIN
     expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
@@ -86,6 +88,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         reader_model=env.get("TAGALONG_READER_MODEL") or DEFAULT_READER_MODEL,
         reader_daily_usd=_positive_usd(env, "TAGALONG_READER_DAILY_USD", DEFAULT_READER_DAILY_USD),
         loop_poll_s=_positive_int(env, "TAGALONG_LOOP_POLL_S", DEFAULT_LOOP_POLL_S),
+        loop_stale_days=_positive_int(env, "TAGALONG_LOOP_STALE_DAYS", DEFAULT_LOOP_STALE_DAYS),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
         job_quiet_min=_job_quiet_min(env.get("TAGALONG_JOB_QUIET_MIN")),
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),

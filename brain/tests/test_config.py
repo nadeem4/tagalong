@@ -286,3 +286,14 @@ def test_loop_poll_default_and_override():
 def test_bad_loop_poll_raises(value):
     with pytest.raises(ValueError, match="TAGALONG_LOOP_POLL_S"):
         load_config({"TAGALONG_LOOP_POLL_S": value})
+
+
+def test_loop_stale_days_default_and_override():
+    assert load_config({}).loop_stale_days == 7
+    assert load_config({"TAGALONG_LOOP_STALE_DAYS": "14"}).loop_stale_days == 14
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-5"])
+def test_bad_loop_stale_days_raises(value):
+    with pytest.raises(ValueError, match="TAGALONG_LOOP_STALE_DAYS"):
+        load_config({"TAGALONG_LOOP_STALE_DAYS": value})
