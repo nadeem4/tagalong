@@ -318,3 +318,16 @@ def test_main_starts_the_loop_service(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="stop"):
         asyncio.run(_run())
     assert len(started) == 1
+
+
+def test_one_key_reaches_both_models():
+    class Fake:
+        ready = False
+
+        def set_key(self, key):
+            self.ready = True
+
+    scout, reader = Fake(), Fake()
+    keyed = main._KeyedModels(scout, reader)
+    keyed.set_key("sk-x")
+    assert scout.ready and reader.ready and keyed.ready
