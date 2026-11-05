@@ -433,3 +433,24 @@ async def test_the_you_replied_note_does_not_count_as_inbound_mail(rig):
     svc.disable("gmail")
     notes = {h["note"]: h for h in store.list()[0].history}
     assert "mail_at" in notes["mail from Priya <p@x.com>"] and "mail_at" not in notes["you replied"]
+
+
+async def test_an_inbound_reply_on_a_they_owe_loop_cancels_its_old_quiet(rig):
+    store, clock, _, events, _ = rig
+    store.save(
+        Loop(
+            source="gmail",
+            ref="a",
+            title="t",
+            asks="x",
+            direction="they_owe",
+            quiet_after=clock.at + timedelta(hours=1),
+        )
+    )
+    svc = service(rig)
+    svc.enable("gmail", FakeSource([mail("a", 1)]))
+    await settled(svc, store)
+    svc.disable("gmail")
+    clock.at += timedelta(hours=2)
+    svc.fire_due()
+    assert [e for e in events if e.facts.get("reason") == "quiet"] == []

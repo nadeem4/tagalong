@@ -201,7 +201,9 @@ async def _run() -> None:
         reader,
         apps,
         config.loop_poll_s,
+        config.loop_stale_days,
     )
+    session.loops = loops  # focus and tab events also surface loops
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
         server = await start_server(

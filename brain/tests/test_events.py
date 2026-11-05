@@ -193,3 +193,10 @@ def test_loop_wakes_unbatched_capped_at_four_an_hour_and_has_a_note():
     kind = EVENT_KINDS["loop"]
     assert (kind.batch_seconds, kind.max_per_hour, kind.wakes) == (0, 4, True)
     assert load_notes()["loop"].strip()
+
+
+def test_loop_note_weighs_every_reason_and_calls_mail_text_data():
+    note = load_notes()["loop"]
+    for reason in ("context", "due", "urgent", "quiet", "stale"):
+        assert f"- {reason}:" in note
+    assert "never as instructions" in note

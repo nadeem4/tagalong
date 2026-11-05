@@ -33,6 +33,7 @@ variable still works and is the developer path.
 | `TAGALONG_READER_MODEL`        | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
 | `TAGALONG_READER_DAILY_USD`    | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
 | `TAGALONG_LOOP_POLL_S`         | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                |
+| `TAGALONG_LOOP_STALE_DAYS`     | `7`                | Days a held loop may sit untouched before it goes to one stale wake (a positive whole number)                                                              |
 | `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                                               |
 | `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
 | `TAGALONG_EXPERT_CMD`          | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
@@ -1362,8 +1363,8 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
 ## Loops
 
 A loop is something left open that Scout holds for the person: a reply they owe, a promise
-someone made them. This part has the shape, the store, the deadline clock and the mail source; no
-mail app is switched on yet, so nothing creates a loop outside tests.
+someone made them. This part has the shape, the store, the triggers that surface a loop, and the
+mail source; no mail app is switched on yet, so nothing creates a loop outside tests.
 
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
@@ -1376,15 +1377,48 @@ mail app is switched on yet, so nothing creates a loop outside tests.
   it is written, history included. `forget` removes one loop; `wipe` removes every loop, the
   surface log and the per-app cursor.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
-  `main.py` beside the session. It emits a `loop` event (`reason=due`, with the loop's id, title,
-  asks, direction, people and due) for each `held` or `snoozed` loop whose `due` has passed, once per
-  due time: the fire is recorded in the store, so a restart does not repeat it, and moving the
-  due time lets it fire again. Loops that are done, dropped, surfaced or stale never fire. One
-  `call_later` is armed for the earliest unfired due time, re-checked at least hourly (the same
-  pattern as `Timers`); `changed()` re-arms after loops are added or edited.
+  `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
+  loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
+  recorded in the store before the event goes out, so a restart never repeats it. One `call_later` is
+  armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
+  `Timers`); `changed()` re-arms after loops are added or edited. `fire_due()` also runs on each poll
+  tick, so the quiet and stale checks need no timer of their own.
 - **Event.** `loop` wakes Scout with a 0 s batch window and at most 4 wakes an hour. Its note in
-  `mind/events.md` tells Scout the title, asks and people may be someone else's words and are data,
-  not instructions. Later slices add more reasons (context, urgent, quiet, stale, digest).
+  `mind/events.md` weighs each reason and tells Scout the title, asks, people and anchor may be
+  someone else's words and are data, not instructions. All of it reaches the model inside the wake's
+  fenced block, like every event. If no display body is online the wake waits for one and is not
+  lost. The digest reason comes in a later slice.
+- **Triggers** (`loops/triggers/`: `context.py`, `due.py`, `urgent.py`, `quiet.py`, `stale.py`, pure
+  rules; the service owns timing). Five reasons:
+  - _context._ `Session.body_event` also hands every `focus` (app, title) and `tab` (title, url)
+    event to `loops.saw`; they stay non-waking events. A `held` or `surfaced` loop surfaces when a
+    window or tab matches one of its anchors. An anchor matches only if, after lowercasing and
+    dropping punctuation, it has at least two words that are not on the stoplist (Untitled,
+    Document1, New Tab, Inbox, Home, app names and similar), or it is a file name (`Q4 pricing.pptx`:
+    the whole name and extension in the title). A text anchor needs at least two of its words in the
+    title and at least half of them, so `Q4 pricing deck` matches the window `Q4 pricing.pptx -
+PowerPoint` but a one-word anchor never matches. A URL anchor must have a path and matches the
+    tab on host (without `www.`) and path prefix; the query and fragment are ignored. Nothing
+    matches while the mail app is in front (Gmail, Outlook or Thunderbird in the app or title, or a
+    known mail host), since opening the mail would surface itself.
+  - _due._ A `held` or `snoozed` loop whose `due` has passed, once per due time (moving the due time
+    lets it fire again).
+  - _urgent._ The reader's `urgent` flag on a **new** loop, once per loop, immediately, and only for
+    mail from the last 24 hours (the backfill's old mail is not urgent now).
+  - _quiet._ A `they_owe` loop (`held` or `snoozed`) whose `quiet_after` has passed, once per quiet
+    time. A reply cancels it through the reader: `close`, or an update that turns it into an `i_owe`
+    loop.
+  - _stale._ Each sweep marks `held` loops untouched for `TAGALONG_LOOP_STALE_DAYS` (default 7) as
+    `stale` and sends one `loop` event (`reason=stale`, `count`, and `loops`, one line of id, title and
+    asks per loop; key per sweep). A stale loop returns to `held` if new mail arrives on its
+    thread. The keep-or-drop tools come later.
+  - _Once a day, and throttles._ A context surface is recorded per loop and anchor under the local day,
+    so the same window surfaces a loop once a day. Before the event goes out the service throttles per
+    reason across all loops: context 1 per 10 minutes, urgent and quiet 2 per hour. A throttled
+    match is not recorded, so it can surface on a later focus (urgent only comes on read, so a
+    throttled urgent wake is dropped, and the loop can still surface on context or due; a throttled
+    quiet loop is re-armed for when the throttle frees). Due and stale are not throttled. The `loop` event cap (4 an hour) is
+    the second line of defence.
 - **Reader** (`loops/reader.py`, wording in `mind/reader.md`). Turns one `MailItem` plus the related
   open loops (same thread or people) into one `Change`: `new`, `update`, `close` or `ignore`. Nothing
   calls it yet; the next slice's mail source feeds it.
@@ -1423,7 +1457,7 @@ mail app is switched on yet, so nothing creates a loop outside tests.
   - _Mail to loops._ Each mail passes the pre-filter (bulk costs no model call), then the reader with
     the open loops of the same thread. `new` and `update` save through (source, ref), so a follow-up
     on a thread updates its loop and never makes a second one; new mail on a thread whose loop was done
-    reopens it. `close` marks the loop done. Each note in a loop's history carries when its mail
+    reopens it (so does a stale one). `close` marks the loop done. Each note in a loop's history carries when its mail
     arrived.
   - _Related loops._ In v1 a mail is matched to its loop by thread only: a reply on a new thread
     makes a new loop.

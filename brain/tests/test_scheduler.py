@@ -8,7 +8,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from brain.bodies import Bodies
-from brain.events import Event, EventKind
+from brain.events import EVENT_KINDS, Event, EventKind
 from brain.guards import Guard, Guards, Hook, stop
 from brain.scheduler import Scheduler
 
@@ -141,6 +141,18 @@ def test_no_body_online_waits_and_connect_runs_it():
     rig.bodies.ids.append("desktop")
     rig.scheduler.pump()
     assert len(rig.starts) == 1
+
+
+def test_a_loop_wake_with_no_display_body_waits_and_is_not_lost():
+    kinds = {"loop": EVENT_KINDS["loop"]}
+    rig = Rig(online=("browser",), kinds=kinds, last="browser")
+    rig.bodies.headless = {"browser"}
+    rig.scheduler.emit(Event("loop", {"reason": "due", "title": "Send the deck"}, key="loop:1"))
+    assert rig.starts == []
+    rig.bodies.ids.append("desktop")
+    rig.scheduler.pump()
+    assert [b for b, _ in rig.starts] == ["desktop"]
+    assert "reason: due" in rig.text()
 
 
 def test_busy_blocks_and_turn_ended_runs_the_next():
