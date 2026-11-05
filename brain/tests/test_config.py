@@ -260,3 +260,18 @@ def test_expert_idle_defaults_to_300_and_reads_the_environment():
 def test_bad_expert_idle_raises(value):
     with pytest.raises(ValueError):
         load_config({"TAGALONG_EXPERT_IDLE_S": value})
+
+
+def test_reader_defaults_and_overrides():
+    cfg = load_config({})
+    assert (cfg.reader_model, cfg.reader_daily_usd) == ("claude-haiku-5-5", 0.5)
+    cfg = load_config(
+        {"TAGALONG_READER_MODEL": "claude-sonnet-5-5", "TAGALONG_READER_DAILY_USD": "0.2"}
+    )
+    assert (cfg.reader_model, cfg.reader_daily_usd) == ("claude-sonnet-5-5", 0.2)
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-1", "nan"])
+def test_bad_reader_allowance_raises(value):
+    with pytest.raises(ValueError, match="TAGALONG_READER_DAILY_USD"):
+        load_config({"TAGALONG_READER_DAILY_USD": value})

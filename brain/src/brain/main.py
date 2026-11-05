@@ -20,6 +20,7 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
+from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
 from brain.masking import Masker, SecretLogFilter
@@ -44,6 +45,21 @@ from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
 
 log = logging.getLogger("brain")
+
+
+class _KeyedModels:
+    """One key for both models: Scout's and the mail reader's."""
+
+    def __init__(self, *models: AnthropicModel) -> None:
+        self._models = models
+
+    @property
+    def ready(self) -> bool:
+        return self._models[0].ready
+
+    def set_key(self, key: str) -> None:
+        for m in self._models:
+            m.set_key(key)
 
 
 def cached[T](fn: Callable[[], T], ttl: float, clock: Callable[[], float] = time.monotonic):
@@ -80,6 +96,12 @@ async def _run() -> None:
     bodies = Bodies()
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
+    reader_model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.reader_model, key)
+    # Its own ledger, so a heavy mail day never silences Scout and a spent Scout budget never
+    # stops the reader.
+    reader = HaikuReader(
+        reader_model, Budget(config.data_dir / "reader-budget.json", config.reader_daily_usd)
+    )
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
@@ -87,7 +109,7 @@ async def _run() -> None:
     masker = Masker(secrets)
     keys = KeySettings(
         config.data_dir,
-        model,
+        _KeyedModels(model, reader_model),
         bodies.notify,
         "environment" if from_environment else "file" if key else "none",
         anthropic_check,
@@ -172,6 +194,7 @@ async def _run() -> None:
         LoopStore(memory.db, lambda: datetime.now(UTC), masker.mask),
         emit_event,
         lambda: datetime.now(UTC),
+        reader,
     )
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:

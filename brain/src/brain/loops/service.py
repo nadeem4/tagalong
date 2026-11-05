@@ -11,6 +11,7 @@ from datetime import datetime
 
 from brain.events import Event
 from brain.loops.loop import Loop
+from brain.loops.reader import Reader
 from brain.loops.store import LoopStore
 
 # Re-check at least hourly so a wall-clock change cannot strand the timer.
@@ -25,11 +26,16 @@ def _due_anchor(loop: Loop) -> str:
 
 class LoopService:
     def __init__(
-        self, store: LoopStore, emit: Callable[..., None], now: Callable[[], datetime]
+        self,
+        store: LoopStore,
+        emit: Callable[..., None],
+        now: Callable[[], datetime],
+        reader: Reader | None = None,  # the mail source (next slice) feeds it items
     ) -> None:
         self._store = store
         self._emit = emit
         self._now = now
+        self._reader = reader
         self._handle: asyncio.TimerHandle | None = None
 
     def start(self) -> None:

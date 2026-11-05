@@ -147,6 +147,12 @@ environment or its `.env` (see [brain.md](brain.md#run-it) and
 `TAGALONG_TURN_TIMEOUT_S` (default 300 seconds, a positive number) is read by `config.py`, passed
 to the session, and ends a Scout turn that runs too long.
 
+The loops mail reader has its own allowance and model, apart from Scout's: `TAGALONG_READER_DAILY_USD`
+(default 0.5, a positive number of US dollars a day; a bad value stops the brain at start, like the
+daily limit) and `TAGALONG_READER_MODEL` (default `claude-haiku-5-5`). Both are read by `config.py`
+from the environment or `.env`; there is no Home control for them yet. See
+[Loops](brain.md#loops).
+
 Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
 (Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped

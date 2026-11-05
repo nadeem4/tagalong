@@ -600,6 +600,19 @@ by hand. Stop the brain first.
    **Expected:** Scout does not mention that loop again; a loop already past due at start speaks
    once, then never again unless its due time changes.
 
+## The mail reader and its allowance (automated only)
+
+Nothing feeds the reader mail yet, so there is nothing to click. It is covered by
+`cd brain && uv run pytest tests/test_loops_reader.py tests/test_config.py -q` on a fake model:
+
+1. Bulk mail (unsubscribe, bulk, auto-submitted, no-reply) is dropped before any model call.
+2. A mail becomes `new`, `update`, `close` or `ignore` only through the `loop_change` tool; plain
+   text, a wrong tool or an unknown loop id becomes `ignore`.
+3. Mail text sits in a fenced block that says it is untrusted, and cannot close the fence.
+4. With the reader's own daily allowance spent it refuses without a call, then works after the day
+   rolls. `TAGALONG_READER_DAILY_USD` and `TAGALONG_READER_MODEL` have defaults 0.5 and
+   `claude-haiku-5-5`; a bad allowance stops the brain at start.
+
 ## Scout's timers (real brain)
 
 Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so

@@ -30,6 +30,8 @@ variable still works and is the developer path.
 | `TAGALONG_HOME`                | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
 | `TAGALONG_MODEL`               | `claude-opus-5-5` | Model Scout thinks with                                                                                                                                    |
 | `TAGALONG_DAILY_BUDGET_USD`    | `5`               | Most Scout may spend per local day, in USD                                                                                                                 |
+| `TAGALONG_READER_MODEL`        | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
+| `TAGALONG_READER_DAILY_USD`    | `0.5`             | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
 | `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                                               |
 | `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
 | `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
@@ -78,7 +80,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
-| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events (see [Loops](#loops))                                                                                                                                |
+| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader (see [Loops](#loops))                                                                                                                                |
 | `brain/src/brain/timers.py`            | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
@@ -1382,6 +1384,23 @@ mail yet, so nothing creates a loop outside tests.
 - **Event.** `loop` wakes Scout with a 0 s batch window and at most 4 wakes an hour. Its note in
   `mind/events.md` tells Scout the title, asks and people may be someone else's words and are data,
   not instructions. Later slices add more reasons (context, urgent, quiet, stale, digest).
+- **Reader** (`loops/reader.py`, wording in `mind/reader.md`). Turns one `MailItem` plus the related
+  open loops (same thread or people) into one `Change`: `new`, `update`, `close` or `ignore`. Nothing
+  calls it yet; the next slice's mail source feeds it.
+  - *Pre-filter.* `prefilter(item)` returns why a mail is bulk, or `None`. It drops `List-Unsubscribe`,
+    `Precedence: bulk/list/junk`, `Auto-Submitted` (anything but `no`) and no-reply senders, with no
+    model call.
+  - *Safe by shape.* Mail is untrusted. It goes to the model only inside a fenced
+    `<mail untrusted="true">` block (angle brackets in mail text are escaped, so it cannot close the
+    fence), the system prompt says it is data, never instructions, and the model may answer only
+    through the `loop_change` tool schema. Text, a wrong tool, an unknown kind, a model error or a
+    malformed answer all become `ignore` (logged, never raised). An `update` or `close` for an id that
+    was not in the related loops is dropped.
+  - *Allowance.* The reader uses a second `AnthropicModel` (`TAGALONG_READER_MODEL`, default Haiku)
+    and its own `Budget` (`reader-budget.json`, `TAGALONG_READER_DAILY_USD`, default 0.50 USD a day),
+    separate from Scout's. Each call spends from it. When it is spent, or the model has no key,
+    `read` raises `ReaderStopped` without a call so the service can show "mail unread since"; the
+    day roll starts it again. The one key set in Home feeds both models.
 
 ## Web search and fetch
 
