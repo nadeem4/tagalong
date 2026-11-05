@@ -71,7 +71,7 @@ export function LoopsPanel() {
   useEffect(() => {
     refresh();
     return bridge.onBrainChanged((what) => {
-      if (what === 'loops') refresh();
+      if (what === 'loops' || what === 'apps') refresh(); // Gmail may have just connected
     });
   }, [bridge, refresh]);
 
@@ -92,6 +92,7 @@ export function LoopsPanel() {
   }
 
   const anyOn = state.apps.some((app) => app.on);
+  const open = state.loops.filter((loop) => loop.status !== 'done' && loop.status !== 'dropped');
   return (
     <section className="home-card loops" aria-labelledby={headingId}>
       <h2 id={headingId} className="home-card__label">
@@ -123,9 +124,7 @@ export function LoopsPanel() {
       ))}
 
       <div className="loops-held">
-        <h3 className="perm-group__title">
-          Held{state.loops.length > 0 ? ` (${state.loops.length})` : ''}
-        </h3>
+        <h3 className="perm-group__title">Held{open.length > 0 ? ` (${open.length})` : ''}</h3>
         {state.loops.length === 0 ? (
           <p>Nothing is held.</p>
         ) : (

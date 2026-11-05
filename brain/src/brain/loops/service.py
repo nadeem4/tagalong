@@ -68,9 +68,10 @@ class LoopService:
         self._unread: dict[str, datetime] = {}
 
     def start(self) -> None:
-        for app_id in self._store.on_apps():  # the switch outlives a restart
-            if self.can_read(app_id):
-                self.enable(app_id)
+        # The switch outlives a restart. Apps connect after this runs, so no can_read check: a
+        # poll before the app is up counts as a failure and is retried.
+        for app_id in self._store.on_apps() if self._apps else []:
+            self.enable(app_id, GmailSource(app_id, self._apps.call))
         self.fire_due()
 
     def changed(self) -> None:

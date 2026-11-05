@@ -147,6 +147,21 @@ describe('LoopsPanel', () => {
     expect(await screen.findByText('Send Priya the Q4 deck')).toBeInTheDocument();
   });
 
+  it('reads again when an app connects while Home is open', async () => {
+    const bridge = open({ apps: [] });
+    await screen.findByText(/Connect Gmail/);
+    bridge.loops = { ...bridge.loops, apps: [{ id: 'gmail', name: 'Gmail', on: false }] };
+    act(() => bridge.emitChanged('apps'));
+    expect(await screen.findByRole('switch', { name: /Gmail/ })).toBeInTheDocument();
+  });
+
+  it('counts only open loops in Held, not done or dropped ones', async () => {
+    open({
+      loops: [LOOP, { ...WAITING, status: 'done' }, { ...WAITING, id: 'c3', status: 'dropped' }],
+    });
+    expect(await screen.findByRole('heading', { name: 'Held (1)' })).toBeInTheDocument();
+  });
+
   it('points to connecting a mail app when none is offered', async () => {
     open({ apps: [] });
     expect(await screen.findByText(/Connect Gmail/)).toBeInTheDocument();

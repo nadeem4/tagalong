@@ -27,8 +27,8 @@ def loop_home_tools(
     def mail_apps() -> list[dict]:
         out = []
         for app_id, name in apps():
-            if not service.can_read(app_id):
-                continue
+            if not (service.is_on(app_id) or service.can_read(app_id)):
+                continue  # an app that is on stays listed even while it cannot be read
             row: dict = {"id": app_id, "name": name, "on": service.is_on(app_id)}
             since = service.unread_since(app_id)
             if since is not None:

@@ -1380,7 +1380,9 @@ creates a loop before that.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
-  recorded in the store before the event goes out, so a restart never repeats it. One `call_later` is
+  recorded in the store before the event goes out, so a restart never repeats it. Known limit: if the scheduler then drops
+  the wake (the hourly wake budget is spent, or no key is set), that surface is not retried; a due
+  loop stays visible in Home's Held list but Scout does not bring it up again. One `call_later` is
   armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
   `Timers`); `changed()` re-arms after loops are added or edited. `fire_due()` also runs on each poll
   tick, so the quiet and stale checks need no timer of their own.
@@ -1442,8 +1444,10 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   `wipe` stops everything and deletes every loop and cursor). Home's "Read my
   mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
   turns it on. The switch is saved (an `on:<app>` key in `loop_cursor`, set by `enable`, deleted by
-  `disable`), and `start()` turns on each saved app that is still a readable mail app, so a restart
-  keeps reading.
+  `disable`), and `start()` turns on every saved app without checking that it can be read yet (apps connect after
+  `start()`, so their tools are not listed then). A poll before the app is connected fails and is
+  retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
+  is on even while it cannot be read.
   - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
     `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
     `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`

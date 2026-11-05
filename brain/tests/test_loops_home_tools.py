@@ -149,14 +149,25 @@ async def test_the_switch_survives_a_restart(rig):
     assert not fresh.is_on("gmail")  # switched off stays off
 
 
-async def test_a_saved_switch_for_an_app_that_cannot_be_read_any_more_is_skipped(rig):
+async def test_a_saved_switch_is_on_after_a_restart_before_the_app_connects(rig):
     await rig.call("loops_set", app="gmail", on=True)
+    rig.svc.disable("gmail")
+    rig.store.set_on("gmail", True)  # as left by the earlier run
     apps = StubApps()
-    apps.by_app["gmail"] = []
+    apps.by_app["gmail"] = []  # apps.start() has not connected Gmail yet
     again = LoopService(rig.store, lambda e: None, lambda: T0, None, apps, poll_s=3600)
     again.start()
-    assert not again.is_on("gmail")
-    rig.svc.disable("gmail")
+    assert again.is_on("gmail")
+    rows = {a["id"]: a for a in json.loads(await _state(again))["apps"]}
+    assert rows["gmail"]["on"] is True  # listed though it cannot be read right now
+    apps.by_app["gmail"] = GMAIL  # it connects
+    assert again.can_read("gmail")
+    again.disable("gmail")
+
+
+async def _state(svc):
+    tools = {s.name: h for s, h in loop_home_tools(svc, lambda: [("gmail", "Gmail")])}
+    return await tools["loops_state"]({})
 
 
 async def test_sweeping_stale_loops_and_surfacing_tell_home(rig):

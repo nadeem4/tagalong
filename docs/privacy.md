@@ -425,7 +425,8 @@ day, for Home's **Spend** card and the daily budget.
 - **Off until you turn it on.** Home, Connections, "Read my mail for loops", one switch per Gmail
   account you connected. While it is off Scout reads no mail. Turning it on reads the last 14 days
   of mail you have not answered, then new and sent mail every few minutes. The switch stays as you
-  left it across restarts: on stays on until you turn it off.
+  left it across restarts: on stays on until you turn it off. If the mail app is not connected yet
+  after a restart, it reads again as soon as it is.
 - **What leaves.** Each mail is sent to Anthropic (a small model) so it can be read for what is
   waiting on you. Bulk mail is skipped before that. Scout only reads and drafts: it never sends,
   and it never changes your mailbox (no labels, archive or read marks).
