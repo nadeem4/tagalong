@@ -1,7 +1,8 @@
 """Quiet trigger: someone owes the person a reply and has gone quiet past the agreed time.
 
-A reply cancels it through the reader: it closes the loop or turns it into one the person
-owes, so only a still-waiting loop reaches here.
+A reply from the person closes the loop (sent scan) or the reader turns it into one they owe;
+an inbound reply from them marks the old quiet time as used (LoopService), so only a
+still-waiting loop reaches here.
 """
 
 from datetime import datetime

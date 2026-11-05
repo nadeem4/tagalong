@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 # Re-check at least hourly so a wall-clock change cannot strand the timer.
 _MAX_SLEEP_S = 3600
-_DUE_STATUSES = ("held", "snoozed")
+_DUE_STATUSES = ("held", "snoozed", "stale")  # a stale loop's future due still fires
 _OPEN = ("held", "surfaced", "snoozed", "stale")
 _CONTEXT_STATUSES = ("held", "surfaced")  # a snoozed loop waits for its time, not for a window
 # Per reason: (wakes, within seconds), counted across all loops, so Held cannot become noise.
@@ -125,6 +125,15 @@ class LoopService:
         self._sent[reason] = [*recent, now]
         return True
 
+    def _free_at(self, reason: str) -> datetime | None:
+        """When a throttled reason may wake again; None when it may now."""
+        limit, within = _THROTTLE[reason]
+        now = self._now()
+        recent = [t for t in self._sent.get(reason, []) if (now - t).total_seconds() < within]
+        if len(recent) < limit:
+            return None
+        return recent[len(recent) - limit] + timedelta(seconds=within)
+
     def _sweep_stale(self, now: datetime) -> None:
         found = stale.ripe(self._store.list("held"), now, self._stale_days)
         if not found:
@@ -165,12 +174,15 @@ class LoopService:
         except RuntimeError:
             return
         waiting = self._with_status(_DUE_STATUSES)
+        now = self._now()
+        free = self._free_at("quiet")  # a ripe quiet loop waits for the throttle, not a busy loop
         times = [lp.due for lp in due.pending(waiting)] + [
-            lp.quiet_after for lp in quiet.pending(waiting)
+            max(lp.quiet_after, free) if free and lp.quiet_after <= now else lp.quiet_after  # type: ignore[type-var,operator]
+            for lp in quiet.pending(waiting)
         ]
         if not times:
             return
-        delay = (min(times) - self._now()).total_seconds()  # type: ignore[type-var]
+        delay = (min(times) - now).total_seconds()  # type: ignore[type-var]
         self._handle = running.call_later(min(max(delay, 0), _MAX_SLEEP_S), self.fire_due)
 
     # --- mail ---
@@ -299,7 +311,12 @@ class LoopService:
         elif change.kind == "update":
             current = self._store.get(change.loop_id)
             if current is not None:
-                self._save(self._merged(current, change), item)
+                merged = self._merged(current, change)
+                if merged.direction == "they_owe" and not change.quiet_after and merged.quiet_after:
+                    # They wrote back: the old quiet time no longer means they have gone quiet.
+                    # Marked before the save, whose re-check would otherwise fire it.
+                    self._store.mark_surfaced(current.id, quiet.anchor(merged), self._today())
+                self._save(merged, item)
         elif change.kind == "new":
             known = related[0] if related else None
             saved = self._save(self._from_change(item, change, known), item)

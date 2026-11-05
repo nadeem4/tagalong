@@ -48,6 +48,7 @@ def matches(anchor: str, title: str, url: str = "") -> bool:
         padded = " " + " ".join(seen) + " "
         if f" {' '.join(name)} " in padded and ext.group()[1:] in seen:
             return True
+        return False  # a file anchor is that file, not a topic another app's window may share
     meaningful = [w for w in _words(anchor) if w not in _STOP]
     if len(meaningful) < 2:
         return False
@@ -66,5 +67,6 @@ def mail_in_front(app: str, title: str, url: str) -> bool:
     host = _host_path(url)[0] if url else ""
     if host in _MAIL_HOSTS:
         return True
-    seen = f"{app} {title}".lower()
-    return any(word in seen for word in _MAIL_WORDS)
+    # The app itself, or the "- Outlook" / "- Gmail" tail mail clients put on a window title.
+    tail = title.lower().rsplit(" - ", 1)[-1] if " - " in title else ""
+    return any(word in app.lower() or word == tail.strip() for word in _MAIL_WORDS)
