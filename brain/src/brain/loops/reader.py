@@ -68,7 +68,7 @@ class Change:
     loop_id: str = ""
     title: str = ""
     asks: str = ""
-    direction: Literal["i_owe", "they_owe"] = "i_owe"
+    direction: Literal["i_owe", "they_owe"] | None = None  # None: the model gave none
     people: list[str] = field(default_factory=list)
     due: datetime | None = None
     quiet_after: datetime | None = None
@@ -107,6 +107,10 @@ def _esc(text: str) -> str:
     return text.replace("<", "&lt;")
 
 
+def _attr(text: str) -> str:
+    return _esc(text).replace('"', "&quot;")
+
+
 def _prompt(item: MailItem, related: list[Loop]) -> str:
     loops = "\n".join(
         f"- id {lp.id}: {_esc(lp.title)} | {lp.direction} | asks: {_esc(lp.asks)} "
@@ -114,10 +118,10 @@ def _prompt(item: MailItem, related: list[Loop]) -> str:
         for lp in related
     )
     return (
-        "Open loops that may relate (ids for update or close):\n"
-        f"{loops or '(none)'}\n\n"
-        f'<mail untrusted="true" app="{_esc(item.app)}" thread="{_esc(item.thread)}" '
+        f'<mail untrusted="true" app="{_attr(item.app)}" thread="{_attr(item.thread)}" '
         f'from_me="{str(item.sent).lower()}">\n'
+        "Open loops that may relate (ids for update or close; from earlier mail):\n"
+        f"{loops or '(none)'}\n\n"
         f"From: {_esc(item.sender)}\nDate: {item.date.isoformat()}\n"
         f"Subject: {_esc(item.subject)}\n\n{_esc(item.body[:BODY_MAX])}\n</mail>"
     )
@@ -129,7 +133,10 @@ def _ignore(reason: str) -> Change:
 
 def _when(value) -> datetime | None:
     try:
-        return datetime.fromisoformat(value) if isinstance(value, str) and value else None
+        if not isinstance(value, str) or not value:
+            return None
+        when = datetime.fromisoformat(value)
+        return when if when.tzinfo else when.astimezone()  # a naive time is the person's local
     except ValueError:
         return None
 
@@ -165,6 +172,7 @@ class HaikuReader:
             return _ignore("reader call failed")
         if final is None:
             return _ignore("no answer")
+        # A stream that fails after billing records no spend: no Final, so no usage to count.
         self._budget.spend(final.usage, final.model or self._model.model_id)
         call = next(
             (
@@ -200,7 +208,7 @@ class HaikuReader:
             loop_id=loop_id,
             title=_text(data.get("title")),
             asks=_text(data.get("asks")),
-            direction=direction if direction in ("i_owe", "they_owe") else "i_owe",
+            direction=direction if direction in ("i_owe", "they_owe") else None,
             people=_strings(data.get("people")),
             due=_when(data.get("due")),
             quiet_after=_when(data.get("quiet_after")),
