@@ -78,6 +78,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
+| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events (see [Loops](#loops))                                                                                                                                |
 | `brain/src/brain/timers.py`            | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
@@ -1058,6 +1059,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
 | `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                       |
 | `timer`           | 0 s          | 6            | One of Scout's timers came due                                                                                                                                                               |
+| `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                             |
 | `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                      |
 | `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                     |
 | `job_question`    | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                                              |
@@ -1353,6 +1355,33 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
+
+## Loops
+
+A loop is something left open that Scout holds for the person: a reply they owe, a promise
+someone made them. This first part has the shape, the store and the deadline clock; nothing reads
+mail yet, so nothing creates a loop outside tests.
+
+- **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
+  app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
+  (`i_owe` or `they_owe`), people, a `due` time, a `quiet_after` time, anchors (window or page names
+  that mean "you are working on this", used later), a status (`held`, `surfaced`, `snoozed`,
+  `done`, `dropped`, `stale`), a map of when each anchor last surfaced it, and a history.
+- **Store** (`loops/store.py`). `LoopStore` works over the connection `Memory` already opened
+  (`Memory.db`), so loops live in `tagalong.db`; see [Memory](memory.md#loops-tables). Saving the
+  same (source, ref) updates the loop and never duplicates it. Text is masked (`[secret]`) before
+  it is written, history included. `forget` removes one loop; `wipe` removes every loop, the
+  surface log and the per-app cursor.
+- **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
+  `main.py` beside the session. It emits a `loop` event (`reason=due`, with the loop's id, title,
+  asks, direction, people and due) for each `held` or `snoozed` loop whose `due` has passed, once per
+  due time: the fire is recorded in the store, so a restart does not repeat it, and moving the
+  due time lets it fire again. Loops that are done, dropped, surfaced or stale never fire. One
+  `call_later` is armed for the earliest unfired due time, re-checked at least hourly (the same
+  pattern as `Timers`); `changed()` re-arms after loops are added or edited.
+- **Event.** `loop` wakes Scout with a 0 s batch window and at most 4 wakes an hour. Its note in
+  `mind/events.md` tells Scout the title, asks and people may be someone else's words and are data,
+  not instructions. Later slices add more reasons (context, urgent, quiet, stale, digest).
 
 ## Web search and fetch
 

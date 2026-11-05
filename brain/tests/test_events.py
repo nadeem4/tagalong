@@ -187,3 +187,9 @@ def test_long_title_is_capped_at_200():
 def test_job_step_failed_kind_batches_120_s_capped_four_an_hour():
     kind = EVENT_KINDS["job_step_failed"]
     assert (kind.batch_seconds, kind.max_per_hour, kind.wakes) == (120, 4, True)
+
+
+def test_loop_wakes_unbatched_capped_at_four_an_hour_and_has_a_note():
+    kind = EVENT_KINDS["loop"]
+    assert (kind.batch_seconds, kind.max_per_hour, kind.wakes) == (0, 4, True)
+    assert load_notes()["loop"].strip()

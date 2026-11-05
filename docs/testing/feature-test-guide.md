@@ -585,6 +585,23 @@ Needs the same setup as the hand-off section above.
    file with a connected app or with Claude Code.
    **Expected:** Scout still answers, and fetches more only when it needs it.
 
+## A due loop wakes Scout (real brain)
+
+Loops have no way in yet (mail reading comes later), so this needs a test row put in the database
+by hand. Stop the brain first.
+
+1. **Action:** in `tagalong.db` run this, with the due time (UTC) a minute or two ahead:
+   `INSERT INTO loops(id, source, ref, title, asks, direction, people, due, quiet_after, anchors,
+status, history, created, updated) VALUES ('test0001', 'manual', 'test-1', 'Send Sam the Q4
+numbers', 'send the Q4 numbers', 'i_owe', '["Sam"]', '2026-11-04T09:30:00+00:00', NULL, '[]',
+'held', '[]', '2026-11-04T09:00:00+00:00', '2026-11-04T09:00:00+00:00');`
+   Start the brain and the desktop.
+   **Expected:** when the time comes Scout speaks once, without being asked, about sending Sam the
+   numbers, in its own words.
+2. **Action:** stop and restart the brain.
+   **Expected:** Scout does not mention that loop again; a loop already past due at start speaks
+   once, then never again unless its due time changes.
+
 ## Scout's timers (real brain)
 
 Needs the real brain running and the desktop connected. Timers wake Scout with no batching, so
