@@ -5,7 +5,7 @@
  * The brain owns it all; this asks, then reads again when it says `loops` changed. A row shows
  * what the loop is, never the mail it came from. Contains LoopsPanel.
  */
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { LoopRow, LoopsState } from '../shapes';
 import { Button } from '../controls/button';
 import { Toggle } from '../controls/toggle';
@@ -42,6 +42,18 @@ export function LoopsPanel() {
   const [state, setState] = useState<LoopsState | null>(null);
   const [failed, setFailed] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const stopRef = useRef<HTMLButtonElement>(null);
+  const backToStop = useRef(false); // Cancel/Escape: focus returns to the button that opened it
+  const cancel = () => {
+    backToStop.current = true;
+    setConfirming(false);
+  };
+  useEffect(() => {
+    if (!confirming && backToStop.current) {
+      backToStop.current = false;
+      stopRef.current?.focus();
+    }
+  }, [confirming]);
 
   const refresh = useCallback(() => {
     bridge
@@ -89,6 +101,7 @@ export function LoopsPanel() {
         Scout can notice what is waiting on you in your mail, and bring it up when it matters. It
         only reads, never sends or changes your mail. Off until you turn it on.
       </p>
+      <p>Your mail goes to Anthropic to be read. The loops it finds stay on this computer.</p>
       {state.apps.length === 0 && <p>Connect Gmail above and the switch appears here.</p>}
       {state.apps.map((app) => (
         <div key={app.id} className="loops-app">
@@ -100,11 +113,6 @@ export function LoopsPanel() {
               onChange={(on) => run(bridge.setLoopsOn(app.id, on))}
             />
           </div>
-          {app.on && (
-            <p className="loops-app__note">
-              Your mail goes to Anthropic to be read. The loops it finds stay on this computer.
-            </p>
-          )}
           {app.on && app.unreadSince !== undefined && (
             <p className="loops-app__note loops-app__note--warn">
               <span className="home-dot home-dot--warn" aria-hidden="true" /> Mail unread since{' '}
@@ -147,7 +155,7 @@ export function LoopsPanel() {
       </div>
 
       {(anyOn || state.loops.length > 0) && !confirming && (
-        <Button variant="secondary" onClick={() => setConfirming(true)}>
+        <Button variant="secondary" ref={stopRef} onClick={() => setConfirming(true)}>
           Stop and wipe
         </Button>
       )}
@@ -156,7 +164,7 @@ export function LoopsPanel() {
           role="alert"
           className="loops-confirm"
           onKeyDown={(event) => {
-            if (event.key === 'Escape') setConfirming(false);
+            if (event.key === 'Escape') cancel();
           }}
         >
           <p>
@@ -172,7 +180,7 @@ export function LoopsPanel() {
           >
             Wipe
           </Button>
-          <Button variant="quiet" autoFocus onClick={() => setConfirming(false)}>
+          <Button variant="quiet" autoFocus onClick={cancel}>
             Cancel
           </Button>
         </div>

@@ -592,11 +592,10 @@ Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the deskt
 `e2e/loops.spec.ts` on the fake brain. By hand, with a real brain and Gmail connected:
 
 1. **Action:** open Home, Connections, scroll to "Read my mail for loops".
-   **Expected:** the Gmail switch is Off, the list says "Nothing is held.", and no line about mail
-   leaving yet. With no mail app connected the card says to connect Gmail and shows no switch.
+   **Expected:** the Gmail switch is Off, the list says "Nothing is held.", and the line "Your mail
+   goes to Anthropic to be read. The loops it finds stay on this computer." is already there. With no mail app connected the card says to connect Gmail and shows no switch.
 2. **Action:** turn the switch On.
-   **Expected:** the line "Your mail goes to Anthropic to be read. The loops it finds stay on this
-   computer." appears; within a minute or two held rows appear (title, what it asks, You owe or
+   **Expected:** within a minute or two held rows appear (title, what it asks, You owe or
    Waiting on them, people, due, status), none showing mail text.
 3. **Action:** press Forget on one row.
    **Expected:** only that row goes.

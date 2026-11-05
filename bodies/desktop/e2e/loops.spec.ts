@@ -60,12 +60,11 @@ test('the mail switch, the Held list, forget and Stop and wipe', async () => {
   const toggle = card.getByRole('switch', { name: 'Read my mail for loops (Gmail)' });
   await expect(toggle).toHaveAttribute('aria-checked', 'false', { timeout: 30_000 });
   await expect(card).toContainText('Nothing is held.');
-  await expect(card).not.toContainText('goes to Anthropic');
+  await expect(card).toContainText('Your mail goes to Anthropic to be read');
 
-  // On: the brain hears it, the plain line shows, and the first read leaves a held row.
+  // On: the brain hears it and the first read leaves a held row.
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
-  await expect(card).toContainText('Your mail goes to Anthropic to be read');
   const row = card.getByRole('listitem').filter({ hasText: 'Send Priya the Q4 deck' });
   await expect(row).toContainText('You owe');
   await expect(row).toContainText('Priya');

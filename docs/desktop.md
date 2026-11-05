@@ -499,11 +499,11 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
   checks the card. Home's Connections page ends with the "Read my mail for loops" card
   (`bodies/ui/src/home/loops-panel.tsx`, `ipc/loops.ts`): one shared `Toggle` per mail app the brain
-  offers (off until turned on; on shows "Your mail goes to Anthropic to be read. The loops it finds
-  stay on this computer."), "Mail unread since HH:MM" when the brain says reading stopped, the Held
+  offers (off until turned on; the card always says "Your mail goes to Anthropic to be read. The loops it
+  finds stay on this computer."), "Mail unread since HH:MM" when the brain says reading stopped, the Held
   list (every loop the brain holds: title, what it asks, You owe or Waiting on them, people, due, status,
   never the mail text) with a quiet Forget on each row, and Stop and wipe, which asks inside the
-  page (a Wipe and Cancel alert, Escape cancels) before every switch goes off and every loop is
+  page (a Wipe and Cancel alert, Escape cancels, focus returns to Stop and wipe) before every switch goes off and every loop is
   deleted. The ipc layer checks its arguments (the page is not trusted); the card reads again on
   `changed { what: "loops" }`. The fake brain turns a held loop up when the switch goes on, and
   `e2e/loops.spec.ts` walks switch, row, Forget, Cancel and Wipe. A tool the brain marks `self_asks` (Claude Code's own, which asks through a

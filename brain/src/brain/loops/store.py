@@ -152,6 +152,16 @@ class LoopStore:
     def set_backfilled(self, app_id: str) -> None:
         self.set_cursor(f"backfill:{app_id}", "done")
 
+    def set_on(self, app_id: str, on: bool) -> None:
+        if on:
+            self.set_cursor(f"on:{app_id}", "1")
+        else:
+            self._db.execute("DELETE FROM loop_cursor WHERE app_id = ?", (f"on:{app_id}",))
+
+    def on_apps(self):
+        rows = self._db.execute("SELECT app_id FROM loop_cursor WHERE app_id LIKE 'on:%'")
+        return [r[0][3:] for r in rows.fetchall()]
+
     def forget(self, loop_id: str) -> None:
         self._db.execute("DELETE FROM loop_surfaced WHERE loop_id = ?", (loop_id,))
         self._db.execute("DELETE FROM loops WHERE id = ?", (loop_id,))

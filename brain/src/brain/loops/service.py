@@ -68,6 +68,9 @@ class LoopService:
         self._unread: dict[str, datetime] = {}
 
     def start(self) -> None:
+        for app_id in self._store.on_apps():  # the switch outlives a restart
+            if self.can_read(app_id):
+                self.enable(app_id)
         self.fire_due()
 
     def changed(self) -> None:
@@ -113,6 +116,7 @@ class LoopService:
         self._store.mark_surfaced(loop.id, key, self._today())
         facts = {**self._facts(loop, reason), **(extra or {})}
         self._emit(Event("loop", facts, key=f"loop:{loop.id}"))
+        self._notify("changed", {"what": "loops"})
 
     def _take(self, reason: str) -> bool:
         """Whether this reason may wake now; if so, counts it."""
@@ -143,6 +147,7 @@ class LoopService:
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in found)
         facts: dict[str, str | int] = {"reason": "stale", "count": len(found), "loops": lines}
         self._emit(Event("loop", facts, key=f"loop-stale:{now.isoformat()}"))
+        self._notify("changed", {"what": "loops"})
 
     def _today(self) -> str:
         return self._now().astimezone().date().isoformat()  # the local day
@@ -195,11 +200,13 @@ class LoopService:
             source = GmailSource(app_id, self._apps.call)  # direct: the switch is the consent
         self.disable(app_id)
         self._sources[app_id] = source
+        self._store.set_on(app_id, True)
         self._schedule(app_id, 0)
         self._notify("changed", {"what": "loops"})
 
     def disable(self, app_id: str) -> None:
         """Switch off: polling stops; loops already held stay."""
+        self._store.set_on(app_id, False)
         self._sources.pop(app_id, None)
         handle = self._polls.pop(app_id, None)
         if handle:
@@ -256,8 +263,10 @@ class LoopService:
 
     async def _cycle(self, app_id: str) -> None:
         try:
+            before = self._view(app_id)
             await self.poll(app_id)
-            self._notify("changed", {"what": "loops"})  # new loops, or the unread line moved
+            if self._view(app_id) != before:  # new loops, or the unread line moved
+                self._notify("changed", {"what": "loops"})
             self.fire_due()  # the poll tick also sweeps quiet and stale loops
         except Exception:  # a bad poll must not end the polling
             log.exception("loops poll failed for %s", app_id)
@@ -266,6 +275,10 @@ class LoopService:
             # chain.
             if app_id in self._sources and self._tasks.get(app_id) is asyncio.current_task():
                 self._schedule(app_id, self._poll_s)
+
+    def _view(self, app_id: str) -> tuple:
+        loops = [(lp.id, lp.status, len(lp.history)) for lp in self._store.list()]
+        return loops, self._unread.get(app_id)
 
     async def poll(self, app_id: str) -> None:
         source = self._sources[app_id]

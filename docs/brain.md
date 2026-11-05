@@ -1441,7 +1441,9 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
   `wipe` stops everything and deletes every loop and cursor). Home's "Read my
   mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
-  turns it on, and a restart puts it back off.
+  turns it on. The switch is saved (an `on:<app>` key in `loop_cursor`, set by `enable`, deleted by
+  `disable`), and `start()` turns on each saved app that is still a readable mail app, so a restart
+  keeps reading.
   - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
     `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
     `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
@@ -1479,8 +1481,9 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   backfill) or stops that app's poll; an app that is not a mail app is refused with `invalid_params`,
   and off keeps the loops. `loop_forget {id}` deletes one loop. `loops_wipe` is Stop and wipe: every
   switch off, every loop, surface log and cursor deleted. Each emits `changed { what: "loops" }`, as
-  does every finished poll, so an open Home reads again. The switch is not saved: a fresh brain, and
-  a restarted one, has every switch off.
+  does a poll that changed something, a surfacing and a stale sweep, so an open Home reads again.
+  The switch is saved: a restarted brain keeps reading where it was on; a fresh one has every
+  switch off.
 
 ## Web search and fetch
 

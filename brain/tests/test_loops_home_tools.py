@@ -134,3 +134,52 @@ async def test_wipe_switches_off_and_deletes_every_loop_and_cursor(rig):
     assert state["loops"] == [] and state["apps"][0]["on"] is False
     assert rig.store.cursor("gmail") is None
     await asyncio.sleep(0)
+
+
+async def test_the_switch_survives_a_restart(rig):
+    await rig.call("loops_set", app="gmail", on=True)
+    again = LoopService(rig.store, lambda e: None, lambda: T0, None, StubApps(), poll_s=3600)
+    assert not again.is_on("gmail")
+    again.start()
+    assert again.is_on("gmail") and "gmail" in again._polls
+    again.disable("gmail")
+    rig.svc.disable("gmail")
+    fresh = LoopService(rig.store, lambda e: None, lambda: T0, None, StubApps(), poll_s=3600)
+    fresh.start()
+    assert not fresh.is_on("gmail")  # switched off stays off
+
+
+async def test_a_saved_switch_for_an_app_that_cannot_be_read_any_more_is_skipped(rig):
+    await rig.call("loops_set", app="gmail", on=True)
+    apps = StubApps()
+    apps.by_app["gmail"] = []
+    again = LoopService(rig.store, lambda e: None, lambda: T0, None, apps, poll_s=3600)
+    again.start()
+    assert not again.is_on("gmail")
+    rig.svc.disable("gmail")
+
+
+async def test_sweeping_stale_loops_and_surfacing_tell_home(rig):
+    rig.add(due=T0 - timedelta(hours=1))
+    rig.notes.clear()
+    rig.svc.fire_due()
+    assert ("changed", {"what": "loops"}) in rig.notes  # the due loop surfaced
+    rig.notes.clear()
+    rig.svc.fire_due()
+    assert rig.notes == []  # nothing changed, so nothing is announced
+
+
+async def test_a_stale_sweep_tells_home(rig):
+    rig.add()
+    notes = []
+    later = LoopService(
+        rig.store,
+        lambda e: None,
+        lambda: T0 + timedelta(days=30),
+        None,
+        StubApps(),
+        notify=lambda kind, data: notes.append((kind, data)),
+    )
+    later.fire_due()
+    assert rig.store.list()[0].status == "stale"
+    assert ("changed", {"what": "loops"}) in notes

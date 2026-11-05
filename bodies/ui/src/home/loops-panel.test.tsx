@@ -44,23 +44,24 @@ function open(state: Partial<LoopsState> = {}): FakeHostBridge {
 }
 
 describe('LoopsPanel', () => {
-  it('has the switch off by default and says nothing about mail leaving until it is on', async () => {
+  it('has the switch off by default and says where mail goes before it is turned on', async () => {
     open();
     const toggle = await screen.findByRole('switch', { name: 'Read my mail for loops (Gmail)' });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
-    expect(screen.queryByText(/goes to Anthropic/)).toBeNull();
+    expect(screen.getByText(/goes to Anthropic to be read/)).toHaveTextContent(
+      'stay on this computer',
+    );
   });
 
-  it('turning it on calls the brain and shows one plain line about where mail goes', async () => {
+  it('turning it on calls the brain and flips the switch', async () => {
     const bridge = open();
     fireEvent.click(await screen.findByRole('switch', { name: /Read my mail for loops/ }));
     await waitFor(() => expect(bridge.loopCalls).toEqual(['set gmail on']));
-    expect(await screen.findByText(/goes to Anthropic to be read/)).toHaveTextContent(
-      'stay on this computer',
-    );
-    expect(screen.getByRole('switch', { name: /Read my mail/ })).toHaveAttribute(
-      'aria-checked',
-      'true',
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: /Read my mail/ })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
     );
   });
 
@@ -102,6 +103,15 @@ describe('LoopsPanel', () => {
     fireEvent.click(within(alert).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alert')).toBeNull();
     expect(bridge.loopCalls).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Stop and wipe' })).toHaveFocus();
+  });
+
+  it('Escape also closes the confirm and returns focus to Stop and wipe', async () => {
+    open({ loops: [LOOP] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop and wipe' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Cancel' }), { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Stop and wipe' })).toHaveFocus();
   });
 
   it('wipes on Confirm: switch off, list empty', async () => {
