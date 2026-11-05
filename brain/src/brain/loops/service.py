@@ -4,9 +4,9 @@ Code decides when; Scout decides whether and what to say. A due loop fires once 
 time (recorded in the store, so a restart never repeats it), through the same event path
 timers use. The arming mirrors Timers: one call_later, re-checked at least hourly.
 Mail: `enable(app)` starts a poll per app (the first poll reads the last 14 days, unanswered
-only, then a cursor keeps place); each mail goes through the pre-filter and the reader into the
-store; the person's own sent mail closes an "I owe" loop in code. Read-only: nothing here
-changes a mailbox.
+only, until it finishes; then a cursor keeps place); each mail goes through the pre-filter and
+the reader into the store; the person's own sent mail closes an "I owe" loop in code.
+Read-only: nothing here changes a mailbox.
 """
 
 import asyncio
@@ -14,7 +14,6 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
-from brain.apps import AppError
 from brain.events import Event
 from brain.loops.loop import Loop
 from brain.loops.reader import Change, MailItem, Reader, ReaderStopped, prefilter
@@ -167,7 +166,9 @@ class LoopService:
         except Exception:  # a bad poll must not end the polling
             log.exception("loops poll failed for %s", app_id)
         finally:
-            if app_id in self._sources:
+            # Only the live task reschedules: a cancelled one (switched on again) would start a 2nd
+            # chain.
+            if app_id in self._sources and self._tasks.get(app_id) is asyncio.current_task():
                 self._schedule(app_id, self._poll_s)
 
     async def poll(self, app_id: str) -> None:
@@ -177,17 +178,21 @@ class LoopService:
         since = datetime.fromisoformat(cursor) if cursor else now - timedelta(days=BACKFILL_DAYS)
         stopped = False
         try:
-            items = await source.new_items(since, unanswered_only=cursor is None)
+            items = await source.new_items(
+                since, unanswered_only=not self._store.backfilled(app_id)
+            )
             try:
                 for item in items:
                     await self._process(app_id, item)
                     self._store.set_cursor(app_id, item.date.isoformat())
             except ReaderStopped:
                 stopped = True
-            if cursor is None and not items:
-                self._store.set_cursor(app_id, now.isoformat())  # nothing waiting: backfill done
-            await self._close_replied(app_id, source, since)
-        except AppError as exc:
+            if not stopped:
+                self._store.set_backfilled(app_id)
+                if cursor is None and not items:
+                    self._store.set_cursor(app_id, now.isoformat())  # nothing waiting
+            await self._close_replied(app_id, source, since, advance=not stopped)
+        except Exception as exc:  # any failure counts; CancelledError is not an Exception
             self._fails[app_id] = self._fails.get(app_id, 0) + 1
             log.warning("loops poll of %s failed: %s", app_id, exc)
             if self._fails[app_id] >= _FAILS_BEFORE_UNREAD:
@@ -251,14 +256,23 @@ class LoopService:
             anchors=change.anchors or loop.anchors,
         )
 
-    async def _close_replied(self, app_id: str, source: Source, since: datetime) -> None:
-        """A reply the person sent after the mail that made the loop is the loop done (no model)."""
-        for sent in await source.sent_items(since):
+    async def _close_replied(
+        self, app_id: str, source: Source, since: datetime, advance: bool
+    ) -> None:
+        """A reply the person sent after the mail that made the loop is the loop done (no model).
+
+        Sent mail has its own cursor, moved only after a full poll so a stop cannot skip a reply
+        whose inbound mail was not read yet."""
+        mark = self._store.sent_cursor(app_id)
+        sent_items = await source.sent_items(datetime.fromisoformat(mark) if mark else since)
+        if advance and sent_items:
+            self._store.set_sent_cursor(app_id, max(s.date for s in sent_items).isoformat())
+        for sent in sent_items:
             for loop in self._open(app_id):
                 is_reply = loop.ref == sent.thread and loop.direction == "i_owe"
                 if is_reply and sent.date > self._last_inbound(loop):
                     self._store.set_status(loop.id, "done")
-                    self._store.add_history(loop.id, "you replied", sent.date)
+                    self._store.add_history(loop.id, "you replied")  # not inbound: no mail_at
 
     @staticmethod
     def _last_inbound(loop: Loop) -> datetime:

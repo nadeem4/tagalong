@@ -21,7 +21,7 @@ from brain.loops.reader import MailItem
 READ_TOOLS = ("search_threads", "get_thread")
 DRAFT_TOOLS = ("create_draft",)
 _ALLOWED = frozenset(READ_TOOLS + DRAFT_TOOLS)
-_PAGE = 50  # threads per search; a poll is minutes of mail, a backfill is 14 days
+_PAGE = 50  # threads per search page; the next-page token is followed to the end
 
 
 def _when(value) -> datetime | None:
@@ -73,12 +73,23 @@ class GmailSource:
 
     async def _threads(self, folder: str, since: datetime) -> list[str]:
         query = f"{folder} after:{int(since.timestamp())}"
-        data = await self._call("search_threads", {"query": query, "page_size": _PAGE})
-        found = data.get("threads") if isinstance(data, dict) else None
-        if not isinstance(found, list):
-            return []
-        ids = (t.get("id") for t in found if isinstance(t, dict))
-        return [i for i in ids if isinstance(i, str) and i]
+        ids: list[str] = []
+        token = ""
+        seen = {token}
+        while True:  # follow the next-page token, so a busy backfill loses no thread
+            args = {"query": query, "page_size": _PAGE, **({"page_token": token} if token else {})}
+            data = await self._call("search_threads", args)
+            if not isinstance(data, dict):
+                return ids
+            found = data.get("threads")
+            for t in found if isinstance(found, list) else []:
+                tid = t.get("id") if isinstance(t, dict) else None
+                if isinstance(tid, str) and tid:
+                    ids.append(tid)
+            token = data.get("next_page_token")
+            if not isinstance(token, str) or token in seen:
+                return ids
+            seen.add(token)
 
     async def _messages(self, thread: str) -> list[MailItem]:
         data = await self._call("get_thread", {"thread_id": thread})

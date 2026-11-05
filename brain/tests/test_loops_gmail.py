@@ -121,6 +121,16 @@ async def test_missing_fields_are_tolerated(gmail):
     assert len(items) == 1 and items[0].subject == "" and items[0].body == ""
 
 
+async def test_every_thread_since_the_time_is_read_across_pages(gmail):
+    busy = [
+        {"id": f"b{i}", "messages": [msg(f"x{i}", "Priya <p@x.com>", 30, ["INBOX"])]}
+        for i in range(120)
+    ]
+    _, spy = await gmail(busy)
+    items = await GmailSource("gmail", spy.call).new_items(NOW - timedelta(days=14))
+    assert len(items) == 120 and spy.tools.count("search_threads") == 3
+
+
 async def test_draft_reply_uses_only_the_draft_tool(gmail):
     _, spy = await gmail(THREADS)
     await GmailSource("gmail", spy.call).draft_reply("t1", "Thanks, on it.")

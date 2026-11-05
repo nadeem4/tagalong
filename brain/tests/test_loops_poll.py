@@ -43,7 +43,14 @@ class FakeSource:
         if self.fail:
             self.fail -= 1
             raise AppError("Gmail is not connected.")
-        return [i for i in self.inbound if i.date > since]
+        found = [i for i in self.inbound if i.date > since]
+        if unanswered_only:  # like Gmail: skip a thread whose last message is the person's own
+            found = [
+                i
+                for i in found
+                if not any(s.thread == i.thread and s.date > i.date for s in self.sent)
+            ]
+        return found
 
     async def sent_items(self, since):
         self.sent_calls.append(since)
@@ -168,6 +175,8 @@ async def test_a_second_mail_on_a_known_thread_updates_the_same_loop(rig):
 
 async def test_a_sent_reply_newer_than_the_last_inbound_closes_an_i_owe_loop(rig):
     store, _, reader, _, _ = rig
+    store.set_cursor("gmail", (T0 - timedelta(days=1)).isoformat())
+    store.set_backfilled("gmail")
     source = FakeSource([mail("a", 5)], sent=[mail("a", 3, sent=True, sender="me")])
     svc = service(rig)
     svc.enable("gmail", source)
@@ -334,3 +343,93 @@ async def test_enable_builds_the_gmail_source_only_for_a_mail_app(rig):
     mail_app.enable("gmail")
     assert "gmail" in mail_app._sources
     mail_app.disable("gmail")
+
+
+async def test_a_stop_mid_backfill_keeps_reading_unanswered_only_on_resume(rig):
+    store, _, reader, _, _ = rig
+    answered = mail("c", 2)
+    source = FakeSource([mail("a", 6), mail("b", 4), answered], sent=[mail("c", 1, sent=True)])
+    reader.stop_after = 1
+    svc = service(rig, poll_s=0.05)
+    svc.enable("gmail", source)
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if svc.unread_since("gmail"):
+            break
+    reader.stop_after = None
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if len(store.list()) == 2 and svc.unread_since("gmail") is None:
+            break
+    svc.disable("gmail")
+    assert reader.seen == ["a", "b"]  # the answered thread was never read
+    assert [flag for _, flag in source.new_calls[:2]] == [True, True]
+
+
+async def test_switching_on_twice_during_a_poll_leaves_one_poll_chain(rig):
+    store = rig[0]
+    gate = asyncio.Event()
+
+    class Slow(FakeSource):
+        async def new_items(self, since, unanswered_only=False):
+            self.new_calls.append((since, unanswered_only))
+            await gate.wait()
+            return []
+
+    source = Slow()
+    svc = service(rig, poll_s=0.05)
+    svc.enable("gmail", source)
+    await asyncio.sleep(0.03)
+    svc.enable("gmail", source)  # while the first poll is in flight
+    await asyncio.sleep(0.03)
+    svc.enable("gmail", source)
+    gate.set()
+    await asyncio.sleep(0.05)
+    before = len(source.new_calls)
+    await asyncio.sleep(0.5)
+    svc.disable("gmail")
+    rate = len(source.new_calls) - before
+    assert rate <= 11  # one chain at 50 ms; two chains would be about 20
+    assert store.cursor("gmail") is not None
+
+
+async def test_any_error_counts_toward_unread_since(rig):
+    class Broken(FakeSource):
+        async def new_items(self, since, unanswered_only=False):
+            raise RuntimeError("malformed")
+
+    svc = service(rig, poll_s=0.03)
+    svc.enable("gmail", Broken())
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if svc.unread_since("gmail"):
+            break
+    svc.disable("gmail")
+    assert svc.unread_since("gmail") == T0
+
+
+async def test_the_sent_scan_has_its_own_cursor(rig):
+    store = rig[0]
+    source = FakeSource([mail("a", 5)], sent=[mail("z", 3, sent=True, sender="me")])
+    svc = service(rig, poll_s=0.05)
+    svc.enable("gmail", source)
+    await settled(svc, store)
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if len(source.sent_calls) >= 2:
+            break
+    svc.disable("gmail")
+    assert source.sent_calls[1] == mail("z", 3).date  # not the inbound cursor (a, 5 h ago)
+
+
+async def test_the_you_replied_note_does_not_count_as_inbound_mail(rig):
+    store = rig[0]
+    store.set_cursor("gmail", (T0 - timedelta(days=1)).isoformat())
+    store.set_backfilled("gmail")
+    source = FakeSource([mail("a", 5)], sent=[mail("a", 3, sent=True, sender="me")])
+    svc = service(rig)
+    svc.enable("gmail", source)
+    await settled(svc, store)
+    svc.disable("gmail")
+    notes = {h["note"]: h for h in store.list()[0].history}
+    assert "mail_at" in notes["mail from Priya <p@x.com>"] and "mail_at" not in notes["you replied"]

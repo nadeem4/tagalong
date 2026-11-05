@@ -1414,9 +1414,10 @@ mail app is switched on yet, so nothing creates a loop outside tests.
     `matches` is true for a connected app whose tools include all three, so a second Gmail account
     is just a second app id.
   - _Poll._ The first poll after the switch reads 14 days back (`BACKFILL_DAYS`, a constant), unanswered
-    threads only: a thread whose last message is the person's own is skipped. After it a cursor (the
-    date of the last mail handled, per app, in the store) keeps place, and each poll reads from the
-    cursor. A poll repeats every `TAGALONG_LOOP_POLL_S` seconds (default 300) by `call_later`, never
+    threads only: a thread whose last message is the person's own is skipped (a stop mid-backfill
+    keeps that rule on resume until the backfill has finished). Every page of a search is read, by its
+    next-page token. After it a cursor (the date of the last mail handled, per app, in the store)
+    keeps place, and each poll reads from the cursor. A poll repeats every `TAGALONG_LOOP_POLL_S` seconds (default 300) by `call_later`, never
     two at once for an app. The cursor moves after each mail, so a stop loses nothing and reads
     nothing twice.
   - _Mail to loops._ Each mail passes the pre-filter (bulk costs no model call), then the reader with
@@ -1424,12 +1425,14 @@ mail app is switched on yet, so nothing creates a loop outside tests.
     on a thread updates its loop and never makes a second one; new mail on a thread whose loop was done
     reopens it. `close` marks the loop done. Each note in a loop's history carries when its mail
     arrived.
-  - _Self-close._ After reading, each poll scans the person's sent mail since the cursor: a sent
+  - _Related loops._ In v1 a mail is matched to its loop by thread only: a reply on a new thread
+    makes a new loop.
+  - _Self-close._ After reading, each poll scans the person's sent mail since its own sent cursor: a sent
     message newer than the last mail on that thread closes an `i_owe` loop, in code with no model
     call. The reader's own `close` (the sender withdrew) is the other way a loop closes.
   - _When reading stops._ If the reader's allowance is spent mid-poll, the poll stops, the cursor
     stays on the last mail read, and `unread_since(app)` returns when it stopped; the next poll resumes
-    there once the allowance is back. If the app errors or is disconnected, the poll tries again at the
+    there once the allowance is back. If the app errors, is disconnected or answers badly (any failure), the poll tries again at the
     next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
     it. Nothing here raises into the brain.
 

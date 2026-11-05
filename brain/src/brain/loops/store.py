@@ -138,6 +138,20 @@ class LoopStore:
             (app_id, value),
         )
 
+    # Two more places per app share the cursor table under a prefixed key: where the sent scan
+    # got to, and whether the unanswered-only backfill finished.
+    def sent_cursor(self, app_id: str) -> str | None:
+        return self.cursor(f"sent:{app_id}")
+
+    def set_sent_cursor(self, app_id: str, value: str) -> None:
+        self.set_cursor(f"sent:{app_id}", value)
+
+    def backfilled(self, app_id: str) -> bool:
+        return self.cursor(f"backfill:{app_id}") is not None
+
+    def set_backfilled(self, app_id: str) -> None:
+        self.set_cursor(f"backfill:{app_id}", "done")
+
     def forget(self, loop_id: str) -> None:
         self._db.execute("DELETE FROM loop_surfaced WHERE loop_id = ?", (loop_id,))
         self._db.execute("DELETE FROM loops WHERE id = ?", (loop_id,))

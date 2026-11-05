@@ -73,7 +73,7 @@ def _add_mail_tools() -> None:
     """Only with FAKE_MAIL_FILE set, so the other tests still see the same six tools."""
 
     @server.tool(annotations=ToolAnnotations(read_only_hint=True))
-    def search_threads(query: str, page_size: int = 50) -> dict:
+    def search_threads(query: str, page_size: int = 50, page_token: str = "") -> dict:
         """Threads with a message in `in:sent` or `in:inbox` after `after:<epoch>`."""
         label = "SENT" if "in:sent" in query else "INBOX"
         found = re.search(r"after:(\d+)", query)
@@ -87,7 +87,11 @@ def _add_mail_tools() -> None:
                 for m in t["messages"]
             )
         ]
-        return {"threads": ids[:page_size]}
+        start = int(page_token or 0)
+        out: dict = {"threads": ids[start : start + page_size]}
+        if start + page_size < len(ids):
+            out["next_page_token"] = str(start + page_size)
+        return out
 
     @server.tool(annotations=ToolAnnotations(read_only_hint=True))
     def get_thread(thread_id: str) -> dict:
