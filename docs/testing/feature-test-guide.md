@@ -689,7 +689,7 @@ including the Priya journey. By hand, with a real brain, Gmail connected and the
 2. **Action:** choose Show.
    **Expected:** Scout gives the gist of the thread, not the whole mail.
 3. **Action:** choose Later and say "in 2 minutes".
-   **Expected:** the loop leaves the open list and Scout brings it back about 2 minutes later.
+   **Expected:** the loop shows as snoozed and stays quiet; Scout brings it back about 2 minutes later.
 4. **Action:** choose Done.
    **Expected:** Scout offers a drafted reply; say yes. A draft appears in Gmail's Drafts and nothing
    is sent. The mail itself has no new label, is not archived and keeps its read state.

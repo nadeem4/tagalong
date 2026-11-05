@@ -130,7 +130,13 @@ def loop_tools(service: LoopService) -> list[tuple[ToolSpec, Handler]]:
             spec(
                 "loop_later",
                 "Put a loop off until a time (ISO 8601 with a UTC offset); it comes back then.",
-                {**_ID, "until": {"type": "string"}},
+                {
+                    **_ID,
+                    "until": {
+                        "type": "string",
+                        "description": "when it comes back: ISO 8601 with a UTC offset",
+                    },
+                },
                 "change",
                 auto=True,
             ),

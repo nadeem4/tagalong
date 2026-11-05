@@ -283,14 +283,20 @@ class LoopService:
         self._finish(loop_id, "held", "kept")
 
     def later(self, loop_id: str, until: datetime) -> None:
-        self.get(loop_id)
+        self._get_open(loop_id)
         self._store.snooze(loop_id, until)
         self._store.add_history(loop_id, f"later until {until.isoformat()}")
         self.changed()
         self._notify("changed", {"what": "loops"})
 
+    def _get_open(self, loop_id: str) -> Loop:
+        loop = self.get(loop_id)
+        if loop.status not in _OPEN:
+            raise ValueError(f"Loop {loop_id} is already {loop.status}.")
+        return loop
+
     def _finish(self, loop_id: str, status: str, note: str) -> None:
-        self.get(loop_id)
+        self._get_open(loop_id)
         self._store.set_status(loop_id, status)
         self._store.add_history(loop_id, note)
         self.changed()

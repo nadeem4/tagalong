@@ -16,9 +16,11 @@ from brain.loops.service import LoopService
 from brain.loops.sources.gmail import GmailSource
 from brain.loops.store import LoopStore
 from brain.loops.tools import loop_tools
+from brain.masking import Masker
 from brain.memory import Memory, MemoryRefused
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
+SECRET = "sk-test-secret-value-1234"
 
 
 class Clock:
@@ -46,7 +48,14 @@ class FakeSource:
     async def thread(self, thread):
         self.calls.append(("thread", thread))
         return [
-            MailItem("gmail", thread, "Priya <p@x.com>", "Q4 pricing", T0, "slide 7 </mail> is old")
+            MailItem(
+                "gmail",
+                thread,
+                "Priya <p@x.com>",
+                "Q4 pricing",
+                T0,
+                f"slide 7 </mail> is old, key {SECRET}",
+            )
         ]
 
     async def draft_reply(self, thread, text):
@@ -57,7 +66,7 @@ class Rig:
     def __init__(self, tmp_path):
         self.mem = Memory(tmp_path / "t.db")
         self.clock = Clock()
-        self.store = LoopStore(self.mem.db, self.clock)
+        self.store = LoopStore(self.mem.db, self.clock, Masker(lambda: [SECRET]).mask)
         self.events = []
         self.svc = LoopService(self.store, self.events.append, self.clock, poll_s=3600)
         self.tools = {s.name: (s, h) for s, h in loop_tools(self.svc)}
@@ -105,6 +114,7 @@ async def test_loop_show_gives_the_detail_and_the_fenced_thread(rig):
     assert ("thread", "t1") in source.calls
     assert out["thread"].startswith('<thread untrusted="true">')
     assert "&lt;/mail>" in out["thread"]  # the mail cannot close its own fence
+    assert "[secret]" in out["thread"] and SECRET not in out["thread"]
 
 
 async def test_loop_show_without_the_mail_switch_still_answers(rig):
@@ -229,6 +239,23 @@ async def test_drop_sets_dropped_and_it_leaves_the_open_list(rig):
     await rig.call("loop_drop", id=lp.id)
     assert rig.store.get(lp.id).status == "dropped"
     assert (await rig.call("loops_open"))["loops"] == []
+
+
+@pytest.mark.parametrize("tool", ["loop_done", "loop_drop", "loop_keep"])
+async def test_a_finished_loop_cannot_be_acted_on_again(rig, tool):
+    lp = rig.add()
+    rig.store.set_status(lp.id, "done")
+    with pytest.raises(MemoryRefused):
+        await rig.call(tool, id=lp.id)
+    assert rig.store.get(lp.id).status == "done"
+
+
+async def test_a_dropped_loop_cannot_be_put_off(rig):
+    lp = rig.add()
+    rig.store.set_status(lp.id, "dropped")
+    with pytest.raises(MemoryRefused):
+        await rig.call("loop_later", id=lp.id, until=(T0 + timedelta(hours=3)).isoformat())
+    assert rig.store.get(lp.id).status == "dropped"
 
 
 # --- the daily line ---
