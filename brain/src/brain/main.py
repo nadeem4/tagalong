@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from functools import partial
 
 from anthropic import AsyncAnthropic
@@ -19,6 +20,8 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
+from brain.loops.service import LoopService
+from brain.loops.store import LoopStore
 from brain.masking import Masker, SecretLogFilter
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
@@ -165,6 +168,12 @@ async def _run() -> None:
     session.voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
+    loops = LoopService(
+        LoopStore(memory.db, lambda: datetime.now(UTC), masker.mask),
+        emit_event,
+        lambda: datetime.now(UTC),
+    )
+    loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
         server = await start_server(
             config.host, config.port, bodies, session_id(config.data_dir), session

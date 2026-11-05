@@ -55,6 +55,15 @@ The kinds table in `memory.py` is the only place caps and rules live.
   is `PRAGMA user_version`; a file from a newer brain stops the brain at start. A Python build
   without FTS5 also stops it, with a message.
 
+### Loops tables
+
+`loops/store.py` owns three tables in the same file (migration 16, created by `Memory`):
+`loops` (one row per loop; unique on source and ref; people, anchors and history are JSON; times
+are UTC ISO text), `loop_surfaced` (loop id, anchor, day: when a loop last came up for an anchor or
+its due time) and `loop_cursor` (app id, value: how far that app's mail was read). Text is masked
+before it is saved. Forgetting a loop removes its rows in both; wiping removes everything in the
+three. See [Loops](brain.md#loops).
+
 ### Saved chat
 
 - Every turn end saves its messages to a `messages` table (migration 2) with its own FTS index.

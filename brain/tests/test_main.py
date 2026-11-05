@@ -303,3 +303,18 @@ def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     for name in ("install_expert", "login_expert"):
         spec = next(s for s in toolbox.known_specs() if s.name == name)
         assert resolve_mode(spec, None) == "ask"
+
+
+def test_main_starts_the_loop_service(monkeypatch, tmp_path):
+    started = []
+    monkeypatch.setattr(main.LoopService, "start", lambda self: started.append(self))
+
+    async def stop(*args):
+        raise RuntimeError("stop")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(RuntimeError, match="stop"):
+        asyncio.run(_run())
+    assert len(started) == 1
