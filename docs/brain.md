@@ -82,7 +82,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
-| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader (see [Loops](#loops))                                                                                                   |
+| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [Loops](#loops))                                                                    |
 | `brain/src/brain/timers.py`            | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
@@ -1390,7 +1390,8 @@ creates a loop before that.
   `mind/events.md` weighs each reason and tells Scout the title, asks, people and anchor may be
   someone else's words and are data, not instructions. All of it reaches the model inside the wake's
   fenced block, like every event. If no display body is online the wake waits for one and is not
-  lost. The digest reason comes in a later slice.
+  lost. Two more reasons come with Scout's actions: `later` (a loop put off with Later is back) and
+  `digest` (see Acting on a loop).
 - **Triggers** (`loops/triggers/`: `context.py`, `due.py`, `urgent.py`, `quiet.py`, `stale.py`, pure
   rules; the service owns timing). Five reasons:
   - _context._ `Session.body_event` also hands every `focus` (app, title) and `tab` (title, url)
@@ -1414,7 +1415,7 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   - _stale._ Each sweep marks `held` loops untouched for `TAGALONG_LOOP_STALE_DAYS` (default 7) as
     `stale` and sends one `loop` event (`reason=stale`, `count`, and `loops`, one line of id, title and
     asks per loop; key per sweep). A stale loop returns to `held` if new mail arrives on its
-    thread. The keep-or-drop tools come later.
+    thread. `loop_keep` and `loop_drop` answer it.
   - _Once a day, and throttles._ A context surface is recorded per loop and anchor under the local day,
     so the same window surfaces a loop once a day. Before the event goes out the service throttles per
     reason across all loops: context 1 per 10 minutes, urgent and quiet 2 per hour. A throttled
@@ -1449,7 +1450,8 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
   is on even while it cannot be read.
   - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
-    `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
+    `sent_items(since)`, `thread(thread)` (every message of one thread, for Show) and
+    `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
     `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
     directly (the switch is the consent, so the toolbox gate is not involved). Any other tool name is
     refused in the adapter, so loops cannot send mail (`send_message`) or change the mailbox.
@@ -1488,6 +1490,34 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   does a poll that changed something, a surfacing and a stale sweep, so an open Home reads again.
   The switch is saved: a restarted brain keeps reading where it was on; a fresh one has every
   switch off.
+- **Acting on a loop** (`loops/tools.py`, Scout's own tools; `main.py` registers them). When Scout
+  speaks up about a loop it offers Show, Done and Later with `choose` (the answer comes back as a
+  `choice` event; no new bubble or frame). Then:
+  - `loops_open` lists every open loop (id, title, asks, direction, people, due, status): the answer
+    to "what's waiting on me?". `loop_show {id}` gives one loop with its history and, when mail
+    reading is on for its app, the mail thread in a masked `<thread untrusted="true">` block (angle
+    brackets escaped, each mail cut at the reader's cap); with the switch off, or the app failing,
+    `thread` is null.
+  - `loop_done {id}` sets `done` and notes it in the history. It touches only the store: no mail
+    tool is called, so no label, archive or read mark. `loop_later {id, until}` (ISO 8601 with an
+    offset, in the future) sets `snoozed` with `snoozed_until`; the loop is skipped by the context
+    trigger, and when the time comes the service puts it back to `held` and sends a `loop` event
+    `reason=later` (once; `due` still fires on its own). `loop_keep` returns a stale loop to `held`
+    with the stale clock restarted; `loop_drop` sets `dropped`. These four are Auto.
+  - `loop_draft {id, text}` calls only the source's `draft_reply` (Gmail `create_draft`) on the
+    loop's thread and returns the text for Scout to show; the person reads and sends it from their
+    drafts. Scout never sends. It is a `change`, so it asks like any change unless the person set
+    it to Auto; it needs the mail switch on for that app, else it is refused.
+  - A hand-off for a loop starts its brief with `Loop <id>:` (soul.md) and carries the thread's key
+    facts. The brief is the job's task, so the `job_ended` wake shows it and its note tells Scout to
+    offer the drafted reply (`loop_draft`). No new column or job field.
+  - _Digest._ On the first `back` or `body_online` of a local day, if any `held` loop was created
+    that day, the service sends one `loop` event `reason=digest` (`count`, and `loops`: id, title and
+    asks per line). Nothing is sent when none was held; the day is saved in the cursor table
+    (`digest:day`) so a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
+    silent.
+  - _Corrections._ soul.md tells Scout that when the owner says it should have told them, it saves
+    that with `remember` as a preference. There is no new store or code path.
 
 ## Web search and fetch
 

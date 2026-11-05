@@ -68,6 +68,9 @@ class GmailSource:
             items += [m for m in await self._messages(thread) if m.sent and m.date > since]
         return sorted(items, key=lambda m: m.date)
 
+    async def thread(self, thread: str) -> list[MailItem]:
+        return await self._messages(thread)
+
     async def draft_reply(self, thread: str, text: str) -> None:
         await self._call("create_draft", {"thread_id": thread, "body": text})
 

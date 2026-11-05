@@ -1166,11 +1166,34 @@ async def test_other_events_and_bad_frames_do_not_reach_the_loops_service():
     session, sent = make(Gate([]), kinds=None)
     join(session, "desktop")
     session.loops = SeenLoops()
-    session.body_event("desktop", "back", {"idle_seconds": 600})
+    session.body_event("desktop", "idle", {"idle_seconds": 600})
     session.body_event("desktop", "focus", {"app": 5})
     session.body_event("desktop", "nope", None)
     await settle()
     assert session.loops.seen == []
+
+
+async def test_back_reaches_the_loops_service():
+    session, _ = make(Gate([]), kinds=None)
+    join(session, "desktop")
+    session.loops = SeenLoops()
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    assert [e.kind for e in session.loops.seen] == ["back"]
+
+
+async def test_body_online_reaches_the_loops_service():
+    clock = Tick()
+    session, _ = make(Gate(["ok"]), kinds=None, bodies=Bodies(clock=clock))
+    session.loops = SeenLoops()
+    peer = QuietPeer()
+    body = Body(id="desktop", kind="desktop", name="desktop")
+    session._bodies.connect(body, [], peer, None)
+    session._bodies.disconnect("desktop", peer)
+    clock.now = 700.0
+    session._bodies.connect(body, [], QuietPeer(), None)
+    await settle()
+    assert "body_online" in [e.kind for e in session.loops.seen]
 
 
 class Tick:

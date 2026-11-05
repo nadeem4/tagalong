@@ -278,6 +278,8 @@ MIGRATIONS = (
         value TEXT NOT NULL
     );
     """,
+    # Later: a snoozed loop comes back at this time (UTC ISO text); `due` stays the deadline.
+    "ALTER TABLE loops ADD COLUMN snoozed_until TEXT;",
 )
 
 DROPPED_MARKER = "[older steps dropped]"

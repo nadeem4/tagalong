@@ -17,6 +17,7 @@ _COLS = (
     "id, source, ref, title, asks, direction, people, due, quiet_after, anchors, status,"
     " history, created, updated"
 )
+_SELECT = _COLS + ", snoozed_until"  # the snooze time is set only by `snooze`, never by an insert
 
 
 def _iso(at: datetime | None) -> str | None:
@@ -84,11 +85,11 @@ class LoopStore:
         return self.get(loop_id)  # type: ignore[return-value]
 
     def get(self, loop_id: str) -> Loop | None:
-        row = self._db.execute(f"SELECT {_COLS} FROM loops WHERE id = ?", (loop_id,)).fetchone()
+        row = self._db.execute(f"SELECT {_SELECT} FROM loops WHERE id = ?", (loop_id,)).fetchone()
         return self._loop(row) if row else None
 
     def list(self, status: str | None = None) -> list[Loop]:
-        sql = f"SELECT {_COLS} FROM loops"
+        sql = f"SELECT {_SELECT} FROM loops"
         args: tuple = ()
         if status:
             sql += " WHERE status = ?"
@@ -100,6 +101,15 @@ class LoopStore:
             "UPDATE loops SET status = ?, updated = ? WHERE id = ?",
             (status, _iso(self._now()), loop_id),
         )
+
+    def snooze(self, loop_id: str, until: datetime) -> None:
+        self._db.execute(
+            "UPDATE loops SET status = 'snoozed', snoozed_until = ?, updated = ? WHERE id = ?",
+            (_iso(until), _iso(self._now()), loop_id),
+        )
+
+    def mask(self, text: str) -> str:
+        return self._mask(text)
 
     def add_history(self, loop_id: str, note: str, mail_at: datetime | None = None) -> None:
         loop = self.get(loop_id)
@@ -175,6 +185,6 @@ class LoopStore:
             id=row[0], source=row[1], ref=row[2], title=row[3], asks=row[4], direction=row[5],
             people=json.loads(row[6]), due=_parse(row[7]), quiet_after=_parse(row[8]),
             anchors=json.loads(row[9]), status=row[10], history=json.loads(row[11]),
-            created=_parse(row[12]), updated=_parse(row[13]),
+            created=_parse(row[12]), updated=_parse(row[13]), snoozed_until=_parse(row[14]),
         )  # fmt: skip
         return replace(loop, surfaced=self.surfaced(loop.id))

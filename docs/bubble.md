@@ -193,6 +193,11 @@ The bubble keeps each one's state from its notification:
 
 Asks are described in [brain.md](brain.md).
 
+**Loops in the bubble.** When Scout brings up a held loop (see [brain.md](brain.md#loops)) it asks
+with `choose`, so Show, Done and Later are these same option rows, the recommended one first. The
+answer comes back to Scout as a `choice` event and Scout calls its loop tools. There is no loop card
+or frame of its own.
+
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
 a remark or a brain status mark. It fades after `holdMs` (7,000 ms
 by default, 12,000 for remarks) with a 300 ms fade (`LEAVE_MS`); pointing at it or

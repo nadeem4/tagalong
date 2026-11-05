@@ -8,6 +8,9 @@ throttled per reason. The arming mirrors Timers: one call_later, re-checked at l
 Mail: `enable(app)` starts a poll per app (the first poll reads the last 14 days, unanswered
 only, until it finishes; then a cursor keeps place); each mail goes through the pre-filter and
 the reader into the store; the person's own sent mail closes an "I owe" loop in code.
+Scout acts on a surfaced loop through `done`, `later`, `keep`, `drop` and `draft`: all but the
+draft stay inside the store, and the draft reaches only the source's draft tool. On the first
+return of the local day one `digest` event lists what was held that day.
 Read-only: nothing here changes a mailbox.
 """
 
@@ -18,11 +21,11 @@ from datetime import datetime, timedelta
 
 from brain.events import Event
 from brain.loops.loop import Loop
-from brain.loops.reader import Change, MailItem, Reader, ReaderStopped, prefilter
+from brain.loops.reader import BODY_MAX, Change, MailItem, Reader, ReaderStopped, prefilter
 from brain.loops.source import Source
 from brain.loops.sources.gmail import GmailSource
 from brain.loops.store import LoopStore
-from brain.loops.triggers import context, due, quiet, stale, urgent
+from brain.loops.triggers import context, due, quiet, snooze, stale, urgent
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +88,9 @@ class LoopService:
         for loop in due.pending(waiting):
             if loop.due <= now:  # type: ignore[operator]
                 self._surface(loop, "due", due.anchor(loop))
+        for loop in snooze.ripe(waiting, now):
+            self._store.set_status(loop.id, "held")  # before the wake, so the time is used once
+            self._surface(loop, "later", snooze.anchor(loop))
         for loop in quiet.ripe(waiting, now):
             if self._take("quiet"):
                 self._surface(loop, "quiet", quiet.anchor(loop))
@@ -96,6 +102,9 @@ class LoopService:
 
         One loop per anchor per local day, one wake per throttle window. A throttled match is
         not used up, so it can still surface on a later focus."""
+        if event.kind in ("back", "body_online"):
+            self._digest()
+            return
         if event.kind not in ("focus", "tab"):
             return
         app, title, url = (str(event.facts.get(k) or "") for k in ("app", "title", "url"))
@@ -150,6 +159,23 @@ class LoopService:
         self._emit(Event("loop", facts, key=f"loop-stale:{now.isoformat()}"))
         self._notify("changed", {"what": "loops"})
 
+    def _digest(self) -> None:
+        """Once per local day, on the person's return: what was held today (nothing if none)."""
+        today = self._today()
+        if self._store.cursor("digest:day") == today:
+            return
+        held = [
+            lp
+            for lp in self._store.list("held")
+            if lp.created and lp.created.astimezone().date().isoformat() == today
+        ]
+        if not held:
+            return
+        self._store.set_cursor("digest:day", today)
+        lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in held)
+        facts: dict[str, str | int] = {"reason": "digest", "count": len(held), "loops": lines}
+        self._emit(Event("loop", facts, key=f"loop-digest:{today}"))
+
     def _today(self) -> str:
         return self._now().astimezone().date().isoformat()  # the local day
 
@@ -182,10 +208,14 @@ class LoopService:
         waiting = self._with_status(_DUE_STATUSES)
         now = self._now()
         free = self._free_at("quiet")  # a ripe quiet loop waits for the throttle, not a busy loop
-        times = [lp.due for lp in due.pending(waiting)] + [
-            max(lp.quiet_after, free) if free and lp.quiet_after <= now else lp.quiet_after  # type: ignore[type-var,operator]
-            for lp in quiet.pending(waiting)
-        ]
+        times = (
+            [lp.due for lp in due.pending(waiting)]
+            + [lp.snoozed_until for lp in snooze.pending(waiting)]
+            + [
+                max(lp.quiet_after, free) if free and lp.quiet_after <= now else lp.quiet_after  # type: ignore[type-var,operator]
+                for lp in quiet.pending(waiting)
+            ]
+        )
         if not times:
             return
         delay = (min(times) - now).total_seconds()  # type: ignore[type-var]
@@ -225,6 +255,79 @@ class LoopService:
     def all_loops(self) -> list[Loop]:
         """Every loop the store holds, whatever its status, for the Held list."""
         return self._store.list()
+
+    # --- Scout's actions on a loop ---
+
+    def now(self) -> datetime:
+        return self._now()
+
+    def open_loops(self) -> list[Loop]:
+        """What is still waiting: every loop that is not done or dropped."""
+        return self._with_status(_OPEN)
+
+    def get(self, loop_id: str) -> Loop:
+        loop = self._store.get(loop_id)
+        if loop is None:
+            raise ValueError(f"There is no loop {loop_id}.")
+        return loop
+
+    def done(self, loop_id: str) -> None:
+        """Finished. Store only: the mailbox is never touched."""
+        self._finish(loop_id, "done", "done")
+
+    def drop(self, loop_id: str) -> None:
+        self._finish(loop_id, "dropped", "dropped")
+
+    def keep(self, loop_id: str) -> None:
+        """Keep a stale loop: held again, and its untouched clock starts over."""
+        self._finish(loop_id, "held", "kept")
+
+    def later(self, loop_id: str, until: datetime) -> None:
+        self._get_open(loop_id)
+        self._store.snooze(loop_id, until)
+        self._store.add_history(loop_id, f"later until {until.isoformat()}")
+        self.changed()
+        self._notify("changed", {"what": "loops"})
+
+    def _get_open(self, loop_id: str) -> Loop:
+        loop = self.get(loop_id)
+        if loop.status not in _OPEN:
+            raise ValueError(f"Loop {loop_id} is already {loop.status}.")
+        return loop
+
+    def _finish(self, loop_id: str, status: str, note: str) -> None:
+        self._get_open(loop_id)
+        self._store.set_status(loop_id, status)
+        self._store.add_history(loop_id, note)
+        self.changed()
+        self._notify("changed", {"what": "loops"})
+
+    async def thread_text(self, loop_id: str) -> str | None:
+        """The loop's mail thread as one fenced, masked block; None when its mail is switched off.
+
+        Mail is untrusted, so angle brackets are escaped and the block says so, as the reader's
+        prompt does."""
+        loop = self.get(loop_id)
+        source = self._sources.get(loop.source)
+        if source is None:
+            return None
+        parts = [
+            f"From: {m.sender}\nDate: {m.date.isoformat()}\nSubject: {m.subject}\n\n"
+            f"{m.body[:BODY_MAX]}"
+            for m in await source.thread(loop.ref)
+        ]
+        text = "\n\n---\n\n".join(parts).replace("<", "&lt;")
+        return self._store.mask(f'<thread untrusted="true">\n{text}\n</thread>')
+
+    async def draft(self, loop_id: str, text: str) -> None:
+        """Leave a draft reply in the loop's thread. Never sends; needs the mail switch on."""
+        loop = self.get(loop_id)
+        source = self._sources.get(loop.source)
+        if source is None:
+            raise ValueError(f"Mail for {loop.source} is switched off, so no draft can be left.")
+        await source.draft_reply(loop.ref, text)
+        self._store.add_history(loop_id, "draft left in the thread")
+        self._notify("changed", {"what": "loops"})
 
     def is_on(self, app_id: str) -> bool:
         return app_id in self._sources

@@ -433,6 +433,18 @@ day, for Home's **Spend** card and the daily budget.
 - **What is held.** The brain keeps a short note per open thing (a title, what it asks, who, when
   it is due, its status) in its own database on this computer, with secrets masked. Not the mail
   itself. Home's Held list shows every one of them.
+- **Done changes nothing in your mailbox.** Marking a loop done, putting it off with Later, keeping
+  or dropping it only changes Scout's own list. Scout can leave a draft reply in the thread when
+  you ask; it is a draft for you to read and send. Scout never sends mail, and the reader never
+  labels, archives, deletes or marks anything read.
+- **Reading a thread.** When you choose Show, Scout reads that one thread again through the same
+  mail connection and tells you the gist. The thread text is not stored: only Scout's chat, which
+  is masked for secrets like everything it saves, may quote it. When Scout hands such a loop to an
+  expert, the brief carries the thread facts it chose to include, and you see the brief on the Send
+  card first.
+- **A daily line and corrections.** Once a day, when you come back, Scout may say in its own words
+  what it held that day. If you tell it that it should have mentioned something, it saves that as a
+  preference you can see and delete under Home, What Scout remembers.
 - **Forget and wipe.** Forget deletes one held loop. Stop and wipe (it asks first) turns mail
   reading off and deletes every held loop and the place it had reached in your mail. Turning the
   switch off alone stops reading and keeps what is held.

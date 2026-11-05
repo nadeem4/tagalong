@@ -673,6 +673,11 @@ def test_job_note_states_facts_and_carries_the_report_whole():
     assert "A" * 5000 in note and "[trimmed]" not in note  # the cap is the gate's (outputs.py)
 
 
+def test_job_note_carries_the_loop_id_the_brief_starts_with():
+    job = a_job("j3", "Loop ab12cd34: write Priya the numbers", "done", "end_turn", "ok")
+    assert "Task: Loop ab12cd34:" in job_note(job)
+
+
 def test_job_note_without_a_result_or_reason():
     job = a_job("j2", "t", "stopped")
     note = job_note(job)

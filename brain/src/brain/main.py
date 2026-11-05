@@ -24,6 +24,7 @@ from brain.loops.home_tools import loop_home_tools
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
+from brain.loops.tools import loop_tools
 from brain.masking import Masker, SecretLogFilter, mask_json
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
@@ -188,6 +189,7 @@ async def _run() -> None:
         + app_tools
         + login
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
+        + loop_tools(loops)
         + home_setup_tools(
             registry,
             inspect_machine,

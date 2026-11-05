@@ -62,7 +62,9 @@ The kinds table in `memory.py` is the only place caps and rules live.
 are UTC ISO text), `loop_surfaced` (loop id, anchor, day: when a loop last came up for an anchor or
 its due time) and `loop_cursor` (app id, value: how far that app's mail was read). Text is masked
 before it is saved. Forgetting a loop removes its rows in both; wiping removes everything in the
-three. See [Loops](brain.md#loops).
+three. Migration 17 adds `loops.snoozed_until` (the time a loop put off with Later comes back; the
+`due` column stays the real deadline). The cursor table also holds `digest:day`, the local day of
+the last held-today line. See [Loops](brain.md#loops).
 
 ### Saved chat
 

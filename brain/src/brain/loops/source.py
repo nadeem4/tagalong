@@ -27,6 +27,10 @@ class Source(Protocol):
         """The person's own mail sent after `since`."""
         ...
 
+    async def thread(self, thread: str) -> list[MailItem]:
+        """Every message in one thread, oldest first, so Scout can read what was asked."""
+        ...
+
     async def draft_reply(self, thread: str, text: str) -> None:
         """Leave a draft in the thread. Never sends."""
         ...
