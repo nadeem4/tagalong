@@ -590,10 +590,12 @@ Needs the same setup as the hand-off section above.
 Loops have no way in yet (mail reading comes later), so this needs a test row put in the database
 by hand. Stop the brain first.
 
-1. **Action:** in `tagalong.db` insert one `loops` row with status `held`, title "Send Sam the Q4
-   numbers", asks "send the Q4 numbers", direction `i_owe`, people `["Sam"]`, anchors `[]`, history
-   `[]`, a made-up id and ref, and a `due` a minute or two ahead (UTC ISO text). Start the brain and
-   the desktop.
+1. **Action:** in `tagalong.db` run this, with the due time (UTC) a minute or two ahead:
+   `INSERT INTO loops(id, source, ref, title, asks, direction, people, due, quiet_after, anchors,
+status, history, created, updated) VALUES ('test0001', 'manual', 'test-1', 'Send Sam the Q4
+numbers', 'send the Q4 numbers', 'i_owe', '["Sam"]', '2026-11-04T09:30:00+00:00', NULL, '[]',
+'held', '[]', '2026-11-04T09:00:00+00:00', '2026-11-04T09:00:00+00:00');`
+   Start the brain and the desktop.
    **Expected:** when the time comes Scout speaks once, without being asked, about sending Sam the
    numbers, in its own words.
 2. **Action:** stop and restart the brain.

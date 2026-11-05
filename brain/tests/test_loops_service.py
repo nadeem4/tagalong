@@ -122,3 +122,29 @@ def test_changed_rearms_for_a_loop_added_later(tmp_path):
         mem.close()
 
     asyncio.run(run())
+
+
+def test_surfaced_day_is_the_local_day(parts):
+    store, clock, events, _ = parts
+    clock.at = datetime(2026, 11, 4, 23, 30, tzinfo=UTC)
+    lp = held(store, due=clock.at - timedelta(minutes=5))
+    svc(store, clock, events).start()
+    assert list(store.get(lp.id).surfaced.values()) == [clock.at.astimezone().date().isoformat()]
+
+
+def test_a_new_service_over_an_earlier_saved_future_loop_arms_and_fires(tmp_path):
+    async def run():
+        now = lambda: datetime.now(UTC)  # noqa: E731
+        mem = Memory(tmp_path / "t.db")
+        held(LoopStore(mem.db, now), due=now() + timedelta(milliseconds=150))
+        mem.close()
+        mem = Memory(tmp_path / "t.db")  # the brain restarted
+        events = []
+        s = LoopService(LoopStore(mem.db, now), events.append, now)
+        s.start()
+        assert events == [] and s._handle is not None
+        await asyncio.sleep(0.4)
+        assert len(events) == 1
+        mem.close()
+
+    asyncio.run(run())
