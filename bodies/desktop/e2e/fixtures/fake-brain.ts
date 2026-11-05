@@ -42,6 +42,8 @@ export interface FakeBrain {
   answers: { ask: string; option: string; text?: string; apps?: string[] }[];
   /** Every `set_permission` call Home made, in order. */
   permissionSets: { tool: string; mode: string }[];
+  /** Every loops call the page made, in order: `set gmail on`, `forget l1`, `wipe`. */
+  loopCalls: string[];
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
@@ -273,6 +275,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   let turns = 0;
   const answers: FakeBrain['answers'] = [];
   const permissionSets: { tool: string; mode: string }[] = [];
+  // Home's loops: one mail app, off at first. Turning it on "reads" one mail into a held loop,
+  // as the brain's first poll would; forget and wipe edit the list.
+  const loopCalls: string[] = [];
+  const loopApps = [{ id: 'gmail', name: 'Gmail', on: false }];
+  let heldLoops: Record<string, unknown>[] = [];
   const stops: string[] = [];
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
@@ -577,6 +584,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             usd?: number;
             approved?: boolean;
             query?: string;
+            app?: string;
+            on?: boolean;
           };
         };
         let value: unknown = {};
@@ -715,6 +724,35 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           const at = preferences.findIndex((p) => p.id === params.input?.id);
           if (at >= 0) preferences.splice(at, 1);
           notify('changed', { what: 'approvals' });
+        } else if (params.tool === 'loops_state') value = { apps: loopApps, loops: heldLoops };
+        else if (params.tool === 'loops_set') {
+          const on = params.input?.on === true;
+          loopCalls.push(`set ${String(params.input?.app)} ${on ? 'on' : 'off'}`);
+          for (const app of loopApps) app.on = on;
+          if (on && heldLoops.length === 0) {
+            heldLoops = [
+              {
+                id: 'l1',
+                app: 'gmail',
+                title: 'Send Priya the Q4 deck',
+                asks: 'Wants the pricing slide updated',
+                direction: 'i_owe',
+                due: '2026-11-06T09:00:00+00:00',
+                people: ['Priya'],
+                status: 'held',
+              },
+            ];
+          }
+          notify('changed', { what: 'loops' });
+        } else if (params.tool === 'loop_forget') {
+          loopCalls.push(`forget ${String(params.input?.id)}`);
+          heldLoops = heldLoops.filter((l) => l.id !== params.input?.id);
+          notify('changed', { what: 'loops' });
+        } else if (params.tool === 'loops_wipe') {
+          loopCalls.push('wipe');
+          heldLoops = [];
+          for (const app of loopApps) app.on = false;
+          notify('changed', { what: 'loops' });
         } else if (params.tool === 'list_permissions') value = { tools: permissions };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
@@ -758,6 +796,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     addr: `127.0.0.1:${(server.address() as AddressInfo).port}`,
     answers,
     permissionSets,
+    loopCalls,
     get keyAttempts() {
       return keyCalls.attempts;
     },

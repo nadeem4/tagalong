@@ -19,6 +19,7 @@ import { ConnectionsPanel } from './connections-panel';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
 import { JobsPanel } from './jobs-panel';
+import { LoopsPanel } from './loops-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
 import { WhereThingsRun } from './where-things-run';
@@ -113,7 +114,12 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
         <div className="home-page">
           {page === 'overview' && <Overview companion={companion} host={host} />}
           {page === 'jobs' && <JobsPanel />}
-          {page === 'connections' && <ConnectionsPanel />}
+          {page === 'connections' && (
+            <>
+              <ConnectionsPanel />
+              <LoopsPanel />
+            </>
+          )}
           {page === 'approvals' && <ApprovalsView />}
           {page === 'memory' && <MemoryView name={name} />}
           {page === 'settings' && (

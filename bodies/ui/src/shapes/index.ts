@@ -8,6 +8,7 @@ export * from './addressing';
 export * from './apps';
 export * from './context';
 export * from './echo';
+export * from './loops';
 export * from './memory';
 export * from './pet';
 export * from './setup';

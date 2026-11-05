@@ -1364,7 +1364,8 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
 
 A loop is something left open that Scout holds for the person: a reply they owe, a promise
 someone made them. This part has the shape, the store, the triggers that surface a loop, and the
-mail source; no mail app is switched on yet, so nothing creates a loop outside tests.
+mail source, and Home's switch for it; the switch is off until the person turns it on, so nothing
+creates a loop before that.
 
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
@@ -1379,7 +1380,9 @@ mail source; no mail app is switched on yet, so nothing creates a loop outside t
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
-  recorded in the store before the event goes out, so a restart never repeats it. One `call_later` is
+  recorded in the store before the event goes out, so a restart never repeats it. Known limit: if the scheduler then drops
+  the wake (the hourly wake budget is spent, or no key is set), that surface is not retried; a due
+  loop stays visible in Home's Held list but Scout does not bring it up again. One `call_later` is
   armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
   `Timers`); `changed()` re-arms after loops are added or edited. `fire_due()` also runs on each poll
   tick, so the quiet and stale checks need no timer of their own.
@@ -1438,8 +1441,13 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     day roll starts it again. The one key set in Home feeds both models.
 - **Mail source** (`loops/source.py`, `loops/sources/gmail.py`, the poll in `loops/service.py`).
   `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
-  `wipe` stops everything and deletes every loop and cursor). It is built but not yet wired to a
-  Home switch: nothing calls `enable` until the Home slice, so the switch stays off.
+  `wipe` stops everything and deletes every loop and cursor). Home's "Read my
+  mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
+  turns it on. The switch is saved (an `on:<app>` key in `loop_cursor`, set by `enable`, deleted by
+  `disable`), and `start()` turns on every saved app without checking that it can be read yet (apps connect after
+  `start()`, so their tools are not listed then). A poll before the app is connected fails and is
+  retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
+  is on even while it cannot be read.
   - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
     `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
     `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
@@ -1469,6 +1477,17 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     there once the allowance is back. If the app errors, is disconnected or answers badly (any failure), the poll tries again at the
     next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
     it. Nothing here raises into the brain.
+- **Home tools** (`loops/home_tools.py`, Home only, never in Scout's toolbox; `main.py` registers
+  them). `loops_state` answers `{apps, loops}`: `apps` are the connected apps the Gmail adapter
+  matches (`can_read`), each with `on` and, only when set, `unread_since`; `loops` are every loop
+  the store holds (any status) with id, app, title, asks, direction, due, people and status, and
+  never the mail text (the brain does not keep it). `loops_set {app, on}` starts (the 14-day
+  backfill) or stops that app's poll; an app that is not a mail app is refused with `invalid_params`,
+  and off keeps the loops. `loop_forget {id}` deletes one loop. `loops_wipe` is Stop and wipe: every
+  switch off, every loop, surface log and cursor deleted. Each emits `changed { what: "loops" }`, as
+  does a poll that changed something, a surfacing and a stale sweep, so an open Home reads again.
+  The switch is saved: a restarted brain keeps reading where it was on; a fresh one has every
+  switch off.
 
 ## Web search and fetch
 

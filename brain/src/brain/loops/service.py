@@ -49,6 +49,7 @@ class LoopService:
         apps=None,  # Apps: builds the mail source for a connected app on `enable`
         poll_s: float = 300,
         stale_days: int = 7,
+        notify: Callable[[str, dict], None] = lambda kind, data: None,
     ) -> None:
         self._store = store
         self._emit = emit
@@ -57,6 +58,7 @@ class LoopService:
         self._apps = apps
         self._poll_s = poll_s
         self._stale_days = stale_days
+        self._notify = notify  # tells Home the Held list or a switch changed
         self._sent: dict[str, list[datetime]] = {}  # reason -> recent wakes, for throttles
         self._handle: asyncio.TimerHandle | None = None
         self._sources: dict[str, Source] = {}
@@ -66,6 +68,10 @@ class LoopService:
         self._unread: dict[str, datetime] = {}
 
     def start(self) -> None:
+        # The switch outlives a restart. Apps connect after this runs, so no can_read check: a
+        # poll before the app is up counts as a failure and is retried.
+        for app_id in self._store.on_apps() if self._apps else []:
+            self.enable(app_id, GmailSource(app_id, self._apps.call))
         self.fire_due()
 
     def changed(self) -> None:
@@ -111,6 +117,7 @@ class LoopService:
         self._store.mark_surfaced(loop.id, key, self._today())
         facts = {**self._facts(loop, reason), **(extra or {})}
         self._emit(Event("loop", facts, key=f"loop:{loop.id}"))
+        self._notify("changed", {"what": "loops"})
 
     def _take(self, reason: str) -> bool:
         """Whether this reason may wake now; if so, counts it."""
@@ -141,6 +148,7 @@ class LoopService:
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in found)
         facts: dict[str, str | int] = {"reason": "stale", "count": len(found), "loops": lines}
         self._emit(Event("loop", facts, key=f"loop-stale:{now.isoformat()}"))
+        self._notify("changed", {"what": "loops"})
 
     def _today(self) -> str:
         return self._now().astimezone().date().isoformat()  # the local day
@@ -188,16 +196,18 @@ class LoopService:
     def enable(self, app_id: str, source: Source | None = None) -> None:
         """Switch mail reading on for one app: the first poll runs now, then every poll_s."""
         if source is None:
-            names = {t.name for t in self._apps.tools(app_id)} if self._apps else set()
-            if not GmailSource.matches(names):
+            if not self.can_read(app_id):
                 raise ValueError(f"{app_id} is not a mail app Scout can read.")
             source = GmailSource(app_id, self._apps.call)  # direct: the switch is the consent
         self.disable(app_id)
         self._sources[app_id] = source
+        self._store.set_on(app_id, True)
         self._schedule(app_id, 0)
+        self._notify("changed", {"what": "loops"})
 
     def disable(self, app_id: str) -> None:
         """Switch off: polling stops; loops already held stay."""
+        self._store.set_on(app_id, False)
         self._sources.pop(app_id, None)
         handle = self._polls.pop(app_id, None)
         if handle:
@@ -205,6 +215,27 @@ class LoopService:
         task = self._tasks.pop(app_id, None)
         if task:
             task.cancel()
+        self._notify("changed", {"what": "loops"})
+
+    def can_read(self, app_id: str) -> bool:
+        """Whether this connected app is a mail app Scout can read (the switch is offered)."""
+        names = {t.name for t in self._apps.tools(app_id)} if self._apps else set()
+        return GmailSource.matches(names)
+
+    def all_loops(self) -> list[Loop]:
+        """Every loop the store holds, whatever its status, for the Held list."""
+        return self._store.list()
+
+    def is_on(self, app_id: str) -> bool:
+        return app_id in self._sources
+
+    def forget(self, loop_id: str) -> bool:
+        """Delete one loop; False when there is none."""
+        if self._store.get(loop_id) is None:
+            return False
+        self._store.forget(loop_id)
+        self._notify("changed", {"what": "loops"})
+        return True
 
     def wipe(self) -> None:
         """Stop and wipe: every switch off, every loop and every cursor deleted."""
@@ -213,6 +244,7 @@ class LoopService:
         self._store.wipe()
         self._fails.clear()
         self._unread.clear()
+        self._notify("changed", {"what": "loops"})
 
     def unread_since(self, app_id: str) -> datetime | None:
         """When mail stopped being read (allowance spent or the app kept failing), if it has."""
@@ -232,7 +264,10 @@ class LoopService:
 
     async def _cycle(self, app_id: str) -> None:
         try:
+            before = self._view(app_id)
             await self.poll(app_id)
+            if self._view(app_id) != before:  # new loops, or the unread line moved
+                self._notify("changed", {"what": "loops"})
             self.fire_due()  # the poll tick also sweeps quiet and stale loops
         except Exception:  # a bad poll must not end the polling
             log.exception("loops poll failed for %s", app_id)
@@ -241,6 +276,10 @@ class LoopService:
             # chain.
             if app_id in self._sources and self._tasks.get(app_id) is asyncio.current_task():
                 self._schedule(app_id, self._poll_s)
+
+    def _view(self, app_id: str) -> tuple:
+        loops = [(lp.id, lp.status, len(lp.history)) for lp in self._store.list()]
+        return loops, self._unread.get(app_id)
 
     async def poll(self, app_id: str) -> None:
         source = self._sources[app_id]

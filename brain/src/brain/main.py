@@ -20,6 +20,7 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
+from brain.loops.home_tools import loop_home_tools
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
@@ -150,6 +151,22 @@ async def _run() -> None:
         emit_event,
     )
     login = login_tools(config.data_dir, logins)
+    # Built before the session so Home's loops tools can hold it; the mask and the event path
+    # reach the session lazily.
+    loops = LoopService(
+        LoopStore(
+            memory.db,
+            lambda: datetime.now(UTC),
+            lambda text: mask_json(session.guards, "loop", text),
+        ),
+        emit_event,
+        lambda: datetime.now(UTC),
+        reader,
+        apps,
+        config.loop_poll_s,
+        config.loop_stale_days,
+        bodies.notify,
+    )
     session = Session(
         model,
         budget,
@@ -170,6 +187,7 @@ async def _run() -> None:
         + expert_tools
         + app_tools
         + login
+        + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + home_setup_tools(
             registry,
             inspect_machine,
@@ -189,19 +207,6 @@ async def _run() -> None:
     )
     session.voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
-    )
-    loops = LoopService(
-        LoopStore(
-            memory.db,
-            lambda: datetime.now(UTC),
-            lambda text: mask_json(session.guards, "loop", text),
-        ),
-        emit_event,
-        lambda: datetime.now(UTC),
-        reader,
-        apps,
-        config.loop_poll_s,
-        config.loop_stale_days,
     )
     session.loops = loops  # focus and tab events also surface loops
     loops.start()  # wakes Scout for a loop already due, and arms the next one

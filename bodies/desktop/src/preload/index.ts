@@ -36,6 +36,7 @@ import type {
   KeyStatus,
   KeyResult,
 } from '@tagalong/ui';
+import type { LoopsState } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
 import type { PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
@@ -85,6 +86,11 @@ const bridge: PreloadBridge = {
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
   listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
+  loopsState: () => ipcRenderer.invoke(IPC.loopsState) as Promise<LoopsState>,
+  setLoopsOn: (app: string, on: boolean) =>
+    ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,
+  forgetLoop: (id: string) => ipcRenderer.invoke(IPC.loopForget, id) as Promise<void>,
+  wipeLoops: () => ipcRenderer.invoke(IPC.loopsWipe) as Promise<void>,
   setPermission: (tool: string, mode: 'off' | 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,

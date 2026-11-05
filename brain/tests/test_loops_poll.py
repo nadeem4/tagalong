@@ -454,3 +454,43 @@ async def test_an_inbound_reply_on_a_they_owe_loop_cancels_its_old_quiet(rig):
     clock.at += timedelta(hours=2)
     svc.fire_due()
     assert [e for e in events if e.facts.get("reason") == "quiet"] == []
+
+
+async def test_a_saved_switch_polls_mail_once_the_app_connects_after_start(rig):
+    class Result:
+        is_error = False
+        content = [type("C", (), {"text": "{}"})()]
+
+    class Tool:
+        def __init__(self, name):
+            self.name = name
+
+    class LateApps:
+        def __init__(self):
+            self.names = []  # apps.start() connects in the background, after loops.start()
+            self.calls = 0
+
+        def tools(self, app_id):
+            return [Tool(n) for n in self.names]
+
+        async def call(self, *a, **k):
+            self.calls += 1
+            if not self.names:
+                raise AppError("Gmail is not connected.")
+            return Result()
+
+    store, clock, reader, events, _ = rig
+    store.set_on("gmail", True)
+    apps = LateApps()
+    svc = LoopService(store, events.append, clock, reader, apps=apps, poll_s=0.05)
+    svc.start()
+    assert svc.is_on("gmail")  # on even though no tools are visible yet
+    await asyncio.sleep(0.1)
+    assert apps.calls > 0 and svc._fails.get("gmail", 0) > 0  # not connected: a failed poll
+    apps.names = ["search_threads", "get_thread", "create_draft", "send_message"]
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if svc._fails.get("gmail") == 0:
+            break
+    assert svc._fails.get("gmail") == 0  # connected: the poll reads mail again
+    svc.disable("gmail")
