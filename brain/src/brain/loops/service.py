@@ -45,7 +45,9 @@ class LoopService:
             assert loop.due is not None
             if loop.due <= now:
                 # Marked before emitting: a crash after this loses one wake, never repeats it.
-                self._store.mark_surfaced(loop.id, _due_anchor(loop), now.date().isoformat())
+                self._store.mark_surfaced(
+                    loop.id, _due_anchor(loop), now.astimezone().date().isoformat()
+                )  # the local day
                 self._emit(Event("loop", self._facts(loop, "due"), key=f"loop:{loop.id}"))
         self._arm()
 

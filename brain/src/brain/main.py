@@ -22,7 +22,7 @@ from brain.experts import ExpertHosts
 from brain.guardrails import Budget
 from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
-from brain.masking import Masker, SecretLogFilter
+from brain.masking import Masker, SecretLogFilter, mask_json
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
 from brain.offers import OfferSettings
@@ -169,7 +169,11 @@ async def _run() -> None:
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
     loops = LoopService(
-        LoopStore(memory.db, lambda: datetime.now(UTC), masker.mask),
+        LoopStore(
+            memory.db,
+            lambda: datetime.now(UTC),
+            lambda text: mask_json(session.guards, "loop", text),
+        ),
         emit_event,
         lambda: datetime.now(UTC),
     )
