@@ -24,25 +24,26 @@ the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it 
 `<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
 variable still works and is the developer path.
 
-| Variable                       | Default           | Meaning                                                                                                                                                    |
-| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port                                                                                                       |
-| `TAGALONG_HOME`                | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
-| `TAGALONG_MODEL`               | `claude-opus-5-5` | Model Scout thinks with                                                                                                                                    |
-| `TAGALONG_DAILY_BUDGET_USD`    | `5`               | Most Scout may spend per local day, in USD                                                                                                                 |
+| Variable                       | Default            | Meaning                                                                                                                                                    |
+| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                       |
+| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
+| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                                    |
+| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                                                                                 |
 | `TAGALONG_READER_MODEL`        | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
-| `TAGALONG_READER_DAILY_USD`    | `0.5`             | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
-| `TAGALONG_STEP_CAP`            | `25`              | Most model calls in one turn                                                                                                                               |
-| `TAGALONG_TURN_TIMEOUT_S`      | `300`             | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
-| `TAGALONG_EXPERT_CMD`          | none              | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
-| `TAGALONG_JOB_QUIET_MIN`       | `20`              | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                          |
-| `TAGALONG_EXPERT_IDLE_S`       | `300`             | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                           |
-| `TAGALONG_WAKES_PER_HOUR`      | `12`              | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                   |
-| `TAGALONG_OFFER_MIN_APPROVALS` | `3`               | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                    |
-| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`              | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                |
-| `TAGALONG_KEEP_ASKING_DAYS`    | `7`               | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                           |
-| `TAGALONG_TOOL_PREVIEW_CHARS`  | `4000`            | Characters of one tool result (brain tool, connected app, expert report) Scout sees at once; the rest is read with `read_output` (whole number, 1 or more) |
-| `ANTHROPIC_API_KEY`            | none              | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                   |
+| `TAGALONG_READER_DAILY_USD`    | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
+| `TAGALONG_LOOP_POLL_S`         | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                |
+| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                                               |
+| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
+| `TAGALONG_EXPERT_CMD`          | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
+| `TAGALONG_JOB_QUIET_MIN`       | `20`               | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                          |
+| `TAGALONG_EXPERT_IDLE_S`       | `300`              | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                           |
+| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                   |
+| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                    |
+| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                |
+| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                           |
+| `TAGALONG_TOOL_PREVIEW_CHARS`  | `4000`             | Characters of one tool result (brain tool, connected app, expert report) Scout sees at once; the rest is read with `read_output` (whole number, 1 or more) |
+| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                   |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -80,7 +81,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                   |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                  |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                 |
-| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader (see [Loops](#loops))                                                                                                                                |
+| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader (see [Loops](#loops))                                                                                                   |
 | `brain/src/brain/timers.py`            | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                           |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                             |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                        |
@@ -1361,8 +1362,8 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
 ## Loops
 
 A loop is something left open that Scout holds for the person: a reply they owe, a promise
-someone made them. This first part has the shape, the store and the deadline clock; nothing reads
-mail yet, so nothing creates a loop outside tests.
+someone made them. This part has the shape, the store, the deadline clock and the mail source; no
+mail app is switched on yet, so nothing creates a loop outside tests.
 
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
@@ -1387,20 +1388,50 @@ mail yet, so nothing creates a loop outside tests.
 - **Reader** (`loops/reader.py`, wording in `mind/reader.md`). Turns one `MailItem` plus the related
   open loops (same thread or people) into one `Change`: `new`, `update`, `close` or `ignore`. Nothing
   calls it yet; the next slice's mail source feeds it.
-  - *Pre-filter.* `prefilter(item)` returns why a mail is bulk, or `None`. It drops `List-Unsubscribe`,
+  - _Pre-filter._ `prefilter(item)` returns why a mail is bulk, or `None`. It drops `List-Unsubscribe`,
     `Precedence: bulk/list/junk`, `Auto-Submitted` (anything but `no`) and no-reply senders, with no
     model call.
-  - *Safe by shape.* Mail is untrusted. It goes to the model only inside a fenced
+  - _Safe by shape._ Mail is untrusted. It goes to the model only inside a fenced
     `<mail untrusted="true">` block (angle brackets in mail text are escaped, so it cannot close the
     fence), the system prompt says it is data, never instructions, and the model may answer only
     through the `loop_change` tool schema. Text, a wrong tool, an unknown kind, a model error or a
     malformed answer all become `ignore` (logged, never raised). An `update` or `close` for an id that
     was not in the related loops is dropped.
-  - *Allowance.* The reader uses a second `AnthropicModel` (`TAGALONG_READER_MODEL`, default Haiku)
+  - _Allowance._ The reader uses a second `AnthropicModel` (`TAGALONG_READER_MODEL`, default Haiku)
     and its own `Budget` (`reader-budget.json`, `TAGALONG_READER_DAILY_USD`, default 0.50 USD a day),
     separate from Scout's. Each call spends from it. When it is spent, or the model has no key,
     `read` raises `ReaderStopped` without a call so the service can show "mail unread since"; the
     day roll starts it again. The one key set in Home feeds both models.
+- **Mail source** (`loops/source.py`, `loops/sources/gmail.py`, the poll in `loops/service.py`).
+  `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
+  `wipe` stops everything and deletes every loop and cursor). It is built but not yet wired to a
+  Home switch: nothing calls `enable` until the Home slice, so the switch stays off.
+  - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
+    `sent_items(since)` and `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
+    `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
+    directly (the switch is the consent, so the toolbox gate is not involved). Any other tool name is
+    refused in the adapter, so loops cannot send mail (`send_message`) or change the mailbox.
+    `matches` is true for a connected app whose tools include all three, so a second Gmail account
+    is just a second app id.
+  - _Poll._ The first poll after the switch reads 14 days back (`BACKFILL_DAYS`, a constant), unanswered
+    threads only: a thread whose last message is the person's own is skipped. After it a cursor (the
+    date of the last mail handled, per app, in the store) keeps place, and each poll reads from the
+    cursor. A poll repeats every `TAGALONG_LOOP_POLL_S` seconds (default 300) by `call_later`, never
+    two at once for an app. The cursor moves after each mail, so a stop loses nothing and reads
+    nothing twice.
+  - _Mail to loops._ Each mail passes the pre-filter (bulk costs no model call), then the reader with
+    the open loops of the same thread. `new` and `update` save through (source, ref), so a follow-up
+    on a thread updates its loop and never makes a second one; new mail on a thread whose loop was done
+    reopens it. `close` marks the loop done. Each note in a loop's history carries when its mail
+    arrived.
+  - _Self-close._ After reading, each poll scans the person's sent mail since the cursor: a sent
+    message newer than the last mail on that thread closes an `i_owe` loop, in code with no model
+    call. The reader's own `close` (the sender withdrew) is the other way a loop closes.
+  - _When reading stops._ If the reader's allowance is spent mid-poll, the poll stops, the cursor
+    stays on the last mail read, and `unread_since(app)` returns when it stopped; the next poll resumes
+    there once the allowance is back. If the app errors or is disconnected, the poll tries again at the
+    next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
+    it. Nothing here raises into the brain.
 
 ## Web search and fetch
 

@@ -276,12 +276,27 @@ the tool's name), with the tool's short name and its masked, clipped arguments a
 done, failed or refused. The app's result is never copied there. See Scout's own steps in
 [docs/brain.md](brain.md).
 
+## Mail as a source for loops
+
+A connected Gmail app can also feed Scout's loops (see [brain.md](brain.md#loops)), but only when
+reading is switched on for that app (the Home switch comes with a later slice; it is off until
+then). The loops service reads through `Apps.call` directly, so the toolbox gate is not involved:
+the switch is the consent. The Gmail adapter (`loops/sources/gmail.py`) may call only
+`search_threads` and `get_thread` to read and `create_draft` to draft; it refuses any other tool, so
+`send_message` and everything that changes the mailbox (labels, archive, read state, delete) is out
+of reach. An app qualifies when its tool list has all three names. Mail text goes to the model that
+reads it (Haiku) and a loop keeps only a title, what is asked, people and anchors, masked for
+secrets.
+
 ## Tests that pin it
 
 - `brain/tests/test_apps.py`: slugs, `${VAR}` expansion, validation (including a malformed or
   hostless url), the store, and the manager against a real fake server over stdio and http (connect,
   call, hang, exit, drop, restart, process cleanup).
 - `brain/tests/test_app_tools.py`: classification, names, results and `AppSource`.
+- `brain/tests/test_loops_gmail.py`: the Gmail adapter against the fake server (items after a time,
+  unanswered only, sent mail, missing fields, only the allowed tools) and a fake mailbox of 3
+  unanswered, 1 answered and 1 bulk mail becoming 3 loops.
 - `brain/tests/test_apps.py` also pins the secret split, the merge at connect and
   clearing every key on remove.
 - `brain/tests/test_app_oauth.py`: token storage, the loopback listener, and sign-in against a

@@ -101,11 +101,13 @@ class LoopStore:
             (status, _iso(self._now()), loop_id),
         )
 
-    def add_history(self, loop_id: str, note: str) -> None:
+    def add_history(self, loop_id: str, note: str, mail_at: datetime | None = None) -> None:
         loop = self.get(loop_id)
         if loop is None:
             return
         entry = {"at": _iso(self._now()), "note": self._mask(note)}
+        if mail_at:  # when the mail itself arrived, so a later reply can be compared with it
+            entry["mail_at"] = _iso(mail_at)
         self._db.execute(
             "UPDATE loops SET history = ? WHERE id = ?",
             (json.dumps([*loop.history, entry]), loop_id),
