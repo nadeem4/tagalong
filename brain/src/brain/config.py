@@ -16,6 +16,8 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 47321
 DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_DAILY_BUDGET_USD = 5.0
+DEFAULT_READER_MODEL = "claude-haiku-5-5"
+DEFAULT_READER_DAILY_USD = 0.5
 DEFAULT_STEP_CAP = 25
 DEFAULT_JOB_QUIET_MIN = 20.0
 DEFAULT_EXPERT_IDLE_S = 300.0
@@ -35,6 +37,8 @@ class Config:
     model: str = DEFAULT_MODEL
     daily_budget_usd: float = DEFAULT_DAILY_BUDGET_USD
     step_cap: int = DEFAULT_STEP_CAP
+    reader_model: str = DEFAULT_READER_MODEL  # reads mail for loops; its own allowance
+    reader_daily_usd: float = DEFAULT_READER_DAILY_USD
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
     job_quiet_min: float = DEFAULT_JOB_QUIET_MIN
     expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
@@ -77,6 +81,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         model=env.get("TAGALONG_MODEL") or DEFAULT_MODEL,
         daily_budget_usd=_budget(env.get("TAGALONG_DAILY_BUDGET_USD")),
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
+        reader_model=env.get("TAGALONG_READER_MODEL") or DEFAULT_READER_MODEL,
+        reader_daily_usd=_positive_usd(env, "TAGALONG_READER_DAILY_USD", DEFAULT_READER_DAILY_USD),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
         job_quiet_min=_job_quiet_min(env.get("TAGALONG_JOB_QUIET_MIN")),
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
@@ -104,6 +110,19 @@ def _budget(text: str | None) -> float:
         raise ValueError(f"bad TAGALONG_DAILY_BUDGET_USD: {text!r}") from None
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"TAGALONG_DAILY_BUDGET_USD must be positive: {text!r}")
+    return value
+
+
+def _positive_usd(env: Mapping[str, str], name: str, default: float) -> float:
+    text = env.get(name)
+    if not text:
+        return default
+    try:
+        value = float(text)
+    except ValueError:
+        raise ValueError(f"bad {name}: {text!r}") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be positive: {text!r}")
     return value
 
 
