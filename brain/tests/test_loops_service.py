@@ -75,7 +75,7 @@ def test_snoozed_fires_but_done_dropped_surfaced_stale_do_not(parts):
     store, clock, events, _ = parts
     past = T0 - timedelta(hours=1)
     held(store, "s", past, "snoozed")
-    for ref, st in [("d", "done"), ("x", "dropped"), ("u", "surfaced"), ("z", "stale")]:
+    for ref, st in [("d", "done"), ("x", "dropped"), ("u", "surfaced")]:
         held(store, ref, past, st)
     svc(store, clock, events).start()
     assert [e.facts["title"] for e in events] == ["t-s"]
@@ -145,6 +145,38 @@ def test_a_new_service_over_an_earlier_saved_future_loop_arms_and_fires(tmp_path
         assert events == [] and s._handle is not None
         await asyncio.sleep(0.4)
         assert len(events) == 1
+        mem.close()
+
+    asyncio.run(run())
+
+
+def test_stale_loop_with_a_future_due_still_fires(parts):
+    store, clock, events, _ = parts
+    held(store, due=T0 - timedelta(hours=1), status="stale")
+    svc(store, clock, events).start()
+    assert len(events) == 1
+
+
+def test_throttled_ripe_quiet_loops_arm_after_the_throttle_not_now(tmp_path):
+    async def run():
+        mem = Memory(tmp_path / "t.db")
+        store = LoopStore(mem.db, Clock())
+        events = []
+        for ref in "abc":
+            store.save(
+                Loop(
+                    source="app1",
+                    ref=ref,
+                    title=ref,
+                    asks="x",
+                    direction="they_owe",
+                    quiet_after=T0 - timedelta(hours=1),
+                )
+            )
+        s = svc(store, Clock(), events)
+        s.start()
+        assert len(events) == 2 and s._handle is not None
+        assert s._handle.when() - asyncio.get_running_loop().time() > 60
         mem.close()
 
     asyncio.run(run())

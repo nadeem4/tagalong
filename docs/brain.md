@@ -1416,7 +1416,8 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     so the same window surfaces a loop once a day. Before the event goes out the service throttles per
     reason across all loops: context 1 per 10 minutes, urgent and quiet 2 per hour. A throttled
     match is not recorded, so it can surface on a later focus (urgent only comes on read, so a
-    throttled one stays held). Due and stale are not throttled. The `loop` event cap (4 an hour) is
+    throttled urgent wake is dropped, and the loop can still surface on context or due; a throttled
+    quiet loop is re-armed for when the throttle frees). Due and stale are not throttled. The `loop` event cap (4 an hour) is
     the second line of defence.
 - **Reader** (`loops/reader.py`, wording in `mind/reader.md`). Turns one `MailItem` plus the related
   open loops (same thread or people) into one `Change`: `new`, `update`, `close` or `ignore`. Nothing

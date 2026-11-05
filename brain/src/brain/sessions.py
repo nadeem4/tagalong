@@ -418,7 +418,10 @@ class Session:
         event = from_body(body_id, name, data)
         if event is not None:
             if self.loops is not None and event.kind in ("focus", "tab"):
-                self.loops.saw(event)
+                try:
+                    self.loops.saw(event)
+                except Exception:  # a store error must not stop the wake path
+                    log.exception("loops.saw failed")
             self.scheduler.emit(event)
 
     def _on_connect(self, body_id: str, away: float | None) -> None:

@@ -128,3 +128,12 @@ def test_stale_is_held_and_untouched_for_n_days():
     fresh = lp(ref="b", updated=T0 - timedelta(days=2))
     snoozed = lp(ref="c", updated=T0 - timedelta(days=30), status="snoozed")
     assert [x.ref for x in stale.ripe([old, fresh, snoozed], T0, 7)] == ["a"]
+
+
+def test_a_file_anchor_does_not_match_another_file_of_the_same_name_in_another_app():
+    assert not context.matches("Q4 pricing.pptx", "Q4 pricing - Excel")
+
+
+def test_a_word_outlook_in_a_file_title_is_not_mail():
+    assert not context.mail_in_front("WINWORD.EXE", "2026 outlook.docx - Word", "")
+    assert context.mail_in_front("chrome.exe", "Re: pricing - Outlook", "")

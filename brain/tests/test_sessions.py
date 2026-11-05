@@ -2401,3 +2401,18 @@ async def test_web_tools_are_offered_and_listed_in_the_capability_picture():
     await finish_quietly(session)
     assert {"web_search", "web_fetch"} <= {t["name"] for t in model.tools[0]}
     assert "web_search" in model.systems[0]
+
+
+async def test_a_loops_store_error_does_not_stop_the_event_reaching_the_scheduler():
+    class Broken:
+        def saw(self, event):
+            raise RuntimeError("db")
+
+    model = Gate([])
+    session, _ = make(model, kinds=None)
+    join(session, "desktop")
+    session.loops = Broken()
+    emitted = []
+    session.scheduler.emit = emitted.append
+    session.body_event("desktop", "focus", {"app": "Code", "title": "x"})
+    assert [e.kind for e in emitted] == ["focus"]

@@ -291,7 +291,7 @@ The window titles the focus watch reports (`focus`: app and title) and the tab c
 body reports (`tab`: title and address) are handed to the brain's loops service as well as to the
 event queue. If one matches an anchor of a loop Scout is holding (the deck a mail asked about, the
 page it linked), Scout may speak up, at most once per loop and anchor a day. No new screen read is
-made: only titles and addresses already sent,; the focus watch is off while sight is paused. See
+made: only titles and addresses already sent; the focus watch is off while sight is paused. See
 [brain.md](brain.md#loops).
 
 ### Dropping things on Scout
