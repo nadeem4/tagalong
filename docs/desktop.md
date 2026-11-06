@@ -607,6 +607,19 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   Apps come from `listConnections`. Each row is a letter tile, a name over its subline and the
   Connections page's status chip. Offline, the card says apps return with the brain.
   `e2e/where-things-run.spec.ts` covers it on the fake brain.
+- **How Scout reads your screen** (`home/reading-rows.tsx`, a group in the same card). It shows two
+  rows, "Reading window text" (Windows UI Automation) and "Text from pictures" (Windows OCR), each
+  "this PC", with a chip that always carries words beside its colour: Working, Needs a fix or Not
+  working. The rows come from the brain's `reading_status` Home tool (`IPC.readingStatus`, read by
+  `readingRowsOf`); the card reads again on `changed reading` and asks the desktop to re-detect
+  (`readingRecheck`) when Home opens. With no rows (no desktop body, or the brain away) the group
+  is hidden. A row that needs a fix shows one plain sentence naming the language, **Ask Scout to
+  fix it** and **Do it myself in Windows Settings** (`openLanguageSettings`); Not working shows the
+  sentence and the Settings link only. Ask Scout to fix it calls `askScout("Fix text from
+pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sends
+  `IPC.panelAskEvent`; the preload's `onPanelAsk` hands it to `panel.tsx`, which opens the full
+  chat and passes it to the bubble's `onAsk`, which asks it as if the person typed it. Scout then
+  runs its usual ask for `install_ocr_language`; nothing installs without the person's yes.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`
   (otherwise `BrainOffline`) and rejects if the brain refuses it (the ask already closed). The

@@ -309,7 +309,8 @@ not confused with "no text": when a read fell back to the picture and there was 
 "Windows has no text recognition for your language, so text in pictures could not be read." Reading never installs
 anything and nothing leaves the machine. Never rejects.
 
-**Reading status and the language pack.** `detectReading` (`reading-status.ts`) runs `READING_SCRIPT` with
+**Reading status and the language pack.** Home shows it in "Where things run" under "How Scout
+reads your screen" (see [desktop.md](desktop.md)); "Ask Scout to fix it" asks Scout as the person. `detectReading` (`reading-status.ts`) runs `READING_SCRIPT` with
 `DETECT_TIMEOUT_MS` = 20,000: UI Automation's root element for window text, `TryCreateFromUserProfileLanguages()` for
 text from pictures, and the display language (`Get-WinUILanguageOverride`, else `Get-UICulture`). It never calls
 `Get-WindowsCapability`, which needs administrator rights. Empty output, a blocked script or a thrown runner reads

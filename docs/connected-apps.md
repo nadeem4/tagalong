@@ -195,7 +195,8 @@ flowchart LR
   computer.
 - **Where things run**: Overview has a read-only card: for the brain and each app a letter tile,
   the name over its command line (`node files-server.js`) or web address, and a coloured status
-  chip; Claude Code closes the list. Secrets never show: the brain strips
+  chip; Claude Code closes the list. A group above it, "How Scout reads your screen", has two rows
+  (Reading window text, Text from pictures) with the same kind of chip; see [desktop.md](desktop.md). Secrets never show: the brain strips
   them from `list_apps` (see [brain.md](brain.md#home-tools)). Env values and secret url parts are
   moved to the token file for you; do not put secrets in args, which stay in the row.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
