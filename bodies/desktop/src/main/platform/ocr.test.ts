@@ -18,24 +18,28 @@ describe('the text recognition script', () => {
 
 describe('parseOcr', () => {
   it('returns the recognised lines', () => {
-    expect(parseOcr('PS C:> npm test\r\nError: expected 3\r\n')).toBe(
-      'PS C:> npm test\nError: expected 3',
-    );
+    expect(parseOcr('PS C:> npm test\r\nError: expected 3\r\n')).toEqual({
+      text: 'PS C:> npm test\nError: expected 3',
+      noRecogniser: false,
+    });
   });
 
-  it('reads as empty when Windows has no recogniser for these languages', () => {
-    expect(parseOcr(`${NO_RECOGNISER}\r\n`)).toBe('');
+  it('reads as empty, and says why, when Windows has no recogniser for these languages', () => {
+    expect(parseOcr(`${NO_RECOGNISER}\r\n`)).toEqual({ text: '', noRecogniser: true });
   });
 });
 
 describe('recognizeText', () => {
   it('hands the picture over as input and returns the text', async () => {
     const run = vi.fn().mockResolvedValue('hello\r\n');
-    expect(await recognizeText(run, 'cG5n')).toBe('hello');
+    expect(await recognizeText(run, 'cG5n')).toEqual({ text: 'hello', noRecogniser: false });
     expect(run).toHaveBeenCalledWith(OCR_SCRIPT, expect.any(Number), 'cG5n');
   });
 
   it('reads as empty rather than failing the read when PowerShell throws', async () => {
-    expect(await recognizeText(vi.fn().mockRejectedValue(new Error('gone')), 'cG5n')).toBe('');
+    expect(await recognizeText(vi.fn().mockRejectedValue(new Error('gone')), 'cG5n')).toEqual({
+      text: '',
+      noRecogniser: false,
+    });
   });
 });

@@ -40,17 +40,23 @@ foreach ($line in $result.Lines) { $line.Text }
 /** Runs a script with data on its stdin and resolves with what it printed. */
 type RunWithInput = (script: string, timeoutMs: number, input: string) => Promise<string>;
 
-/** The recognised lines, or nothing when there is no recogniser or the run failed. */
-export function parseOcr(stdout: string): string {
+/** What a recognition gave: the lines, and whether there was no recogniser to ask. */
+export interface OcrReading {
+  text: string;
+  noRecogniser: boolean;
+}
+
+/** The recognised lines. No recogniser is reported apart from "no text", so it can be said. */
+export function parseOcr(stdout: string): OcrReading {
   const text = stdout.replace(/\r\n/g, '\n').trim();
-  return text === NO_RECOGNISER ? '' : text;
+  return text === NO_RECOGNISER ? { text: '', noRecogniser: true } : { text, noRecogniser: false };
 }
 
 /** Reads the text in a PNG. Never rejects: a picture it could not read reads as empty. */
-export async function recognizeText(run: RunWithInput, pngBase64: string): Promise<string> {
+export async function recognizeText(run: RunWithInput, pngBase64: string): Promise<OcrReading> {
   try {
     return parseOcr(await run(OCR_SCRIPT, OCR_TIMEOUT_MS, pngBase64));
   } catch {
-    return '';
+    return { text: '', noRecogniser: false };
   }
 }

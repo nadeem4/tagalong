@@ -200,7 +200,7 @@ describe('readWindowTextWith, reading the picture when the text layer is thin', 
   const TERMINAL = ['PS C:> npm test', 'Error: expected 3 to be 4'].join('\n');
 
   it('reads the text from a picture of a window that publishes little, and says so', async () => {
-    const readPicture = vi.fn().mockResolvedValue(TERMINAL);
+    const readPicture = vi.fn().mockResolvedValue({ text: TERMINAL, noRecogniser: false });
     const d = { ...deps({ text: 'Terminal' }), readPicture };
 
     const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
@@ -234,7 +234,10 @@ describe('readWindowTextWith, reading the picture when the text layer is thin', 
   });
 
   it('keeps the thin text when the picture holds no more', async () => {
-    const d = { ...deps({ text: 'Terminal' }), readPicture: vi.fn().mockResolvedValue('') };
+    const d = {
+      ...deps({ text: 'Terminal' }),
+      readPicture: vi.fn().mockResolvedValue({ text: '', noRecogniser: false }),
+    };
 
     const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
 
@@ -242,8 +245,30 @@ describe('readWindowTextWith, reading the picture when the text layer is thin', 
     expect(result.text).toBe('Terminal');
   });
 
+  it('a thin text layer with no recogniser adds the no-recogniser note instead of looking empty', async () => {
+    const readPicture = vi.fn().mockResolvedValue({ text: '', noRecogniser: true });
+    const d = { ...deps({ text: 'Terminal' }), readPicture };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(result.source).toBe('uia');
+    expect(result.notes?.join(' ')).toMatch(/no text recognition for your language/);
+  });
+
+  it('does not add the no-recogniser note when recognition ran', async () => {
+    const readPicture = vi.fn().mockResolvedValue({ text: '', noRecogniser: false });
+    const d = { ...deps({ text: 'Terminal' }), readPicture };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(result.notes?.join(' ')).not.toMatch(/no text recognition/);
+  });
+
   it('caps what it read from the picture like any other read', async () => {
-    const d = { ...deps({ text: '' }), readPicture: vi.fn().mockResolvedValue('y'.repeat(100)) };
+    const d = {
+      ...deps({ text: '' }),
+      readPicture: vi.fn().mockResolvedValue({ text: 'y'.repeat(100), noRecogniser: false }),
+    };
 
     const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 40 });
 

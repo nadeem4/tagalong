@@ -20,6 +20,8 @@ interface TextLayerReading {
   /** Characters actually returned, after any cap was applied. */
   textLength: number;
   truncated: boolean;
+  /** A fall back to reading a picture found Windows has no recogniser for the language. */
+  noRecogniser?: boolean;
 }
 
 /**
@@ -79,6 +81,12 @@ export function textLayerNotes(reading: TextLayerReading): string[] {
     notes.push(
       `This is the beginning of the window's text, not all of it. Ask again with a larger ` +
         `character budget if the part you need is further down.`,
+    );
+  }
+
+  if (reading.noRecogniser === true) {
+    notes.push(
+      'Windows has no text recognition for your language, so text in pictures could not be read.',
     );
   }
 
