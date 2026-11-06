@@ -98,6 +98,26 @@ and real pixels by the Electron smoke test.
 
 #### Talking to PowerShell
 
+Node cannot see inside other apps' windows; Windows can, through UI Automation (a window's text)
+and Windows OCR (text in a picture). PowerShell ships with every Windows and reaches both without a
+native add-on to compile and sign, so each read runs a small script and parses what it prints.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+sequenceDiagram
+  participant B as Python brain
+  participant D as Desktop body (Node)
+  participant P as powershell.exe
+  participant O as UI Automation / Windows OCR
+  B->>D: read request (tool call)
+  D->>P: runPowerShellScript: script as -EncodedCommand, OCR picture on stdin
+  P->>O: read the window
+  O-->>P: text, rectangles, recognised lines
+  P-->>D: printed output (capped, never rejects)
+  D->>D: parse, or name the failure
+  D-->>B: text, or tool_failed
+```
+
 UI Automation and OCR run in `powershell.exe`, spawned per read. `runPowerShellScript` is the one
 place the host starts it; nothing else may spawn PowerShell, and the transport integration test
 calls this function rather than its own copy of the arguments.
