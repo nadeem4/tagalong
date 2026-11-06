@@ -1,7 +1,7 @@
 # Tagalong
 
 A desktop screen companion for Windows: Scout sits on your screen and helps with what you are working on.
-Product intent: PRODUCT.md. Visual design: DESIGN.md. Engineering reference: docs/ (start at docs/README.md).
+Product intent: bodies/PRODUCT.md. Visual design: bodies/DESIGN.md (both under bodies/ so the impeccable design skill finds them from every UI app). Engineering reference: docs/ (start at docs/README.md).
 
 ## Architecture
 

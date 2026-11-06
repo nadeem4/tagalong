@@ -185,7 +185,7 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
 
 ### Shared controls
 
-Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see DESIGN.md, Shared controls).
+Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls).
 
 ### The window inventory
 
