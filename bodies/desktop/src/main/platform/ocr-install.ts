@@ -26,10 +26,15 @@ type Run = (script: string, timeoutMs: number) => Promise<string>;
  * passed the contract's language-tag check, so it holds no quote or shell character.
  */
 export function buildElevatedScript(language: string): string {
+  // -ErrorAction Stop on both: a non-terminating error must not fall through to exit 0. A
+  // failed lookup (offline, servicing policy) is exit 4, not 3, which means "no such pack".
   return [
-    `$c = Get-WindowsCapability -Online -Name 'Language.OCR~~~${language}~*' | Select-Object -First 1`,
+    'try {',
+    `$c = Get-WindowsCapability -Online -Name 'Language.OCR~~~${language}~*' -ErrorAction Stop | Select-Object -First 1`,
     'if ($null -eq $c) { exit 3 }',
-    'try { Add-WindowsCapability -Online -Name $c.Name | Out-Null; exit 0 } catch { exit 4 }',
+    'Add-WindowsCapability -Online -Name $c.Name -ErrorAction Stop | Out-Null',
+    'exit 0',
+    '} catch { exit 4 }',
   ].join('\n');
 }
 

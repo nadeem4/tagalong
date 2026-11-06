@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, Tool } from '@tagalong/contract';
 import type { CaptureExclusions } from '../../shared/settings';
 import type { Platform } from '../platform/index';
-import { bodyTools } from './body-tools';
+import { INSTALL_TOOL_TIMEOUT_MS, bodyTools } from './body-tools';
 import type { ReadingDeps } from './body-tools';
 import type { ReadingStatus } from '../platform/reading-status';
 import { RpcError } from '@tagalong/contract';
 import { INSTALL_TIMEOUT_MS } from '../platform/ocr-install';
+import { DETECT_TIMEOUT_MS } from '../platform/reading-status';
 import { SightPausedError } from '../platform/sight-gate';
 
 const exclusions = { processNames: [], titlePatterns: [] } as unknown as CaptureExclusions;
@@ -400,6 +401,10 @@ describe('run limits', () => {
     expect(await result).toMatchObject({ code: ErrorCode.timeout });
   });
 
+  it('leaves room after the install limit for the re-check', () => {
+    expect(INSTALL_TOOL_TIMEOUT_MS).toBe(INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000);
+  });
+
   it('lets the install run past 15 s, which no other tool may', async () => {
     const { run } = setup({}, { install: () => new Promise(() => undefined) });
     let outcome: unknown = 'pending';
@@ -408,7 +413,7 @@ describe('run limits', () => {
     });
     await vi.advanceTimersByTimeAsync(15_001);
     expect(outcome).toBe('pending');
-    await vi.advanceTimersByTimeAsync(INSTALL_TIMEOUT_MS + 30_000);
+    await vi.advanceTimersByTimeAsync(INSTALL_TOOL_TIMEOUT_MS);
     expect(outcome).toMatchObject({ code: ErrorCode.timeout });
   });
 

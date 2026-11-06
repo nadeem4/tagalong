@@ -78,6 +78,22 @@ describe('the install scripts', () => {
     expect(script).toContain('#declined');
   });
 
+  it('stops on any error from both calls, so a non-terminating failure cannot report installed', () => {
+    const elevated = buildElevatedScript('fr-FR');
+    expect(elevated.match(/-ErrorAction Stop/g)).toHaveLength(2);
+    expect(elevated).toMatch(/Get-WindowsCapability[^\n]*-ErrorAction Stop/);
+    expect(elevated).toMatch(/Add-WindowsCapability[^\n]*-ErrorAction Stop/);
+  });
+
+  it('exits 4 (failed) when the lookup itself throws, and 3 only when no pack matched', () => {
+    const elevated = buildElevatedScript('fr-FR');
+    const lookup = elevated.indexOf('Get-WindowsCapability');
+    expect(elevated.lastIndexOf('try', lookup)).toBeGreaterThanOrEqual(0);
+    expect(elevated).toMatch(/catch \{ exit 4 \}/);
+    expect(elevated).toContain('exit 3');
+    expect(buildInstallScript('fr-FR')).toMatch(/ExitCode -eq 3\) \{ '#failed:Windows has no text/);
+  });
+
   it('finds the exact capability name inside the elevated process, never outside it', () => {
     const elevated = buildElevatedScript('fr-FR');
     expect(elevated).toContain('Language.OCR~~~fr-FR~*');

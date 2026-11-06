@@ -15,6 +15,7 @@ import type { Platform } from '../platform/index';
 import { RpcError } from '@tagalong/contract';
 import { fileTools, type FileDeps } from '../tools/files';
 import { INSTALL_TIMEOUT_MS, type InstallResult } from '../platform/ocr-install';
+import { DETECT_TIMEOUT_MS } from '../platform/reading-status';
 import type { ReadingStatus } from '../platform/reading-status';
 
 /**
@@ -28,8 +29,11 @@ const RUN_TIMEOUT_MS = 15_000;
  * "still installing"; this limit sits above it (room for the re-check) so that answer always
  * comes first, and the brain's own wait sits above this one.
  */
+/** Install limit, plus the re-check that follows it, plus slack. The brain's wait must exceed it. */
+export const INSTALL_TOOL_TIMEOUT_MS = INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000;
+
 const TOOL_TIMEOUTS: Record<string, number> = {
-  install_ocr_language: INSTALL_TIMEOUT_MS + 20_000,
+  install_ocr_language: INSTALL_TOOL_TIMEOUT_MS,
 };
 
 /** What the reading tools need: detection, the install, and telling the brain the result. */
