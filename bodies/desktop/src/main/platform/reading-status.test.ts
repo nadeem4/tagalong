@@ -33,14 +33,14 @@ describe('parseReading', () => {
   });
 
   it('never says needs-language-pack without a usable display tag', () => {
-    expect(parseReading('window-text=ok\nocr=missing\ndisplay=\nprofile=').rows[1].state).toBe(
+    expect(parseReading('window-text=ok\nocr=missing\ndisplay=\nprofile=').rows[1]?.state).toBe(
       'not-working',
     );
   });
 
   it('never lets a malformed display tag through', () => {
     const ocr = parseReading('window-text=ok\nocr=missing\ndisplay=en-US; calc\nprofile=').rows[1];
-    expect(ocr.state).toBe('not-working');
+    expect(ocr?.state).toBe('not-working');
   });
 
   it('says not-working for a row whose line failed', () => {

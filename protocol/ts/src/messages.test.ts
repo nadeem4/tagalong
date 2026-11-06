@@ -15,6 +15,7 @@ import {
   HeardParams,
   ListenParams,
   ReadAloudEventData,
+  ReadingEventData,
   SayParams,
   SpeechParams,
   TabEventData,
@@ -120,6 +121,37 @@ describe('tab and download event data', () => {
   it('rejects a bad download state and a tab without a url', () => {
     expect(DownloadEventData.safeParse({ name: 'a', state: 'started' }).success).toBe(false);
     expect(TabEventData.safeParse({ title: 'x' }).success).toBe(false);
+  });
+});
+
+describe('reading event data', () => {
+  const row = {
+    capability: 'text-from-pictures',
+    engine: 'windows-ocr',
+    where: 'this-pc',
+    state: 'needs-language-pack',
+  };
+
+  it('parses the example', () => {
+    const data = ReadingEventData.parse(eventData('reading'));
+    expect(data.rows.map((r) => r.state)).toEqual(['working', 'working']);
+  });
+
+  it('rejects an unknown state', () => {
+    expect(ReadingEventData.safeParse({ rows: [{ ...row, state: 'fine' }] }).success).toBe(false);
+  });
+
+  it('rejects a language that could carry shell characters', () => {
+    expect(
+      ReadingEventData.safeParse({ rows: [{ ...row, language: 'en-US; calc' }] }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a row with no language, and one with a language', () => {
+    expect(ReadingEventData.safeParse({ rows: [row] }).success).toBe(true);
+    expect(ReadingEventData.safeParse({ rows: [{ ...row, language: 'en-US' }] }).success).toBe(
+      true,
+    );
   });
 });
 

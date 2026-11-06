@@ -41,27 +41,28 @@ function facts(stdout: string): Map<string, string> {
   return found;
 }
 
-const NOT_WORKING: ReadingStatus = {
-  rows: [
-    { capability: 'window-text', engine: 'windows-uia', where: 'this-pc', state: 'not-working' },
-    {
-      capability: 'text-from-pictures',
-      engine: 'windows-ocr',
-      where: 'this-pc',
-      state: 'not-working',
-    },
-  ],
+const WINDOW_TEXT: ReadingRow = {
+  capability: 'window-text',
+  engine: 'windows-uia',
+  where: 'this-pc',
+  state: 'not-working',
+};
+const PICTURE_TEXT: ReadingRow = {
+  capability: 'text-from-pictures',
+  engine: 'windows-ocr',
+  where: 'this-pc',
+  state: 'not-working',
 };
 
 /** Turns the script's lines into rows. Anything unclear reads as not-working, never as working. */
 export function parseReading(stdout: string): ReadingStatus {
   const found = facts(stdout);
   const windowText: ReadingRow = {
-    ...NOT_WORKING.rows[0],
+    ...WINDOW_TEXT,
     state: found.get('window-text') === 'ok' ? 'working' : 'not-working',
   };
 
-  const ocr: ReadingRow = { ...NOT_WORKING.rows[1] };
+  const ocr: ReadingRow = { ...PICTURE_TEXT };
   const display = found.get('display') ?? '';
   if (found.get('ocr') === 'ok') {
     ocr.state = 'working';
