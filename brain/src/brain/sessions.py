@@ -61,6 +61,7 @@ from brain.outputs import OutputStore
 from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
+from brain.reading_tools import reading_home_tools
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
@@ -210,6 +211,7 @@ class Session:
             + choice_tools(choices)
             + preference_tools(approvals, self._asks)
             + approval_home_tools(approvals)
+            + reading_home_tools(self.reading)
             + (extra_tools or [])
         )
         sources: list = []
@@ -639,7 +641,7 @@ class Session:
             for app_id, specs in by_app.items()
         ]
         experts = [ExpertCaps(e.id, e.logged_in) for e in self._experts_live()]
-        return capability_picture(builtin, bodies, apps, experts)
+        return capability_picture(builtin, bodies, apps, experts, self.reading.ocr_problem())
 
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:

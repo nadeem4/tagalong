@@ -681,6 +681,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "list_memories",
         "list_permissions",
         "list_preferences",
+        "reading_status",
         "remove_preference",
         "set_api_key",
         "set_daily_limit",

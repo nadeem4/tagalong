@@ -12,7 +12,7 @@ from brain.bodies import Bodies
 from brain.guards import ALLOW, Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
-from brain.toolbox import BodySource, BrainSource, ToolSpec
+from brain.toolbox import INSTALL_OCR_TIMEOUT_S, BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
 
@@ -1366,3 +1366,40 @@ def test_set_mode_rejects_unknown_mode_text():
     with pytest.raises(RpcError) as e:
         Toolbox([FakeSource([spec("a")])]).set_mode("a", "maybe")
     assert str(e.value) == "mode must be off, ask or auto."
+
+
+async def test_install_ocr_language_runs_with_the_long_limit_and_others_with_the_default():
+    bodies = Bodies()
+    connect(bodies, "desktop", tools=("install_ocr_language", "see_screen"))
+    seen = {}
+
+    async def use(body_id, call_id, tool, tool_input, timeout=30.0):
+        seen[tool] = timeout
+        return [{"type": "text", "text": "ok"}]
+
+    bodies.use = use
+    box = body_box(bodies)
+    for name in ("install_ocr_language", "see_screen"):
+        await box.run(Call(id="c", name=f"desktop__{name}", input={}, turn="t", text=""))
+    assert seen == {"install_ocr_language": INSTALL_OCR_TIMEOUT_S, "see_screen": 30.0}
+
+
+def test_install_ocr_language_declared_always_is_person_only_with_no_new_gate():
+    bodies = Bodies()
+    decl = [
+        Tool(
+            name="install_ocr_language",
+            description="d",
+            input_schema={"type": "object"},
+            confirm="always",
+        )
+    ]
+    bodies.connect(
+        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+    )
+    (s,) = BodySource(bodies).specs()
+    assert s.person_only and s.locked
+
+
+def test_the_install_wait_is_longer_than_the_desktops_own_limit():
+    assert INSTALL_OCR_TIMEOUT_S >= 660

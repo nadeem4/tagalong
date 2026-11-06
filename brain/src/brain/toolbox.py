@@ -97,6 +97,13 @@ class BrainSource:
         return None
 
 
+# The desktop's install_ocr_language gives up on its own at INSTALL_TOOL_TIMEOUT_MS (630 s).
+# The brain's wait MUST stay strictly above that so the body always answers first with
+# "still installing". Raise this together with the desktop constant.
+INSTALL_OCR_TIMEOUT_S = 660.0
+# Tools whose body-side work legitimately runs long. Every other tool keeps Bodies.use's 30 s.
+BODY_TOOL_TIMEOUTS = {"install_ocr_language": INSTALL_OCR_TIMEOUT_S}
+
 SEP = "__"  # joins body id and tool name; bodies may not use it in tool names
 
 
@@ -136,7 +143,11 @@ class BodySource:
 
     async def run(self, call: Call, tool: str) -> str | list[dict]:
         body_id, _, plain = tool.partition(SEP)
-        raw = await self._bodies.use(body_id, call.id, plain, call.input)
+        limit = BODY_TOOL_TIMEOUTS.get(plain)
+        if limit is None:
+            raw = await self._bodies.use(body_id, call.id, plain, call.input)
+        else:
+            raw = await self._bodies.use(body_id, call.id, plain, call.input, timeout=limit)
         try:
             parts = CallResult.model_validate({"output": raw}).output
         except ValidationError:

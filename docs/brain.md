@@ -89,6 +89,8 @@ the total can run a little low.
 | `brain/src/brain/questions.py`         | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                 |
 | `brain/src/brain/jobs.py`              | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                               |
 | `brain/src/brain/job_activity.py`      | `JobActivity`: one per running job; turns ACP updates into masked, capped, stored activity entries                                                                                                                                                                                         |
+| `brain/src/brain/reading.py`           | `ReadingStore`: the `reading` status each body last reported (how Scout reads the screen), forgotten when the body goes                                                                                                                                                                    |
+| `brain/src/brain/reading_tools.py`     | Home's `reading_status` tool                                                                                                                                                                                                                                                               |
 | `brain/src/brain/outputs.py`           | `OutputStore` and `preview`: a long tool result becomes a capped preview, the full text is stored masked for `read_output`                                                                                                                                                                 |
 | `brain/src/brain/apps.py`              | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                                                                                                                                                |
 | `brain/src/brain/app_oauth.py`         | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                                                                                                                                                       |
@@ -266,7 +268,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 - **Gate step 3: ask.** A call from Scout to a tool whose mode is `ask` waits for a person (see
   [Permissions and asks](#permissions-and-asks)). A call from Home skips this step. A tool never
   runs without passing the gate.
-- **Body calls.** `use` waits at most 30 s. On timeout or when the turn is cancelled the brain
+- **Body calls.** `use` waits at most 30 s, except `install_ocr_language` (`BODY_TOOL_TIMEOUTS` in `toolbox.py`, 660 s: it must stay above the desktop's own 630 s so the body answers first with "still installing"). On timeout or when the turn is cancelled the brain
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Long text results.** Over `TAGALONG_TOOL_PREVIEW_CHARS` a text result reaches the model as a
@@ -338,6 +340,23 @@ connect). `error` or `needs-sign-in` found by the wait come back in the result a
 At shutdown `stop_watches()` cancels pending watches before `apps.shutdown()`, so a watch never
 wakes Scout during teardown. The `mind/events.md` notes for `choice` and `setup_done` say the
 earlier request is still in the conversation and should be resumed.
+
+## Reading status
+
+The desktop body sends a `reading` event (contract: `ReadingData` in `protocol.py`) on connect and
+after a change: one row per way it reads the screen (`window-text`, `text-from-pictures`) with a
+state of `working`, `needs-language-pack` or `not-working`. `Session.body_event` validates it
+(a malformed one is logged and dropped), keeps the latest in `ReadingStore` (`reading.py`, in
+memory only; the body resends on connect) and sends `changed {what: "reading"}` only when the
+copy differs. The event never wakes Scout. When the body disconnects, `Session.body_gone` forgets
+its copy and tells Home, so a stale status never outlives the body.
+
+Home reads it with the `reading_status` tool (`reading_tools.py`, Home only, effect `read`):
+`{"rows": [...]}`, or `{"rows": []}` with no body, in which case Home hides the group. When the
+picture-reading row is not `working`, the capability picture gains one fact line (text inside
+pictures cannot be read on this PC, and why); it names the body tool `install_ocr_language` only
+for a missing language pack. The model words any offer. That tool is declared `confirm: "always"`
+by the desktop, so it is person-only: no side check or offer touches it.
 
 ## Permissions and asks
 

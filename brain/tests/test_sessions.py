@@ -2493,3 +2493,14 @@ def test_a_reading_event_does_not_wake_scout():
     session.scheduler.emit = emitted.append
     session.body_event("desktop", "reading", reading())
     assert emitted == []
+
+
+async def test_home_gets_reading_status_and_scout_is_told_when_pictures_cannot_be_read():
+    model = Gate(["hi"])
+    session, _ = make(model)
+    join(session, "desktop")
+    session.body_event("desktop", "reading", reading("needs-language-pack"))
+    assert "reading_status" in {t.name for t in session.home_tools()}
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert "Text inside pictures cannot be read on this PC" in model.systems[0]
