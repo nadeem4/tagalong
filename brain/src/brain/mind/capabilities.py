@@ -6,6 +6,8 @@ cacheable. No schemas and no focus facts: those change every turn and would brea
 
 from dataclasses import dataclass
 
+from brain.protocol import ReadingRow
+
 MAX_APPS = 20  # apps listed before "and K more"; every other group is always shown
 LINE_CHARS = 160
 
@@ -54,6 +56,7 @@ def capability_picture(
     bodies: list[BodyCaps],
     apps: list[AppCaps],
     experts: list[ExpertCaps],
+    ocr: ReadingRow | None = None,
 ) -> str:
     lines = ["What you can do:", _names("Built in: ", builtin)]
     if bodies:
@@ -81,4 +84,16 @@ def capability_picture(
         )
     else:
         lines.append("Experts: none installed")
+    if ocr is not None:  # a fact only; the model words any offer to fix it
+        if ocr.state == "needs-language-pack":
+            lines.append(
+                "Text inside pictures cannot be read on this PC: the Windows language pack for "
+                f"{ocr.language or 'the display language'} is missing. The body tool "
+                "install_ocr_language can add it, with the person's say-so."
+            )
+        else:
+            lines.append(
+                "Text inside pictures cannot be read on this PC right now: "
+                "Windows text recognition is not working."
+            )
     return "\n".join(lines)

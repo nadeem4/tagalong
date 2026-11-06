@@ -681,6 +681,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "list_memories",
         "list_permissions",
         "list_preferences",
+        "reading_status",
         "remove_preference",
         "set_api_key",
         "set_daily_limit",
@@ -1048,6 +1049,38 @@ async def test_without_a_voice_listen_is_method_not_found_and_notifications_are_
             for method, params in (("mic", {"pcm": "AAA="}), ("unlisten", {}), ("hush", {})):
                 await ws.send(json.dumps(notification(method, params)))
             assert await settle(ws) == {}
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_a_body_disconnect_drops_its_reading():
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    row = {
+        "capability": "window-text",
+        "engine": "windows-uia",
+        "where": "this-pc",
+        "state": "working",
+    }
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            await ws.send(
+                json.dumps(notification("event", {"name": "reading", "data": {"rows": [row]}}))
+            )
+            for _ in range(50):  # Home's "changed" frame also arrives, so poll rather than settle
+                if session.reading.rows():
+                    break
+                await asyncio.sleep(0.01)
+            assert len(session.reading.rows()) == 1
+        for _ in range(50):
+            if not session.reading.rows():
+                break
+            await asyncio.sleep(0.01)
+        assert session.reading.rows() == []
     finally:
         server.close()
         await server.wait_closed()

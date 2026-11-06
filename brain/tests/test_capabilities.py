@@ -95,3 +95,33 @@ def test_long_lines_are_cut_whole_never_mid_name():
     assert all(
         n in names for n in built.removeprefix("Built in: ").removesuffix(", ...").split(", ")
     )
+
+
+def ocr(state, language=None):
+    from brain.protocol import ReadingRow
+
+    return ReadingRow(
+        capability="text-from-pictures",
+        engine="windows-ocr",
+        where="this-pc",
+        state=state,
+        **({"language": language} if language else {}),
+    )
+
+
+def test_the_picture_has_no_reading_line_when_ocr_works():
+    assert "pictures" not in picture()
+    assert "pictures" not in picture(ocr=None)
+
+
+def test_the_picture_says_text_in_pictures_is_not_readable_when_the_pack_is_missing():
+    out = picture(ocr=ocr("needs-language-pack", "en-US"))
+    assert "Text inside pictures cannot be read on this PC" in out
+    assert "language pack for en-US" in out
+    assert "install_ocr_language" in out
+
+
+def test_the_picture_says_not_working_without_offering_the_install_tool():
+    out = picture(ocr=ocr("not-working"))
+    assert "Text inside pictures cannot be read on this PC" in out
+    assert "install_ocr_language" not in out

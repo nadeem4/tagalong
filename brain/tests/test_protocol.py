@@ -23,6 +23,7 @@ from brain.protocol import (
     ErrorObject,
     FocusData,
     ReadAloudData,
+    ReadingData,
     SayParams,
     SpeechParams,
     TabData,
@@ -361,3 +362,18 @@ def test_speech_n_counts_from_one_and_not_on_done() -> None:
         SpeechParams.model_validate({"turn": "t1", "n": 0, "text": "Hi."})
     with pytest.raises(ValidationError):
         SpeechParams.model_validate({"turn": "t1", "n": 1, "done": True})
+
+
+def test_reading_data_parses_the_example_and_rejects_bad_state_and_language():
+    data = ReadingData.model_validate(event_data("reading"))
+    assert [(r.capability, r.state) for r in data.rows] == [
+        ("window-text", "working"),
+        ("text-from-pictures", "working"),
+    ]
+    row = {"capability": "text-from-pictures", "engine": "windows-ocr", "where": "this-pc"}
+    with pytest.raises(ValidationError):
+        ReadingData.model_validate({"rows": [{**row, "state": "broken"}]})
+    with pytest.raises(ValidationError):
+        ReadingData.model_validate(
+            {"rows": [{**row, "state": "needs-language-pack", "language": "en-US; calc"}]}
+        )

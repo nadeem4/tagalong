@@ -151,6 +151,8 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
             task.cancel()  # nobody is left to read their replies
         if body_id is not None:
             was_current = bodies.disconnect(body_id, peer)
+            if was_current:
+                session.body_gone(body_id)
             # A replaced connection must not tear down the listening its successor started.
             if was_current and body_id in listening and session.voice is not None:
                 session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
