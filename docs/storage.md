@@ -6,7 +6,10 @@ One map of every place Tagalong keeps data, grouped by kind: what it holds, wher
 writes and reads it, how long it is kept and whether a secret can land in it. This is the one
 place the layout of each store is described; other docs link here. The code on `main` is the
 source of truth. Paths are relative to `TAGALONG_HOME` (default `~/.tagalong`) unless the row says
-otherwise.
+otherwise. This doc covers the brain's stores only. What the desktop and the browser body keep
+is in [desktop.md](desktop.md#what-it-stores) and [browser-body.md](browser-body.md#what-it-stores).
+Secrets files (`.env`, `app-tokens.json`, `app-oauth/`) are described in
+[settings-and-secrets.md](settings-and-secrets.md) and [connected-apps.md](connected-apps.md).
 
 ## Where data lives
 
@@ -16,21 +19,11 @@ flowchart LR
     subgraph Brain["Python brain, TAGALONG_HOME"]
         DB[(tagalong.db: 15 tables, 2 FTS5 indexes)]
         KV[budget.json, reader-budget.json, session, experts.json]
-        SEC[.env, app-tokens.json, app-oauth/]
         OBJ[voice/, runtime/node/, tools/]
         CA[cache/]
         MEM[In memory: asks, wakes, outboxes, grants]
     end
-    subgraph Desktop["Desktop body, userData"]
-        SET[settings.json]
-        LOG[logs/tagalong.log]
-        FILES[Folders the person chose]
-    end
-    subgraph Browser["Browser body"]
-        CS[chrome.storage.local and .session]
-    end
-    Desktop -->|screenshots, text: in memory only| Brain
-    Browser -->|screenshots, text: in memory only| Brain
+    Bodies[Desktop and browser bodies, see desktop.md and browser-body.md] -->|screenshots, text: in memory only| Brain
     Brain -->|model calls| API[Anthropic API]
 ```
 
@@ -44,10 +37,8 @@ Not stored anywhere: embeddings or vectors, screenshots, audio, a brain log file
 3. [Vectors and embeddings](#3-vectors-and-embeddings) (0)
 4. [Object and file storage](#4-object-and-file-storage) (5)
 5. [Key-value and config files](#5-key-value-and-config-files) (4)
-6. [Secrets](#6-secrets) (3)
-7. [Caches](#7-caches) (3)
-8. [Body-side storage](#8-body-side-storage) (5)
-9. [Memory only](#9-memory-only) (12)
+6. [Caches](#6-caches) (3)
+7. [Memory only](#7-memory-only) (12)
 
 ## 1. Relational: SQLite tables
 
@@ -74,6 +65,16 @@ brain needs a Python SQLite with FTS5 and stops without it.
 | `loop_surfaced` | loop_id, anchor, day                                                                                                                                                    | When a loop last came up for each anchor                                                                              | `loops/store.py` / `loops/triggers/`                                                                                       | Removed with its loop                                                                                                          | No                                                                                                               |
 | `loop_cursor`   | app_id, value                                                                                                                                                           | How far each app's mail was read. The key also carries flags by prefix: `sent:`, `on:`, `backfill:`, and `digest:day` | `loops/store.py: set_cursor, set_on, set_backfilled` / `loops/service.py`                                                  | Removed by `wipe` or by turning an app off (`on:` key only)                                                                    | No                                                                                                               |
 
+### Masking
+
+The `Masker` (`masking.py`) replaces exact secret values (8 characters or more)
+and common key shapes (`sk-ant-`, `Bearer`, GitHub, Slack and AWS keys, `?token=` style query
+parameters) with `[secret]`. It runs as the `save` guard on chat, approvals, job titles, results,
+progress and activity, tool outputs and loops, and as a filter on every log handler. Scout's live
+turn is not masked, only what reaches disk or logs.
+Memories, timer notes, preferences and job
+`task` text are not covered (see Observations).
+
 ## 2. Search index: FTS5
 
 | Index          | Kind                                   | Location      | Shape                                | Purpose                           | Written by / read by                                      | Retention                      | Secrets                 |
@@ -91,16 +92,20 @@ column or vector library. Recall is keyword search (FTS5, section 2). The ONNX f
 
 ## 4. Object and file storage
 
-| Name              | Location                                                                                                                          | Shape                                                       | Purpose                                                 | Written by / read by                                                                                      | Retention                                                        | Secrets |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------- |
-| Ears models       | `voice/ears/silero-vad/model.onnx`, `voice/ears/smart-turn-v3/smart-turn-v3.2-cpu.onnx` (about 11 MB)                             | Pinned URL, size and SHA-256 per file                       | Voice activity and end-of-turn detection                | `voice/models.py: ensure_files` (checked download to `.part`, then rename) / `voice/load.py: ears_loader` | Kept; a file that fails its hash is deleted and fetched again    | No      |
-| Kokoro voice      | `voice/tts/kokoro/kokoro-v1.0.int8.onnx`, `voices-v1.0.bin` (about 120 MB)                                                        | Same pinned, checked download                               | Local speech                                            | `voice/models.py` / `voice/load.py: tts_loader`, `voice/kokoro.py`                                        | Kept                                                             | No      |
-| Moonshine         | `voice/moonshine/`                                                                                                                | The `moonshine-voice` package's own download (`cache_root`) | Speech to text                                          | `voice/moonshine.py: load` / same                                                                         | Kept. Not hash-checked by Tagalong                               | No      |
-| Tagalong's Node   | `runtime/node/` (marker file `.tagalong-node-version`; `runtime/node.part/` and `runtime/node.new/` exist only during an install) | An official Node archive, checksum from `SHASUMS256.txt`    | Runs installed experts without touching the system Node | `setup/node_runtime.py`, `setup/archive.py` (safe extract) / `setup/install.py`, `setup/facts.py`         | Replaced on upgrade; old copy removed after the swap             | No      |
-| Installed experts | `tools/<expert>/` (`tools/<expert>.part`, `.dl`, `.old` during an install)                                                        | An expert's npm packages                                    | The code behind an installed expert                     | `setup/install.py: install_expert` / `experts.py` (runs the command)                                      | Removed on a failed install (only what was staged); no uninstall | No      |
+Nothing here is in git. The repository holds only the code and the pinned URLs and hashes; every
+file below is created under `TAGALONG_HOME` on the person's machine (outside the repo, so
+`.gitignore` is not involved) and no model or runtime file is tracked by `git ls-files`.
 
-Long tool outputs are also blobs in effect, but they are stored in the `tool_outputs` table
-(section 1). No image, screenshot or audio file is written by the brain.
+| Name                   | Location                                                                                                               | In git or local                                                                      | Downloaded by, and when                                                                                                                                                                                             | Written by / read by                                                          | Retention                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Silero VAD, Smart Turn | `voice/ears/silero-vad/model.onnx`, `voice/ears/smart-turn-v3/smart-turn-v3.2-cpu.onnx` (about 11 MB)                  | Local only. Pinned Hugging Face URL, size and SHA-256 are in git (`voice/models.py`) | The brain, on the first `listen` (`voice/service.py` calls `ears_loader`; `models.ensure_files`). Checked download to `.part`, renamed once the hash matches, one retry                                             | `voice/models.py`, `voice/load.py` / `voice/silero.py`, `voice/smart_turn.py` | Kept; a file failing its hash is deleted and fetched again |
+| Kokoro voice           | `voice/tts/kokoro/kokoro-v1.0.int8.onnx`, `voices-v1.0.bin` (about 120 MB)                                             | Local only. Pinned GitHub release URL and hash are in git                            | The brain, on the first spoken reply (`voice/mouth.py` calls `tts_loader`; same `ensure_files`)                                                                                                                     | `voice/models.py`, `voice/load.py` / `voice/kokoro.py`                        | Kept                                                       |
+| Moonshine              | `voice/moonshine/` (about 45 MB)                                                                                       | Local only. Nothing about it is pinned in git                                        | The `moonshine-voice` Python package, on the first `listen`, into `cache_root` (`voice/moonshine.py`). Not hash-checked by Tagalong                                                                                 | `voice/moonshine.py`                                                          | Kept                                                       |
+| Tagalong's Node        | `runtime/node/` (marker `.tagalong-node-version`; `runtime/node.part/` and `runtime/node.new/` only during an install) | Local only                                                                           | The brain, on the first install of an expert that needs Node (`setup/install.py` calls `ensure_node`; `setup/node_runtime.py`). Official archive, checksum from `SHASUMS256.txt`, safe extract (`setup/archive.py`) | `setup/node_runtime.py` / `setup/install.py`, `setup/facts.py`                | Replaced on upgrade; old copy removed after the swap       |
+| Installed experts      | `tools/<expert>/` (`.part`, `.dl`, `.old` during an install)                                                           | Local only                                                                           | The brain, when Scout runs `install_expert` or the CLI runs `tagalong install <expert>` (`setup/install.py`), from the ACP registry entry                                                                           | `setup/install.py` / `experts.py` (runs the command)                          | A failed install removes only what it staged; no uninstall |
+
+Long tool outputs are blobs in effect, but they are stored in the `tool_outputs` table (section 1).
+No image, screenshot or audio file is written by the brain.
 
 ## 5. Key-value and config files
 
@@ -111,23 +116,7 @@ Long tool outputs are also blobs in effect, but they are stored in the `tool_out
 | Session id        | `session`                                                 | One hex id                                                             | The id `hello` returns, stable across restarts | `config.py: session_id`                                                                  | Kept                                                     | No (an id, not a credential)                                                                               |
 | Installed experts | `experts.json` (`.part` while writing, `.bad` if corrupt) | `{"experts": [{id, name, version, command, source, logged_in, node}]}` | Which experts are installed and logged in      | `setup/store.py: ExpertStore` (also written by the CLI) / `experts.py`, `setup/tools.py` | Kept; a corrupt file is renamed `.bad` and read as empty | The command is stored; the code says it holds no secret (per-expert env keys are stripped, `setup/env.py`) |
 
-## 6. Secrets
-
-| Name        | Location                  | Shape                                                                                       | Purpose                                                    | Written by / read by                                                                                                                                | Retention                                                | Protection                                                                                                                                                                                            |
-| ----------- | ------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`      | `.env`                    | `NAME=value` lines: `ANTHROPIC_API_KEY` and any `TAGALONG_*` setting                        | The Anthropic key and settings                             | `config.py: upsert_env_value` (temp file created `0600`, then rename; also `cli.py: key set`, `tools.py: set_api_key`) / `config.py: load_env_file` | Kept until edited                                        | Owner-only where the platform honours it (little on Windows). The key is in the `Masker` list, so it becomes `[secret]` before anything is saved or logged. `key_status` never returns any part of it |
-| App tokens  | `app-tokens.json`         | `{"<id>": bearer token, "<id>:env:<NAME>": literal env value, "<id>:url_query": "a=b&c=d"}` | Pasted tokens and the secret parts of an app's env and url | `apps.py: TokenFile` (temp then rename, `0600` attempted) / `Apps` at connect, `secret_values`                                                      | Removed with its app (`clear_app`)                       | Same as `.env`; values are in the `Masker` list; never in the `apps` row, a tool list or an error line                                                                                                |
-| App sign-in | `app-oauth/<app_id>.json` | `{tokens, client_info, saved_at}` (OAuth)                                                   | An app's OAuth client registration and tokens              | `app_oauth.py: FileTokenStorage` (created `0600`) / the MCP SDK's provider, `apps.py`                                                               | Deleted by `clear` when the app is removed or signed out | Same; access and refresh tokens are in the `Masker` list                                                                                                                                              |
-
-What is masked: the `Masker` (`masking.py`) replaces exact secret values (8 characters or more)
-and common key shapes (`sk-ant-`, `Bearer`, GitHub, Slack and AWS keys, `?token=` style query
-parameters) with `[secret]`. It runs as the `save` guard on chat, approvals, job titles, results,
-progress and activity, tool outputs and loops, and as a filter on every log handler. Scout's live
-turn is not masked, only what reaches disk or logs. Memories, timer notes, preferences and job
-`task` text are not covered (see Observations). The desktop applies its own `hide-secrets.ts` to
-its log file.
-
-## 7. Caches
+## 6. Caches
 
 Safe to delete; each is rebuilt on next use.
 
@@ -139,25 +128,7 @@ Safe to delete; each is rebuilt on next use.
 
 The voice models (section 4) can also be deleted and are downloaded again.
 
-## 8. Body-side storage
-
-Bodies keep only what they need to be a body. Settings other than these live in the brain.
-
-| Name                             | Body, location                                                                | Shape                                                                                                                                                                  | Purpose                                          | Written by / read by                                                                   | Retention                                                                                            | Secrets                                                                                                    |
-| -------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `settings.json`                  | Desktop, `<userData>` (`%APPDATA%\Tagalong`); also `.tmp`, `.bak`, `.corrupt` | JSON: hotkeys, avatar x/y, `captureExclusions` (process names, title patterns), `voice` (enabled, voice, speed), `listening.always`, `walkthrough.done`, `fileFolders` | The desktop's own settings                       | `bodies/desktop/src/main/settings-store.ts: SettingsStore` / same, `index.ts` at start | Kept; the previous good file is `.bak`, an invalid one becomes `.corrupt`                            | No key lives here (the key is in the brain's `.env`)                                                       |
-| `tagalong.log`, `tagalong.1.log` | Desktop, `<userData>/logs/`                                                   | One line each: time, level, text (max 300 characters)                                                                                                                  | Warnings and errors a person can send            | `main/log-file.ts: installLogFile` / `openLogsFolder`                                  | Rotates at 1 MB: `tagalong.log` becomes `tagalong.1.log`, replacing the old one (about 2 MB at most) | Secrets hidden by `hide-secrets.ts`; only a text first argument is kept, other arguments become their type |
-| Chosen folders                   | Desktop, any folder the person added to `fileFolders`                         | The person's own files                                                                                                                                                 | Where Scout's file tools may read and write      | `main/tools/files.ts` (the only writer, confined to the folders by real path)          | The person's files; Tagalong never deletes by itself                                                 | Whatever the person's files hold; not masked on disk                                                       |
-| `chrome.storage.local`           | Browser                                                                       | `bodyId` (random id), `brainAddr`, `bodyName`                                                                                                                          | Identity and the brain's address across restarts | `identity.ts`, `settings.ts` / `service-worker.ts`, popup                              | Until the extension is removed                                                                       | No                                                                                                         |
-| `chrome.storage.session`         | Browser                                                                       | `lastSeq` (last message number)                                                                                                                                        | Replay position after a service-worker restart   | `body.ts: seqStore`                                                                    | Cleared when the browser session ends                                                                | No                                                                                                         |
-
-Checked and found none: `localStorage`, `sessionStorage` and IndexedDB in `bodies/ui`,
-`bodies/desktop` and `bodies/browser`; electron-store; any file the desktop or browser body writes
-for a capture. The browser's offscreen page (`src/offscreen/`) holds the microphone stream only
-while listening and stores nothing. Electron and Chromium keep their own profile files under
-`<userData>` (caches, session data); Tagalong's code writes none of them.
-
-## 9. Memory only
+## 7. Memory only
 
 Lost on restart. Single user, so most are small.
 
@@ -205,8 +176,6 @@ Facts only.
 - Not masked although the model or a person can put free text in them: `memories`, `timers.note`,
   `preferences.sentence`, `jobs.task`, `job_parts.task`, and `apps.config` beyond what
   `split_secrets` moves. Everything else that reaches disk goes through `mask_json`.
-- Secrets are in three places (`.env`, `app-tokens.json`, `app-oauth/`) with three writers.
-  Owner-only permissions are attempted on all three but do little on Windows.
 - Overlap: `jobs` and `job_parts` both carry `task`, `folder` and `state`; `job_parts` also holds
   `report` while `jobs` holds `scout_result`. `loop_cursor` mixes cursors and on/off flags in one
   key space by prefix.

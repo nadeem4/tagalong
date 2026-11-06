@@ -804,9 +804,18 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`           |
 | `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`   |
 
-## Storage
+## What it stores
 
-The desktop host writes:
+The desktop keeps three things on disk, all in `<userData>` (`%APPDATA%\Tagalong`), apart from the
+brain's data (see [storage.md](storage.md)). No capture, screenshot or audio is written to disk.
+
+| Item                                              | Location                 | Purpose                                                             | Retention                           |
+| ------------------------------------------------- | ------------------------ | ------------------------------------------------------------------- | ----------------------------------- |
+| `settings.json` (with `.tmp`, `.bak`, `.corrupt`) | `<userData>`             | The desktop's own settings (below)                                  | Kept; the last good file is `.bak`  |
+| `tagalong.log`, `tagalong.1.log`                  | `<userData>/logs/`       | Warnings and errors a person can send; secrets hidden               | Rotates at 1 MB, about 2 MB at most |
+| Chosen folders                                    | Folders in `fileFolders` | Where Scout's file tools may read and write; the person's own files | Never deleted by Tagalong           |
+
+The host writes:
 
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
 - Settings through `SettingsStore`
