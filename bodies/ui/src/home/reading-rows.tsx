@@ -46,22 +46,24 @@ export function ReadingRows({ rows }: { rows: ReadingRowView[] }) {
             {row.state !== 'working' && (
               <div className="home-reading__fix">
                 <p>{row.plain}</p>
-                <div className="home-reading__actions">
-                  {row.fixable && (
-                    <Button variant="primary" onClick={() => void bridge.askScout(FIX_REQUEST)}>
-                      Ask Scout to fix it
-                    </Button>
-                  )}
-                  {row.capability === 'text-from-pictures' && (
-                    <button
-                      type="button"
-                      className="job-overview__link"
-                      onClick={() => void bridge.openLanguageSettings()}
-                    >
-                      Do it myself in Windows Settings
-                    </button>
-                  )}
-                </div>
+                {(row.fixable || row.capability === 'text-from-pictures') && (
+                  <div className="home-reading__actions">
+                    {row.fixable && (
+                      <Button variant="primary" onClick={() => void bridge.askScout(FIX_REQUEST)}>
+                        Ask Scout to fix it
+                      </Button>
+                    )}
+                    {row.capability === 'text-from-pictures' && (
+                      <button
+                        type="button"
+                        className="job-overview__link"
+                        onClick={() => void bridge.openLanguageSettings()}
+                      >
+                        Do it myself in Windows Settings
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

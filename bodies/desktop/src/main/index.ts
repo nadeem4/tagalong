@@ -968,6 +968,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openBubble, openBubbleWithKeyboard);
   // Home's Ask Scout to fix it: the bubble comes up and asks the text as the person typed it.
   registerAskScoutIpc(handle, {
+    fromHome: fromWindow(() => required().homeWindow),
     bringUp: openBubbleWithKeyboard,
     send: (text) => desktop?.panel?.webContents.send(IPC.panelAskEvent, text),
   });

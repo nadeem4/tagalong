@@ -77,6 +77,12 @@ describe('ReadingRows', () => {
     expect(screen.getByRole('button', { name: 'Do it myself in Windows Settings' })).toBeVisible();
   });
 
+  it('a not-working window-text row has the sentence but no empty actions box', () => {
+    const { container } = renderRows(rowsOf({ ...UIA, state: 'not-working' }));
+    expect(container.querySelector('.home-reading__fix')).not.toBeNull();
+    expect(container.querySelector('.home-reading__actions')).toBeNull();
+  });
+
   it('the Settings link calls openLanguageSettings with no argument', () => {
     const { bridge } = renderRows(
       rowsOf({ ...OCR, state: 'needs-language-pack', language: 'fr-FR' }),

@@ -615,10 +615,12 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`readingRecheck`) when Home opens. With no rows (no desktop body, or the brain away) the group
   is hidden. A row that needs a fix shows one plain sentence naming the language, **Ask Scout to
   fix it** and **Do it myself in Windows Settings** (`openLanguageSettings`); Not working shows the
-  sentence and the Settings link only. Ask Scout to fix it calls `askScout("Fix text from
+  sentence and the Settings link only, and the Settings link (and the actions box) shows only on
+  the Text from pictures row. Only Home's page may call `askScout`; any other window is ignored. Ask Scout to fix it calls `askScout("Fix text from
 pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sends
   `IPC.panelAskEvent`; the preload's `onPanelAsk` hands it to `panel.tsx`, which opens the full
-  chat and passes it to the bubble's `onAsk`, which asks it as if the person typed it. Scout then
+  chat and passes it to the bubble's `onAsk`, which asks it as if the person typed it (if Scout's
+  quiet line is showing, the panel ends the line and holds the text until the bubble mounts). Scout then
   runs its usual ask for `install_ocr_language`; nothing installs without the person's yes.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`

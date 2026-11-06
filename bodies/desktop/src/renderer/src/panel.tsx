@@ -130,14 +130,30 @@ function Panel() {
   }, []);
 
   useEffect(() => window.tagalongHost.onPanelSide(setSide), []);
-  // Home's Ask Scout to fix it arrives as text for the bubble to ask; the chat shows the exchange.
-  const [onAsk] = useState(
-    () => (handler: (text: string) => void) =>
+  // Home's Ask Scout to fix it arrives as text for the bubble to ask. The bubble is not mounted
+  // while a quiet line shows, so the panel listens itself: it ends the line, opens the chat and
+  // keeps the text until the bubble is there to take it.
+  const askHandler = useRef<((text: string) => void) | null>(null);
+  const pendingAsk = useRef<string | null>(null);
+  useEffect(
+    () =>
       window.tagalongHost.onPanelAsk((text) => {
+        clearRemark();
         setMode('chat');
-        handler(text);
+        if (askHandler.current !== null) askHandler.current(text);
+        else pendingAsk.current = text;
       }),
+    [],
   );
+  const [onAsk] = useState(() => (handler: (text: string) => void) => {
+    askHandler.current = handler;
+    const waiting = pendingAsk.current;
+    pendingAsk.current = null;
+    if (waiting !== null) handler(waiting);
+    return () => {
+      askHandler.current = null;
+    };
+  });
 
   useEffect(() => {
     void window.tagalongHost

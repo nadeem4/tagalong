@@ -91,6 +91,26 @@ test('shows a needs-a-fix row and asks Scout to fix it', async () => {
   await expect(panel.getByText('Fix text from pictures')).toBeVisible();
 });
 
+test('an ask from Home still lands while the quiet line is showing', async () => {
+  brain.setReading(READING_ROWS({ state: 'needs-language-pack', language: 'en-US' }));
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.hidePanel());
+  brain.sendRemark('Good morning, I am here');
+  await expect(panel.getByRole('button', { name: 'Ask Scout something' })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const home = await windowFor('home');
+  const card = home.getByRole('region', { name: 'Where things run' });
+  const asked = brain.voice.says.length;
+  await card.getByRole('button', { name: 'Ask Scout to fix it' }).click();
+
+  await expect
+    .poll(() => brain.voice.says.slice(asked).map((say) => say.text), { timeout: 15_000 })
+    .toEqual(['Fix text from pictures']);
+  await expect(panel.getByText('Fix text from pictures')).toBeVisible();
+});
+
 test('the row turns to Working after the brain changes it', async () => {
   const home = await windowFor('home');
   const card = home.getByRole('region', { name: 'Where things run' });
