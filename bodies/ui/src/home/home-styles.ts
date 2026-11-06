@@ -73,6 +73,17 @@ export const HOME_CSS = `
   padding: 2px ${t.space.md}px; border-radius: 999px; background: ${t.color.panelTile};
   font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
 }
+.home-card__group {
+  margin: ${t.space.xl}px 0 0; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
+  letter-spacing: ${t.letterSpacing.pixel}px; text-transform: uppercase; color: ${t.color.panelMuted};
+}
+.home-reading__fix {
+  margin: 0 0 ${t.space.md}px; padding: ${t.space.lg}px; border-radius: ${t.radius.row}px;
+  background: ${t.color.warnFill}; display: flex; flex-direction: column; gap: ${t.space.md}px;
+}
+.home-card .home-reading__fix p { color: ${t.color.warnInk}; line-height: 1.5; }
+.home-reading__actions { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.lg}px; }
+.home-reading__actions .job-overview__link { color: ${t.color.warnInk}; }
 .home-spend { font-size: 26px; font-weight: ${t.fontWeight.semibold}; font-variant-numeric: tabular-nums; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-dot--warn { background: ${t.color.gold}; }
