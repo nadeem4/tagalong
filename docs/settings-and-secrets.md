@@ -81,10 +81,8 @@ variables, not settings: see [brain.md](brain.md#run-it).
 Connected apps' secrets live in the brain, not the desktop. They live in the data
 directory, never in the `apps` table:
 
-| Where                 | Holds                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `app-tokens.json`     | `<id>` (bearer token), `<id>:env:<NAME>` (a literal env value), `<id>:url_query` (secret url parts) |
-| `app-oauth/<id>.json` | An app's OAuth client and tokens                                                                    |
+They are kept in `app-tokens.json` and `app-oauth/<id>.json`; the shape of each file and how it is
+protected are in [storage.md](storage.md#6-secrets).
 
 `${VAR}` references stay in the row and are filled from the brain's environment at connect. The
 rules and the missing-key error are in [connected apps](connected-apps.md).
@@ -133,7 +131,7 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 `settings.json` (with `.tmp`, `.bak`, `.corrupt`) sits in the desktop's data
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see
-[brain.md](brain.md#run-it)).
+[brain.md](brain.md#run-it)). Every store is mapped in [storage.md](storage.md).
 
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
@@ -161,11 +159,9 @@ first read is fixed in code, not a setting.
 brain marks it stale and hands it to Scout in one batched wake. A zero, negative or non-numeric
 value stops the brain at start.
 
-Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
-(Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
-exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped
-in only on success, so a failed install removes only what it staged), `cache/` (registry lists) and `experts.json` (the installed experts and their
-start commands).
+Setup keeps its own files under the same data folder, never anywhere else (its Node, installed
+expert packages, registry cache and `experts.json`); where each lives is in
+[storage.md](storage.md#4-object-and-file-storage).
 `TAGALONG_EXPERT_CMD` (in `.env` or the environment) names one custom expert; it holds a command, never a secret, and each expert's own key variables are stripped from its process (see brain.md).
 None holds a secret. See [brain.md](brain.md#setting-things-up-setup).
 

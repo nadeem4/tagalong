@@ -240,12 +240,9 @@ to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-car
 
 ## Storage
 
-| Where                         | Holds                                                                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`                                                    |
-| `permissions` table           | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
-| `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows |
-| `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                          |
+Apps are kept in the `apps` table, tool choices in `permissions`, and secrets in `app-tokens.json` and
+`app-oauth/`. The columns, file shapes, protection and retention are in
+[storage.md](storage.md#1-relational-sqlite-tables) and [storage.md](storage.md#6-secrets).
 
 ## Failure handling
 

@@ -657,17 +657,17 @@ url shows empty. Home shows these rows in its "Where things run" card.
   Answers are capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`.
 - **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
   `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
-- **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where
-  the platform allows). A token is never in a row, a tool list or an error line.
+- **`app-tokens.json`** holds pasted tokens and moved secrets (see
+  [storage.md](storage.md#6-secrets)). A token is never in a row, a tool list or an error line.
 - **OAuth** (`app_oauth.py`): an `auth: "oauth"` app signs in through the app's own page. The brain
   runs the MCP SDK's `OAuthClientProvider` (client name "Tagalong", PKCE, dynamic registration) with
   a one-request listener on `127.0.0.1` (port picked by the system, 300 s wait) as the redirect.
   The provider asks a body's `open_url` to show the page. Only https is followed, or http to
   loopback. With no saved tokens the app starts `needs-sign-in` and opens no browser; `sign_in_app`
   starts it. A 401 mid-session returns the app to `needs-sign-in`.
-- **`app-oauth/<app id>.json`** in the data directory (`FileTokenStorage`) holds that app's tokens
-  and client registration, with `saved_at` and `expires_in` so tokens refresh before they expire.
-  A new sign-in clears the old registration (the redirect port changes). Removing the app deletes
+- **`app-oauth/<app id>.json`** (`FileTokenStorage`) holds that app's tokens and client
+  registration (shape in [storage.md](storage.md#6-secrets)). Tokens refresh before they expire. A
+  new sign-in clears the old registration (the redirect port changes). Removing the app deletes
   the file. Like `app-tokens.json`, it never reaches a row, a tool list or an error line.
 
 ## Setting things up (`setup/`)
