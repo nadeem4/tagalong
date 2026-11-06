@@ -88,6 +88,8 @@ export interface CompanionBubbleProps {
   status?: StatusMarkValue | null;
   /** Bean's idle strip, drawn still in Scout's mark beside lines Scout starts. */
   scout?: BeanClipData;
+  /** Subscribes to text Home sends as the person (Ask Scout to fix it); returns an unsubscribe. */
+  onAsk?: (handler: (text: string) => void) => () => void;
   /** Scout's own line the person clicked open on the quiet line: it becomes Scout's first message. */
   remark?: string;
 }
@@ -156,6 +158,7 @@ export function CompanionBubble({
   status,
   remark,
   scout,
+  onAsk,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -486,6 +489,14 @@ export function CompanionBubble({
   });
   const onHeard = talk?.onHeard;
   useEffect(() => onHeard?.((text, interrupted) => askHeard(text, interrupted)), [onHeard]);
+
+  // Home asks on the person's behalf: shown and sent as if typed, with no screen snapshot.
+  const askFromHome = useEffectEvent((text: string) => {
+    if (text.trim() === '') return;
+    // `heard` keeps the person's words on screen above Scout's answer, though nothing was said.
+    submit(text, undefined, false, true);
+  });
+  useEffect(() => onAsk?.((text) => askFromHome(text)), [onAsk]);
 
   // Barge-in: talking over Scout stops the answer still streaming, not only its voice,
   // and nothing more of it is said.

@@ -21,7 +21,7 @@ export interface ReadingRowView {
   engine: WireRow['engine'];
   where: WireRow['where'];
   state: WireRow['state'];
-  language?: string;
+  language?: string | undefined;
   title: string;
   engineLabel: string;
   whereLabel: string;

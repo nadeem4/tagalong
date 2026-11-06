@@ -54,6 +54,10 @@ export interface FakeHostBridge extends HostBridge {
   loops: LoopsState;
   /** Every loops call made, in order: `set gmail on`, `forget id`, `wipe`. */
   readonly loopCalls: readonly string[];
+  /** The brain's reading_status answer (JSON text); a test may swap it. */
+  reading: string;
+  /** Every reading and ask call made, in order: `recheck`, `settings`, `ask <text>`. */
+  readonly readingCalls: readonly string[];
   /** Home's Jobs rows; a test may swap them. */
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
@@ -124,6 +128,8 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's loops state. */
     loops?: LoopsState;
+    /** The brain's reading_status answer (JSON text). */
+    reading?: string;
     /** Home's Jobs rows. */
     jobs?: JobRow[];
     /** A job's steps by job id, and the running steps the bubble shows. */
@@ -160,6 +166,7 @@ export function createFakeHostBridge(
   const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
   const loopCalls: string[] = [];
+  const readingCalls: string[] = [];
   const jobStops: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
@@ -279,6 +286,23 @@ export function createFakeHostBridge(
     },
     loops: options.loops ?? { apps: [], loops: [] },
     loopCalls,
+    reading: options.reading ?? '{"rows":[]}',
+    readingCalls,
+    readingStatus() {
+      return Promise.resolve(fake.reading);
+    },
+    readingRecheck() {
+      readingCalls.push('recheck');
+      return Promise.resolve();
+    },
+    openLanguageSettings() {
+      readingCalls.push('settings');
+      return Promise.resolve();
+    },
+    askScout(text) {
+      readingCalls.push(`ask ${text}`);
+      return Promise.resolve();
+    },
     loopsState() {
       return Promise.resolve(structuredClone(fake.loops));
     },

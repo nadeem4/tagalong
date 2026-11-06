@@ -91,6 +91,8 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,
   forgetLoop: (id: string) => ipcRenderer.invoke(IPC.loopForget, id) as Promise<void>,
   wipeLoops: () => ipcRenderer.invoke(IPC.loopsWipe) as Promise<void>,
+  readingStatus: () => ipcRenderer.invoke(IPC.readingStatus) as Promise<string>,
+  askScout: (text: string) => ipcRenderer.invoke(IPC.askScout, text) as Promise<void>,
   setPermission: (tool: string, mode: 'off' | 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
@@ -181,6 +183,11 @@ const host: TagalongHostApi = {
   dragAvatar: (dx: number, dy: number) =>
     ipcRenderer.invoke(IPC.dragAvatar, dx, dy) as Promise<void>,
   dropAvatar: () => ipcRenderer.invoke(IPC.dropAvatar) as Promise<void>,
+  onPanelAsk: (handler) => {
+    const listener = (_event: IpcRendererEvent, text: string): void => handler(text);
+    ipcRenderer.on(IPC.panelAskEvent, listener);
+    return () => void ipcRenderer.off(IPC.panelAskEvent, listener);
+  },
   onRemark: (handler) => {
     const listener = (_event: IpcRendererEvent, remark: PetRemarkParams): void => handler(remark);
     ipcRenderer.on(IPC.remarkEvent, listener);

@@ -130,6 +130,14 @@ function Panel() {
   }, []);
 
   useEffect(() => window.tagalongHost.onPanelSide(setSide), []);
+  // Home's Ask Scout to fix it arrives as text for the bubble to ask; the chat shows the exchange.
+  const [onAsk] = useState(
+    () => (handler: (text: string) => void) =>
+      window.tagalongHost.onPanelAsk((text) => {
+        setMode('chat');
+        handler(text);
+      }),
+  );
 
   useEffect(() => {
     void window.tagalongHost
@@ -278,6 +286,7 @@ function Panel() {
               {...(drop !== null ? { drop } : {})}
               onDropDone={() => setDrop(null)}
               status={status}
+              onAsk={onAsk}
               {...(openedRemark !== null ? { remark: openedRemark } : {})}
             />
           )}
