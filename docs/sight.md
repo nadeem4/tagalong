@@ -304,8 +304,20 @@ model names wins.
 **OCR.** `recognizeText` (`ocr.ts`) runs `OCR_SCRIPT` with `OCR_TIMEOUT_MS` = 10,000. The PNG goes
 to PowerShell's stdin as base64, so it is never written to disk. The script uses
 `Windows.Media.Ocr.OcrEngine.TryCreateFromUserProfileLanguages()`; with no recogniser it prints
-`#no-recogniser` and the result is empty. Nothing is installed and nothing leaves the machine.
-Never rejects.
+`#no-recogniser` and the result is empty. `parseOcr` and `recognizeText` return `{ text, noRecogniser }`, so "no recogniser" is
+not confused with "no text": when a read fell back to the picture and there was no recogniser, `textLayerNotes` adds
+"Windows has no text recognition for your language, so text in pictures could not be read." Reading never installs
+anything and nothing leaves the machine. Never rejects.
+
+**Reading status and the language pack.** `detectReading` (`reading-status.ts`) runs `READING_SCRIPT` with
+`DETECT_TIMEOUT_MS` = 20,000: UI Automation's root element for window text, `TryCreateFromUserProfileLanguages()` for
+text from pictures, and the display language (`Get-WinUILanguageOverride`, else `Get-UICulture`). It never calls
+`Get-WindowsCapability`, which needs administrator rights. Empty output, a blocked script or a thrown runner reads
+as `not-working`, never as working; `needs-language-pack` needs a valid display tag. `installOcrLanguage`
+(`ocr-install.ts`) validates the tag against the contract's pattern before building any script, then starts an
+elevated PowerShell (`Start-Process -Verb RunAs -Wait`) that finds the capability name itself
+(`Get-WindowsCapability -Online -Name "Language.OCR~~~<tag>~*"`) and runs `Add-WindowsCapability`. A refused
+administrator prompt is `declined`. Tests use a fake runner; nothing installs in tests.
 
 **Selection.** `captureSelectionWith` (`selection.ts`) saves the clipboard, presses Ctrl+C, waits
 `COPY_SETTLE_MS` = 150, reads, and restores the original clipboard in a `finally`. An unchanged or

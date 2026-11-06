@@ -69,6 +69,20 @@ describe('textLayerNotes', () => {
     expect(notes).not.toMatch(/all tabs|every tab/i);
   });
 
+  it('says Windows has no text recognition when a read fell back to pictures without it', () => {
+    const notes = textLayerNotes({ ...reading, textLength: 12, noRecogniser: true });
+
+    expect(notes).toContain(
+      'Windows has no text recognition for your language, so text in pictures could not be read.',
+    );
+  });
+
+  it('does not say it when text recognition ran fine', () => {
+    expect(textLayerNotes({ ...reading, textLength: 12 }).join(' ')).not.toMatch(
+      /no text recognition/,
+    );
+  });
+
   it('says when the text is a beginning rather than the whole window', () => {
     const notes = textLayerNotes({ ...reading, truncated: true });
 

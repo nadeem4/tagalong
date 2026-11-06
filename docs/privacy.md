@@ -470,6 +470,14 @@ conversations) in the database on this computer, until you delete it.
 | Conversation summaries   | Until deleted         |
 | Conversations with Scout | Until deleted         |
 
+## Installing a text recognition language
+
+When Windows has no text recognition for your language, Scout can install Windows' own language pack, but only
+after you say yes in Scout's ask (it always asks, whatever your other settings) and accept Windows' administrator
+prompt. Windows downloads the pack from Microsoft. Checking whether it is needed is read-only: it asks Windows which
+languages it can read and sends the answer (working or not, and your Windows display language) to the Scout brain on
+this computer. Nothing is installed without both yes answers, and nothing retries by itself.
+
 ## Pausing sight
 
 `Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The

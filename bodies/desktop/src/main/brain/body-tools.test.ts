@@ -3,8 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, Tool } from '@tagalong/contract';
 import type { CaptureExclusions } from '../../shared/settings';
 import type { Platform } from '../platform/index';
-import { bodyTools } from './body-tools';
+import { INSTALL_TOOL_TIMEOUT_MS, bodyTools } from './body-tools';
+import type { ReadingDeps } from './body-tools';
+import type { ReadingStatus } from '../platform/reading-status';
 import { RpcError } from '@tagalong/contract';
+import { INSTALL_TIMEOUT_MS } from '../platform/ocr-install';
+import { DETECT_TIMEOUT_MS } from '../platform/reading-status';
 import { SightPausedError } from '../platform/sight-gate';
 
 const exclusions = { processNames: [], titlePatterns: [] } as unknown as CaptureExclusions;
@@ -14,7 +18,23 @@ const windows = [
   { id: 'w2', processName: 'notes', title: 'todo', state: 'minimized', browser: false },
 ];
 
-function setup(overrides: Record<string, unknown> = {}) {
+const NEEDS_PACK: ReadingStatus = {
+  rows: [
+    { capability: 'window-text', engine: 'windows-uia', where: 'this-pc', state: 'working' },
+    {
+      capability: 'text-from-pictures',
+      engine: 'windows-ocr',
+      where: 'this-pc',
+      state: 'needs-language-pack',
+      language: 'fr-FR',
+    },
+  ],
+};
+
+function setup(
+  overrides: Record<string, unknown> = {},
+  readingOverrides: Partial<ReadingDeps> = {},
+) {
   const platform = {
     listWindows: vi.fn(async () => ({ windows })),
     readWindowText: vi.fn(async (p: { windowId?: string }) => ({
@@ -32,14 +52,30 @@ function setup(overrides: Record<string, unknown> = {}) {
   const onCapture = vi.fn();
   const openExternal = vi.fn(async (_url: string) => undefined);
   const trash = vi.fn(async (_path: string) => undefined);
+  const order: string[] = [];
+  const reading: ReadingDeps = {
+    detect: vi.fn(async () => {
+      order.push('detect');
+      return NEEDS_PACK;
+    }),
+    install: vi.fn(async (_language: string) => {
+      order.push('install');
+      return { outcome: 'installed' as const, message: 'The text recognition pack is installed.' };
+    }),
+    push: vi.fn((_status: ReadingStatus) => {
+      order.push('push');
+    }),
+    ...readingOverrides,
+  };
   const tools = bodyTools(
     platform as unknown as Platform,
     () => exclusions,
     onCapture,
     openExternal,
     { folders: () => [], trash },
+    reading,
   );
-  return { platform, onCapture, openExternal, trash, ...tools };
+  return { platform, onCapture, openExternal, trash, reading, order, ...tools };
 }
 
 describe('bodyTools declarations', () => {
@@ -56,6 +92,7 @@ describe('bodyTools declarations', () => {
       'rename_file',
       'delete_file',
       'write_file',
+      'install_ocr_language',
     ]);
     for (const tool of tools) expect(Tool.safeParse(tool).success).toBe(true);
   });
@@ -73,6 +110,7 @@ describe('bodyTools declarations', () => {
       ['rename_file', 'change'],
       ['delete_file', 'change'],
       ['write_file', 'change'],
+      ['install_ocr_language', 'change'],
     ]);
   });
 });
@@ -98,6 +136,79 @@ describe('file tool declarations', () => {
     const parts = await run('delete_file', { path: 'C:\\Users\\me\\Downloads\\a.txt' });
     expect(parts).toEqual([{ type: 'text', text: expect.stringMatching(/no folders chosen/i) }]);
     expect(trash).not.toHaveBeenCalled();
+  });
+});
+
+describe('install_ocr_language', () => {
+  it('always asks, so only the person can start an install', () => {
+    const { tools } = setup();
+    const tool = tools.find((t) => t.name === 'install_ocr_language');
+    expect(tool?.confirm).toBe('always');
+    expect(tool?.effect).toBe('change');
+  });
+
+  it('installs, then re-detects, then pushes, and returns the outcome and the new status', async () => {
+    const { run, reading, order } = setup();
+    const [part] = await run('install_ocr_language', { language: 'fr-FR' });
+    expect(reading.install).toHaveBeenCalledWith('fr-FR');
+    expect(order).toEqual(['install', 'detect', 'push']);
+    expect(reading.push).toHaveBeenCalledWith(NEEDS_PACK);
+    const text = (part as { text: string }).text;
+    expect(text).toContain('The text recognition pack is installed.');
+    expect(text).toContain('needs-language-pack');
+  });
+
+  it('on a declined prompt returns a plain message, and the pushed status is the re-detected one', async () => {
+    const { run, reading } = setup(
+      {},
+      {
+        install: vi.fn(async () => ({
+          outcome: 'declined' as const,
+          message: 'Windows asked for administrator permission and it was not given.',
+        })),
+      },
+    );
+    const [part] = await run('install_ocr_language', { language: 'fr-FR' });
+    expect((part as { text: string }).text).toContain('administrator permission');
+    expect(reading.push).toHaveBeenCalledWith(NEEDS_PACK);
+  });
+
+  it('on still-installing returns without throwing', async () => {
+    const { run } = setup(
+      {},
+      {
+        install: vi.fn(async () => ({
+          outcome: 'still-installing' as const,
+          message: 'Windows is still installing it.',
+        })),
+      },
+    );
+    const [part] = await run('install_ocr_language', { language: 'fr-FR' });
+    expect((part as { text: string }).text).toContain('still installing');
+  });
+
+  it('on invalid-language returns the message and neither re-detects nor pushes', async () => {
+    const { run, reading } = setup(
+      {},
+      {
+        install: vi.fn(async () => ({
+          outcome: 'invalid-language' as const,
+          message: 'That is not a language tag.',
+        })),
+      },
+    );
+    const [part] = await run('install_ocr_language', { language: 'en-US; calc' });
+    expect((part as { text: string }).text).toContain('not a language tag');
+    expect(reading.detect).not.toHaveBeenCalled();
+    expect(reading.push).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing or non-string language without installing', async () => {
+    const { run, reading } = setup();
+    await expect(run('install_ocr_language', {})).rejects.toMatchObject({
+      code: ErrorCode.invalid_params,
+    });
+    expect(reading.install).not.toHaveBeenCalled();
   });
 });
 
@@ -288,6 +399,22 @@ describe('run limits', () => {
     const result = run('list_windows', {}).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(await result).toMatchObject({ code: ErrorCode.timeout });
+  });
+
+  it('leaves room after the install limit for the re-check', () => {
+    expect(INSTALL_TOOL_TIMEOUT_MS).toBe(INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000);
+  });
+
+  it('lets the install run past 15 s, which no other tool may', async () => {
+    const { run } = setup({}, { install: () => new Promise(() => undefined) });
+    let outcome: unknown = 'pending';
+    void run('install_ocr_language', { language: 'fr-FR' }).catch((e: unknown) => {
+      outcome = e;
+    });
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(outcome).toBe('pending');
+    await vi.advanceTimersByTimeAsync(INSTALL_TOOL_TIMEOUT_MS);
+    expect(outcome).toMatchObject({ code: ErrorCode.timeout });
   });
 
   it('turns a platform error into tool_failed carrying its message', async () => {

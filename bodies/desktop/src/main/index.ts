@@ -36,6 +36,7 @@ import {
   createBackSender,
   frontWindow,
   readAloudEvent,
+  readingEvent,
   startFocusWatch,
 } from './brain/body-events';
 import type { BrainStatus } from '@tagalong/contract';
@@ -49,6 +50,11 @@ import {
 import type { HotkeyOutcome } from './hotkeys';
 import { TalkKeyWatch, loadKeyHook, startTalkKey } from './talk-key';
 import { createPlatform } from './platform/index';
+import { runPowerShellScript } from './platform/powershell';
+import { installOcrLanguage } from './platform/ocr-install';
+import { detectReading } from './platform/reading-status';
+import type { ReadingStatus } from './platform/reading-status';
+import { registerReadingIpc } from './ipc/reading';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
@@ -254,6 +260,11 @@ async function start(): Promise<void> {
       folders: () => desktop?.settings.fileFolders ?? settings.fileFolders,
       trash: (path) => shell.trashItem(path),
     },
+    reading: {
+      detect: detectReadingStatus,
+      install: (language) => installOcrLanguage(runPowerShellScript, language),
+      push: sendReading,
+    },
     onNotification: (method, params) => {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {
@@ -289,6 +300,8 @@ async function start(): Promise<void> {
         void refreshKeyMark();
         // The brain forgets nothing across a reconnect, but a restarted brain knows no setting.
         if (desktop !== null) sendReadAloud(desktop.settings);
+        // How Scout reads the screen here: found again on every connect, so a restarted brain knows.
+        void detectReadingStatus().then(sendReading);
       }
       watchOffline(status);
       // Home's "Where things run" shows the link; it reads it again when it changes.
@@ -496,6 +509,16 @@ function showRemark(params: unknown): void {
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
   // The brain reads the remark aloud itself when Scout talks is on (see sendReadAloud).
+}
+
+function detectReadingStatus(): Promise<ReadingStatus> {
+  return detectReading(runPowerShellScript);
+}
+
+/** Tells the brain how Scout reads the screen on this PC (it keeps the latest per body). */
+function sendReading(status: ReadingStatus): void {
+  const event = readingEvent(status);
+  desktop?.brain.event(event.name, event.data);
 }
 
 /**
@@ -829,6 +852,11 @@ function registerIpc(): void {
   registerSpendIpc(handle, { brain: required().brain });
   registerKeyIpc(handle, {
     brain: required().brain,
+    openExternal: (url) => shell.openExternal(url),
+  });
+  registerReadingIpc(handle, {
+    detect: detectReadingStatus,
+    push: sendReading,
     openExternal: (url) => shell.openExternal(url),
   });
   registerFileFoldersIpc(handle, {

@@ -1,10 +1,12 @@
 /**
  * The desktop's body events to the brain: `back` (the person returned after a long idle),
- * `focus` (the front window changed) and `read_aloud` (what Scout's voice setting asks for).
+ * `focus` (the front window changed), `read_aloud` (what Scout's voice setting asks for) and
+ * `reading` (how this PC reads the screen).
  * Facts only; the brain decides whether to speak. A blocked window is never reported, so an
  * excluded app never leaves the machine.
  */
 import type { ReadAloudEventData } from '@tagalong/contract';
+import type { ReadingStatus } from '../platform/reading-status';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
 import type { Settings } from '../../shared/settings';
@@ -22,6 +24,11 @@ export function readAloudEvent(voice: Settings['voice']): ReadAloudEventData {
     speed: voice.speed,
     system_voice: chosenMouth(voice) === 'system',
   };
+}
+
+/** The `reading` event: how Scout reads the screen on this PC. Sent on connect and after a re-check. */
+export function readingEvent(status: ReadingStatus): { name: 'reading'; data: ReadingStatus } {
+  return { name: 'reading', data: status };
 }
 
 /** How often the front window is read. */

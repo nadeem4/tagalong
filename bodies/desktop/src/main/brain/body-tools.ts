@@ -1,6 +1,7 @@
 /**
  * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window, open_url,
- * and the file tools (list_files, read_file, move_file, rename_file, delete_file, write_file).
+ * the file tools (list_files, read_file, move_file, rename_file, delete_file, write_file) and
+ * install_ocr_language (the person-only fix when text from pictures needs a language pack).
  * Declared in `hello`, run when the brain sends `use`. Every run is bounded at 15 s, and any
  * capture that reads pixels raises the capture notice.
  */
@@ -13,6 +14,9 @@ import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { RpcError } from '@tagalong/contract';
 import { fileTools, type FileDeps } from '../tools/files';
+import { INSTALL_TIMEOUT_MS, type InstallResult } from '../platform/ocr-install';
+import { DETECT_TIMEOUT_MS } from '../platform/reading-status';
+import type { ReadingStatus } from '../platform/reading-status';
 
 /**
  * How much of one window's text a read returns unless asked otherwise: roughly 2,000 tokens,
@@ -20,6 +24,24 @@ import { fileTools, type FileDeps } from '../tools/files';
  */
 const DEFAULT_WINDOW_TEXT_CHARS = 8_000;
 const RUN_TIMEOUT_MS = 15_000;
+/**
+ * Tools that may outlast the usual limit. The install gives up at INSTALL_TIMEOUT_MS with
+ * "still installing"; this limit sits above it (room for the re-check) so that answer always
+ * comes first, and the brain's own wait sits above this one.
+ */
+/** Install limit, plus the re-check that follows it, plus slack. The brain's wait must exceed it. */
+export const INSTALL_TOOL_TIMEOUT_MS = INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000;
+
+const TOOL_TIMEOUTS: Record<string, number> = {
+  install_ocr_language: INSTALL_TOOL_TIMEOUT_MS,
+};
+
+/** What the reading tools need: detection, the install, and telling the brain the result. */
+export interface ReadingDeps {
+  detect(): Promise<ReadingStatus>;
+  install(language: string): Promise<InstallResult>;
+  push(status: ReadingStatus): void;
+}
 const LONG_SIDE = 1568;
 const MINIMIZED = 'That window is minimized, so there is nothing drawn to look at.';
 
@@ -190,6 +212,23 @@ const tools: Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'install_ocr_language',
+    description:
+      "Install Windows' text recognition for one language, so Scout can read text in pictures. " +
+      'Use the language tag from the reading status (for example fr-FR). Windows asks for ' +
+      'administrator permission itself. It always asks the person first.',
+    effect: 'change',
+    confirm: 'always',
+    input_schema: {
+      type: 'object',
+      properties: {
+        language: { type: 'string', description: 'A language tag such as en-US.' },
+      },
+      required: ['language'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function failed(message: string): RpcError {
@@ -206,6 +245,7 @@ export function bodyTools(
   onCapture: (notice: CaptureNotice) => void,
   openExternal: (url: string) => Promise<void>,
   files: FileDeps,
+  reading: ReadingDeps,
 ): { tools: Tool[]; run: (tool: string, input: Record<string, unknown>) => Promise<Part[]> } {
   const announce = (blocked: CaptureBlock | null) =>
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
@@ -279,12 +319,28 @@ export function bodyTools(
     return text('Opened in the browser.');
   }
 
+  // The outcome is a plain sentence; the fresh status follows so Scout sees what changed. A
+  // refused tag stops before any re-check, since nothing was attempted.
+  async function installOcrLanguage(input: Record<string, unknown>): Promise<Part[]> {
+    const language = input['language'];
+    if (typeof language !== 'string' || language.length === 0) {
+      throw new RpcError(ErrorCode.invalid_params, 'language is required');
+    }
+    const result = await reading.install(language);
+    if (result.outcome === 'invalid-language') return text(result.message);
+    const status = await reading.detect();
+    reading.push(status);
+    return text(`${result.message}
+${JSON.stringify(status)}`);
+  }
+
   const handlers: Record<string, (input: Record<string, unknown>) => Promise<Part[]>> = {
     list_windows: listWindows,
     read_window_text: readWindowText,
     look_at_window: lookAtWindow,
     open_url: openUrl,
     ...fileTools(files),
+    install_ocr_language: installOcrLanguage,
   };
 
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {
@@ -296,7 +352,7 @@ export function bodyTools(
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(
         () => reject(new RpcError(ErrorCode.timeout, `${tool} took too long`)),
-        RUN_TIMEOUT_MS,
+        TOOL_TIMEOUTS[tool] ?? RUN_TIMEOUT_MS,
       );
     });
     try {

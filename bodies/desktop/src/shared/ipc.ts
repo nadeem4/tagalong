@@ -117,6 +117,9 @@ export const IPC = {
   // The Anthropic key and the daily limit: thin calls to the brain. The key is never returned.
   keyStatus: 'tagalong:key:status',
   keyOpenPage: 'tagalong:key:open-page',
+  // How Scout reads the screen: detect again and tell the brain, or open Windows' language page.
+  readingRecheck: 'tagalong:reading:recheck',
+  readingOpenLanguageSettings: 'tagalong:reading:open-language-settings',
   keySet: 'tagalong:key:set',
   limitSet: 'tagalong:limit:set',
   // The first-run walkthrough: open it (at a step) or finish it.
@@ -335,6 +338,10 @@ export interface TagalongHostApi {
   onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
   /** Opens Anthropic's Console key page in the browser (a fixed address, chosen by main). */
   openKeyPage(): Promise<void>;
+  /** Detects how Scout reads the screen again and tells the brain. */
+  readingRecheck(): Promise<void>;
+  /** Opens Windows Settings, Language and region (a fixed address, chosen by main). */
+  openLanguageSettings(): Promise<void>;
   /** Finish or Skip: marks the walkthrough seen and closes its window. */
   /** Marks the tour seen; closes the window unless `close` is false (the finish card stays up). */
   finishWalkthrough(options?: { close?: boolean }): Promise<void>;

@@ -113,8 +113,12 @@ describe('reading the screen', () => {
   it('names every screen-reading tool the desktop declares, and no other', () => {
     const source = readFileSync(new URL('../../main/brain/body-tools.ts', import.meta.url), 'utf8');
     const declared = [...source.matchAll(/^\s{4}name: '(\w+)',/gm)].map((m) => m[1]);
-    // open_url and the file tools (list_files, move_file, ...) do not read the screen.
-    const screen = declared.filter((name) => name !== 'open_url' && !/_files?$/.test(name ?? ''));
+    // open_url, install_ocr_language and the file tools (list_files, move_file, ...) do not
+    // read the screen.
+    const notScreen = ['open_url', 'install_ocr_language'];
+    const screen = declared.filter(
+      (name) => !notScreen.includes(name ?? '') && !/_files?$/.test(name ?? ''),
+    );
     expect(screen.sort()).toEqual([...READS].sort());
     for (const tool of ['recall', 'open_url']) {
       expect(dockMood(look(turn, tool))).toBe('thinking');

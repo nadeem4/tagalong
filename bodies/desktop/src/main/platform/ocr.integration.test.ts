@@ -32,7 +32,7 @@ describe.skipIf(!onWindows)('text recognition through the real PowerShell', () =
     const raw = await runPowerShellScript(OCR_SCRIPT, 30_000, png);
     if (raw.trim() === NO_RECOGNISER) context.skip();
 
-    const text = await recognizeText(runPowerShellScript, png);
+    const { text } = await recognizeText(runPowerShellScript, png);
     expect(text).toMatch(/npm test failed/i);
     expect(text).toMatch(/expected 3 to be 4/i);
   }, 60_000);

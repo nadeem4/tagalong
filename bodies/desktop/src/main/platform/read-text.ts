@@ -3,6 +3,7 @@
  * layer is thin. Checked against the classified inventory first. Contains readWindowTextWith.
  */
 
+import type { OcrReading } from './ocr';
 import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer-notes';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 
@@ -27,7 +28,7 @@ export interface ReadWindowTextDeps {
    * The text in a picture of the window, for apps that draw their own text (terminals,
    * editors) and publish little to the text layer. Absent where there is no recogniser.
    */
-  readPicture?: (handle: number) => Promise<string>;
+  readPicture?: (handle: number) => Promise<OcrReading>;
 }
 
 export interface ReadWindowTextParams {
@@ -122,12 +123,17 @@ export async function readWindowTextWith(
 
   // Thin text from a window that is on screen: read what it shows instead. Terminals and
   // editors draw their own text, so the picture often holds far more than the text layer.
+  let noRecogniser = false;
   if (
     deps.readPicture !== undefined &&
     reading.text.length < THIN_TEXT_CHARS &&
     target.state !== 'minimized'
   ) {
-    const seen = (await deps.readPicture(handle).catch(() => '')).trim();
+    const picture = await deps
+      .readPicture(handle)
+      .catch((): OcrReading => ({ text: '', noRecogniser: false }));
+    const seen = picture.text.trim();
+    noRecogniser = picture.noRecogniser;
     if (seen.length > reading.text.length) {
       const truncated = seen.length > params.maxChars;
       return {
@@ -150,6 +156,7 @@ export async function readWindowTextWith(
     browser: target.browser,
     textLength: reading.text.length,
     truncated: reading.truncated,
+    noRecogniser,
   });
 
   return {

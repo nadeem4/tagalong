@@ -82,6 +82,24 @@ export const ReadAloudEventData = z.object({
 });
 export type ReadAloudEventData = z.infer<typeof ReadAloudEventData>;
 
+// Data of the `reading` event: how this body reads the screen, one row per capability.
+// `language` is checked against a language-tag shape because it later reaches a command line.
+export const ReadingRow = z.object({
+  capability: z.enum(['window-text', 'text-from-pictures']),
+  engine: z.enum(['windows-uia', 'windows-ocr']),
+  where: z.literal('this-pc'),
+  state: z.enum(['working', 'needs-language-pack', 'not-working']),
+  language: z
+    .string()
+    .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/)
+    .optional(),
+  profile_languages: z.array(z.string()).max(20).optional(),
+});
+export type ReadingRow = z.infer<typeof ReadingRow>;
+
+export const ReadingEventData = z.object({ rows: z.array(ReadingRow).max(8) });
+export type ReadingEventData = z.infer<typeof ReadingEventData>;
+
 // Data of the browser body's `tab` and `download` events.
 export const TabEventData = z.object({ title: z.string(), url: z.string() });
 export type TabEventData = z.infer<typeof TabEventData>;

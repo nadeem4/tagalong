@@ -22,7 +22,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
 | `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; stops only that child on quit                                               |
 | `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
-| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`: the `back`, `focus` and `read_aloud` events sent to the brain                                       |
+| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
 | `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
 | `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
@@ -139,6 +139,17 @@ client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
   parent folder must exist). List and read are reads (Auto by default); move and rename are changes
   (Ask by default); delete and write are `confirm: "always"`: they always ask and cannot be set to Auto.
   This is file access, not computer control: nothing clicks, types or drives another app.
+
+- **How Scout reads the screen.** `platform/reading-status.ts` (`detectReading`) runs one read-only PowerShell script
+  (no elevation) and reports two rows, window text (UI Automation) and text from pictures (Windows OCR),
+  each `working`, `needs-language-pack` (with the display language) or `not-working`. The desktop sends it as the
+  `reading` event on every connect, after an install and when asked (`IPC.readingRecheck`,
+  `readingRecheck()` on `window.tagalongHost`). `IPC.readingOpenLanguageSettings`
+  (`openLanguageSettings()`) opens `ms-settings:regionlanguage`; the address is fixed in `ipc/reading.ts`.
+  The body tool `install_ocr_language {language}` (`platform/ocr-install.ts`) is `confirm: "always"`, so it always
+  asks the person; Windows then shows its own administrator prompt. It gives up after 10 minutes with
+  "still installing" (the brain waits a little longer), then re-detects and sends the fresh status.
+  See [sight.md](sight.md).
 
 - **Body events.** `brain/body-events.ts` sends facts with `event` (`back`, `focus`, and the `read_aloud` setting from `readAloudEvent`); the brain decides whether
   they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person

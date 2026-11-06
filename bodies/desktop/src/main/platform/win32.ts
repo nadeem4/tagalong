@@ -138,7 +138,9 @@ export class Win32Platform implements Platform {
             handle,
             OCR_MAX_LONG_SIDE,
           );
-          return image === null ? '' : recognizeText(runPowerShellScript, image.base64);
+          return image === null
+            ? { text: '', noRecogniser: false }
+            : recognizeText(runPowerShellScript, image.base64);
         },
       },
       params,
