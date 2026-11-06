@@ -5,7 +5,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/ui/shapes';
 import { AWAY_AFTER_MS } from '../presence';
-import { createBackSender, frontWindow, readAloudEvent, startFocusWatch } from './body-events';
+import { ReadingEventData } from '@tagalong/contract';
+import {
+  createBackSender,
+  frontWindow,
+  readAloudEvent,
+  readingEvent,
+  startFocusWatch,
+} from './body-events';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -213,5 +220,17 @@ describe('startFocusWatch', () => {
     stop();
     await vi.advanceTimersByTimeAsync(20_000);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('readingEvent', () => {
+  it('is named reading and carries data the contract accepts', () => {
+    const event = readingEvent({
+      rows: [
+        { capability: 'window-text', engine: 'windows-uia', where: 'this-pc', state: 'working' },
+      ],
+    });
+    expect(event.name).toBe('reading');
+    expect(ReadingEventData.parse(event.data)).toEqual(event.data);
   });
 });

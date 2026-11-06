@@ -2201,6 +2201,17 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    still asks, and Home's Approvals shows the hand-off row naming the app.
 4. `hand_off` with an app that is off or unknown is refused in plain words and no card appears.
 
+## How Scout reads the screen (desktop, automated; install by hand only on a spare PC)
+
+1. `pnpm --filter @tagalong/desktop test`: `reading-status.test.ts` maps the script's lines to rows, says
+   `not-working` for empty output or a throwing runner, and never `needs-language-pack` without a valid tag.
+2. `ocr-install.test.ts` and `body-tools.test.ts` (fake runner): a bad tag such as `en-US; calc` never reaches
+   PowerShell; a refused prompt gives `declined`; an overrun gives `still-installing`; `install_ocr_language` is
+   `confirm: "always"`; the tool re-detects and sends the status after an attempt.
+3. `ipc/reading.test.ts`: opening language settings always opens `ms-settings:regionlanguage`.
+4. By hand, read-only: start the desktop with a brain running and check the brain log receives a `reading` event.
+   Do not run the install while testing.
+
 ## Not supported
 
 Do not test these here.

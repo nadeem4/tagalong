@@ -9,6 +9,7 @@ import type { CaptureExclusions } from '../../shared/settings';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
+import type { ReadingDeps } from './body-tools';
 import type { FileDeps } from '../tools/files';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
@@ -21,6 +22,8 @@ type StartBrainOptions = Pick<BrainClientOptions, 'onNotification' | 'onStatus' 
   openExternal: (url: string) => Promise<void>;
   /** The folders Scout may use for files, and the Recycle Bin call for deletes. */
   files: FileDeps;
+  /** How Scout reads the screen: detection, the language install and telling the brain. */
+  reading: ReadingDeps;
   env?: NodeJS.ProcessEnv;
   /** Tests pass a fake; the app uses the global WebSocket. */
   openSocket?: BrainClientOptions['openSocket'];
@@ -50,9 +53,10 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     onCapture,
     openExternal,
     files,
+    reading,
     ...handlers
   } = options;
-  const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files);
+  const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);
   const brain = new BrainClient({
     ...handlers,
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,

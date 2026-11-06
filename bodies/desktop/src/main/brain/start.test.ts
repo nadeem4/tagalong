@@ -12,6 +12,11 @@ const tools = {
   onCapture: noop,
   openExternal: async () => undefined,
   files: { folders: () => [], trash: async () => undefined },
+  reading: {
+    detect: async () => ({ rows: [] }),
+    install: async () => ({ outcome: 'installed' as const, message: '' }),
+    push: noop,
+  },
 };
 
 function setup(env: NodeJS.ProcessEnv) {
@@ -71,6 +76,7 @@ describe('startBrain', () => {
       'rename_file',
       'delete_file',
       'write_file',
+      'install_ocr_language',
     ]);
 
     const result = { protocol: 1, session: 's', tools: [], seq: 0, resync: false };
