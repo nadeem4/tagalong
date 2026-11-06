@@ -403,5 +403,5 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 - [Developer guide](docs/development.md): build, run, test and package from source.
 - [Architecture](docs/architecture.md): how the brain and its bodies fit together.
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
-- [Product](PRODUCT.md) and [design system](DESIGN.md).
+- [Product](bodies/PRODUCT.md) and [design system](bodies/DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.
