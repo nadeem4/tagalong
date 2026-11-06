@@ -24,6 +24,7 @@ The desktop host does the reading. Windows is the only platform.
 | Screenshots                    | `platform/capture.ts` (`captureWindowImageWith`, one window by handle), `platform/window-shot.ts` (`lookAtWindowWith`), `platform/downscale.ts` (`fitWithin`)         |
 | Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                      |
 | Body tools                     | `bodies/desktop/src/main/brain/body-tools.ts` (`list_windows`, `read_window_text`, `look_at_window`)                                                                  |
+| Focus events                   | `bodies/desktop/src/main/brain/body-events.ts` (`startFocusWatch`, `frontWindow`)                                                                                     |
 | Ask and voice snapshots        | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `captureActiveWindow`), `capture-notice.ts`                                                               |
 | Exclusion rules and inventory  | `bodies/desktop/src/main/platform/exclusions.ts`, `inventory.ts`, `text-layer-notes.ts`; `bodies/desktop/src/shared/blind-spots.ts`                                   |
 | Wire shapes                    | `bodies/ui/src/shapes/context.ts` (`@tagalong/ui/shapes`), `shared/settings.ts`                                                                                       |
@@ -34,7 +35,42 @@ The desktop host does the reading. Windows is the only platform.
 
 On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the talk key call it from `context.ts`; the brain calls it through the body tools.
 
-The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. Each takes a window id minted by the list. The browser body offers a `tabs` tool instead (see [browser-body.md](browser-body.md)).
+The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. `read_window_text` and `look_at_window` take a window id minted by the list (`read_window_text` defaults to the foreground window). The brain sends a `use` frame, the desktop's `BrainClient` hands it to `run`, and every run is bounded at `RUN_TIMEOUT_MS` = 15,000; anything that is not already an `RpcError` (the sight pause, a helper failing) becomes a `tool_failed` error carrying its own words. The browser body offers its own tools instead (`tabs`, `page_parts` and others; see [browser-body.md](browser-body.md)).
+
+The path of one `read_window_text`, end to end:
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+sequenceDiagram
+  participant B as Python brain
+  participant T as body-tools.ts run
+  participant G as gateSight
+  participant W as Win32Platform
+  participant P as PowerShell
+  B->>T: use read_window_text {windowId?, maxChars?}
+  T->>G: readWindowText(params, exclusions)
+  alt sight paused
+    G-->>T: SightPausedError
+    T-->>B: tool_failed "sight is paused ..."
+  else sight on
+    G->>W: readWindowText
+    W->>P: LIST_WINDOWS_SCRIPT, then the text count
+    P-->>W: windows, classified by buildInventory
+    alt unknown id or blocked
+      W-->>T: empty text and a note (blocked set when refused)
+    else allowed
+      W->>P: readWindowTextScript(handle)
+      P-->>W: text nodes, sorted and capped
+      opt under 500 characters and not minimized
+        W->>P: OCR_SCRIPT, PNG on stdin
+        P-->>W: recognised lines (kept only if longer)
+      end
+      W-->>T: text, source uia or ocr, notes
+    end
+    T-->>B: text part, or tool_failed for a blocked window
+    Note over T: source ocr raises the capture notice
+  end
+```
 
 ### The platform adapter
 
@@ -52,7 +88,7 @@ The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`
 platform fails at boot instead of perceiving nothing.
 
 Each capability is a free function that takes its Electron and process dependencies as ports
-(`desktopCapturer`, `screen`, `nativeImage`, a script runner). `Win32Platform` only wires the real
+(`desktopCapturer`, `screen`, `clipboard`, a script runner). `Win32Platform` only wires the real
 ones in. The whole layer is therefore unit-tested in Node with no display; the real PowerShell
 transport and the real recogniser are covered by the Windows-only `*.integration.test.ts` files,
 and real pixels by the Electron smoke test.
@@ -80,8 +116,9 @@ calls this function rather than its own copy of the arguments.
   `MAX_OUTPUT_BYTES` = 1,000,000. The parsers turn anything unusable into a named failure.
 - `PER_MONITOR_AWARE` sets per-monitor DPI awareness v2 before UI Automation loads, so rectangles on
   mixed-scale desks come back in physical pixels. Best effort.
-- Only integers (window handles, checked by `safeHandle`) are interpolated into scripts. The
-  element name for pointing goes in as base64 and is decoded inside PowerShell.
+- Only integers (window handles, checked by `safeHandle`) are interpolated into scripts; the count
+  pass drops any handle that is not a safe integer. The one piece of data a script takes, the OCR
+  picture, goes in on stdin.
 
 ### The window list
 
@@ -115,17 +152,35 @@ calls this function rather than its own copy of the arguments.
 `handleOf` turns an id back into a handle and returns null for anything the host did not mint, so a
 model-invented id fails as "no such window" rather than reaching a script.
 
-Callers that need titles only pass `countText: false`: the focus watch, the listening guard and the `list_windows` tool.
+Callers that need titles only pass `countText: false`: the focus watch, the listening guard and
+the minimized check `look_at_window` makes before its picture. The `list_windows` tool, the
+lookups inside `readWindowText` and `lookAtWindow`, and `windowInFocus` list with counts.
 
 ### Active window and title handling
 
 - The ask hotkey (`hotkeys.ask`, default `CommandOrControl+Shift+Space`) calls
   `captureAskSnapshot` (`context.ts`): `getActiveWindow`, then the exclusion check, then the
   selection unless that window is blocked. No picture, no displays, no window list ride along with
-  an ask; Scout takes those by tool.
-- Holding the talk key (Right Ctrl) calls `captureActiveWindow` through the voice IPC
-  (`ipc/voice.ts`, `noteActiveWindow`): the window only, never the selection, because copying
-  would press keys while the talk key is held. See [voice.md](voice.md).
+  an ask; Scout takes those by tool. While sight is paused the window read is refused (no app),
+  but the selection is still copied: it is handed over, not seen.
+- Holding the talk key (Right Ctrl) calls `noteActiveWindow` (`main/index.ts`, reached through
+  the voice IPC in `ipc/voice.ts`), which calls `captureActiveWindow`: the window only, never the
+  selection, because copying would press keys while the talk key is held. A blocked or paused
+  read sends no snapshot. See [voice.md](voice.md).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart TD
+  K[Ask hotkey: captureAskSnapshot] --> A{getActiveWindow}
+  A -- paused --> AP[no app, paused = true]
+  A -- read --> F{findCaptureBlock}
+  AP --> S[captureSelection: Ctrl+C, read, restore]
+  F -- not blocked --> S
+  F -- blocked --> NB[app name and blocked only, no Ctrl+C]
+  S --> N[snapshot, then announceCapture with screenshot false]
+  NB --> N
+```
+
 - A click on the pet captures nothing (`openPanelNow`).
 - `windowInFocus` looks past Tagalong's own windows: when the foreground app is Tagalong's own
   executable (`process.execPath`), it uses the topmost non-minimized window from the list that is
@@ -143,8 +198,10 @@ Rules shared by every picture:
 
 - The size bound goes into the `desktopCapturer.getSources` request (`thumbnailSize`), and
   `fitWithin` resizes afterwards as a safety net. `fitWithin` never upscales and clamps each side
-  to at least 1 pixel. All images are PNG (`CapturedImage`, `mime: 'image/png'`).
-- A window picture matches the capturer's source ids `window:<handle>:`.
+  to at least 1 pixel. All images are PNG (`CapturedImage` is base64 plus size; the
+  `look_at_window` answer adds `mime: 'image/png'`).
+- A window picture matches the capturer's source ids `window:<handle>:` and skips an empty
+  thumbnail (a window Electron could not read); no match gives null, never another window.
 
 #### Capture announcements
 
@@ -153,18 +210,18 @@ Rules shared by every picture:
 (`tagalong:capture-event`) and sets the tray tooltip (`captureTooltip`). `captureNotice` writes
 the sentence: paused first ("Sight is paused — Tagalong read nothing…"), then blocked (naming the
 exclusion entry, never the window title), then "Tagalong captured the screen." or "Tagalong read
-the selection and the active window." The avatar shows its `seeing` state for `SEEING_MS` = 2,500
-unless the notice is paused or blocked.
+the selection and the active window." The avatar (`renderer/src/avatar.tsx`) shows its `seeing`
+state for `SEEING_MS` = 2,500 unless the notice is paused or blocked.
 
 Which reads announce:
 
-| Path                                                | Announced                |
-| --------------------------------------------------- | ------------------------ |
-| Ask hotkey (`openPanelWithContext`)                 | yes, `screenshot: false` |
-| Talk key (`noteActiveWindow`)                       | yes, `screenshot: false` |
-| `look_at_window`                                    | yes, `screenshot: true`  |
-| `read_window_text` read by OCR                      | yes, `screenshot: true`  |
-| `read_window_text` by UI Automation, `list_windows` | no notice                |
+| Path                                                | Announced                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Ask hotkey (`openPanelWithContext`)                 | yes, `screenshot: false` (paused or blocked when refused)                                         |
+| Talk key (`noteActiveWindow`)                       | yes, `screenshot: false` (paused or blocked when refused)                                         |
+| `look_at_window`                                    | yes, `screenshot: true`, with `blocked` when refused; none when paused or the window is minimized |
+| `read_window_text` read by OCR                      | yes, `screenshot: true`                                                                           |
+| `read_window_text` by UI Automation, `list_windows` | no notice                                                                                         |
 
 ### Screen text, selection and OCR
 
@@ -172,7 +229,8 @@ Which reads announce:
 
 1. Lists windows (classified) and finds the target by id, or the foreground window when no id is
    given. Missing, blocked and unknown-id cases return an answer with empty `text` and a `notes`
-   sentence, never an exception. A blocked window returns `blocked`.
+   sentence, never an exception. A blocked window returns `blocked`, which the body tool turns
+   into a failed tool call carrying that sentence.
 2. Reads through `TextLayerProvider.readWindowText(handle, maxChars)`. `readWindowTextScript`
    finds the window by `NativeWindowHandleProperty` among the root's children (never walking from
    the desktop root), collects descendants of control type Text, Edit and Document, prefers
@@ -184,7 +242,8 @@ Which reads announce:
    saying the read did not happen, so Scout does not call the window empty.
 4. If the text is under `THIN_TEXT_CHARS` = 500 and the window is not minimized, it photographs the
    window at 2,500 and runs OCR. The OCR text wins only if it is longer; the answer is then
-   `source: 'ocr'` with a note that it covers only what is on screen and may misread words.
+   `source: 'ocr'`, cut to `maxChars`, with a note that it covers only what is on screen and may
+   misread words (and one more when it was cut).
 5. Otherwise `textLayerNotes` (`platform/text-layer-notes.ts`) adds caveats: no text
    published, under 500 characters (likely menus only), a browser window (active tab only; other
    tabs need the extension), or truncated.
@@ -231,36 +290,46 @@ Matching: process names are compared whole after `normalizeProcessName` (trim, l
 other character is escaped, so no pattern can carry regex syntax. A window with neither process
 name nor title is allowed: refusing everything unnamed would leave Scout blind.
 
-The person's list has no editor in Settings; Settings → Privacy shows the blind spots read-only
-under **Scout never looks at**. An entry is added by asking Scout ("never look at Signal"), which
-shows a settings card for `captureExclusions.add` (a name ending `.exe` goes to `processNames`,
-anything else to `titlePatterns`); applying it is the person's click. See
+The person's list has no editor in Settings and Scout cannot change it; Settings → Privacy shows
+the blind spots read-only under **Scout never looks at**. An entry is added or removed by editing
+`captureExclusions` in `settings.json` by hand. See [privacy.md](privacy.md) and
 [settings-and-secrets.md](settings-and-secrets.md).
 
 Enforcement points, all before any pixel or text is read:
 
-| Read                                  | Where the refusal happens                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Ask snapshot                          | `captureAskSnapshot`: blocked window keeps only its app name; Ctrl+C is never pressed there |
-| Window list                           | `countableHandles` skips the text count; `buildInventory` drops title and count             |
-| Window text, window picture, pointing | the target is looked up in the classified list; `blocked` returns before the read           |
+| Read                        | Where the refusal happens                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| Ask snapshot                | `captureAskSnapshot`: blocked window keeps only its app name; Ctrl+C is never pressed there |
+| Window list                 | `countableHandles` skips the text count; `buildInventory` drops title and count             |
+| Window text, window picture | the target is looked up in the classified list; `blocked` returns before the read           |
+| Focus event                 | `frontWindow` returns null for a blocked front window, so an empty `focus` goes instead     |
 
 No whole-screen capture exists, so there is no display-level refusal: a picture is always of one
-listed window, and that window was checked first.
+listed window, and that window was checked first. How `look_at_window` decides (every refusal is a
+failed tool call carrying the sentence shown):
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
   A[look_at_window] --> B{Sight paused?}
-  B -- yes --> P[SightPausedError, nothing read]
-  B -- no --> C{Window in the list?}
+  B -- yes --> P[SightPausedError, nothing read, no notice]
+  B -- no --> E{Minimized and not blocked?}
+  E -- yes --> M[refused: nothing drawn, no notice]
+  E -- no --> C{Window in the list?}
   C -- no --> N[no such window]
   C -- yes --> D{Window blocked?}
   D -- yes --> X[refused, blocked = entry]
-  D -- no --> E{Minimized?}
-  E -- yes --> M[refused, nothing drawn]
-  E -- no --> I[PNG fitted to the long side]
+  D -- no --> S[captureWindowImageWith at LONG_SIDE]
+  S -- no usable source --> F[could not photograph]
+  S -- found --> I[PNG fitted to the long side]
+  N --> Q[capture notice, screenshot true]
+  X --> Q
+  F --> Q
+  I --> Q
 ```
+
+The first two checks run in `body-tools.ts` on a titles-only list; the rest in
+`lookAtWindowWith` on a fresh, classified list.
 
 ### Pausing sight
 
@@ -282,17 +351,49 @@ brain as a failed tool call. `AskCapture.paused` is separate from `blocked`, bec
 On a change, `sightPause.onChange` sends
 `IPC.sightPauseEvent` (`tagalong:sight-pause-event`) to every window (the avatar greys its eye),
 rebuilds the tray menu and sets the tooltip to `Tagalong — sight is paused`. A window that opens
-later reads the state with `IPC.getSightPaused`. The focus watch and the listening guard
-also check the pause before listing. Drops are not refused by a pause: they are handed over.
+later reads the state with `IPC.getSightPaused`. The focus watch checks the pause itself before
+listing (`enabled`) and sends one empty `focus` instead; the listening guard's listing is refused
+by the gate and it keeps its last answer. Drops are not refused by a pause: they are handed over.
 
 ### Focus and tab also feed loops
 
-The window titles the focus watch reports (`focus`: app and title) and the tab changes the browser
-body reports (`tab`: title and address) are handed to the brain's loops service as well as to the
-event queue. If one matches an anchor of a loop Scout is holding (the deck a mail asked about, the
-page it linked), Scout may speak up, at most once per loop and anchor a day. No new screen read is
-made: only titles and addresses already sent; the focus watch is off while sight is paused. See
+The focus watch (`startFocusWatch`, `body-events.ts`) lists windows titles-only every
+`FOCUS_POLL_MS` = 5,000 and sends a `focus` event (`{app, title}`) only when the front window
+changed. A blocked front window, or sight paused, sends one empty `focus` (app `''`) so the brain
+stops naming the old app; a send the brain missed is tried again next tick. The browser body sends
+`tab` (`{title, url}`, the URL without query or fragment, throttled to one per `TAB_THROTTLE_MS` =
+2,000).
+
+In the brain, `Session` hands both to the loops service (`LoopService.saw`) as well as to the event
+queue, where they never wake Scout on their own (`wakes=False`) and only the latest per body is kept
+for the prompt. The title is cut to 200 characters and the URL to 300 (`events.py`). If one matches
+an anchor of a loop Scout is holding (the deck a mail asked about, the page it linked), Scout may
+speak up. No new screen read is made: only titles and addresses already sent. See
 [brain.md](brain.md#loops).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+sequenceDiagram
+  participant D as Desktop focus watch
+  participant X as Browser body
+  participant S as Brain Session
+  participant L as LoopService.saw
+  participant Q as Scheduler
+  D->>S: event focus {app, title}
+  X->>S: event tab {title, url}
+  S->>L: focus or tab
+  alt mail itself in front (Gmail, Outlook)
+    L-->>L: nothing
+  else an anchor of a held or surfaced loop matches
+    Note over L: once per loop and anchor a local day, at most one context wake per 10 minutes
+    L->>Q: loop event, reason context
+  end
+  S->>Q: the focus or tab event itself (kept, no wake)
+```
+
+Matching (`loops/triggers/context.py`) leans strict: an address anchor matches on host and path,
+a file-name anchor needs the whole name and its extension in the title, and any other anchor needs
+two shared words that are at least half of it; common titles ("New Tab", "Inbox") never count.
 
 ### Dropping things on Scout
 
@@ -335,6 +436,10 @@ not block a drop.
 | `MAX_SELECTION_CHARS`       | 20,000    | `bodies/ui/src/shapes/context.ts`      |
 | `MAX_PAGE_TEXT_CHARS`       | 40,000    | `bodies/browser/src/content/limits.ts` |
 | `DEFAULT_WINDOW_TEXT_CHARS` | 8,000     | `main/brain/body-tools.ts`             |
+| `RUN_TIMEOUT_MS`            | 15,000    | `main/brain/body-tools.ts`             |
+| `FOCUS_POLL_MS`             | 5,000     | `main/brain/body-events.ts`            |
+| `SEEING_MS`                 | 2,500     | `renderer/src/avatar.tsx`              |
+| `TAB_THROTTLE_MS`           | 2,000     | `bodies/browser/src/events.ts`         |
 
 ## Storage
 
@@ -349,8 +454,12 @@ not block a drop.
   empty list is never reported as "no windows".
 - **PowerShell never throws** to callers; text reads distinguish "the read never happened" from
   "the window published nothing".
-- **Model mistakes are answers.** Unknown window ids, closed windows and minimized windows come
-  back as tool results with a sentence the pet can repeat.
+- **Model mistakes come back in words.** Unknown window ids, closed windows, blocked windows and
+  minimized windows come back with a sentence the pet can repeat: as notes in the
+  `read_window_text` result, or as the message of a failed tool call for `look_at_window` and for
+  a blocked text read.
+- **Slow reads are bounded.** Every body tool run gives up after 15 s with a `timeout` error; the
+  platform has no abort, so a late OCR read still raises its capture notice.
 - **No foreground window** (locked session, UAC, full-screen game) gives a snapshot with no app.
 
 ## Privacy notes
@@ -377,4 +486,7 @@ The privacy reference for everything above is [privacy.md](privacy.md): what is 
 | Selection borrow and restore                                                                                                                            | `platform/selection.test.ts`                                                             |
 | Exclusion matching, blind spots, secret files                                                                                                           | `platform/exclusions.test.ts`, `shared/blind-spots.test.ts`                              |
 | Inventory classification, text-layer notes                                                                                                              | `platform/inventory.test.ts`, `platform/text-layer-notes.test.ts`                        |
-| A paused sight refuses a `list_windows` tool call, and sight settings, end to end                                                                       | `bodies/desktop/e2e/smoke.spec.ts`                                                       |
+| Body tools: list failure named, OCR read announced, blocked read refused, minimized look refused                                                        | `bodies/desktop/src/main/brain/body-tools.test.ts`                                       |
+| Focus watch: once per change, empty focus for a blocked window or a pause, retry after a missed send                                                    | `bodies/desktop/src/main/brain/body-events.test.ts`                                      |
+| Focus and tab surface a matching loop; context matching rules                                                                                           | `brain/tests/test_loops_surface.py`, `brain/tests/test_loops_triggers.py`                |
+| A paused sight refuses a `list_windows` tool call, end to end                                                                                           | `bodies/desktop/e2e/smoke.spec.ts`                                                       |

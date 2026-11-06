@@ -121,8 +121,8 @@ A body implements two things.
 
 **Perception.** The desktop reads the screen itself: the window list, captures, OCR and the
 selection (`bodies/desktop/src/main/platform`). Exclusions and the built-in blind spots are checked before
-anything is read; the details are in [sight.md](sight.md). The Python brain does not ask the
-desktop for reads yet.
+anything is read; the details are in [sight.md](sight.md). The Python brain asks for reads through
+the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`).
 
 **Presentation.** The desktop renders Scout and its bubble, shows the cards (the drop card, the
 settings card) and speaks. The UI package draws all of it against `HostBridge`
