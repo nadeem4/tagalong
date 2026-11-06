@@ -102,6 +102,36 @@ Node cannot see inside other apps' windows; Windows can, through UI Automation (
 and Windows OCR (text in a picture). PowerShell ships with every Windows and reaches both without a
 native add-on to compile and sign, so each read runs a small script and parses what it prints.
 
+The two Windows tools it reaches both run in the desktop body, on the person's machine; the brain
+never touches them, it asks through a tool call and gets text back:
+
+- **UI Automation** is Windows' accessibility layer, the one screen readers such as Narrator use.
+  Apps describe their screen as a tree of elements (a window holds a toolbar, the toolbar a button
+  named "Save", a text box holds its value), each with a type, a name, a value and a rectangle. The
+  script walks that tree through .NET's `System.Windows.Automation` and collects names and values.
+  It only reads; it never clicks or types. It gives exact text without a picture, but only what
+  the app chooses to describe: games, canvas-drawn apps, image-only PDFs and video give little or
+  nothing.
+- **Windows OCR** (`Windows.Media.Ocr`) is the text-recognition engine built into Windows 10 and 11. It finds printed text in a picture on the machine, offline and free, in the languages
+  installed for the user (`TryCreateFromUserProfileLanguages`).
+
+UI Automation goes first because it is exact and needs no picture; OCR is the fallback for apps
+that describe themselves poorly, and an answer that comes from OCR raises the capture notice. The
+numbers are in [Screen text, selection and OCR](#screen-text-selection-and-ocr).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart TD
+  R[Read a window] --> U[UI Automation text]
+  U --> T{500 characters or more?}
+  T -- yes --> K[Use the UI Automation text]
+  T -- no --> M{Minimized?}
+  M -- yes --> K
+  M -- no --> C[Photograph the window]
+  C --> O[Windows OCR]
+  O --> L[Use the longer text; capture notice if it is the OCR text]
+```
+
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 sequenceDiagram
