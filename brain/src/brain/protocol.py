@@ -231,6 +231,24 @@ class ReadAloudData(Model):
     system_voice: bool = False
 
 
+class ReadingRow(Model):
+    # One way this body reads the screen. `language` reaches a command line on the body, so it
+    # must look like a language tag.
+    capability: Literal["window-text", "text-from-pictures"]
+    engine: Literal["windows-uia", "windows-ocr"]
+    where: Literal["this-pc"]
+    state: Literal["working", "needs-language-pack", "not-working"]
+    language: Annotated[str, Field(pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$")] | None = (
+        None
+    )
+    profile_languages: Annotated[list[str], Field(max_length=20)] | None = None
+
+
+class ReadingData(Model):
+    # Data of the `reading` event: how this body reads the screen, one row per capability.
+    rows: Annotated[list[ReadingRow], Field(max_length=8)]
+
+
 class CallParams(Model):
     tool: str
     input: Input
