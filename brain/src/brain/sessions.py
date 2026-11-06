@@ -58,8 +58,9 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
 from brain.outputs import OutputStore
-from brain.protocol import ReadAloudData, SayParams, SayResult, Tool
+from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
+from brain.reading import ReadingStore
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
@@ -127,6 +128,7 @@ class Session:
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
     ) -> None:
         self._model = model
+        self.reading = ReadingStore()  # how the connected body reads the screen, for Home
         self._apps_live = apps  # read each turn for the capability picture
         self._experts_live = experts or (lambda: [])
         # Set by main when voice is built; None answers `listen` with method_not_found.
@@ -415,6 +417,15 @@ class Session:
             ):
                 self._speak(self._turn_id, body_id, None)
             return
+        if name == "reading":  # a status of the body for Home, not something that happened
+            try:
+                status = ReadingData.model_validate(data)
+            except ValidationError:
+                log.warning("dropped a malformed reading event from %s", body_id)
+                return
+            if self.reading.set(body_id, status):
+                self._bodies.notify("changed", {"what": "reading"})
+            return
         event = from_body(body_id, name, data)
         if event is not None:
             if self.loops is not None and event.kind in ("focus", "tab", "back"):
@@ -423,6 +434,11 @@ class Session:
                 except Exception:  # a store error must not stop the wake path
                     log.exception("loops.saw failed")
             self.scheduler.emit(event)
+
+    def body_gone(self, body_id: str) -> None:
+        """A body disconnected for good: its reading status must not outlive it."""
+        if self.reading.forget(body_id):
+            self._bodies.notify("changed", {"what": "reading"})
 
     def _on_connect(self, body_id: str, away: float | None) -> None:
         kind = next((b.kind for b in self._bodies.online() if b.id == body_id), None)

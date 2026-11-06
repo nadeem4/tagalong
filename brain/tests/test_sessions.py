@@ -2439,3 +2439,57 @@ async def test_a_loops_store_error_does_not_stop_the_event_reaching_the_schedule
     session.scheduler.emit = emitted.append
     session.body_event("desktop", "focus", {"app": "Code", "title": "x"})
     assert [e.kind for e in emitted] == ["focus"]
+
+
+def reading(state="working"):
+    row = {"capability": "text-from-pictures", "engine": "windows-ocr", "where": "this-pc"}
+    return {"rows": [{**row, "state": state}]}
+
+
+def changed_reading(sent):
+    return [p for m, p in sent if m == "changed" and p == {"what": "reading"}]
+
+
+def test_a_reading_event_is_cached_and_home_is_told_with_changed_reading():
+    session, sent = make(Gate([]))
+    join(session, "desktop")
+    session.body_event("desktop", "reading", reading())
+    assert session.reading.rows()[0]["state"] == "working"
+    assert len(changed_reading(sent)) == 1
+
+
+def test_the_same_reading_twice_tells_home_once():
+    session, sent = make(Gate([]))
+    join(session, "desktop")
+    session.body_event("desktop", "reading", reading())
+    session.body_event("desktop", "reading", reading())
+    assert len(changed_reading(sent)) == 1
+
+
+def test_a_malformed_reading_event_is_ignored():
+    session, sent = make(Gate([]))
+    join(session, "desktop")
+    session.body_event("desktop", "reading", {"rows": [{"state": "broken"}]})
+    session.body_event("desktop", "reading", "nonsense")
+    assert session.reading.rows() == []
+    assert changed_reading(sent) == []
+
+
+def test_a_body_that_goes_away_takes_its_reading_with_it_and_home_is_told():
+    session, sent = make(Gate([]))
+    join(session, "desktop")
+    session.body_event("desktop", "reading", reading())
+    session.body_gone("desktop")
+    assert session.reading.rows() == []
+    assert len(changed_reading(sent)) == 2
+    session.body_gone("desktop")  # nothing left to forget, nothing to tell
+    assert len(changed_reading(sent)) == 2
+
+
+def test_a_reading_event_does_not_wake_scout():
+    session, _ = make(Gate([]))
+    join(session, "desktop")
+    emitted = []
+    session.scheduler.emit = emitted.append
+    session.body_event("desktop", "reading", reading())
+    assert emitted == []
