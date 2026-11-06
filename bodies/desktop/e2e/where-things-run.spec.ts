@@ -66,3 +66,56 @@ test('Overview shows where the brain, apps and Claude Code run', async () => {
   await expect(card).toContainText('https://wiki.example.com/mcp');
   await expect(card).toContainText('Claude Code');
 });
+
+const READING_ROWS = (ocr: Record<string, unknown>) => [
+  { capability: 'window-text', engine: 'windows-uia', where: 'this-pc', state: 'working' },
+  { capability: 'text-from-pictures', engine: 'windows-ocr', where: 'this-pc', ...ocr },
+];
+
+test('shows a needs-a-fix row and asks Scout to fix it', async () => {
+  brain.setReading(READING_ROWS({ state: 'needs-language-pack', language: 'en-US' }));
+  const home = await windowFor('home');
+  const card = home.getByRole('region', { name: 'Where things run' });
+  await expect(card).toContainText('How Scout reads your screen', { timeout: 30_000 });
+  await expect(card).toContainText('Needs a fix');
+  await expect(card).toContainText('Windows has no text-recognition pack for English');
+
+  const asked = brain.voice.says.length;
+  await card.getByRole('button', { name: 'Ask Scout to fix it' }).click();
+
+  // The companion opens and the person's words go to the brain as typed.
+  await expect
+    .poll(() => brain.voice.says.slice(asked).map((say) => say.text), { timeout: 15_000 })
+    .toEqual(['Fix text from pictures']);
+  const panel = await windowFor('panel');
+  await expect(panel.getByText('Fix text from pictures')).toBeVisible();
+});
+
+test('an ask from Home still lands while the quiet line is showing', async () => {
+  brain.setReading(READING_ROWS({ state: 'needs-language-pack', language: 'en-US' }));
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.hidePanel());
+  brain.sendRemark('Good morning, I am here');
+  await expect(panel.getByRole('button', { name: 'Ask Scout something' })).toBeVisible({
+    timeout: 30_000,
+  });
+
+  const home = await windowFor('home');
+  const card = home.getByRole('region', { name: 'Where things run' });
+  const asked = brain.voice.says.length;
+  await card.getByRole('button', { name: 'Ask Scout to fix it' }).click();
+
+  await expect
+    .poll(() => brain.voice.says.slice(asked).map((say) => say.text), { timeout: 15_000 })
+    .toEqual(['Fix text from pictures']);
+  await expect(panel.getByText('Fix text from pictures')).toBeVisible();
+});
+
+test('the row turns to Working after the brain changes it', async () => {
+  const home = await windowFor('home');
+  const card = home.getByRole('region', { name: 'Where things run' });
+  brain.setReading(READING_ROWS({ state: 'working' }));
+  await expect(card.getByText('Needs a fix')).toHaveCount(0, { timeout: 15_000 });
+  await expect(card.getByText('Working')).toHaveCount(2);
+  await expect(card.getByRole('button', { name: 'Ask Scout to fix it' })).toHaveCount(0);
+});

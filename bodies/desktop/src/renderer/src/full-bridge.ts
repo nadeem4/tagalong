@@ -33,5 +33,7 @@ export function fullBridge(): HostBridge {
     openFix: (target: FixTarget) =>
       target === 'key' ? bridge.openWalkthrough(KEY_STEP) : host.openSettings(target),
     openLogs: () => host.openLogsFolder(),
+    readingRecheck: () => host.readingRecheck(),
+    openLanguageSettings: () => host.openLanguageSettings(),
   };
 }

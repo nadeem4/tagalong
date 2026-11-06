@@ -55,6 +55,7 @@ import { installOcrLanguage } from './platform/ocr-install';
 import { detectReading } from './platform/reading-status';
 import type { ReadingStatus } from './platform/reading-status';
 import { registerReadingIpc } from './ipc/reading';
+import { registerAskScoutIpc } from './ipc/ask-scout';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
@@ -855,6 +856,7 @@ function registerIpc(): void {
     openExternal: (url) => shell.openExternal(url),
   });
   registerReadingIpc(handle, {
+    brain: required().brain,
     detect: detectReadingStatus,
     push: sendReading,
     openExternal: (url) => shell.openExternal(url),
@@ -956,12 +958,19 @@ function registerIpc(): void {
     return toggleSightPause();
   });
 
-  ipcMain.handle(IPC.openBubble, () => {
+  // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
+  // back (the click focused the pet's window). It never closes it.
+  const openBubbleWithKeyboard = (): void => {
     const current = required();
-    // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
-    // back (the click focused the pet's window). It never closes it.
     if (current.panel?.isVisible() !== true) openPanelNow(current);
     else if (current.avatar !== null) showPanelBeside(current.panel, current.avatar);
+  };
+  ipcMain.handle(IPC.openBubble, openBubbleWithKeyboard);
+  // Home's Ask Scout to fix it: the bubble comes up and asks the text as the person typed it.
+  registerAskScoutIpc(handle, {
+    fromHome: fromWindow(() => required().homeWindow),
+    bringUp: openBubbleWithKeyboard,
+    send: (text) => desktop?.panel?.webContents.send(IPC.panelAskEvent, text),
   });
 
   // A Fix it names its target; fixPage refuses anything off the list.

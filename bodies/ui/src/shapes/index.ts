@@ -11,6 +11,7 @@ export * from './echo';
 export * from './loops';
 export * from './memory';
 export * from './pet';
+export * from './reading';
 export * from './setup';
 export * from './status';
 export * from './turn-events';

@@ -1328,6 +1328,15 @@ the apps in C1 to C7 use a command or a pasted key.
 - [ ] Start the brain on another port and the desktop with `TAGALONG_BRAIN_ADDR=127.0.0.1:50000`. The
       card shows that address.
 
+- [ ] With a desktop connected, the same card has a group **How Scout reads your screen** with two rows,
+      **Reading window text** and **Text from pictures**, each with **Working** (green chip, the engine name
+      under the title, "this PC"). Stop the desktop: the group disappears.
+- [ ] On a spare PC without the OCR pack for your display language: **Text from pictures** shows **Needs a fix**
+      and one sentence naming the language. **Ask Scout to fix it** opens the companion with "Fix text from
+      pictures" as your message and Scout's usual ask; **Do it myself in Windows Settings** opens Language and
+      region. After the install the chip turns **Working** without reopening Home. A refused prompt leaves it
+      **Needs a fix**. An OCR failure (not a missing pack) shows **Not working** with only the Settings link.
+
 ### C8. An app with browser sign-in (OAuth)
 
 You need a real MCP server that signs in with OAuth (for example Notion's or Linear's hosted MCP
@@ -2208,7 +2217,13 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 2. `ocr-install.test.ts` and `body-tools.test.ts` (fake runner): a bad tag such as `en-US; calc` never reaches
    PowerShell; a refused prompt gives `declined`; an overrun gives `still-installing`; `install_ocr_language` is
    `confirm: "always"`; the tool re-detects and sends the status after an attempt.
-3. `ipc/reading.test.ts`: opening language settings always opens `ms-settings:regionlanguage`.
+3. `ipc/reading.test.ts`: opening language settings always opens `ms-settings:regionlanguage`; `reading:status`
+   hands Home the brain's `reading_status` text. `ipc/ask-scout.test.ts`: Home's ask brings up the bubble and
+   sends the text once; empty text is ignored.
+   `pnpm --filter @tagalong/ui test`: `reading.test.ts` (labels, only `needs-language-pack` fixable),
+   `reading-rows.test.tsx` and `where-things-run.test.tsx` (group, fix box, hidden with no rows, refetch on
+   `changed reading`), `companion-bubble-ask.test.tsx` (`onAsk` submits as typed).
+   `pnpm --filter @tagalong/desktop test:e2e -- where-things-run`: needs-a-fix, Ask Scout, then Working.
 4. By hand, read-only: start the desktop with a brain running and check the brain log receives a `reading` event.
    Do not run the install while testing.
 

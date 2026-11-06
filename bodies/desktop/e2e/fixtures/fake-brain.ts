@@ -44,6 +44,10 @@ export interface FakeBrain {
   permissionSets: { tool: string; mode: string }[];
   /** Every loops call the page made, in order: `set gmail on`, `forget l1`, `wipe`. */
   loopCalls: string[];
+  /** The data of every `reading` event the desktop sent (how this PC reads the screen). */
+  readingEvents: Record<string, unknown>[];
+  /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
+  setReading(rows: Record<string, unknown>[]): void;
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
@@ -296,6 +300,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     { ...DEFAULT_PREFERENCE },
     { ...TEST_PREFERENCE },
   ];
+  const readingEvents: Record<string, unknown>[] = [];
+  let readingRows: Record<string, unknown>[] = [];
   const voice: FakeBrain['voice'] = {
     listens: [],
     unlistens: 0,
@@ -467,6 +473,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       } else if (msg.method === 'hush') {
         voice.hushes += 1;
       } else if (msg.method === 'event') {
+        if (msg.params?.name === 'reading') {
+          readingEvents.push((msg.params.data ?? {}) as Record<string, unknown>);
+        }
         if (msg.params?.name === 'read_aloud') {
           readAloud = (msg.params.data ?? {}) as typeof readAloud;
           voice.readAloud.push({ ...readAloud });
@@ -724,7 +733,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           const at = preferences.findIndex((p) => p.id === params.input?.id);
           if (at >= 0) preferences.splice(at, 1);
           notify('changed', { what: 'approvals' });
-        } else if (params.tool === 'loops_state') value = { apps: loopApps, loops: heldLoops };
+        } else if (params.tool === 'reading_status') value = { rows: readingRows };
+        else if (params.tool === 'loops_state') value = { apps: loopApps, loops: heldLoops };
         else if (params.tool === 'loops_set') {
           const on = params.input?.on === true;
           loopCalls.push(`set ${String(params.input?.app)} ${on ? 'on' : 'off'}`);
@@ -797,6 +807,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     answers,
     permissionSets,
     loopCalls,
+    readingEvents,
+    setReading: (rows) => {
+      readingRows = rows;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'reading' },
+          }),
+        );
+      }
+    },
     get keyAttempts() {
       return keyCalls.attempts;
     },

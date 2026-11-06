@@ -124,6 +124,8 @@ shows a 48 px Bean, "Ask Scout anything about what is on your screen." and, when
 "Hold [key] to talk" with the real key from `talk.keyLabel`. Padding rule: anything bordered or
 filled that holds text keeps at least 8 px inside (12 to 16 px for cards and message tiles).
 
+**Asked from Home.** The optional `onAsk` prop subscribes to text Home sends as the person ("Ask Scout to fix it" sends "Fix text from pictures"); the bubble asks it like typed text and keeps the words on screen, with no snapshot. Empty text is ignored. The desktop panel opens the full chat when one arrives.
+
 **One answer, as a state machine.** `reply` is one of:
 
 ```mermaid

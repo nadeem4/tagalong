@@ -238,7 +238,7 @@ change works at once.
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
 Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in six pages:
 
-- **Overview**: whether Scout is ready and what it thinks with, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code).
+- **Overview**: whether Scout is ready and what it thinks with, what was spent today, and where things run (the brain's address and whether it is connected, each connected app's command or web address, Claude Code, and how Scout reads your screen: window text and text from pictures, each Working, Needs a fix or Not working, with "Ask Scout to fix it" when Windows lacks the text-recognition pack for your language).
   **Spend** shows the dollars spent today against the daily limit,
   as the brain reports them. The brain's limit is $5 a day unless `TAGALONG_DAILY_BUDGET_USD` sets
   another when the brain starts. A single

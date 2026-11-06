@@ -281,6 +281,20 @@ export interface HostBridge {
   forgetLoop(id: string): Promise<void>;
   /** Stop and wipe: every switch off, every loop and mail cursor deleted. */
   wipeLoops(): Promise<void>;
+  /**
+   * How Scout reads the screen on this PC, as the brain's reading_status answer (JSON text; read
+   * it with readingRowsOf). Changes arrive as `changed reading`. Rejects while the brain is away.
+   */
+  readingStatus(): Promise<string>;
+  /** Detects how Scout reads the screen again and tells the brain (Home does this on open). */
+  readingRecheck(): Promise<void>;
+  /** Opens Windows Settings, Language and region. */
+  openLanguageSettings(): Promise<void>;
+  /**
+   * Opens the companion and asks Scout `text` as if the person typed it (empty text is ignored).
+   * Scout's usual ask still gates anything it does.
+   */
+  askScout(text: string): Promise<void>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
   listPermissions(): Promise<PermissionRow[]>;
   /** Sets one tool to off, ask or auto; rejects when the brain refuses (a locked tool, say). */

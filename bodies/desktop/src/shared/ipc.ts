@@ -74,6 +74,9 @@ export const IPC = {
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
   settingsChangedEvent: 'tagalong:settings-changed-event',
   openBubble: 'tagalong:bubble:open',
+  // Home's "Ask Scout to fix it": main brings the bubble up and hands it the text to ask.
+  askScout: 'tagalong:bubble:ask',
+  panelAskEvent: 'tagalong:panel:ask',
   openHome: 'tagalong:home:open',
   homePageEvent: 'tagalong:home:page',
   speakSample: 'tagalong:voice:speak-sample',
@@ -118,6 +121,7 @@ export const IPC = {
   keyStatus: 'tagalong:key:status',
   keyOpenPage: 'tagalong:key:open-page',
   // How Scout reads the screen: detect again and tell the brain, or open Windows' language page.
+  readingStatus: 'tagalong:reading:status',
   readingRecheck: 'tagalong:reading:recheck',
   readingOpenLanguageSettings: 'tagalong:reading:open-language-settings',
   keySet: 'tagalong:key:set',
@@ -227,7 +231,10 @@ export interface BrowserFolder {
 /**
  * What the preload can supply of the HostBridge; renderer/src/full-bridge.ts adds the rest.
  */
-export type PreloadBridge = Omit<HostBridge, 'checkHealth' | 'openFix' | 'openLogs'>;
+export type PreloadBridge = Omit<
+  HostBridge,
+  'checkHealth' | 'openFix' | 'openLogs' | 'readingRecheck' | 'openLanguageSettings'
+>;
 
 /**
  * Host-only concerns, deliberately kept off `window.tagalong`.
@@ -280,6 +287,8 @@ export interface TagalongHostApi {
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;
+  /** Main hands the bubble text Home asks on the person's behalf (Ask Scout to fix it). */
+  onPanelAsk(handler: (text: string) => void): () => void;
   /** Main hands the bubble one line Scout says on its own (a wake). */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */

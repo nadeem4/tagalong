@@ -1,13 +1,15 @@
 /**
  * Home's "Where things run" card on Overview: the address the desktop dials the brain at (with
  * link state), each connected app by command or web address, and Claude Code as a local
- * process. Read-only; the brain owns all of it, so this reads again when it says changed.
+ * process, and how Scout reads this PC's screen (reading-rows.tsx). Read-only; the brain owns
+ * all of it, so this reads again when it says changed.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo } from '../shapes';
+import { readingRowsOf, type AppInfo, type ReadingRowView } from '../shapes';
 import { useHostBridge, type BrainLink } from '../host-bridge';
 import { STATUS_CHIP, STATUS_DOT, STATUS_WORDS } from './connection-row';
+import { ReadingRows } from './reading-rows';
 
 // Link states reuse the apps' dots; words say it too, so colour never carries it alone.
 const LINK: Record<BrainLink['status'], { words: string; dot: string; chip: string }> = {
@@ -33,6 +35,7 @@ export function WhereThingsRun() {
   const bridge = useHostBridge();
   const [link, setLink] = useState<BrainLink | null>(null);
   const [apps, setApps] = useState<AppInfo[]>([]);
+  const [reading, setReading] = useState<ReadingRowView[]>([]);
 
   const refresh = useCallback(() => {
     void bridge.brainLink().then(setLink, () => undefined);
@@ -43,10 +46,22 @@ export function WhereThingsRun() {
     );
   }, [bridge]);
 
+  const refreshReading = useCallback(() => {
+    // Offline there is nothing to read: no rows hide the group.
+    void bridge.readingStatus().then(
+      (json) => setReading(readingRowsOf(json)),
+      () => setReading([]),
+    );
+  }, [bridge]);
+
   useEffect(() => {
     refresh();
+    refreshReading();
+    // Look again at how this PC reads the screen: the person may have fixed it since.
+    void bridge.readingRecheck().catch(() => undefined);
     const stopBrain = bridge.onBrainChanged((what) => {
       if (what === 'link' || what === 'apps') refresh();
+      if (what === 'link' || what === 'reading') refreshReading();
     });
     const stopTurn = bridge.onTurnEvent((event) => {
       if (event.type === 'connections.changed') refresh();
@@ -55,7 +70,7 @@ export function WhereThingsRun() {
       stopBrain();
       stopTurn();
     };
-  }, [bridge, refresh]);
+  }, [bridge, refresh, refreshReading]);
 
   if (link === null) return null;
   const state = LINK[link.status];
@@ -94,6 +109,8 @@ export function WhereThingsRun() {
           </p>
         ))
       )}
+      <ReadingRows rows={reading} />
+
       <p className="home-card__row home-card__row--app">
         <span className="home-conn__initial" aria-hidden="true">
           C

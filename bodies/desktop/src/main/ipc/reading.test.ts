@@ -12,15 +12,29 @@ function setup() {
   const opened: string[] = [];
   const detect = vi.fn(async () => STATUS);
   const push = vi.fn();
+  const calls: string[] = [];
+  const brain = {
+    call: (tool: string) => {
+      calls.push(tool);
+      return Promise.resolve([{ type: 'text' as const, text: '{"rows":[]}' }]) as Promise<never>;
+    },
+  };
   registerReadingIpc(ipc.handle, {
+    brain,
     detect,
     push,
     openExternal: async (url) => void opened.push(url),
   });
-  return { ...ipc, opened, detect, push };
+  return { ...ipc, opened, detect, push, calls };
 }
 
 describe('registerReadingIpc', () => {
+  it('reading:status hands Home the brain reading_status answer as text', async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.readingStatus)).toBe('{"rows":[]}');
+    expect(calls).toEqual(['reading_status']);
+  });
+
   it('reading:recheck detects once and pushes what it found', async () => {
     const { invoke, detect, push } = setup();
     await invoke(IPC.readingRecheck);

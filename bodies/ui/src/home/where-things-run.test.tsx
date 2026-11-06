@@ -119,6 +119,40 @@ describe('WhereThingsRun', () => {
     expect(await screen.findByText(/node files-server\.js/)).toBeInTheDocument();
   });
 
+  describe('how Scout reads your screen', () => {
+    const OCR_ROW = {
+      capability: 'text-from-pictures',
+      engine: 'windows-ocr',
+      where: 'this-pc',
+      language: 'en-US',
+    };
+    const reading = (state: string) => JSON.stringify({ rows: [{ ...OCR_ROW, state }] });
+
+    it('shows the group when the brain has rows, and checks again on open', async () => {
+      const bridge = createFakeHostBridge({ reading: reading('needs-language-pack') });
+      renderCard(bridge);
+      expect(await screen.findByText('How Scout reads your screen')).toBeVisible();
+      expect(screen.getByText('Needs a fix')).toBeVisible();
+      expect(bridge.readingCalls).toContain('recheck');
+    });
+
+    it('has no group when there are no rows', async () => {
+      renderCard(createFakeHostBridge());
+      await card();
+      expect(screen.queryByText('How Scout reads your screen')).toBeNull();
+    });
+
+    it('refetches when changed reading arrives', async () => {
+      const bridge = createFakeHostBridge({ reading: reading('needs-language-pack') });
+      renderCard(bridge);
+      await screen.findByText('Needs a fix');
+      bridge.reading = reading('working');
+      act(() => bridge.emitChanged('reading'));
+      expect(await screen.findByText('Working')).toBeVisible();
+      expect(screen.queryByText('Needs a fix')).toBeNull();
+    });
+  });
+
   it('keeps a quiet note instead of apps while the brain is offline', async () => {
     renderCard(createFakeHostBridge({ brainLink: OFFLINE, apps: [FILES] }));
     const region = await card();
