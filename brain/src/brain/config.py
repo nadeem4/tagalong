@@ -31,6 +31,8 @@ DEFAULT_KEEP_ASKING_DAYS = 7
 DEFAULT_TOOL_PREVIEW_CHARS = 4000
 DEFAULT_JOB_STEPS_MAX_ENTRIES = 2000  # steps one job's log keeps
 DEFAULT_JOB_STEPS_MAX_BYTES = 1_000_000  # text bytes one job's log keeps
+DEFAULT_WORK_KEEP_DAYS = 30  # finished work is swept this many days after it ended
+DEFAULT_OUTPUTS_KEEP = 200  # stored long tool results kept, beyond those work still points at
 DEFAULT_RETRY_MAX = 3  # tries of a step that failed for a passing reason
 DEFAULT_RETRY_BACKOFF_S = (30, 120, 600)  # waits before each retry; the last repeats
 
@@ -47,6 +49,8 @@ class Config:
     reader_daily_usd: float = DEFAULT_READER_DAILY_USD
     loop_poll_s: int = DEFAULT_LOOP_POLL_S
     loop_stale_days: int = DEFAULT_LOOP_STALE_DAYS
+    work_keep_days: int = DEFAULT_WORK_KEEP_DAYS
+    outputs_keep: int = DEFAULT_OUTPUTS_KEEP
     retry_max: int = DEFAULT_RETRY_MAX
     retry_backoff_s: tuple[int, ...] = DEFAULT_RETRY_BACKOFF_S
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
@@ -97,6 +101,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         reader_daily_usd=_positive_usd(env, "TAGALONG_READER_DAILY_USD", DEFAULT_READER_DAILY_USD),
         loop_poll_s=_positive_int(env, "TAGALONG_LOOP_POLL_S", DEFAULT_LOOP_POLL_S),
         loop_stale_days=_positive_int(env, "TAGALONG_LOOP_STALE_DAYS", DEFAULT_LOOP_STALE_DAYS),
+        work_keep_days=_positive_int(env, "TAGALONG_WORK_KEEP_DAYS", DEFAULT_WORK_KEEP_DAYS),
+        outputs_keep=_positive_int(env, "TAGALONG_OUTPUTS_KEEP", DEFAULT_OUTPUTS_KEEP),
         retry_max=_positive_int(env, "TAGALONG_RETRY_MAX", DEFAULT_RETRY_MAX),
         retry_backoff_s=_backoff(env.get("TAGALONG_RETRY_BACKOFF_S")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),

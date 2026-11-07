@@ -36,9 +36,11 @@ from brain.config import (
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
     DEFAULT_OFFER_WINDOW_DAYS,
+    DEFAULT_OUTPUTS_KEEP,
     DEFAULT_TOOL_PREVIEW_CHARS,
     DEFAULT_TURN_TIMEOUT_S,
     DEFAULT_WAKES_PER_HOUR,
+    DEFAULT_WORK_KEEP_DAYS,
 )
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.expert_apps import ExpertApps
@@ -140,6 +142,8 @@ class Session:
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
         job_steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
+        work_keep_days: int = DEFAULT_WORK_KEEP_DAYS,
+        outputs_keep: int = DEFAULT_OUTPUTS_KEEP,
     ) -> None:
         self._model = model
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
@@ -164,9 +168,11 @@ class Session:
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
         # Long tool results and expert reports reach the model as a capped preview; the full text
-        # is stored masked for read_output. Old rows go at startup.
+        # is stored masked for read_output. At startup finished work goes first (with the reports
+        # it points at), then the oldest outputs nothing points at.
         outputs = OutputStore(memory, self.guards, preview_chars)
-        outputs.prune()
+        work.sweep(work_keep_days)
+        outputs.prune(outputs_keep)
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
         make_run = make_run or ExpertHosts()

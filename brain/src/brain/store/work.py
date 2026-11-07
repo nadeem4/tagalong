@@ -879,6 +879,40 @@ class WorkStore:
         self.db.execute(f"DELETE FROM work_loop WHERE work_id IN ({ids})", args)
         self.db.execute(f"DELETE FROM work WHERE {where}", args)
 
+    # ---- cleanup ----
+
+    def sweep(self, keep_days: int) -> int:
+        """Remove whole trees that ended more than `keep_days` ago; returns the roots removed.
+
+        A tree goes only when its root and every row under it has ended, so an open watch, a
+        repeating timer or a goal with a running child is never touched. One transaction per
+        root: a crash leaves whole trees, never half of one.
+        """
+        cutoff = utc_text(self.now() - timedelta(days=keep_days))
+        ended = "('done','failed','cancelled','expired')"
+        roots = self.db.execute(
+            f"SELECT id FROM work r WHERE r.parent_id IS NULL AND r.state IN {ended}"
+            " AND r.ended_at < ? AND NOT EXISTS ("
+            f"SELECT 1 FROM work c WHERE c.root_id = r.id AND c.state NOT IN {ended})",
+            (cutoff,),
+        ).fetchall()
+        for (root_id,) in roots:
+            with transaction(self.db):
+                ids = "SELECT id FROM work WHERE root_id = ?"
+                outputs = "SELECT detail_id FROM work WHERE root_id = ? AND detail_id IS NOT NULL"
+                self.db.execute(f"DELETE FROM tool_outputs WHERE id IN ({outputs})", (root_id,))
+                for table, column in (
+                    ("work_events", "work_id"),
+                    ("job_steps", "job_id"),
+                    ("work_job", "work_id"),
+                    ("work_timer", "work_id"),
+                    ("work_loop", "work_id"),
+                    ("work_ask", "work_id"),
+                ):
+                    self.db.execute(f"DELETE FROM {table} WHERE {column} IN ({ids})", (root_id,))
+                self.db.execute("DELETE FROM work WHERE root_id = ?", (root_id,))
+        return len(roots)
+
     # ---- what is waiting ----
 
     def unreported(self, kinds: Sequence[str] | None = None) -> list[WorkRow]:

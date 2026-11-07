@@ -1,8 +1,8 @@
 """Long tool output as a capped preview: the model sees the start and reads the rest by id.
 
 The cap is a transport guardrail in characters, not a presentation rule: what to say about a
-long result is Scout's call. The full text is stored masked (the newest 200 are kept) so a
-`read_output` page can never show a secret. Cuts are on code points, never mid-character.
+long result is Scout's call. The full text is stored masked (the newest TAGALONG_OUTPUTS_KEEP are
+kept) so a `read_output` page can never show a secret. Cuts are on code points, not mid-character.
 """
 
 import json
@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from brain.guards import Guards
 from brain.masking import mask_json
 from brain.memory import Memory
-
-KEEP_OUTPUTS = 200
 
 
 @dataclass(frozen=True)
@@ -54,7 +52,7 @@ class OutputStore:
             "chars": len(text),
         }
 
-    def prune(self, keep: int = KEEP_OUTPUTS) -> None:
+    def prune(self, keep: int) -> None:
         self._memory.prune_outputs(keep)
 
 
