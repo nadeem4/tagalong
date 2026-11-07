@@ -106,6 +106,8 @@ def _row(r: tuple) -> WorkRow:
 def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
     if kind == "goal" and to in ("done", "failed"):
         return via_close and frm in ("planned", "active", "blocked")
+    if kind == "goal" and frm == "failed":
+        return False  # a goal Scout closed as failed stays failed
     if to in _MOVES.get(frm, ()):
         return True
     if kind == "goal" and (frm, to) == ("blocked", "active"):

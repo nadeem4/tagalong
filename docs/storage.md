@@ -256,8 +256,7 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
 - Loop only: an ended loop goes back to `planned` (with a `reopened` event).
 - Rollup: a child that goes `blocked` or `failed` blocks its active goal; when no child is
   `blocked` or `failed` any more and one moves to `planned`, `active` or `cancelled`, the goal is
-  `active` again. A goal is never
-  failed automatically.
+  `active` again. A goal is never failed automatically.
 - Parent end: when a row ends, its open children end too: asks and questions `expired` ("parent
   ended: ..."), everything else `cancelled` ("goal closed"). Rows ended this way are marked
   reported, since Scout already knows the parent ended.

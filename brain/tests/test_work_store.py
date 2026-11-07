@@ -531,3 +531,10 @@ def test_search_survives_updates_of_other_fields(store):
     row = store.create("goal", "invoice thing")
     store.update(row.id, progress="going")
     assert [r.id for r in store.search("invoice")] == [row.id]
+
+
+def test_closed_goal_stays_failed(store):
+    goal = store.create("goal", "g", state="active")
+    store.close_goal(goal.id, "failed", "no luck")
+    with pytest.raises(TransitionRefused):
+        store.transition(goal.id, "cancelled", reason="x")
