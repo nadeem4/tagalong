@@ -52,4 +52,4 @@ def test_search_finds_memory_and_message(tmp_path):
     conversation.save_messages(db, [{"role": "user", "content": "marmalade toast"}], AT)
     hits = search.search(db, "marmalade", None, 10)
     assert {h.kind for h in hits} == {"about_you", "chat"}
-    assert all(h.ref for h in hits)
+    assert sorted(h.ref for h in hits) == ["1", "chat:1"]

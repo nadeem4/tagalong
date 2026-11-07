@@ -26,7 +26,7 @@ def _soul() -> str:
     return files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8").strip()
 
 
-# Headings live here, not in memory.KINDS: they are wording for the model, not storage.
+# Headings live here, not in store.memory.KINDS: they are wording for the model, not storage.
 _KNOW_HEADINGS = {
     "instruction": "Instructions from the owner",
     "about_you": "About the owner",

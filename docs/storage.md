@@ -29,15 +29,15 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 
-`Memory` keeps its public methods and each one calls the matching store function with its
-connection. The other tables (jobs, timers, approvals, preferences, permissions, offers) keep
-their SQL in `memory.py` until the slice that rewrites them moves them.
-
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
   `0001_memories` to `0017_loops_snooze`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
+
+`Memory` keeps its public methods and each one calls the matching store function with its
+connection. The other tables (jobs, timers, approvals, preferences, permissions, offers) keep
+their SQL in `memory.py` until the slice that rewrites them moves them.
 
 ## Tables and relations
 
@@ -445,8 +445,8 @@ A long tool result stored whole, so Scout can read the rest of a capped preview 
 | `text`  | TEXT             | The full masked text                   |
 | `at`    | TEXT             | When it was stored                     |
 
-- Written by: `outputs.py` `OutputStore.put` through `memory.py` `put_output`.
-- Read by: `memory.py` `get_output` (paged by `OutputStore.page`).
+- Written by: `outputs.py` `OutputStore.put` through `store/outputs.py` `put_output` (via `Memory`).
+- Read by: `store/outputs.py` `get_output` (via `Memory`), paged by `OutputStore.page`.
 - Retention: the newest 200 are kept; older rows are deleted at brain start (`prune_outputs`).
 - Masked: yes, before storing.
 

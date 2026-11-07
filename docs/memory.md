@@ -4,8 +4,9 @@
 
 The Python brain (`brain/`) keeps what Scout should remember across restarts in one SQLite file,
 `tagalong.db` in the data folder (`TAGALONG_HOME`). Code is in `brain/src/brain/memory.py` (the
-store object) and `store/memory.py` (the SQL and the kinds), `tools.py` (the model's tools) and `mind/prompt.py` (the "What you know" block). It also
-saves the chat and picks it up after a restart (see [brain.md](brain.md)).
+store object) and `store/memory.py` (the SQL and the kinds), `tools.py` (the model's tools) and
+`mind/prompt.py` (the "What you know" block). It also saves the chat and picks it up after a
+restart (see [brain.md](brain.md)).
 
 ### Kinds
 
