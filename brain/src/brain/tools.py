@@ -27,8 +27,9 @@ from brain.asks import Asks
 from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
+from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
-from brain.memory import JobPart, Memory
+from brain.memory import Memory
 from brain.outputs import OutputStore
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
@@ -250,7 +251,7 @@ def output_tools(outputs: OutputStore) -> list[tuple[ToolSpec, Handler]]:
 
 
 def timer_tools(
-    memory: Memory, timers: Timers, now: Callable[[], datetime]
+    memory: Memory, records: JobRecords, timers: Timers, now: Callable[[], datetime]
 ) -> list[tuple[ToolSpec, Handler]]:
     """Scout's timers. Times are stored in UTC; answers echo the owner's offset."""
 
@@ -298,11 +299,11 @@ def timer_tools(
         if job_id is not None:
             if not isinstance(job_id, str):
                 raise MemoryRefused("job must be a job id.")
-            job = memory.get_job(job_id)
+            job = records.get_job(job_id)
             if job is None:
                 raise MemoryRefused(f"no job with id {job_id}.")
-            if job.state != "running":
-                raise MemoryRefused(f"job {job_id} is not running ({job.state}).")
+            if job.state != "active":
+                raise MemoryRefused(f"job {job_id} is not running ({home_state(job.state)}).")
         timer = memory.add_timer(note, when, repeat * 60 if repeat else None, job_id)
         timers.changed()
         local = timer.next_at.astimezone(current.tzinfo)
@@ -416,7 +417,7 @@ def _part_row(part: JobPart) -> dict:
     return {
         "id": part.id,
         "expert": part.agent,
-        "state": part.state,
+        "state": home_state(part.state),
         "reason": part.reason,
         "progress": progress,
         "result": result,
@@ -483,8 +484,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
 
     async def close_job(args: dict) -> str:
         _need_text("close_job", args, "job")
+        outcome = args.get("outcome", "done")
+        if outcome not in ("done", "failed"):
+            return "outcome must be done or failed"
         try:
-            jobs.close(args["job"])
+            jobs.close(args["job"], outcome)
         except JobError as err:
             return str(err)
         return f"job {args['job']} closed"
@@ -521,6 +525,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         watched = jobs.with_activity()  # one query, not one per row
         for job in jobs.list():
             row = asdict(job)
+            row["state"] = home_state(job.state)
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
             row["title"] = job_title(job)
@@ -634,8 +639,16 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "close_job",
                 "Close a job when you judge its work done. It stays in the list with its last "
                 "outcome; a closed job takes no more parts. A job with a part still running "
-                "cannot be closed. A job you never close just stays open.",
-                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                "cannot be closed. A job you never close just stays open. Pass outcome failed "
+                "when the work did not get done; the default is done.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "job": job_id,
+                        "outcome": {"type": "string", "enum": ["done", "failed"]},
+                    },
+                    "required": ["job"],
+                },
                 scout,
                 effect="change",
                 default_mode="auto",

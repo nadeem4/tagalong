@@ -1,6 +1,6 @@
 """Jobs: Scout's hand-offs to Claude Code, from the folder check to the finished row.
 Owns the running ExpertRuns, asks the user to pick a mode (the hand-off ask), relays Claude
-Code's own permission and question prompts as turn-less asks, and keeps the jobs table current.
+Code's own permission and question prompts as turn-less asks, and keeps the job records current.
 It tells bodies through the injected notify (`changed: jobs`, `changed: job_activity`).
 """
 
@@ -15,6 +15,7 @@ from contextlib import suppress
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 
 from brain.approvals import Approvals
 from brain.asks import Answer, Asks
@@ -23,8 +24,9 @@ from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import AskCtx, Guards, Hook
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
+from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.memory import ActivityEntry, Job, JobPart, Memory
+from brain.memory import ActivityEntry, Memory
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
 from brain.protocol import ErrorCode, RpcError
@@ -32,6 +34,7 @@ from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
+from brain.store.work import TransitionRefused
 
 log = logging.getLogger("brain")
 
@@ -50,6 +53,9 @@ def _prefix(agent: str) -> str:
     for its asks still match; any other expert is keyed by its own id."""
     return AGENT if agent == "claude-acp" else agent
 
+
+# What an expert's run reports when it ends, in the words of a work row.
+_WORK_STATE = {"done": "done", "error": "failed", "stopped": "cancelled"}
 
 CANCEL = "cancel"
 HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
@@ -92,6 +98,7 @@ class JobId(str):
 class Jobs:
     def __init__(
         self,
+        records: JobRecords,
         memory: Memory,
         asks: Asks,
         notify: Callable[[str, dict], None],
@@ -120,7 +127,8 @@ class Jobs:
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
-        self._memory = memory
+        self._records = records  # the jobs themselves: goal and expert-call rows
+        self._memory = memory  # the steps log and timers; jobs are not kept here
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
         self._notify = notify
@@ -154,7 +162,24 @@ class Jobs:
         self._activity_trailing: dict[str, asyncio.Task] = {}
 
     def startup(self) -> None:
-        self._memory.stop_running_on_start()
+        """No job survives a brain restart: stop the leftovers, end each running part's log there
+        and drop their check-back timers."""
+        stopped = self._records.stop_running_on_start()
+        now = self._now().isoformat()
+        for job_id, part in stopped:
+            self._memory.save_activity(
+                job_id,
+                ActivityEntry(
+                    rev=self._memory.last_rev(job_id) + 1,
+                    seq=self._memory.max_seq(job_id) + 1,
+                    at=now,
+                    kind="end",
+                    text="# stopped",
+                    part=part,
+                ),
+            )
+        for job_id in dict.fromkeys(j for j, _ in stopped):
+            self._memory.delete_timers_for_job(job_id)
 
     def installed(self) -> list[InstalledExpert]:
         return self._experts()
@@ -165,10 +190,10 @@ class Jobs:
 
     def _earlier(self, job_id: str, folder: str, expert: str | None) -> Job:
         """The finished job a follow-up continues; the refusals are facts for the model."""
-        earlier = self._memory.get_job(job_id)
+        earlier = self._records.get_job(job_id)
         if earlier is None:
             raise JobError(f"no job {job_id}")
-        if earlier.state == "running":
+        if earlier.state == "active":
             raise JobError(f"job {job_id} is still running; send it a note instead")
         ran_on = earlier.parts[-1].agent
         if expert is not None and expert != ran_on:
@@ -256,7 +281,7 @@ class Jobs:
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         earlier_part = earlier.parts[-1] if earlier else None
         if job is not None:
-            existing = self._memory.get_job(job)
+            existing = self._records.get_job(job)
             if existing is None:
                 raise JobError(f"no job {job}")
             if existing.closed_at:
@@ -267,7 +292,7 @@ class Jobs:
         if not (path.is_absolute() and path.is_dir()):
             raise JobError(f"no folder at {folder}")
         if earlier is None and not fresh:
-            found = self._memory.last_part_for(chosen.id, str(path))
+            found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
         started = await self._start_part(
             job or uuid.uuid4().hex[:8],
@@ -282,9 +307,9 @@ class Jobs:
         )
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
-            self._memory.set_title(str(started), clean.strip())
+            self._records.set_title(str(started), clean.strip())
         if job is None:
-            saved = self._memory.get_job(str(started))
+            saved = self._records.get_job(str(started))
             started.title = job_title(saved) if saved else None
         return started
 
@@ -321,7 +346,7 @@ class Jobs:
         """The one seam that starts an expert run: a new job's first part, or (new_job False) a
         further part of an existing job."""
         running = [
-            (j, p) for j in self._memory.running_jobs() for p in j.parts if p.state == "running"
+            (j, p) for j in self._records.running_jobs() for p in j.parts if p.state == "active"
         ]
         if len(running) + self._starting >= self._max_running:
             names = ", ".join(f"{j.id} ({p.task[:40]})" for j, p in running)
@@ -396,15 +421,14 @@ class Jobs:
                     self._record_hand_off(chosen, path, task, "approved", "person", logged)
             if new_job:
                 parent = earlier.id if earlier else None
-                self._memory.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
+                self._records.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             else:
                 # Scout may have closed the job while the start awaited the expert or the card.
-                current = self._memory.get_job(job_id)
+                current = self._records.get_job(job_id)
                 if current is None or current.closed_at:
                     raise JobError(f"job {job_id} is closed; open a new job instead")
-                added = self._memory.add_part(job_id, chosen.id, task, str(path), _now(), part)
+                added = self._records.add_part(job_id, chosen.id, task, str(path), part)
                 assert added == part
-                self._memory.update_job(job_id, state="running", ended_at=None)
             self._runs.setdefault(job_id, {})[part] = run
             self._activity.setdefault(job_id, {})[part] = JobActivity(
                 job_id,
@@ -431,7 +455,7 @@ class Jobs:
                 if isinstance(exc, Exception):
                     raise JobError(message) from exc
                 raise
-            self._memory.update_part(job_id, part, session_id=run.session_id)
+            self._records.update_part(job_id, part, session_id=run.session_id)
             return self._started(job_id, part, earlier_part, run)
         finally:
             if not new_job:
@@ -444,7 +468,7 @@ class Jobs:
     def _reserve_part(self, job_id: str) -> str:
         """The next part id, promised to this start so a concurrent one cannot take it."""
         taken = self._reserved.setdefault(job_id, set())
-        stored = self._memory.next_part_id(job_id)
+        stored = self._records.next_part_id(job_id)
         top = max([int(stored[1:]), *(int(r[1:]) + 1 for r in taken)])
         part = f"p{top}"
         taken.add(part)
@@ -521,20 +545,24 @@ class Jobs:
             return JobId(job_id, "continued", None, parent, part)
         return JobId(job_id, "fresh", run.fresh_reason, parent, part)
 
-    def close(self, job_id: str) -> None:
-        """Scout judges the work done. A job with a running part cannot be closed."""
-        job = self._memory.get_job(job_id)
+    def close(self, job_id: str, outcome: Literal["done", "failed"] = "done") -> None:
+        """Scout judges the work finished, as done or as failed. A job with a running part cannot
+        be closed."""
+        job = self._records.get_job(job_id)
         if job is None:
             raise JobError(f"no job {job_id}")
         if job.closed_at:
             raise JobError(f"job {job_id} is already closed")
-        running = [p.id for p in job.parts if p.state == "running"]
+        running = [p.id for p in job.parts if p.state == "active"]
         if running:
             raise JobError(
                 f"job {job_id} still running: {', '.join(running)}",
                 {"running_parts": running},
             )
-        self._memory.close_job(job_id, _now())
+        try:
+            self._records.close_job(job_id, outcome)
+        except TransitionRefused as err:
+            raise JobError(f"job {job_id} cannot be closed: {err}") from err
         self._changed()
 
     def tell(self, job_id: str, note: str, part: str | None = None) -> None:
@@ -567,7 +595,7 @@ class Jobs:
     def activity_page(self, job_id: str, after_rev: int) -> dict:
         """A job's steps after the cursor (rows are masked when written); `rev` is the cursor
         to pass next time. `watch` is filled by the watch feature later."""
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         if job is None:
             raise JobError(f"no job {job_id}")
         rows = self._memory.activity_after(job_id, after_rev, PAGE_LIMIT + 1)
@@ -576,7 +604,7 @@ class Jobs:
         return {
             "job": job_id,
             "title": job.title,
-            "state": job.state,
+            "state": home_state(job.state),
             "started_at": job.started_at,
             "ended_at": job.ended_at,
             "closed_at": job.closed_at,
@@ -585,7 +613,7 @@ class Jobs:
                 {
                     "id": p.id,
                     "expert": p.agent,
-                    "state": p.state,
+                    "state": home_state(p.state),
                     "reason": p.reason,
                     "folder": p.folder,
                     "started_at": p.started_at,
@@ -601,7 +629,7 @@ class Jobs:
 
     def part_report(self, job_id: str, part: str) -> str | None:
         """One part's report for the job page's Reports tab (masked when it was saved)."""
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         if job is None:
             raise JobError(f"no job {job_id}")
         for p in job.parts:
@@ -612,26 +640,26 @@ class Jobs:
     def set_watch(self, job_id: str, items: object) -> list[dict]:
         """Replace Scout's watch list for a job. A bad shape is refused with a plain line and the
         old list stays; text is masked before it is saved, like anything model-written."""
-        if self._memory.get_job(job_id) is None:
+        if self._records.get_job(job_id) is None:
             raise JobError(f"no job {job_id}")
         clean = _check_watch(items)
         clean = mask_json(self._guards, "job_watch", clean)
-        self._memory.set_watch(job_id, clean)
+        self._records.set_watch(job_id, clean)
         self._activity_changed(job_id)  # an open job page redraws its header
         return clean
 
     def set_result(self, job_id: str, text: str) -> None:
         """Store Scout's own result for the job (masked, replaceable, even after close). No
         template or length rule: only the storage cap."""
-        if self._memory.get_job(job_id) is None:
+        if self._records.get_job(job_id) is None:
             raise JobError(f"no job {job_id}")
-        self._memory.set_result(job_id, mask_json(self._guards, "job_result", text))
+        self._records.set_result(job_id, mask_json(self._guards, "job_result", text))
         self._activity_changed(job_id)  # an open job page redraws its overview
 
     def record_step(self, job_id: str, source: str, text: str, status: str) -> None:
         """A step Scout took itself for the job (its own tool or a connected app) joins the
         timeline beside the experts' steps: what was tried and how it went, never the result."""
-        if self._memory.get_job(job_id) is None:
+        if self._records.get_job(job_id) is None:
             return
         steps = self._scout_steps.get(job_id)
         if steps is None:
@@ -647,7 +675,7 @@ class Jobs:
 
     def _part_fact(self, job_id: str, part: str) -> dict[str, str]:
         """Names the part in a wake, but only when the job has several and it matters which."""
-        parts = self._memory.parts_of(job_id)
+        parts = self._records.parts_of(job_id)
         found = next((p for p in parts if p.id == part), None)
         return {"part": part, "expert": found.agent} if found and len(parts) > 1 else {}
 
@@ -685,9 +713,9 @@ class Jobs:
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its
         stored log (so a job from before a restart has one too) and masked once more."""
-        summary = activity_summary(self._memory, job_id, self._now())
+        summary = activity_summary(self._memory, self._records, job_id, self._now())
         facts = {"activity": mask_json(self._guards, "job_summary", summary)}
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         if job is not None and job.watch:  # already masked when saved
             facts["watching"] = render_watch(job.watch)
         return facts
@@ -705,7 +733,7 @@ class Jobs:
         """The step each running job is on now, for the bubble's one live line."""
         names = {e.id: e.name for e in self._experts()}
         out = []
-        for job in self._memory.running_jobs():
+        for job in self._records.running_jobs():
             for part in job.parts:
                 activity = self._activity.get(job.id, {}).get(part.id)
                 step = activity.running_step() if activity else None
@@ -722,7 +750,7 @@ class Jobs:
         return out
 
     def list(self) -> list[Job]:
-        return self._memory.list_jobs(LIST_LIMIT)
+        return self._records.list_jobs(LIST_LIMIT)
 
     def _running_parts(self, job_id: str, part: str | None = None) -> dict[str, ExpertRun]:
         """The job's running parts, or just the named one; a plain refusal when none."""
@@ -731,7 +759,7 @@ class Jobs:
             runs = {part: runs[part]} if part in runs else {}
         if runs:
             return runs
-        if self._memory.get_job(job_id) is None:
+        if self._records.get_job(job_id) is None:
             raise JobError(f"no job {job_id}")
         raise JobError(f"job {job_id} is not running")
 
@@ -776,7 +804,7 @@ class Jobs:
     ) -> str | None:
         by_name = {o.name: o for o in request.options}
         once = next((o for o in request.options if o.kind == "allow_once"), None)
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         folder = job.folder if job is not None else ""
         agent = _prefix(self._agent_of(job, part))
         tool = f"{agent}:{request.title}"
@@ -837,13 +865,13 @@ class Jobs:
 
     def _offer(self, job_id: str, request: PermissionRequest, part: str) -> None:
         """A person allowed this: Scout may offer to approve the whole folder's kind of ask."""
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         if self._offers is not None and job is not None:
             agent = _prefix(self._agent_of(job, part))
             self._offers.consider(f"{agent}:{job.folder}", AGENT, f"{agent}:{request.title}")
 
     def _record(self, job_id: str, request: PermissionRequest, outcome: str, part: str) -> None:
-        job = self._memory.get_job(job_id)
+        job = self._records.get_job(job_id)
         if self._approvals is None or job is None:
             return
         agent = _prefix(self._agent_of(job, part))
@@ -892,7 +920,7 @@ class Jobs:
 
     async def _progress(self, job_id: str, text: str, part: str = "p1") -> None:
         masked = mask_json(self._guards, "job_progress", text)
-        self._memory.update_part(job_id, part, progress=masked)
+        self._records.update_part(job_id, part, progress=masked)
         now = self._clock()
         if now - self._progress_sent.get(job_id, -PROGRESS_NOTIFY_S) >= PROGRESS_NOTIFY_S:
             self._progress_sent[job_id] = now
@@ -941,15 +969,13 @@ class Jobs:
         self, job_id: str, part: str, state: str, reason: str, report: str | None
     ) -> Job | None:
         """Record how a part ended. The job takes that outcome once no part is still running."""
-        now = _now()
-        self._memory.update_part(
-            job_id, part, state=state, reason=reason, report=report, ended_at=now
-        )
-        job = self._memory.get_job(job_id)
-        if job is not None and not any(p.state == "running" for p in job.parts):
-            self._memory.update_job(job_id, state=state, ended_at=now)
-            job = self._memory.get_job(job_id)
-        return job
+        try:
+            self._records.update_part(
+                job_id, part, state=_WORK_STATE[state], reason=reason or state, report=report
+            )
+        except TransitionRefused:
+            pass  # the part had already ended: another writer got there first
+        return self._records.get_job(job_id)
 
     def _forget(self, job_id: str, part: str) -> bool:
         """Drop a finished part's run, activity and asks. True when the job has none left running:
@@ -988,10 +1014,6 @@ class Jobs:
             outcome = self._on_finished(job)
             if inspect.isawaitable(outcome):
                 await outcome
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat()
 
 
 def _check_watch(items: object) -> list[dict]:
@@ -1042,16 +1064,17 @@ def job_note(
         f"Title: {job_title(job)}",
         f"Task: {job.task}",
         f"Folder: {job.folder}",
-        f"State: {job.state}",
+        f"State: {home_state(job.state)}",
     ]
     many = len(job.parts) > 1
     ended = [p for p in job.parts if p.ended_at]
-    last = max(ended, key=lambda p: p.ended_at) if ended else None
+    last = max(reversed(ended), key=lambda p: p.ended_at) if ended else None  # ties: later part
     if many:  # facts only: which part ended last, and where each stands
         if last:
             lines.append(f"Part: {last.id}")
         lines.append(
-            "Parts: " + "; ".join(f"{p.id} {p.agent} {p.folder} {p.state}" for p in job.parts)
+            "Parts: "
+            + "; ".join(f"{p.id} {p.agent} {p.folder} {home_state(p.state)}" for p in job.parts)
         )
     for part in job.parts:
         tag = f" ({part.id}, {part.agent}, {part.folder})" if many else ""

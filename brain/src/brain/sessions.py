@@ -41,10 +41,11 @@ from brain.config import (
 from brain.events import EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
+from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
 from brain.loops.service import LoopService
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
-from brain.memory import Job, Memory
+from brain.memory import Memory
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
@@ -66,6 +67,7 @@ from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.store.conversation import compaction_text
+from brain.store.work import WorkStore
 from brain.timers import Timers
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
@@ -176,7 +178,13 @@ class Session:
         offer = Offers(
             model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
         )
+        self.records = JobRecords(
+            WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text)),
+            memory.db,
+            now,
+        )
         self.jobs = Jobs(
+            self.records,
             memory,
             self._asks,
             notify,
@@ -198,7 +206,7 @@ class Session:
         )
         self.jobs.startup()  # rows left running by a dead brain become stopped
         timers = self.timers = Timers(
-            memory, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
+            memory, self.records, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
         )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
@@ -206,7 +214,7 @@ class Session:
             + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
-            + timer_tools(memory, timers, now)
+            + timer_tools(memory, self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
@@ -282,7 +290,7 @@ class Session:
         # whether it uses its system voice. Kept across a reconnect; the body also resends it.
         self._read_aloud: dict[str, ReadAloudData] = {}
         bodies.on_connect = self._on_connect
-        for job in memory.unreported_jobs():  # ended while the brain was down, or never told
+        for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
         timers.start()
 
@@ -458,7 +466,7 @@ class Session:
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
             Event("job_ended", {"report": self.jobs.note(job)}, key=job.id),
-            on_start=lambda: self._memory.mark_reported(job.id),
+            on_start=lambda: self.records.mark_reported(job.id),
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
@@ -511,7 +519,7 @@ class Session:
                 job = json.loads(result or "").get("job")
             except (ValueError, AttributeError):
                 job = None
-        if isinstance(job, str) and self._memory.get_job(job) is not None:
+        if isinstance(job, str) and self.records.get_job(job) is not None:
             return job
         return None
 

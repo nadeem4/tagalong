@@ -27,6 +27,7 @@ tagalong/
     ts/                             # @tagalong/contract: zod schemas for contract v1
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
                                     # config.py, bodies.py, server.py, apps.py, app_tools.py,
+                                    # job_records.py (jobs as work rows),
                                     # main.py and cli.py (the `tagalong` command; see docs/brain.md);
                                     # store/ opens tagalong.db and runs its numbered migrations
                                     # (db.py, search.py, conversation.py, memory.py, connections.py,

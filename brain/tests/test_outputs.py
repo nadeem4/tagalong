@@ -4,6 +4,7 @@ Fakes only: a throwaway Memory and a Masker over a made-up secret.
 """
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 
@@ -99,6 +100,24 @@ def test_prune_keeps_the_newest(store):
         store.page(ids[0], 0)
     assert store.page(ids[4], 0)["chars"] == 21
     assert store.page(ids[3], 0)["chars"] == 21
+
+
+def test_prune_spares_work_detail(mem):
+    from brain.job_records import JobRecords
+    from brain.store.work import WorkStore
+
+    def now():
+        return datetime(2026, 1, 1, tzinfo=UTC)
+
+    records = JobRecords(WorkStore(mem.db, now), mem.db, now)
+    records.add_job("j1", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("j1", "p1", state="done", reason="done", report="w" * 5000)
+    kept = records.work.get("j1.p1").detail_id
+    mem.put_output("other", "t", "x" * 20)
+    mem.put_output("newer", "t", "y" * 20)
+    mem.prune_outputs(keep=1)
+    assert mem.get_output(kept) == "w" * 5000  # a job report is still needed by its row
+    assert mem.get_output("other") is None and mem.get_output("newer") is not None
 
 
 def test_two_calls_make_two_ids(store):

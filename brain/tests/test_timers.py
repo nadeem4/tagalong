@@ -7,6 +7,8 @@ next_at to the whole second.
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+from job_rows import records_for
+
 from brain.memory import Memory
 from brain.timers import Timers
 
@@ -21,7 +23,7 @@ class Clock:
         return self.at
 
 
-def make(memory=None, clock=None, job_facts=None):
+def make(memory=None, clock=None, job_facts=None, records=None):
     memory = memory or Memory(":memory:")
     clock = clock or Clock()
     events = []
@@ -32,7 +34,8 @@ def make(memory=None, clock=None, job_facts=None):
         starts.append(on_start)
 
     kw = {"job_facts": job_facts} if job_facts else {}
-    return Timers(memory, emit, clock, **kw), memory, clock, events, starts
+    records = records or records_for(memory, clock)
+    return Timers(memory, records, emit, clock, **kw), memory, clock, events, starts
 
 
 def _timer(mem, id):
@@ -130,7 +133,9 @@ def test_two_due_timers_emit_in_due_order():
 async def test_arming_schedules_the_soonest_timer():
     mem = Memory(":memory:")
     events = []
-    timers = Timers(mem, lambda e, **kw: events.append(e), lambda: datetime.now(UTC))
+    timers = Timers(
+        mem, records_for(mem), lambda e, **kw: events.append(e), lambda: datetime.now(UTC)
+    )
     mem.add_timer("soon", datetime.now(UTC) + timedelta(seconds=1.2))
     timers.start()
     assert events == []
@@ -141,7 +146,9 @@ async def test_arming_schedules_the_soonest_timer():
 async def test_changed_rearms_for_a_new_sooner_timer():
     mem = Memory(":memory:")
     events = []
-    timers = Timers(mem, lambda e, **kw: events.append(e), lambda: datetime.now(UTC))
+    timers = Timers(
+        mem, records_for(mem), lambda e, **kw: events.append(e), lambda: datetime.now(UTC)
+    )
     mem.add_timer("far", datetime.now(UTC) + timedelta(hours=1))
     timers.start()
     mem.add_timer("soon", datetime.now(UTC) + timedelta(seconds=1.2))
@@ -158,7 +165,7 @@ def test_a_job_timer_wake_has_job_state_and_wake_facts():
         return {"activity": "2 steps", "watching": "- tests pass"}
 
     timers, mem, _c, events, _s = make(job_facts=job_facts)
-    mem.add_job("j1", "a", "t", "f", "m")
+    timers._records.add_job("j1", "a", "t", "f", "m")
     t = mem.add_timer("check back", T0 - timedelta(seconds=1), job_id="j1")
     timers.fire_due()
     assert events[0].facts == {
@@ -182,7 +189,7 @@ def test_a_plain_timer_wake_facts_are_unchanged():
 
 def test_a_repeating_job_timer_does_not_fire_after_its_job_ends():
     timers, mem, clock, events, _s = make()
-    mem.add_job("j1", "a", "t", "f", "m")
+    timers._records.add_job("j1", "a", "t", "f", "m")
     mem.add_timer("again", T0 + timedelta(minutes=5), repeat_s=300, job_id="j1")
     mem.delete_timers_for_job("j1")  # what Jobs._end does
     clock.at = T0 + timedelta(minutes=6)
