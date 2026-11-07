@@ -65,11 +65,12 @@ from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Too
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
 from brain.reading_tools import reading_home_tools
+from brain.retry import classify, safe_to_retry
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.store.conversation import compaction_text
-from brain.store.work import WorkStore
+from brain.store.work import TransitionRefused, WorkStore
 from brain.timers import Timers
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
@@ -95,6 +96,7 @@ JOB_TOOLS = frozenset({"hand_off", "tell_expert", "stop_job", "close_job", "set_
 # Job bookkeeping Scout does about the job, not work for it: never on the timeline.
 BOOKKEEPING_TOOLS = frozenset({"set_job_result", "watch_job", "work_status"})
 _ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked, then clipped
+_SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
 
@@ -510,7 +512,13 @@ class Session:
         self.scheduler.emit(event, on_start=started, **hooks)
 
     def _on_tool_call(
-        self, call: Call, spec: ToolSpec, kind: str, status: str, result: str | None
+        self,
+        call: Call,
+        spec: ToolSpec,
+        kind: str,
+        status: str,
+        result: str | None,
+        error: BaseException | None = None,
     ) -> None:
         """Put a tool or app call of a job-bound turn on that job's timeline. Which calls count
         is mechanical: every one, except the job bookkeeping tools."""
@@ -532,6 +540,40 @@ class Session:
         args = json.dumps(call.input, ensure_ascii=False, default=str)[:_ARGS_CAP]
         text = f"{label} {args}" if call.input else label
         self.jobs.record_step(job, source, text, _STEP_STATUS[status])
+        if spec.name not in JOB_TOOLS:  # those manage the goal itself; they are not steps of it
+            self._record_tool_row(job, call, spec, status, result, error)
+
+    def _record_tool_row(
+        self,
+        job: str,
+        call: Call,
+        spec: ToolSpec,
+        status: str,
+        result: str | None,
+        error: BaseException | None,
+    ) -> None:
+        """A goal's tool call becomes a `tool_call` row: done with its result's start, or failed
+        through the retry rule. A refused call never ran, so it leaves no row."""
+        if status == "refused":
+            return
+        work = self.records.work
+        payload = mask_json(self.guards, "work", {"name": call.name, "input": call.input})
+        try:
+            row = work.create(
+                "tool_call",
+                call.name,
+                parent_id=job,
+                state="active",
+                input=payload,
+                safe_to_retry=safe_to_retry(spec),
+            )
+            if status == "ok":
+                work.update(row.id, summary=(result or "")[:_SUMMARY_CAP])
+                work.transition(row.id, "done", reason="ok")
+            else:
+                work.fail(row.id, classify(error or RuntimeError()), str(error or "failed"))
+        except TransitionRefused:
+            return  # the goal ended meanwhile: nothing to record against
 
     def _job_named(self, call: Call, status: str, result: str | None) -> str | None:
         """The job a job tool worked on: the one in its arguments, or for a new hand-off the

@@ -2326,6 +2326,32 @@ async def test_args_are_masked_in_the_entry():
     assert "fake-token-12345678" not in step.text and "[secret]" in step.text
 
 
+def tool_rows(memory, job_id="j1"):
+    return [r for r in records_for(memory).work.children(job_id) if r.kind == "tool_call"]
+
+
+async def test_goal_turn_tool_call_becomes_row():
+    session, memory = await wake_with([tool_use("recall", query="x")])
+    [row] = tool_rows(memory)
+    assert (row.state, row.input) == ("done", {"name": "recall", "input": {"query": "x"}})
+    assert row.summary and len(row.summary) <= 300
+    assert row.safe_to_retry  # recall only reads
+
+
+async def test_goal_turn_failed_tool_call_row_fails_and_keeps_the_error():
+    session, memory = await wake_with(
+        [tool_use("files__list", path="C:/x")], app=AppLike(fail=True)
+    )
+    [row] = tool_rows(memory)
+    assert (row.state, row.error_kind, row.last_error) == ("failed", "permanent", "app down")
+    assert records_for(memory).work.get("j1").state == "blocked"  # a given-up step holds the goal
+
+
+async def test_bookkeeping_tools_leave_no_work_rows():
+    session, memory = await wake_with([tool_use("list_jobs", "a"), tool_use("work_status", "b")])
+    assert tool_rows(memory) == []
+
+
 async def test_bookkeeping_tools_are_not_recorded():
     session, memory = await wake_with(
         [

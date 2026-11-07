@@ -187,13 +187,15 @@ class Toolbox:
         offers: Offers | None = None,
         guards: Guards | None = None,
         owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
-        on_call: Callable[[Call, ToolSpec, str, str, str | None], None] | None = None,
+        on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
+        | None = None,
         outputs: OutputStore | None = None,
     ) -> None:
         # Long text results reach the model as a capped preview; None leaves them whole.
         self._outputs = outputs
         # Told after every call of a known tool: (call, spec, source kind, "ok" | "failed" |
-        # "refused", the text result when it ran). Never allowed to break the call.
+        # "refused", the text result when it ran, the exception when it failed). Never allowed
+        # to break the call.
         self._on_call = on_call
         self.sources = sources  # brain source first, then the body and app sources
         self._modes = modes  # stored per-tool choices, read on every call
@@ -354,9 +356,10 @@ class Toolbox:
         found: list = []  # [spec, source kind, ran?] once a servable tool is matched
         try:
             out = await self._run(call, caller, found, job_id)
-        except Exception:
+        except Exception as err:
             if found:
-                self._report(call, found[0], found[1], "failed" if found[2] else "refused", None)
+                status = "failed" if found[2] else "refused"
+                self._report(call, found[0], found[1], status, None, err)
             raise
         if found:
             self._report(call, found[0], found[1], "ok", out if isinstance(out, str) else None)
@@ -372,12 +375,18 @@ class Toolbox:
         return out
 
     def _report(
-        self, call: Call, spec: ToolSpec, kind: str, status: str, result: str | None
+        self,
+        call: Call,
+        spec: ToolSpec,
+        kind: str,
+        status: str,
+        result: str | None,
+        error: BaseException | None = None,
     ) -> None:
         if self._on_call is None:
             return
         try:
-            self._on_call(call, spec, kind, status, result)
+            self._on_call(call, spec, kind, status, result, error)
         except Exception:
             log.exception("on_call hook failed")
 
