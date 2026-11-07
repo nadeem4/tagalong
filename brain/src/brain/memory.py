@@ -23,8 +23,12 @@ class Memory:
         self,
         path: Path | str,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
+        mask: Callable[[str], str] = lambda text: text,
     ):
         self._now = now
+        # Memory text reaches disk masked. The brain builds Memory before the secrets it must
+        # hide are known, so the session sets this to the save guard's mask once it has one.
+        self.mask = mask
         self._db = open_db(path)
 
     @property
@@ -59,7 +63,8 @@ class Memory:
         connections.remove_app(self._db, app_id)
 
     def remember(self, kind: str, text: str, replaces: int | None = None) -> Item:
-        return memory_store.remember(self._db, kind, text, replaces, self._now().isoformat())
+        at = self._now().isoformat()
+        return memory_store.remember(self._db, kind, self.mask(text), replaces, at)
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
@@ -71,7 +76,7 @@ class Memory:
         return memory_store.always_loaded(self._db)
 
     def add_summary(self, text: str) -> Item:
-        return memory_store.add_summary(self._db, text, self._now().isoformat())
+        return memory_store.add_summary(self._db, self.mask(text), self._now().isoformat())
 
     def save_messages(self, messages: list[dict]) -> None:
         conversation.save_messages(self._db, messages, self._now().isoformat())

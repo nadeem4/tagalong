@@ -167,6 +167,7 @@ class Session:
         self.guards.add(wake_caps(wakes_per_hour))
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
+        memory.mask = lambda text: mask_json(self.guards, "memory", text)
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
         # it points at), then the oldest outputs nothing points at.

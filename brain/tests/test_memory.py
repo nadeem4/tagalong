@@ -344,6 +344,52 @@ def test_add_summary_is_search_only_kind(mem):
     assert [h.kind for h in mem.search("tea")] == ["summary"]
 
 
+# ---- layers and masking on save (S7) ----
+
+_LAYER_COLUMNS = (
+    "layer, period, span_start, span_end, source_msg_from, source_msg_to, source_work_id"
+)
+
+
+def _layers(m, kind):
+    sql = f"SELECT {_LAYER_COLUMNS} FROM memories WHERE kind=?"
+    return [tuple(r) for r in m.db.execute(sql, (kind,))]
+
+
+def test_memory_layers_migrated(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    migrate(db, upto=load_migrations()[-1].number - 1)  # the schema before the layers
+    at = "2026-01-02T03:04:05+00:00"
+    for kind in ("instruction", "about_you", "project", "summary"):
+        db.execute(
+            "INSERT INTO memories(kind, text, created_at, updated_at) VALUES (?, 'x', ?, ?)",
+            (kind, at, at),
+        )
+    db.close()
+    m = Memory(path)
+    for kind in ("instruction", "about_you", "project"):
+        assert _layers(m, kind) == [("core", None, None, None, None, None, None)]
+    assert _layers(m, "summary") == [("episodic", "day", at, at, None, None, None)]
+    assert [i.kind for i in m.list_items(10)].count("summary") == 1  # Home's list is stable
+    m.close()
+
+
+def test_summary_is_episodic_day(mem):
+    item = mem.add_summary("We talked about tea")
+    layer, period, start, end, *_ = _layers(mem, "summary")[0]
+    assert (layer, period) == ("episodic", "day")
+    assert start == end == item.created_at
+
+
+def test_remember_masks_secret(tmp_path):
+    m = Memory(tmp_path / "t.db", mask=lambda t: t.replace("sk-fake-123", "[secret]"))
+    assert m.remember("about_you", "My key is sk-fake-123").text == "My key is [secret]"
+    assert m.add_summary("Pasted sk-fake-123 once").text == "Pasted [secret] once"
+    assert not [i for i in m.list_items(10) if "sk-fake-123" in i.text]
+    m.close()
+
+
 def test_compaction_text_reads_content():
     assert compaction_text({"type": "compaction", "content": "sum"}) == "sum"
     assert compaction_text({"type": "compaction", "content": None}) == ""
