@@ -26,14 +26,16 @@ connection from `store.db.open_db`; nothing else opens the file.
   `load_messages`).
 - `store/memory.py`: owns `memories` (`remember`, `forget`, `list_items`, `always_loaded`,
   `add_summary`), with the kinds table, `Item` and `MemoryRefused`.
-- `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`).
+- `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`,
+  the mail switch `set_reads_mail` and `reads_mail_apps`) and `app_cursors` (`cursor`, `set_cursor`,
+  `clear_mail`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/work.py`: `WorkStore` over the `work`, `work_events` and `work_fts` tables: create, the
   state machine, rollup, retry, due queries, search and the resume scan. Jobs use it through
   `job_records.py` (S2a); the other areas move over in later slices.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0019_jobs_to_work`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0022_loops_to_work`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -55,8 +57,8 @@ erDiagram
     work ||--o| work_timer : "timer and watch rows"
     work ||--o{ approvals : "job_id, optional"
     preferences ||--o{ approvals : "preference_id"
-    loops ||--o{ loop_surfaced : "loop_id"
-    apps ||--o{ loop_cursor : "app_id, with key prefixes"
+    work ||--o| work_loop : "loop rows"
+    apps ||--o{ app_cursors : "app_id"
     memories ||--|| memories_fts : "triggers"
     messages ||--|| messages_fts : "triggers"
 
@@ -89,17 +91,14 @@ erDiagram
     preferences {
         int id PK
     }
-    loops {
-        text id PK
+    work_loop {
+        text work_id PK
         text source
         text ref
     }
-    loop_surfaced {
-        text loop_id PK
-        text anchor PK
-    }
-    loop_cursor {
+    app_cursors {
         text app_id PK
+        text stream PK
     }
     apps {
         text id PK
@@ -421,61 +420,69 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
   watches once, as a `watches_paused` event, and the person switches them on.
 - Masked: yes, the title and a long note, like all work text.
 
-### loops
+### work_loop
 
-Things left open that Scout found in mail: a reply owed, a reply awaited.
+Things left open that Scout found in mail: a reply owed, a reply awaited. The loop itself is a
+`loop` row in `work`, with the loop id as its id. `title` is the short title, `due_at` the real
+deadline, `created_at` when it was found and `updated_at` when it last changed (the stale clock).
+A loop's status is not stored; Home and the triggers get it from the row:
+
+| Work state  | Loop status | Notes                                                        |
+| ----------- | ----------- | ------------------------------------------------------------ |
+| `planned`   | `held`      | `snoozed` while `snoozed_until` is set (Later)               |
+| `done`      | `done`      |                                                              |
+| `cancelled` | `dropped`   |                                                              |
+| `expired`   | `stale`     | `end_reason` "went quiet"                                    |
+
+There is no `surfaced` status: when a loop comes up it gets a `surfaced` event.
 
 | Column          | Type             | Meaning                                                          |
 | --------------- | ---------------- | ---------------------------------------------------------------- |
-| `id`            | TEXT PRIMARY KEY | Loop id                                                          |
+| `work_id`       | TEXT PRIMARY KEY | The `loop` row                                                   |
 | `source`        | TEXT             | Which source it came from, such as the Gmail app id              |
 | `ref`           | TEXT             | The source's own id (a thread); `UNIQUE(source, ref)`            |
-| `title`         | TEXT             | Short title                                                      |
 | `asks`          | TEXT             | What is being asked                                              |
 | `direction`     | TEXT             | `i_owe` or `they_owe`                                            |
 | `people`        | TEXT             | JSON list of names                                               |
-| `due`           | TEXT             | The real deadline, if any                                        |
 | `quiet_after`   | TEXT             | When silence starts to matter                                    |
 | `anchors`       | TEXT             | JSON list of things that make it relevant (a project, a person)  |
-| `status`        | TEXT             | `held`, `surfaced`, `snoozed`, `done`, `dropped` or `stale`      |
-| `history`       | TEXT             | JSON list of what happened to it                                 |
-| `created`       | TEXT             | When it was found                                                |
-| `updated`       | TEXT             | When it last changed                                             |
-| `snoozed_until` | TEXT             | When a snoozed loop (Later) comes back; `due` stays the deadline |
+| `snoozed_until` | TEXT             | When a snoozed loop (Later) comes back; `due_at` stays the deadline |
 
-- Written by: `loops/store.py` `LoopStore` (`save`, `set_status`, `snooze`, `add_history`),
-  driven by `loops/service.py` and Scout's loop tools.
+- Events on the loop row: `history` (`note`, and `mail_at` when the mail itself arrived, so a
+  later reply can be compared with it) and `surfaced` (`anchor`, `day`: when a loop last came up
+  for an anchor or its due time, so Scout does not repeat itself; the latest per anchor counts).
+- Written by: `loops/store.py` `LoopStore` (`save`, `set_status`, `snooze`, `add_history`,
+  `mark_surfaced`) through `store/work.py`, driven by `loops/service.py` and Scout's loop tools.
+  New mail on a `done` or `stale` loop reopens it (the loop-only move back to `planned`); a
+  dropped one stays dropped.
 - Read by: `loops/store.py`, `loops/service.py`, `loops/triggers/`.
-- Retention: kept until `forget` (one loop) or `wipe` (every loop and cursor); done and dropped
-  loops stay.
-- Masked: `title`, `asks`, `people` and `anchors` yes (the mask is wired in `main.py`).
+- Retention: kept until `forget` (one loop) or `wipe` (every loop, its events and the cursors);
+  done and dropped loops stay.
+- Masked: `title`, `asks`, `people`, `anchors` and history notes yes (the mask is wired in
+  `main.py`).
 
-### loop_surfaced
+### The daily digest
 
-When a loop last came up for each anchor, so Scout does not repeat itself.
+One `watch` row, id `loop-digest`, with `input.trigger = "return"` and `repeat_s` 86400. `Timers`
+skips a row with that trigger, and `watch list` hides it. `loops/service.py` runs it when a
+`back` or `body_online` event arrives and `due_at` has passed: it moves `due_at` to the next local
+midnight (even when nothing was held) and, if loops were held that day, emits one `digest` event.
+`wipe` leaves it.
 
-| Column    | Type | Meaning                                               |
-| --------- | ---- | ----------------------------------------------------- |
-| `loop_id` | TEXT | The loop; part of the primary key `(loop_id, anchor)` |
-| `anchor`  | TEXT | The anchor, or the due time, it came up for           |
-| `day`     | TEXT | The day it came up                                    |
+### app_cursors
 
-- Written by: `loops/store.py`; read by `loops/store.py` and `loops/triggers/`.
-- Retention: removed with its loop (`forget`, `wipe`).
-- Masked: no.
+How far each app's mail has been read.
 
-### loop_cursor
+| Column       | Type | Meaning                                                              |
+| ------------ | ---- | -------------------------------------------------------------------- |
+| `app_id`     | TEXT | The app; part of the primary key `(app_id, stream)`                  |
+| `stream`     | TEXT | `mail` (inbox cursor), `sent` (sent-mail cursor) or `backfill` (first read done) |
+| `value`      | TEXT | A timestamp, or `done`                                               |
+| `updated_at` | TEXT | When it last moved                                                   |
 
-How far each app's mail has been read, plus a few per-app flags kept under prefixed keys.
-
-| Column   | Type             | Meaning                                                                                                                                         |
-| -------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app_id` | TEXT PRIMARY KEY | An app id, or a prefixed key: `sent:<app>` (sent-mail cursor), `on:<app>` (loops switched on), `backfill:<app>` (first read done), `digest:day` |
-| `value`  | TEXT             | A timestamp, `1`, `done` or a day                                                                                                               |
-
-- Written by: `loops/store.py` `set_cursor`, `set_on`, `set_backfilled`; read by
+- Written by: `loops/store.py` through `store/connections.py` `set_cursor`; read by
   `loops/service.py`.
-- Retention: `on:<app>` is removed when the app is switched off; everything goes on `wipe`.
+- Retention: everything goes on `wipe`.
 - Masked: no.
 
 ## Permissions
@@ -569,6 +576,7 @@ Connected apps (MCP servers).
 | `config`    | TEXT             | Transport details as JSON; secrets are never in it |
 | `auth`      | TEXT             | `none`, `token` or `oauth` (CHECK)                 |
 | `enabled`   | INTEGER          | 0 or 1; default 1                                  |
+| `reads_mail` | INTEGER         | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
 
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
 - Read by: `store/connections.py` `list_apps`.

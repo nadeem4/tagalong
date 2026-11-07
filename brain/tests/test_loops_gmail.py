@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from loop_rows import loop_store
 from test_apps import Rig, stdio_row, until
 
 from brain.apps import AppError
@@ -13,7 +14,6 @@ from brain.guardrails import Budget
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
 from brain.loops.sources.gmail import GmailSource
-from brain.loops.store import LoopStore
 from brain.mind.turn import Final
 
 NOW = datetime(2026, 11, 4, 12, 0, tzinfo=UTC)
@@ -175,7 +175,7 @@ async def test_three_unanswered_one_answered_one_bulk_yield_three_loops(gmail, t
     rig, spy = await gmail(threads)
     model = CountingModel()
     reader = HaikuReader(model, Budget(tmp_path / "b.json", 1.0))
-    store = LoopStore(rig.memory.db, lambda: NOW)
+    store = loop_store(rig.memory, lambda: NOW)
     svc = LoopService(store, lambda e: None, lambda: NOW, reader, poll_s=3600)
     svc.enable("gmail", GmailSource("gmail", spy.call))
     await until(lambda: store.cursor("gmail") is not None)

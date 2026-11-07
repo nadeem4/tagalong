@@ -1536,7 +1536,7 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
   `wipe` stops everything and deletes every loop and cursor). Home's "Read my
   mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
-  turns it on. The switch is saved (an `on:<app>` key in `loop_cursor`, set by `enable`, deleted by
+  turns it on. The switch is saved (the `apps.reads_mail` column, set by `enable`, cleared by
   `disable`), and `start()` turns on every saved app without checking that it can be read yet (apps connect after
   `start()`, so their tools are not listed then). A poll before the app is connected fails and is
   retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
@@ -1605,8 +1605,9 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     offer the drafted reply (`loop_draft`). No new column or job field.
   - _Digest._ On the first `back` or `body_online` of a local day, if any `held` loop was created
     that day, the service sends one `loop` event `reason=digest` (`count`, and `loops`: id, title and
-    asks per line). Nothing is sent when none was held; the day is saved in the cursor table
-    (`digest:day`) so a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
+    asks per line). Nothing is sent when none was held; the digest is the `loop-digest` watch
+    row (return trigger, due at the next local midnight; Timers skips it), advanced when it runs so
+    a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
     silent.
   - _Corrections._ soul.md tells Scout that when the owner says it should have told them, it saves
     that with `remember` as a preference. There is no new store or code path.

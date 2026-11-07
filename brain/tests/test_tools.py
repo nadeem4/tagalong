@@ -1008,6 +1008,13 @@ async def test_list_timers_leaves_out_watches_and_ended_timers(trun):
     assert json.loads(await trun("list_timers", {}))["timers"] == []
 
 
+async def test_watch_list_leaves_out_the_loops_daily_digest(trun):
+    made = json.loads(await trun("watch", {"action": "add", "note": "w", "every_minutes": 10}))
+    listed = json.loads(await trun("watch", {"action": "list"}))["watches"]
+    assert trun.work.get("loop-digest") is not None
+    assert [w["id"] for w in listed] == [made["id"]]
+
+
 async def test_cancel_timer_takes_string_id(trun):
     await trun("set_timer", {"note": "n", "in_minutes": 5})
     tid = _timers(trun)[0].id

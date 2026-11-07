@@ -32,8 +32,8 @@ log = logging.getLogger(__name__)
 # Re-check at least hourly so a wall-clock change cannot strand the timer.
 _MAX_SLEEP_S = 3600
 _DUE_STATUSES = ("held", "snoozed", "stale")  # a stale loop's future due still fires
-_OPEN = ("held", "surfaced", "snoozed", "stale")
-_CONTEXT_STATUSES = ("held", "surfaced")  # a snoozed loop waits for its time, not for a window
+_OPEN = ("held", "snoozed", "stale")
+_CONTEXT_STATUSES = ("held",)  # a snoozed loop waits for its time, not for a window
 # Per reason: (wakes, within seconds), counted across all loops, so Held cannot become noise.
 # Due and stale are not here: a deadline must not be lost, and stale is one batched wake.
 _THROTTLE = {"context": (1, 600), "urgent": (2, 3600), "quiet": (2, 3600)}
@@ -160,10 +160,13 @@ class LoopService:
         self._notify("changed", {"what": "loops"})
 
     def _digest(self) -> None:
-        """Once per local day, on the person's return: what was held today (nothing if none)."""
-        today = self._today()
-        if self._store.cursor("digest:day") == today:
+        """Once per local day, on the person's return: what was held today (nothing if none).
+
+        The day is spent either way: the digest row moves on to the next local midnight."""
+        if not self._store.digest_due():
             return
+        self._store.advance_digest()
+        today = self._today()
         held = [
             lp
             for lp in self._store.list("held")
@@ -171,7 +174,6 @@ class LoopService:
         ]
         if not held:
             return
-        self._store.set_cursor("digest:day", today)
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in held)
         facts: dict[str, str | int] = {"reason": "digest", "count": len(held), "loops": lines}
         self._emit(Event("loop", facts, key=f"loop-digest:{today}"))
@@ -442,9 +444,7 @@ class LoopService:
                 self._surface(saved, "urgent", urgent.ANCHOR)
 
     def _save(self, loop: Loop, item: MailItem) -> Loop:
-        saved = self._store.save(loop)
-        if saved.status in ("done", "stale"):
-            self._store.set_status(saved.id, "held")  # new mail on a finished thread reopens it
+        saved = self._store.save(loop)  # new mail on a finished thread reopens it
         self._store.add_history(saved.id, f"mail from {item.sender}", item.date)
         self.changed()
         return saved

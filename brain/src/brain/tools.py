@@ -38,7 +38,7 @@ from brain.setup.store import InstalledExpert
 from brain.store.memory import KINDS, MemoryRefused
 from brain.store.search import Hit
 from brain.store.work import TITLE_CAP, TransitionRefused, WorkEvent, WorkRow, WorkStore
-from brain.timers import MIN_REPEAT_S, Timers, note_of
+from brain.timers import MIN_REPEAT_S, Timers, is_return_wake, note_of
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
 
@@ -382,7 +382,9 @@ def timer_tools(
             row = create_row("watch", note, current + timedelta(minutes=every), every * 60)
             return json.dumps({"id": row.id, "every_minutes": every})
         if action == "list":
-            rows = work.of_kind("watch", ["planned", "paused"])
+            rows = [
+                r for r in work.of_kind("watch", ["planned", "paused"]) if not is_return_wake(r)
+            ]
             return json.dumps(
                 {
                     "watches": [

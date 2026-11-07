@@ -1,13 +1,14 @@
 """Tests for LoopService: the due timer emits one `loop` event per due loop, once."""
 
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from loop_rows import loop_store
 
 from brain.loops.loop import Loop
 from brain.loops.service import LoopService
-from brain.loops.store import LoopStore
 from brain.memory import Memory
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -25,9 +26,15 @@ class Clock:
 def parts(tmp_path):
     mem = Memory(tmp_path / "t.db")
     clock = Clock()
-    store = LoopStore(mem.db, clock)
+    store = loop_store(mem, clock)
     yield store, clock, [], mem
     mem.close()
+
+
+def second_clock():
+    """Real time that starts on a whole second: stored times keep whole seconds only."""
+    base, t0 = datetime.now(UTC).replace(microsecond=0), time.monotonic()
+    return lambda: base + timedelta(seconds=time.monotonic() - t0)
 
 
 def svc(store, clock, events):
@@ -36,7 +43,9 @@ def svc(store, clock, events):
 
 def held(store, ref="a", due=None, status="held"):
     lp = store.save(Loop(source="app1", ref=ref, title=f"t-{ref}", asks="do it", due=due))
-    if status != "held":
+    if status == "snoozed":
+        store.snooze(lp.id, T0 + timedelta(days=1))
+    elif status != "held":
         store.set_status(lp.id, status)
     return lp
 
@@ -71,11 +80,11 @@ def test_a_changed_due_fires_again(parts):
     assert len(events) == 2
 
 
-def test_snoozed_fires_but_done_dropped_surfaced_stale_do_not(parts):
+def test_snoozed_fires_but_done_and_dropped_do_not(parts):
     store, clock, events, _ = parts
     past = T0 - timedelta(hours=1)
     held(store, "s", past, "snoozed")
-    for ref, st in [("d", "done"), ("x", "dropped"), ("u", "surfaced")]:
+    for ref, st in [("d", "done"), ("x", "dropped")]:
         held(store, ref, past, st)
     svc(store, clock, events).start()
     assert [e.facts["title"] for e in events] == ["t-s"]
@@ -91,14 +100,14 @@ def test_no_due_never_fires(parts):
 def test_future_due_arms_a_timer_and_fires_when_it_comes(tmp_path):
     async def run():
         mem = Memory(tmp_path / "t.db")
-        now = lambda: datetime.now(UTC)  # noqa: E731
-        store = LoopStore(mem.db, now)
+        now = second_clock()
+        store = loop_store(mem, now)
         events = []
-        held(store, due=now() + timedelta(milliseconds=150))
+        held(store, due=now() + timedelta(seconds=1))
         s = LoopService(store, events.append, now)
         s.start()
         assert events == [] and s._handle is not None
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(1.5)
         assert len(events) == 1
         mem.close()
 
@@ -108,16 +117,16 @@ def test_future_due_arms_a_timer_and_fires_when_it_comes(tmp_path):
 def test_changed_rearms_for_a_loop_added_later(tmp_path):
     async def run():
         mem = Memory(tmp_path / "t.db")
-        now = lambda: datetime.now(UTC)  # noqa: E731
-        store = LoopStore(mem.db, now)
+        now = second_clock()
+        store = loop_store(mem, now)
         events = []
         s = LoopService(store, events.append, now)
         s.start()
         assert s._handle is None
-        held(store, due=now() + timedelta(milliseconds=150))
+        held(store, due=now() + timedelta(seconds=1))
         s.changed()
         assert s._handle is not None
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(1.5)
         assert len(events) == 1
         mem.close()
 
@@ -134,16 +143,16 @@ def test_surfaced_day_is_the_local_day(parts):
 
 def test_a_new_service_over_an_earlier_saved_future_loop_arms_and_fires(tmp_path):
     async def run():
-        now = lambda: datetime.now(UTC)  # noqa: E731
+        now = second_clock()
         mem = Memory(tmp_path / "t.db")
-        held(LoopStore(mem.db, now), due=now() + timedelta(milliseconds=150))
+        held(loop_store(mem, now), due=now() + timedelta(seconds=1))
         mem.close()
         mem = Memory(tmp_path / "t.db")  # the brain restarted
         events = []
-        s = LoopService(LoopStore(mem.db, now), events.append, now)
+        s = LoopService(loop_store(mem, now), events.append, now)
         s.start()
         assert events == [] and s._handle is not None
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(1.5)
         assert len(events) == 1
         mem.close()
 
@@ -160,7 +169,7 @@ def test_stale_loop_with_a_future_due_still_fires(parts):
 def test_throttled_ripe_quiet_loops_arm_after_the_throttle_not_now(tmp_path):
     async def run():
         mem = Memory(tmp_path / "t.db")
-        store = LoopStore(mem.db, Clock())
+        store = loop_store(mem, Clock())
         events = []
         for ref in "abc":
             store.save(

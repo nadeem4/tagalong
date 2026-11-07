@@ -431,7 +431,7 @@ day, for Home's **Spend** card and the daily budget.
   waiting on you. Bulk mail is skipped before that. Scout only reads and drafts: it never sends,
   and it never changes your mailbox (no labels, archive or read marks).
 - **What is held.** The brain keeps a short note per open thing (a title, what it asks, who, when
-  it is due, its status) in its own database on this computer, with secrets masked. Not the mail
+  it is due, its status) in its own database on this computer (the work table), with secrets masked. Not the mail
   itself. Home's Held list shows every one of them.
 - **Done changes nothing in your mailbox.** Marking a loop done, putting it off with Later, keeping
   or dropping it only changes Scout's own list. Scout can leave a draft reply in the thread when

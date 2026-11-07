@@ -1,190 +1,190 @@
-"""SQLite store for loops, over the connection Memory already opened.
+"""Loops as `loop` work rows, with the per-app mail switch and read cursors beside them.
 
-Tables are created by Memory's migrations (one database file, one schema history). Text is
-masked before it is written, so a secret in a mail never lands on disk.
+`WorkStore` holds the row and its events (history and "surfaced" marks); `store.connections`
+holds the cursors and `apps.reads_mail`. This class only translates between a `Loop` and those.
+Text is masked on the way in (by the work store), so a secret in a mail never lands on disk.
 """
 
-import json
 import sqlite3
-import uuid
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import datetime, time, timedelta
 
 from brain.loops.loop import Loop
+from brain.store import connections
+from brain.store.db import transaction, utc_text
+from brain.store.work import WorkRow, WorkStore
 
-_COLS = (
-    "id, source, ref, title, asks, direction, people, due, quiet_after, anchors, status,"
-    " history, created, updated"
-)
-_SELECT = _COLS + ", snoozed_until"  # the snooze time is set only by `snooze`, never by an insert
-
-
-def _iso(at: datetime | None) -> str | None:
-    return at.astimezone(UTC).isoformat() if at else None
+DIGEST_ID = "loop-digest"
+# Loop statuses Home and the triggers see, by the work state they end in.
+_ENDED = {
+    "done": ("done", "done"),
+    "dropped": ("cancelled", "dropped"),
+    "stale": ("expired", "went quiet"),
+}
+_STATUS = {"done": "done", "cancelled": "dropped", "expired": "stale"}
 
 
 def _parse(text: str | None) -> datetime | None:
     return datetime.fromisoformat(text) if text else None
 
 
+def next_local_midnight(now: datetime) -> datetime:
+    return datetime.combine(now.astimezone().date() + timedelta(days=1), time()).astimezone()
+
+
 class LoopStore:
     def __init__(
-        self,
-        db: sqlite3.Connection,
-        now: Callable[[], datetime],
-        mask: Callable[[str], str] = lambda text: text,
+        self, work: WorkStore, db: sqlite3.Connection, now: Callable[[], datetime]
     ) -> None:
-        self._db = db
+        self.work = work
+        self.db = db
         self._now = now
-        self._mask = mask
 
     def save(self, loop: Loop) -> Loop:
-        """Insert, or update the loop with the same (source, ref); its id and history stay."""
-        at = _iso(self._now())
-        m = self._mask
-        fields = (
-            m(loop.title),
-            m(loop.asks),
-            loop.direction,
-            json.dumps([m(p) for p in loop.people]),
-            _iso(loop.due),
-            _iso(loop.quiet_after),
-            json.dumps([m(a) for a in loop.anchors]),
+        """Insert, or update the loop with the same (source, ref); its id and history stay.
+
+        New mail on a loop that is done or went quiet reopens it; a dropped one stays dropped."""
+        existing = self.work.find_loop(loop.source, loop.ref)
+        if existing is None:
+            row = self.work.create("loop", loop.title, due_at=loop.due)
+        else:
+            self.work.update(existing, title=loop.title, due_at=loop.due)
+            row = self.work.get(existing)
+            assert row is not None
+            if row.state in ("done", "expired"):
+                self.work.transition(row.id, "planned")
+        self.work.set_loop_detail(
+            row.id,
+            source=loop.source,
+            ref=loop.ref,
+            direction=loop.direction,
+            people=loop.people,
+            anchors=loop.anchors,
+            quiet_after=loop.quiet_after,
+            asks=loop.asks,
         )
-        row = self._db.execute(
-            "SELECT id FROM loops WHERE source = ? AND ref = ?", (loop.source, loop.ref)
-        ).fetchone()
-        if row:
-            self._db.execute(
-                "UPDATE loops SET title=?, asks=?, direction=?, people=?, due=?, quiet_after=?,"
-                " anchors=?, updated=? WHERE id=?",
-                (*fields, at, row[0]),
-            )
-            return self.get(row[0])  # type: ignore[return-value]
-        loop_id = uuid.uuid4().hex[:8]
-        self._db.execute(
-            f"INSERT INTO loops({_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                loop_id,
-                loop.source,
-                loop.ref,
-                fields[0],
-                fields[1],
-                fields[2],
-                fields[3],
-                fields[4],
-                fields[5],
-                fields[6],
-                loop.status,
-                "[]",
-                at,
-                at,
-            ),  # fmt: skip
-        )
-        return self.get(loop_id)  # type: ignore[return-value]
+        return self.get(row.id)  # type: ignore[return-value]
 
     def get(self, loop_id: str) -> Loop | None:
-        row = self._db.execute(f"SELECT {_SELECT} FROM loops WHERE id = ?", (loop_id,)).fetchone()
-        return self._loop(row) if row else None
+        row = self.work.get(loop_id)
+        detail = self.work.loop_details(loop_id).get(loop_id)
+        if row is None or row.kind != "loop" or detail is None:
+            return None
+        return self._loop(row, detail)
 
     def list(self, status: str | None = None) -> list[Loop]:
-        sql = f"SELECT {_SELECT} FROM loops"
-        args: tuple = ()
-        if status:
-            sql += " WHERE status = ?"
-            args = (status,)
-        return [self._loop(r) for r in self._db.execute(sql + " ORDER BY created, id", args)]
+        details = self.work.loop_details()
+        loops = [self._loop(r, details[r.id]) for r in self.work.of_kind("loop") if r.id in details]
+        return [lp for lp in loops if status is None or lp.status == status]
 
     def set_status(self, loop_id: str, status: str) -> None:
-        self._db.execute(
-            "UPDATE loops SET status = ?, updated = ? WHERE id = ?",
-            (status, _iso(self._now()), loop_id),
-        )
+        """held (open again, snooze cleared), done, dropped or stale."""
+        row = self.work.get(loop_id)
+        if row is None:
+            return
+        if status == "held":
+            if row.state != "planned":
+                self.work.transition(loop_id, "planned")
+            else:
+                self.work.update(loop_id)  # touched: the stale clock starts over
+        else:
+            state, reason = _ENDED[status]
+            self.work.transition(loop_id, state, reason=reason)
+            self.work.mark_reported(loop_id)  # Scout hears loops through the service, not this
+        self.work.set_snooze(loop_id, None)
 
     def snooze(self, loop_id: str, until: datetime) -> None:
-        self._db.execute(
-            "UPDATE loops SET status = 'snoozed', snoozed_until = ?, updated = ? WHERE id = ?",
-            (_iso(until), _iso(self._now()), loop_id),
-        )
+        row = self.work.get(loop_id)
+        if row is not None and row.state != "planned":
+            self.work.transition(loop_id, "planned")  # a loop that went quiet is waiting again
+        self.work.set_snooze(loop_id, until)
+        self.work.update(loop_id)
 
     def mask(self, text: str) -> str:
-        return self._mask(text)
+        return self.work.mask(text)
 
     def add_history(self, loop_id: str, note: str, mail_at: datetime | None = None) -> None:
-        loop = self.get(loop_id)
-        if loop is None:
+        if self.work.get(loop_id) is None:
             return
-        entry = {"at": _iso(self._now()), "note": self._mask(note)}
+        data = {"note": self.work.mask(note)}
         if mail_at:  # when the mail itself arrived, so a later reply can be compared with it
-            entry["mail_at"] = _iso(mail_at)
-        self._db.execute(
-            "UPDATE loops SET history = ? WHERE id = ?",
-            (json.dumps([*loop.history, entry]), loop_id),
-        )
+            data["mail_at"] = mail_at.isoformat()
+        self.work.add_event(loop_id, "history", data)
 
     def mark_surfaced(self, loop_id: str, anchor: str, day: str) -> None:
-        self._db.execute(
-            "INSERT INTO loop_surfaced(loop_id, anchor, day) VALUES (?,?,?)"
-            " ON CONFLICT(loop_id, anchor) DO UPDATE SET day = excluded.day",
-            (loop_id, anchor, day),
-        )
+        self.work.add_event(loop_id, "surfaced", {"anchor": anchor, "day": day})
 
     def surfaced(self, loop_id: str) -> dict[str, str]:
-        rows = self._db.execute(
-            "SELECT anchor, day FROM loop_surfaced WHERE loop_id = ?", (loop_id,)
-        )
-        return dict(rows.fetchall())
+        """anchor -> the local day it last surfaced."""
+        return {
+            e.data["anchor"]: e.data["day"]
+            for e in self.work.events_of_kind(loop_id, "surfaced")
+            if e.data
+        }
 
     def cursor(self, app_id: str) -> str | None:
-        row = self._db.execute("SELECT value FROM loop_cursor WHERE app_id = ?", (app_id,))
-        found = row.fetchone()
-        return found[0] if found else None
+        return connections.cursor(self.db, app_id, "mail")
 
     def set_cursor(self, app_id: str, value: str) -> None:
-        self._db.execute(
-            "INSERT INTO loop_cursor(app_id, value) VALUES (?,?)"
-            " ON CONFLICT(app_id) DO UPDATE SET value = excluded.value",
-            (app_id, value),
-        )
+        self._put(app_id, "mail", value)
 
-    # Two more places per app share the cursor table under a prefixed key: where the sent scan
-    # got to, and whether the unanswered-only backfill finished.
+    # Two more places per app: where the sent scan got to, and whether the unanswered-only
+    # backfill finished.
     def sent_cursor(self, app_id: str) -> str | None:
-        return self.cursor(f"sent:{app_id}")
+        return connections.cursor(self.db, app_id, "sent")
 
     def set_sent_cursor(self, app_id: str, value: str) -> None:
-        self.set_cursor(f"sent:{app_id}", value)
+        self._put(app_id, "sent", value)
 
     def backfilled(self, app_id: str) -> bool:
-        return self.cursor(f"backfill:{app_id}") is not None
+        return connections.cursor(self.db, app_id, "backfill") is not None
 
     def set_backfilled(self, app_id: str) -> None:
-        self.set_cursor(f"backfill:{app_id}", "done")
+        self._put(app_id, "backfill", "done")
 
     def set_on(self, app_id: str, on: bool) -> None:
-        if on:
-            self.set_cursor(f"on:{app_id}", "1")
-        else:
-            self._db.execute("DELETE FROM loop_cursor WHERE app_id = ?", (f"on:{app_id}",))
+        connections.set_reads_mail(self.db, app_id, on)
 
     def on_apps(self):
-        rows = self._db.execute("SELECT app_id FROM loop_cursor WHERE app_id LIKE 'on:%'")
-        return [r[0][3:] for r in rows.fetchall()]
+        return connections.reads_mail_apps(self.db)
 
     def forget(self, loop_id: str) -> None:
-        self._db.execute("DELETE FROM loop_surfaced WHERE loop_id = ?", (loop_id,))
-        self._db.execute("DELETE FROM loops WHERE id = ?", (loop_id,))
+        with transaction(self.db):
+            self.work.delete_loops(loop_id)
 
     def wipe(self) -> None:
-        for table in ("loop_surfaced", "loop_cursor", "loops"):
-            self._db.execute(f"DELETE FROM {table}")
+        with transaction(self.db):
+            self.work.delete_loops()
+            connections.clear_mail(self.db)
 
-    def _loop(self, row: tuple) -> Loop:
+    # The daily digest is a watch row Timers leaves alone; the service runs it on a return.
+    def digest_due(self) -> bool:
+        row = self.work.get(DIGEST_ID)
+        return row is not None and row.due_at is not None and row.due_at <= utc_text(self._now())
+
+    def advance_digest(self) -> None:
+        self.work.update(DIGEST_ID, due_at=next_local_midnight(self._now()))
+
+    def _put(self, app_id: str, stream: str, value: str) -> None:
+        connections.set_cursor(self.db, app_id, stream, value, utc_text(self._now()))
+
+    def _loop(self, row: WorkRow, d: dict) -> Loop:
         loop = Loop(
-            id=row[0], source=row[1], ref=row[2], title=row[3], asks=row[4], direction=row[5],
-            people=json.loads(row[6]), due=_parse(row[7]), quiet_after=_parse(row[8]),
-            anchors=json.loads(row[9]), status=row[10], history=json.loads(row[11]),
-            created=_parse(row[12]), updated=_parse(row[13]), snoozed_until=_parse(row[14]),
+            id=row.id, source=d["source"], ref=d["ref"], title=row.title, asks=d["asks"],
+            direction=d["direction"], people=d["people"], due=_parse(row.due_at),
+            quiet_after=_parse(d["quiet_after"]), anchors=d["anchors"],
+            status=self._status(row, d),
+            history=[
+                {"at": e.at, **(e.data or {})} for e in self.work.events_of_kind(row.id, "history")
+            ],
+            created=_parse(row.created_at), updated=_parse(row.updated_at),
+            snoozed_until=_parse(d["snoozed_until"]),
         )  # fmt: skip
         return replace(loop, surfaced=self.surfaced(loop.id))
+
+    @staticmethod
+    def _status(row: WorkRow, d: dict) -> str:
+        if row.state == "planned":
+            return "snoozed" if d["snoozed_until"] else "held"
+        return _STATUS[row.state]

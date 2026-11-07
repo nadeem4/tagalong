@@ -58,16 +58,15 @@ Keeping an eye on something is no longer a memory: it is a `watch` (see below). 
   (see [storage.md](storage.md#store-layer)); a file from a newer brain stops the brain at start. A Python build
   without FTS5 also stops it, with a message.
 
-### Loops tables
+### Loops
 
-`loops/store.py` owns three tables in the same file (migration 16, created by `Memory`):
-`loops` (one row per loop; unique on source and ref; people, anchors and history are JSON; times
-are UTC ISO text), `loop_surfaced` (loop id, anchor, day: when a loop last came up for an anchor or
-its due time) and `loop_cursor` (app id, value: how far that app's mail was read). Text is masked
-before it is saved. Forgetting a loop removes its rows in both; wiping removes everything in the
-three. Migration 17 adds `loops.snoozed_until` (the time a loop put off with Later comes back; the
-`due` column stays the real deadline). The cursor table also holds `digest:day`, the local day of
-the last held-today line. See [Loops](brain.md#loops).
+Loops are `loop` rows in the work tree (migration 22): `work` holds the title, deadline and state,
+`work_loop` the source, thread ref, people, anchors, asks and the snooze time, and `work_events`
+the history notes and the "surfaced" marks. How far each app's mail was read, and whether reading
+is on, live in `app_cursors` and `apps.reads_mail`; the daily digest is the `loop-digest` watch.
+`loops/store.py` only translates between a `Loop` and those rows. Text is masked before it is
+saved. Forgetting a loop deletes its rows; wiping deletes every loop and the mail cursors. See
+[storage.md](storage.md#work_loop) and [Loops](brain.md#loops).
 
 ### Saved chat
 

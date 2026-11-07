@@ -8,11 +8,11 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from loop_rows import loop_store
 
 from brain.loops.home_tools import loop_home_tools
 from brain.loops.loop import Loop
 from brain.loops.service import LoopService
-from brain.loops.store import LoopStore
 from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
 
@@ -39,7 +39,7 @@ class StubApps:
 class Rig:
     def __init__(self, tmp_path):
         self.mem = Memory(tmp_path / "t.db")
-        self.store = LoopStore(self.mem.db, lambda: T0)
+        self.store = loop_store(self.mem, lambda: T0)
         self.notes = []
         self.svc = LoopService(
             self.store,
@@ -108,6 +108,21 @@ async def test_rows_carry_title_asks_direction_due_people_status_and_no_body(rig
         "people": ["Priya"],
         "status": "held",
     }
+
+
+async def test_home_loop_status_words_unchanged(rig):
+    for ref, status in [("a", "held"), ("b", "done"), ("c", "dropped"), ("d", "stale")]:
+        lp = rig.add(ref)
+        if status != "held":
+            rig.store.set_status(lp.id, status)
+    rig.store.snooze(rig.add("e").id, T0 + timedelta(days=1))
+    assert sorted(r["status"] for r in (await rig.call("loops_state"))["loops"]) == [
+        "done",
+        "dropped",
+        "held",
+        "snoozed",
+        "stale",
+    ]
 
 
 async def test_unread_since_shows_only_when_set(rig):
