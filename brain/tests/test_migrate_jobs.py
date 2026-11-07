@@ -253,6 +253,14 @@ def _seed(db):
             (job_id, "p1", "claude-acp", "t", state, reason, "tail", None, report, 0, T)
             + ("2026-01-04T07:10:00+00:00", "C:/a"),
         )
+    db.execute(JOB, ("retried1", "t", "C:/a", "ask", "done", T, T) + (None,) * 5)
+    db.execute(JOB, ("shut1", "t", "C:/a", "ask", "running", T, None, None, None, None, None, T))
+    for part_id, state in (("p1", "error"), ("p2", "done")):
+        db.execute(
+            PART,
+            ("retried1", part_id, "claude-acp", "t", state, "x", None, None, None, 0, T, T)
+            + ("C:/a",),
+        )
     db.execute(
         PART, ("ghost", "p1", "claude-acp", "t", "done", "done", None, None, "x", 0, T, T, "C:/a")
     )
@@ -288,7 +296,9 @@ def test_jobs_become_goals_with_mapped_states(work):
         "cont1": "done",
         "long1": "done",
         "open1": "active",
-        "openerr1": "blocked",  # a part failed, the job was not closed
+        "openerr1": "blocked",  # its last part failed, the job was not closed
+        "retried1": "active",  # p1 failed but p2 ran after it: a later part reopens a goal
+        "shut1": "cancelled",  # closed while still marked running
         "nulls1": "active",
     }
     run = work.get("run1")
@@ -373,8 +383,8 @@ def test_nulls_in_every_optional_column_migrate(work):
 
 
 def test_every_row_is_kept(db):
-    assert db.execute("SELECT count(*) FROM work WHERE kind='goal'").fetchone()[0] == 9
-    assert db.execute("SELECT count(*) FROM work WHERE kind='expert_call'").fetchone()[0] == 9
+    assert db.execute("SELECT count(*) FROM work WHERE kind='goal'").fetchone()[0] == 11
+    assert db.execute("SELECT count(*) FROM work WHERE kind='expert_call'").fetchone()[0] == 11
 
 
 def test_orphan_parts_are_counted_in_the_log(db, caplog):
@@ -481,3 +491,8 @@ def test_a_job_from_before_parts_gets_its_p1(db_from_11):
     assert old1.closed_at == "2026-01-01T10:05:00+00:00"  # 0013 closed every non-running job
     assert [(p.id, p.state) for p in old2.parts] == [("p1", "active")]
     assert old2.closed_at is None and old2.state == "active"
+
+
+def test_closed_while_running_reads_as_stopped(work):
+    goal = work.get("shut1")
+    assert (goal.state, goal.end_reason) == ("cancelled", "stopped")

@@ -360,7 +360,7 @@ active, failed once the goal failed, otherwise the state of the part that ended 
   (old part states `running`, `done`, `stopped`, `error` become `active`, `done`, `cancelled`,
   `failed`), then drops both tables. Only a job Scout closed (`closed_at` set) becomes an ended
   goal, with `ended_at` and `reported_at` set to that `closed_at`; a job never closed stays `active`
-  (`blocked` if a part failed) so it can still take a follow-up part. Ended parts have no
+  (`blocked` if its last part failed) so it can still take a follow-up part. Ended parts have no
   progress, as at runtime. A part with no job is dropped and counted in the log.
 
 ## Work (old shape)

@@ -81,7 +81,7 @@ def migrate(db) -> None:
         log.warning("migration 0019 dropped %d job part(s) with no job", len(orphans))
     for seq, job in enumerate(jobs, 1):
         mine = by_job.get(job[0], [])
-        _goal(db, seq, job, any(p[4] == "error" for p in mine))
+        _goal(db, seq, job, bool(mine) and mine[-1][4] == "error")
         for number, part in enumerate(mine, 1):
             _call(db, job, part, number)
     db.execute("DROP TABLE job_parts")
@@ -90,14 +90,15 @@ def migrate(db) -> None:
 
 def _goal(db, seq: int, job: tuple, part_failed: bool) -> None:
     """Only a job Scout closed (closed_at set) becomes an ended goal. An open job stays open,
-    blocked when a part failed, so a follow-up part can still be added to it."""
+    blocked when its last part failed (a later part reopens it at runtime), so a follow-up part
+    can still be added to it."""
     id, task, folder, mode, old, started, ended, parent, watch, title, result, closed = job
     created = started or ended or closed or EPOCH
     summary, detail_id = _summary(db, result, closed or ended or created)
     if closed:
         state = _state(old)
         if state not in _ENDED:
-            state = "cancelled"
+            state, old = "cancelled", "stopped"  # closed while a part still ran
     else:
         state = "blocked" if part_failed else "active"
     stopped = state in _ENDED
