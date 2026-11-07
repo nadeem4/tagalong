@@ -6,11 +6,26 @@ How the brain stores data: every table, its columns, who writes and reads it, ho
 and whether they are masked.
 
 The brain keeps its data in one SQLite file, `tagalong.db`, under `TAGALONG_HOME` (default
-`~/.tagalong`). The file runs in WAL mode. Its schema is the `MIGRATIONS` tuple in
-`brain/src/brain/memory.py`, applied in order and numbered by `PRAGMA user_version`; a file from a
-newer brain stops the brain at start, and so does a Python SQLite without FTS5. Times are UTC ISO
-text. What the desktop and the browser body keep is in [desktop.md](desktop.md#what-it-stores) and
-[browser-body.md](browser-body.md#what-it-stores).
+`~/.tagalong`). The file runs in WAL mode. Its schema is the numbered files in
+`brain/src/brain/store/migrations/`, applied in order and numbered by `PRAGMA user_version` (see
+[Store layer](#store-layer)); a file from a newer brain stops the brain at start, and so does a
+Python SQLite without FTS5. Times are UTC ISO text. What the desktop and the browser body keep is
+in [desktop.md](desktop.md#what-it-stores) and [browser-body.md](browser-body.md#what-it-stores).
+
+## Store layer
+
+The `brain/src/brain/store/` package opens the file and owns its schema. `Memory` gets its
+connection from `store.db.open_db`; nothing else opens the file.
+
+- `store/db.py`: `open_db(path)` makes the folder, runs the FTS5 probe, sets WAL and runs the
+  migrations. `migrate(db, migrations, upto)` applies every migration newer than `user_version`,
+  `transaction(db)` is a `BEGIN IMMEDIATE` block, and `utc_text(at)` writes the stored time text.
+- `store/search.py`: the SQLite-only full-text helpers, `probe_fts5` and `fts_query`.
+- `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
+  `0001_memories` to `0017_loops_snooze`. The numbers have no gaps (the loader refuses a gap or a
+  duplicate). Each file runs in one transaction together with its `user_version` bump, so a
+  failure leaves the file at the last good version. A file is never edited after it has merged;
+  a schema change is a new file.
 
 ## Tables and relations
 

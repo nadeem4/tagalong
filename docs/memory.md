@@ -53,7 +53,8 @@ The kinds table in `memory.py` is the only place caps and rules live.
   near-duplicate, and to `recall` before saying it does not know.
 - Storage is one `memories` table plus an FTS5 index kept in step by triggers; every table in
   `tagalong.db` is mapped in [storage.md](storage.md#tables-and-relations). The schema version
-  is `PRAGMA user_version`; a file from a newer brain stops the brain at start. A Python build
+  is `PRAGMA user_version`, set by the numbered files in `brain/src/brain/store/migrations/`
+  (see [storage.md](storage.md#store-layer)); a file from a newer brain stops the brain at start. A Python build
   without FTS5 also stops it, with a message.
 
 ### Loops tables

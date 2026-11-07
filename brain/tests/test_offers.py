@@ -11,10 +11,11 @@ import pytest
 from brain.approvals import Approvals
 from brain.asks import Answer
 from brain.guards import stop
-from brain.memory import Memory, _utc_text
+from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.offers import Offers, OfferSettings
 from brain.protocol import ErrorCode, RpcError
+from brain.store.db import utc_text
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
 YES, KEEP = "Yes, auto-approve", "Keep asking"
@@ -98,7 +99,7 @@ class Rig:
         )
 
     def approve(self, days_ago=1, by="person", group=GROUP, tool="Read", n=1, summary="read a"):
-        at = _utc_text(NOW - timedelta(days=days_ago))
+        at = utc_text(NOW - timedelta(days=days_ago))
         for _ in range(n):
             self.mem.add_approval(
                 source="scout_tool", tool=tool, summary=summary, input={}, job_id=None,
@@ -194,7 +195,7 @@ async def test_keep_asking_blocks_for_seven_days_then_allows(mem):
 async def test_group_with_a_preference_is_never_offered(rig):
     rig.approve(n=3)
     rig.mem.add_preference(
-        sentence="read away", source=None, tool=None, group_key=GROUP, at=_utc_text(NOW)
+        sentence="read away", source=None, tool=None, group_key=GROUP, at=utc_text(NOW)
     )
     await rig.consider()
     assert rig.model.calls == 0
