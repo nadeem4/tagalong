@@ -239,7 +239,8 @@ async def test_turn_sends_memory_tools():
     session.say("desktop", say("hello"))
     await finish(session)
     names = [t["name"] for t in model.tools[0]]
-    assert names == sorted(names)
+    own = [n for n in names if not n.startswith("web_")]  # web tools are their own source
+    assert own == sorted(own)
     assert {"forget", "recall", "remember"} <= set(names)
 
 
