@@ -169,10 +169,9 @@ class Jobs:
     def startup(self) -> list[tuple[str, str]]:
         """Settle what a dead brain left running (the resume scan): a call that saved a session is
         held for Scout to carry on, any other ends as failed. Each such part's log ends there and
-        its job's check-back timers go. Returns the scan's (work id, outcome) pairs."""
+        its timers stay planned. Returns the scan's (work id, outcome) pairs."""
         work = self._records.work
         settled = work.resume_scan(self.can_resume_row)
-        stopped: dict[str, None] = {}
         # The end lines come after the scan commits; a crash between only loses them, because
         # resume_scan is idempotent and will not settle these rows twice.
         for work_id, _ in settled:
@@ -191,25 +190,7 @@ class Jobs:
                     part=work_id.split(".", 1)[1],
                 ),
             )
-            stopped[job_id] = None
-        self._end_stopped_timers(list(stopped))
         return settled
-
-    def _end_stopped_timers(self, job_ids: list[str]) -> None:
-        """A job the scan stopped, with nothing held for a carry-on, has no run to check back on:
-        its timers go quietly."""
-        work = self._records.work
-        for job_id in job_ids:
-            children = work.children(job_id)
-            if any(
-                c.state in ("planned", "active", "blocked") and c.kind == "expert_call"
-                for c in children
-            ):
-                continue
-            for child in children:
-                if child.kind in ("timer", "watch") and child.state in ("planned", "active"):
-                    work.transition(child.id, "cancelled", reason="job stopped")
-                    work.mark_reported(child.id)
 
     def can_resume_row(self, row: WorkRow) -> bool | None:
         """Whether the expert that ran this call reopens sessions; None when not known yet."""

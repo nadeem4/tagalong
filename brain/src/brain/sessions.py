@@ -308,13 +308,18 @@ class Session:
         paused = [w for w in work.of_kind("watch", ["paused"]) if w.reported_at is None]
         if not paused:
             return
-        facts = "; ".join(
+        entries = [
             f"{w.id}: {w.title}"
             + (f" ({(w.input or {})['cadence']})" if (w.input or {}).get("cadence") else "")
             for w in paused
-        )
-        self.scheduler.emit(Event("watches_paused", {"watches": facts[:1500]}))
-        for w in paused:
+        ]
+        told = [entries[0][:1500]]  # whole entries only; one alone may be cut
+        for entry in entries[1:]:
+            if len("; ".join([*told, entry])) > 1500:
+                break
+            told.append(entry)
+        self.scheduler.emit(Event("watches_paused", {"watches": "; ".join(told)}))
+        for w in paused[: len(told)]:  # the rest are told at the next start
             work.mark_reported(w.id)
 
     def say(self, body_id: str, params: SayParams) -> SayResult:

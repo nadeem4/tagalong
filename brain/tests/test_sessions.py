@@ -2043,26 +2043,17 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
     assert "Event: job_step_failed" in text and "cmd9" in text and "cmd8" not in text
 
 
-async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
+async def test_after_a_brain_restart_a_stopped_jobs_timers_stay_planned():
     tz = datetime.timezone(datetime.timedelta(hours=1))
     now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
     memory = Memory(":memory:")
     records_for(memory).add_job("j1", "a", "t", "f", "m")  # left running by the dead brain
     work = records_for(memory).work
-    timer = add_timer(work, "check the job", now - datetime.timedelta(minutes=1), parent_id="j1")
-    kinds = {
-        "timer": EventKind("timer", batch_seconds=0, max_per_hour=6),
-        "job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10),
-    }
-    model = Gate(["ok"])
-    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
-    join(session, "desktop")
-    session.scheduler.pump()
-    await idle(session)
-    assert work.get(timer.id).state == "cancelled"
+    timer = add_timer(work, "check the job", now + datetime.timedelta(hours=1), parent_id="j1")
+    kinds = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}
+    session, _ = make(Gate(["ok"]), memory, kinds=kinds, now=lambda: now)
     assert records_for(memory).get_job("j1").state == "failed"
-    texts = [m[-1]["content"][-1]["text"] for m in model.seen]
-    assert texts and all("Event: timer" not in t for t in texts)  # only the job_ended wake
+    assert work.get(timer.id).state == "planned"  # only closing the goal removes timers
 
 
 async def test_closing_a_job_cancels_its_timers_and_the_ended_wake_still_comes():
