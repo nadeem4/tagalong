@@ -423,25 +423,25 @@ Things left open that Scout found in mail: a reply owed, a reply awaited. The lo
 deadline, `created_at` when it was found and `updated_at` when it last changed (the stale clock).
 A loop's status is not stored; Home and the triggers get it from the row:
 
-| Work state  | Loop status | Notes                                                        |
-| ----------- | ----------- | ------------------------------------------------------------ |
-| `planned`   | `held`      | `snoozed` while `snoozed_until` is set (Later)               |
-| `done`      | `done`      |                                                              |
-| `cancelled` | `dropped`   |                                                              |
-| `expired`   | `stale`     | `end_reason` "went quiet"                                    |
+| Work state  | Loop status | Notes                                          |
+| ----------- | ----------- | ---------------------------------------------- |
+| `planned`   | `held`      | `snoozed` while `snoozed_until` is set (Later) |
+| `done`      | `done`      |                                                |
+| `cancelled` | `dropped`   |                                                |
+| `expired`   | `stale`     | `end_reason` "went quiet"                      |
 
 There is no `surfaced` status: when a loop comes up it gets a `surfaced` event.
 
-| Column          | Type             | Meaning                                                          |
-| --------------- | ---------------- | ---------------------------------------------------------------- |
-| `work_id`       | TEXT PRIMARY KEY | The `loop` row                                                   |
-| `source`        | TEXT             | Which source it came from, such as the Gmail app id              |
-| `ref`           | TEXT             | The source's own id (a thread); `UNIQUE(source, ref)`            |
-| `asks`          | TEXT             | What is being asked                                              |
-| `direction`     | TEXT             | `i_owe` or `they_owe`                                            |
-| `people`        | TEXT             | JSON list of names                                               |
-| `quiet_after`   | TEXT             | When silence starts to matter                                    |
-| `anchors`       | TEXT             | JSON list of things that make it relevant (a project, a person)  |
+| Column          | Type             | Meaning                                                             |
+| --------------- | ---------------- | ------------------------------------------------------------------- |
+| `work_id`       | TEXT PRIMARY KEY | The `loop` row                                                      |
+| `source`        | TEXT             | Which source it came from, such as the Gmail app id                 |
+| `ref`           | TEXT             | The source's own id (a thread); `UNIQUE(source, ref)`               |
+| `asks`          | TEXT             | What is being asked                                                 |
+| `direction`     | TEXT             | `i_owe` or `they_owe`                                               |
+| `people`        | TEXT             | JSON list of names                                                  |
+| `quiet_after`   | TEXT             | When silence starts to matter                                       |
+| `anchors`       | TEXT             | JSON list of things that make it relevant (a project, a person)     |
 | `snoozed_until` | TEXT             | When a snoozed loop (Later) comes back; `due_at` stays the deadline |
 
 - Events on the loop row: `history` (`note`, and `mail_at` when the mail itself arrived, so a
@@ -469,12 +469,12 @@ midnight (even when nothing was held) and, if loops were held that day, emits on
 
 How far each app's mail has been read.
 
-| Column       | Type | Meaning                                                              |
-| ------------ | ---- | -------------------------------------------------------------------- |
-| `app_id`     | TEXT | The app; part of the primary key `(app_id, stream)`                  |
+| Column       | Type | Meaning                                                                          |
+| ------------ | ---- | -------------------------------------------------------------------------------- |
+| `app_id`     | TEXT | The app; part of the primary key `(app_id, stream)`                              |
 | `stream`     | TEXT | `mail` (inbox cursor), `sent` (sent-mail cursor) or `backfill` (first read done) |
-| `value`      | TEXT | A timestamp, or `done`                                               |
-| `updated_at` | TEXT | When it last moved                                                   |
+| `value`      | TEXT | A timestamp, or `done`                                                           |
+| `updated_at` | TEXT | When it last moved                                                               |
 
 - Written by: `loops/store.py` through `store/connections.py` `set_cursor`; read by
   `loops/service.py`.
@@ -556,15 +556,15 @@ The log of how each ask ended.
 
 Connected apps (MCP servers).
 
-| Column      | Type             | Meaning                                            |
-| ----------- | ---------------- | -------------------------------------------------- |
-| `id`        | TEXT PRIMARY KEY | App id                                             |
-| `name`      | TEXT             | Display name                                       |
-| `transport` | TEXT             | `stdio` or `http` (CHECK)                          |
-| `config`    | TEXT             | Transport details as JSON; secrets are never in it |
-| `auth`      | TEXT             | `none`, `token` or `oauth` (CHECK)                 |
-| `enabled`   | INTEGER          | 0 or 1; default 1                                  |
-| `reads_mail` | INTEGER         | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
+| Column       | Type             | Meaning                                                                                    |
+| ------------ | ---------------- | ------------------------------------------------------------------------------------------ |
+| `id`         | TEXT PRIMARY KEY | App id                                                                                     |
+| `name`       | TEXT             | Display name                                                                               |
+| `transport`  | TEXT             | `stdio` or `http` (CHECK)                                                                  |
+| `config`     | TEXT             | Transport details as JSON; secrets are never in it                                         |
+| `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                         |
+| `enabled`    | INTEGER          | 0 or 1; default 1                                                                          |
+| `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
 
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
 - Read by: `store/connections.py` `list_apps`.
