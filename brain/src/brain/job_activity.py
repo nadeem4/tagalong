@@ -8,6 +8,7 @@ through Memory.
 from collections.abc import Callable
 from datetime import datetime
 
+from brain.job_records import JobRecords
 from brain.memory import ActivityEntry, Memory
 
 KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", "end", "tool")
@@ -305,9 +306,9 @@ def _digest(memory: Memory, job_id: str) -> tuple[list[ActivityEntry], dict[tupl
     return [e for e in rows if e.kind in _STEP_KINDS], outputs
 
 
-def _who(memory: Memory, job_id: str) -> dict[str, str]:
+def _who(records: JobRecords, job_id: str) -> dict[str, str]:
     """part -> expert name, only when the job has several parts (else nothing needs naming)."""
-    parts = memory.parts_of(job_id)
+    parts = records.parts_of(job_id)
     return {p.id: p.agent for p in parts} if len(parts) > 1 else {}
 
 
@@ -315,13 +316,15 @@ def _tag(who: dict[str, str], entry: ActivityEntry) -> str:
     return f"[{who[entry.part]}] " if entry.part in who else ""
 
 
-def activity_summary(memory: Memory, job_id: str, now: datetime, cap: int = SUMMARY_CAP) -> str:
+def activity_summary(
+    memory: Memory, records: JobRecords, job_id: str, now: datetime, cap: int = SUMMARY_CAP
+) -> str:
     """Facts about what a job did, for a wake: counts, failed commands with their output tail,
     the last commands and the step running now. Plain reads; the stored text is already masked."""
     steps, outputs = _digest(memory, job_id)
     if not steps:
         return "no activity recorded"
-    who = _who(memory, job_id)
+    who = _who(records, job_id)
     failed = [e for e in steps if is_failed(e)]
     lines = [f"steps: {len(steps)}, failed: {len(failed)}"]
     # What is running and the last commands come before the failure blocks: a wake cut at the

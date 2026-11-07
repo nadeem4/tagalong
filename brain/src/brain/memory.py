@@ -7,7 +7,7 @@ outputs delegate to `brain.store`; the other areas keep their SQL here until the
 import json
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -21,42 +21,6 @@ from brain.store.memory import Item
 from brain.store.search import Hit
 
 DROPPED_MARKER = "[older steps dropped]"
-
-
-@dataclass(frozen=True)
-class JobPart:
-    """One expert hand-off inside a job (not `Part`: protocol.py exports that for say parts)."""
-
-    job_id: str
-    id: str
-    agent: str
-    task: str
-    state: str
-    reason: str | None
-    progress: str | None
-    session_id: str | None
-    report: str | None
-    reported: bool
-    started_at: str
-    ended_at: str | None
-    folder: str  # parts of one job may work in different folders
-
-
-@dataclass(frozen=True)
-class Job:
-    id: str
-    task: str  # the first brief; the title's fallback
-    folder: str
-    mode: str
-    state: str
-    started_at: str
-    ended_at: str | None
-    parent_job: str | None = None
-    watch: list[dict] | None = None
-    title: str | None = None
-    scout_result: str | None = None
-    closed_at: str | None = None
-    parts: list[JobPart] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -113,32 +77,6 @@ class Preference:
     last_used: str | None
 
 
-_JOB_COLUMNS = (
-    "id, task, folder, mode, state, started_at, ended_at, parent_job, watch,"
-    " title, scout_result, closed_at"
-)
-_JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
-_PART_COLUMNS = (
-    "job_id, id, agent, task, state, reason, progress, session_id, report, reported,"
-    " started_at, ended_at, folder"
-)
-_PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported", "ended_at"}
-JOB_RESULT_CAP = 1_000_000  # characters kept of a report or Scout result; a storage safety only
-JOB_PROGRESS_CAP = 2_000
-JOB_TITLE_CAP = 200
-
-
-def _parse_watch(raw: str | None) -> list[dict] | None:
-    """A stored watch list; anything unreadable reads as none, never as a crash."""
-    if not raw:
-        return None
-    try:
-        items = json.loads(raw)
-    except ValueError:
-        return None
-    return items if isinstance(items, list) else None
-
-
 class Memory:
     def __init__(
         self,
@@ -165,113 +103,6 @@ class Memory:
             " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
             (tool, mode),
         )
-
-    def _jobs(self, where: str = "", args: tuple = (), limit: int | None = None) -> list[Job]:
-        sql = f"SELECT {_JOB_COLUMNS} FROM jobs {where} ORDER BY rowid DESC"
-        if limit is not None:
-            sql += " LIMIT ?"
-            args += (limit,)
-        rows = self._db.execute(sql, args).fetchall()
-        parts: dict[str, list[JobPart]] = {}
-        marks = ",".join("?" * len(rows))
-        for r in self._db.execute(
-            f"SELECT {_PART_COLUMNS} FROM job_parts WHERE job_id IN ({marks}) ORDER BY rowid",
-            [r[0] for r in rows],
-        ):
-            parts.setdefault(r[0], []).append(JobPart(*r[:9], bool(r[9]), r[10], r[11], r[12]))
-        return [
-            Job(*r[:8], _parse_watch(r[8]), r[9], r[10], r[11], parts.get(r[0], [])) for r in rows
-        ]
-
-    def add_job(
-        self, id: str, agent: str, task: str, folder: str, mode: str, parent_job: str | None = None
-    ) -> Job:
-        """A new running job with its first part, p1."""
-        now = self._now().isoformat()
-        self._db.execute(
-            "INSERT INTO jobs(id, task, folder, mode, state, started_at, parent_job)"
-            " VALUES (?,?,?,?,'running',?,?)",
-            (id, task, folder, mode, now, parent_job),
-        )
-        self.add_part(id, agent, task, folder, now)
-        return self._jobs("WHERE id=?", (id,))[0]
-
-    def next_part_id(self, job_id: str) -> str:
-        """The id the job's next part will get (p1, p2, ...), known before the part exists."""
-        rows = self._db.execute("SELECT id FROM job_parts WHERE job_id=?", (job_id,)).fetchall()
-        return f"p{max((int(r[0][1:]) for r in rows), default=0) + 1}"
-
-    def add_part(
-        self,
-        job_id: str,
-        agent: str,
-        task: str,
-        folder: str,
-        started_at: str,
-        part_id: str | None = None,
-    ) -> str:
-        """Add a running part to a job; returns its id (p1, p2, ...). part_id is one the caller
-        reserved earlier."""
-        part_id = part_id or self.next_part_id(job_id)
-        self._db.execute(
-            "INSERT INTO job_parts(job_id, id, agent, task, state, started_at, folder)"
-            " VALUES (?,?,?,?,'running',?,?)",
-            (job_id, part_id, agent, task, started_at, folder),
-        )
-        return part_id
-
-    def parts_of(self, job_id: str) -> list[JobPart]:
-        job = self.get_job(job_id)
-        return job.parts if job else []
-
-    def update_part(self, job_id: str, part_id: str, **fields) -> None:
-        unknown = set(fields) - _PART_FIELDS
-        if unknown:
-            raise ValueError(f"Unknown part fields: {', '.join(sorted(unknown))}")
-        if not fields:
-            return
-        if isinstance(fields.get("report"), str):
-            fields["report"] = fields["report"][:JOB_RESULT_CAP]
-        if isinstance(fields.get("progress"), str):
-            fields["progress"] = fields["progress"][-JOB_PROGRESS_CAP:]  # a running tail
-        sets = ", ".join(f"{k}=?" for k in fields)
-        self._db.execute(
-            f"UPDATE job_parts SET {sets} WHERE job_id=? AND id=?",
-            (*fields.values(), job_id, part_id),
-        )
-
-    def set_title(self, job_id: str, title: str) -> None:
-        """Scout's own title for a job; only a safety cap on storage, never a rewrite."""
-        self.update_job(job_id, title=title[:JOB_TITLE_CAP])
-
-    def set_result(self, job_id: str, text: str) -> None:
-        """Scout's own words for the whole job; replaces the earlier one."""
-        self.update_job(job_id, scout_result=text[:JOB_RESULT_CAP])
-
-    def close_job(self, job_id: str, at: str) -> None:
-        """Mark the job closed: Scout judged the work done. Its state stays the last outcome."""
-        self.update_job(job_id, closed_at=at)
-
-    def set_watch(self, job_id: str, items: list[dict] | None) -> None:
-        """Replace Scout's watch list for a job; none or empty clears it."""
-        self.update_job(job_id, watch=json.dumps(items) if items else None)
-
-    def update_job(self, id: str, **fields) -> None:
-        """Job-level fields only (part fields go through update_part). Ending a job (a state
-        other than running) settles its running parts."""
-        unknown = set(fields) - _JOB_FIELDS
-        if unknown:
-            raise ValueError(f"Unknown job fields: {', '.join(sorted(unknown))}")
-        if not fields:
-            return
-        sets = ", ".join(f"{k}=?" for k in fields)
-        self._db.execute(f"UPDATE jobs SET {sets} WHERE id=?", (*fields.values(), id))
-        if fields.get("state") not in (None, "running"):
-            self._db.execute(
-                "UPDATE job_parts SET state=?, ended_at=COALESCE(?, ended_at)"
-                " WHERE job_id=? AND state='running'",
-                (fields["state"], fields.get("ended_at"), id),
-            )
 
     def save_activity(self, job_id: str, entry: ActivityEntry) -> None:
         self._db.execute(
@@ -364,74 +195,6 @@ class Memory:
                 text=DROPPED_MARKER,
             ),
         )
-
-    def get_job(self, id: str) -> Job | None:
-        rows = self._jobs("WHERE id=?", (id,))
-        return rows[0] if rows else None
-
-    def last_part_for(self, agent: str, folder: str) -> tuple[Job, JobPart] | None:
-        """The expert's newest finished part in this folder that saved a session. Folders compare
-        as paths (Windows ignores case, a trailing slash is nothing), not as SQL strings."""
-        rows = self._db.execute(
-            "SELECT job_id, id, folder FROM job_parts"
-            " WHERE agent=? AND state!='running' AND session_id IS NOT NULL"
-            " ORDER BY rowid DESC LIMIT 50",
-            (agent,),
-        ).fetchall()
-        for job_id, part_id, part_folder in rows:
-            job = self.get_job(job_id)
-            if job is not None and Path(part_folder or job.folder) == Path(folder):
-                return job, next(p for p in job.parts if p.id == part_id)
-        return None
-
-    def list_jobs(self, limit: int = 20) -> list[Job]:
-        """Newest first."""
-        return self._jobs(limit=limit)
-
-    def running_jobs(self) -> list[Job]:
-        return self._jobs("WHERE state='running'")
-
-    def stop_running_on_start(self) -> None:
-        """No job survives a brain restart; mark the leftovers stopped, each running part's log
-        ending there."""
-        now = self._now().isoformat()
-        for job in self.running_jobs():
-            for part in job.parts:
-                if part.state != "running":
-                    continue
-                self.save_activity(
-                    job.id,
-                    ActivityEntry(
-                        rev=self.last_rev(job.id) + 1,
-                        seq=self.max_seq(job.id) + 1,
-                        at=now,
-                        kind="end",
-                        text="# stopped",
-                        part=part.id,
-                    ),
-                )
-        self._db.execute(
-            "DELETE FROM timers WHERE job_id IN (SELECT id FROM jobs WHERE state='running')"
-        )
-        self._db.execute(
-            "UPDATE job_parts SET state='stopped', reason='brain restarted', ended_at=?"
-            " WHERE state='running'",
-            (now,),
-        )
-        self._db.execute(
-            "UPDATE jobs SET state='stopped', ended_at=?, closed_at=COALESCE(closed_at, ?)"
-            " WHERE state='running'",
-            (now, now),
-        )
-
-    def unreported_jobs(self) -> list[Job]:
-        return self._jobs(
-            "WHERE state!='running'"
-            " AND EXISTS(SELECT 1 FROM job_parts p WHERE p.job_id=jobs.id AND p.reported=0)"
-        )
-
-    def mark_reported(self, id: str) -> None:
-        self._db.execute("UPDATE job_parts SET reported=1 WHERE job_id=?", (id,))
 
     def _timers(self, where: str = "", args: tuple = ()) -> list[Timer]:
         rows = self._db.execute(

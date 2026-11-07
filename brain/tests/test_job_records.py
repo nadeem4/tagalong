@@ -74,7 +74,7 @@ def test_update_part_state_uses_transition(records, work):
     records.add_job("j1", "claude-acp", "t", "C:/a", "ask")
     records.update_part("j1", "p1", state="done", reason="done", report="all good")
     (part,) = records.get_job("j1").parts
-    assert (part.state, part.reason, part.report) == ("done", "done", "all good")
+    assert (part.state, part.reason, part.report) == ("done", None, "all good")  # no news in "done"
     assert part.ended_at == "2026-01-01T12:00:00+00:00"
     with pytest.raises(TransitionRefused):  # a second writer finds it already ended
         records.update_part("j1", "p1", state="failed", reason="late")
@@ -215,3 +215,47 @@ def test_stop_running_on_start_cancels_parts_and_goal(records, work):
     assert job.closed_at is not None
     assert work.get("fin").state == "active"  # a finished job is left alone
     assert {j.id for j in records.unreported_jobs()} == {"run", "fin"}  # both are news to Scout
+
+
+@pytest.mark.parametrize("state", ["cancelled", "failed"])
+def test_last_part_for_counts_stopped_and_failed_parts(records, state):
+    records.add_job("a", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("a", "p1", session_id="s-a")
+    records.update_part("a", "p1", state=state, reason="x")
+    job, part = records.last_part_for("claude-acp", "C:/a")
+    assert (job.id, part.session_id) == ("a", "s-a")
+
+
+def test_last_part_for_ignores_parts_without_a_session_and_picks_the_newest(records):
+    records.add_job("a", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("a", "p1", state="done", reason="done")  # no session saved
+    assert records.last_part_for("claude-acp", "C:/a") is None
+    records.add_job("b", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("b", "p1", session_id="s-b", state="done", reason="done")
+    records.add_job("c", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("c", "p1", session_id="s-c", state="done", reason="done")
+    assert records.last_part_for("claude-acp", "C:/a")[0].id == "c"
+
+
+def test_last_part_for_uses_the_parts_folder_and_expert_in_a_mixed_job(records):
+    records.add_job("j", "codex", "t", "C:/a", "ask")
+    records.add_part("j", "claude-acp", "t2", "C:/b")
+    records.update_part("j", "p1", session_id="s-codex", state="done", reason="done")
+    records.update_part("j", "p2", session_id="s-claude", state="done", reason="done")
+    job, part = records.last_part_for("claude-acp", "C:/b")
+    assert (job.id, part.id, part.session_id) == ("j", "p2", "s-claude")
+    assert records.last_part_for("claude-acp", "C:/a") is None  # the job's folder is not p2's
+    assert records.last_part_for("codex", "C:/a")[1].id == "p1"
+
+
+def test_last_part_for_matches_folder_spelling_variants(records):
+    records.add_job("a", "claude-acp", "t", "C:/Proj/", "ask")
+    records.update_part("a", "p1", session_id="s", state="done", reason="done")
+    assert records.last_part_for("claude-acp", "C:/Proj") is not None
+    assert records.last_part_for("claude-acp", "c:\\proj") is not None
+
+
+def test_a_failed_part_keeps_its_reason(records):
+    records.add_job("a", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("a", "p1", state="failed", reason="connection lost")
+    assert records.get_job("a").parts[0].reason == "connection lost"

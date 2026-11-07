@@ -90,7 +90,7 @@ class JobRecords:
             agent=detail.get("agent") or "",
             task=(call.input or {}).get("task", call.title),
             state=call.state,
-            reason=call.end_reason,
+            reason=None if call.end_reason == home_state(call.state) else call.end_reason,
             progress=call.progress,
             session_id=(call.checkpoint or {}).get("session_id"),
             report=None,  # filled by the caller: it may need the output store
@@ -237,8 +237,9 @@ class JobRecords:
         work_id = f"{job_id}.{part_id}"
         if isinstance(fields.get("progress"), str):
             self.work.update(work_id, progress=fields["progress"][-JOB_PROGRESS_CAP:])
-        if fields.get("session_id") is not None:
-            self.work.update(work_id, checkpoint={"session_id": fields["session_id"]})
+        if "session_id" in fields:  # None forgets the session
+            session = fields["session_id"]
+            self.work.update(work_id, checkpoint={"session_id": session} if session else {})
         if isinstance(fields.get("report"), str):
             self._store_text(work_id, fields["report"])
         if fields.get("state") is not None:

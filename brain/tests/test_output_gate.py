@@ -8,8 +8,9 @@ import json
 import pytest
 
 from brain.guards import Guards
+from brain.job_records import Job, JobPart
 from brain.jobs import job_note
-from brain.memory import Job, JobPart, Memory
+from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.outputs import OutputStore
 from brain.toolbox import Toolbox, ToolSpec

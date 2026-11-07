@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import acp
 import pytest
 from acp import schema
+from job_rows import records_for
 
 from brain import job_activity
 from brain.guards import Guards
@@ -18,6 +19,7 @@ SECRET = "fake-token-12345678"
 class Rig:
     def __init__(self, tmp_path, mask=None) -> None:
         self.memory = Memory(tmp_path / "t.db")
+        self.records = records_for(self.memory)
         self.changes = 0
         self.log = JobActivity(
             "j",
@@ -421,12 +423,12 @@ def test_summary_counts_steps_and_failed_steps(rig):
         rig.memory,
         [cmd("a", "1"), cmd("b", "2"), cmd("c", "3", 1, "failed"), cmd("d", "4"), cmd("e", "5")],
     )
-    assert "steps: 5, failed: 1" in job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "steps: 5, failed: 1" in job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
 
 
 def test_summary_lists_a_failed_command_with_exit_and_last_three_output_lines(rig):
     seed(rig.memory, [cmd("npm test", "1", 1, "failed"), outrow("l1\nl2\nl3\nl4\nl5", "1")])
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert "failed: npm test (exit 1)" in text
     assert "l3" in text and "l4" in text and "l5" in text
     assert "l2" not in text
@@ -434,7 +436,7 @@ def test_summary_lists_a_failed_command_with_exit_and_last_three_output_lines(ri
 
 def test_summary_lists_the_last_five_commands_with_exit_codes_oldest_first(rig):
     seed(rig.memory, [cmd(f"c{i}", str(i), i % 2) for i in range(1, 8)])
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     recent = text[text.index("recent:") :]
     assert "c1 " not in recent and "c2 " not in recent
     assert recent.index("c3 (exit 1)") < recent.index("c4 (exit 0)") < recent.index("c7 (exit 1)")
@@ -442,18 +444,18 @@ def test_summary_lists_the_last_five_commands_with_exit_codes_oldest_first(rig):
 
 def test_summary_names_the_running_step_and_how_long(rig):
     seed(rig.memory, [cmd("npm install", "1", None, "running", 34)])
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert "running: npm install, 34 min" in text
 
 
 def test_summary_for_a_job_with_no_entries_is_one_short_line(rig):
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert "\n" not in text and "no activity" in text
 
 
 def test_summary_is_cut_to_the_cap_on_a_character_boundary(rig):
     seed(rig.memory, [cmd("é" * 10_000, "1", 1, "failed"), outrow("ü" * 10_000, "1")])
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert 0 < len(text) <= job_activity.SUMMARY_CAP
     text.encode()  # a clean string: no half character
 
@@ -465,7 +467,7 @@ def test_running_step_survives_three_long_failures(rig):
         rows += [cmd("c" * 200 + str(i), str(i), 1, "failed"), outrow(output, str(i))]
     rows.append(cmd("npm install", "9", None, "running", 34))
     seed(rig.memory, rows)
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert len(text) <= job_activity.SUMMARY_CAP
     assert "running: npm install, 34 min" in text
     assert text.index("running:") < text.index("failed: c")
@@ -482,7 +484,7 @@ def test_fit_keeps_earlier_lines_whole_and_cuts_only_the_last_with_an_ellipsis()
 
 def test_a_command_with_nonzero_exit_counts_as_failed_even_if_status_is_done(rig):
     seed(rig.memory, [cmd("make", "1", 2, "done")])
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert "failed: 1" in text and "failed: make (exit 2)" in text
 
 
@@ -566,9 +568,10 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
 # --- parts (SP2): one ordered log per job, each step tagged with its part
 
 
-def two_part_logs(memory):
-    memory.add_job("j", "claude-code", "t", "/w", "work")
-    memory.add_part("j", "gemini", "t2", "f", NOW.isoformat())
+def two_part_logs(rig):
+    memory = rig.memory
+    rig.records.add_job("j", "claude-code", "t", "/w", "work")
+    rig.records.add_part("j", "gemini", "t2", "f")
 
     def log(part):
         return JobActivity("j", memory, lambda t: t, lambda: NOW, lambda: None, part=part)
@@ -577,13 +580,13 @@ def two_part_logs(memory):
 
 
 def test_entries_carry_their_part(rig):
-    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "ls"}))
     assert {e.part for e in rig.rows()} == {"p1"}
 
 
 def test_two_parts_share_one_ordered_log(rig):
-    one, two = two_part_logs(rig.memory)
+    one, two = two_part_logs(rig)
     one.on_update(start("t1", raw_input={"command": "a"}))
     two.on_update(start("t1", raw_input={"command": "b"}))
     one.on_update(start("t2", raw_input={"command": "c"}))
@@ -592,7 +595,7 @@ def test_two_parts_share_one_ordered_log(rig):
 
 
 def test_a_second_part_continues_the_jobs_seq(rig):
-    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "a"}))
     later = JobActivity("j", rig.memory, lambda t: t, lambda: NOW, lambda: None, part="p2")
     later.on_update(start("t1", raw_input={"command": "b"}))
@@ -600,19 +603,19 @@ def test_a_second_part_continues_the_jobs_seq(rig):
 
 
 def test_summary_names_the_expert_when_a_job_has_several_parts(rig):
-    one, two = two_part_logs(rig.memory)
+    one, two = two_part_logs(rig)
     one.on_update(start("t1", raw_input={"command": "npm test"}))
     two.on_update(start("t1", raw_input={"command": "make"}))
     two.on_update(progress("t1", "failed", "boom"))
-    text = job_activity.activity_summary(rig.memory, "j", NOW)
+    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
     assert "[gemini] make" in text and "[claude-code] npm test" in text
     assert "boom" in text
 
 
 def test_summary_of_a_one_part_job_has_no_expert_tag(rig):
-    rig.memory.add_job("j", "claude-code", "t", "/w", "work")
+    rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "ls"}))
-    assert "[" not in job_activity.activity_summary(rig.memory, "j", NOW)
+    assert "[" not in job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
 
 
 def test_tool_step_is_a_masked_capped_tool_entry_with_its_source(tmp_path):

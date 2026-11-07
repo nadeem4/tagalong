@@ -10,6 +10,7 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from job_rows import records_for
 
 from brain.bodies import Bodies
 from brain.events import EventKind
@@ -255,10 +256,10 @@ async def test_turn_offers_the_expert_tools_and_home_gets_two():
 
 def test_session_start_marks_running_jobs_stopped():
     memory = Memory(":memory:")
-    memory.add_job("j1", "claude_code", "task", "C:/x", "default")
+    records_for(memory).add_job("j1", "claude_code", "task", "C:/x", "default")
     session, _ = make(Gate([]), memory)
     job = session.jobs.list()[0]
-    assert job.state == "stopped" and job.parts[-1].reason == "brain restarted"
+    assert job.state == "cancelled" and job.parts[-1].reason == "brain restarted"
 
 
 class PictureApps:
@@ -836,13 +837,13 @@ async def test_wake_held_while_busy_runs_after_the_turn_ends():
     session.say("desktop", say("a"))
     session.jobs._on_finished(end_job(memory))
     assert (
-        states(sent) == [] and not memory.get_job("j1").parts[-1].reported
+        states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
     )  # the say turn still runs
     gate.set()
     await idle(session)
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert "Event: job_ended" in model.seen[-1][-1]["content"][-1]["text"]
-    assert memory.get_job("j1").parts[-1].reported
+    assert records_for(memory).get_job("j1").parts[-1].reported
     assert rebuild_history(memory.load_messages()) == session.history
 
 
@@ -953,7 +954,7 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert states(sent) == [] and not memory.get_job("j1").parts[-1].reported
+    assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
 
 
 async def test_say_during_a_wake_turn_joins_it():
@@ -975,10 +976,11 @@ async def test_say_during_a_wake_turn_joins_it():
 
 
 def end_job(memory, job_id="j1", result="all good", state="done"):
-    memory.add_job(job_id, "claude_code", "fix the build", "C:/x", "default")
-    memory.update_part(job_id, "p1", reason="end_turn", report=result)
-    memory.update_job(job_id, state=state, ended_at="t")
-    return memory.get_job(job_id)
+    records = records_for(memory)
+    records.add_job(job_id, "claude_code", "fix the build", "C:/x", "default")
+    work_state = {"done": "done", "error": "failed", "stopped": "cancelled"}[state]
+    records.update_part(job_id, "p1", state=work_state, reason="end_turn", report=result)
+    return records.get_job(job_id)
 
 
 async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_on_start():
@@ -988,7 +990,7 @@ async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_
     join(session, "desktop")
     job = end_job(memory)
     session.jobs._on_finished(job)
-    assert memory.get_job("j1").parts[-1].reported  # the turn started right away
+    assert records_for(memory).get_job("j1").parts[-1].reported  # the turn started right away
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert text.startswith('<data kind="event">') and text.endswith("</data>")
@@ -1014,10 +1016,10 @@ async def test_job_ended_default_batches_30_seconds():
     session, sent = make(Gate(["ok"]), memory, kinds=None, now=lambda: clock[0])
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
-    assert states(sent) == [] and not memory.get_job("j1").parts[-1].reported
+    assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
     clock[0] += datetime.timedelta(seconds=30)
     session.scheduler.pump()
-    assert memory.get_job("j1").parts[-1].reported
+    assert records_for(memory).get_job("j1").parts[-1].reported
     await idle(session)
     assert states(sent) == ["started", "ended"]
 
@@ -1026,9 +1028,9 @@ async def test_not_reported_until_a_body_is_there_to_tell():
     memory = Memory(":memory:")
     session, _ = make(Gate(["ok"]), memory)
     session.jobs._on_finished(end_job(memory))
-    assert not memory.get_job("j1").parts[-1].reported
+    assert not records_for(memory).get_job("j1").parts[-1].reported
     join(session, "desktop")
-    assert memory.get_job("j1").parts[-1].reported
+    assert records_for(memory).get_job("j1").parts[-1].reported
     await idle(session)
 
 
@@ -1047,9 +1049,11 @@ async def test_a_hostile_result_cannot_close_the_fence():
 async def test_restart_queues_only_finished_unreported_jobs():
     memory = Memory(":memory:")
     end_job(memory, "old", state="done")
-    memory.mark_reported("old")
+    records_for(memory).mark_reported("old")
     end_job(memory, "fresh", state="error")
-    memory.add_job("alive", "claude_code", "t", "C:/x", "default")  # stopped by the restart
+    records_for(memory).add_job(
+        "alive", "claude_code", "t", "C:/x", "default"
+    )  # stopped by the restart
     model = Gate(["a"])
     session, _ = make(model, memory)
     join(session, "desktop")
@@ -1058,7 +1062,7 @@ async def test_restart_queues_only_finished_unreported_jobs():
     assert len(told) == 1  # held with no body, so both batch into one wake
     assert "Job fresh ended" in told[0] and "Job alive ended" in told[0]
     assert "Job old ended" not in told[0]
-    assert not memory.unreported_jobs()
+    assert not records_for(memory).unreported_jobs()
 
 
 async def test_a_due_timer_wakes_scout_with_its_note():
@@ -1085,8 +1089,8 @@ async def test_session_job_timer_wake_includes_watching_and_activity():
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=kinds, now=lambda: now)
     # A job running after startup (startup stops any left over), then its timer comes due.
-    memory.add_job("j1", "a", "t", "f", "m")
-    memory.set_watch("j1", [{"text": "tests pass", "done": False}])
+    records_for(memory).add_job("j1", "a", "t", "f", "m")
+    records_for(memory).set_watch("j1", [{"text": "tests pass", "done": False}])
     memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
     session.timers.fire_due()
     join(session, "desktop")
@@ -1516,7 +1520,9 @@ async def test_finished_job_is_told_when_the_person_returns():
 async def test_job_ended_while_the_brain_was_down_is_told_on_start():
     memory = Memory(":memory:")
     end_job(memory)  # ended, never told
-    memory.add_job("j2", "claude_code", "still going", "C:/x", "default")  # killed by the restart
+    records_for(memory).add_job(
+        "j2", "claude_code", "still going", "C:/x", "default"
+    )  # killed by the restart
     model = Gate(["ok"])
     session, _ = make(model, memory)
     await settle()
@@ -1531,7 +1537,7 @@ async def test_question_while_nobody_is_online_is_told_when_someone_returns():
     memory = Memory(":memory:")
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=AWAY_KINDS)
-    memory.add_job("j1", "claude_code", "fix the build", "C:/x", "default")
+    records_for(memory).add_job("j1", "claude_code", "fix the build", "C:/x", "default")
     question = Question("Which database?", [QuestionField("db", "Database", ["pg", "sqlite"])])
     assert await session.jobs._question("j1", question) is None
     await settle()
@@ -1547,7 +1553,7 @@ async def test_permission_while_nobody_is_online_is_told_when_someone_returns():
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=AWAY_KINDS)
     # added after the Session starts, which stops rows left running by a dead brain
-    memory.add_job("j1", "claude_code", "fix the build", "C:/x", "default")
+    records_for(memory).add_job("j1", "claude_code", "fix the build", "C:/x", "default")
     request = PermissionRequest(
         "Run rm -rf build", "execute", {}, [PermissionOption("a", "Allow once", "allow_once")]
     )
@@ -1571,7 +1577,7 @@ async def test_news_is_told_once_not_twice():
     await idle(session)
     assert len(model.seen) == 1
     again, _ = make(Gate(["never"]), memory)  # nor does a restart
-    assert not memory.unreported_jobs()
+    assert not records_for(memory).unreported_jobs()
     join(again, "desktop")
     await idle(again)
     assert again._model.seen == []
@@ -1966,7 +1972,9 @@ async def test_wake_without_key_does_nothing():
     await settle()
     assert states(sent) == []
     assert session.history == []
-    assert not memory.get_job("j1").parts[-1].reported  # told at a later start, once a key is set
+    assert (
+        not records_for(memory).get_job("j1").parts[-1].reported
+    )  # told at a later start, once a key is set
 
 
 async def test_job_ended_wake_carries_the_activity_summary():
@@ -2006,7 +2014,7 @@ async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
     tz = datetime.timezone(datetime.timedelta(hours=1))
     now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
     memory = Memory(":memory:")
-    memory.add_job("j1", "a", "t", "f", "m")  # left running by the dead brain
+    records_for(memory).add_job("j1", "a", "t", "f", "m")  # left running by the dead brain
     memory.add_timer("check the job", now - datetime.timedelta(minutes=1), job_id="j1")
     kinds = {
         "timer": EventKind("timer", batch_seconds=0, max_per_hour=6),
@@ -2018,7 +2026,7 @@ async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
     session.scheduler.pump()
     await idle(session)
     assert memory.list_timers() == []
-    assert memory.get_job("j1").state == "stopped"
+    assert records_for(memory).get_job("j1").state == "cancelled"
     texts = [m[-1]["content"][-1]["text"] for m in model.seen]
     assert texts and all("Event: timer" not in t for t in texts)  # only the job_ended wake
 
@@ -2032,7 +2040,7 @@ async def test_job_ended_still_wakes_scout_after_cleanup():
     }
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=kinds, now=lambda: now)
-    memory.add_job("j1", "claude_code", "t", "C:/x", "default")
+    records_for(memory).add_job("j1", "claude_code", "t", "C:/x", "default")
     # A fired one-off, held by the scheduler (no body online), and a future repeating timer
     # that keeps the sleeper armed.
     fired = memory.add_timer("look", now - datetime.timedelta(minutes=1), job_id="j1")
@@ -2288,13 +2296,13 @@ async def test_bookkeeping_tools_are_not_recorded():
         ]
     )
     assert steps_of(memory) == []
-    assert memory.get_job("j1").scout_result == "done"
+    assert records_for(memory).get_job("j1").scout_result == "done"
 
 
 async def test_owner_turn_without_a_job_records_nothing():
     memory = Memory(":memory:")
     end_job(memory)
-    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
+    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     session, _ = make(Gate([tool_use("recall", query="x"), "ok"]), memory)
     join(session, "desktop")
     session.say("desktop", say("what do you remember"))
@@ -2305,7 +2313,7 @@ async def test_owner_turn_without_a_job_records_nothing():
 async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_ends_with_the_turn():
     memory = Memory(":memory:")
     end_job(memory)
-    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
+    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     session, _ = make(
         Gate(
             [
@@ -2331,15 +2339,15 @@ async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_e
 async def test_a_job_tool_for_another_job_records_on_that_job_plain_tools_stay_on_the_turns_job():
     memory = Memory(":memory:")
     end_job(memory)
-    memory.mark_reported("j1")  # no wake of its own: only the owner turn runs
+    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     end_job(memory, "j2")
-    memory.mark_reported("j2")
+    records_for(memory).mark_reported("j2")
     session, _ = make(
         Gate([tool_use("close_job", "a", job="j2"), tool_use("recall", "b", query="x"), "ok"]),
         memory,
     )
     join(session, "desktop")
-    session.jobs._on_finished(memory.get_job("j1"))
+    session.jobs._on_finished(records_for(memory).get_job("j1"))
     await idle(session)
     assert [s.source for s in steps_of(memory, "j2")] == ["scout:close_job"]
     assert [s.source for s in steps_of(memory, "j1")] == ["scout:recall"]
@@ -2385,7 +2393,7 @@ async def test_scouts_tool_steps_stay_out_of_the_summary_and_never_wake_for_a_fa
     memory = Memory(":memory:")
     session, _ = make(Gate(["ok"]), memory)
     end_job(memory)
-    memory.mark_reported("j1")
+    records_for(memory).mark_reported("j1")
     emitted = []
     session.jobs._emit = lambda event, **hooks: emitted.append(event.kind)
     session.jobs.record_step("j1", "app:files", "list", "failed")

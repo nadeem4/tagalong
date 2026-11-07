@@ -10,6 +10,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from brain.events import Event
+from brain.job_records import JobRecords, home_state
 from brain.memory import Memory, Timer
 
 log = logging.getLogger("brain")
@@ -23,12 +24,14 @@ class Timers:
     def __init__(
         self,
         memory: Memory,
+        records: JobRecords,
         emit: Callable[..., None],
         now: Callable[[], datetime],
         job_facts: Callable[[str], dict] = lambda job_id: {},
     ) -> None:
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._memory = memory
+        self._records = records
         self._emit = emit
         self._now = now
         self._handle: asyncio.TimerHandle | None = None
@@ -56,10 +59,10 @@ class Timers:
     def _emit_one(self, t: Timer) -> None:
         facts = {"id": t.id, "note": t.note, "repeat_minutes": (t.repeat_s or 0) // 60}
         if t.job_id:
-            job = self._memory.get_job(t.job_id)
+            job = self._records.get_job(t.job_id)
             facts["job"] = t.job_id
             if job is not None:
-                facts["state"] = job.state
+                facts["state"] = home_state(job.state)
             facts.update(self._job_facts(t.job_id))
         event = Event("timer", facts, key=f"timer:{t.id}")
         if t.repeat_s:
