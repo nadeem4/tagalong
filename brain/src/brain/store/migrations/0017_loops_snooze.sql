@@ -1,0 +1,1 @@
+ALTER TABLE loops ADD COLUMN snoozed_until TEXT;
