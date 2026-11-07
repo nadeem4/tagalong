@@ -8,7 +8,8 @@ import sqlite3
 
 import pytest
 
-from brain.store.db import Migration, load_migrations, migrate, open_db, utc_text
+from brain.store import db as store_db
+from brain.store.db import Migration, load_migrations, migrate, open_db, transaction, utc_text
 
 
 def _version(db: sqlite3.Connection) -> int:
@@ -117,3 +118,64 @@ def test_utc_text_is_whole_seconds_in_utc():
     at = datetime(2026, 1, 2, 3, 4, 5, 999, tzinfo=timezone(timedelta(hours=2)))
     assert utc_text(at) == "2026-01-02T01:04:05+00:00"
     assert utc_text(datetime(2026, 1, 2, tzinfo=UTC)) == "2026-01-02T00:00:00+00:00"
+
+
+def test_transaction_commits_on_success(tmp_path):
+    db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
+    db.execute("CREATE TABLE t(x)")
+    with transaction(db):
+        db.execute("INSERT INTO t VALUES (1)")
+    assert not db.in_transaction
+    other = sqlite3.connect(tmp_path / "t.db")
+    assert other.execute("SELECT count(*) FROM t").fetchone()[0] == 1
+    other.close()
+    db.close()
+
+
+def test_transaction_rolls_back_and_reraises(tmp_path):
+    db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
+    db.execute("CREATE TABLE t(x)")
+    with pytest.raises(ValueError, match="boom"):
+        with transaction(db):
+            db.execute("INSERT INTO t VALUES (1)")
+            raise ValueError("boom")
+    assert not db.in_transaction
+    assert db.execute("SELECT count(*) FROM t").fetchone()[0] == 0
+    db.close()
+
+
+def test_failed_open_leaves_no_write_open(tmp_path, monkeypatch):
+    path = tmp_path / "f.db"
+    bad = [
+        Migration(1, "a", "CREATE TABLE a(x);", None),
+        Migration(2, "b", "CREATE TABLE h(x); CREATE TABLE h(x);", None),
+    ]
+    monkeypatch.setattr(store_db, "load_migrations", lambda: bad)
+    with pytest.raises(sqlite3.OperationalError):
+        open_db(path)
+    other = sqlite3.connect(path, timeout=0.2, isolation_level=None)
+    other.execute("BEGIN IMMEDIATE")
+    other.execute("ROLLBACK")
+    other.close()
+    monkeypatch.undo()
+    db = open_db(path)
+    assert _version(db) == 17
+    db.close()
+
+
+@pytest.mark.parametrize(
+    "name", ["18_work.sql", "0018-work.sql", "0018_work.txt.py", "0018_work.PY"]
+)
+def test_misnamed_migration_file_refused(tmp_path, name):
+    (tmp_path / "0001_a.sql").write_text("SELECT 1;")
+    (tmp_path / name).write_text("SELECT 1;")
+    with pytest.raises(ValueError, match="misnamed"):
+        load_migrations(tmp_path)
+
+
+def test_support_files_are_not_migrations(tmp_path):
+    (tmp_path / "0001_a.sql").write_text("SELECT 1;")
+    (tmp_path / "__init__.py").write_text("")
+    (tmp_path / "__pycache__").mkdir()
+    (tmp_path / "README.md").write_text("notes")
+    assert [m.number for m in load_migrations(tmp_path)] == [1]

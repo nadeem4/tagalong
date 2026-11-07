@@ -359,7 +359,7 @@ def test_compaction_text_reads_content():
 
 def test_upgrade_from_v1_keeps_items(tmp_path):
     path = tmp_path / "v1.db"
-    db = sqlite3.connect(path)
+    db = sqlite3.connect(path, isolation_level=None)
     migrate(db, upto=1)
     db.execute(
         "INSERT INTO memories(kind,text,created_at,updated_at)"
@@ -406,7 +406,7 @@ def test_off_is_a_stored_permission_and_survives_reopen(tmp_path):
 
 def test_off_migration_keeps_rows_stored_before_it(tmp_path):
     path = tmp_path / "old.db"
-    db = sqlite3.connect(str(path))
+    db = sqlite3.connect(str(path), isolation_level=None)
     migrate(db, upto=14)  # the schema as it was before Off existed (0015)
     db.execute("INSERT INTO permissions(tool, mode) VALUES ('x', 'auto')")
     db.commit()

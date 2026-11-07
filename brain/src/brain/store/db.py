@@ -45,6 +45,8 @@ def load_migrations(directory: Path = MIGRATIONS_DIR) -> list[Migration]:
     for path in sorted(directory.iterdir()):
         match = _FILE.match(path.name)
         if match is None:
+            if path.suffix.lower() in (".sql", ".py") and path.name != "__init__.py":
+                raise ValueError(f"misnamed migration file {path.name}: expected NNNN_name.sql/.py")
             continue
         number, name, kind = int(match[1]), match[2], match[3]
         if kind == "sql":
@@ -72,7 +74,7 @@ def migrate(
     if migrations is None:
         migrations = load_migrations()
     version = db.execute("PRAGMA user_version").fetchone()[0]
-    if version > len(migrations):
+    if version > (migrations[-1].number if migrations else 0):
         raise RuntimeError("database is newer than this brain")
     for m in migrations:
         if m.number <= version or (upto is not None and m.number > upto):
