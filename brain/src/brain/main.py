@@ -42,6 +42,7 @@ from brain.setup.registry import Registry
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
+from brain.store.work import WorkStore
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
@@ -156,9 +157,13 @@ async def _run() -> None:
     # reach the session lazily.
     loops = LoopService(
         LoopStore(
+            WorkStore(
+                memory.db,
+                lambda: datetime.now(UTC),
+                lambda text: mask_json(session.guards, "loop", text),
+            ),
             memory.db,
             lambda: datetime.now(UTC),
-            lambda text: mask_json(session.guards, "loop", text),
         ),
         emit_event,
         lambda: datetime.now(UTC),

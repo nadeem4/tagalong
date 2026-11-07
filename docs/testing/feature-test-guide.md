@@ -648,10 +648,12 @@ A due time needs a loop to exist, and the switch only makes loops from real mail
 put in the database by hand. Stop the brain first.
 
 1. **Action:** in `tagalong.db` run this, with the due time (UTC) a minute or two ahead:
-   `INSERT INTO loops(id, source, ref, title, asks, direction, people, due, quiet_after, anchors,
-status, history, created, updated) VALUES ('test0001', 'manual', 'test-1', 'Send Sam the Q4
-numbers', 'send the Q4 numbers', 'i_owe', '["Sam"]', '2026-11-04T09:30:00+00:00', NULL, '[]',
-'held', '[]', '2026-11-04T09:00:00+00:00', '2026-11-04T09:00:00+00:00');`
+   `INSERT INTO work(id, root_id, seq, kind, state, title, due_at, created_at, updated_at)
+VALUES ('test0001', 'test0001', (SELECT COALESCE(MAX(seq),0)+1 FROM work WHERE parent_id IS NULL),
+'loop', 'planned', 'Send Sam the Q4 numbers', '2026-11-04T09:30:00+00:00',
+'2026-11-04T09:00:00+00:00', '2026-11-04T09:00:00+00:00');`
+   then `INSERT INTO work_loop(work_id, source, ref, direction, people, anchors, asks) VALUES
+('test0001', 'manual', 'test-1', 'i_owe', '["Sam"]', '[]', 'send the Q4 numbers');`
    Start the brain and the desktop.
    **Expected:** when the time comes Scout speaks once, without being asked, about sending Sam the
    numbers, in its own words.

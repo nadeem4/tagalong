@@ -146,7 +146,12 @@ def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
         return True
     if kind == "goal" and (frm, to) == ("blocked", "active"):
         return True
-    return kind == "loop" and frm in ("done", "cancelled", "expired") and to == "planned"
+    if kind != "loop":
+        return False
+    # A loop is settled from waiting or after going quiet, and reopens by new mail.
+    if frm in ("planned", "expired") and to in ("done", "cancelled", "expired"):
+        return frm != to
+    return frm in ("done", "cancelled", "expired") and to == "planned"
 
 
 class WorkStore:
@@ -185,7 +190,8 @@ class WorkStore:
         return self._select("parent_id = ?", (id,))
 
     def tree(self, root_id: str) -> list[WorkRow]:
-        return self._select("root_id = ?", (root_id,))
+        # the root first: its seq counts among all roots, the rows under it count from 1
+        return self._select("root_id = ?", (root_id,), "parent_id IS NOT NULL, seq, rowid")
 
     def of_kind(self, kind: str, states: Sequence[str] | None = None) -> list[WorkRow]:
         where, args = "kind = ?", [kind]
@@ -624,6 +630,92 @@ class WorkStore:
     def repeat_of(self, id: str) -> int | None:
         row = self.db.execute("SELECT repeat_s FROM work_timer WHERE work_id = ?", (id,)).fetchone()
         return None if row is None else row[0]
+
+    # ---- work_loop: what a loop is, beside its row ----
+
+    def set_loop_detail(
+        self,
+        work_id: str,
+        *,
+        source: str,
+        ref: str,
+        direction: str,
+        people: list[str],
+        anchors: list[str],
+        quiet_after: datetime | None,
+        asks: str,
+    ) -> None:
+        """Save the detail row (text masked); the snooze is kept as it was."""
+        mask = self.mask
+        self.db.execute(
+            "INSERT INTO work_loop(work_id, source, ref, direction, people, anchors, quiet_after,"
+            " asks) VALUES (?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(work_id) DO UPDATE SET direction = excluded.direction,"
+            " people = excluded.people, anchors = excluded.anchors,"
+            " quiet_after = excluded.quiet_after, asks = excluded.asks",
+            (
+                work_id,
+                source,
+                ref,
+                direction,
+                json.dumps([mask(p) for p in people]),
+                json.dumps([mask(a) for a in anchors]),
+                None if quiet_after is None else utc_text(quiet_after),
+                mask(asks),
+            ),
+        )
+
+    def set_snooze(self, work_id: str, until: datetime | None) -> None:
+        self.db.execute(
+            "UPDATE work_loop SET snoozed_until = ? WHERE work_id = ?",
+            (None if until is None else utc_text(until), work_id),
+        )
+
+    def find_loop(self, source: str, ref: str) -> str | None:
+        row = self.db.execute(
+            "SELECT work_id FROM work_loop WHERE source = ? AND ref = ?", (source, ref)
+        ).fetchone()
+        return None if row is None else row[0]
+
+    def loop_details(self, id: str | None = None) -> dict[str, dict]:
+        """The detail of every loop, or of one."""
+        rows = self.db.execute(
+            "SELECT work_id, source, ref, direction, people, anchors, quiet_after, snoozed_until,"
+            " asks FROM work_loop" + ("" if id is None else " WHERE work_id = ?"),
+            () if id is None else (id,),
+        )
+        return {
+            w: {
+                "source": s,
+                "ref": r,
+                "direction": d,
+                "people": json.loads(p),
+                "anchors": json.loads(a),
+                "quiet_after": q,
+                "snoozed_until": z,
+                "asks": k,
+            }
+            for w, s, r, d, p, a, q, z, k in rows
+        }
+
+    def events_of_kind(self, id: str, kind: str) -> list[WorkEvent]:
+        """All of one row's events of one kind, oldest first."""
+        rows = self.db.execute(
+            "SELECT id, work_id, at, kind, data FROM work_events WHERE work_id = ? AND kind = ?"
+            " ORDER BY id",
+            (id, kind),
+        )
+        return [WorkEvent(i, w, at, k, _loads(d)) for i, w, at, k, d in rows]
+
+    def delete_loops(self, id: str | None = None) -> None:
+        """Remove one loop, or every loop, with its events and detail. The caller holds the
+        transaction, so a wipe can take the cursors in the same one."""
+        where = "kind = 'loop'" + ("" if id is None else " AND id = ?")
+        args = () if id is None else (id,)
+        ids = f"SELECT id FROM work WHERE {where}"
+        self.db.execute(f"DELETE FROM work_events WHERE work_id IN ({ids})", args)
+        self.db.execute(f"DELETE FROM work_loop WHERE work_id IN ({ids})", args)
+        self.db.execute(f"DELETE FROM work WHERE {where}", args)
 
     # ---- what is waiting ----
 

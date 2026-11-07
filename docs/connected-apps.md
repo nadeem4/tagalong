@@ -280,7 +280,7 @@ done, failed or refused. The app's result is never copied there. See Scout's own
 ## Mail as a source for loops
 
 A connected Gmail app can also feed Scout's loops (see [brain.md](brain.md#loops)), but only when
-reading is switched on for that app (the Home switch comes with a later slice; it is off until
+reading is switched on for that app (saved as `apps.reads_mail`) (the Home switch comes with a later slice; it is off until
 then). The loops service reads through `Apps.call` directly, so the toolbox gate is not involved:
 the switch is the consent. The Gmail adapter (`loops/sources/gmail.py`) may call only
 `search_threads` and `get_thread` to read and `create_draft` to draft; it refuses any other tool, so

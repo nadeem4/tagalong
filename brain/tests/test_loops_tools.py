@@ -8,13 +8,13 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from loop_rows import loop_store
 
 from brain.events import Event
 from brain.loops.loop import Loop
 from brain.loops.reader import Change, MailItem
 from brain.loops.service import LoopService
 from brain.loops.sources.gmail import GmailSource
-from brain.loops.store import LoopStore
 from brain.loops.tools import loop_tools
 from brain.masking import Masker
 from brain.memory import Memory
@@ -67,7 +67,7 @@ class Rig:
     def __init__(self, tmp_path):
         self.mem = Memory(tmp_path / "t.db")
         self.clock = Clock()
-        self.store = LoopStore(self.mem.db, self.clock, Masker(lambda: [SECRET]).mask)
+        self.store = loop_store(self.mem, self.clock, Masker(lambda: [SECRET]).mask)
         self.events = []
         self.svc = LoopService(self.store, self.events.append, self.clock, poll_s=3600)
         self.tools = {s.name: (s, h) for s, h in loop_tools(self.svc)}
@@ -276,6 +276,29 @@ async def test_the_first_return_of_the_day_emits_one_digest_of_what_was_held(rig
     rig.add("c", title="Next day")
     rig.svc.saw(Event("body_online", {"body": "d", "offline_seconds": 9000}, key="b"))
     assert len(rig.events) == 2 and rig.events[1].facts["count"] == 1
+
+
+async def test_digest_once_per_local_day(rig):
+    rig.add("a")
+    back = Event("back", {"body": "d", "idle_seconds": 900}, key="back:d")
+    rig.svc.saw(back)
+    rig.svc.saw(back)
+    assert len(rig.events) == 1
+    rig.clock.at = T0 + timedelta(hours=6)  # still the same local day or before the next midnight
+    row = rig.store.work.get("loop-digest")
+    assert datetime.fromisoformat(row.due_at) > T0  # advanced to the next local midnight
+    rig.clock.at = T0 + timedelta(days=2)
+    rig.add("b")
+    rig.svc.saw(back)
+    assert len(rig.events) == 2
+
+
+async def test_an_empty_day_still_advances_the_digest(rig):
+    rig.svc.saw(Event("back", {"body": "d", "idle_seconds": 900}, key="back:d"))
+    assert rig.events == []
+    rig.add("late")
+    rig.svc.saw(Event("back", {"body": "d", "idle_seconds": 900}, key="back:d"))
+    assert rig.events == []  # it was spent: the next digest is the next local midnight
 
 
 async def test_nothing_held_today_means_no_digest(rig):

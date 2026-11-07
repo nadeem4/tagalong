@@ -44,7 +44,9 @@ def _kinds(store, work_id):
 
 def test_create_root_sets_root_id_to_self(store):
     row = store.create("goal", "Fix export")
-    assert row.root_id == row.id and row.parent_id is None and row.seq == 1
+    assert (
+        row.root_id == row.id and row.parent_id is None and row.seq == 2
+    )  # the loop digest is root 1
     assert len(row.id) == 8 and row.state == "planned"
     assert store.get(row.id) == row
     assert store.get("nope") is None

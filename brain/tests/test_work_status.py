@@ -88,3 +88,10 @@ async def test_work_status_by_words(work, run):
 def test_work_status_is_a_scout_read_tool(run):
     assert run.spec.audience == frozenset({"scout"})
     assert run.spec.effect == "read"
+
+
+async def test_work_status_open_leaves_out_loops_and_the_digest(work, run):
+    work.create("goal", "Open one", id="open1", state="active")
+    work.create("loop", "Reply to Sam", id="loop1")
+    out = await run({})
+    assert [r["id"] for r in out["open"]] == ["open1"]

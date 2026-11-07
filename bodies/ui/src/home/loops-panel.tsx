@@ -19,7 +19,6 @@ const SHORT_TIME: Intl.DateTimeFormatOptions = {
 };
 const STATUS: Record<LoopRow['status'], string> = {
   held: 'Held',
-  surfaced: 'Mentioned',
   snoozed: 'Snoozed',
   done: 'Done',
   dropped: 'Dropped',

@@ -1462,13 +1462,14 @@ creates a loop before that.
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
   (`i_owe` or `they_owe`), people, a `due` time, a `quiet_after` time, anchors (window or page names
-  that mean "you are working on this", used later), a status (`held`, `surfaced`, `snoozed`,
+  that mean "you are working on this", used later), a status (`held`, `snoozed`,
   `done`, `dropped`, `stale`), a map of when each anchor last surfaced it, and a history.
-- **Store** (`loops/store.py`). `LoopStore` works over the connection `Memory` already opened
-  (`Memory.db`), so loops live in `tagalong.db`; see [Memory](memory.md#loops-tables). Saving the
-  same (source, ref) updates the loop and never duplicates it. Text is masked (`[secret]`) before
-  it is written, history included. `forget` removes one loop; `wipe` removes every loop, the
-  surface log and the per-app cursor.
+- **Store** (`loops/store.py`). `LoopStore` is a thin layer over the work store: a loop is a `loop`
+  work row plus a `work_loop` detail row, with its history and "surfaced" marks as events; the
+  per-app read cursors are `app_cursors` and the mail switch is `apps.reads_mail` (see
+  [Memory](memory.md#loops) and [storage.md](storage.md#work_loop)). Saving the same (source, ref)
+  updates the loop and never duplicates it. Text is masked (`[secret]`) before it is written,
+  history included. `forget` removes one loop; `wipe` removes every loop and the mail cursors.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
@@ -1487,7 +1488,7 @@ creates a loop before that.
 - **Triggers** (`loops/triggers/`: `context.py`, `due.py`, `urgent.py`, `quiet.py`, `stale.py`, pure
   rules; the service owns timing). Five reasons:
   - _context._ `Session.body_event` also hands every `focus` (app, title) and `tab` (title, url)
-    event to `loops.saw`; they stay non-waking events. A `held` or `surfaced` loop surfaces when a
+    event to `loops.saw`; they stay non-waking events. A `held` loop surfaces when a
     window or tab matches one of its anchors. An anchor matches only if, after lowercasing and
     dropping punctuation, it has at least two words that are not on the stoplist (Untitled,
     Document1, New Tab, Inbox, Home, app names and similar), or it is a file name (`Q4 pricing.pptx`:
@@ -1536,7 +1537,7 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
   `wipe` stops everything and deletes every loop and cursor). Home's "Read my
   mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
-  turns it on. The switch is saved (an `on:<app>` key in `loop_cursor`, set by `enable`, deleted by
+  turns it on. The switch is saved (the `apps.reads_mail` column, set by `enable`, cleared by
   `disable`), and `start()` turns on every saved app without checking that it can be read yet (apps connect after
   `start()`, so their tools are not listed then). A poll before the app is connected fails and is
   retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
@@ -1605,8 +1606,9 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     offer the drafted reply (`loop_draft`). No new column or job field.
   - _Digest._ On the first `back` or `body_online` of a local day, if any `held` loop was created
     that day, the service sends one `loop` event `reason=digest` (`count`, and `loops`: id, title and
-    asks per line). Nothing is sent when none was held; the day is saved in the cursor table
-    (`digest:day`) so a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
+    asks per line). Nothing is sent when none was held; the digest is the `loop-digest` watch
+    row (return trigger, due at the next local midnight; Timers skips it), advanced when it runs so
+    a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
     silent.
   - _Corrections._ soul.md tells Scout that when the owner says it should have told them, it saves
     that with `remember` as a preference. There is no new store or code path.

@@ -43,7 +43,7 @@ def db(tmp_path):
     db = sqlite3.connect(tmp_path / "old.db", isolation_level=None)
     migrate(db, upto=20)
     _seed(db)
-    migrate(db)
+    migrate(db, upto=21)
     yield db
     db.close()
 

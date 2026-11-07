@@ -28,7 +28,7 @@ def note_of(row: WorkRow) -> str:
     return (row.input or {}).get("note") or row.title
 
 
-def _skipped(row: WorkRow) -> bool:
+def is_return_wake(row: WorkRow) -> bool:
     return (row.input or {}).get("trigger") == "return"  # a loop's return wake runs elsewhere
 
 
@@ -58,7 +58,7 @@ class Timers:
     def fire_due(self) -> None:
         now = self._now()
         for row in self._work.due(KINDS):
-            if _skipped(row):
+            if is_return_wake(row):
                 continue
             repeat_s = self._work.repeat_of(row.id)
             try:
@@ -141,7 +141,7 @@ class Timers:
             r.due_at
             for kind in (*KINDS, *(RERUN_KINDS if self._rerun else ()))
             for r in self._work.of_kind(kind, ["planned"])
-            if r.due_at and not _skipped(r)
+            if r.due_at and not is_return_wake(r)
         ]
         if not times:
             return

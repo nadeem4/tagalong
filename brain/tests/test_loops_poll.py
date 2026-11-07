@@ -6,12 +6,12 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from loop_rows import loop_store
 
 from brain.apps import AppError
 from brain.loops.loop import Loop
 from brain.loops.reader import Change, MailItem, ReaderStopped
 from brain.loops.service import LoopService
-from brain.loops.store import LoopStore
 from brain.memory import Memory
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -91,7 +91,7 @@ class Clock:
 def rig(tmp_path):
     mem = Memory(tmp_path / "t.db")
     clock = Clock()
-    store = LoopStore(mem.db, clock)
+    store = loop_store(mem, clock)
     reader = ScriptReader()
     events = []
     yield store, clock, reader, events, mem

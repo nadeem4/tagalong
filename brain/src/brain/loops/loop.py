@@ -9,7 +9,9 @@ from datetime import datetime
 from typing import Literal
 
 Direction = Literal["i_owe", "they_owe"]
-Status = Literal["held", "surfaced", "snoozed", "done", "dropped", "stale"]
+# Derived from the work row: planned is held (or snoozed while a Later time is set), done stays
+# done, cancelled reads as dropped and expired as stale. Surfacing is an event, not a status.
+Status = Literal["held", "snoozed", "done", "dropped", "stale"]
 
 
 @dataclass

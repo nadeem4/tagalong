@@ -4,12 +4,12 @@ per-reason throttles, the once-a-day dedupe, and the end-to-end Priya journey on
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from loop_rows import loop_store
 
 from brain.events import Event
 from brain.loops.loop import Loop
 from brain.loops.reader import Change, MailItem
 from brain.loops.service import LoopService
-from brain.loops.store import LoopStore
 from brain.memory import Memory
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -27,7 +27,7 @@ class Clock:
 def parts(tmp_path):
     mem = Memory(tmp_path / "t.db")
     clock = Clock()
-    yield LoopStore(mem.db, clock), clock, [], mem
+    yield loop_store(mem, clock), clock, [], mem
     mem.close()
 
 
@@ -103,7 +103,8 @@ def test_nothing_surfaces_while_the_mail_app_is_in_front(parts):
 
 def test_only_held_and_surfaced_loops_match(parts):
     store, clock, events, _ = parts
-    for i, status in enumerate(("snoozed", "done", "dropped", "stale")):
+    store.snooze(deck(store, ref="s").id, T0 + timedelta(days=1))
+    for i, status in enumerate(("done", "dropped", "stale")):
         store.set_status(deck(store, ref=str(i)).id, status)
     svc(store, clock, events).saw(focus())
     assert events == []
