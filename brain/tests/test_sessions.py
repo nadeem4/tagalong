@@ -261,7 +261,9 @@ def test_session_start_fails_running_jobs_that_cannot_reload():
     records_for(memory).add_job("j1", "claude_code", "task", "C:/x", "default")
     session, _ = make(Gate([]), memory)
     job = session.jobs.list()[0]
-    assert job.state == "failed" and job.parts[-1].reason == "brain restarted"
+    assert (
+        job.state == "failed" and job.parts[-1].reason == "brain restarted, session cannot reload"
+    )
 
 
 class PictureApps:
