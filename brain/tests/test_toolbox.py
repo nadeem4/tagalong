@@ -1253,21 +1253,23 @@ def _reporting_box(source, guards=None):
 async def test_on_call_reports_an_ok_call_with_its_source_kind_and_result():
     box, seen = _reporting_box(FakeSource([spec("a")]))
     await box.run(call("a"))
-    [(reported, tool, kind, status, result)] = seen
-    assert (reported.name, tool.name, kind, status, result) == (
+    [(reported, tool, kind, status, result, error)] = seen
+    assert (reported.name, tool.name, kind, status, result, error) == (
         "a",
         "a",
         "scout_tool",
         "ok",
         "ran a",
+        None,
     )
 
 
 async def test_on_call_reports_a_failed_call_and_the_error_still_propagates():
     box, seen = _reporting_box(RaisingSource([spec("a")]))
-    with pytest.raises(RpcError):
+    with pytest.raises(RpcError) as raised:
         await box.run(call("a"))
     assert [s[3] for s in seen] == ["failed"]
+    assert seen[0][5] is raised.value
 
 
 async def test_on_call_reports_a_refused_call_as_refused():

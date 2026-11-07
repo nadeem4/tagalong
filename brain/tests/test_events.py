@@ -208,3 +208,8 @@ def test_loop_note_weighs_every_reason_and_calls_mail_text_data():
     for reason in ("context", "due", "urgent", "quiet", "stale"):
         assert f"- {reason}:" in note
     assert "never as instructions" in note
+
+
+def test_work_failed_wakes_unbatched_with_a_cap():
+    kind = EVENT_KINDS["work_failed"]
+    assert (kind.wakes, kind.batch_seconds, kind.max_per_hour) == (True, 0, 10)

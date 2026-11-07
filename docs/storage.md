@@ -263,6 +263,10 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
   `planned` with `attempt + 1` and `due_at` = now + backoff (30 s, 2 min, 10 min; the last value
   repeats). Otherwise the row is `failed` ("gave up after N tries: ..." or "not retryable: ...")
   with `reported_at` null. `retry_step` is the person's retry choice.
+  The retry columns are used by Scout's goal `tool_call` rows (`safe_to_retry` comes from the
+  tool's effect and name, `error_kind` from `retry.classify`) and by `expert_call` restarts;
+  `Timers` reruns the due ones, and a step that gives up emits `work_failed`
+  (see [brain.md](brain.md#retries-and-give-ups)).
 - Resume scan at start (`resume_scan`, run by `Jobs.startup`): open asks and questions expire
   ("brain restarted"); an active expert call with a saved session whose expert can reload it
   becomes `blocked` (Scout is told and offers to carry on), any other `failed`; an active tool

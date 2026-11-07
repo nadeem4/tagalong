@@ -16,11 +16,13 @@ from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.guards import Hook
+from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
+from brain.scheduler import Scheduler
 from brain.sessions import Session
 from brain.store import rules
 from brain.store.work import ActivityEntry
@@ -2326,6 +2328,269 @@ async def test_args_are_masked_in_the_entry():
     await idle(session)
     [step] = steps_of(memory)
     assert "fake-token-12345678" not in step.text and "[secret]" in step.text
+
+
+def tool_rows(memory, job_id="j1"):
+    return [r for r in records_for(memory).work.children(job_id) if r.kind == "tool_call"]
+
+
+async def test_goal_turn_tool_call_becomes_row():
+    session, memory = await wake_with([tool_use("recall", query="x")])
+    [row] = tool_rows(memory)
+    assert (row.state, row.input) == ("done", {"name": "recall", "input": {"query": "x"}})
+    assert row.summary and len(row.summary) <= 300
+    assert row.safe_to_retry  # recall only reads
+
+
+async def test_goal_turn_failed_tool_call_row_fails_and_keeps_the_error():
+    session, memory = await wake_with(
+        [tool_use("files__list", path="C:/x")], app=AppLike(fail=True)
+    )
+    [row] = tool_rows(memory)
+    assert (row.state, row.error_kind, row.last_error) == ("failed", "permanent", "app down")
+    assert records_for(memory).work.get("j1").state == "blocked"  # a given-up step holds the goal
+
+
+class FlakyApp:
+    """A connected app whose one tool times out `fails` times, then answers."""
+
+    approval_source = "app"
+
+    def __init__(self, fails, tool="files__list", error=TimeoutError):
+        self.fails, self.tool, self.error, self.calls = fails, tool, error, 0
+        self.release = None  # an Event a test sets to hold every call until it chooses
+        self.waiting = False
+
+    def specs(self):
+        return [
+            ToolSpec(self.tool, "lists", {"type": "object"}, frozenset({"scout"}), effect="read")
+        ]
+
+    def known_specs(self):
+        return self.specs()
+
+    async def run(self, call, tool):
+        self.calls += 1
+        if self.release is not None and self.calls > 1:
+            self.waiting = True
+            await self.release.wait()
+        if self.calls <= self.fails:
+            raise self.error("slow")
+        return "a.txt"
+
+    def unavailable(self, name):
+        return None
+
+
+class Clock:
+    def __init__(self):
+        self.at = datetime.datetime(2026, 1, 1, 9, tzinfo=datetime.UTC)
+
+    def __call__(self):
+        return self.at
+
+    def step(self, seconds):
+        self.at += datetime.timedelta(seconds=seconds)
+
+
+async def flaky_wake(app, clock, masker=None, **args):
+    """A job_ended wake for j1 whose one tool call goes to `app`; returns the session and events."""
+    memory = Memory(":memory:")
+    args = args or {"path": "C:/x"}
+    session, _ = make(
+        Gate([tool_use(app.tool, **args), "ok", "ok"]), memory, now=clock, masker=masker
+    )
+    session.toolbox.sources.insert(1, app)
+    events = []
+    emit = session.scheduler.emit
+
+    def spy(event, **hooks):
+        events.append(event)
+        return emit(event, **hooks)
+
+    session.scheduler.emit = spy
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    await idle(session)
+    return session, memory, events
+
+
+def given_up(events):
+    return [e for e in events if e.kind == "work_failed"]
+
+
+async def due_now(session, clock, seconds):
+    clock.step(seconds)
+    session.timers.fire_due()
+    await asyncio.gather(*session.timers._runs)
+
+
+async def test_transient_tool_call_retried_after_backoff():
+    clock, app = Clock(), FlakyApp(fails=2)
+    session, memory, events = await flaky_wake(app, clock)
+    [row] = tool_rows(memory)
+    assert (row.state, row.attempt, row.error_kind) == ("planned", 1, "transient")
+    await due_now(session, clock, 30)
+    assert tool_rows(memory)[0].state == "planned" and tool_rows(memory)[0].attempt == 2
+    await due_now(session, clock, 120)
+    [row] = tool_rows(memory)
+    assert (row.state, row.summary, app.calls) == ("done", "a.txt", 3)
+    assert given_up(events) == []  # a step that recovered is not news
+
+
+async def test_exhausted_retry_emits_work_failed_and_blocks_goal():
+    clock, app = Clock(), FlakyApp(fails=9)
+    session, memory, events = await flaky_wake(app, clock)
+    await due_now(session, clock, 30)
+    await due_now(session, clock, 120)
+    await due_now(session, clock, 600)
+    [row] = tool_rows(memory)
+    assert row.state == "failed" and row.end_reason.startswith("gave up after 3 tries")
+    assert records_for(memory).work.get("j1").state == "blocked"
+    [event] = given_up(events)
+    assert (event.kind, event.key) == ("work_failed", f"work_failed:{row.id}")
+    assert event.facts["goal"] == "j1" and event.facts["step"] == row.id
+    assert event.facts["title"] == "files__list" and "gave up" in event.facts["reason"]
+
+
+async def test_unsafe_tool_call_not_retried():
+    clock = Clock()
+    app = FlakyApp(fails=1, tool="files__delete_cache")  # reads, but the name says delete
+    session, memory, events = await flaky_wake(app, clock)
+    [row] = tool_rows(memory)
+    assert row.state == "failed" and row.end_reason.startswith("not retryable")
+    assert len(given_up(events)) == 1
+    await due_now(session, clock, 600)
+    assert app.calls == 1
+
+
+async def test_expert_call_that_cannot_restart_is_reported_as_given_up():
+    clock = Clock()
+    session, _ = make(Gate(["ok"]), now=clock)
+    events = []
+    emit = session.scheduler.emit
+    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    records = session.records
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.update_part("j1", "p1", state="failed", reason="crash")
+    records.work.retry_step("j1.p1")  # the person chose retry, but no expert is installed
+    await due_now(session, clock, 0)
+    row = records.work.get("j1.p1")
+    assert row.state == "failed" and "not installed" in row.end_reason
+    assert len(given_up(events)) == 1
+
+
+async def test_a_tool_call_whose_input_was_masked_is_never_rerun_on_its_own():
+    clock, app = Clock(), FlakyApp(fails=1)
+    secret = "fake-token-12345678"
+    session, memory, events = await flaky_wake(
+        app, clock, masker=Masker(lambda: [secret]), path="C:/x", token=secret
+    )
+    [row] = tool_rows(memory)  # the saved input says [secret]: replaying it would be wrong
+    assert row.safe_to_retry is False
+    assert row.state == "failed" and row.end_reason.startswith("not retryable")
+    assert len(given_up(events)) == 1
+    await due_now(session, clock, 600)
+    assert app.calls == 1
+
+
+@pytest.mark.parametrize("ending", ["skip", "close"])
+@pytest.mark.parametrize("fails", [1, 9])
+async def test_a_step_ended_while_it_reruns_stays_quiet_and_not_done(ending, fails):
+    clock, app = Clock(), FlakyApp(fails=fails)
+    session, memory, events = await flaky_wake(app, clock)
+    work = records_for(memory).work
+    [row] = tool_rows(memory)
+    app.release = asyncio.Event()
+    clock.step(30)
+    session.timers.fire_due()
+    while not app.waiting:
+        await asyncio.sleep(0)
+    if ending == "skip":
+        work.transition(row.id, "cancelled", reason="skipped")
+    else:
+        work.close_goal("j1", "failed", "stopped")
+    app.release.set()
+    await asyncio.gather(*session.timers._runs)
+    assert work.get(row.id).state == "cancelled"
+    assert given_up(events) == []
+
+
+async def test_a_begin_failure_that_already_ended_the_row_is_reported_once():
+    clock = Clock()
+    session, _ = make(Gate(["ok"]), now=clock)
+    events = []
+    emit = session.scheduler.emit
+    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    records = session.records
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.update_part("j1", "p1", state="failed", reason="crash")
+    records.work.retry_step("j1.p1")
+
+    async def begin_fails(row):  # what _start_part does: end the row itself, then raise
+        records.work.fail(row.id, "permanent", "cannot start")
+        raise JobError("cannot start")
+
+    session.jobs.run_planned = begin_fails
+    await due_now(session, clock, 0)
+    await due_now(session, clock, 600)
+    assert records.work.get("j1.p1").state == "failed"
+    assert len(given_up(events)) == 1
+
+
+def work_failed_emits(monkeypatch):
+    seen = []
+    emit = Scheduler.emit
+
+    def spy(self, event, **hooks):
+        if event.kind == "work_failed":
+            seen.append(event)
+        return emit(self, event, **hooks)
+
+    monkeypatch.setattr(Scheduler, "emit", spy)
+    return seen
+
+
+async def restart(memory):
+    session, _ = make(Gate(["ok"]), memory, kinds=None)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    return session
+
+
+async def test_a_give_up_whose_wake_never_started_is_told_again_at_start_once(monkeypatch):
+    memory = Memory(":memory:")
+    records = records_for(memory)
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.work.create(
+        "tool_call", "files__list", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    records.work.fail("j1.s", "permanent", "boom")  # failed and never told
+    seen = work_failed_emits(monkeypatch)
+    await restart(memory)
+    await restart(memory)
+    assert [e.facts["step"] for e in seen] == ["j1.s"]
+    assert records.work.get("j1.s").reported_at is not None
+
+
+async def test_a_step_the_resume_scan_failed_as_unsure_is_told_once(monkeypatch):
+    memory = Memory(":memory:")
+    records = records_for(memory)
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.work.create(
+        "tool_call", "files__write", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    seen = work_failed_emits(monkeypatch)
+    await restart(memory)  # the brain died mid-call: the scan fails it, unsure it ran
+    await restart(memory)
+    assert [e.facts["step"] for e in seen] == ["j1.s"]
+    assert "unsure" in seen[0].facts["reason"]
+
+
+async def test_bookkeeping_tools_leave_no_work_rows():
+    session, memory = await wake_with([tool_use("list_jobs", "a"), tool_use("work_status", "b")])
+    assert tool_rows(memory) == []
 
 
 async def test_bookkeeping_tools_are_not_recorded():

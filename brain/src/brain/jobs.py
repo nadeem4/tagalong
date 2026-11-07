@@ -369,17 +369,25 @@ class Jobs:
         scout_follow_up: bool = False,
         new_job: bool = True,
         apps: tuple[str, ...] = (),
+        redo: WorkRow | None = None,
     ) -> JobId:
         """The one seam that starts an expert run: a new job's first part, or (new_job False) a
-        further part of an existing job."""
+        further part of an existing job. redo is a part's own row, already active, run again in
+        the job's mode: no card, no new row."""
         running = [
-            (j, p) for j in self._records.running_jobs() for p in j.parts if p.state == "active"
+            (j, p)
+            for j in self._records.running_jobs()
+            for p in j.parts
+            if p.state == "active" and (j.id, p.id) != (job_id, redo and redo.id.split(".")[1])
         ]
         if len(running) + self._starting >= self._max_running:
             names = ", ".join(f"{j.id} ({p.task[:40]})" for j, p in running)
             raise JobError(f"{self._max_running} jobs are already running: {names}")
         # Named before the run exists so callbacks fired while it starts file under this part.
-        part = "p1" if new_job else self._reserve_part(job_id)
+        if redo is not None:
+            part = redo.id.split(".", 1)[1]
+        else:
+            part = "p1" if new_job else self._reserve_part(job_id)
         run = self._make_run(
             chosen,
             job_id=job_id,
@@ -405,6 +413,8 @@ class Jobs:
                 raise JobError("this expert can't take connected apps")
             by_name = {m.name: m.id for m in modes}
             mode_id = None
+            if redo is not None:
+                mode_id = self._redo_mode(job_id, by_name.values())
             # The chain runs only when the earlier mode can be reused, so a Scout row always
             # means a mode was chosen; otherwise the card is the owner's question as today.
             # Apps on the card are the person's to approve, so a covering preference never skips it.
@@ -446,7 +456,9 @@ class Jobs:
                     self._card_picked(chosen, task, path, logged)
                 elif apps:
                     self._record_hand_off(chosen, path, task, "approved", "person", logged)
-            if new_job:
+            if redo is not None:
+                pass  # the row exists and is active; the run attaches to it
+            elif new_job:
                 parent = earlier.id if earlier else None
                 self._records.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
             else:
@@ -493,6 +505,33 @@ class Jobs:
                 self._starting -= 1
             if not handed_off:
                 await run.close()
+
+    async def run_planned(self, row: WorkRow) -> JobId:
+        """The due runner restarts an expert call that went back to planned: the same row runs
+        again with its task, reopening its saved session when the expert can."""
+        job = self._records.get_job(row.parent_id or "")
+        if job is None or job.closed_at:
+            raise JobError(f"job {row.parent_id} is closed; open a new job instead")
+        part = next((p for p in job.parts if p.id == row.id.split(".", 1)[1]), None)
+        chosen = next((e for e in self._experts() if part and e.id == part.agent), None)
+        if part is None or chosen is None:
+            raise JobError("the expert that ran this part is not installed any more")
+        return await self._start_part(
+            job.id,
+            chosen,
+            part.task,
+            Path(part.folder),
+            earlier_part=part,
+            new_job=False,
+            redo=row,
+        )
+
+    def _redo_mode(self, job_id: str, offered) -> str:
+        job = self._records.get_job(job_id)
+        mode = job.mode if job else ""
+        if mode not in offered:
+            raise JobError("the expert no longer offers the mode this job ran in")
+        return mode
 
     def _reserve_part(self, job_id: str) -> str:
         """The next part id, promised to this start so a concurrent one cannot take it."""

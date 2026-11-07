@@ -311,6 +311,15 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Manual check:** start a job, quit the brain, start it again. **Expected:** Home → Jobs still
     pages the job's steps and the last one reads "stopped"; Scout says the step was stopped by the
     restart and offers to carry on; asking "what is going on?" gets an answer from `work_status`.
+    **Retry and give-ups (S3b):** a Scout tool call made while working for a job is now a step
+    of that job, and a known temporary failure (a timeout, a dropped connection, a rate limit) on
+    a read-only tool is tried again after 30 s, 2 min and 10 min. Automated only, because it needs
+    a failing provider: `test_retry.py` (which errors are temporary, which tools are never
+    repeated, the due runner, `resolve_step`), `test_sessions.py` (`test_transient_tool_call_retried_after_backoff`,
+    `test_exhausted_retry_emits_work_failed_and_blocks_goal`, `test_unsafe_tool_call_not_retried`),
+    `test_jobs.py` (`test_run_planned_restarts_expert_call`). **What Scout says:** when a step gives
+    up it is woken once (`work_failed`), says plainly which step failed and why, and offers retry,
+    skip or stop the job; the job stays held until the person answers.
     **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
     tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
     page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it

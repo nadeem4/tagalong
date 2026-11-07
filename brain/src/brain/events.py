@@ -37,6 +37,7 @@ _KINDS = (
     EventKind("job_ended", batch_seconds=30, max_per_hour=10),
     EventKind("job_quiet", batch_seconds=0, max_per_hour=3),
     EventKind("job_step_failed", batch_seconds=120, max_per_hour=4),
+    EventKind("work_failed", batch_seconds=0, max_per_hour=10),
     EventKind("loop", batch_seconds=0, max_per_hour=4),
     EventKind("body_online", batch_seconds=0, max_per_hour=2),
     EventKind("back", batch_seconds=0, max_per_hour=2),

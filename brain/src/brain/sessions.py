@@ -65,12 +65,13 @@ from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Too
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
 from brain.reading_tools import reading_home_tools
+from brain.retry import classify, safe_to_retry
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.store import rules
 from brain.store.conversation import compaction_text
-from brain.store.work import WorkStore
+from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.timers import Timers
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
@@ -96,6 +97,9 @@ JOB_TOOLS = frozenset({"hand_off", "tell_expert", "stop_job", "close_job", "set_
 # Job bookkeeping Scout does about the job, not work for it: never on the timeline.
 BOOKKEEPING_TOOLS = frozenset({"set_job_result", "watch_job", "work_status"})
 _ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked, then clipped
+# Tools that manage the goal itself are not steps of it, so they leave no work row.
+_NOT_STEPS = JOB_TOOLS | {"resolve_step"}
+_SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
 
@@ -213,7 +217,11 @@ class Session:
         )
         self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
         timers = self.timers = Timers(
-            self.records.work, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
+            self.records.work,
+            self.scheduler.emit,
+            now,
+            job_facts=self.jobs.wake_facts,
+            rerun=self._rerun_step,
         )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
@@ -221,7 +229,7 @@ class Session:
             + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
-            + work_tools(self.records.work)
+            + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)
@@ -304,6 +312,10 @@ class Session:
         for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
         self._tell_paused_watches()
+        # Steps that gave up (or that the restart scan could not vouch for) and were never told.
+        for step in self.records.work.of_kind("tool_call", ["failed"]):
+            if step.reported_at is None:
+                self._tell_given_up(step)
         timers.start()
 
     def _tell_paused_watches(self) -> None:
@@ -519,7 +531,13 @@ class Session:
         self.scheduler.emit(event, on_start=started, **hooks)
 
     def _on_tool_call(
-        self, call: Call, spec: ToolSpec, kind: str, status: str, result: str | None
+        self,
+        call: Call,
+        spec: ToolSpec,
+        kind: str,
+        status: str,
+        result: str | None,
+        error: BaseException | None = None,
     ) -> None:
         """Put a tool or app call of a job-bound turn on that job's timeline. Which calls count
         is mechanical: every one, except the job bookkeeping tools."""
@@ -541,6 +559,92 @@ class Session:
         args = json.dumps(call.input, ensure_ascii=False, default=str)[:_ARGS_CAP]
         text = f"{label} {args}" if call.input else label
         self.jobs.record_step(job, source, text, _STEP_STATUS[status])
+        if spec.name not in _NOT_STEPS:
+            self._record_tool_row(job, call, spec, status, result, error)
+
+    def _record_tool_row(
+        self,
+        job: str,
+        call: Call,
+        spec: ToolSpec,
+        status: str,
+        result: str | None,
+        error: BaseException | None,
+    ) -> None:
+        """A goal's tool call becomes a `tool_call` row: done with its result's start, or failed
+        through the retry rule. A refused call never ran, so it leaves no row."""
+        if status == "refused":
+            return
+        work = self.records.work
+        raw = {"name": call.name, "input": call.input}
+        payload = mask_json(self.guards, "work", raw)
+        try:
+            row = work.create(
+                "tool_call",
+                call.name,
+                parent_id=job,
+                state="active",
+                input=payload,
+                # A masked input would replay as the literal "[secret]": never repeat it on its own.
+                safe_to_retry=safe_to_retry(spec) and payload == raw,
+            )
+            if status == "ok":
+                work.update(row.id, summary=(result or "")[:_SUMMARY_CAP])
+                work.transition(row.id, "done", reason="ok")
+            else:
+                self._step_failed(row.id, error)
+        except TransitionRefused:
+            return  # the goal ended meanwhile: nothing to record against
+
+    def _step_failed(self, id: str, error: BaseException | None) -> None:
+        """A step failed: the retry rule backs it off or ends it. A step that ended is news."""
+        work = self.records.work
+        try:
+            row = work.fail(id, classify(error or RuntimeError()), str(error or "failed"))
+        except TransitionRefused:
+            # The goal was closed while it ran (handled), or a failed start already ended the
+            # row itself and nobody has been told.
+            row = work.get(id)
+            if row is None or row.state != "failed" or row.reported_at is not None:
+                return
+        if row.state != "failed":
+            self.timers.changed()  # the next try is waiting out its backoff
+            return
+        self._tell_given_up(row)
+
+    def _tell_given_up(self, row: WorkRow) -> None:
+        """Scout is woken once about a step that ended failed; the wake starting marks it told."""
+        work = self.records.work
+        facts = {
+            "goal": row.root_id,
+            "step": row.id,
+            "title": row.title,
+            "reason": row.end_reason or "",
+        }
+        self.scheduler.emit(
+            Event("work_failed", facts, key=f"work_failed:{row.id}"),
+            on_start=lambda: work.mark_reported(row.id),
+        )
+
+    async def _rerun_step(self, row: WorkRow) -> None:
+        """The runner found a step due again: run it as Scout would, outside any turn."""
+        work = self.records.work
+        try:
+            if row.kind == "expert_call":
+                await self.jobs.run_planned(row)
+                return
+            wanted = row.input or {}
+            call = Call(
+                f"rerun:{row.id}", wanted.get("name", ""), wanted.get("input") or {}, "", ""
+            )
+            result = await self.toolbox.run(call, caller="scout", job_id=row.root_id)
+            text = result if isinstance(result, str) else ""
+            work.update(row.id, summary=text[:_SUMMARY_CAP])
+            work.transition(row.id, "done", reason="ok", expect="active")
+        except TransitionRefused:
+            return  # skipped or the goal closed while it ran: already handled
+        except Exception as err:
+            self._step_failed(row.id, err)
 
     def _job_named(self, call: Call, status: str, result: str | None) -> str | None:
         """The job a job tool worked on: the one in its arguments, or for a new hand-off the
