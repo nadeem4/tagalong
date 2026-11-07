@@ -30,7 +30,7 @@ tagalong/
                                     # main.py and cli.py (the `tagalong` command; see docs/brain.md);
                                     # store/ opens tagalong.db and runs its numbered migrations
                                     # (db.py, search.py, conversation.py, memory.py, connections.py,
-                                    # outputs.py, migrations/; see docs/storage.md)
+                                    # outputs.py, work.py, migrations/; see docs/storage.md)
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context

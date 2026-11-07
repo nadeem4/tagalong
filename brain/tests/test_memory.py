@@ -147,7 +147,7 @@ def test_fts5_missing_fails_clearly(tmp_path, monkeypatch):
 
 def test_memory_uses_store_open(tmp_path):
     m = Memory(tmp_path / "t.db")
-    assert m.db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert m.db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert hasattr(memory, "MIGRATIONS") is False
     m.close()
 

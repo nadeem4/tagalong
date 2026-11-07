@@ -152,7 +152,7 @@ desktop app. You need `uv` and an Anthropic key.
    `uv run python -c "import sqlite3,pathlib; print(sqlite3.connect(pathlib.Path.home()/'.tagalong'/'tagalong.db').execute('select id, kind, text from memories').fetchall())"`
 8. **Action:** stop the brain and start it again, say hello, then `say` with `What do I like?`
    **Expected:** the answer mentions short answers. The item was loaded into the prompt from the
-   database. An existing `tagalong.db` (from before the store package, schema version 17) opens
+   database. An existing `tagalong.db` (from before the store package, schema version 17 or earlier) opens
    unchanged: the brain starts with no migration error, and the rows from step 7 are all still
    there.
 9. **Action:** `say` with `Forget that.`
@@ -184,6 +184,10 @@ desktop app. You need `uv` and an Anthropic key.
     large page).
     **Expected:** the call ends as an error result `<tool> sent more data than allowed.`
     (`over_limit`); Scout does not receive the text.
+16. **Action:** from `brain/`, run `uv run pytest tests/test_work_store.py tests/test_work_resume.py -q`.
+    **Expected:** all pass. These cover the work table (not yet used by Scout): every allowed and
+    refused state move, the goal rollup, the retry backoff, search, and the resume scan, which
+    changes nothing when run a second time. A fresh `tagalong.db` opens at schema version 18.
 
 ## The desktop on the Python brain
 

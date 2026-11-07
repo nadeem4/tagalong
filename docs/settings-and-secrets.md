@@ -161,6 +161,11 @@ first read is fixed in code, not a setting.
 brain marks it stale and hands it to Scout in one batched wake. A zero, negative or non-numeric
 value stops the brain at start.
 
+`TAGALONG_RETRY_MAX` (default 3) is how many times a step that failed for a passing reason
+(timeout, network, rate limit) and is safe to repeat is retried before it is reported as failed.
+`TAGALONG_RETRY_BACKOFF_S` (default `30,120,600`) is the comma-separated wait in seconds before
+each retry; the last value repeats. A zero, negative or non-numeric value stops the brain at start.
+
 Setup keeps its own files under the same data folder, never anywhere else: `runtime/node/`
 (Tagalong's own Node, downloaded on first need; `runtime/node.part/` and `runtime/node.new/`
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped
