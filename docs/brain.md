@@ -86,7 +86,7 @@ the total can run a little low.
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [Loops](#loops))                                                                                                                                                          |
-| `brain/src/brain/timers.py`            | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                                                                                                                                                                                                                                 |
+| `brain/src/brain/timers.py`            | `Timers`: fires the due `timer` and `watch` work rows as `timer` events and keeps one wake armed                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/questions.py`         | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                                                                                                       |
@@ -176,7 +176,7 @@ flowchart TD
   and the local time (with its UTC offset), in that order.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
-  `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`) and every online body's
+  `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`, `watch`) and every online body's
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
@@ -552,8 +552,9 @@ so there is one gate and no second path.
 
 | Tool               | Input                              | Result text (JSON)                                                                                                                                                                                                   |
 | ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                                                                                                                 |
+| `list_memories`    | `{}`                               | `{"memories": [{"id", "kind", "text", "at"}]}`, newest first, at most 200                                                                                                                                 |
 | `forget`           | `{"id": int}`                      | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                                              |
+| `watch`            | `{"action", "note?", "every_minutes?", "id?"}` | add returns `{"id", "every_minutes"}`, list `{"watches": [...]}`, the rest a plain sentence (Scout may call it too); see Timers |
 | `spend_today`      | `{}`                               | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                           |
 | `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
 | `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                         |
@@ -1085,7 +1086,8 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
 | `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                       |
-| `timer`           | 0 s          | 6            | One of Scout's timers came due                                                                                                                                                               |
+| `timer`           | 0 s          | 6            | One of Scout's timers or watches came due                                                                                                                                                    |
+| `watches_paused`  | 0 s          | 2            | Watches an update paused, told once at the first start after it                                                                                                                              |
 | `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                             |
 | `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                      |
 | `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                     |
@@ -1338,20 +1340,20 @@ flowchart LR
   reason `brain restarted`; its job stays open and Scout is told once (`job_ended`) and offers to
   carry on with `hand_off` and `continue_job`. Any other running part becomes `failed` with the same
   reason. Each such part's step log ends with a `# stopped` line, and the job's check-back timers
-  are deleted. Running it twice changes nothing.
+  are cancelled (unless a part is held for a carry-on). Running it twice changes nothing.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
   running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
   sends no report: those jobs stay unreported and are told about at the next start.
 
 ## Timers
 
-Scout can leave itself a message for later. `Timers` (`timers.py`) fires the stored timers as `timer`
-events; the scheduler (see [Jobs and tools](#jobs-and-tools)) decides when Scout hears them. A
-timer has a 0 s batch window (timer events held together share one wake) and wakes at most 6 times
-an hour.
+Scout can leave itself a message for later. `Timers` (`timers.py`) fires the due `timer` and
+`watch` rows of the `work` table as `timer` events; the scheduler (see
+[Jobs and tools](#jobs-and-tools)) decides when Scout hears them. A timer has a 0 s batch window
+(timer events held together share one wake) and wakes at most 6 times an hour.
 
-The `timers` table (in `tagalong.db`): `id`, `note`, `next_at` (UTC ISO text, so text order is time
-order), `repeat_s` (null for a one-off), `created_at`, `fired` (0 or 1) and `job_id` (null, or the running job the timer checks back on). Times are stored in UTC.
+A timer is a `work` row of kind `timer`, a watch one of kind `watch`; the next time is `due_at` and
+the repeat is `work_timer.repeat_s` (see [storage.md](storage.md)). Times are stored in UTC.
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
@@ -1359,35 +1361,49 @@ ISO time.
 | -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                    |
 | `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
-| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                                                                                           |
+| `cancel_timer` | change | `auto` | `{id}` as text. Returns `timer <id> cancelled`                                                                                                                   |
+| `watch`        | change | `auto` | `{action: add, list, pause, switch_on or cancel, note?, every_minutes?, id?}`; Scout and Home. See Watches below                                                 |
 
 `set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
 one of `in_minutes` (a number above 0, at most 525600, one year) or `at` (ISO 8601 with a UTC
-offset, in the future). A repeat (`repeat_minutes`) must be a whole number from 5 to 525600. `cancel_timer`
-needs `id` as a whole number. Refusals are plain sentences the model reads, for example
-`repeat_minutes must be at least 5.`, `at is not in the future.` or, from `cancel_timer`,
-`no timer with id 7.`. `job` is the id of a running job; an unknown one or one that is not running
-is refused (`no job with id j9.`, `job j9 is not running (done).`).
+offset, in the future). A repeat (`repeat_minutes`) must be a whole number from 5 to 525600.
+`cancel_timer` needs `id` as text (ids are strings such as `t12`). Refusals are plain sentences the
+model reads, for example `repeat_minutes must be at least 5.`, `at is not in the future.` or, from
+`cancel_timer`, `no timer with id t7.`. `job` is the id of a running job; an unknown one or one that
+is not running is refused (`no job with id j9.`, `job j9 is not running (done).`).
 
-- **Firing.** When a timer is due, `Timers` emits `timer` with the facts `id`, `note` and
-  `repeat_minutes`, keyed `timer:<id>`. It sleeps until the next due timer, and wakes at least
-  hourly to re-check.
-- **Job timers.** With `job`, the wake keeps kind `timer` (same batch window and cap) and its facts
-  also carry `job`, `state` and the job's wake facts from `Jobs.wake_facts` (`activity`, the masked
-  summary of its steps, and `watching`, Scout's watch list), so Scout decides from those whether to
-  speak, nudge the job or set the next check. A job timer is deleted, with any held wake for it
-  dropped and the sleeper re-armed, when its job ends (`Jobs._end`) and, for jobs a dead brain left
-  running, when the brain starts (`Jobs.startup`). This is cleanup, not a decision.
-- **One-offs.** A due one-off is marked `fired` and deleted once Scout's wake turn starts. If the
-  brain stops before that, the timer is emitted again at the next start.
-- **Repeats.** A repeating timer sets its next time from the moment it fired, not the old time. After
-  a long outage it fires once, not once per missed interval.
-- **Watching something.** "Watch my email" is a repeating timer. Its note names the connected app and
-  what counts as worth saying; on each wake Scout uses the app's tools and may stay silent.
+- **Firing.** When a row is due, `Timers` emits `timer` with the facts `id`, `note`, `kind` and
+  `repeat_minutes`, keyed `timer:<id>`. It sleeps until the next due row, and wakes at least
+  hourly to re-check. Rows with `input.trigger == "return"` are left to the loops code.
+- **Job timers.** With `job`, the row hangs under the job and the wake keeps kind `timer` (same
+  batch window and cap); its facts also carry `job`, `state` and the job's wake facts from
+  `Jobs.wake_facts` (`activity`, the masked summary of its steps, and `watching`, Scout's watch
+  list), so Scout decides from those whether to speak, nudge the job or set the next check. A
+  job's timers are cancelled, with any held wake dropped and the sleeper re-armed, when Scout
+  closes the job (`Jobs.close`), and, for a job a dead brain left running, when the brain starts
+  (`Jobs.startup`). A run that merely ends leaves them alone. This is cleanup, not a decision.
+- **One-offs.** A due one-off moves `planned` to `active` and to `done` ("fired") once Scout's wake
+  turn starts. If the brain stops before that, the `active` row is emitted again at the next start.
+  A race with `cancel_timer` is harmless: the move is refused and nothing is emitted.
+- **Repeats.** A repeating row stays `planned` and sets its next time from the moment it fired, not
+  the old time. After a long outage it fires once, not once per missed interval.
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
+
+### Watches
+
+"Keep an eye on my email" is a `watch` row, a repeating check. The `watch` tool: `add` takes a
+`note` (it names the connected app and what counts as worth saying) and `every_minutes` (5 to
+525600) and plans the first fire one interval from now; `list` returns `{"watches": [{id, note,
+state, every_minutes, next_at, cadence_text}]}` for planned and paused watches; `pause` moves a
+planned watch to `paused`; `switch_on` moves a paused one back to `planned` one interval from now
+and needs a repeat (`every_minutes`, or one already saved); `cancel` ends it. A paused watch never
+fires. The old `tracking` memories became paused watches when the database was migrated; on the
+next start the Session emits `watches_paused` once (0 s batch, 2 an hour) with the facts `watches`
+(one `id: note (cadence)` entry per watch), and Scout mentions them and offers to switch each on.
+It does not switch any on itself.
 
 ## Loops
 

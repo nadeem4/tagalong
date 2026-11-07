@@ -190,7 +190,6 @@ class Session:
         )
         self.jobs = Jobs(
             self.records,
-            memory,
             self._asks,
             notify,
             experts or (lambda: []),
@@ -213,7 +212,7 @@ class Session:
         )
         self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
         timers = self.timers = Timers(
-            memory, self.records, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
+            self.records.work, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
         )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
@@ -222,7 +221,7 @@ class Session:
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work)
-            + timer_tools(memory, self.records, timers, now)
+            + timer_tools(self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
@@ -300,7 +299,23 @@ class Session:
         bodies.on_connect = self._on_connect
         for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
+        self._tell_paused_watches()
         timers.start()
+
+    def _tell_paused_watches(self) -> None:
+        """Watches a migration paused are mentioned once, then marked told."""
+        work = self.records.work
+        paused = [w for w in work.of_kind("watch", ["paused"]) if w.reported_at is None]
+        if not paused:
+            return
+        facts = "; ".join(
+            f"{w.id}: {w.title}"
+            + (f" ({(w.input or {})['cadence']})" if (w.input or {}).get("cadence") else "")
+            for w in paused
+        )
+        self.scheduler.emit(Event("watches_paused", {"watches": facts[:1500]}))
+        for w in paused:
+            work.mark_reported(w.id)
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes

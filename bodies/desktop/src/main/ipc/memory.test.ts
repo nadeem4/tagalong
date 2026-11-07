@@ -27,9 +27,6 @@ describe('registerMemoryIpc', () => {
     const { invoke, calls } = setup(() =>
       text({
         memories: [
-          { id: 3, kind: 'instruction', text: 'Short answers.', cadence: null, at: AT },
-          { id: 2, kind: 'about_you', text: 'Works on Tagalong', cadence: null, at: AT },
-          { id: 1, kind: 'summary', text: 'Talked about launch.', cadence: null, at: AT },
         ],
       }),
     );

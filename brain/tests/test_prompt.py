@@ -121,8 +121,8 @@ def test_loop_event_notes_cover_later_digest_and_a_job_for_a_loop():
     assert "loop_draft" in notes["job_ended"]
 
 
-def item(id, kind, text, cadence=None):
-    return Item(id, kind, text, cadence, "2026-10-25T00:00:00", "2026-10-25T00:00:00")
+def item(id, kind, text):
+    return Item(id, kind, text, "2026-10-25T00:00:00", "2026-10-25T00:00:00")
 
 
 def test_render_know_groups_with_ids():
@@ -130,14 +130,17 @@ def test_render_know_groups_with_ids():
         {
             "instruction": [item(1, "instruction", "Reply in French")],
             "about_you": [item(2, "about_you", "Works nights")],
-            "tracking": [item(3, "tracking", "Watch the build", "daily")],
         }
     )
     assert out == (
         "Instructions from the owner:\n- [1] Reply in French\n\n"
-        "About the owner:\n- [2] Works nights\n\n"
-        "Things to keep an eye on:\n- [3] (daily) Watch the build"
+        "About the owner:\n- [2] Works nights"
     )
+
+
+def test_prompt_has_no_tracking_heading():
+    out = render_know({"instruction": [item(1, "instruction", "Be brief")]})
+    assert "keep an eye on" not in out and "tracking" not in out.lower()
 
 
 def test_render_know_empty_is_blank():
@@ -193,8 +196,9 @@ def test_system_prompt_without_know_unchanged():
 
 def test_soul_has_memory_rules():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8").lower()
-    assert "instruction" in soul and "tracking" in soul
+    assert "instruction" in soul and "watch" in soul
     assert "replaces" in soul and "recall" in soul
+    assert "tracking" not in soul
 
 
 def test_system_prompt_with_no_bodies():

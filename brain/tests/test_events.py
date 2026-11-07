@@ -133,6 +133,14 @@ def test_timer_defaults():
     assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 6
 
 
+def test_watches_paused_defaults_and_has_a_note():
+    kind = EVENT_KINDS["watches_paused"]
+    assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 2
+    from importlib.resources import files
+
+    assert "## watches_paused" in files("brain.mind").joinpath("events.md").read_text("utf-8")
+
+
 def test_job_question_defaults_never_merge_and_ignore_caps():
     kind = EVENT_KINDS["job_question"]
     assert kind.wakes is True
