@@ -159,7 +159,7 @@ def test_failed_open_leaves_no_write_open(tmp_path, monkeypatch):
     other.close()
     monkeypatch.undo()
     db = open_db(path)
-    assert _version(db) == 17
+    assert _version(db) == load_migrations()[-1].number
     db.close()
 
 
