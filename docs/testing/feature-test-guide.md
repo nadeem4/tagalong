@@ -478,7 +478,7 @@ next section.
    **Expected:** a row with `outcome: "no_one"`.
 5. **Action:** press **Stop** on the turn while its ask is open, and run a tool that is set to `auto`.
    **Expected:** no row for either.
-5b. **Action:** leave a permission ask open and quit the brain, then start it again.
+   5b. **Action:** leave a permission ask open and quit the brain, then start it again.
    **Expected:** the ask is gone from the body, and it is not in `list_approvals` (it was never
    decided). The ask is an `ask` work row that now reads expired, "brain restarted". The
    `list_approvals` shape and counts are the same as before asks moved onto work rows

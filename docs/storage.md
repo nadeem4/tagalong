@@ -531,29 +531,29 @@ An `ask` row in `work` is a permission ask, from the moment it is opened until i
 has none, or the job is gone). The row id is the ask id the bodies see, so an open ask and its
 log entry are one row. Home's log is the ask rows that were decided.
 
-| Work state  | Meaning                                                                                |
-| ----------- | -------------------------------------------------------------------------------------- |
-| `active`    | Open: a body can answer it                                                             |
-| `done`      | Approved                                                                               |
-| `cancelled` | Refused (a refused ask does not block its job)                                         |
-| `expired`   | Timed out, nobody online, cancelled, or ended with its job or by a restart             |
+| Work state  | Meaning                                                                    |
+| ----------- | -------------------------------------------------------------------------- |
+| `active`    | Open: a body can answer it                                                 |
+| `done`      | Approved                                                                   |
+| `cancelled` | Refused (a refused ask does not block its job)                             |
+| `expired`   | Timed out, nobody online, cancelled, or ended with its job or by a restart |
 
 `end_reason` is the outcome word (`approved`, `refused`, `timed_out`, `no_one`) once decided.
 An ask that ended before it was decided (answered, timed out) first ends with its own reason
 and is re-ended with the outcome when `Approvals.record` decides it.
 
-| Column          | Type                | Meaning                                                                            |
-| --------------- | ------------------- | ---------------------------------------------------------------------------------- |
-| `id`            | INTEGER PRIMARY KEY | Log id: Home's approval id and paging cursor                                       |
-| `work_id`       | TEXT UNIQUE         | The `ask` row                                                                      |
-| `source`        | TEXT                | `scout_tool`, `claude_code` or `app`                                               |
-| `tool`          | TEXT                | The tool asked about                                                               |
-| `summary`       | TEXT                | One-line description of the action                                                 |
-| `input`         | TEXT                | The tool input as JSON                                                             |
-| `group_key`     | TEXT                | The kind of action, to group like asks                                             |
-| `decided_by`    | TEXT                | `person`, `scout` or `none`; NULL while undecided                                  |
-| `rule_id`       | INTEGER             | The `sentence` rule Scout approved under                                           |
-| `rule_sentence` | TEXT                | That rule's sentence as it was then, so editing it later rewrites no history       |
+| Column          | Type                | Meaning                                                                      |
+| --------------- | ------------------- | ---------------------------------------------------------------------------- |
+| `id`            | INTEGER PRIMARY KEY | Log id: Home's approval id and paging cursor                                 |
+| `work_id`       | TEXT UNIQUE         | The `ask` row                                                                |
+| `source`        | TEXT                | `scout_tool`, `claude_code` or `app`                                         |
+| `tool`          | TEXT                | The tool asked about                                                         |
+| `summary`       | TEXT                | One-line description of the action                                           |
+| `input`         | TEXT                | The tool input as JSON                                                       |
+| `group_key`     | TEXT                | The kind of action, to group like asks                                       |
+| `decided_by`    | TEXT                | `person`, `scout` or `none`; NULL while undecided                            |
+| `rule_id`       | INTEGER             | The `sentence` rule Scout approved under                                     |
+| `rule_sentence` | TEXT                | That rule's sentence as it was then, so editing it later rewrites no history |
 
 - Events on the row: `decided` (`outcome`, `decided_by`); an answered ask also keeps the chosen
   `option` in its end event.
@@ -628,7 +628,7 @@ These are lost when the brain restarts.
 
 | State                | Where                           | What a restart means                                                                                  |
 | -------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Open asks            | `asks.py` `Asks`                | The waiting is gone; its `ask` row is expired ("brain restarted") and the body no longer lists it    |
+| Open asks            | `asks.py` `Asks`                | The waiting is gone; its `ask` row is expired ("brain restarted") and the body no longer lists it     |
 | Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                |
 | Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                       |
 | Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start |
