@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from brain import memory
 from brain.apps import AppError, AppRow, Apps, TokenFile, expand_env, slug_for, validate_app
 from brain.memory import Memory
+from brain.store.db import load_migrations
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
 
@@ -39,7 +39,7 @@ def test_migration_adds_apps(tmp_path):
     with pytest.raises(sqlite3.IntegrityError):
         db.execute("INSERT INTO apps VALUES('x','X','http','{}','basic',1)")
     db.close()
-    assert len(memory.MIGRATIONS) >= 5
+    assert len(load_migrations()) >= 5
 
 
 def test_slug_basic():

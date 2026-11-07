@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING
 
 from brain.guards import Guards
 from brain.masking import mask_json
-from brain.memory import Memory, Preference, _utc_text
+from brain.memory import Memory, Preference
 from brain.protocol import ErrorCode, RpcError
+from brain.store.db import utc_text
 
 if TYPE_CHECKING:
     from brain.side_check import AskFacts
@@ -65,7 +66,7 @@ class Approvals:
             outcome=outcome,
             decided_by=decided_by,
             preference_id=preference_id,
-            at=_utc_text(self._now()),
+            at=utc_text(self._now()),
             preference_sentence=preference_sentence,
         )
         self._notify("changed", {"what": "approvals"})
@@ -86,7 +87,7 @@ class Approvals:
             preference_id=pref.id,
             preference_sentence=pref.sentence,
         )
-        self._memory.use_preference(pref.id, _utc_text(self._now()))
+        self._memory.use_preference(pref.id, utc_text(self._now()))
         self._notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})
 
     # Preference writes live here so every writer (Home, the offer) notifies the same way.
@@ -98,7 +99,7 @@ class Approvals:
             source=source,
             tool=tool,
             group_key=group_key,
-            at=_utc_text(self._now()),
+            at=utc_text(self._now()),
         )
         self._notify("changed", {"what": "approvals"})
         return pref

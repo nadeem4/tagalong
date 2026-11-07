@@ -5,7 +5,6 @@ with a plain sentence the model reads and can act on; code never evicts items si
 """
 
 import json
-import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -14,6 +13,8 @@ from pathlib import Path
 from typing import Literal
 
 from brain.apps import AppRow
+from brain.store.db import open_db, utc_text
+from brain.store.search import fts_query
 
 
 @dataclass(frozen=True)
@@ -36,251 +37,6 @@ KINDS: dict[str, Kind] = {
         Kind("summary", "code", False, None, None),
     )
 }
-
-MIGRATIONS = (
-    """
-    CREATE TABLE memories(
-        id INTEGER PRIMARY KEY,
-        kind TEXT NOT NULL,
-        text TEXT NOT NULL,
-        cadence TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-    );
-    CREATE VIRTUAL TABLE memories_fts USING fts5(
-        text, content='memories', content_rowid='id', tokenize='porter unicode61'
-    );
-    CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
-        INSERT INTO memories_fts(rowid, text) VALUES (new.id, new.text);
-    END;
-    CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
-        INSERT INTO memories_fts(memories_fts, rowid, text) VALUES ('delete', old.id, old.text);
-    END;
-    CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
-        INSERT INTO memories_fts(memories_fts, rowid, text) VALUES ('delete', old.id, old.text);
-        INSERT INTO memories_fts(rowid, text) VALUES (new.id, new.text);
-    END;
-    """,
-    # Saved chat. Images and documents never land here; see _clean_block.
-    """
-    CREATE TABLE messages(
-        id INTEGER PRIMARY KEY,
-        at TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content_json TEXT NOT NULL,
-        text TEXT NOT NULL
-    );
-    CREATE VIRTUAL TABLE messages_fts USING fts5(
-        text, content='messages', content_rowid='id', tokenize='porter unicode61'
-    );
-    CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN
-        INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
-    END;
-    CREATE TRIGGER messages_ad AFTER DELETE ON messages BEGIN
-        INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
-    END;
-    CREATE TRIGGER messages_au AFTER UPDATE ON messages BEGIN
-        INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
-        INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
-    END;
-    """,
-    # Per-tool permission choice; no row means the tool's default applies.
-    """
-    CREATE TABLE permissions(
-        tool TEXT PRIMARY KEY,
-        mode TEXT NOT NULL CHECK(mode IN ('ask','auto'))
-    );
-    """,
-    # Expert jobs (Claude Code hand-offs). Rows still running at brain start become stopped.
-    """
-    CREATE TABLE jobs(
-        id TEXT PRIMARY KEY,
-        agent TEXT, task TEXT, folder TEXT, mode TEXT,
-        state TEXT, reason TEXT, progress TEXT, result TEXT, session_id TEXT,
-        reported INTEGER DEFAULT 0,
-        started_at TEXT, ended_at TEXT
-    );
-    """,
-    # Connected apps (MCP servers). config holds transport details as JSON; tokens never live here.
-    """
-    CREATE TABLE apps(
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        transport TEXT NOT NULL CHECK(transport IN ('stdio','http')),
-        config TEXT NOT NULL,
-        auth TEXT NOT NULL CHECK(auth IN ('none','token','oauth')),
-        enabled INTEGER NOT NULL DEFAULT 1
-    );
-    """,
-    # Scout's timers. next_at is UTC ISO text so text order equals time order; fired marks
-    # one-offs that already woke Scout (kept, so a restart never replays them).
-    """
-    CREATE TABLE timers(
-        id INTEGER PRIMARY KEY,
-        note TEXT NOT NULL,
-        next_at TEXT NOT NULL,
-        repeat_s INTEGER,
-        created_at TEXT NOT NULL,
-        fired INTEGER NOT NULL DEFAULT 0
-    );
-    """,
-    # Learned approvals. approvals is the audit log of every ask; preferences are the person's
-    # sentences (the one builtin default is seeded here, so deleting it sticks); offers record
-    # each "want me to handle these?" so Scout does not nag.
-    """
-    CREATE TABLE approvals(
-        id INTEGER PRIMARY KEY,
-        source TEXT NOT NULL CHECK(source IN ('scout_tool','claude_code','app')),
-        tool TEXT NOT NULL,
-        summary TEXT NOT NULL,
-        input TEXT NOT NULL,
-        job_id TEXT,
-        group_key TEXT NOT NULL,
-        outcome TEXT NOT NULL CHECK(outcome IN ('approved','refused','timed_out','no_one')),
-        decided_by TEXT NOT NULL CHECK(decided_by IN ('person','scout','none')),
-        preference_id INTEGER,
-        at TEXT NOT NULL
-    );
-    CREATE TABLE preferences(
-        id INTEGER PRIMARY KEY,
-        sentence TEXT NOT NULL,
-        source TEXT,
-        tool TEXT,
-        group_key TEXT,
-        builtin INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        use_count INTEGER NOT NULL DEFAULT 0,
-        last_used TEXT
-    );
-    CREATE TABLE offers(
-        id INTEGER PRIMARY KEY,
-        group_key TEXT NOT NULL,
-        at TEXT NOT NULL,
-        outcome TEXT NOT NULL CHECK(outcome IN ('yes','keep_asking','no_answer','none'))
-    );
-    INSERT INTO preferences(sentence, builtin, created_at)
-        VALUES ('Always ask me before risky actions', 1, strftime('%Y-%m-%dT%H:%M:%S+00:00','now'));
-    """,
-    # A scout approval keeps the sentence it was made under, so editing or removing the
-    # preference later does not rewrite history.
-    """
-    ALTER TABLE approvals ADD COLUMN preference_sentence TEXT;
-    """,
-    # A follow-up job points at the job whose session it continues, so the list shows the chain.
-    """
-    ALTER TABLE jobs ADD COLUMN parent_job TEXT;
-    """,
-    # What a job did, step by step. rev rises on every write (cursor for readers); seq is the
-    # display order, fixed at insert; seq 0 is the "[older steps dropped]" marker.
-    """
-    CREATE TABLE job_activity(
-        job_id TEXT NOT NULL,
-        rev INTEGER NOT NULL,
-        seq INTEGER NOT NULL,
-        at TEXT NOT NULL,
-        kind TEXT NOT NULL,
-        step TEXT,
-        status TEXT,
-        exit INTEGER,
-        text TEXT NOT NULL,
-        PRIMARY KEY(job_id, seq)
-    );
-    CREATE INDEX job_activity_rev ON job_activity(job_id, rev);
-    """,
-    # What Scout says it expects from a job: a JSON list of {text, done}, replaced whole.
-    """
-    ALTER TABLE jobs ADD COLUMN watch TEXT;
-    """,
-    # A timer can belong to a running job; it goes when the job ends.
-    """
-    ALTER TABLE timers ADD COLUMN job_id TEXT;
-    """,
-    # A job holds parts, one per expert hand-off. What was per-expert on jobs moves to job_parts;
-    # every old job becomes closed with one part p1. Steps carry their part and a source label.
-    """
-    CREATE TABLE job_parts(
-        job_id TEXT NOT NULL,
-        id TEXT NOT NULL,
-        agent TEXT, task TEXT, state TEXT, reason TEXT, progress TEXT,
-        session_id TEXT, report TEXT,
-        reported INTEGER NOT NULL DEFAULT 0,
-        started_at TEXT, ended_at TEXT, folder TEXT,
-        PRIMARY KEY(job_id, id)
-    );
-    INSERT INTO job_parts(job_id, id, agent, task, state, reason, progress, session_id, report,
-                          reported, started_at, ended_at, folder)
-        SELECT id, 'p1', agent, task, state, reason, progress, session_id, result,
-               COALESCE(reported, 0), started_at, ended_at, folder FROM jobs ORDER BY rowid;
-    CREATE TABLE jobs_new(
-        id TEXT PRIMARY KEY,
-        task TEXT, folder TEXT, mode TEXT, state TEXT,
-        started_at TEXT, ended_at TEXT, parent_job TEXT, watch TEXT,
-        title TEXT, scout_result TEXT, closed_at TEXT
-    );
-    INSERT INTO jobs_new(id, task, folder, mode, state, started_at, ended_at, parent_job, watch,
-                         closed_at)
-        SELECT id, task, folder, mode, state, started_at, ended_at, parent_job, watch,
-               CASE WHEN state = 'running' THEN NULL ELSE ended_at END FROM jobs ORDER BY rowid;
-    DROP TABLE jobs;
-    ALTER TABLE jobs_new RENAME TO jobs;
-    ALTER TABLE job_activity ADD COLUMN part TEXT NOT NULL DEFAULT 'p1';
-    ALTER TABLE job_activity ADD COLUMN source TEXT;
-    """,
-    # Long tool output, stored masked so Scout can read the rest of a capped preview by id.
-    """
-    CREATE TABLE tool_outputs(
-        id TEXT PRIMARY KEY,
-        tool TEXT NOT NULL,
-        chars INTEGER NOT NULL,
-        text TEXT NOT NULL,
-        at TEXT NOT NULL
-    );
-    """,
-    # A tool can be Off (the third per-tool state): widen the CHECK, keeping every stored row.
-    """
-    CREATE TABLE permissions_new(
-        tool TEXT PRIMARY KEY,
-        mode TEXT NOT NULL CHECK(mode IN ('off','ask','auto'))
-    );
-    INSERT INTO permissions_new(tool, mode) SELECT tool, mode FROM permissions;
-    DROP TABLE permissions;
-    ALTER TABLE permissions_new RENAME TO permissions;
-    """,
-    # Loops (things left open). Owned by loops/store.py over this same connection. Times are UTC
-    # ISO text; people, anchors and history are JSON. loop_surfaced says when a loop last came up
-    # for each anchor (or its due time); loop_cursor is how far each app's mail was read.
-    """
-    CREATE TABLE loops(
-        id TEXT PRIMARY KEY,
-        source TEXT NOT NULL,
-        ref TEXT NOT NULL,
-        title TEXT NOT NULL,
-        asks TEXT NOT NULL,
-        direction TEXT NOT NULL,
-        people TEXT NOT NULL,
-        due TEXT,
-        quiet_after TEXT,
-        anchors TEXT NOT NULL,
-        status TEXT NOT NULL,
-        history TEXT NOT NULL,
-        created TEXT NOT NULL,
-        updated TEXT NOT NULL,
-        UNIQUE(source, ref)
-    );
-    CREATE TABLE loop_surfaced(
-        loop_id TEXT NOT NULL,
-        anchor TEXT NOT NULL,
-        day TEXT NOT NULL,
-        PRIMARY KEY(loop_id, anchor)
-    );
-    CREATE TABLE loop_cursor(
-        app_id TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-    );
-    """,
-    # Later: a snoozed loop comes back at this time (UTC ISO text); `due` stays the deadline.
-    "ALTER TABLE loops ADD COLUMN snoozed_until TEXT;",
-)
 
 DROPPED_MARKER = "[older steps dropped]"
 
@@ -424,21 +180,6 @@ def _parse_watch(raw: str | None) -> list[dict] | None:
     return items if isinstance(items, list) else None
 
 
-def _utc_text(at: datetime) -> str:
-    """Whole seconds in UTC, so stored text sorts the same as the instants it names."""
-    return at.astimezone(UTC).isoformat(timespec="seconds")
-
-
-def _probe_fts5(db: sqlite3.Connection) -> None:
-    db.execute("CREATE VIRTUAL TABLE temp._fts_probe USING fts5(x)")
-    db.execute("DROP TABLE temp._fts_probe")
-
-
-def fts_query(text: str) -> str:
-    """Turn free text into a safe FTS5 query: quoted word tokens joined by OR."""
-    return " OR ".join(f'"{w}"' for w in re.findall(r"\w+", text.lower()))
-
-
 _MARKERS = {"image": "[screenshot]", "document": "[document]"}
 
 
@@ -481,35 +222,7 @@ class Memory:
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ):
         self._now = now
-        if str(path) != ":memory:":
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-        # Autocommit; transactions are explicit where atomicity matters.
-        self._db = sqlite3.connect(str(path), isolation_level=None)
-        try:
-            _probe_fts5(self._db)
-        except sqlite3.OperationalError as err:
-            self._db.close()
-            raise RuntimeError(f"This Python's SQLite has no FTS5 support: {err}") from err
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._migrate()
-
-    def _migrate(self) -> None:
-        version = self._db.execute("PRAGMA user_version").fetchone()[0]
-        if version > len(MIGRATIONS):
-            self._db.close()
-            raise RuntimeError(
-                f"The memory file is from a newer version (schema {version}); update the brain."
-            )
-        for n in range(version, len(MIGRATIONS)):
-            # One transaction per migration; the version bump commits with it.
-            script = "BEGIN;" + MIGRATIONS[n] + f"PRAGMA user_version = {n + 1}; COMMIT;"
-            try:
-                self._db.executescript(script)
-            except BaseException:
-                if self._db.in_transaction:
-                    self._db.execute("ROLLBACK")
-                self._db.close()
-                raise
+        self._db = open_db(path)
 
     @property
     def db(self) -> sqlite3.Connection:
@@ -853,7 +566,7 @@ class Memory:
     ) -> Timer:
         cur = self._db.execute(
             "INSERT INTO timers(note, next_at, repeat_s, created_at, job_id) VALUES (?,?,?,?,?)",
-            (note, _utc_text(next_at), repeat_s, self._now().isoformat(), job_id),
+            (note, utc_text(next_at), repeat_s, self._now().isoformat(), job_id),
         )
         return self._timers("WHERE id=?", (cur.lastrowid,))[0]
 
@@ -871,10 +584,10 @@ class Memory:
         return ids
 
     def set_timer_next(self, id: int, next_at: datetime) -> None:
-        self._db.execute("UPDATE timers SET next_at=? WHERE id=?", (_utc_text(next_at), id))
+        self._db.execute("UPDATE timers SET next_at=? WHERE id=?", (utc_text(next_at), id))
 
     def due_timers(self, now: datetime) -> list[Timer]:
-        return self._timers("WHERE fired=0 AND next_at<=?", (_utc_text(now),))
+        return self._timers("WHERE fired=0 AND next_at<=?", (utc_text(now),))
 
     def mark_timer_fired(self, id: int) -> None:
         self._db.execute("UPDATE timers SET fired=1 WHERE id=?", (id,))

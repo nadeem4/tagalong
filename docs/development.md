@@ -27,7 +27,9 @@ tagalong/
     ts/                             # @tagalong/contract: zod schemas for contract v1
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
                                     # config.py, bodies.py, server.py, apps.py, app_tools.py,
-                                    # main.py and cli.py (the `tagalong` command; see docs/brain.md)
+                                    # main.py and cli.py (the `tagalong` command; see docs/brain.md);
+                                    # store/ opens tagalong.db and runs its numbered migrations
+                                    # (db.py, search.py, migrations/; see docs/storage.md)
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
