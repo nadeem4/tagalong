@@ -133,11 +133,12 @@ def test_resume_timer_watch_loop_untouched(tmp_path):
 
 def test_resume_scan_twice_changes_nothing(tmp_path):
     seed, restart = _stores(tmp_path)
-    ask = _active(seed, "ask")
-    call = _active(seed, "expert_call")
+    goal = seed.create("goal", "g", state="active")
+    ask = _active(seed, "ask", parent_id=goal.id)
+    call = _active(seed, "expert_call", parent_id=goal.id)
     seed.update(call.id, checkpoint={"session_id": "s"})
-    safe = _active(seed, "tool_call", safe_to_retry=True)
-    unsafe = _active(seed, "tool_call")
+    safe = _active(seed, "tool_call", parent_id=goal.id, safe_to_retry=True)
+    unsafe = _active(seed, "tool_call", parent_id=goal.id)
     store = restart()
     first = store.resume_scan(_yes)
     assert {w for w, _ in first} == {ask.id, call.id, safe.id, unsafe.id}
@@ -147,3 +148,14 @@ def test_resume_scan_twice_changes_nothing(tmp_path):
     assert again.resume_scan(_yes) == []
     assert _event_count(again) == events
     assert {w: again.get(w) for w in states} == states
+
+
+@pytest.mark.parametrize("unsafe_first", [True, False])
+def test_resume_goal_ends_blocked_in_either_order(tmp_path, unsafe_first):
+    seed, restart = _stores(tmp_path)
+    goal = seed.create("goal", "g", state="active")
+    for safe in [False, True] if unsafe_first else [True, False]:
+        _active(seed, "tool_call", parent_id=goal.id, safe_to_retry=safe)
+    store = restart()
+    store.resume_scan(_yes)
+    assert store.get(goal.id).state == "blocked"

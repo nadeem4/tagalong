@@ -233,6 +233,12 @@ stateDiagram-v2
     planned --> paused : person pauses
     paused --> planned : person switches on
     paused --> cancelled
+    failed --> planned : retry_step, person chose retry
+    failed --> cancelled : person chose skip
+    blocked --> active : goal only, rollup
+    done --> planned : loop only, reopened
+    cancelled --> planned : loop only, reopened
+    expired --> planned : loop only, reopened
     done --> [*]
     failed --> [*]
     cancelled --> [*]
@@ -244,10 +250,13 @@ Terminal states are `done`, `failed`, `cancelled` and `expired`; an ended row al
 transaction with its `state` event, and raises `TransitionRefused` for a move from a state that
 has already changed (`expect=`), so two writers on one row never overwrite each other.
 
-- Goal only: `blocked` to `active`; `done` and `failed` only through `close_goal`.
+- Goal only: `blocked` to `active`; `done` and `failed` only through `close_goal`, which also
+  accepts a goal still `planned`.
+- Skip: a `failed` step can move to `cancelled`; a cancelled step no longer blocks its goal.
 - Loop only: an ended loop goes back to `planned` (with a `reopened` event).
 - Rollup: a child that goes `blocked` or `failed` blocks its active goal; when no child is
-  blocked and one moves to `planned` or `active`, the goal is `active` again. A goal is never
+  `blocked` or `failed` any more and one moves to `planned`, `active` or `cancelled`, the goal is
+  `active` again. A goal is never
   failed automatically.
 - Parent end: when a row ends, its open children end too: asks and questions `expired` ("parent
   ended: ..."), everything else `cancelled` ("goal closed"). Rows ended this way are marked
@@ -280,7 +289,8 @@ Indexed on `(work_id, id)`.
 
 FTS5 over `work.title` and `work.summary`, external content keyed by `work`'s rowid, with the
 same tokenizer (`porter unicode61`) and trigger style as `messages_fts`. `WorkStore.search` reads
-it, so Scout can find "that invoice thing".
+it, so Scout can find "that invoice thing". Any rebuild of `work` must copy `rowid` explicitly and
+then run `INSERT INTO work_fts(work_fts) VALUES('rebuild')`, because the index is keyed by rowid.
 
 ## Work (old shape)
 

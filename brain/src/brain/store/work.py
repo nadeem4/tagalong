@@ -30,6 +30,7 @@ _MOVES = {
     "active": {"done", "failed", "blocked", "planned", "cancelled", "expired"},
     "blocked": {"planned", "cancelled", "expired"},
     "paused": {"planned", "cancelled"},
+    "failed": {"cancelled"},  # the person chose to skip a failed step
 }
 
 _COLUMNS = (
@@ -104,7 +105,7 @@ def _row(r: tuple) -> WorkRow:
 
 def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
     if kind == "goal" and to in ("done", "failed"):
-        return via_close and frm in ("active", "blocked")
+        return via_close and frm in ("planned", "active", "blocked")
     if to in _MOVES.get(frm, ()):
         return True
     if kind == "goal" and (frm, to) == ("blocked", "active"):
@@ -210,7 +211,10 @@ class WorkStore:
         with transaction(self.db):
             root_id = id
             if parent_id is not None:
-                root_id = self._need(parent_id).root_id
+                parent = self._need(parent_id)
+                if parent.state in TERMINAL:
+                    raise TransitionRefused(f"{parent_id} has ended; nothing can be added")
+                root_id = parent.root_id
             seq = self.db.execute(
                 "SELECT COALESCE(MAX(seq), 0) + 1 FROM work WHERE parent_id IS ?", (parent_id,)
             ).fetchone()[0]
@@ -227,7 +231,7 @@ class WorkStore:
                     state,
                     self.mask(title)[:TITLE_CAP],
                     _dumps(input),
-                    max_attempts or self.retry.max_attempts,
+                    self.retry.max_attempts if max_attempts is None else max_attempts,
                     int(safe_to_retry),
                     None if due_at is None else utc_text(due_at),
                     now,
@@ -316,6 +320,7 @@ class WorkStore:
         ending = to in TERMINAL
         if ending and not reason:
             raise ValueError("an ended state needs a reason")
+        reason = self.mask(reason) if reason else reason
         now = self._stamp()
         sets: dict[str, object] = {"state": to, "updated_at": now}
         if ending:
@@ -358,8 +363,8 @@ class WorkStore:
             return
         if to in ("blocked", "failed") and parent.state == "active":
             self._move(parent, "blocked", None, {"because": row.id})
-        elif to in ("planned", "active") and parent.state == "blocked":
-            if not any(c.state == "blocked" for c in self.children(parent.id)):
+        elif to in ("planned", "active", "cancelled") and parent.state == "blocked":
+            if not any(c.state in ("blocked", "failed") for c in self.children(parent.id)):
                 self._move(parent, "active", None, {"because": row.id})
 
     def children_ended(self, goal_id: str) -> bool:
@@ -397,7 +402,10 @@ class WorkStore:
             row = self._need(id)
             if row.state not in ("blocked", "failed"):
                 raise TransitionRefused(f"{id} is {row.state}, not blocked or failed")
-            self._move(row, "planned", None, force=True, extra={"attempt": 0, "due_at": None})
+            if row.parent_id is not None and self._need(row.parent_id).state in TERMINAL:
+                raise TransitionRefused(f"{row.parent_id} has ended; {id} cannot restart")
+            extra = {"attempt": 0, "due_at": self._stamp()}  # due now, so the runner picks it up
+            self._move(row, "planned", None, force=True, extra=extra)
             self.add_event(id, "retried")
         return self._need(id)
 

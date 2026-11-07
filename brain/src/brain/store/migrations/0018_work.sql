@@ -29,7 +29,7 @@
     CREATE INDEX work_parent_seq ON work(parent_id, seq);
     CREATE INDEX work_kind_state ON work(kind, state);
     CREATE INDEX work_unreported ON work(reported_at)
-        WHERE state IN ('done','failed','cancelled','expired');
+        WHERE state IN ('done','failed','cancelled','expired','blocked');
     CREATE TABLE work_events(
         id INTEGER PRIMARY KEY,
         work_id TEXT NOT NULL,
@@ -48,7 +48,7 @@
         INSERT INTO work_fts(work_fts, rowid, title, summary)
             VALUES ('delete', old.rowid, old.title, old.summary);
     END;
-    CREATE TRIGGER work_au AFTER UPDATE ON work BEGIN
+    CREATE TRIGGER work_au AFTER UPDATE OF title, summary ON work BEGIN
         INSERT INTO work_fts(work_fts, rowid, title, summary)
             VALUES ('delete', old.rowid, old.title, old.summary);
         INSERT INTO work_fts(rowid, title, summary) VALUES (new.rowid, new.title, new.summary);

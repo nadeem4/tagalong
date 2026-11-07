@@ -147,6 +147,7 @@ ALLOWED = {
         "active": {"done", "failed", "blocked", "planned", "cancelled", "expired"},
         "blocked": {"planned", "cancelled", "expired"},
         "paused": {"planned", "cancelled"},
+        "failed": {"cancelled"},
     }.items()
     for b in tos
 }
@@ -454,3 +455,79 @@ def test_config_retry_settings():
             load_config({"TAGALONG_RETRY_BACKOFF_S": bad})
     with pytest.raises(ValueError, match="TAGALONG_RETRY_MAX"):
         load_config({"TAGALONG_RETRY_MAX": "0"})
+
+
+# ---- review fixes ----
+
+
+def test_goal_stays_blocked_while_a_sibling_is_failed(store):
+    goal = store.create("goal", "g", state="active")
+    bad = store.create("tool_call", "bad", parent_id=goal.id)
+    other = store.create("tool_call", "other", parent_id=goal.id)
+    store.transition(bad.id, "active")
+    store.transition(bad.id, "failed", reason="boom")
+    store.transition(other.id, "active")
+    assert store.get(goal.id).state == "blocked"
+
+
+def test_skip_failed_step_unblocks_goal(store):
+    goal = store.create("goal", "g", state="active")
+    bad = store.create("tool_call", "bad", parent_id=goal.id)
+    store.transition(bad.id, "active")
+    store.transition(bad.id, "failed", reason="boom")
+    assert store.get(goal.id).state == "blocked"
+    assert store.transition(bad.id, "cancelled", reason="skipped").state == "cancelled"
+    assert store.get(goal.id).state == "active"
+
+
+def test_cannot_add_or_retry_under_an_ended_parent(store):
+    goal = store.create("goal", "g", state="active")
+    step = store.create("tool_call", "s", parent_id=goal.id)
+    store.transition(step.id, "active")
+    store.transition(step.id, "failed", reason="boom")
+    store.mark_reported(step.id)
+    store.close_goal(goal.id, "failed", "gave up")
+    with pytest.raises(TransitionRefused):
+        store.create("tool_call", "late", parent_id=goal.id)
+    with pytest.raises(TransitionRefused):
+        store.retry_step(step.id)
+    assert store.get(step.id).state == "failed"
+
+
+def test_reason_is_masked(store):
+    row = store.create("tool_call", "t")
+    store.transition(row.id, "active")
+    got = store.transition(row.id, "failed", reason="bad key sk-x")
+    assert got.end_reason == "bad key [secret]"
+    assert store.events(row.id)[-1].data["reason"] == "bad key [secret]"
+
+
+def test_unreported_index_matches_the_query(db):
+    plan = db.execute(
+        "EXPLAIN QUERY PLAN SELECT id FROM work WHERE reported_at IS NULL"
+        " AND state IN ('done','failed','cancelled','expired','blocked')"
+    ).fetchall()
+    assert any("work_unreported" in str(r) for r in plan)
+
+
+def test_close_goal_from_planned(store):
+    goal = store.create("goal", "g")
+    assert store.close_goal(goal.id, "done", "ok").state == "done"
+
+
+def test_max_attempts_zero_is_kept(store):
+    assert store.create("tool_call", "t", max_attempts=0).max_attempts == 0
+
+
+def test_retry_step_is_due_now(store):
+    row = store.create("tool_call", "t")
+    store.transition(row.id, "active")
+    store.fail(row.id, "permanent", "x")
+    store.retry_step(row.id)
+    assert [r.id for r in store.due(["tool_call"])] == [row.id]
+
+
+def test_search_survives_updates_of_other_fields(store):
+    row = store.create("goal", "invoice thing")
+    store.update(row.id, progress="going")
+    assert [r.id for r in store.search("invoice")] == [row.id]
