@@ -35,7 +35,7 @@ from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
-from brain.store.work import ActivityEntry, TransitionRefused, WorkRow
+from brain.store.work import OPEN, ActivityEntry, TransitionRefused, WorkRow
 
 log = logging.getLogger("brain")
 
@@ -333,7 +333,10 @@ class Jobs:
             self._records.update_part(
                 earlier.id, earlier_part.id, state="cancelled", reason="carried on", reported=True
             )
-            if job != earlier.id:  # a part added to the same job keeps that job open
+            # A part added to the same job, or another part still open, keeps the job open.
+            if job != earlier.id and not any(
+                c.state in OPEN for c in self._records.work.children(earlier.id)
+            ):
                 self._records.work.transition(earlier.id, "cancelled", reason="carried on")
                 self._records.mark_reported(earlier.id)
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""

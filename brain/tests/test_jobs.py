@@ -1379,6 +1379,31 @@ async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_
     assert "old" not in [r.id for r in rig.records.work.open_roots()]
 
 
+async def test_carrying_on_from_one_of_two_blocked_parts_leaves_the_other_and_the_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.records.add_part("old", "claude-acp", "t2", str(rig.folder))
+    rig.records.update_part("old", "p2", session_id="s2")
+    rig.jobs.startup()
+    assert [p.state for p in rig.records.get_job("old").parts] == ["blocked", "blocked"]
+    await rig.jobs.start("two", str(rig.folder), continue_job="old")
+    old = rig.records.get_job("old")
+    assert [p.state for p in old.parts] == ["blocked", "cancelled"]
+    assert "old" in [r.id for r in rig.records.work.open_roots()]
+
+
+async def test_carrying_on_inside_the_same_job_keeps_the_job_open(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    await rig.jobs.start("two", str(rig.folder), continue_job="old", job="old")
+    old = rig.records.get_job("old")
+    assert old.parts[0].state == "cancelled"
+    assert old.state == "active"
+
+
 async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
     first = await rig.jobs.start("one", str(rig.folder))
