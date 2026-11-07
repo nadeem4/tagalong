@@ -1,4 +1,4 @@
-"""Migration 0021: permissions, preferences and offers become rows of one `rules` table.
+"""Migration 0022: permissions, preferences and offers become rows of one `rules` table.
 
 Runs on a file seeded at the last version before it, with the rows a real database has: a tool
 set to off, the built-in preference, a user preference with nulls, and an offer of every outcome.
@@ -12,7 +12,7 @@ from brain.store import rules
 from brain.store.db import migrate
 
 T = "2026-01-01T10:00:00+00:00"
-BEFORE = 20
+BEFORE = 21
 
 
 @pytest.fixture
@@ -69,3 +69,18 @@ def test_old_rule_tables_gone(db):
     names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert not names & {"permissions", "preferences", "offers"}
     assert "rules" in names
+
+
+def test_database_from_version_7_migrates_to_head(tmp_path):
+    """An old file (before 0008 and 0015): ask/auto only, just the built-in preference."""
+    old = sqlite3.connect(tmp_path / "v7.db", isolation_level=None)
+    migrate(old, upto=7)
+    for tool, mode in [("a", "auto"), ("b", "ask")]:
+        old.execute("INSERT INTO permissions(tool, mode) VALUES (?,?)", (tool, mode))
+    old.execute("INSERT INTO offers(group_key, at, outcome) VALUES ('g', ?, 'yes')", (T,))
+    migrate(old)
+    assert rules.permission_modes(old) == {"a": "auto", "b": "ask"}
+    assert [p.builtin for p in rules.list_preferences(old)] == [True]
+    assert old.execute("SELECT COUNT(*) FROM rules WHERE kind='offer'").fetchone()[0] == 1
+    names = {r[0] for r in old.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert not names & {"permissions", "preferences", "offers"}

@@ -81,10 +81,21 @@ async def test_remember_result_names_the_id(run):
 
 
 async def test_remember_refusal_raises(mem, run):
-    for i in range(30):
-        mem.remember("tracking", f"item {i}")
+    for i in range(50):
+        mem.remember("instruction", f"item {i}")
     with pytest.raises(MemoryRefused):
-        await run("remember", {"kind": "tracking", "text": "one more"})
+        await run("remember", {"kind": "instruction", "text": "one more"})
+
+
+async def test_remember_rejects_tracking(run):
+    with pytest.raises(MemoryRefused, match="watch"):
+        await run("remember", {"kind": "tracking", "text": "the build"})
+
+
+def test_remember_schema_has_no_tracking_or_cadence(mem):
+    props = next(s for s, _ in brain_tools(mem) if s.name == "remember").input_schema["properties"]
+    assert "tracking" not in props["kind"]["enum"]
+    assert "cadence" not in props
 
 
 async def test_recall_formats_hits(run):
@@ -684,14 +695,14 @@ def drop(bodies, body_id):
     bodies.disconnect(body_id, bodies._online[body_id].peer)
 
 
-async def test_list_memories_json_shape_newest_first(mem, home):
+async def test_list_memories_has_no_cadence_and_is_newest_first(mem, home):
     mem.remember("about_you", "Likes tea")
-    mem.remember("tracking", "Water plants", cadence="weekly")
+    mem.remember("instruction", "Water plants")
     out = json.loads(await home.run("list_memories"))
     assert [m["id"] for m in out["memories"]] == [2, 1]
     first = out["memories"][0]
-    assert set(first) == {"id", "kind", "text", "cadence", "at"}
-    assert first["kind"] == "tracking" and first["cadence"] == "weekly"
+    assert set(first) == {"id", "kind", "text", "at"}  # no cadence: watches replaced tracking
+    assert first["kind"] == "instruction"
     assert first["text"] == "Water plants"
     assert re.match(r"\d{4}-\d{2}-\d{2}T", first["at"])
 
@@ -871,7 +882,7 @@ def records(mem):
 def trun(mem):
     fake = _FakeTimers()
     records = records_for(mem, lambda: _T0)
-    pairs = timer_tools(mem, records, fake, lambda: _T0)
+    pairs = timer_tools(records, fake, lambda: _T0)
     handlers = {spec.name: handler for spec, handler in pairs}
 
     async def call(name, args):
@@ -879,23 +890,32 @@ def trun(mem):
 
     call.fake = fake
     call.records = records
+    call.work = records.work
     call.specs = {spec.name: spec for spec, _ in pairs}
     return call
 
 
-async def test_set_timer_in_minutes_adds_a_row_and_rearms(mem, trun):
+def _timers(trun):
+    return trun.work.of_kind("timer", ["planned", "active"])
+
+
+def _due(row):
+    return datetime.datetime.fromisoformat(row.due_at)
+
+
+async def test_set_timer_in_minutes_adds_a_row_and_rearms(trun):
     out = await trun("set_timer", {"note": "check build", "in_minutes": 30})
-    t = mem.list_timers()[0]
-    assert t.next_at == _T0 + datetime.timedelta(minutes=30)
-    assert t.repeat_s is None
+    t = _timers(trun)[0]
+    assert (t.kind, t.state, t.title) == ("timer", "planned", "check build")
+    assert _due(t) == _T0 + datetime.timedelta(minutes=30)
+    assert trun.work.repeat_of(t.id) is None
     assert out == f"timer {t.id} set for 2026-10-28T09:30:00+01:00"
     assert trun.fake.changes == 1
 
 
-async def test_set_timer_at_with_offset_stores_utc(mem, trun):
+async def test_set_timer_at_with_offset_stores_utc(trun):
     out = await trun("set_timer", {"note": "n", "at": "2026-10-28T15:00:00+01:00"})
-    t = mem.list_timers()[0]
-    assert t.next_at == datetime.datetime(2026, 10, 28, 14, 0, tzinfo=datetime.UTC)
+    assert _due(_timers(trun)[0]) == datetime.datetime(2026, 10, 28, 14, 0, tzinfo=datetime.UTC)
     assert out.endswith("2026-10-28T15:00:00+01:00")
 
 
@@ -924,45 +944,60 @@ async def test_set_timer_at_with_offset_stores_utc(mem, trun):
         {"note": "n", "in_minutes": "5"},
     ],
 )
-async def test_set_timer_refuses_bad_input(mem, trun, args):
+async def test_set_timer_refuses_bad_input(trun, args):
     with pytest.raises(MemoryRefused):
         await trun("set_timer", args)
-    assert mem.list_timers() == []
+    assert _timers(trun) == []
     assert trun.fake.changes == 0
 
 
-async def test_set_timer_accepts_integral_float_repeat_and_the_year_limit(mem, trun):
+async def test_set_timer_accepts_integral_float_repeat_and_the_year_limit(trun):
     out = await trun("set_timer", {"note": "n", "in_minutes": 5, "repeat_minutes": 5.0})
     assert out.endswith(", repeats every 5 minutes")
     await trun("set_timer", {"note": "n", "in_minutes": 525600, "repeat_minutes": 525600})
-    assert len(mem.list_timers()) == 2
+    assert len(_timers(trun)) == 2
 
 
-@pytest.mark.parametrize("bad", [True, "1", [1], 1.5, None])
-async def test_cancel_timer_refuses_non_integer_ids(mem, trun, bad):
+async def test_set_timer_keeps_a_note_longer_than_a_title(trun):
+    await trun("set_timer", {"note": "n" * 400, "in_minutes": 5})
+    assert (_timers(trun)[0].input or {}).get("note") == "n" * 400
+    rows = json.loads(await trun("list_timers", {}))["timers"]
+    assert rows[0]["note"] == "n" * 400
+
+
+async def test_set_timer_for_a_job_hangs_under_it(trun):
+    trun.work.create("goal", "the job", id="j1", state="active")
+    await trun("set_timer", {"note": "n", "in_minutes": 5, "job": "j1"})
+    assert _timers(trun)[0].parent_id == "j1"
+    rows = json.loads(await trun("list_timers", {}))["timers"]
+    assert rows[0]["job"] == "j1"
+
+
+@pytest.mark.parametrize("bad", [True, 1, [1], 1.5, None, " "])
+async def test_cancel_timer_refuses_non_text_ids(trun, bad):
     await trun("set_timer", {"note": "n", "in_minutes": 5})
-    with pytest.raises(MemoryRefused, match="whole number"):
+    with pytest.raises(MemoryRefused, match="text"):
         await trun("cancel_timer", {"id": bad})
-    assert len(mem.list_timers()) == 1
+    assert len(_timers(trun)) == 1
 
 
-async def test_list_timers_marks_fired_one_offs_pending(mem, trun):
+async def test_list_timers_marks_fired_one_offs_pending(trun):
     await trun("set_timer", {"note": "n", "in_minutes": 5})
     await trun("set_timer", {"note": "r", "in_minutes": 10, "repeat_minutes": 15})
-    first = min(mem.list_timers(), key=lambda t: t.next_at)
-    mem.mark_timer_fired(first.id)
+    first = min(_timers(trun), key=lambda t: t.due_at)
+    trun.work.transition(first.id, "active", expect="planned")  # fired, Scout has not heard
     rows = {r["note"]: r for r in json.loads(await trun("list_timers", {}))["timers"]}
     assert rows["n"]["pending"] is True
     assert rows["r"]["pending"] is False
 
 
-async def test_set_timer_repeat_of_5_is_allowed(mem, trun):
+async def test_set_timer_repeat_of_5_is_allowed(trun):
     out = await trun("set_timer", {"note": "n", "in_minutes": 5, "repeat_minutes": 5})
-    assert mem.list_timers()[0].repeat_s == 300
+    assert trun.work.repeat_of(_timers(trun)[0].id) == 300
     assert out.endswith(", repeats every 5 minutes")
 
 
-async def test_list_timers_shows_next_and_repeat(mem, trun):
+async def test_list_timers_shows_next_and_repeat(trun):
     await trun("set_timer", {"note": "later", "in_minutes": 60})
     await trun("set_timer", {"note": "soon", "in_minutes": 10, "repeat_minutes": 15})
     rows = json.loads(await trun("list_timers", {}))["timers"]
@@ -973,14 +1008,31 @@ async def test_list_timers_shows_next_and_repeat(mem, trun):
     assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes", "pending", "job"}
 
 
-async def test_cancel_timer_removes_it_and_refuses_unknown_ids(mem, trun):
+async def test_list_timers_leaves_out_watches_and_ended_timers(trun):
     await trun("set_timer", {"note": "n", "in_minutes": 5})
-    tid = mem.list_timers()[0].id
+    watch = json.loads(await trun("watch", {"action": "add", "note": "w", "every_minutes": 10}))
+    assert watch["id"]
+    await trun("cancel_timer", {"id": _timers(trun)[0].id})
+    assert json.loads(await trun("list_timers", {}))["timers"] == []
+
+
+async def test_cancel_timer_takes_string_id(trun):
+    await trun("set_timer", {"note": "n", "in_minutes": 5})
+    tid = _timers(trun)[0].id
+    assert isinstance(tid, str)
     await trun("cancel_timer", {"id": tid})
-    assert mem.list_timers() == []
+    gone = trun.work.get(tid)
+    assert (gone.state, gone.end_reason) == ("cancelled", "cancelled by Scout")
+    assert gone.reported_at is not None  # Scout did it, so it needs no report
     assert trun.fake.changes == 2
     with pytest.raises(MemoryRefused, match=f"no timer with id {tid}."):
         await trun("cancel_timer", {"id": tid})
+
+
+async def test_cancel_timer_refuses_a_watch_id(trun):
+    made = json.loads(await trun("watch", {"action": "add", "note": "w", "every_minutes": 10}))
+    with pytest.raises(MemoryRefused, match="no timer"):
+        await trun("cancel_timer", {"id": made["id"]})
 
 
 async def test_timer_tool_modes(trun):
@@ -988,16 +1040,15 @@ async def test_timer_tool_modes(trun):
     assert trun.specs["cancel_timer"].default_mode == "auto"
     assert trun.specs["set_timer"].effect == "change"
     assert trun.specs["list_timers"].effect == "read"
-    assert all(s.audience == frozenset({"scout"}) for s in trun.specs.values())
+    assert trun.specs["set_timer"].audience == frozenset({"scout"})
+    assert trun.specs["watch"].audience == frozenset({"scout", "home"})
 
 
 async def test_set_timer_with_a_naive_clock_still_gets_an_aware_time(mem):
-    pairs = timer_tools(
-        mem, records_for(mem), _FakeTimers(), lambda: datetime.datetime(2026, 10, 28, 9, 0)
-    )
+    naive = lambda: datetime.datetime(2026, 10, 28, 9, 0)  # noqa: E731
+    pairs = timer_tools(records_for(mem, naive), _FakeTimers(), naive)
     handlers = {s.name: h for s, h in pairs}
     out = await handlers["set_timer"]({"note": "n", "in_minutes": 5})
-    assert mem.list_timers()[0].next_at.tzinfo is not None
     assert out.startswith("timer ")
 
 
@@ -1304,25 +1355,25 @@ def test_hand_off_description_points_to_watch_job_and_how_done_is_judged(home):
     assert "watch_job" in text and "done" in text and "summary" in text
 
 
-async def test_set_timer_with_a_running_job_stores_job_id(mem, trun, records):
+async def test_set_timer_with_a_running_job_stores_job_id(trun, records):
     records.add_job("j1", "a", "t", "f", "m")
     await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
-    assert mem.list_timers()[0].job_id == "j1"
+    assert _timers(trun)[0].parent_id == "j1"
     assert trun.fake.changes == 1
 
 
-async def test_set_timer_refuses_an_unknown_job(mem, trun):
+async def test_set_timer_refuses_an_unknown_job(trun):
     with pytest.raises(MemoryRefused, match="no job"):
         await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "nope"})
-    assert mem.list_timers() == []
+    assert _timers(trun) == []
 
 
-async def test_set_timer_refuses_a_finished_job(mem, trun, records):
+async def test_set_timer_refuses_a_finished_job(trun, records):
     records.add_job("j1", "a", "t", "f", "m")
     end_job(records, "j1", "done")
     with pytest.raises(MemoryRefused, match="not running"):
         await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
-    assert mem.list_timers() == []
+    assert _timers(trun) == []
 
 
 async def test_set_timer_refuses_a_non_string_job(mem, trun):
@@ -1476,7 +1527,7 @@ def test_built_in_defaults_match_the_spec_table(mem):
     tools = (
         brain_tools(mem)
         + output_tools(OutputStore(mem, Guards(), 10))
-        + timer_tools(mem, records_for(mem), _FakeTimers(), lambda: _T0)
+        + timer_tools(records_for(mem), _FakeTimers(), lambda: _T0)
         + expert_tools(jobs, lambda: True)
     )
     box = Toolbox(
@@ -1487,7 +1538,7 @@ def test_built_in_defaults_match_the_spec_table(mem):
     modes = {s.name: box.mode(s) for s in box.sources[0].specs() if "scout" in s.audience}
     auto = {
         "remember", "recall", "forget", "read_output", "set_timer", "list_timers",
-        "cancel_timer", "job_report", "watch_job", "close_job",
+        "cancel_timer", "watch", "job_report", "watch_job", "close_job",
         "set_job_result", "list_experts", "hand_off", "stop_job",
     }  # fmt: skip
     assert {n: modes[n] for n in auto} == {n: "auto" for n in auto}

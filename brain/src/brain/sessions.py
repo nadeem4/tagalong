@@ -191,7 +191,6 @@ class Session:
         )
         self.jobs = Jobs(
             self.records,
-            memory,
             self._asks,
             notify,
             experts or (lambda: []),
@@ -214,7 +213,7 @@ class Session:
         )
         self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
         timers = self.timers = Timers(
-            memory, self.records, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
+            self.records.work, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
         )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
@@ -223,7 +222,7 @@ class Session:
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work)
-            + timer_tools(memory, self.records, timers, now)
+            + timer_tools(self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
@@ -246,10 +245,13 @@ class Session:
             rules.set_permission_mode(memory.db, name, mode)
             notify("changed", {"what": "permissions"})
 
+        def modes() -> dict[str, str]:
+            return rules.permission_modes(memory.db)
+
         # The tool gate and its ask chain: nobody online, then Scout's look, then the person.
         self.guards.add(
             tool_mode(
-                lambda: rules.permission_modes(memory.db),
+                modes,
                 lambda turn_id: self._owner_turn and turn_id == self._turn_id,
             )
         )
@@ -258,7 +260,7 @@ class Session:
         self.guards.add(person_ask())
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
-            lambda: rules.permission_modes(memory.db),
+            modes,
             save_mode,
             self._asks,
             approvals,
@@ -301,7 +303,28 @@ class Session:
         bodies.on_connect = self._on_connect
         for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
+        self._tell_paused_watches()
         timers.start()
+
+    def _tell_paused_watches(self) -> None:
+        """Watches a migration paused are mentioned once, then marked told."""
+        work = self.records.work
+        paused = [w for w in work.of_kind("watch", ["paused"]) if w.reported_at is None]
+        if not paused:
+            return
+        entries = [
+            f"{w.id}: {w.title}"
+            + (f" ({(w.input or {})['cadence']})" if (w.input or {}).get("cadence") else "")
+            for w in paused
+        ]
+        told = [entries[0][:1500]]  # whole entries only; one alone may be cut
+        for entry in entries[1:]:
+            if len("; ".join([*told, entry])) > 1500:
+                break
+            told.append(entry)
+        self.scheduler.emit(Event("watches_paused", {"watches": "; ".join(told)}))
+        for w in paused[: len(told)]:  # the rest are told at the next start
+            work.mark_reported(w.id)
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes

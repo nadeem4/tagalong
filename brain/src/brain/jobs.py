@@ -27,7 +27,6 @@ from brain.guards import AskCtx, Guards, Hook
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.memory import Memory
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
 from brain.protocol import ErrorCode, RpcError
@@ -103,7 +102,6 @@ class Jobs:
     def __init__(
         self,
         records: JobRecords,
-        memory: Memory,
         asks: Asks,
         notify: Callable[[str, dict], None],
         experts: Callable[[], list[InstalledExpert]],
@@ -136,7 +134,6 @@ class Jobs:
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
         self._records = records  # the jobs themselves: goal and expert-call rows
-        self._memory = memory  # timers; jobs and their steps are work rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
         self._notify = notify
@@ -172,12 +169,11 @@ class Jobs:
     def startup(self) -> list[tuple[str, str]]:
         """Settle what a dead brain left running (the resume scan): a call that saved a session is
         held for Scout to carry on, any other ends as failed. Each such part's log ends there and
-        its job's check-back timers go. Returns the scan's (work id, outcome) pairs."""
+        its timers stay planned. Returns the scan's (work id, outcome) pairs."""
         work = self._records.work
         settled = work.resume_scan(self.can_resume_row)
         # The end lines come after the scan commits; a crash between only loses them, because
         # resume_scan is idempotent and will not settle these rows twice.
-        jobs: dict[str, None] = {}
         for work_id, _ in settled:
             row = work.get(work_id)
             if row is None or row.kind != "expert_call" or row.parent_id is None:
@@ -194,9 +190,6 @@ class Jobs:
                     part=work_id.split(".", 1)[1],
                 ),
             )
-            jobs[job_id] = None
-        for job_id in jobs:
-            self._memory.delete_timers_for_job(job_id)
         return settled
 
     def can_resume_row(self, row: WorkRow) -> bool | None:
@@ -595,10 +588,17 @@ class Jobs:
                 f"job {job_id} still running: {', '.join(running)}",
                 {"running_parts": running},
             )
+        work = self._records.work
+        timers = [t.id for t in work.children(job_id) if t.kind in ("timer", "watch")]
         try:
             self._records.close_job(job_id, outcome)
         except TransitionRefused as err:
             raise JobError(f"job {job_id} cannot be closed: {err}") from err
+        # Closing cancelled the job's check-back timers: drop their held wakes, re-arm the sleeper.
+        for timer_id in timers:
+            self._drop("timer", f"timer:{timer_id}")
+        if timers:
+            self._timers_changed()
         self._changed()
 
     def tell(self, job_id: str, note: str, part: str | None = None) -> None:
@@ -996,13 +996,6 @@ class Jobs:
         if activity := self._activity.get(job_id, {}).get(part):
             activity.on_update(update)
 
-    def _end_timers(self, job_id: str) -> None:
-        """A job's check-back timers are lifecycle, not a decision: gone with the job."""
-        if timer_ids := self._memory.delete_timers_for_job(job_id):
-            for timer_id in timer_ids:
-                self._drop("timer", f"timer:{timer_id}")
-            self._timers_changed()
-
     def _settle(
         self, job_id: str, part: str, state: str, reason: str, report: str | None
     ) -> Job | None:
@@ -1026,7 +1019,6 @@ class Jobs:
         if job_id in self._runs:
             return False
         self._stop_activity_notes(job_id)
-        self._end_timers(job_id)
         self._progress_sent.pop(job_id, None)
         return True
 

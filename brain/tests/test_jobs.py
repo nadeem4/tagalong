@@ -13,7 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from fake_clock import FakeClock
-from job_rows import end_job
+from job_rows import add_timer, end_job
 
 from brain.approvals import Approvals
 from brain.asks import Answer
@@ -184,7 +184,6 @@ class Rig:
         )
         self.jobs = Jobs(
             self.records,
-            self.memory,
             asks,
             lambda method, params: self.notes.append((method, params)),
             lambda: self.experts,
@@ -360,28 +359,6 @@ async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_t
     await until(lambda: not alive(rig.runs[0]))
     rig.jobs._make_run = original
     await rig.jobs.start("again", str(rig.folder))  # the cap of one is free again
-
-
-async def test_begin_failure_deletes_the_jobs_timers_and_rearms(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
-    original = rig.make_run
-
-    def failing(expert, **callbacks):
-        run = original(expert, **callbacks)
-
-        async def boom(mode_id, task):
-            job_id = rig.records.list_jobs()[0].id
-            rig.memory.add_timer("x", datetime.now(UTC) + timedelta(hours=1), job_id=job_id)
-            raise ConnectionError("connection lost")
-
-        run.begin = boom
-        return run
-
-    rig.jobs._make_run = failing
-    with pytest.raises(JobError, match="connection lost"):
-        await rig.jobs.start("go", str(rig.folder))
-    assert rig.memory.list_timers() == []
-    assert rig.timers_changed == 1
 
 
 async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
@@ -2028,44 +2005,50 @@ async def test_two_quick_watch_changes_end_in_one_trailing_notice(make_rig, monk
     assert rig.records.get_job("j1").watch == _items(3)
 
 
-async def test_ending_a_job_deletes_its_timers_and_rearms(make_rig):
+async def test_closing_a_job_cancels_its_timers_and_rearms(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     when = datetime.now(UTC) + timedelta(hours=1)
-    rig.memory.add_timer("a", when, job_id=job_id)
-    rig.memory.add_timer("b", when, repeat_s=600, job_id=job_id)
+    a = add_timer(rig.records.work, "a", when, parent_id=job_id)
+    b = add_timer(rig.records.work, "b", when, repeat_s=600, parent_id=job_id)
     await finish(rig, job_id)
     await until(lambda: rig.finished)
-    assert rig.memory.list_timers() == []
+    assert rig.timers_changed == 0  # parts ending is not Scout's decision to stop watching
+    rig.jobs.close(job_id)
+    assert [rig.records.work.get(t.id).state for t in (a, b)] == ["cancelled", "cancelled"]
     assert rig.timers_changed == 1
 
 
-async def test_ending_a_job_drops_a_held_timer_event_for_it(make_rig):
+async def test_closing_a_job_drops_a_held_timer_event_for_it(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
-    t = rig.memory.add_timer("a", datetime.now(UTC) + timedelta(hours=1), job_id=job_id)
+    t = add_timer(rig.records.work, "a", datetime.now(UTC) + timedelta(hours=1), parent_id=job_id)
     await finish(rig, job_id)
     await until(lambda: rig.finished)
-    assert ("timer", f"timer:{t.id}", 0) in rig.dropped  # dropped before on_finished ran
+    rig.jobs.close(job_id)
+    assert ("timer", f"timer:{t.id}") in [(k, key) for k, key, _n in rig.dropped]
 
 
-async def test_ending_a_job_leaves_other_jobs_and_plain_timers(make_rig):
+async def test_closing_a_job_leaves_other_jobs_and_plain_timers(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     when = datetime.now(UTC) + timedelta(hours=1)
-    other = rig.memory.add_timer("o", when, job_id="someone-else")
-    plain = rig.memory.add_timer("p", when)
+    rig.records.add_job("someone-else", "claude-acp", "t", str(rig.folder), "plan")
+    other = add_timer(rig.records.work, "o", when, parent_id="someone-else")
+    plain = add_timer(rig.records.work, "p", when)
     await finish(rig, job_id)
     await until(lambda: rig.finished)
-    assert {t.id for t in rig.memory.list_timers()} == {other.id, plain.id}
+    rig.jobs.close(job_id)
+    assert {rig.records.work.get(t.id).state for t in (other, plain)} == {"planned"}
     assert not any(kind == "timer" for kind, _key, _n in rig.dropped)
 
 
-async def test_ending_a_job_without_timers_does_not_rearm(make_rig):
+async def test_closing_a_job_without_timers_does_not_rearm(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     await until(lambda: rig.finished)
+    rig.jobs.close(job_id)
     assert rig.timers_changed == 0
 
 
@@ -2402,17 +2385,15 @@ async def test_stop_stops_all_running_parts(make_rig):
     assert rig.jobs._runs == {} and len(rig.finished) == 1  # one report, after the last part
 
 
-async def test_restart_settles_running_parts_and_drops_timers(make_rig):
+async def test_restart_settles_running_parts(make_rig):
     rig = make_rig(FakeAsks())
     rig.records.add_job("j1", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.add_part("j1", "claude-acp", "t2", "f")
     rig.records.update_part("j1", "p1", state="done", reason="done")
-    timer = rig.memory.add_timer("x", datetime(2030, 1, 1, tzinfo=UTC), job_id="j1")
     rig.jobs.startup()
     got = rig.records.get_job("j1")
     assert [p.state for p in got.parts] == ["done", "failed"]
     assert [e.part for e in rig.records.work.activity_after("j1", 0, 10)] == ["p2"]
-    assert all(t.id != timer.id for t in rig.memory.list_timers())
 
 
 async def test_folder_session_reuse_picks_the_part_that_has_the_session(make_rig):

@@ -1,7 +1,7 @@
 """Tests for the SQLite memory store: kinds rules, remember, replace, forget, open/migrate."""
 
 import sqlite3
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -37,7 +37,6 @@ def test_remember_returns_item(mem):
     assert item.id == 1
     assert item.kind == "about_you"
     assert item.text == "Likes tea"
-    assert item.cadence is None
 
 
 def test_unknown_kind_refused(mem):
@@ -52,15 +51,14 @@ def test_summary_kind_refused_for_model(mem):
 
 def test_blank_and_too_long_refused(mem):
     with pytest.raises(MemoryRefused):
-        mem.remember("tracking", "   ")
+        mem.remember("instruction", "   ")
     with pytest.raises(MemoryRefused, match="300"):
         mem.remember("instruction", "x" * 301)
 
 
-def test_cadence_only_for_tracking(mem):
-    assert mem.remember("tracking", "watch X", cadence="daily").cadence == "daily"
-    with pytest.raises(MemoryRefused):
-        mem.remember("about_you", "a", cadence="daily")
+def test_tracking_kind_is_gone(mem):
+    with pytest.raises(MemoryRefused, match="Unknown kind 'tracking'"):
+        mem.remember("tracking", "watch X")
 
 
 def test_exact_duplicate_not_added(mem):
@@ -72,19 +70,19 @@ def test_exact_duplicate_not_added(mem):
 
 
 def test_full_kind_refused_with_hint(mem):
-    for i in range(30):
-        mem.remember("tracking", f"t{i}")
+    for i in range(50):
+        mem.remember("instruction", f"t{i}")
     with pytest.raises(MemoryRefused) as err:
-        mem.remember("tracking", "one more")
+        mem.remember("instruction", "one more")
     assert "replaces" in str(err.value)
     assert "forget" in str(err.value)
 
 
 def test_replace_in_full_kind_works(mem):
-    first = mem.remember("tracking", "t0")
-    for i in range(1, 30):
-        mem.remember("tracking", f"t{i}")
-    new = mem.remember("tracking", "new", replaces=first.id)
+    first = mem.remember("instruction", "t0")
+    for i in range(1, 50):
+        mem.remember("instruction", f"t{i}")
+    new = mem.remember("instruction", "new", replaces=first.id)
     assert new.id == first.id
     assert new.text == "new"
     assert new.updated_at > first.updated_at
@@ -92,9 +90,9 @@ def test_replace_in_full_kind_works(mem):
 
 
 def test_replace_rules(mem):
-    a = mem.remember("tracking", "a")
+    a = mem.remember("instruction", "a")
     other = mem.remember("about_you", "b")
-    gone = mem.remember("tracking", "gone")
+    gone = mem.remember("instruction", "gone")
     mem.forget(gone.id)
     mem._db.execute(
         "INSERT INTO memories(kind, text, created_at, updated_at) VALUES ('summary','s','x','x')"
@@ -102,10 +100,10 @@ def test_replace_rules(mem):
     summary_id = mem._db.execute("SELECT max(id) FROM memories").fetchone()[0]
     for bad in (999, other.id, gone.id):
         with pytest.raises(MemoryRefused):
-            mem.remember("tracking", "z", replaces=bad)
+            mem.remember("instruction", "z", replaces=bad)
     with pytest.raises(MemoryRefused):
         mem.remember("about_you", "z", replaces=summary_id)
-    assert mem.remember("tracking", "a2", replaces=a.id).id == a.id
+    assert mem.remember("instruction", "a2", replaces=a.id).id == a.id
 
 
 def test_replace_with_text_of_another_item_merges(mem):
@@ -167,10 +165,10 @@ def test_creates_missing_folder(tmp_path):
 
 
 def test_always_loaded_groups_in_kind_order(mem):
-    mem.remember("tracking", "t")
+    mem.remember("about_you", "t")
     mem.remember("instruction", "i")
     mem.remember("project", "p")
-    assert list(mem.always_loaded()) == ["instruction", "tracking"]
+    assert list(mem.always_loaded()) == ["instruction", "about_you"]
 
 
 def test_always_loaded_oldest_first(mem):
@@ -227,13 +225,6 @@ def test_search_sees_replaced_and_forgotten(mem):
 def test_fts_query_quotes_tokens():
     assert fts_query('Foo "bar"!') == '"foo" OR "bar"'
     assert fts_query("***") == ""
-
-
-def test_replace_without_cadence_keeps_old_cadence(mem):
-    old = mem.remember("tracking", "Watch the build", "daily")
-    new = mem.remember("tracking", "Watch the nightly build", replaces=old.id)
-    assert new.cadence == "daily"
-    assert mem.remember("tracking", "Watch it", "weekly", replaces=old.id).cadence == "weekly"
 
 
 # --- 6b: saved chat, summaries, hardening ---
@@ -422,74 +413,6 @@ def test_off_migration_keeps_rows_stored_before_it(tmp_path):
 # ---- jobs (8a2) ----
 
 
-# ---- timers (10b) ----
-
-
-def _t(hour, minute=0, tz=UTC):
-    return datetime(2026, 3, 1, hour, minute, tzinfo=tz)
-
-
-def test_timers_table_exists_after_migration(mem):
-    assert mem.list_timers() == []
-    cols = [r[1] for r in mem._db.execute("PRAGMA table_info(timers)")]
-    assert cols == ["id", "note", "next_at", "repeat_s", "created_at", "fired", "job_id"]
-
-
-def test_add_and_list_timers_soonest_first(mem):
-    late = mem.add_timer("late", _t(12))
-    soon = mem.add_timer("soon", _t(9), repeat_s=600)
-    assert soon.repeat_s == 600 and late.repeat_s is None and not soon.fired
-    assert soon.next_at == _t(9)
-    assert [t.note for t in mem.list_timers()] == ["soon", "late"]
-    assert _timer(mem, late.id) == late
-    assert _timer(mem, 999) is None
-
-
-def test_due_timers_returns_only_those_at_or_before_now(mem):
-    mem.add_timer("past", _t(8))
-    mem.add_timer("exact", _t(9))
-    mem.add_timer("future", _t(10))
-    assert [t.note for t in mem.due_timers(_t(9))] == ["past", "exact"]
-
-
-def test_next_at_is_stored_in_utc_and_compares_across_offsets(mem):
-    plus5 = timezone(timedelta(hours=5))
-    t = mem.add_timer("tz", datetime(2026, 3, 1, 14, 0, tzinfo=plus5))
-    assert t.next_at == _t(9)
-    assert t.next_at.utcoffset() == timedelta(0)
-    stored = mem._db.execute("SELECT next_at FROM timers").fetchone()[0]
-    assert stored == "2026-03-01T09:00:00+00:00"
-    assert mem.due_timers(_t(9))[0].id == t.id
-
-
-def test_delete_timer_returns_false_for_unknown_id(mem):
-    t = mem.add_timer("x", _t(9))
-    assert mem.delete_timer(t.id) is True
-    assert mem.delete_timer(t.id) is False
-    assert mem.list_timers() == []
-
-
-def _timer(mem, id):
-    # The timer with this id, read through the public list; None once it is gone.
-    return next((t for t in mem.list_timers() if t.id == id), None)
-
-
-def test_set_timer_next_moves_a_timer(mem):
-    t = mem.add_timer("x", _t(9), repeat_s=300)
-    mem.set_timer_next(t.id, _t(11))
-    assert _timer(mem, t.id).next_at == _t(11)
-    assert mem.due_timers(_t(10)) == []
-
-
-def test_fired_timers_are_excluded_from_due_and_listed_separately(mem):
-    a = mem.add_timer("a", _t(8))
-    mem.add_timer("b", _t(8))
-    mem.mark_timer_fired(a.id)
-    assert [t.note for t in mem.due_timers(_t(9))] == ["b"]
-    assert [t.id for t in mem.fired_timers()] == [a.id]
-    assert _timer(mem, a.id).fired is True
-
-
 def test_an_older_database_migrates_forward(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
@@ -497,7 +420,7 @@ def test_an_older_database_migrates_forward(tmp_path):
     migrate(db, upto=n)
     db.close()
     m = Memory(path)
-    assert m.list_timers() == []
+    assert m.list_items(10) == []
     m.close()
 
 
@@ -641,43 +564,4 @@ def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
     db.close()
     m = Memory(path)
     assert m.list_approvals("all", 10, None)[0].preference_sentence is None
-    m.close()
-
-
-def test_timer_job_id_round_trips_and_defaults_to_none(mem):
-    plain = mem.add_timer("p", _t(9))
-    linked = mem.add_timer("l", _t(10), job_id="j1")
-    assert plain.job_id is None and linked.job_id == "j1"
-    assert [t.job_id for t in mem.list_timers()] == [None, "j1"]
-
-
-def test_delete_timers_for_job_returns_ids_and_leaves_other_timers(mem):
-    a = mem.add_timer("a", _t(9), job_id="j1")
-    b = mem.add_timer("b", _t(10), repeat_s=600, job_id="j1")
-    other = mem.add_timer("o", _t(11), job_id="j2")
-    plain = mem.add_timer("p", _t(12))
-    assert sorted(mem.delete_timers_for_job("j1")) == sorted([a.id, b.id])
-    assert {t.id for t in mem.list_timers()} == {other.id, plain.id}
-    assert mem.delete_timers_for_job("j1") == []
-
-
-def test_delete_timers_for_job_includes_fired_one_offs(mem):
-    t = mem.add_timer("a", _t(9), job_id="j1")
-    mem.mark_timer_fired(t.id)
-    assert mem.delete_timers_for_job("j1") == [t.id]
-    assert mem.fired_timers() == []
-
-
-def test_an_old_database_gets_the_job_id_column(tmp_path):
-    path = tmp_path / "old.db"
-    db = sqlite3.connect(path, isolation_level=None)
-    n = _PARTS_MIGRATION
-    migrate(db, upto=n)
-    db.execute(
-        "INSERT INTO timers(note, next_at, created_at) VALUES ('n','2026-01-01T00:00:00+00:00','c')"
-    )
-    db.close()
-    m = Memory(path)
-    assert m.list_timers()[0].job_id is None
-    assert m.add_timer("x", _t(9), job_id="j").job_id == "j"
     m.close()

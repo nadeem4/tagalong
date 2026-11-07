@@ -30,7 +30,6 @@ def _soul() -> str:
 _KNOW_HEADINGS = {
     "instruction": "Instructions from the owner",
     "about_you": "About the owner",
-    "tracking": "Things to keep an eye on",
 }
 
 
@@ -40,7 +39,7 @@ def render_know(groups: dict[str, list[Item]]) -> str:
         items = groups.get(kind)
         if not items:
             continue
-        lines = [f"- [{i.id}] {f'({i.cadence}) ' if i.cadence else ''}{i.text}" for i in items]
+        lines = [f"- [{i.id}] {i.text}" for i in items]
         blocks.append(f"{heading}:\n" + "\n".join(lines))
     return "\n\n".join(blocks)
 

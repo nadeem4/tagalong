@@ -16,11 +16,10 @@ The kinds table in `store/memory.py` is the only place caps and rules live.
 | ------------- | ---------- | --------------- | ---------- | --------------- |
 | `instruction` | model      | yes             | 50         | 300             |
 | `about_you`   | model      | yes             | 50         | 300             |
-| `tracking`    | model      | yes             | 30         | 300             |
 | `project`     | model      | no, `recall`    | 200        | 500             |
 | `summary`     | code       | no, `recall`    | none       | none            |
 
-`tracking` items may carry a `cadence` (how often). Code writes `summary` items: one for each compaction block (see Saved chat).
+Keeping an eye on something is no longer a memory: it is a `watch` (see below). Code writes `summary` items: one for each compaction block (see Saved chat).
 
 ### Tools
 
@@ -49,9 +48,9 @@ The kinds table in `store/memory.py` is the only place caps and rules live.
   for `read_output`. The newest 200 are kept; older ones are deleted at startup.
 - At the start of each turn the brain reads the always-loaded kinds once. Every step of the turn
   puts them in the system prompt under "What you know", grouped as instructions, about the owner,
-  and things to keep an eye on, each line `- [id] text`, with a `(cadence)` prefix on tracking items (`- [id] (daily) text`).
+  each line `- [id] text`.
   The id lets Scout use `replaces` or `forget`.
-- `soul.md` tells Scout to save instructions and tracking requests, to prefer `replaces` over a
+- `soul.md` tells Scout to save instructions, to use `watch` for anything to keep an eye on, to prefer `replaces` over a
   near-duplicate, and to `recall` before saying it does not know.
 - Storage is one `memories` table plus an FTS5 index kept in step by triggers; every table in
   `tagalong.db` is mapped in [storage.md](storage.md#tables-and-relations). The schema version
@@ -96,3 +95,12 @@ flowchart LR
     R --> SE
     MS -->|recall chat| T
 ```
+
+## Watches
+
+A standing check is a `watch` work row, not a memory (storage.md, `work_timer`). Scout adds one with
+the `watch` tool (`add` with a note and `every_minutes`, at least 5), lists them, `pause`s,
+`switch_on`s or `cancel`s one. A watch wakes Scout as a `timer` event every `every_minutes` until it
+is cancelled or paused; a paused watch never fires. The old `tracking` memories became paused
+watches; on the first start after the update Scout is told once (`watches_paused`) and offers to
+switch each on.

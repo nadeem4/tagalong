@@ -689,6 +689,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "speak_sample",
         "spend_today",
         "stop_job",
+        "watch",
     ]
     for t in tools:
         assert set(t) == {"name", "description", "input_schema", "effect"}

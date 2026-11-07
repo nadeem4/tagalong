@@ -16,20 +16,9 @@ from brain.apps import AppRow
 from brain.store import connections, conversation, outputs
 from brain.store import memory as memory_store
 from brain.store import search as search_store
-from brain.store.db import open_db, utc_text
+from brain.store.db import open_db
 from brain.store.memory import Item
 from brain.store.search import Hit
-
-
-@dataclass(frozen=True)
-class Timer:
-    id: int
-    note: str
-    next_at: datetime
-    repeat_s: int | None
-    created_at: str
-    fired: bool
-    job_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,54 +53,6 @@ class Memory:
 
     def close(self) -> None:
         self._db.close()
-
-    def _timers(self, where: str = "", args: tuple = ()) -> list[Timer]:
-        rows = self._db.execute(
-            "SELECT id, note, next_at, repeat_s, created_at, fired, job_id FROM timers"
-            f" {where} ORDER BY next_at, id",
-            args,
-        ).fetchall()
-        return [
-            Timer(i, n, datetime.fromisoformat(a), r, c, bool(f), j) for i, n, a, r, c, f, j in rows
-        ]
-
-    def add_timer(
-        self,
-        note: str,
-        next_at: datetime,
-        repeat_s: int | None = None,
-        job_id: str | None = None,
-    ) -> Timer:
-        cur = self._db.execute(
-            "INSERT INTO timers(note, next_at, repeat_s, created_at, job_id) VALUES (?,?,?,?,?)",
-            (note, utc_text(next_at), repeat_s, self._now().isoformat(), job_id),
-        )
-        return self._timers("WHERE id=?", (cur.lastrowid,))[0]
-
-    def list_timers(self) -> list[Timer]:
-        """Soonest first."""
-        return self._timers()
-
-    def delete_timer(self, id: int) -> bool:
-        return self._db.execute("DELETE FROM timers WHERE id=?", (id,)).rowcount > 0
-
-    def delete_timers_for_job(self, job_id: str) -> list[int]:
-        """Lifecycle cleanup: every timer of this job, fired one-offs included."""
-        ids = [r[0] for r in self._db.execute("SELECT id FROM timers WHERE job_id=?", (job_id,))]
-        self._db.execute("DELETE FROM timers WHERE job_id=?", (job_id,))
-        return ids
-
-    def set_timer_next(self, id: int, next_at: datetime) -> None:
-        self._db.execute("UPDATE timers SET next_at=? WHERE id=?", (utc_text(next_at), id))
-
-    def due_timers(self, now: datetime) -> list[Timer]:
-        return self._timers("WHERE fired=0 AND next_at<=?", (utc_text(now),))
-
-    def mark_timer_fired(self, id: int) -> None:
-        self._db.execute("UPDATE timers SET fired=1 WHERE id=?", (id,))
-
-    def fired_timers(self) -> list[Timer]:
-        return self._timers("WHERE fired=1")
 
     def add_approval(
         self,
@@ -193,12 +134,8 @@ class Memory:
     def remove_app(self, app_id: str) -> None:
         connections.remove_app(self._db, app_id)
 
-    def remember(
-        self, kind: str, text: str, cadence: str | None = None, replaces: int | None = None
-    ) -> Item:
-        return memory_store.remember(
-            self._db, kind, text, cadence, replaces, self._now().isoformat()
-        )
+    def remember(self, kind: str, text: str, replaces: int | None = None) -> Item:
+        return memory_store.remember(self._db, kind, text, replaces, self._now().isoformat())
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
