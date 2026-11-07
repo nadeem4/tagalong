@@ -158,6 +158,10 @@ desktop app. You need `uv` and an Anthropic key.
 9. **Action:** `say` with `Forget that.`
    **Expected:** a `forget` tool `ended` with `ok: true`; rerun the check from step 7 and the
    row is gone from `memories`.
+   Layers: an existing `tagalong.db` at schema version 24 opens at 25 with the same rows; every
+   `instruction`, `about_you` and `project` row has `layer = 'core'`, and a `summary` row has
+   `layer = 'episodic'` and `period = 'day'`. Saying `Remember my key is` followed by a fake
+   `sk-ant-` key stores the item with `[secret]` in its place.
 10. **Action:** `say` with `We are planning a trip to Lisbon.`, stop the brain, start it, say hello, then
     `say` with `What were we just talking about?`
     **Expected:** Scout answers about the Lisbon trip; the chat was picked up after the restart.
@@ -623,6 +627,11 @@ Needs the same setup as the hand-off section above.
 4. **Action:** set `TAGALONG_TOOL_PREVIEW_CHARS=200`, restart the brain and ask Scout to read a long
    file with a connected app or with Claude Code.
    **Expected:** Scout still answers, and fetches more only when it needs it.
+5. **Action:** automated: from `brain/`, run `uv run pytest tests/test_work_sweep.py tests/test_store_boundary.py -q`.
+   **Expected:** all pass. Finished work (a job with its steps and long report, an ask) older than
+   `TAGALONG_WORK_KEEP_DAYS` is gone after the brain starts; an open watch, a repeating timer,
+   a held loop and a goal with a running part stay; stored outputs a job points at survive
+   the `TAGALONG_OUTPUTS_KEEP` cut; and no module outside `store/` runs SQL.
 
 ## The mail switch and the Held list (fake brain, then real)
 

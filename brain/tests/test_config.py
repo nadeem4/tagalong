@@ -310,3 +310,14 @@ def test_loop_stale_days_default_and_override():
 def test_bad_loop_stale_days_raises(value):
     with pytest.raises(ValueError, match="TAGALONG_LOOP_STALE_DAYS"):
         load_config({"TAGALONG_LOOP_STALE_DAYS": value})
+
+
+def test_config_retention_settings():
+    cfg = load_config({})
+    assert (cfg.work_keep_days, cfg.outputs_keep) == (30, 200)
+    cfg = load_config({"TAGALONG_WORK_KEEP_DAYS": "7", "TAGALONG_OUTPUTS_KEEP": "50"})
+    assert (cfg.work_keep_days, cfg.outputs_keep) == (7, 50)
+    for key in ("TAGALONG_WORK_KEEP_DAYS", "TAGALONG_OUTPUTS_KEEP"):
+        for bad in ("0", "-1", "lots"):
+            with pytest.raises(ValueError, match=key):
+                load_config({key: bad})

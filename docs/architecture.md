@@ -11,7 +11,8 @@ one turn. Each subsystem has its own page, linked from [the subsystem map](#subs
 
 The brain is the Python program in `brain/`: the conversation, Scout's mind, memory, experts,
 connected apps and asks. It never knows which operating system or which body it is serving. See
-[brain.md](brain.md).
+[brain.md](brain.md). Everything it keeps is in one SQLite file behind the `store/` package, the
+only code that runs SQL ([storage.md](storage.md)).
 
 A body is a thin shell around it. It perceives (selection, windows, screenshots, page text),
 offers tools and presents (the figure, the bubble, the voice). A body reaches the brain only

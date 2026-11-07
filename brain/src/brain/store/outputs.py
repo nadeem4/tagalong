@@ -16,11 +16,12 @@ def get_output(db: sqlite3.Connection, output_id: str) -> str | None:
 
 
 def prune_outputs(db: sqlite3.Connection, keep: int) -> None:
-    """Keep the newest `keep` stored outputs (rowid order is insertion order), and any a work row
-    still points at: a job's long report is its record, not a cache."""
+    """Keep the newest `keep` stored outputs that no work row names (rowid order is insertion
+    order). A named one is a job's long report, its record, so it is never counted or cut."""
+    linked = "SELECT detail_id FROM work WHERE detail_id IS NOT NULL"
     db.execute(
-        "DELETE FROM tool_outputs WHERE rowid NOT IN "
-        "(SELECT rowid FROM tool_outputs ORDER BY rowid DESC LIMIT ?)"
-        " AND id NOT IN (SELECT detail_id FROM work WHERE detail_id IS NOT NULL)",
+        f"DELETE FROM tool_outputs WHERE id NOT IN ({linked}) AND rowid NOT IN "
+        f"(SELECT rowid FROM tool_outputs WHERE id NOT IN ({linked}) "
+        "ORDER BY rowid DESC LIMIT ?)",
         (keep,),
     )

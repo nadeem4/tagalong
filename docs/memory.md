@@ -21,6 +21,14 @@ The kinds table in `store/memory.py` is the only place caps and rules live.
 
 Keeping an eye on something is no longer a memory: it is a `watch` (see below). Code writes `summary` items: one for each compaction block (see Saved chat).
 
+### Layers
+
+Every memory also sits in a layer (migration 25). `instruction`, `about_you` and `project` rows are `core`: what Scout knows about the person. `summary` rows are `episodic`: a dated entry with a `period` (`day`) and the time it covers (`span_start`, `span_end`). `kind` is unchanged, so the tools and Home's list work as before. The columns `source_msg_from`, `source_msg_to` and `source_work_id` are there for linking an entry back to the chat or the work it came from; nothing sets them yet, and nothing rolls entries up or rewrites core yet.
+
+### Masking on save
+
+`remember` and the compaction summary mask their text with the session's `save` guard before it is stored, so a key or token the person pasted is stored as `[secret]` (see [storage.md](storage.md#masking)). The cap is checked on the masked text. If a blocking save guard withholds the whole text, `remember` refuses with a `MemoryRefused` message (the model reads it as a tool error) and stores nothing.
+
 ### Tools
 
 | Tool       | Does                                                                                 |
@@ -45,7 +53,7 @@ Keeping an eye on something is no longer a memory: it is a `watch` (see below). 
 ### Prompt and storage
 
 - A second table, `tool_outputs` (id, tool, chars, text, at), holds long tool results stored masked
-  for `read_output`. The newest 200 are kept; older ones are deleted at startup.
+  for `read_output`. At startup the brain keeps the newest `TAGALONG_OUTPUTS_KEEP` (200) that no work row points at and deletes older ones; a job's long report stays with its job and goes when the job is swept (see [storage.md](storage.md#cleanup)).
 - At the start of each turn the brain reads the always-loaded kinds once. Every step of the turn
   puts them in the system prompt under "What you know", grouped as instructions, about the owner,
   each line `- [id] text`.
@@ -77,7 +85,7 @@ saved. Forgetting a loop deletes its rows; wiping deletes every loop and the mai
   server-side compaction bounds its size). A tool call left unanswered by a crash is closed as
   "cancelled", and that result is stored on the next save. A crash mid-turn loses that turn's
   unsaved messages.
-- Each compaction block's text becomes one `summary` memory (search-only, written by code), once
+- Each compaction block's text becomes one `summary` memory (an episodic `day` entry, search-only, written by code), once
   per block.
 
 ```mermaid

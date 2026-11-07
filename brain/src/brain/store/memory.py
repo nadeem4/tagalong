@@ -156,9 +156,11 @@ def always_loaded(db: sqlite3.Connection) -> dict[str, list[Item]]:
 
 
 def add_summary(db: sqlite3.Connection, text: str, at: str) -> Item:
-    """Code-written compaction summary; skips the model-write checks and caps."""
+    """Code-written compaction summary, an episodic entry for the day; skips the model-write
+    checks and caps."""
     cur = db.execute(
-        "INSERT INTO memories(kind, text, created_at, updated_at) VALUES ('summary',?,?,?)",
-        (text.strip(), at, at),
+        "INSERT INTO memories(kind, text, created_at, updated_at, layer, period, span_start,"
+        " span_end) VALUES ('summary',?,?,?,'episodic','day',?,?)",
+        (text.strip(), at, at, at, at),
     )
     return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]

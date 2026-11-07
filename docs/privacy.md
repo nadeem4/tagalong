@@ -465,11 +465,13 @@ conversations) in the database on this computer, until you delete it.
 
 ### How long things are kept
 
-| What                     | Kept                  |
-| ------------------------ | --------------------- |
-| Facts and preferences    | Until you delete them |
-| Conversation summaries   | Until deleted         |
-| Conversations with Scout | Until deleted         |
+| What                                     | Kept                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------- |
+| Facts and preferences                    | Until you delete them                                                      |
+| Conversation summaries                   | Until deleted                                                              |
+| Conversations with Scout                 | Until deleted                                                              |
+| Finished jobs, timers, asks and loops    | 30 days after they end (`TAGALONG_WORK_KEEP_DAYS`); open ones stay         |
+| Long tool results kept for `read_output` | The newest 200 (`TAGALONG_OUTPUTS_KEEP`); a job's report goes with its job |
 
 ## Installing a text recognition language
 

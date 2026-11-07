@@ -188,6 +188,8 @@ async def _run() -> None:
         preview_chars=config.tool_preview_chars,
         job_steps_max_entries=config.job_steps_max_entries,
         job_steps_max_bytes=config.job_steps_max_bytes,
+        work_keep_days=config.work_keep_days,
+        outputs_keep=config.outputs_keep,
         masker=masker,
         keys=keys,
         setup_facts=partial(setup_facts, registry, inspect_machine),
