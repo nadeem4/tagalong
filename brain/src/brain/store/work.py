@@ -184,6 +184,60 @@ class WorkStore:
         ).fetchall()
         return [WorkEvent(i, w, at, k, _loads(d)) for i, w, at, k, d in reversed(rows)]
 
+    def event_of(self, id: str, kind: str) -> WorkEvent | None:
+        """The row's oldest event of one kind (`continued` is written once)."""
+        r = self.db.execute(
+            "SELECT id, work_id, at, kind, data FROM work_events WHERE work_id = ? AND kind = ?"
+            " ORDER BY id LIMIT 1",
+            (id, kind),
+        ).fetchone()
+        return None if r is None else WorkEvent(r[0], r[1], r[2], r[3], _loads(r[4]))
+
+    def newest(self, kind: str, limit: int) -> list[WorkRow]:
+        """The most recently created rows of one kind, newest first."""
+        return self._select("kind = ?", [kind], f"rowid DESC LIMIT {int(limit)}")
+
+    def expert_calls_with_session(self, agent: str, limit: int = 50) -> list[WorkRow]:
+        """The expert's newest calls that are not running and saved a session, newest first."""
+        sql = (
+            f"SELECT {_W_COLUMNS} FROM work w JOIN work_job j ON j.work_id = w.id"
+            " WHERE w.kind = 'expert_call' AND j.agent = ? AND w.state != 'active'"
+            " AND json_extract(w.checkpoint, '$.session_id') IS NOT NULL"
+            " ORDER BY w.rowid DESC LIMIT ?"
+        )
+        return [_row(r) for r in self.db.execute(sql, (agent, limit))]
+
+    # ---- work_job: what a goal or expert call needs to run in a folder ----
+
+    def set_job_detail(
+        self,
+        work_id: str,
+        *,
+        agent: str | None = None,
+        folder: str | None = None,
+        mode: str | None = None,
+        task: str | None = None,
+    ) -> None:
+        """Save the detail row; an argument left at None keeps what was saved."""
+        self.db.execute(
+            "INSERT INTO work_job(work_id, agent, folder, mode, task) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(work_id) DO UPDATE SET agent = COALESCE(excluded.agent, agent),"
+            " folder = COALESCE(excluded.folder, folder), mode = COALESCE(excluded.mode, mode),"
+            " task = COALESCE(excluded.task, task)",
+            (work_id, agent, folder, mode, task),
+        )
+
+    def job_detail(self, work_id: str) -> dict | None:
+        return self.job_details([work_id]).get(work_id)
+
+    def job_details(self, ids: Sequence[str]) -> dict[str, dict]:
+        marks = ",".join("?" * len(ids))
+        rows = self.db.execute(
+            f"SELECT work_id, agent, folder, mode, task FROM work_job WHERE work_id IN ({marks})",
+            list(ids),
+        )
+        return {w: {"agent": a, "folder": f, "mode": m, "task": t} for w, a, f, m, t in rows}
+
     def add_event(self, id: str, kind: str, data: dict | None = None) -> None:
         self.db.execute(
             "INSERT INTO work_events(work_id, at, kind, data) VALUES (?, ?, ?, ?)",

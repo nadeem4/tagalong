@@ -11,6 +11,8 @@ import pytest
 from brain.store import db as store_db
 from brain.store.db import Migration, load_migrations, migrate, open_db, transaction, utc_text
 
+LATEST = load_migrations()[-1].number
+
 
 def _version(db: sqlite3.Connection) -> int:
     return db.execute("PRAGMA user_version").fetchone()[0]
@@ -22,7 +24,7 @@ def test_migrations_are_numbered_without_gaps():
 
 def test_fresh_file_reaches_latest(tmp_path):
     db = open_db(tmp_path / "t.db")
-    assert _version(db) == 18
+    assert _version(db) == LATEST
     columns = [r[1] for r in db.execute("PRAGMA table_info(loops)")]
     assert "snoozed_until" in columns
     db.close()
@@ -37,7 +39,7 @@ def test_old_file_upgrades(tmp_path):
     )
     old.close()
     db = open_db(path)
-    assert _version(db) == 18
+    assert _version(db) == LATEST
     assert db.execute("SELECT text FROM memories").fetchone()[0] == "tea"
     db.close()
 
@@ -159,7 +161,7 @@ def test_failed_open_leaves_no_write_open(tmp_path, monkeypatch):
     other.close()
     monkeypatch.undo()
     db = open_db(path)
-    assert _version(db) == load_migrations()[-1].number
+    assert _version(db) == LATEST
     db.close()
 
 
