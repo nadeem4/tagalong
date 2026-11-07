@@ -29,6 +29,8 @@ DEFAULT_OFFER_MIN_APPROVALS = 3
 DEFAULT_OFFER_WINDOW_DAYS = 14
 DEFAULT_KEEP_ASKING_DAYS = 7
 DEFAULT_TOOL_PREVIEW_CHARS = 4000
+DEFAULT_RETRY_MAX = 3  # tries of a step that failed for a passing reason
+DEFAULT_RETRY_BACKOFF_S = (30, 120, 600)  # waits before each retry; the last repeats
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,8 @@ class Config:
     reader_daily_usd: float = DEFAULT_READER_DAILY_USD
     loop_poll_s: int = DEFAULT_LOOP_POLL_S
     loop_stale_days: int = DEFAULT_LOOP_STALE_DAYS
+    retry_max: int = DEFAULT_RETRY_MAX
+    retry_backoff_s: tuple[int, ...] = DEFAULT_RETRY_BACKOFF_S
     expert_cmd: list[str] = field(default_factory=list)  # the custom-expert override
     job_quiet_min: float = DEFAULT_JOB_QUIET_MIN
     expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
@@ -89,6 +93,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         reader_daily_usd=_positive_usd(env, "TAGALONG_READER_DAILY_USD", DEFAULT_READER_DAILY_USD),
         loop_poll_s=_positive_int(env, "TAGALONG_LOOP_POLL_S", DEFAULT_LOOP_POLL_S),
         loop_stale_days=_positive_int(env, "TAGALONG_LOOP_STALE_DAYS", DEFAULT_LOOP_STALE_DAYS),
+        retry_max=_positive_int(env, "TAGALONG_RETRY_MAX", DEFAULT_RETRY_MAX),
+        retry_backoff_s=_backoff(env.get("TAGALONG_RETRY_BACKOFF_S")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
         job_quiet_min=_job_quiet_min(env.get("TAGALONG_JOB_QUIET_MIN")),
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
@@ -203,6 +209,18 @@ def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:
     if value < 1:
         raise ValueError(f"{name} must be at least 1: {text!r}")
     return value
+
+
+def _backoff(text: str | None) -> tuple[int, ...]:
+    if not text:
+        return DEFAULT_RETRY_BACKOFF_S
+    try:
+        waits = tuple(int(part) for part in text.split(","))
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_RETRY_BACKOFF_S: {text!r}") from None
+    if any(w < 1 for w in waits):
+        raise ValueError(f"TAGALONG_RETRY_BACKOFF_S needs whole seconds of at least 1: {text!r}")
+    return waits
 
 
 def load_env_file(data_dir: Path, env: MutableMapping[str, str]) -> None:

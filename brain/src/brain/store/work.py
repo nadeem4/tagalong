@@ -1,0 +1,441 @@
+"""The `work` table: every job, step, ask, timer and loop as one row in a tree.
+
+`WorkStore` is the one state machine over it: the allowed moves, the parent rollup, the retry
+rule, the due queries and the resume scan. Each move is one transaction that also appends
+a `work_events` row, so a second writer holding a stale state is refused, not overwritten.
+"""
+
+import json
+import sqlite3
+import uuid
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from types import EllipsisType
+from typing import Literal
+
+from brain.store import search
+from brain.store.db import transaction, utc_text
+
+Kind = Literal["goal", "expert_call", "tool_call", "ask", "question", "timer", "loop", "watch"]
+State = Literal["planned", "active", "blocked", "paused", "done", "failed", "cancelled", "expired"]
+TERMINAL = frozenset({"done", "failed", "cancelled", "expired"})
+OPEN = ("planned", "active", "blocked", "paused")
+
+TITLE_CAP = 200
+ERROR_CAP = 300
+
+_MOVES = {
+    "planned": {"active", "cancelled", "expired", "paused"},
+    "active": {"done", "failed", "blocked", "planned", "cancelled", "expired"},
+    "blocked": {"planned", "cancelled", "expired"},
+    "paused": {"planned", "cancelled"},
+}
+
+_COLUMNS = (
+    "id, parent_id, root_id, seq, kind, state, title, input, summary, detail_id, progress,"
+    " checkpoint, attempt, max_attempts, safe_to_retry, error_kind, last_error, due_at,"
+    " created_at, updated_at, ended_at, end_reason, reported_at, source_message_id"
+)
+_W_COLUMNS = ", ".join(f"w.{c.strip()}" for c in _COLUMNS.split(","))
+
+
+class TransitionRefused(ValueError):
+    """The move is not allowed, or the row is no longer in the state the caller expected."""
+
+
+@dataclass(frozen=True)
+class RetrySettings:
+    max_attempts: int = 3
+    backoff_s: tuple[int, ...] = (30, 120, 600)
+
+
+_DEFAULT_RETRY = RetrySettings()
+
+
+@dataclass(frozen=True)
+class WorkRow:
+    id: str
+    parent_id: str | None
+    root_id: str
+    seq: int
+    kind: str
+    state: str
+    title: str
+    input: dict | None
+    summary: str | None
+    detail_id: str | None
+    progress: str | None
+    checkpoint: dict | None
+    attempt: int
+    max_attempts: int
+    safe_to_retry: bool
+    error_kind: str | None
+    last_error: str | None
+    due_at: str | None
+    created_at: str
+    updated_at: str
+    ended_at: str | None
+    end_reason: str | None
+    reported_at: str | None
+    source_message_id: int | None
+
+
+@dataclass(frozen=True)
+class WorkEvent:
+    id: int
+    work_id: str
+    at: str
+    kind: str
+    data: dict | None
+
+
+def _loads(text: str | None) -> dict | None:
+    return None if text is None else json.loads(text)
+
+
+def _dumps(value: dict | None) -> str | None:
+    return None if value is None else json.dumps(value, ensure_ascii=False)
+
+
+def _row(r: tuple) -> WorkRow:
+    return WorkRow(*r[:7], _loads(r[7]), *r[8:11], _loads(r[11]), *r[12:14], bool(r[14]), *r[15:])
+
+
+def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
+    if kind == "goal" and to in ("done", "failed"):
+        return via_close and frm in ("active", "blocked")
+    if to in _MOVES.get(frm, ()):
+        return True
+    if kind == "goal" and (frm, to) == ("blocked", "active"):
+        return True
+    return kind == "loop" and frm in ("done", "cancelled", "expired") and to == "planned"
+
+
+class WorkStore:
+    def __init__(
+        self,
+        db: sqlite3.Connection,
+        now: Callable[[], datetime],
+        mask: Callable[[str], str] = lambda s: s,
+        retry: RetrySettings = _DEFAULT_RETRY,
+    ) -> None:
+        self.db = db
+        self.now = now
+        self.mask = mask
+        self.retry = retry
+
+    def _stamp(self) -> str:
+        return utc_text(self.now())
+
+    # ---- reads ----
+
+    def get(self, id: str) -> WorkRow | None:
+        r = self.db.execute(f"SELECT {_COLUMNS} FROM work WHERE id = ?", (id,)).fetchone()
+        return None if r is None else _row(r)
+
+    def _need(self, id: str) -> WorkRow:
+        row = self.get(id)
+        if row is None:
+            raise KeyError(id)
+        return row
+
+    def _select(self, where: str, args: Sequence = (), order: str = "seq, rowid") -> list[WorkRow]:
+        sql = f"SELECT {_COLUMNS} FROM work WHERE {where} ORDER BY {order}"
+        return [_row(r) for r in self.db.execute(sql, args)]
+
+    def children(self, id: str) -> list[WorkRow]:
+        return self._select("parent_id = ?", (id,))
+
+    def tree(self, root_id: str) -> list[WorkRow]:
+        return self._select("root_id = ?", (root_id,))
+
+    def of_kind(self, kind: str, states: Sequence[str] | None = None) -> list[WorkRow]:
+        where, args = "kind = ?", [kind]
+        if states is not None:
+            where += f" AND state IN ({','.join('?' * len(states))})"
+            args += list(states)
+        return self._select(where, args, "created_at, rowid")
+
+    def open_roots(self) -> list[WorkRow]:
+        return self._select(
+            "parent_id IS NULL AND state IN ('planned','active','blocked','paused')"
+        )
+
+    def search(self, query: str, limit: int = 10) -> list[WorkRow]:
+        match = search.fts_query(query)
+        if not match:
+            return []
+        sql = (
+            f"SELECT {_W_COLUMNS} FROM work_fts JOIN work w ON w.rowid = work_fts.rowid"
+            " WHERE work_fts MATCH ? ORDER BY bm25(work_fts) LIMIT ?"
+        )
+        return [_row(r) for r in self.db.execute(sql, (match, limit))]
+
+    def events(self, id: str, limit: int = 50) -> list[WorkEvent]:
+        """The newest `limit` events of one row, oldest first."""
+        rows = self.db.execute(
+            "SELECT id, work_id, at, kind, data FROM work_events WHERE work_id = ?"
+            " ORDER BY id DESC LIMIT ?",
+            (id, limit),
+        ).fetchall()
+        return [WorkEvent(i, w, at, k, _loads(d)) for i, w, at, k, d in reversed(rows)]
+
+    def add_event(self, id: str, kind: str, data: dict | None = None) -> None:
+        self.db.execute(
+            "INSERT INTO work_events(work_id, at, kind, data) VALUES (?, ?, ?, ?)",
+            (id, self._stamp(), kind, _dumps(data)),
+        )
+
+    # ---- writes that leave the state alone ----
+
+    def create(
+        self,
+        kind: Kind,
+        title: str,
+        *,
+        parent_id: str | None = None,
+        state: State = "planned",
+        input: dict | None = None,
+        due_at: datetime | None = None,
+        safe_to_retry: bool = False,
+        source_message_id: int | None = None,
+        id: str | None = None,
+        max_attempts: int | None = None,
+    ) -> WorkRow:
+        if state in TERMINAL:
+            raise ValueError("a new row cannot start in an ended state")
+        id = id or uuid.uuid4().hex[:8]
+        now = self._stamp()
+        with transaction(self.db):
+            root_id = id
+            if parent_id is not None:
+                root_id = self._need(parent_id).root_id
+            seq = self.db.execute(
+                "SELECT COALESCE(MAX(seq), 0) + 1 FROM work WHERE parent_id IS ?", (parent_id,)
+            ).fetchone()[0]
+            self.db.execute(
+                "INSERT INTO work(id, parent_id, root_id, seq, kind, state, title, input,"
+                " max_attempts, safe_to_retry, due_at, created_at, updated_at, source_message_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    id,
+                    parent_id,
+                    root_id,
+                    seq,
+                    kind,
+                    state,
+                    self.mask(title)[:TITLE_CAP],
+                    _dumps(input),
+                    max_attempts or self.retry.max_attempts,
+                    int(safe_to_retry),
+                    None if due_at is None else utc_text(due_at),
+                    now,
+                    now,
+                    source_message_id,
+                ),
+            )
+            self.add_event(id, "created", {"kind": kind})
+        return self._need(id)
+
+    def update(
+        self,
+        id: str,
+        *,
+        title: str | None = None,
+        summary: str | None = None,
+        detail_id: str | None = None,
+        progress: str | None = None,
+        checkpoint: dict | None = None,
+        input: dict | None = None,
+        due_at: datetime | None | EllipsisType = ...,
+        error_kind: str | None = None,
+        last_error: str | None = None,
+    ) -> None:
+        """Change non-state fields; an argument left at None stays as it was.
+
+        `due_at` is the exception: None clears it, so its "unchanged" value is `...`.
+        """
+        sets: dict[str, object] = {}
+        if title is not None:
+            sets["title"] = self.mask(title)[:TITLE_CAP]
+        if summary is not None:
+            sets["summary"] = self.mask(summary)
+        if detail_id is not None:
+            sets["detail_id"] = detail_id
+        if progress is not None:
+            sets["progress"] = self.mask(progress)
+        if checkpoint is not None:
+            sets["checkpoint"] = _dumps(checkpoint)
+        if input is not None:
+            sets["input"] = _dumps(input)
+        if due_at is not ...:
+            sets["due_at"] = None if due_at is None else utc_text(due_at)
+        if error_kind is not None:
+            sets["error_kind"] = error_kind
+        if last_error is not None:
+            sets["last_error"] = self.mask(last_error)[:ERROR_CAP]
+        sets["updated_at"] = self._stamp()
+        self.db.execute(
+            f"UPDATE work SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?",
+            (*sets.values(), id),
+        )
+
+    # ---- states ----
+
+    def transition(
+        self,
+        id: str,
+        to: State,
+        *,
+        reason: str | None = None,
+        data: dict | None = None,
+        expect: State | None = None,
+    ) -> WorkRow:
+        with transaction(self.db):
+            row = self._need(id)
+            if expect is not None and row.state != expect:
+                raise TransitionRefused(f"{id} is {row.state}, expected {expect}")
+            self._move(row, to, reason, data)
+        return self._need(id)
+
+    def _move(
+        self,
+        row: WorkRow,
+        to: str,
+        reason: str | None,
+        data: dict | None = None,
+        *,
+        via_close: bool = False,
+        force: bool = False,
+        extra: dict | None = None,
+    ) -> None:
+        """One checked move inside the caller's transaction, then rollup and parent end."""
+        if not force and not _allowed(row.kind, row.state, to, via_close):
+            raise TransitionRefused(f"{row.kind} cannot go from {row.state} to {to}")
+        ending = to in TERMINAL
+        if ending and not reason:
+            raise ValueError("an ended state needs a reason")
+        now = self._stamp()
+        sets: dict[str, object] = {"state": to, "updated_at": now}
+        if ending:
+            sets.update(ended_at=now, end_reason=reason, progress=None)
+        elif row.state in TERMINAL:
+            sets.update(ended_at=None, end_reason=None)
+        if ending or to == "blocked" or row.state in TERMINAL:
+            sets["reported_at"] = None  # Scout has not heard about this change yet
+        sets.update(extra or {})
+        self.db.execute(
+            f"UPDATE work SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?",
+            (*sets.values(), row.id),
+        )
+        self.add_event(
+            row.id, "state", {**(data or {}), "from": row.state, "to": to, "reason": reason}
+        )
+        if row.kind == "loop" and row.state in TERMINAL and to == "planned":
+            self.add_event(row.id, "reopened")
+        if ending:
+            self._end_children(row.id, reason or "")
+        self._rollup(row, to)
+
+    def _end_children(self, parent_id: str, reason: str) -> None:
+        for child in self.children(parent_id):
+            if child.state not in OPEN:
+                continue
+            if child.kind in ("ask", "question"):
+                to, why = "expired", f"parent ended: {reason}"
+            else:
+                to, why = "cancelled", "goal closed"
+            # Scout already knows the parent ended, so these need no report of their own.
+            self._move(child, to, why, force=True, extra={"reported_at": self._stamp()})
+
+    def _rollup(self, row: WorkRow, to: str) -> None:
+        """The only automatic goal move: a stuck child blocks it, a freed one unblocks it."""
+        if row.parent_id is None:
+            return
+        parent = self._need(row.parent_id)
+        if parent.kind != "goal":
+            return
+        if to in ("blocked", "failed") and parent.state == "active":
+            self._move(parent, "blocked", None, {"because": row.id})
+        elif to in ("planned", "active") and parent.state == "blocked":
+            if not any(c.state == "blocked" for c in self.children(parent.id)):
+                self._move(parent, "active", None, {"because": row.id})
+
+    def children_ended(self, goal_id: str) -> bool:
+        kids = self.children(goal_id)
+        return bool(kids) and all(k.state in TERMINAL for k in kids)
+
+    def fail(self, id: str, error_kind: Literal["transient", "permanent"], reason: str) -> WorkRow:
+        """A step failed: back off and retry when that is safe, else end it as failed."""
+        reason = self.mask(reason)
+        record = {"error_kind": error_kind, "last_error": reason[:ERROR_CAP]}
+        with transaction(self.db):
+            row = self._need(id)
+            retry = error_kind == "transient" and row.safe_to_retry
+            if retry and row.attempt < row.max_attempts:
+                steps = self.retry.backoff_s
+                wait = timedelta(seconds=steps[min(row.attempt, len(steps) - 1)])
+                extra = {
+                    **record,
+                    "attempt": row.attempt + 1,
+                    "due_at": utc_text(self.now() + wait),
+                }
+                self._move(row, "planned", None, extra=extra)
+                self.add_event(id, "attempt_failed", {"reason": reason})
+            else:
+                if retry:
+                    why = f"gave up after {row.attempt} tries: {reason}"
+                else:
+                    why = f"not retryable: {reason}"
+                self._move(row, "failed", why, extra=record)
+        return self._need(id)
+
+    def retry_step(self, id: str) -> WorkRow:
+        """The person chose retry: a blocked or failed step goes back to planned, tries reset."""
+        with transaction(self.db):
+            row = self._need(id)
+            if row.state not in ("blocked", "failed"):
+                raise TransitionRefused(f"{id} is {row.state}, not blocked or failed")
+            self._move(row, "planned", None, force=True, extra={"attempt": 0, "due_at": None})
+            self.add_event(id, "retried")
+        return self._need(id)
+
+    def close_goal(self, goal_id: str, outcome: Literal["done", "failed"], summary: str) -> WorkRow:
+        """Scout closes a goal; its open children end with it."""
+        with transaction(self.db):
+            row = self._need(goal_id)
+            if row.kind != "goal":
+                raise TransitionRefused(f"{goal_id} is a {row.kind}, not a goal")
+            extra = {"summary": self.mask(summary), "reported_at": self._stamp()}
+            self._move(row, outcome, "closed by Scout", via_close=True, extra=extra)
+        return self._need(goal_id)
+
+    # ---- what is waiting ----
+
+    def unreported(self, kinds: Sequence[str] | None = None) -> list[WorkRow]:
+        where = "reported_at IS NULL AND state IN ('done','failed','cancelled','expired','blocked')"
+        args: list = []
+        if kinds is not None:
+            where += f" AND kind IN ({','.join('?' * len(kinds))})"
+            args += list(kinds)
+        return self._select(where, args, "updated_at, rowid")
+
+    def mark_reported(self, id: str) -> None:
+        self.db.execute("UPDATE work SET reported_at = ? WHERE id = ?", (self._stamp(), id))
+
+    def due(self, kinds: Sequence[str]) -> list[WorkRow]:
+        marks = ",".join("?" * len(kinds))
+        return self._select(
+            f"state = 'planned' AND due_at IS NOT NULL AND due_at <= ? AND kind IN ({marks})",
+            [self._stamp(), *kinds],
+            "due_at, rowid",
+        )
+
+    def next_due(self, kinds: Sequence[str]) -> datetime | None:
+        marks = ",".join("?" * len(kinds))
+        text = self.db.execute(
+            f"SELECT MIN(due_at) FROM work WHERE state = 'planned' AND kind IN ({marks})",
+            list(kinds),
+        ).fetchone()[0]
+        return None if text is None else datetime.fromisoformat(text)
