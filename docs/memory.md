@@ -27,7 +27,7 @@ Every memory also sits in a layer (migration 25). `instruction`, `about_you` and
 
 ### Masking on save
 
-`remember` and the compaction summary mask their text with the session's `save` guard before it is stored, so a key or token the person pasted is stored as `[secret]` (see [storage.md](storage.md#masking)). The cap is checked on the masked text.
+`remember` and the compaction summary mask their text with the session's `save` guard before it is stored, so a key or token the person pasted is stored as `[secret]` (see [storage.md](storage.md#masking)). The cap is checked on the masked text. If a blocking save guard withholds the whole text, `remember` refuses with a `MemoryRefused` message (the model reads it as a tool error) and stores nothing.
 
 ### Tools
 

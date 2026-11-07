@@ -503,6 +503,14 @@ async def test_saved_chat_has_secret_masked_but_history_keeps_it(tmp_path):
     assert SECRET in json.dumps(session.history)
 
 
+async def test_session_masks_memory_text_on_save(tmp_path):
+    memory = file_memory(tmp_path)
+    make(Gate(["ok"]), memory, masker=secret_masker())
+    item = memory.remember("about_you", f"my key is {SECRET}")
+    assert item.text == "my key is [secret]"
+    assert SECRET not in json.dumps([i.text for i in memory.list_items(10)])
+
+
 @pytest.mark.parametrize(
     "shape",
     [

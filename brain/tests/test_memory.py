@@ -361,17 +361,25 @@ def test_memory_layers_migrated(tmp_path):
     db = sqlite3.connect(path, isolation_level=None)
     migrate(db, upto=load_migrations()[-1].number - 1)  # the schema before the layers
     at = "2026-01-02T03:04:05+00:00"
-    for kind in ("instruction", "about_you", "project", "summary"):
+    for kind in ("instruction", "about_you", "project", "summary", "mystery"):
         db.execute(
             "INSERT INTO memories(kind, text, created_at, updated_at) VALUES (?, 'x', ?, ?)",
             (kind, at, at),
         )
     db.close()
     m = Memory(path)
-    for kind in ("instruction", "about_you", "project"):
+    for kind in ("instruction", "about_you", "project", "mystery"):
         assert _layers(m, kind) == [("core", None, None, None, None, None, None)]
     assert _layers(m, "summary") == [("episodic", "day", at, at, None, None, None)]
     assert [i.kind for i in m.list_items(10)].count("summary") == 1  # Home's list is stable
+    m.close()
+
+
+def test_remember_refuses_withheld_text(tmp_path):
+    m = Memory(tmp_path / "t.db", mask=lambda t: "[withheld]")
+    with pytest.raises(MemoryRefused, match="withheld"):
+        m.remember("about_you", "something a guard blocks")
+    assert m.list_items(10) == []
     m.close()
 
 

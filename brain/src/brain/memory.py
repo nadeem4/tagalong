@@ -10,11 +10,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from brain.apps import AppRow
+from brain.masking import WITHHELD
 from brain.store import connections, conversation, outputs
 from brain.store import memory as memory_store
 from brain.store import search as search_store
 from brain.store.db import open_db
-from brain.store.memory import Item
+from brain.store.memory import Item, MemoryRefused
 from brain.store.search import Hit
 
 
@@ -64,7 +65,11 @@ class Memory:
 
     def remember(self, kind: str, text: str, replaces: int | None = None) -> Item:
         at = self._now().isoformat()
-        return memory_store.remember(self._db, kind, self.mask(text), replaces, at)
+        masked = self.mask(text)
+        if masked == WITHHELD:
+            # A blocking save guard: saving "[withheld]" would store noise.
+            raise MemoryRefused("A save guard withheld this text, so it was not remembered.")
+        return memory_store.remember(self._db, kind, masked, replaces, at)
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
