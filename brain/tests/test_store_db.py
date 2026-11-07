@@ -19,7 +19,7 @@ def _version(db: sqlite3.Connection) -> int:
 
 
 def test_migrations_are_numbered_without_gaps():
-    assert [m.number for m in load_migrations()] == list(range(1, 20))
+    assert [m.number for m in load_migrations()] == list(range(1, 21))
 
 
 def test_fresh_file_reaches_latest(tmp_path):

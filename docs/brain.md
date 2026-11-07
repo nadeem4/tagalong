@@ -24,27 +24,29 @@ the Home tool `set_api_key` (see [Home tools](#home-tools)); the brain saves it 
 `<TAGALONG_HOME>/.env` and uses it at once, with no restart. A real `ANTHROPIC_API_KEY` environment
 variable still works and is the developer path.
 
-| Variable                       | Default            | Meaning                                                                                                                                                    |
-| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`          | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                       |
-| `TAGALONG_HOME`                | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
-| `TAGALONG_MODEL`               | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                                    |
-| `TAGALONG_DAILY_BUDGET_USD`    | `5`                | Most Scout may spend per local day, in USD                                                                                                                 |
-| `TAGALONG_READER_MODEL`        | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
-| `TAGALONG_READER_DAILY_USD`    | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
-| `TAGALONG_LOOP_POLL_S`         | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                |
-| `TAGALONG_LOOP_STALE_DAYS`     | `7`                | Days a held loop may sit untouched before it goes to one stale wake (a positive whole number)                                                              |
-| `TAGALONG_STEP_CAP`            | `25`               | Most model calls in one turn                                                                                                                               |
-| `TAGALONG_TURN_TIMEOUT_S`      | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
-| `TAGALONG_EXPERT_CMD`          | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
-| `TAGALONG_JOB_QUIET_MIN`       | `20`               | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                          |
-| `TAGALONG_EXPERT_IDLE_S`       | `300`              | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                           |
-| `TAGALONG_WAKES_PER_HOUR`      | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                   |
-| `TAGALONG_OFFER_MIN_APPROVALS` | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                    |
-| `TAGALONG_OFFER_WINDOW_DAYS`   | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                |
-| `TAGALONG_KEEP_ASKING_DAYS`    | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                           |
-| `TAGALONG_TOOL_PREVIEW_CHARS`  | `4000`             | Characters of one tool result (brain tool, connected app, expert report) Scout sees at once; the rest is read with `read_output` (whole number, 1 or more) |
-| `ANTHROPIC_API_KEY`            | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                   |
+| Variable                         | Default            | Meaning                                                                                                                                                    |
+| -------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                       |
+| `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                         |
+| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                                    |
+| `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                 |
+| `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                      |
+| `TAGALONG_READER_DAILY_USD`      | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                |
+| `TAGALONG_LOOP_POLL_S`           | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                |
+| `TAGALONG_LOOP_STALE_DAYS`       | `7`                | Days a held loop may sit untouched before it goes to one stale wake (a positive whole number)                                                              |
+| `TAGALONG_STEP_CAP`              | `25`               | Most model calls in one turn                                                                                                                               |
+| `TAGALONG_TURN_TIMEOUT_S`        | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                      |
+| `TAGALONG_EXPERT_CMD`            | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                   |
+| `TAGALONG_JOB_QUIET_MIN`         | `20`               | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                          |
+| `TAGALONG_EXPERT_IDLE_S`         | `300`              | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                           |
+| `TAGALONG_WAKES_PER_HOUR`        | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                   |
+| `TAGALONG_OFFER_MIN_APPROVALS`   | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                    |
+| `TAGALONG_OFFER_WINDOW_DAYS`     | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                |
+| `TAGALONG_KEEP_ASKING_DAYS`      | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                           |
+| `TAGALONG_TOOL_PREVIEW_CHARS`    | `4000`             | Characters of one tool result (brain tool, connected app, expert report) Scout sees at once; the rest is read with `read_output` (whole number, 1 or more) |
+| `TAGALONG_JOB_STEPS_MAX_ENTRIES` | `2000`             | Steps one job's log keeps; the oldest go first, leaving one "older steps dropped" line (whole number, 1 or more)                                           |
+| `TAGALONG_JOB_STEPS_MAX_BYTES`   | `1000000`          | Text bytes one job's log keeps; command output is blanked first (whole number, 1 or more)                                                                  |
+| `ANTHROPIC_API_KEY`              | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                   |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -89,7 +91,7 @@ the total can run a little low.
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/questions.py`         | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`)                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/jobs.py`              | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                                                                                                                     |
-| `brain/src/brain/job_activity.py`      | `JobActivity`: one per running job; turns ACP updates into masked, capped, stored activity entries                                                                                                                                                                                                                                                                               |
+| `brain/src/brain/job_activity.py`      | `JobActivity`: one per running job; turns ACP updates into masked, capped job steps (`job_steps`, kept by `WorkStore`)                                                                                                                                                                                                                                                           |
 | `brain/src/brain/reading.py`           | `ReadingStore`: the `reading` status each body last reported (how Scout reads the screen), forgotten when the body goes                                                                                                                                                                                                                                                          |
 | `brain/src/brain/reading_tools.py`     | Home's `reading_status` tool                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/outputs.py`           | `OutputStore` and `preview`: a long tool result becomes a capped preview, the full text is stored masked for `read_output`                                                                                                                                                                                                                                                       |
@@ -367,19 +369,19 @@ asks for itself (below) is `auto`; then the user's saved choice (a locked tool i
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
 `resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
 
-| Tool                                           | Default mode                                                         |
-| ---------------------------------------------- | -------------------------------------------------------------------- |
-| Reads (`effect: "read"`), such as `list_jobs`  | `auto`                                                               |
-| Changes (`effect: "change"`)                   | `ask`                                                                |
-| A connected app's tool, read-only too          | `ask` (`default_mode`), until you change it                          |
-| Memory tools (`remember`, `forget`)            | `auto`                                                               |
-| Timer tools `set_timer` and `cancel_timer`     | `auto`                                                               |
-| Expert tools `watch_job` and `stop_job`        | `auto`                                                               |
-| `tell_expert` (`follow_up`)                    | `ask` on a wake turn, free on an owner turn                          |
-| `hand_off` (asks itself, see below)            | `auto`, no gate ask                                                  |
-| A body tool that does not declare effect       | `ask`                                                                |
-| Locked (`confirm: true` from the body)         | `ask`, until you set it to `auto` on Home                            |
-| Always-ask (`confirm: "always"` from the body) | `ask` every time; cannot be set to `auto`, no preference approves it |
+| Tool                                            | Default mode                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| Reads (`effect: "read"`), such as `work_status` | `auto`                                                               |
+| Changes (`effect: "change"`)                    | `ask`                                                                |
+| A connected app's tool, read-only too           | `ask` (`default_mode`), until you change it                          |
+| Memory tools (`remember`, `forget`)             | `auto`                                                               |
+| Timer tools `set_timer` and `cancel_timer`      | `auto`                                                               |
+| Expert tools `watch_job` and `stop_job`         | `auto`                                                               |
+| `tell_expert` (`follow_up`)                     | `ask` on a wake turn, free on an owner turn                          |
+| `hand_off` (asks itself, see below)             | `auto`, no gate ask                                                  |
+| A body tool that does not declare effect        | `ask`                                                                |
+| Locked (`confirm: true` from the body)          | `ask`, until you set it to `auto` on Home                            |
+| Always-ask (`confirm: "always"` from the body)  | `ask` every time; cannot be set to `auto`, no preference approves it |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -419,14 +421,14 @@ Shipped defaults match the design: built-in memory, timers, `read_output` and th
 `tab_actions` ask); every app tool asks until changed. `test_tools.py` pins the built-in rows
 against the real specs and the body tests pin each body's declared `effect` and `confirm`.
 
-Expert jobs (Claude Code hand-offs) live in `work` rows, read through `JobRecords` (`job_records.py`, the only code that knows the layout; columns in [storage.md](storage.md#jobs-as-work-rows)). A job is a `goal` row with the job id; each expert hand-off inside it is an `expert_call` row named `<job>.<part>` (`p1`, `p2`, ...). `work_job` holds what `work` has no column for: agent, folder, mode and the first task. `JobRecords` hands out the same `Job` and `JobPart` shapes as before: a job has id, task, folder, mode, state, start and end times, `parent_job` (the job a follow-up continued, kept as a `continued` event), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and closes the job with `close_job`, which takes an optional `outcome` of `done` or `failed`). A part has agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, report, session id, a `reported` flag and start and end times. Work states map back to the words Home has always shown: `active` is `running`, `done` is `done`, `failed` is `error`, and `cancelled` (or anything else) is `stopped`; a part's reason is left out when it only repeats its state. A report or result over 2,000 characters keeps its start in the row and the whole text in `tool_outputs`. A finished part has no progress line (the work store clears it when a row ends). A job's state is derived: `running` while any part runs, `error` once the job is closed as failed, otherwise the outcome of the part that ended last. Parts still running at brain start become `cancelled` with reason `brain restarted` and their jobs are closed, so they take no new parts; the activity log and timers of those jobs are cleaned by `Jobs.startup`. A failed part blocks its job, and adding a part to a blocked job makes it run again. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`.
+Expert jobs (Claude Code hand-offs) live in `work` rows, read through `JobRecords` (`job_records.py`, the only code that knows the layout; columns in [storage.md](storage.md#jobs-as-work-rows)). A job is a `goal` row with the job id; each expert hand-off inside it is an `expert_call` row named `<job>.<part>` (`p1`, `p2`, ...). `work_job` holds what `work` has no column for: agent, folder, mode and the first task. `JobRecords` hands out the same `Job` and `JobPart` shapes as before: a job has id, task, folder, mode, state, start and end times, `parent_job` (the job a follow-up continued, kept as a `continued` event), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and closes the job with `close_job`, which takes an optional `outcome` of `done` or `failed`). A part has agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, report, session id, a `reported` flag and start and end times. Work states map back to the words Home has always shown: `active` is `running`, `done` is `done`, `failed` is `error`, and `cancelled` (or anything else) is `stopped`; a part's reason is left out when it only repeats its state. A report or result over 2,000 characters keeps its start in the row and the whole text in `tool_outputs`. A finished part has no progress line (the work store clears it when a row ends). A job's state is derived: `running` while any part runs, `error` once the job is closed as failed, otherwise the outcome of the part that ended last. Parts still running at brain start become `blocked` when their session can be reloaded, otherwise `failed`, with reason `brain restarted`; the job stays open, and the activity log and timers of those jobs are cleaned by `Jobs.startup`. Carrying on from a blocked part (`hand_off` with `continue_job`) ends that old part and job as `cancelled` and already reported. A failed part blocks its job, and adding a part to a blocked job makes it run again. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 erDiagram
     work ||--|{ work : "goal has expert calls"
-    work ||--o{ job_activity : "one ordered log"
-    work ||--o{ job_activity : "part, source"
+    work ||--o{ job_steps : "one ordered log"
+    work ||--o{ job_steps : "part, source"
 ```
 
 When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-tools)).
@@ -556,7 +558,7 @@ so there is one gate and no second path.
 | `list_permissions` | `{}`                               | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
 | `set_permission`   | `{"tool": str, "mode": str}`       | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                         |
 | `speak_sample`     | `{"text", "voice?", "speed?"}`     | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                     |
-| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                                                                                                                       |
+| `list_jobs`        | `{}`                               | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Home only, Scout reads `work_status`                                                                                                        |
 | `stop_job`         | `{"job": str, "part?": str}`       | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                   |
 | `job_activity`     | `{"job?": str, "after_rev?": int}` | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                                              |
 | `job_report`       | `{"job": str, "part": str}`        | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                                      |
@@ -945,7 +947,7 @@ take an optional `part`: with several running parts `tell` must name one, and `s
 of them unless one is named. The job's `JobId` carries `.part`. A wake about a job with more than
 one part names the part and its expert; `on_finished` fires only once no part is still running. `Session` builds it with the expert list (`main.py` passes the installed experts plus the custom
 override) and the `ExpertRun` factory (`ExpertHosts(TAGALONG_EXPERT_IDLE_S, quiet_s=TAGALONG_JOB_QUIET_MIN * 60)`) and calls
-`startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
+`startup()`, which runs the work store's resume scan (see Restart under Job state).
 
 **One session per folder.** A `hand_off` without `continue_job` continues the expert's last
 finished session in that folder: `Memory.last_part_for(agent, folder)` returns the newest job and
@@ -968,7 +970,7 @@ whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
 cross), `session reported no modes`, `the earlier job saved no session` or `null`. Scout words it (see `mind/soul.md`: a short brief,
-never the chat; the expert's summary stays whole in its part's report, and `list_jobs` shows it cut at 1,000 characters; `job_report` reads it whole).
+never the chat; the expert's summary stays whole in its part's report, and the Home `list_jobs` row shows it cut at 1,000 characters; `job_report` reads it whole).
 `list_jobs` rows carry `parts`, each with `expert` and `session_id_known` instead of the session id. The mode card
 still opens for a follow-up; its choices come from the reopened session.
 
@@ -988,10 +990,10 @@ than one part, and keys a step's output by part and step id, since two experts c
 flowchart LR
     A[ACP session update] --> B[ExpertRun._update]
     B -->|only after begin| C[JobActivity]
-    C -->|mask, then cap| D[(job_activity table)]
+    C -->|mask, then cap| D[(job_steps table)]
 ```
 
-Entries (`ActivityEntry` in `memory.py`) have a `rev` that rises on every write to the job's log
+Entries (`ActivityEntry` in `store/work.py`) have a `rev` that rises on every write to the job's log
 (the cursor readers will use), a `seq` fixed at insert (display order; `0` is the
 `[older steps dropped]` marker), a `kind` (`command`, `output`, `edit`, `read`, `search`,
 `other`, `say`, `plan`, `end`, `tool`), an optional `status` (`pending`, `running`, `done`,
@@ -1004,8 +1006,9 @@ with the title, never an error.
 
 Every text is masked (`mask_json(guards, "job_activity", ...)`) on the whole accumulated text,
 then capped: a command's output keeps its last 64 KB behind `[earlier output cut]` (cut on a
-character boundary), a message 8,192 characters, a job 2,000 entries or 1 MB of text. Over the
-caps `Memory.trim_activity` blanks the oldest `output` text first (bumping its `rev`), then
+character boundary), a message 8,192 characters, a job `TAGALONG_JOB_STEPS_MAX_ENTRIES` (2,000) entries or
+`TAGALONG_JOB_STEPS_MAX_BYTES` (1 MB) of text. Over the
+caps `WorkStore.trim_activity` blanks the oldest `output` text first (bumping its `rev`), then
 deletes rows by entry count and by bytes, least recently written first (lowest `rev`, so a plan
 or step still being updated survives), and keeps one marker. Messages without an id join into one
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
@@ -1041,7 +1044,7 @@ from before the log existed has an empty page. `watch` is Scout's watch list for
 list), or `null` when it has none. With no `job` it returns
 `{"running": [{job, expert, text, at}]}`: the latest running or pending step of each running job (`expert` is the
 expert's display name), for the bubble's one live line. `list_jobs` rows gain `activity: true`
-when the job has any rows (one query, `Memory.jobs_with_activity`).
+when the job has any rows (one query, `WorkStore.jobs_with_activity`).
 
 `Jobs` tells bodies with `changed {what: "job_activity"}` at most once per `ACTIVITY_NOTIFY_S`
 (250 ms): the first change goes at once, a burst becomes one trailing send so the last write is
@@ -1154,18 +1157,19 @@ flowchart TD
   H --> I[Scout decides: speak or stay silent]
 ```
 
-| Tool             | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                                                                                                                              |
-| ---------------- | ----------- | ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`       | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start |
-| `list_experts`   | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                |
-| `tell_expert`    | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                           |
-| `close_job`      | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                    |
-| `set_job_result` | scout       | change | `auto`                       | `{job, text}`. Scout's own result for the whole job (`Job.scout_result`): masked, replaceable, allowed on a closed job; stored up to 20,000 characters, no template or length rule. Unknown job: a plain refusal line. `list_jobs` rows carry it as `scout_result` (clipped to 1,000 characters). With none, nothing is invented                                  |
-| `watch_job`      | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                                                            |
-| `list_jobs`      | scout, home | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                         |
-| `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                              |
-| `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                   |
-| `job_report`     | scout, home | read   | `auto`                       | `{job, part}`. One part's whole report as `{"text"}`. Scout's copy is previewed by the output cap, `read_output` pages the rest; Home gets it whole                                                                                                                                                                                                               |
+| Tool             | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | ----------- | ------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hand_off`       | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                                                           |
+| `list_experts`   | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                                                                                                          |
+| `tell_expert`    | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                                                                                                                     |
+| `close_job`      | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                                                                                                              |
+| `set_job_result` | scout       | change | `auto`                       | `{job, text}`. Scout's own result for the whole job (`Job.scout_result`): masked, replaceable, allowed on a closed job; stored up to 20,000 characters, no template or length rule. Unknown job: a plain refusal line. `list_jobs` rows carry it as `scout_result` (clipped to 1,000 characters). With none, nothing is invented                                                                                                                            |
+| `watch_job`      | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                                                                                                                                                      |
+| `list_jobs`      | home        | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                                                                                                                   |
+| `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                                                                                                                        |
+| `work_status`    | scout       | read   | `auto`                       | `{id?, words?}`. With `id`: `{goal, steps, events}` (the goal, its steps and the last 20 events across them); with `words`: `{found: [...]}`, the best 5 matches by title; with neither: `{open: [...], unreported: [...]}`, the open goals and timers and anything that ended or got stuck that Scout has not been told. Rows carry `id`, `kind`, `state`, `title`, `summary`, `progress`, `attempt`, `end_reason`, `due_at`. Replaces Scout's `list_jobs` |
+| `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                                                                                                             |
+| `job_report`     | scout, home | read   | `auto`                       | `{job, part}`. One part's whole report as `{"text"}`. Scout's copy is previewed by the output cap, `read_output` pages the rest; Home gets it whole                                                                                                                                                                                                                                                                                                         |
 
 Which expert: with one installed it is the default; with several and none named, or a name that is
 not installed, `Jobs.start` raises a `JobError` of facts (`several experts installed, name one: <ids>`,
@@ -1215,7 +1219,7 @@ shows them as Scout does.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
   fails naming the running jobs. Stored text is kept whole: a report or Scout's result is capped only at
   1,000,000 characters (a storage safety), and progress keeps its last 2,000 (it is a running
-  tail). Only Scout's copy is compact: `list_jobs` trims each row for Scout's context, a result
+  tail). Only the `list_jobs` row is compact: it trims each row, a result
   (and `scout_result`) to its first 1,000 characters and progress to its last 1,000, a trimmed
   end marked with `…`. Home reads the whole text instead, from `job_activity`'s `result` and
   `job_report`. A job has
@@ -1276,7 +1280,7 @@ flowchart LR
   `app:<app id>` for a connected app (the prefix of its `<app>__<tool>` name) and `scout:<tool>`
   for the brain's own and body tools; expert steps carry no source. Status `ok` is stored as
   `done`. Which calls count is mechanical: the turn must be bound to a job, and every call in it is
-  recorded except `set_job_result`, `watch_job` and `list_jobs`. A turn is bound when it is the wake
+  recorded except `set_job_result`, `watch_job` and `work_status`. A turn is bound when it is the wake
   for exactly one job (`job_ended`, `job_quiet`, `job_step_failed`) or when a job tool
   (`hand_off`, `tell_expert`, `stop_job`, `close_job`, `set_job_result`) ran fine, named a job and
   the turn had none; the binding (`Session._turn_job`) ends with the turn. A batched wake that
@@ -1292,7 +1296,7 @@ flowchart LR
   C[any tool call] --> G[Toolbox.run gate]
   G -->|on_call: call, spec, kind, status| S[Session._on_tool_call]
   T --> S
-  S -->|record_step| J[Jobs] --> A[(job_activity, part scout, source)]
+  S -->|record_step| J[Jobs] --> A[(job_steps, part scout, source)]
 ```
 
 - **Watch list.** Right after `hand_off` returns the job id, Scout writes what it expects in its own
@@ -1303,7 +1307,7 @@ flowchart LR
   (`Memory.set_watch`, `Job.watch`), masked when saved (`mask_json(guards, "job_watch", ...)`), so
   it survives a restart. `Jobs.wake_facts` adds a `watching` fact (`[x] done item` / `[ ] open
 item`, one per line, only when a list exists), so `job_ended`, `job_quiet` and `job_step_failed`
-  show it; `list_jobs` rows carry `watch`; and `job_activity` pages carry it for the job page,
+  show it; `list_jobs` rows (Home) carry `watch`; and `job_activity` pages carry it for the job page,
   where it is read-only. A change sends the throttled `changed {what: "job_activity"}`. Code
   never checks a brief or the list against the result: the model judges. How to brief an expert
   (the goal, how done will be judged, that it tests its own work and ends with a summary of what
@@ -1329,7 +1333,12 @@ flowchart LR
 - **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to
   one per 2 seconds, with no trailing notify, so a body may show slightly stale progress until
   the next change.
-- **Restart.** Jobs do not resume. A brain restart marks running jobs `stopped`.
+- **Restart.** `Jobs.startup()` runs `WorkStore.resume_scan` once the brain starts. A part that was
+  running and saved a session whose expert can reload it (`can_resume`) becomes `blocked` with the
+  reason `brain restarted`; its job stays open and Scout is told once (`job_ended`) and offers to
+  carry on with `hand_off` and `continue_job`. Any other running part becomes `failed` with the same
+  reason. Each such part's step log ends with a `# stopped` line, and the job's check-back timers
+  are deleted. Running it twice changes nothing.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
   running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
   sends no report: those jobs stay unreported and are told about at the next start.
@@ -1368,7 +1377,7 @@ is refused (`no job with id j9.`, `job j9 is not running (done).`).
   summary of its steps, and `watching`, Scout's watch list), so Scout decides from those whether to
   speak, nudge the job or set the next check. A job timer is deleted, with any held wake for it
   dropped and the sleeper re-armed, when its job ends (`Jobs._end`) and, for jobs a dead brain left
-  running, when the brain starts (`Memory.stop_running_on_start`). This is cleanup, not a decision.
+  running, when the brain starts (`Jobs.startup`). This is cleanup, not a decision.
 - **One-offs.** A due one-off is marked `fired` and deleted once Scout's wake turn starts. If the
   brain stops before that, the timer is emitted again at the next start.
 - **Repeats.** A repeating timer sets its next time from the moment it fired, not the old time. After

@@ -23,10 +23,10 @@ from brain.guards import Guards
 from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
-from brain.memory import ActivityEntry, Memory
+from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
-from brain.store.work import WorkStore
+from brain.store.work import ActivityEntry, WorkStore
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 HANG = [{"text": "working"}, {"hang": True}]
@@ -644,12 +644,38 @@ async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_ri
     await until(lambda: not alive(rig.runs[0]))
 
 
-async def test_startup_stops_leftover_running_rows(make_rig):
+async def test_restart_blocks_running_part_with_session(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.records.add_job("old", "claude_code", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    assert rig.jobs.startup() == [("old.p1", "blocked")]
+    job = rig.records.get_job("old")
+    assert (job.state, job.parts[-1].state, job.parts[-1].reason) == (
+        "blocked",
+        "blocked",
+        "brain restarted",
+    )
+    assert [r.id for r in rig.records.unreported_jobs()] == ["old"]  # Scout is told once
+
+
+async def test_restart_fails_part_that_cannot_reload(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks())
+    rig.records.add_job("old", "claude_code", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    monkeypatch.setattr(rig.jobs, "can_resume", lambda expert_id: False)
+    assert rig.jobs.startup() == [("old.p1", "failed")]
+    job = rig.records.get_job("old")
+    assert (job.state, job.parts[-1].state) == ("failed", "failed")
+    assert "cannot reload" in job.parts[-1].reason
+
+
+async def test_restart_ends_each_stopped_parts_log_once(make_rig):
     rig = make_rig(FakeAsks())
     rig.records.add_job("old", "claude_code", "t", str(rig.folder), "plan")
     rig.jobs.startup()
-    job = rig.records.get_job("old")
-    assert (job.state, job.parts[-1].reason) == ("cancelled", "brain restarted")
+    rig.jobs.startup()  # a second start changes nothing
+    ends = [e for e in rig.records.work.activity_after("old", 0, 10) if e.kind == "end"]
+    assert [(e.part, e.text) for e in ends] == [("p1", "# stopped")]
 
 
 def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
@@ -1154,7 +1180,7 @@ async def test_no_quiet_wake_after_the_job_ends(make_rig):
 async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")))  # HANG: one message, no tool call
     job_id = await rig.jobs.start("fix it", str(rig.folder))
-    await until(lambda: rig.memory.activity_after(job_id, 0, 5) and rig.clock._waiters)
+    await until(lambda: rig.records.work.activity_after(job_id, 0, 5) and rig.clock._waiters)
     await rig.clock.advance(1200)
     (event,) = rig.emitted
     assert event.kind == "job_quiet" and event.key == f"job:{job_id}"
@@ -1340,6 +1366,44 @@ async def test_continue_job_reuses_the_saved_session_id_when_the_expert_can_resu
     )
 
 
+async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    assert rig.records.get_job("old").parts[-1].state == "blocked"
+    await rig.jobs.start("two", str(rig.folder), continue_job="old")
+    old = rig.records.get_job("old")
+    assert (old.parts[-1].state, old.state) == ("cancelled", "cancelled")
+    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
+    assert "old" not in [r.id for r in rig.records.work.open_roots()]
+
+
+async def test_carrying_on_from_one_of_two_blocked_parts_leaves_the_other_and_the_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.records.add_part("old", "claude-acp", "t2", str(rig.folder))
+    rig.records.update_part("old", "p2", session_id="s2")
+    rig.jobs.startup()
+    assert [p.state for p in rig.records.get_job("old").parts] == ["blocked", "blocked"]
+    await rig.jobs.start("two", str(rig.folder), continue_job="old")
+    old = rig.records.get_job("old")
+    assert [p.state for p in old.parts] == ["blocked", "cancelled"]
+    assert "old" in [r.id for r in rig.records.work.open_roots()]
+
+
+async def test_carrying_on_inside_the_same_job_keeps_the_job_open(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    await rig.jobs.start("two", str(rig.folder), continue_job="old", job="old")
+    old = rig.records.get_job("old")
+    assert old.parts[0].state == "cancelled"
+    assert old.state == "active"
+
+
 async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
     first = await rig.jobs.start("one", str(rig.folder))
@@ -1467,7 +1531,7 @@ TOKEN = "fake-token-12345678"
 
 
 def rows_of(rig, job_id):
-    return sorted(rig.memory.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
+    return sorted(rig.records.work.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
 
 
 async def test_a_jobs_steps_are_saved_masked(make_rig):
@@ -1689,7 +1753,7 @@ async def test_a_burst_sends_one_leading_and_one_trailing_change(make_rig, monke
     steps = [{"text": str(i)} for i in range(30)]
     rig = make_rig(FakeAsks(Answer("Plan")), [*steps, {"hang": True}])
     job_id = await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.memory.last_rev(job_id) >= 1)
+    await until(lambda: rig.records.work.last_rev(job_id) >= 1)
     await asyncio.sleep(0.05)  # the burst is over; the clock never moved
     assert activity_changes(rig) == 1
     await until(lambda: activity_changes(rig) == 2)  # the trailing flush announces the last write
@@ -1718,7 +1782,7 @@ async def test_the_end_sends_exactly_one_notice_after_the_end_row(make_rig, monk
 
     def spy(method, params):
         if params == {"what": "job_activity"}:
-            rows = rig.memory.activity_after(job_id, 0, 1000)
+            rows = rig.records.work.activity_after(job_id, 0, 1000)
             seen.append(any(e.kind == "end" for e in rows))
         real(method, params)
 
@@ -1831,7 +1895,7 @@ async def test_wake_facts_masks_a_secret_in_the_summary(make_rig):
     rig = make_rig(FakeAsks(), guards=masking_guards())
     rig.records.add_job("j1", "claude_code", "t", str(rig.folder), "default")
     at = datetime.now(UTC).isoformat()
-    rig.memory.save_activity(
+    rig.records.work.save_activity(
         "j1", ActivityEntry(1, 1, at, "command", f"curl {TOKEN}", "failed", "s", 1)
     )
     facts = rig.jobs.wake_facts("j1")
@@ -1844,7 +1908,7 @@ async def test_note_for_a_job_finished_before_a_restart_still_has_its_summary(ma
     rig.records.update_part("j1", "p1", reason="", report="ok")
     end_job(rig.records, "j1", "done")
     at = datetime.now(UTC).isoformat()
-    rig.memory.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
+    rig.records.work.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
     assert "steps: 1" in rig.jobs.note(rig.records.get_job("j1"))
 
 
@@ -2332,7 +2396,7 @@ async def test_stop_stops_all_running_parts(make_rig):
     assert rig.jobs._runs == {} and len(rig.finished) == 1  # one report, after the last part
 
 
-async def test_restart_marks_running_parts_and_job_stopped_and_drops_timers(make_rig):
+async def test_restart_settles_running_parts_and_drops_timers(make_rig):
     rig = make_rig(FakeAsks())
     rig.records.add_job("j1", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.add_part("j1", "claude-acp", "t2", "f")
@@ -2340,8 +2404,8 @@ async def test_restart_marks_running_parts_and_job_stopped_and_drops_timers(make
     timer = rig.memory.add_timer("x", datetime(2030, 1, 1, tzinfo=UTC), job_id="j1")
     rig.jobs.startup()
     got = rig.records.get_job("j1")
-    assert got.state == "cancelled" and [p.state for p in got.parts] == ["done", "cancelled"]
-    assert [e.part for e in rig.memory.activity_after("j1", 0, 10)] == ["p2"]
+    assert [p.state for p in got.parts] == ["done", "failed"]
+    assert [e.part for e in rig.records.work.activity_after("j1", 0, 10)] == ["p2"]
     assert all(t.id != timer.id for t in rig.memory.list_timers())
 
 
@@ -2539,17 +2603,17 @@ async def test_record_step_appends_a_masked_tool_entry_and_notifies(make_rig):
 async def test_record_step_on_an_unknown_job_is_ignored(make_rig):
     rig = make_rig(FakeAsks())
     rig.jobs.record_step("nope", "scout:recall", "recall", "done")
-    assert rig.memory.activity_after("nope", 0, 10) == []
+    assert rig.records.work.activity_after("nope", 0, 10) == []
 
 
 async def test_expert_and_scout_steps_interleave_in_order(make_rig):
     rig = make_rig(FakeAsks())
     rig.records.add_job("j1", "claude_code", "t", str(rig.folder), "default")
     rig.jobs.record_step("j1", "scout:recall", "one", "done")
-    rig.memory.save_activity(
+    rig.records.work.save_activity(
         "j1",
         ActivityEntry(
-            2, rig.memory.max_seq("j1") + 1, "2026-01-01T00:00:00+00:00", "command", "ls"
+            2, rig.records.work.max_seq("j1") + 1, "2026-01-01T00:00:00+00:00", "command", "ls"
         ),
     )
     rig.jobs.record_step("j1", "app:files", "two", "done")

@@ -24,6 +24,7 @@ OPEN = ("planned", "active", "blocked", "paused")
 
 TITLE_CAP = 200
 ERROR_CAP = 300
+DROPPED_MARKER = "[older steps dropped]"
 
 _MOVES = {
     "planned": {"active", "cancelled", "expired", "paused"},
@@ -89,6 +90,22 @@ class WorkEvent:
     at: str
     kind: str
     data: dict | None
+
+
+@dataclass(frozen=True)
+class ActivityEntry:
+    """One row of a job's step log."""
+
+    rev: int
+    seq: int
+    at: str  # ISO UTC
+    kind: str
+    text: str
+    status: str | None = None
+    step: str | None = None
+    exit: int | None = None
+    part: str = "p1"
+    source: str | None = None  # who did it, when not the part's expert
 
 
 def _loads(text: str | None) -> dict | None:
@@ -206,6 +223,100 @@ class WorkStore:
             " ORDER BY w.rowid DESC LIMIT ?"
         )
         return [_row(r) for r in self.db.execute(sql, (agent, limit))]
+
+    # ---- job_steps: what a job did, step by step (keyed by the goal id) ----
+
+    def save_activity(self, job_id: str, entry: ActivityEntry) -> None:
+        self.db.execute(
+            "INSERT INTO job_steps(job_id, rev, seq, at, kind, step, status, exit, text,"
+            " part, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+            " ON CONFLICT(job_id, seq) DO UPDATE SET rev=excluded.rev, at=excluded.at,"
+            " kind=excluded.kind, step=excluded.step, status=excluded.status,"
+            " exit=excluded.exit, text=excluded.text, part=excluded.part,"
+            " source=excluded.source",
+            (
+                job_id,
+                entry.rev,
+                entry.seq,
+                entry.at,
+                entry.kind,
+                entry.step,
+                entry.status,
+                entry.exit,
+                entry.text,
+                entry.part,
+                entry.source,
+            ),
+        )
+
+    def activity_after(self, job_id: str, after_rev: int, limit: int) -> list[ActivityEntry]:
+        rows = self.db.execute(
+            "SELECT rev, seq, at, kind, text, status, step, exit, part, source FROM job_steps"
+            " WHERE job_id=? AND rev>? ORDER BY rev LIMIT ?",
+            (job_id, after_rev, limit),
+        )
+        return [ActivityEntry(*r) for r in rows]
+
+    def last_rev(self, job_id: str) -> int:
+        row = self.db.execute("SELECT MAX(rev) FROM job_steps WHERE job_id=?", (job_id,))
+        return row.fetchone()[0] or 0
+
+    def max_seq(self, job_id: str) -> int:
+        """The highest step number the job has used, across all its parts."""
+        row = self.db.execute("SELECT MAX(seq) FROM job_steps WHERE job_id=?", (job_id,))
+        return row.fetchone()[0] or 0
+
+    def jobs_with_activity(self) -> set[str]:
+        return {r[0] for r in self.db.execute("SELECT DISTINCT job_id FROM job_steps")}
+
+    def trim_activity(self, job_id: str, max_entries: int, max_bytes: int) -> None:
+        """Keep a job's log inside its caps: blank the oldest output text first, then delete
+        the least recently written rows, leaving one marker (seq 0) where they were."""
+        total = self.db.execute(
+            "SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB))), 0) FROM job_steps WHERE job_id=?",
+            (job_id,),
+        ).fetchone()[0]
+        if total > max_bytes:
+            outputs = self.db.execute(
+                "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_steps"
+                " WHERE job_id=? AND kind='output' AND text!='' ORDER BY seq",
+                (job_id,),
+            ).fetchall()
+            for seq, size in outputs:
+                if total <= max_bytes:
+                    break
+                self.db.execute(
+                    "UPDATE job_steps SET text='', rev=? WHERE job_id=? AND seq=?",
+                    (self.last_rev(job_id) + 1, job_id, seq),  # a new rev so readers refetch it
+                )
+                total -= size
+        rows = self.db.execute(
+            "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_steps"
+            " WHERE job_id=? AND seq>0 ORDER BY rev",
+            (job_id,),
+        ).fetchall()
+        count, drop = len(rows), []
+        for seq, size in rows[:-1]:  # the newest row always stays
+            if count <= max_entries and total <= max_bytes:
+                break
+            drop.append(seq)
+            count -= 1
+            total -= size
+        if not drop:
+            return
+        self.db.executemany(
+            "DELETE FROM job_steps WHERE job_id=? AND seq=?", [(job_id, s) for s in drop]
+        )
+        self.save_activity(
+            job_id,
+            ActivityEntry(
+                rev=self.last_rev(job_id) + 1,
+                seq=0,
+                at=self.now().isoformat(),
+                kind="other",
+                text=DROPPED_MARKER,
+            ),
+        )
 
     # ---- work_job: what a goal or expert call needs to run in a folder ----
 

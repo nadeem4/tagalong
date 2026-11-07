@@ -20,13 +20,14 @@ from typing import Literal
 from brain.approvals import Approvals
 from brain.asks import Answer, Asks
 from brain.builtin_guards import anyone_online, person_ask, side_check_guard
+from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
 from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import AskCtx, Guards, Hook
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.memory import ActivityEntry, Memory
+from brain.memory import Memory
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
 from brain.protocol import ErrorCode, RpcError
@@ -34,7 +35,7 @@ from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
-from brain.store.work import TransitionRefused
+from brain.store.work import OPEN, ActivityEntry, TransitionRefused, WorkRow
 
 log = logging.getLogger("brain")
 
@@ -63,6 +64,9 @@ PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most thi
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
 TITLE_FALLBACK_CHARS = 80
+
+
+RESTARTED = "brain restarted"  # the reason a restart gives a part it holds for a carry-on
 
 
 class JobError(Exception):
@@ -120,7 +124,11 @@ class Jobs:
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
         apps=None,
+        steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
+        steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
+        self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
+        self._steps_max_bytes = steps_max_bytes
         self._apps = apps  # the connected apps (ids, names, state); None: none can be handed over
         self._outputs = outputs  # caps the report a wake carries; None leaves it whole
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
@@ -128,7 +136,7 @@ class Jobs:
         self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
         self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
         self._records = records  # the jobs themselves: goal and expert-call rows
-        self._memory = memory  # the steps log and timers; jobs are not kept here
+        self._memory = memory  # timers; jobs and their steps are work rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
         self._notify = notify
@@ -161,25 +169,40 @@ class Jobs:
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
 
-    def startup(self) -> None:
-        """No job survives a brain restart: stop the leftovers, end each running part's log there
-        and drop their check-back timers."""
-        stopped = self._records.stop_running_on_start()
-        now = self._now().isoformat()
-        for job_id, part in stopped:
-            self._memory.save_activity(
+    def startup(self) -> list[tuple[str, str]]:
+        """Settle what a dead brain left running (the resume scan): a call that saved a session is
+        held for Scout to carry on, any other ends as failed. Each such part's log ends there and
+        its job's check-back timers go. Returns the scan's (work id, outcome) pairs."""
+        work = self._records.work
+        settled = work.resume_scan(self.can_resume_row)
+        # The end lines come after the scan commits; a crash between only loses them, because
+        # resume_scan is idempotent and will not settle these rows twice.
+        jobs: dict[str, None] = {}
+        for work_id, _ in settled:
+            row = work.get(work_id)
+            if row is None or row.kind != "expert_call" or row.parent_id is None:
+                continue
+            job_id = row.parent_id
+            work.save_activity(
                 job_id,
                 ActivityEntry(
-                    rev=self._memory.last_rev(job_id) + 1,
-                    seq=self._memory.max_seq(job_id) + 1,
-                    at=now,
+                    rev=work.last_rev(job_id) + 1,
+                    seq=work.max_seq(job_id) + 1,
+                    at=self._now().isoformat(),
                     kind="end",
                     text="# stopped",
-                    part=part,
+                    part=work_id.split(".", 1)[1],
                 ),
             )
-        for job_id in dict.fromkeys(j for j, _ in stopped):
+            jobs[job_id] = None
+        for job_id in jobs:
             self._memory.delete_timers_for_job(job_id)
+        return settled
+
+    def can_resume_row(self, row: WorkRow) -> bool | None:
+        """Whether the expert that ran this call reopens sessions; None when not known yet."""
+        agent = (self._records.work.job_detail(row.id) or {}).get("agent")
+        return self.can_resume(agent) if agent else None
 
     def installed(self) -> list[InstalledExpert]:
         return self._experts()
@@ -305,6 +328,17 @@ class Jobs:
             new_job=job is None,
             apps=offered,
         )
+        if earlier_part and earlier_part.state == "blocked" and earlier_part.reason == RESTARTED:
+            # Carried on: the held part is done with, so its goal stops showing as open.
+            self._records.update_part(
+                earlier.id, earlier_part.id, state="cancelled", reason="carried on", reported=True
+            )
+            # A part added to the same job, or another part still open, keeps the job open.
+            if job != earlier.id and not any(
+                c.state in OPEN for c in self._records.work.children(earlier.id)
+            ):
+                self._records.work.transition(earlier.id, "cancelled", reason="carried on")
+                self._records.mark_reported(earlier.id)
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
             self._records.set_title(str(started), clean.strip())
@@ -432,12 +466,14 @@ class Jobs:
             self._runs.setdefault(job_id, {})[part] = run
             self._activity.setdefault(job_id, {})[part] = JobActivity(
                 job_id,
-                self._memory,
+                self._records.work,
                 lambda text: mask_json(self._guards, "job_activity", text),
                 self._now,
                 on_change=lambda: self._activity_changed(job_id),
                 on_failed=lambda entry: self._step_failed(job_id, entry),
                 part=part,
+                max_entries=self._steps_max_entries,
+                max_bytes=self._steps_max_bytes,
             )
             handed_off = True
             self._starting -= 1
@@ -590,7 +626,7 @@ class Jobs:
             await self._hosts.shutdown()
 
     def with_activity(self) -> set[str]:
-        return self._memory.jobs_with_activity()
+        return self._records.work.jobs_with_activity()
 
     def activity_page(self, job_id: str, after_rev: int) -> dict:
         """A job's steps after the cursor (rows are masked when written); `rev` is the cursor
@@ -598,7 +634,7 @@ class Jobs:
         job = self._records.get_job(job_id)
         if job is None:
             raise JobError(f"no job {job_id}")
-        rows = self._memory.activity_after(job_id, after_rev, PAGE_LIMIT + 1)
+        rows = self._records.work.activity_after(job_id, after_rev, PAGE_LIMIT + 1)
         more = len(rows) > PAGE_LIMIT
         rows = rows[:PAGE_LIMIT]
         return {
@@ -621,7 +657,7 @@ class Jobs:
                 }
                 for p in job.parts
             ],
-            "rev": rows[-1].rev if more else self._memory.last_rev(job_id),
+            "rev": rows[-1].rev if more else self._records.work.last_rev(job_id),
             "entries": [asdict(r) for r in rows],
             "more": more,
             "watch": job.watch,
@@ -665,11 +701,13 @@ class Jobs:
         if steps is None:
             steps = self._scout_steps[job_id] = JobActivity(
                 job_id,
-                self._memory,
+                self._records.work,
                 lambda t: mask_json(self._guards, "job_activity", t),
                 self._now,
                 on_change=lambda: self._activity_changed(job_id),
                 part="scout",
+                max_entries=self._steps_max_entries,
+                max_bytes=self._steps_max_bytes,
             )
         steps.tool_step(source, text, status)
 
@@ -713,7 +751,7 @@ class Jobs:
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its
         stored log (so a job from before a restart has one too) and masked once more."""
-        summary = activity_summary(self._memory, self._records, job_id, self._now())
+        summary = activity_summary(self._records.work, self._records, job_id, self._now())
         facts = {"activity": mask_json(self._guards, "job_summary", summary)}
         job = self._records.get_job(job_id)
         if job is not None and job.watch:  # already masked when saved
@@ -726,7 +764,7 @@ class Jobs:
 
     def activity_line(self, job_id: str) -> str:
         """One line about a job's steps for list_jobs; empty when it recorded none."""
-        line = activity_line(self._memory, job_id, self._now())
+        line = activity_line(self._records.work, job_id, self._now())
         return mask_json(self._guards, "job_summary", line) if line else ""
 
     def running_steps(self) -> list[dict]:

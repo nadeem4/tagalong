@@ -11,29 +11,32 @@ from brain import job_activity
 from brain.guards import Guards
 from brain.job_activity import JobActivity
 from brain.masking import Masker, mask_json, mask_secrets
-from brain.memory import ActivityEntry, Memory
+from brain.memory import Memory
+from brain.store.work import ActivityEntry
 
 SECRET = "fake-token-12345678"
 
 
 class Rig:
-    def __init__(self, tmp_path, mask=None) -> None:
+    def __init__(self, tmp_path, mask=None, **caps) -> None:
         self.memory = Memory(tmp_path / "t.db")
         self.records = records_for(self.memory)
+        self.work = self.records.work
         self.changes = 0
         self.log = JobActivity(
             "j",
-            self.memory,
+            self.work,
             mask or (lambda t: t.replace("SECRETVALUE1", "[secret]")),
             lambda: datetime(2026, 1, 1, tzinfo=UTC),
             on_change=self._changed,
+            **caps,
         )
 
     def _changed(self) -> None:
         self.changes += 1
 
     def rows(self):
-        return sorted(self.memory.activity_after("j", 0, 10_000), key=lambda e: e.seq)
+        return sorted(self.work.activity_after("j", 0, 10_000), key=lambda e: e.seq)
 
 
 @pytest.fixture
@@ -165,9 +168,8 @@ def test_output_over_cap_keeps_the_tail_behind_a_marker(rig):
     assert set(body) == {"é"}
 
 
-def test_job_caps_drop_oldest_output_first(rig, monkeypatch):
-    monkeypatch.setattr(job_activity, "ENTRY_CAP", 5)
-    monkeypatch.setattr(job_activity, "JOB_BYTES_CAP", 2000)
+def test_job_caps_drop_oldest_output_first(tmp_path):
+    rig = Rig(tmp_path, max_entries=5, max_bytes=2000)
     for n in range(6):
         rig.log.on_update(start(f"t{n}", raw_input={"command": f"c{n}"}))
         rig.log.on_update(progress(f"t{n}", "completed", "o" * 600))
@@ -175,6 +177,7 @@ def test_job_caps_drop_oldest_output_first(rig, monkeypatch):
     assert rows[0].text == "[older steps dropped]" and rows[0].seq == 0
     assert len(rows) - 1 <= 5
     assert sum(len(e.text.encode()) for e in rows) <= 2000 + 100
+    rig.memory.close()
 
 
 def test_on_change_called_once_per_update(rig):
@@ -225,13 +228,14 @@ def test_idless_messages_around_a_tool_call_are_separate_says(rig):
     ]
 
 
-def test_latest_plan_survives_trim_after_an_in_place_update(rig, monkeypatch):
-    monkeypatch.setattr(job_activity, "ENTRY_CAP", 3)
+def test_latest_plan_survives_trim_after_an_in_place_update(tmp_path):
+    rig = Rig(tmp_path, max_entries=3)
     rig.log.on_update(acp.update_plan([acp.plan_entry("a")]))
     for n in range(3):
         rig.log.on_update(start(f"r{n}", kind="read", title=f"r{n}"))
     rig.log.on_update(acp.update_plan([acp.plan_entry("a", status="completed")]))
     assert [e.text for e in rig.rows() if e.kind == "plan"] == ["[x] a"]
+    rig.memory.close()
 
 
 def test_end_marks_open_steps_failed_when_stopped_or_errored(tmp_path):
@@ -393,9 +397,9 @@ def test_console_fence_is_stripped_without_the_opt_in(rig):
 
 def test_heartbeats_are_ignored(rig):
     rig.log.on_update(start("t1"))
-    before = rig.memory.last_rev("j")
+    before = rig.work.last_rev("j")
     rig.log.on_update(progress("t1", "in_progress"))
-    assert rig.memory.last_rev("j") == before
+    assert rig.work.last_rev("j") == before
 
 
 # --- summary and one-line form (JM2) ---
@@ -403,11 +407,11 @@ def test_heartbeats_are_ignored(rig):
 NOW = datetime(2026, 1, 1, 1, 0, tzinfo=UTC)
 
 
-def seed(memory, rows):
+def seed(work, rows):
     """rows: (kind, text, status, step, exit, minutes_ago); seq and rev run in order."""
     for i, (kind, text, status, step, code, ago) in enumerate(rows, 1):
         at = (NOW - timedelta(minutes=ago)).isoformat()
-        memory.save_activity("j", ActivityEntry(i, i, at, kind, text, status, step, code))
+        work.save_activity("j", ActivityEntry(i, i, at, kind, text, status, step, code))
 
 
 def cmd(text, step, code=0, status="done", ago=10):
@@ -420,42 +424,42 @@ def outrow(text, step):
 
 def test_summary_counts_steps_and_failed_steps(rig):
     seed(
-        rig.memory,
+        rig.work,
         [cmd("a", "1"), cmd("b", "2"), cmd("c", "3", 1, "failed"), cmd("d", "4"), cmd("e", "5")],
     )
-    assert "steps: 5, failed: 1" in job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    assert "steps: 5, failed: 1" in job_activity.activity_summary(rig.work, rig.records, "j", NOW)
 
 
 def test_summary_lists_a_failed_command_with_exit_and_last_three_output_lines(rig):
-    seed(rig.memory, [cmd("npm test", "1", 1, "failed"), outrow("l1\nl2\nl3\nl4\nl5", "1")])
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, [cmd("npm test", "1", 1, "failed"), outrow("l1\nl2\nl3\nl4\nl5", "1")])
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert "failed: npm test (exit 1)" in text
     assert "l3" in text and "l4" in text and "l5" in text
     assert "l2" not in text
 
 
 def test_summary_lists_the_last_five_commands_with_exit_codes_oldest_first(rig):
-    seed(rig.memory, [cmd(f"c{i}", str(i), i % 2) for i in range(1, 8)])
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, [cmd(f"c{i}", str(i), i % 2) for i in range(1, 8)])
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     recent = text[text.index("recent:") :]
     assert "c1 " not in recent and "c2 " not in recent
     assert recent.index("c3 (exit 1)") < recent.index("c4 (exit 0)") < recent.index("c7 (exit 1)")
 
 
 def test_summary_names_the_running_step_and_how_long(rig):
-    seed(rig.memory, [cmd("npm install", "1", None, "running", 34)])
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, [cmd("npm install", "1", None, "running", 34)])
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert "running: npm install, 34 min" in text
 
 
 def test_summary_for_a_job_with_no_entries_is_one_short_line(rig):
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert "\n" not in text and "no activity" in text
 
 
 def test_summary_is_cut_to_the_cap_on_a_character_boundary(rig):
-    seed(rig.memory, [cmd("é" * 10_000, "1", 1, "failed"), outrow("ü" * 10_000, "1")])
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, [cmd("é" * 10_000, "1", 1, "failed"), outrow("ü" * 10_000, "1")])
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert 0 < len(text) <= job_activity.SUMMARY_CAP
     text.encode()  # a clean string: no half character
 
@@ -466,8 +470,8 @@ def test_running_step_survives_three_long_failures(rig):
         output = "\n".join("x" * 200 for _ in range(5))
         rows += [cmd("c" * 200 + str(i), str(i), 1, "failed"), outrow(output, str(i))]
     rows.append(cmd("npm install", "9", None, "running", 34))
-    seed(rig.memory, rows)
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, rows)
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert len(text) <= job_activity.SUMMARY_CAP
     assert "running: npm install, 34 min" in text
     assert text.index("running:") < text.index("failed: c")
@@ -483,19 +487,19 @@ def test_fit_keeps_earlier_lines_whole_and_cuts_only_the_last_with_an_ellipsis()
 
 
 def test_a_command_with_nonzero_exit_counts_as_failed_even_if_status_is_done(rig):
-    seed(rig.memory, [cmd("make", "1", 2, "done")])
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    seed(rig.work, [cmd("make", "1", 2, "done")])
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert "failed: 1" in text and "failed: make (exit 2)" in text
 
 
 def test_activity_line_is_one_line_within_line_cap(rig):
-    seed(rig.memory, [cmd("x" * 500, "1", 1, "failed"), outrow("a\nb", "1")])
-    line = job_activity.activity_line(rig.memory, "j", NOW)
+    seed(rig.work, [cmd("x" * 500, "1", 1, "failed"), outrow("a\nb", "1")])
+    line = job_activity.activity_line(rig.work, "j", NOW)
     assert line and "\n" not in line and len(line) <= job_activity.LINE_CAP
 
 
 def test_activity_line_is_empty_without_entries(rig):
-    assert job_activity.activity_line(rig.memory, "j", NOW) == ""
+    assert job_activity.activity_line(rig.work, "j", NOW) == ""
 
 
 # --- on_failed ---
@@ -507,7 +511,7 @@ class FailRig(Rig):
         self.failed: list = []
         self.log = JobActivity(
             "j",
-            self.memory,
+            self.work,
             lambda t: t,
             lambda: datetime(2026, 1, 1, tzinfo=UTC),
             on_change=self._changed,
@@ -569,12 +573,11 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
 
 
 def two_part_logs(rig):
-    memory = rig.memory
     rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.records.add_part("j", "gemini", "t2", "f")
 
     def log(part):
-        return JobActivity("j", memory, lambda t: t, lambda: NOW, lambda: None, part=part)
+        return JobActivity("j", rig.work, lambda t: t, lambda: NOW, lambda: None, part=part)
 
     return log("p1"), log("p2")
 
@@ -597,7 +600,7 @@ def test_two_parts_share_one_ordered_log(rig):
 def test_a_second_part_continues_the_jobs_seq(rig):
     rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "a"}))
-    later = JobActivity("j", rig.memory, lambda t: t, lambda: NOW, lambda: None, part="p2")
+    later = JobActivity("j", rig.work, lambda t: t, lambda: NOW, lambda: None, part="p2")
     later.on_update(start("t1", raw_input={"command": "b"}))
     assert [e.seq for e in rig.rows()] == [1, 2]
 
@@ -607,7 +610,7 @@ def test_summary_names_the_expert_when_a_job_has_several_parts(rig):
     one.on_update(start("t1", raw_input={"command": "npm test"}))
     two.on_update(start("t1", raw_input={"command": "make"}))
     two.on_update(progress("t1", "failed", "boom"))
-    text = job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    text = job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     assert "[gemini] make" in text and "[claude-code] npm test" in text
     assert "boom" in text
 
@@ -615,14 +618,14 @@ def test_summary_names_the_expert_when_a_job_has_several_parts(rig):
 def test_summary_of_a_one_part_job_has_no_expert_tag(rig):
     rig.records.add_job("j", "claude-code", "t", "/w", "work")
     rig.log.on_update(start("t1", raw_input={"command": "ls"}))
-    assert "[" not in job_activity.activity_summary(rig.memory, rig.records, "j", NOW)
+    assert "[" not in job_activity.activity_summary(rig.work, rig.records, "j", NOW)
 
 
 def test_tool_step_is_a_masked_capped_tool_entry_with_its_source(tmp_path):
     r = Rig(tmp_path, mask=lambda t: t.replace(SECRET, "[secret]"))
     scout = JobActivity(
         "j",
-        r.memory,
+        r.work,
         r.log._mask,
         lambda: datetime(2026, 1, 1, tzinfo=UTC),
         r.log._on_change,
@@ -644,7 +647,7 @@ def test_tool_steps_share_the_jobs_counter_with_expert_steps(rig):
     rig.log.on_update(start("t1"))
     scout = JobActivity(
         "j",
-        rig.memory,
+        rig.work,
         lambda t: t,
         lambda: datetime(2026, 1, 1, tzinfo=UTC),
         lambda: None,
@@ -655,3 +658,21 @@ def test_tool_steps_share_the_jobs_counter_with_expert_steps(rig):
     rig.log.on_update(start("t2"))
     assert [e.seq for e in rig.rows()] == [1, 2, 3]
     assert [e.part for e in rig.rows()] == ["p1", "scout", "p1"]
+
+
+def test_job_activity_paging_unchanged(rig):
+    """A page and its rev cursor, written down from the pre-S2b behaviour (Review Focus 5)."""
+    rig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    rig.log.on_update(progress("t1", "completed", "a.txt"))
+    rig.log.on_update(start("t2", raw_input={"command": "pwd"}))
+    page = [
+        (e.rev, e.seq, e.kind, e.status, e.text, e.part)
+        for e in rig.work.activity_after("j", 0, 500)
+    ]
+    assert page == [
+        (2, 1, "command", "done", "ls", "p1"),
+        (3, 2, "output", None, "a.txt", "p1"),
+        (4, 3, "command", "running", "pwd", "p1"),
+    ]
+    assert rig.work.last_rev("j") == 4
+    assert [e.seq for e in rig.work.activity_after("j", 3, 500)] == [3]

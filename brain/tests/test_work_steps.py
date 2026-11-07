@@ -1,15 +1,26 @@
-"""Tests for the job_activity rows in Memory: save, page by rev, trim to the per-job caps."""
+"""Tests for the job_steps rows on the work store: save, page by rev, trim to the per-job caps."""
+
+from datetime import UTC, datetime
 
 import pytest
 
-from brain.memory import ActivityEntry, Memory
+from brain.store.db import open_db
+from brain.store.work import ActivityEntry, WorkStore
+
+NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
 def mem(tmp_path):
-    m = Memory(tmp_path / "t.db")
-    yield m
-    m.close()
+    db = open_db(tmp_path / "t.db")
+    yield WorkStore(db, lambda: NOW)
+    db.close()
+
+
+def test_job_steps_table_renamed(mem):
+    names = {r[0] for r in mem.db.execute("SELECT name FROM sqlite_master")}
+    assert {"job_steps", "job_steps_rev"} <= names
+    assert "job_activity" not in names and "job_activity_rev" not in names
 
 
 def _entry(rev, seq, kind="command", text="x", **kw):
@@ -61,12 +72,12 @@ def test_trim_deletes_oldest_rows_over_the_entry_cap_and_keeps_one_marker(mem):
 
 
 def test_activity_survives_reopen(tmp_path):
-    m = Memory(tmp_path / "t.db")
-    m.save_activity("j", _entry(1, 1, text="npm test"))
-    m.close()
-    m = Memory(tmp_path / "t.db")
-    assert m.activity_after("j", 0, 10)[0].text == "npm test"
-    m.close()
+    db = open_db(tmp_path / "t.db")
+    WorkStore(db, lambda: NOW).save_activity("j", _entry(1, 1, text="npm test"))
+    db.close()
+    db = open_db(tmp_path / "t.db")
+    assert WorkStore(db, lambda: NOW).activity_after("j", 0, 10)[0].text == "npm test"
+    db.close()
 
 
 def test_trim_deletes_oversized_non_output_rows_by_bytes(mem):

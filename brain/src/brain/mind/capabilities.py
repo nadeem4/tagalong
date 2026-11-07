@@ -75,6 +75,7 @@ def capability_picture(
             lines.append(f"... and {len(ordered) - MAX_APPS} more apps not listed")
     else:
         lines.append("Apps connected: none")
+    lines.append("Your own work (jobs, timers, what you have not told the owner yet): work_status.")
     if experts:
         lines.append(
             "Experts (for long or many-stepped jobs; each works only with what it is given):"

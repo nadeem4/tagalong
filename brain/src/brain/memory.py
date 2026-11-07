@@ -20,22 +20,6 @@ from brain.store.db import open_db, utc_text
 from brain.store.memory import Item
 from brain.store.search import Hit
 
-DROPPED_MARKER = "[older steps dropped]"
-
-
-@dataclass(frozen=True)
-class ActivityEntry:
-    rev: int
-    seq: int
-    at: str  # ISO UTC
-    kind: str
-    text: str
-    status: str | None = None
-    step: str | None = None
-    exit: int | None = None
-    part: str = "p1"
-    source: str | None = None  # who did it, when not the part's expert
-
 
 @dataclass(frozen=True)
 class Timer:
@@ -102,98 +86,6 @@ class Memory:
             "INSERT INTO permissions(tool, mode) VALUES (?,?)"
             " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
             (tool, mode),
-        )
-
-    def save_activity(self, job_id: str, entry: ActivityEntry) -> None:
-        self._db.execute(
-            "INSERT INTO job_activity(job_id, rev, seq, at, kind, step, status, exit, text,"
-            " part, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
-            " ON CONFLICT(job_id, seq) DO UPDATE SET rev=excluded.rev, at=excluded.at,"
-            " kind=excluded.kind, step=excluded.step, status=excluded.status,"
-            " exit=excluded.exit, text=excluded.text, part=excluded.part,"
-            " source=excluded.source",
-            (
-                job_id,
-                entry.rev,
-                entry.seq,
-                entry.at,
-                entry.kind,
-                entry.step,
-                entry.status,
-                entry.exit,
-                entry.text,
-                entry.part,
-                entry.source,
-            ),
-        )
-
-    def activity_after(self, job_id: str, after_rev: int, limit: int) -> list[ActivityEntry]:
-        rows = self._db.execute(
-            "SELECT rev, seq, at, kind, text, status, step, exit, part, source FROM job_activity"
-            " WHERE job_id=? AND rev>? ORDER BY rev LIMIT ?",
-            (job_id, after_rev, limit),
-        )
-        return [ActivityEntry(*r) for r in rows]
-
-    def last_rev(self, job_id: str) -> int:
-        row = self._db.execute("SELECT MAX(rev) FROM job_activity WHERE job_id=?", (job_id,))
-        return row.fetchone()[0] or 0
-
-    def max_seq(self, job_id: str) -> int:
-        """The highest step number the job has used, across all its parts."""
-        row = self._db.execute("SELECT MAX(seq) FROM job_activity WHERE job_id=?", (job_id,))
-        return row.fetchone()[0] or 0
-
-    def jobs_with_activity(self) -> set[str]:
-        return {r[0] for r in self._db.execute("SELECT DISTINCT job_id FROM job_activity")}
-
-    def trim_activity(self, job_id: str, max_entries: int, max_bytes: int) -> None:
-        """Keep a job's log inside its caps: blank the oldest output text first, then delete
-        the least recently written rows, leaving one marker (seq 0) where they were."""
-        total = self._db.execute(
-            "SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB))), 0) FROM job_activity WHERE job_id=?",
-            (job_id,),
-        ).fetchone()[0]
-        if total > max_bytes:
-            outputs = self._db.execute(
-                "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_activity"
-                " WHERE job_id=? AND kind='output' AND text!='' ORDER BY seq",
-                (job_id,),
-            ).fetchall()
-            for seq, size in outputs:
-                if total <= max_bytes:
-                    break
-                self._db.execute(
-                    "UPDATE job_activity SET text='', rev=? WHERE job_id=? AND seq=?",
-                    (self.last_rev(job_id) + 1, job_id, seq),  # a new rev so readers refetch it
-                )
-                total -= size
-        rows = self._db.execute(
-            "SELECT seq, LENGTH(CAST(text AS BLOB)) FROM job_activity"
-            " WHERE job_id=? AND seq>0 ORDER BY rev",
-            (job_id,),
-        ).fetchall()
-        count, drop = len(rows), []
-        for seq, size in rows[:-1]:  # the newest row always stays
-            if count <= max_entries and total <= max_bytes:
-                break
-            drop.append(seq)
-            count -= 1
-            total -= size
-        if not drop:
-            return
-        self._db.executemany(
-            "DELETE FROM job_activity WHERE job_id=? AND seq=?", [(job_id, s) for s in drop]
-        )
-        self.save_activity(
-            job_id,
-            ActivityEntry(
-                rev=self.last_rev(job_id) + 1,
-                seq=0,
-                at=self._now().isoformat(),
-                kind="other",
-                text=DROPPED_MARKER,
-            ),
         )
 
     def _timers(self, where: str = "", args: tuple = ()) -> list[Timer]:

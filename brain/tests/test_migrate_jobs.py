@@ -364,7 +364,7 @@ def test_parent_job_becomes_continued_event(work):
 def test_old_job_tables_gone(db):
     names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "jobs" not in names and "job_parts" not in names
-    assert {"work", "work_job", "job_activity"} <= names
+    assert {"work", "work_job", "job_steps"} <= names
     assert db.execute("PRAGMA user_version").fetchone()[0] >= 19
 
 
@@ -496,3 +496,25 @@ def test_a_job_from_before_parts_gets_its_p1(db_from_11):
 def test_closed_while_running_reads_as_stopped(work):
     goal = work.get("shut1")
     assert (goal.state, goal.end_reason) == ("cancelled", "stopped")
+
+
+def test_job_activity_rows_come_through_as_job_steps(tmp_path):
+    db = sqlite3.connect(tmp_path / "v19.db", isolation_level=None)
+    migrate(db, upto=19)
+    insert = (
+        "INSERT INTO job_activity(job_id, rev, seq, at, kind, step, status, exit, text, part)"
+        " VALUES ('j', ?, ?, ?, ?, ?, ?, ?, ?, 'p1')"
+    )
+    db.execute(insert, (2, 1, T, "command", "c1", "done", 0, "ls"))
+    db.execute(insert, (3, 2, T, "output", "c1", None, None, "a.txt"))
+    db.execute(insert, (4, 3, T, "command", "c2", "running", None, "pwd"))
+    migrate(db)
+    work = WorkStore(db, lambda: datetime(2026, 1, 1, tzinfo=UTC))
+    assert not db.execute("SELECT 1 FROM sqlite_master WHERE name='job_activity'").fetchone()
+    page = work.activity_after("j", 2, 500)
+    assert [(e.rev, e.seq, e.kind, e.text) for e in page] == [
+        (3, 2, "output", "a.txt"),
+        (4, 3, "command", "pwd"),
+    ]
+    assert work.last_rev("j") == 4
+    db.close()
