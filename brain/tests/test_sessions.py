@@ -17,7 +17,8 @@ from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.guards import Hook
 from brain.masking import Masker
-from brain.memory import ActivityEntry, Memory
+from brain.memory import Memory
+from brain.store.work import ActivityEntry
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
@@ -1065,6 +1066,26 @@ async def test_restart_queues_only_finished_unreported_jobs():
     assert not records_for(memory).unreported_jobs()
 
 
+async def test_restart_wakes_scout_once_for_blocked_job(tmp_path):
+    path = tmp_path / "t.db"
+    memory = Memory(path)
+    records = records_for(memory)
+    records.add_job("j1", "claude_code", "t", "C:/x", "default")
+    records.update_part("j1", "p1", session_id="s1")  # the brain dies mid-call
+    memory.close()
+    told = []
+    for _ in range(2):  # started twice in a row: only the first start tells Scout
+        memory = Memory(path)
+        model = Gate(["a"])
+        session, _ = make(model, memory)
+        join(session, "desktop")
+        await idle(session)
+        told += [m[-1]["content"][-1]["text"] for m in model.seen]
+        memory.close()
+    assert len(told) == 1
+    assert "Job j1 ended" in told[0] and "brain restarted" in told[0]
+
+
 async def test_a_due_timer_wakes_scout_with_its_note():
     tz = datetime.timezone(datetime.timedelta(hours=1))
     now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
@@ -1984,7 +2005,7 @@ async def test_job_ended_wake_carries_the_activity_summary():
     join(session, "desktop")
     job = end_job(memory)
     at = "2026-01-01T00:00:00+00:00"
-    memory.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
+    records_for(memory).work.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
     session.jobs._on_finished(job)
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
@@ -2026,7 +2047,7 @@ async def test_after_a_brain_restart_a_stopped_jobs_timers_never_fire():
     session.scheduler.pump()
     await idle(session)
     assert memory.list_timers() == []
-    assert records_for(memory).get_job("j1").state == "cancelled"
+    assert records_for(memory).get_job("j1").state == "failed"
     texts = [m[-1]["content"][-1]["text"] for m in model.seen]
     assert texts and all("Event: timer" not in t for t in texts)  # only the job_ended wake
 
@@ -2230,7 +2251,7 @@ class AppLike:
 
 
 def steps_of(memory, job_id="j1"):
-    return sorted(memory.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
+    return sorted(records_for(memory).work.activity_after(job_id, 0, 1000), key=lambda e: e.seq)
 
 
 async def wake_with(steps, *, app=None):

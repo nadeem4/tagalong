@@ -29,6 +29,8 @@ DEFAULT_OFFER_MIN_APPROVALS = 3
 DEFAULT_OFFER_WINDOW_DAYS = 14
 DEFAULT_KEEP_ASKING_DAYS = 7
 DEFAULT_TOOL_PREVIEW_CHARS = 4000
+DEFAULT_JOB_STEPS_MAX_ENTRIES = 2000  # steps one job's log keeps
+DEFAULT_JOB_STEPS_MAX_BYTES = 1_000_000  # text bytes one job's log keeps
 DEFAULT_RETRY_MAX = 3  # tries of a step that failed for a passing reason
 DEFAULT_RETRY_BACKOFF_S = (30, 120, 600)  # waits before each retry; the last repeats
 
@@ -56,6 +58,8 @@ class Config:
     offer_window_days: int = DEFAULT_OFFER_WINDOW_DAYS
     keep_asking_days: int = DEFAULT_KEEP_ASKING_DAYS
     tool_preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS  # per tool result shown to the model
+    job_steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES
+    job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -109,6 +113,12 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         keep_asking_days=_positive_int(env, "TAGALONG_KEEP_ASKING_DAYS", DEFAULT_KEEP_ASKING_DAYS),
         tool_preview_chars=_positive_int(
             env, "TAGALONG_TOOL_PREVIEW_CHARS", DEFAULT_TOOL_PREVIEW_CHARS
+        ),
+        job_steps_max_entries=_positive_int(
+            env, "TAGALONG_JOB_STEPS_MAX_ENTRIES", DEFAULT_JOB_STEPS_MAX_ENTRIES
+        ),
+        job_steps_max_bytes=_positive_int(
+            env, "TAGALONG_JOB_STEPS_MAX_BYTES", DEFAULT_JOB_STEPS_MAX_BYTES
         ),
     )
 

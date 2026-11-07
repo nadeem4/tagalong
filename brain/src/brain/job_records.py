@@ -82,15 +82,22 @@ class JobRecords:
                 return whole
         return row.summary
 
-    @staticmethod
-    def _part(call: WorkRow, detail: dict) -> JobPart:
+    def _reason(self, call: WorkRow) -> str | None:
+        """Why a part ended; a blocked part has not ended, so its reason is its last move's."""
+        if call.state == "blocked":
+            moves = [e for e in self.work.events(call.id) if e.kind == "state"]
+            held = [e for e in moves if (e.data or {}).get("to") == "blocked"]
+            return (held[-1].data or {}).get("reason") if held else None
+        return None if call.end_reason == home_state(call.state) else call.end_reason
+
+    def _part(self, call: WorkRow, detail: dict) -> JobPart:
         return JobPart(
             job_id=call.parent_id or "",
             id=call.id.split(".", 1)[1],
             agent=detail.get("agent") or "",
             task=(call.input or {}).get("task", call.title),
             state=call.state,
-            reason=None if call.end_reason == home_state(call.state) else call.end_reason,
+            reason=self._reason(call),
             progress=call.progress,
             session_id=(call.checkpoint or {}).get("session_id"),
             report=None,  # filled by the caller: it may need the output store
@@ -183,7 +190,7 @@ class JobRecords:
         return None
 
     def unreported_jobs(self) -> list[Job]:
-        """Jobs with no part running whose finished parts Scout has not heard about."""
+        """Jobs with no part running whose ended or held-up parts Scout has not heard about."""
         news = self.work.unreported(["expert_call"])
         found = (self.get_job(i) for i in dict.fromkeys(c.parent_id for c in news if c.parent_id))
         return [j for j in found if j is not None and j.state != "active"]
@@ -273,16 +280,3 @@ class JobRecords:
             if call.kind == "expert_call":
                 self.work.mark_reported(call.id)
         self.work.mark_reported(job_id)
-
-    def stop_running_on_start(self) -> list[tuple[str, str]]:
-        """No job survives a brain restart (S2b replaces this with the resume scan): running parts
-        are cancelled and their jobs closed. Returns the (job, part) pairs it stopped."""
-        stopped = []
-        for call in self.work.of_kind("expert_call", ["active"]):
-            self.work.transition(call.id, "cancelled", reason="brain restarted")
-            stopped.append((call.parent_id or "", call.id.split(".", 1)[1]))
-        for job_id in dict.fromkeys(j for j, _ in stopped):
-            goal = self.work.get(job_id)
-            if goal is not None and goal.state in ("active", "blocked"):
-                self.work.transition(job_id, "cancelled", reason="brain restarted")
-        return stopped

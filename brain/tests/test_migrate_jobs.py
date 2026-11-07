@@ -364,7 +364,7 @@ def test_parent_job_becomes_continued_event(work):
 def test_old_job_tables_gone(db):
     names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "jobs" not in names and "job_parts" not in names
-    assert {"work", "work_job", "job_activity"} <= names
+    assert {"work", "work_job", "job_steps"} <= names
     assert db.execute("PRAGMA user_version").fetchone()[0] >= 19
 
 

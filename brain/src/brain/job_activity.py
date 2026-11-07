@@ -2,14 +2,15 @@
 
 One JobActivity per job. Every text is masked before it is stored and capped after, so no
 raw secret and no unbounded output reaches the database or a reader. Entries are written
-through Memory.
+through the WorkStore (the `job_steps` table).
 """
 
 from collections.abc import Callable
 from datetime import datetime
 
+from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
 from brain.job_records import JobRecords
-from brain.memory import ActivityEntry, Memory
+from brain.store.work import ActivityEntry, WorkStore
 
 KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", "end", "tool")
 STATUSES = ("pending", "running", "done", "failed", "refused")
@@ -18,8 +19,6 @@ TOOL_CAP = 300  # characters of one Scout tool or app step: what was tried, neve
 OUTPUT_CAP = 65536  # bytes of one command's output kept (the tail)
 CARRY = 1024  # extra raw chars kept so a cut never lands inside a secret (dropped after masking)
 SAY_CAP = 8192  # characters of one message
-ENTRY_CAP = 2000  # entries per job
-JOB_BYTES_CAP = 1_000_000  # text bytes per job
 PAGE_LIMIT = 500  # entries per page a reader asks for
 
 SUMMARY_CAP = 1500  # characters of the digest a wake carries
@@ -29,6 +28,7 @@ RECENT_COMMANDS = 5  # last commands listed with their exit codes
 FAILED_SHOWN = 3  # failed commands listed in full
 TAIL_CAP = 100  # one output line under a failed command
 _PART_CAP = 200  # one command or output line in the digest
+_ALL = 2**31 - 1  # a digest reads the whole log; the caps already bound it
 _STEP_KINDS = ("command", "edit", "read", "search", "other")
 
 CUT_MARKER = "[earlier output cut]"
@@ -47,19 +47,23 @@ class JobActivity:
     def __init__(
         self,
         job_id: str,
-        memory: Memory,
+        work: WorkStore,
         mask: Callable[[str], str],
         now: Callable[[], datetime],
         on_change: Callable[[], None],
         on_failed: Callable[[ActivityEntry], None] = lambda entry: None,
         part: str = "p1",
+        max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
+        max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
+        self._max_entries = max_entries  # the job's caps, from settings
+        self._max_bytes = max_bytes
         self._part = part  # every entry this writes belongs to this part of the job
         self._on_failed = on_failed  # called once per step id, after the update is written
         self._failed_seen: set[str] = set()
         self._touched: set[str] = set()
         self._job = job_id
-        self._memory = memory
+        self._work = work
         self._mask = mask
         self._now = now
         self._on_change = on_change
@@ -216,10 +220,10 @@ class JobActivity:
         if seq is None:
             # One counter per job, read from the store: other parts and Scout's own steps write
             # to the same log. Never below our last, so a trimmed row's number is not reused.
-            self._seq = max(self._seq, self._memory.max_seq(self._job)) + 1
+            self._seq = max(self._seq, self._work.max_seq(self._job)) + 1
             seq = self._seq
         entry = ActivityEntry(
-            rev=self._memory.last_rev(self._job) + 1,
+            rev=self._work.last_rev(self._job) + 1,
             seq=seq,
             at=self._now().isoformat(),
             kind=kind,
@@ -230,8 +234,8 @@ class JobActivity:
             part=self._part,
             source=source,
         )
-        self._memory.save_activity(self._job, entry)
-        self._memory.trim_activity(self._job, ENTRY_CAP, JOB_BYTES_CAP)
+        self._work.save_activity(self._job, entry)
+        self._work.trim_activity(self._job, self._max_entries, self._max_bytes)
         self._wrote = True
         return entry
 
@@ -299,8 +303,8 @@ def _exit(entry: ActivityEntry) -> str:
     return f"exit {entry.exit}" if entry.exit is not None else (entry.status or "?")
 
 
-def _digest(memory: Memory, job_id: str) -> tuple[list[ActivityEntry], dict[tuple[str, str], str]]:
-    rows = sorted(memory.activity_after(job_id, 0, ENTRY_CAP), key=lambda e: e.seq)
+def _digest(work: WorkStore, job_id: str) -> tuple[list[ActivityEntry], dict[tuple[str, str], str]]:
+    rows = sorted(work.activity_after(job_id, 0, _ALL), key=lambda e: e.seq)
     # Two experts can reuse a step id, so an output belongs to its part's step.
     outputs = {(e.part, e.step): e.text for e in rows if e.kind == "output" and e.step}
     return [e for e in rows if e.kind in _STEP_KINDS], outputs
@@ -317,11 +321,11 @@ def _tag(who: dict[str, str], entry: ActivityEntry) -> str:
 
 
 def activity_summary(
-    memory: Memory, records: JobRecords, job_id: str, now: datetime, cap: int = SUMMARY_CAP
+    work: WorkStore, records: JobRecords, job_id: str, now: datetime, cap: int = SUMMARY_CAP
 ) -> str:
     """Facts about what a job did, for a wake: counts, failed commands with their output tail,
     the last commands and the step running now. Plain reads; the stored text is already masked."""
-    steps, outputs = _digest(memory, job_id)
+    steps, outputs = _digest(work, job_id)
     if not steps:
         return "no activity recorded"
     who = _who(records, job_id)
@@ -364,9 +368,9 @@ def _fit(lines: list[str], cap: int) -> str:
     return "\n".join(out)
 
 
-def activity_line(memory: Memory, job_id: str, now: datetime) -> str:
+def activity_line(work: WorkStore, job_id: str, now: datetime) -> str:
     """One line for list_jobs: counts, then what is running or the last failure."""
-    steps, _ = _digest(memory, job_id)
+    steps, _ = _digest(work, job_id)
     if not steps:
         return ""
     failed = [e for e in steps if is_failed(e)]

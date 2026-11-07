@@ -210,20 +210,21 @@ def test_unreported_jobs_and_mark_reported(records):
     assert records.get_job("fin").parts[0].reported
 
 
-def test_stop_running_on_start_cancels_parts_and_goal(records, work):
+def test_blocked_part_after_a_restart_is_news_with_its_reason(records, work):
     records.add_job("run", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("run", "p1", session_id="s1")
     records.add_job("fin", "claude-acp", "t", "C:/a", "ask")
     records.update_part("fin", "p1", state="done", reason="done")
-    assert records.stop_running_on_start() == [("run", "p1")]
+    records.mark_reported("fin")
+    assert work.resume_scan(lambda row: True) == [("run.p1", "blocked")]
     job = records.get_job("run")
     assert (job.state, job.parts[0].state, job.parts[0].reason) == (
-        "cancelled",
-        "cancelled",
+        "blocked",
+        "blocked",
         "brain restarted",
     )
-    assert job.closed_at is not None
-    assert work.get("fin").state == "active"  # a finished job is left alone
-    assert {j.id for j in records.unreported_jobs()} == {"run", "fin"}  # both are news to Scout
+    assert job.closed_at is None  # Scout can carry on
+    assert [j.id for j in records.unreported_jobs()] == ["run"]
 
 
 @pytest.mark.parametrize("state", ["cancelled", "failed"])

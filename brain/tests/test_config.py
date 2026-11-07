@@ -288,6 +288,19 @@ def test_bad_loop_poll_raises(value):
         load_config({"TAGALONG_LOOP_POLL_S": value})
 
 
+def test_job_steps_caps():
+    cfg = load_config({})
+    assert (cfg.job_steps_max_entries, cfg.job_steps_max_bytes) == (2000, 1_000_000)
+    cfg = load_config(
+        {"TAGALONG_JOB_STEPS_MAX_ENTRIES": "50", "TAGALONG_JOB_STEPS_MAX_BYTES": "9000"}
+    )
+    assert (cfg.job_steps_max_entries, cfg.job_steps_max_bytes) == (50, 9000)
+    for key in ("TAGALONG_JOB_STEPS_MAX_ENTRIES", "TAGALONG_JOB_STEPS_MAX_BYTES"):
+        for bad in ("0", "-1", "lots"):
+            with pytest.raises(ValueError, match=key):
+                load_config({key: bad})
+
+
 def test_loop_stale_days_default_and_override():
     assert load_config({}).loop_stale_days == 7
     assert load_config({"TAGALONG_LOOP_STALE_DAYS": "14"}).loop_stale_days == 14

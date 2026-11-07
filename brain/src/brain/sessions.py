@@ -204,7 +204,7 @@ class Session:
             outputs=outputs,
             apps=apps,
         )
-        self.jobs.startup()  # rows left running by a dead brain become stopped
+        self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
         timers = self.timers = Timers(
             memory, self.records, self.scheduler.emit, now, job_facts=self.jobs.wake_facts
         )
