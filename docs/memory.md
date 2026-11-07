@@ -52,7 +52,7 @@ The kinds table in `memory.py` is the only place caps and rules live.
 - `soul.md` tells Scout to save instructions and tracking requests, to prefer `replaces` over a
   near-duplicate, and to `recall` before saying it does not know.
 - Storage is one `memories` table plus an FTS5 index kept in step by triggers; every table in
-  `tagalong.db` is mapped in [storage.md](storage.md#1-relational-sqlite-tables). The schema version
+  `tagalong.db` is mapped in [storage.md](storage.md#tables-and-relations). The schema version
   is `PRAGMA user_version`; a file from a newer brain stops the brain at start. A Python build
   without FTS5 also stops it, with a message.
 
