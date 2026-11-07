@@ -33,7 +33,7 @@ The brain is Python; the TypeScript apps are bodies.
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice; `src/controls/` the shared controls (toggle, three-way, select, slider, money field, keycap, button, level meter, mic test) and `CONTROLS_CSS`, `src/key/` the Anthropic key field and daily limit, `chat-styles.ts` the companion chat's look, `scout-mark.tsx` Scout's still mark, `src/walkthrough/` the first-run tour, `src/home/reading-rows.tsx` the "How Scout reads your screen" group in Where things run, `src/jobs-kinds.ts` the everyday jobs and the app each needs)
 - bodies/desktop: Electron body (dials the Python brain; `src/main/tools/files.ts` the file tools, confined to the person's chosen folders; `src/main/ipc/ask-scout.ts` Home asking Scout as the person, `src/main/windows/walkthrough.ts`, `walkthrough-gate.ts` and `ipc/key.ts`, `ipc/walkthrough.ts` the first-run tour window, its launch gate and the key calls)
 - bodies/browser: browser body (Chromium MV3; listens by voice from the popup: src/voice/, an offscreen mic page in src/offscreen/, the mic permission page src/permission/mic.*)
-- docs/: one doc per subsystem; docs/development.md has the full layout and how-tos
+- docs/: one doc per subsystem; docs/development.md has the full layout and how-tos; docs/storage.md maps every store by kind
 
 ## Conventions
 

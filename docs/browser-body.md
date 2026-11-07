@@ -502,6 +502,17 @@ auto in Home, so it is refused too. A wake (Scout speaking first) is never label
 browser either. Tools that need no approval, like `tabs` `list`, still work. The rule is in
 "Permissions and asks" and "Wake and finish a turn" in [brain.md](brain.md).
 
+## What it stores
+
+The browser body keeps no pages, chats, captures or audio. It uses only extension storage:
+
+| Item                              | Location                 | Purpose                                                                                | Retention                             |
+| --------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------- |
+| `bodyId`, `brainAddr`, `bodyName` | `chrome.storage.local`   | The body's random id, the brain's address and the browser's name, kept across restarts | Until the extension is removed        |
+| `lastSeq`                         | `chrome.storage.session` | The last message number seen, so a restart can replay what it missed                   | Cleared when the browser session ends |
+
+The offscreen page holds the microphone stream only while listening and stores nothing.
+
 ## Privacy notes
 
 - Nothing is read until Scout asks and you have allowed it. No script runs in a page before that.

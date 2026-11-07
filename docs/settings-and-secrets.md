@@ -133,7 +133,7 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 `settings.json` (with `.tmp`, `.bak`, `.corrupt`) sits in the desktop's data
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see
-[brain.md](brain.md#run-it)).
+[brain.md](brain.md#run-it)). Every store of the brain is mapped in [storage.md](storage.md).
 
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
