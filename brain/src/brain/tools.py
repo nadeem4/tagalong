@@ -37,8 +37,8 @@ from brain.setup.env import is_tested
 from brain.setup.store import InstalledExpert
 from brain.store.memory import KINDS, MemoryRefused
 from brain.store.search import Hit
-from brain.store.work import WorkEvent, WorkRow, WorkStore
-from brain.timers import MIN_REPEAT_S, Timers
+from brain.store.work import TITLE_CAP, TransitionRefused, WorkEvent, WorkRow, WorkStore
+from brain.timers import MIN_REPEAT_S, Timers, note_of
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
 
@@ -110,9 +110,9 @@ def brain_tools(
 ) -> list[tuple[ToolSpec, Handler]]:
     async def remember(args: dict) -> str:
         _need("remember", args, "kind", "text")
-        item = memory.remember(
-            args["kind"], args["text"], args.get("cadence"), args.get("replaces")
-        )
+        if args["kind"] == "tracking":
+            raise MemoryRefused("Keeping an eye on something is the watch tool, not remember.")
+        item = memory.remember(args["kind"], args["text"], args.get("replaces"))
         notify("changed", {"what": "memory"})  # Scout's saves show up in Home
         verb = "replaced" if args.get("replaces") is not None else "saved"
         return f"{verb} {item.kind} #{item.id}"
@@ -137,7 +137,6 @@ def brain_tools(
                         "id": i.id,
                         "kind": i.kind,
                         "text": i.text,
-                        "cadence": i.cadence,
                         "at": i.updated_at,
                     }
                     for i in items
@@ -151,18 +150,13 @@ def brain_tools(
             ToolSpec(
                 "remember",
                 "Save something worth keeping across conversations: a standing instruction, a "
-                "fact about the user, something you track, or project notes. Pass replaces=<id> "
-                "to update an existing item instead of adding a duplicate; its cadence is kept "
-                "if you omit it.",
+                "fact about the user, or project notes. To keep an eye on something, use watch. "
+                "Pass replaces=<id> to update an existing item instead of adding a duplicate.",
                 {
                     "type": "object",
                     "properties": {
                         "kind": {"type": "string", "enum": _MODEL_KINDS},
                         "text": {"type": "string"},
-                        "cadence": {
-                            "type": "string",
-                            "description": "How often; tracking items only.",
-                        },
                         "replaces": {"type": "integer", "description": "Id of the item to update."},
                     },
                     "required": ["kind", "text"],
@@ -254,19 +248,54 @@ def output_tools(outputs: OutputStore) -> list[tuple[ToolSpec, Handler]]:
 
 
 def timer_tools(
-    memory: Memory, records: JobRecords, timers: Timers, now: Callable[[], datetime]
+    records: JobRecords, timers: Timers, now: Callable[[], datetime]
 ) -> list[tuple[ToolSpec, Handler]]:
-    """Scout's timers. Times are stored in UTC; answers echo the owner's offset."""
+    """Scout's timers and watches, kept as work rows. Times are stored in UTC; answers echo the
+    owner's offset."""
+    work = records.work
 
     def aware_now() -> datetime:
-        # A naive clock would be read as local time by Memory; make that explicit.
+        # A naive clock would be read as local time; make that explicit.
         current = now()
         return current if current.tzinfo else current.astimezone()
 
-    async def set_timer(args: dict) -> str:
+    def whole_minutes(value, name: str) -> int:
+        if isinstance(value, float) and value.is_integer():
+            value = int(value)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise MemoryRefused(f"{name} must be a whole number.")
+        if value * 60 < MIN_REPEAT_S:
+            raise MemoryRefused(f"{name} must be at least {MIN_REPEAT_S // 60}.")
+        if value > TIMER_MAX_MINUTES:
+            raise MemoryRefused(f"{name} must be at most {TIMER_MAX_MINUTES} (a year).")
+        return value
+
+    def note_arg(tool: str, args: dict) -> str:
         note = args.get("note")
         if not isinstance(note, str) or not note.strip() or len(note) > TIMER_NOTE_MAX:
-            raise MemoryRefused(f"set_timer needs a note of 1 to {TIMER_NOTE_MAX} characters.")
+            raise MemoryRefused(f"{tool} needs a note of 1 to {TIMER_NOTE_MAX} characters.")
+        return note
+
+    def create_row(kind: str, note: str, when: datetime, repeat_s: int | None, parent_id=None):
+        # The title is capped; a longer note is kept whole in the input.
+        long = {"note": work.mask(note)} if len(note) > TITLE_CAP else None
+        row = work.create(kind, note, parent_id=parent_id, due_at=when, input=long)
+        work.set_repeat(row.id, repeat_s)
+        timers.changed()
+        return row
+
+    def text_id(tool: str, args: dict) -> str:
+        tid = args.get("id")
+        if not isinstance(tid, str) or not tid.strip():
+            raise MemoryRefused(f"{tool} needs id as text.")
+        return tid
+
+    def of_kind(kind: str, tid: str) -> WorkRow | None:
+        row = work.get(tid)
+        return row if row is not None and row.kind == kind else None
+
+    async def set_timer(args: dict) -> str:
+        note = note_arg("set_timer", args)
         minutes, at = args.get("in_minutes"), args.get("at")
         if (minutes is None) == (at is None):
             raise MemoryRefused("set_timer needs exactly one of in_minutes and at.")
@@ -289,15 +318,8 @@ def timer_tools(
             if when <= current:
                 raise MemoryRefused("at is not in the future.")
         repeat = args.get("repeat_minutes")
-        if isinstance(repeat, float) and repeat.is_integer():
-            repeat = int(repeat)
         if repeat is not None:
-            if isinstance(repeat, bool) or not isinstance(repeat, int):
-                raise MemoryRefused("repeat_minutes must be a whole number.")
-            if repeat * 60 < MIN_REPEAT_S:
-                raise MemoryRefused(f"repeat_minutes must be at least {MIN_REPEAT_S // 60}.")
-            if repeat > TIMER_MAX_MINUTES:
-                raise MemoryRefused(f"repeat_minutes must be at most {TIMER_MAX_MINUTES} (a year).")
+            repeat = whole_minutes(repeat, "repeat_minutes")
         job_id = args.get("job")
         if job_id is not None:
             if not isinstance(job_id, str):
@@ -307,35 +329,100 @@ def timer_tools(
                 raise MemoryRefused(f"no job with id {job_id}.")
             if job.state != "active":
                 raise MemoryRefused(f"job {job_id} is not running ({home_state(job.state)}).")
-        timer = memory.add_timer(note, when, repeat * 60 if repeat else None, job_id)
-        timers.changed()
-        local = timer.next_at.astimezone(current.tzinfo)
-        out = f"timer {timer.id} set for {local.isoformat(timespec='seconds')}"
+        row = create_row("timer", note, when, repeat * 60 if repeat else None, job_id)
+        local = when.astimezone(current.tzinfo)
+        out = f"timer {row.id} set for {local.isoformat(timespec='seconds')}"
         return out + (f", repeats every {repeat} minutes" if repeat else "")
 
     async def list_timers(args: dict) -> str:
-        rows = [
+        rows = sorted(work.of_kind("timer", ["planned", "active"]), key=lambda r: r.due_at or "")
+        return json.dumps(
             {
-                "id": t.id,
-                "note": t.note,
-                "next_at": t.next_at.astimezone(UTC).isoformat(timespec="seconds"),
-                "repeat_minutes": t.repeat_s // 60 if t.repeat_s else None,
-                # Fired but Scout has not heard it yet.
-                "pending": bool(t.fired),
-                "job": t.job_id,
+                "timers": [
+                    {
+                        "id": r.id,
+                        "note": note_of(r),
+                        "next_at": datetime.fromisoformat(r.due_at)
+                        .astimezone(UTC)
+                        .isoformat(timespec="seconds"),
+                        "repeat_minutes": (work.repeat_of(r.id) or 0) // 60 or None,
+                        # Fired but Scout has not heard it yet.
+                        "pending": r.state == "active",
+                        "job": r.parent_id,
+                    }
+                    for r in rows
+                ]
             }
-            for t in memory.list_timers()
-        ]
-        return json.dumps({"timers": rows})
+        )
+
+    def end(row: WorkRow, reason: str) -> None:
+        work.transition(row.id, "cancelled", reason=reason)
+        work.mark_reported(row.id)  # Scout did it, so there is nothing to report
 
     async def cancel_timer(args: dict) -> str:
-        tid = args.get("id")
-        if isinstance(tid, bool) or not isinstance(tid, int):
-            raise MemoryRefused("cancel_timer needs id as a whole number.")
-        if not memory.delete_timer(args["id"]):
-            raise MemoryRefused(f"no timer with id {args['id']}.")
+        tid = text_id("cancel_timer", args)
+        row = of_kind("timer", tid)
+        if row is None:
+            raise MemoryRefused(f"no timer with id {tid}.")
+        try:
+            end(row, "cancelled by Scout")
+        except TransitionRefused:
+            raise MemoryRefused(f"no timer with id {tid}.") from None
         timers.changed()
-        return f"timer {args['id']} cancelled"
+        return f"timer {tid} cancelled"
+
+    async def watch(args: dict) -> str:
+        action = args.get("action")
+        current = aware_now()
+        if action == "add":
+            note = note_arg("watch add", args)
+            if args.get("every_minutes") is None:
+                raise MemoryRefused("watch add needs every_minutes.")
+            every = whole_minutes(args["every_minutes"], "every_minutes")
+            row = create_row("watch", note, current + timedelta(minutes=every), every * 60)
+            return json.dumps({"id": row.id, "every_minutes": every})
+        if action == "list":
+            rows = work.of_kind("watch", ["planned", "paused"])
+            return json.dumps(
+                {
+                    "watches": [
+                        {
+                            "id": r.id,
+                            "note": note_of(r),
+                            "state": r.state,
+                            "every_minutes": (work.repeat_of(r.id) or 0) // 60 or None,
+                            "next_at": r.due_at,
+                            "cadence_text": (r.input or {}).get("cadence"),
+                        }
+                        for r in rows
+                    ]
+                }
+            )
+        if action not in ("cancel", "pause", "switch_on"):
+            raise MemoryRefused("watch action must be add, list, cancel, pause or switch_on.")
+        wid = text_id(f"watch {action}", args)
+        row = of_kind("watch", wid)
+        if row is None:
+            raise MemoryRefused(f"no watch with id {wid}.")
+        try:
+            if action == "cancel":
+                end(row, "cancelled by Scout")
+            elif action == "pause":
+                work.transition(wid, "paused", reason="paused by Scout", expect="planned")
+                work.mark_reported(wid)  # the person's own pause is not news to Scout
+            else:
+                repeat_s = work.repeat_of(wid)
+                if args.get("every_minutes") is not None:
+                    repeat_s = whole_minutes(args["every_minutes"], "every_minutes") * 60
+                if not repeat_s:
+                    raise MemoryRefused("watch switch_on needs every_minutes: no repeat is saved.")
+                work.transition(wid, "planned", reason="switched on", expect="paused")
+                work.set_repeat(wid, repeat_s)
+                work.update(wid, due_at=current + timedelta(seconds=repeat_s))
+        except TransitionRefused as err:
+            raise MemoryRefused(f"watch {wid}: {err}") from None
+        timers.changed()
+        return f"watch {wid}: {action} done"
 
     scout = frozenset({"scout"})
     return [
@@ -346,7 +433,8 @@ def timer_tools(
                 "future self. Give exactly one of in_minutes or at (ISO 8601 with a UTC offset, "
                 "e.g. 2026-10-28T15:00:00+01:00). repeat_minutes (at least 5) makes it repeat. To "
                 "check back on a running job, pass its id as job: you are woken with what you were "
-                "watching for, the job's state and a summary of its steps.",
+                "watching for, the job's state and a summary of its steps. A job's timers end when "
+                "you close the job.",
                 {
                     "type": "object",
                     "properties": {
@@ -381,10 +469,10 @@ def timer_tools(
         (
             ToolSpec(
                 "cancel_timer",
-                "Cancel one timer by id.",
+                "Cancel one timer by id (the text id from set_timer or list_timers).",
                 {
                     "type": "object",
-                    "properties": {"id": {"type": "integer"}},
+                    "properties": {"id": {"type": "string"}},
                     "required": ["id"],
                 },
                 scout,
@@ -392,6 +480,32 @@ def timer_tools(
                 default_mode="auto",
             ),
             cancel_timer,
+        ),
+        (
+            ToolSpec(
+                "watch",
+                "Keep an eye on something on a schedule: a standing check that wakes you every "
+                "every_minutes (at least 5) with your note until you cancel it. action is add "
+                "(note and every_minutes), list, pause, switch_on (id; every_minutes if none is "
+                "saved) or cancel (id). Use it for anything the owner asks you to keep watching.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["add", "list", "pause", "switch_on", "cancel"],
+                        },
+                        "note": {"type": "string", "description": "At most 500 characters."},
+                        "every_minutes": {"type": "integer", "description": "At least 5."},
+                        "id": {"type": "string"},
+                    },
+                    "required": ["action"],
+                },
+                frozenset({"scout", "home"}),
+                effect="change",
+                default_mode="auto",
+            ),
+            watch,
         ),
     ]
 

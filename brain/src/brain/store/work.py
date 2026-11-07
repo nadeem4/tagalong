@@ -6,6 +6,7 @@ a `work_events` row, so a second writer holding a stale state is refused, not ov
 """
 
 import json
+import re
 import sqlite3
 import uuid
 from collections.abc import Callable, Sequence
@@ -106,6 +107,22 @@ class ActivityEntry:
     exit: int | None = None
     part: str = "p1"
     source: str | None = None  # who did it, when not the part's expert
+
+
+_UNIT_S = {"minute": 60, "hour": 3600, "day": 86400, "week": 604800}
+_CADENCE = re.compile(r"every\s+(\d+)\s+(minute|hour|day|week)s?", re.IGNORECASE)
+_WORD_CADENCE = {"hourly": 3600, "daily": 86400, "weekly": 604800}
+
+
+def parse_cadence(text: str) -> int | None:
+    """Seconds between runs for a cadence phrase ("daily", "every 2 hours"); None if unreadable."""
+    text = text.strip().lower()
+    if text in _WORD_CADENCE:
+        return _WORD_CADENCE[text]
+    match = _CADENCE.fullmatch(text)
+    if match is None or int(match[1]) == 0:
+        return None
+    return int(match[1]) * _UNIT_S[match[2].lower()]
 
 
 def _loads(text: str | None) -> dict | None:
@@ -592,6 +609,19 @@ class WorkStore:
             extra = {"summary": self.mask(summary), "reported_at": self._stamp()}
             self._move(row, outcome, "closed by Scout", via_close=True, extra=extra)
         return self._need(goal_id)
+
+    # ---- work_timer: how often a timer or watch comes back ----
+
+    def set_repeat(self, id: str, repeat_s: int | None) -> None:
+        self.db.execute(
+            "INSERT INTO work_timer(work_id, repeat_s) VALUES (?, ?)"
+            " ON CONFLICT(work_id) DO UPDATE SET repeat_s = excluded.repeat_s",
+            (id, repeat_s),
+        )
+
+    def repeat_of(self, id: str) -> int | None:
+        row = self.db.execute("SELECT repeat_s FROM work_timer WHERE work_id = ?", (id,)).fetchone()
+        return None if row is None else row[0]
 
     # ---- what is waiting ----
 

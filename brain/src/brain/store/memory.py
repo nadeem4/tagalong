@@ -24,7 +24,6 @@ KINDS: dict[str, Kind] = {
     for k in (
         Kind("instruction", "model", True, 50, 300),
         Kind("about_you", "model", True, 50, 300),
-        Kind("tracking", "model", True, 30, 300),
         Kind("project", "model", False, 200, 500),
         Kind("summary", "code", False, None, None),
     )
@@ -40,12 +39,11 @@ class Item:
     id: int
     kind: str
     text: str
-    cadence: str | None
     created_at: str
     updated_at: str
 
 
-_COLUMNS = "id, kind, text, cadence, created_at, updated_at"
+_COLUMNS = "id, kind, text, created_at, updated_at"
 
 
 def _model_kinds() -> str:
@@ -57,7 +55,7 @@ def _item(db: sqlite3.Connection, item_id: int) -> Item | None:
     return Item(*row) if row else None
 
 
-def _validate(kind: str, text: str, cadence: str | None) -> tuple[Kind, str]:
+def _validate(kind: str, text: str) -> tuple[Kind, str]:
     spec = KINDS.get(kind)
     if spec is None:
         raise MemoryRefused(f"Unknown kind '{kind}'. Use one of: {_model_kinds()}.")
@@ -70,8 +68,6 @@ def _validate(kind: str, text: str, cadence: str | None) -> tuple[Kind, str]:
         raise MemoryRefused(
             f"That is {len(text)} characters; {kind} items are at most {spec.max_chars}."
         )
-    if cadence is not None and kind != "tracking":
-        raise MemoryRefused("cadence is only for tracking items.")
     return spec, text
 
 
@@ -79,14 +75,13 @@ def remember(
     db: sqlite3.Connection,
     kind: str,
     text: str,
-    cadence: str | None,
     replaces: int | None,
     at: str,
 ) -> Item:
-    spec, text = _validate(kind, text, cadence)
+    spec, text = _validate(kind, text)
     db.execute("BEGIN IMMEDIATE")
     try:
-        item = _write(db, spec, text, cadence, replaces, at)
+        item = _write(db, spec, text, replaces, at)
     except BaseException:
         db.execute("ROLLBACK")
         raise
@@ -98,7 +93,6 @@ def _write(
     db: sqlite3.Connection,
     spec: Kind,
     text: str,
-    cadence: str | None,
     replaces: int | None,
     now: str,
 ) -> Item:
@@ -116,8 +110,8 @@ def _write(
                 "Use replaces=<id> to update one or forget one first."
             )
         cur = db.execute(
-            "INSERT INTO memories(kind, text, cadence, created_at, updated_at) VALUES (?,?,?,?,?)",
-            (spec.name, text, cadence, now, now),
+            "INSERT INTO memories(kind, text, created_at, updated_at) VALUES (?,?,?,?)",
+            (spec.name, text, now, now),
         )
         return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]
     old = _item(db, replaces)
@@ -127,11 +121,7 @@ def _write(
         # The new text already exists as another item: drop the old one, keep that one.
         db.execute("DELETE FROM memories WHERE id=?", (replaces,))
         return _item(db, twin[0])  # type: ignore[return-value]
-    # A reworded tracking item keeps its cadence unless a new one is given.
-    db.execute(
-        "UPDATE memories SET text=?, cadence=?, updated_at=? WHERE id=?",
-        (text, cadence if cadence is not None else old.cadence, now, replaces),
-    )
+    db.execute("UPDATE memories SET text=?, updated_at=? WHERE id=?", (text, now, replaces))
     return _item(db, replaces)  # type: ignore[return-value]
 
 
@@ -168,8 +158,7 @@ def always_loaded(db: sqlite3.Connection) -> dict[str, list[Item]]:
 def add_summary(db: sqlite3.Connection, text: str, at: str) -> Item:
     """Code-written compaction summary; skips the model-write checks and caps."""
     cur = db.execute(
-        "INSERT INTO memories(kind, text, cadence, created_at, updated_at)"
-        " VALUES ('summary',?,NULL,?,?)",
+        "INSERT INTO memories(kind, text, created_at, updated_at) VALUES ('summary',?,?,?)",
         (text.strip(), at, at),
     )
     return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]

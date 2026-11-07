@@ -19,7 +19,7 @@ def _version(db: sqlite3.Connection) -> int:
 
 
 def test_migrations_are_numbered_without_gaps():
-    assert [m.number for m in load_migrations()] == list(range(1, 21))
+    assert [m.number for m in load_migrations()] == list(range(1, 22))
 
 
 def test_fresh_file_reaches_latest(tmp_path):
@@ -160,7 +160,8 @@ def test_failed_open_leaves_no_write_open(tmp_path, monkeypatch):
     other.execute("ROLLBACK")
     other.close()
     monkeypatch.undo()
-    db = open_db(path)
+    # The stand-in migrations made no real tables, so the real set opens a fresh file.
+    db = open_db(tmp_path / "fresh.db")
     assert _version(db) == LATEST
     db.close()
 

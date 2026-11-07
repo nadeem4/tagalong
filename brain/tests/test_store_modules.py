@@ -24,7 +24,7 @@ def test_conversation_round_trip(tmp_path):
 
 def test_memory_round_trip(tmp_path):
     db = _db(tmp_path)
-    memory_store.remember(db, "about_you", "likes tea", None, None, AT)
+    memory_store.remember(db, "about_you", "likes tea", None, AT)
     assert [i.text for i in memory_store.list_items(db, 10)] == ["likes tea"]
 
 
@@ -48,7 +48,7 @@ def test_outputs_prune_keeps_newest(tmp_path):
 
 def test_search_finds_memory_and_message(tmp_path):
     db = _db(tmp_path)
-    memory_store.remember(db, "about_you", "likes marmalade", None, None, AT)
+    memory_store.remember(db, "about_you", "likes marmalade", None, AT)
     conversation.save_messages(db, [{"role": "user", "content": "marmalade toast"}], AT)
     hits = search.search(db, "marmalade", None, 10)
     assert {h.kind for h in hits} == {"about_you", "chat"}

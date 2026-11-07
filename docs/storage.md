@@ -39,7 +39,7 @@ connection from `store.db.open_db`; nothing else opens the file.
   a schema change is a new file.
 
 `Memory` keeps its public methods and each one calls the matching store function with its
-connection. The other tables (timers, approvals, preferences, permissions, offers) keep
+connection. The other tables (approvals, preferences, permissions, offers) keep
 their SQL in `memory.py` until the slice that rewrites them moves them.
 
 ## Tables and relations
@@ -52,7 +52,7 @@ erDiagram
     work ||--o{ work : "goal has expert_call rows"
     work ||--o| work_job : "goal row of a job"
     work ||--o{ job_steps : "job_id, the goal id"
-    work ||--o{ timers : "job_id, optional"
+    work ||--o| work_timer : "timer and watch rows"
     work ||--o{ approvals : "job_id, optional"
     preferences ||--o{ approvals : "preference_id"
     loops ||--o{ loop_surfaced : "loop_id"
@@ -77,9 +77,9 @@ erDiagram
         int rev
         text part
     }
-    timers {
-        int id PK
-        text job_id
+    work_timer {
+        text work_id PK
+        int repeat_s
     }
     approvals {
         int id PK
@@ -160,20 +160,19 @@ it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 What Scout remembers across restarts, by kind.
 
-| Column       | Type                | Meaning                                                        |
-| ------------ | ------------------- | -------------------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item               |
-| `kind`       | TEXT                | `instruction`, `about_you`, `tracking`, `project` or `summary` |
-| `text`       | TEXT                | The item                                                       |
-| `cadence`    | TEXT                | How often to check a `tracking` item; null for the others      |
-| `created_at` | TEXT                | When it was saved                                              |
-| `updated_at` | TEXT                | When it last changed                                           |
+| Column       | Type                | Meaning                                            |
+| ------------ | ------------------- | -------------------------------------------------- |
+| `id`         | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item   |
+| `kind`       | TEXT                | `instruction`, `about_you`, `project` or `summary` |
+| `text`       | TEXT                | The item                                           |
+| `created_at` | TEXT                | When it was saved                                  |
+| `updated_at` | TEXT                | When it last changed                               |
 
 - Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
   compaction in `sessions.py`).
 - Read by: `store/memory.py` `always_loaded` (the prompt), `list_items`; `store/search.py` `search`.
 - Retention: kept until forgotten or replaced. Caps per kind: `instruction` 50 items of 300
-  characters, `about_you` 50 of 300, `tracking` 30 of 300, `project` 200 of 500; `summary` is
+  characters, `about_you` 50 of 300, `project` 200 of 500; `summary` is
   uncapped and written by code.
 - Masked: no.
 
@@ -393,26 +392,30 @@ A job's steps as a log (the old `job_activity` table, renamed by migration `0020
   behind the marker. Rows stay after the job ends.
 - Masked: yes, the text is masked and then capped.
 
-### timers
+### work_timer
 
-Scout's timers, one-off or repeating, optionally tied to a running job.
+The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `title` is the note
+(a note longer than 200 characters is kept whole in `input.note`), `due_at` the next fire time
+(UTC ISO text), `parent_id` the job it checks back on, and `state` where it is: `planned` waiting,
+`active` fired but Scout has not heard it yet, `done` a one-off that fired, `cancelled`, or
+`paused` (a watch that is switched off).
 
-| Column       | Type                | Meaning                                                                       |
-| ------------ | ------------------- | ----------------------------------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | Timer id                                                                      |
-| `note`       | TEXT                | What Scout wanted to be told                                                  |
-| `next_at`    | TEXT                | Next fire time, UTC ISO text, so text order is time order                     |
-| `repeat_s`   | INTEGER             | Seconds between fires; null for a one-off (at least 300)                      |
-| `created_at` | TEXT                | When it was set                                                               |
-| `fired`      | INTEGER             | 0 or 1: a one-off that already woke Scout, kept so a restart never replays it |
-| `job_id`     | TEXT                | The running job it checks back on; null otherwise                             |
+| Column     | Type             | Meaning                                                  |
+| ---------- | ---------------- | -------------------------------------------------------- |
+| `work_id`  | TEXT PRIMARY KEY | The `timer` or `watch` row                               |
+| `repeat_s` | INTEGER          | Seconds between fires; null for a one-off (at least 300) |
 
-- Written by: `tools.py` `set_timer` through `memory.py` `add_timer`, `set_timer_next`,
-  `mark_timer_fired`, `delete_timer`; `timers.py` `Timers`.
-- Read by: `timers.py` (`due_timers`, `fired_timers`), `list_timers`.
-- Retention: deleted on cancel and when its job ends (`delete_timers_for_job`, and at start for
-  running jobs). A fired one-off stays.
-- Masked: no.
+- Written by: `tools.py` (`set_timer`, `cancel_timer`, `watch`) through `store/work.py`
+  (`create`, `set_repeat`, `transition`); `timers.py` `Timers` moves due rows.
+- Read by: `timers.py` (`due`, `repeat_of`), `list_timers`, `watch list`.
+- Retention: a cancelled or fired row stays like any ended work. Closing a job cancels its
+  timers (a restart does not). A repeat keeps its row `planned` and moves
+  `due_at` forward from now, so a brain that was off fires an overdue repeat once.
+- Migrated: the old `timers` table became `timer` rows (`t<id>`), and each `tracking` memory
+  became a `paused` `watch` row (`w<id>`) with its cadence in `repeat_s` when it parsed (daily,
+  every N hours, and so on) or in `input.cadence` when it did not. Scout mentions the paused
+  watches once, as a `watches_paused` event, and the person switches them on.
+- Masked: yes, the title and a long note, like all work text.
 
 ### loops
 

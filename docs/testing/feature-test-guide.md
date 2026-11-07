@@ -749,9 +749,22 @@ expect a word right when one is due.
    **Expected:** when the timer fires Scout speaks from the job's state and a short summary of its
    steps (and what it was watching for), without raw output; "what timers do you have?" before
    that shows the timer with the job id.
-6. **Action:** set a check-back timer on a job, then stop the job (or let it finish).
+6. **Action:** set a check-back timer on a job, then ask Scout to close the job (or stop the
+   brain while the job runs and start it again).
    **Expected:** the timer is gone from "what timers do you have?" and never fires afterwards.
-   Repeat with a job still running when you stop the brain and restart it: no stale timer wake.
+   A job that merely finishes keeps its timer until Scout closes the job.
+7. **Action:** ask Scout "remind me in 10 minutes to stand up", stop the brain at once, start it
+   again before the 10 minutes pass.
+   **Expected:** the timer survives the restart: "what timers do you have?" still lists it and
+   Scout speaks when it comes due.
+8. **Action:** ask Scout "keep an eye on the build every 30 minutes", then "what are you
+   watching?", then "pause that", "switch it back on" and "stop watching".
+   **Expected:** Scout confirms the watch, lists it with its 30-minute repeat, and each later step
+   changes it as asked; after the last one the list is empty.
+9. **Action:** on a database that had "things to keep an eye on" saved before this update, start
+   the brain and the desktop.
+   **Expected:** Scout mentions once, briefly, that those watches are paused and offers to switch
+   them on; nothing fires by itself, and on a second start Scout does not mention them again.
 
 ## Scout notices you (real brain, desktop)
 

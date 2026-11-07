@@ -1,15 +1,16 @@
-"""Tests for Timers: firing due timers as events, re-arming, surviving restart.
+"""Tests for Timers: firing due work rows as events, re-arming, surviving restart.
 
-The clock is injected; the arming tests use real time because Memory stores
-next_at to the whole second.
+The clock is injected; the arming tests use real time because due_at is stored to the whole
+second.
 """
 
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from job_rows import records_for
+from job_rows import add_timer
 
 from brain.memory import Memory
+from brain.store.work import TransitionRefused, WorkStore
 from brain.timers import Timers
 
 T0 = datetime(2026, 10, 28, 12, 0, tzinfo=UTC)
@@ -23,7 +24,7 @@ class Clock:
         return self.at
 
 
-def make(memory=None, clock=None, job_facts=None, records=None):
+def make(memory=None, clock=None, job_facts=None):
     memory = memory or Memory(":memory:")
     clock = clock or Clock()
     events = []
@@ -34,80 +35,77 @@ def make(memory=None, clock=None, job_facts=None, records=None):
         starts.append(on_start)
 
     kw = {"job_facts": job_facts} if job_facts else {}
-    records = records or records_for(memory, clock)
-    return Timers(memory, records, emit, clock, **kw), memory, clock, events, starts
+    work = WorkStore(memory.db, clock)
+    return Timers(work, emit, clock, **kw), work, clock, events, starts
 
 
-def _timer(mem, id):
-    # The timer with this id, read through the public list; None once it is gone.
-    return next((t for t in mem.list_timers() if t.id == id), None)
-
-
-def test_fire_due_emits_a_timer_event_with_the_note_and_deletes_a_one_off():
-    timers, mem, _clock, events, starts = make()
-    t = mem.add_timer("stretch", T0 - timedelta(seconds=1))
+def test_fire_due_emits_a_timer_event_with_the_note_and_ends_a_one_off_when_its_wake_starts():
+    timers, work, _clock, events, starts = make()
+    t = add_timer(work, "stretch", T0 - timedelta(seconds=1))
     timers.fire_due()
     assert len(events) == 1
     e = events[0]
     assert e.kind == "timer"
     assert e.facts == {"id": t.id, "note": "stretch", "repeat_minutes": 0}
     assert e.key == f"timer:{t.id}"
-    # Marked fired, still stored until the wake turn starts.
-    assert _timer(mem, t.id).fired
+    assert work.get(t.id).state == "active"  # fired, wake not started
     starts[0]()
-    assert _timer(mem, t.id) is None
+    done = work.get(t.id)
+    assert (done.state, done.end_reason) == ("done", "fired")
+    assert done.reported_at is not None  # Scout is hearing it now
 
 
-def test_one_off_is_deleted_only_when_its_wake_starts():
-    timers, mem, _c, events, starts = make()
-    t = mem.add_timer("x", T0)
+def test_one_off_is_not_fired_twice():
+    timers, work, _c, events, starts = make()
+    add_timer(work, "x", T0)
     timers.fire_due()
-    assert _timer(mem, t.id) is not None
-    timers.fire_due()  # fired rows are not due again
+    timers.fire_due()  # an active row is not due again
     assert len(events) == 1
     starts[0]()
-    assert _timer(mem, t.id) is None
 
 
-def test_fired_one_off_is_re_emitted_after_restart():
-    timers, mem, _c, events, starts = make()
-    t = mem.add_timer("x", T0)
+def test_active_timer_reemitted_on_start():
+    mem = Memory(":memory:")
+    timers, work, _c, _events, _starts = make(mem)
+    t = add_timer(work, "x", T0)
     timers.fire_due()
-    # The wake never started: a new Timers on the same memory re-emits it.
-    timers2, _m, _c2, events2, _s2 = make(mem)
-    timers2.start()
+    # The wake never started: a new Timers on the same database re-emits it.
+    again, _w, _c2, events2, starts2 = make(mem)
+    again.start()
     assert [e.facts["id"] for e in events2] == [t.id]
+    starts2[0]()
+    assert work.get(t.id).state == "done"
 
 
 def test_not_yet_due_does_not_fire():
-    timers, mem, _c, events, _s = make()
-    mem.add_timer("later", T0 + timedelta(minutes=1))
+    timers, work, _c, events, _s = make()
+    add_timer(work, "later", T0 + timedelta(minutes=1))
     timers.fire_due()
     assert events == []
 
 
 def test_repeating_timer_fires_and_reschedules_from_now():
-    timers, mem, _c, events, starts = make()
-    t = mem.add_timer("water", T0, repeat_s=600)
+    timers, work, _c, events, starts = make()
+    t = add_timer(work, "water", T0, repeat_s=600)
     timers.fire_due()
     assert events[0].facts["repeat_minutes"] == 10
     assert starts[0] is None
-    got = _timer(mem, t.id)
-    assert got.next_at == T0 + timedelta(seconds=600)
-    assert not got.fired
+    got = work.get(t.id)
+    assert got.due_at == "2026-10-28T12:10:00+00:00"
+    assert got.state == "planned"
 
 
-def test_missed_repeats_fire_once_at_start():
-    timers, mem, _c, events, _s = make()
-    t = mem.add_timer("water", T0 - timedelta(hours=5), repeat_s=600)
+def test_overdue_repeat_fires_once_and_advances_from_now():
+    timers, work, _c, events, _s = make()
+    t = add_timer(work, "water", T0 - timedelta(days=3), repeat_s=3600)
     timers.start()
     assert len(events) == 1
-    assert _timer(mem, t.id).next_at == T0 + timedelta(minutes=10)
+    assert work.get(t.id).due_at == (T0 + timedelta(hours=1)).isoformat(timespec="seconds")
 
 
 def test_missed_one_off_fires_once_at_start():
-    timers, mem, _c, events, _s = make()
-    mem.add_timer("late", T0 - timedelta(hours=5))
+    timers, work, _c, events, _s = make()
+    add_timer(work, "late", T0 - timedelta(hours=5))
     timers.start()
     assert len(events) == 1
 
@@ -115,28 +113,77 @@ def test_missed_one_off_fires_once_at_start():
 def test_restart_keeps_timers(tmp_path):
     path = tmp_path / "m.db"
     mem = Memory(path)
-    mem.add_timer("persist", T0 - timedelta(minutes=1))
+    add_timer(WorkStore(mem.db, Clock()), "persist", T0 - timedelta(minutes=1))
     mem.close()
-    timers, mem2, _c, events, _s = make(Memory(path))
+    timers, _w, _c, events, _s = make(Memory(path))
     timers.start()
     assert [e.facts["note"] for e in events] == ["persist"]
 
 
 def test_two_due_timers_emit_in_due_order():
-    timers, mem, _c, events, _s = make()
-    mem.add_timer("second", T0 - timedelta(minutes=1))
-    mem.add_timer("first", T0 - timedelta(minutes=5))
+    timers, work, _c, events, _s = make()
+    add_timer(work, "second", T0 - timedelta(minutes=1))
+    add_timer(work, "first", T0 - timedelta(minutes=5))
     timers.fire_due()
     assert [e.facts["note"] for e in events] == ["first", "second"]
+
+
+def test_cancel_during_fire_is_quiet():
+    timers, work, _c, events, _s = make()
+    t = add_timer(work, "stretch", T0 - timedelta(seconds=1))
+    rows = work.due(["timer", "watch"])
+    work.transition(t.id, "cancelled", reason="cancelled by Scout")
+    work.due = lambda kinds: rows  # the runner read its list before the cancel
+    timers.fire_due()
+    assert events == []
+    assert work.get(t.id).state == "cancelled"
+
+
+def test_cancel_before_wake_start_is_quiet():
+    timers, work, _c, events, starts = make()
+    t = add_timer(work, "stretch", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    work.transition(t.id, "cancelled", reason="cancelled by Scout")
+    starts[0]()  # the wake begins after the cancel: nothing to end, nothing raised
+    assert work.get(t.id).state == "cancelled"
+    assert len(events) == 1
+
+
+def test_paused_watch_not_fired():
+    timers, work, _c, events, _s = make()
+    w = add_timer(work, "check CI", T0 - timedelta(hours=1), repeat_s=3600, kind="watch")
+    work.transition(w.id, "paused")
+    timers.start()
+    assert events == []
+
+
+def test_planned_watch_fires_like_a_repeating_timer():
+    timers, work, _c, events, _s = make()
+    w = add_timer(work, "check CI", T0, repeat_s=1800, kind="watch")
+    timers.fire_due()
+    assert events[0].facts == {
+        "id": w.id,
+        "note": "check CI",
+        "repeat_minutes": 30,
+        "kind": "watch",
+    }
+    assert work.get(w.id).state == "planned"
+
+
+def test_return_trigger_rows_are_skipped():
+    timers, work, _c, events, _s = make()
+    t = work.create("timer", "when back", due_at=T0, input={"trigger": "return"})
+    timers.fire_due()
+    assert events == []
+    assert work.get(t.id).state == "planned"
 
 
 async def test_arming_schedules_the_soonest_timer():
     mem = Memory(":memory:")
     events = []
-    timers = Timers(
-        mem, records_for(mem), lambda e, **kw: events.append(e), lambda: datetime.now(UTC)
-    )
-    mem.add_timer("soon", datetime.now(UTC) + timedelta(seconds=1.2))
+    work = WorkStore(mem.db, lambda: datetime.now(UTC))
+    timers = Timers(work, lambda e, **kw: events.append(e), lambda: datetime.now(UTC))
+    add_timer(work, "soon", datetime.now(UTC) + timedelta(seconds=1.2))
     timers.start()
     assert events == []
     await asyncio.sleep(1.7)
@@ -146,12 +193,11 @@ async def test_arming_schedules_the_soonest_timer():
 async def test_changed_rearms_for_a_new_sooner_timer():
     mem = Memory(":memory:")
     events = []
-    timers = Timers(
-        mem, records_for(mem), lambda e, **kw: events.append(e), lambda: datetime.now(UTC)
-    )
-    mem.add_timer("far", datetime.now(UTC) + timedelta(hours=1))
+    work = WorkStore(mem.db, lambda: datetime.now(UTC))
+    timers = Timers(work, lambda e, **kw: events.append(e), lambda: datetime.now(UTC))
+    add_timer(work, "far", datetime.now(UTC) + timedelta(hours=1))
     timers.start()
-    mem.add_timer("soon", datetime.now(UTC) + timedelta(seconds=1.2))
+    add_timer(work, "soon", datetime.now(UTC) + timedelta(seconds=1.2))
     timers.changed()
     await asyncio.sleep(1.7)
     assert [e.facts["note"] for e in events] == ["soon"]
@@ -164,9 +210,9 @@ def test_a_job_timer_wake_has_job_state_and_wake_facts():
         seen.append(job_id)
         return {"activity": "2 steps", "watching": "- tests pass"}
 
-    timers, mem, _c, events, _s = make(job_facts=job_facts)
-    timers._records.add_job("j1", "a", "t", "f", "m")
-    t = mem.add_timer("check back", T0 - timedelta(seconds=1), job_id="j1")
+    timers, work, _c, events, _s = make(job_facts=job_facts)
+    goal = work.create("goal", "a", id="j1", state="active")
+    t = add_timer(work, "check back", T0 - timedelta(seconds=1), parent_id=goal.id)
     timers.fire_due()
     assert events[0].facts == {
         "id": t.id,
@@ -181,17 +227,38 @@ def test_a_job_timer_wake_has_job_state_and_wake_facts():
 
 
 def test_a_plain_timer_wake_facts_are_unchanged():
-    timers, mem, _c, events, _s = make(job_facts=lambda j: {"activity": "x"})
-    t = mem.add_timer("plain", T0 - timedelta(seconds=1))
+    timers, work, _c, events, _s = make(job_facts=lambda j: {"activity": "x"})
+    t = add_timer(work, "plain", T0 - timedelta(seconds=1))
     timers.fire_due()
     assert events[0].facts == {"id": t.id, "note": "plain", "repeat_minutes": 0}
 
 
-def test_a_repeating_job_timer_does_not_fire_after_its_job_ends():
-    timers, mem, clock, events, _s = make()
-    timers._records.add_job("j1", "a", "t", "f", "m")
-    mem.add_timer("again", T0 + timedelta(minutes=5), repeat_s=300, job_id="j1")
-    mem.delete_timers_for_job("j1")  # what Jobs._end does
+def test_a_long_note_is_read_from_the_input():
+    timers, work, _c, events, _s = make()
+    t = work.create("timer", "n" * 400, due_at=T0, input={"note": "n" * 400})
+    timers.fire_due()
+    assert events[0].facts["note"] == "n" * 400
+    assert work.get(t.id).state == "active"
+
+
+def test_goal_close_cancels_its_timer():
+    timers, work, clock, events, _s = make()
+    goal = work.create("goal", "a", id="j1", state="active")
+    t = add_timer(work, "again", T0 + timedelta(minutes=5), repeat_s=300, parent_id=goal.id)
+    work.close_goal("j1", "done", "ok")
+    assert work.get(t.id).state == "cancelled"
     clock.at = T0 + timedelta(minutes=6)
     timers.fire_due()
     assert events == []
+
+
+def test_transition_refused_is_the_race_signal():
+    # The runner depends on this contract of the store.
+    _t, work, _c, _e, _s = make()
+    t = add_timer(work, "x", T0)
+    work.transition(t.id, "cancelled", reason="x")
+    try:
+        work.transition(t.id, "active", expect="planned")
+    except TransitionRefused:
+        return
+    raise AssertionError("expected TransitionRefused")
