@@ -28,9 +28,11 @@ connection from `store.db.open_db`; nothing else opens the file.
   `add_summary`), with the kinds table, `Item` and `MemoryRefused`.
 - `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
+- `store/work.py`: `WorkStore` over the `work`, `work_events` and `work_fts` tables: create, the
+  state machine, rollup, retry, due queries, search and the resume scan. Nothing calls it yet.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0017_loops_snooze`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0018_work`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -176,6 +178,111 @@ What Scout remembers across restarts, by kind.
 `messages_fts`; it backs the `recall` tool.
 
 ## Work
+
+The work model (added in S1; nothing writes it yet). Every job, step, ask, timer and loop will
+become one row in `work`; later slices move each area over and drop its old tables. The sections
+after this one, up to Permissions, describe the old shape and go away slice by slice.
+`store/work.py` (`WorkStore`) is the only code that touches the three tables below.
+
+### work
+
+One row per piece of work, in a tree: a goal has steps, and a step can have asks and timers.
+
+| Column                                 | Type             | Meaning                                                                            |
+| -------------------------------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `id`                                   | TEXT PRIMARY KEY | Short id (8 hex characters)                                                        |
+| `parent_id`                            | TEXT             | The work this belongs to; null for a root                                          |
+| `root_id`                              | TEXT             | Top of the tree; its own id for a root                                             |
+| `seq`                                  | INTEGER          | Order among siblings                                                               |
+| `kind`                                 | TEXT             | `goal`, `expert_call`, `tool_call`, `ask`, `question`, `timer`, `loop`, `watch`    |
+| `state`                                | TEXT             | `planned`, `active`, `blocked`, `paused`, `done`, `failed`, `cancelled`, `expired` |
+| `title`                                | TEXT             | Scout's words, masked, capped at 200                                               |
+| `input`                                | TEXT (JSON)      | What the step was given, so a retry knows what to run                              |
+| `summary`                              | TEXT             | Short text of what was done, found or left; what Scout reads                       |
+| `detail_id`                            | TEXT             | Points to `tool_outputs`: the full text                                            |
+| `progress`                             | TEXT             | One live line while `active`; cleared when the row ends                            |
+| `checkpoint`                           | TEXT (JSON)      | Enough to carry on (an expert call keeps its session id)                           |
+| `attempt`, `max_attempts`              | INTEGER          | Retries so far, and the limit (default 3)                                          |
+| `safe_to_retry`                        | INTEGER          | 0 or 1                                                                             |
+| `error_kind`, `last_error`             | TEXT             | `transient` or `permanent`; the masked error, capped at 300                        |
+| `due_at`                               | TEXT             | Next time something should happen: timer, retry backoff, cadence                   |
+| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC ISO text                                                                       |
+| `end_reason`                           | TEXT             | Why it ended, in a short phrase                                                    |
+| `reported_at`                          | TEXT             | Null means Scout has not told the person                                           |
+| `source_message_id`                    | INTEGER          | The chat message that started it, if any                                           |
+
+Indexes: `(state, due_at)`, `(root_id, seq)`, `(parent_id, seq)`, `(kind, state)`, and
+`(reported_at)` for ended rows only.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+stateDiagram-v2
+    [*] --> planned
+    planned --> active : turn comes
+    active --> done
+    active --> failed
+    active --> blocked : needs the person
+    blocked --> planned : person chose retry
+    blocked --> cancelled : person chose stop
+    active --> planned : transient error, backoff
+    planned --> cancelled
+    planned --> expired : parent ended
+    blocked --> expired : parent ended
+    active --> blocked : brain restarted
+    active --> expired : ask or question, brain restarted
+    planned --> paused : person pauses
+    paused --> planned : person switches on
+    paused --> cancelled
+    done --> [*]
+    failed --> [*]
+    cancelled --> [*]
+    expired --> [*]
+```
+
+Terminal states are `done`, `failed`, `cancelled` and `expired`; an ended row always has
+`ended_at` and `end_reason`. `WorkStore.transition` allows only these moves, runs in one
+transaction with its `state` event, and raises `TransitionRefused` for a move from a state that
+has already changed (`expect=`), so two writers on one row never overwrite each other.
+
+- Goal only: `blocked` to `active`; `done` and `failed` only through `close_goal`.
+- Loop only: an ended loop goes back to `planned` (with a `reopened` event).
+- Rollup: a child that goes `blocked` or `failed` blocks its active goal; when no child is
+  blocked and one moves to `planned` or `active`, the goal is `active` again. A goal is never
+  failed automatically.
+- Parent end: when a row ends, its open children end too: asks and questions `expired` ("parent
+  ended: ..."), everything else `cancelled` ("goal closed"). Rows ended this way are marked
+  reported, since Scout already knows the parent ended.
+- Retry: `fail(id, "transient", reason)` on a `safe_to_retry` row with tries left goes back to
+  `planned` with `attempt + 1` and `due_at` = now + backoff (30 s, 2 min, 10 min; the last value
+  repeats). Otherwise the row is `failed` ("gave up after N tries: ..." or "not retryable: ...")
+  with `reported_at` null. `retry_step` is the person's retry choice.
+- Resume scan at start (`resume_scan`): open asks and questions expire ("brain restarted"); an
+  active expert call with a saved session becomes `blocked`, any other `failed`; an active tool
+  call reruns when safe, else fails; timers, watches, loops, goals and planned, paused or blocked
+  rows are left alone. Running it twice changes nothing.
+
+### work_events
+
+Append-only log of what happened to a row: `created`, `state` (`{from, to, reason}`),
+`attempt_failed`, `retried`, `reopened`, `resumed`, `failed on restart`.
+
+| Column    | Type                | Meaning               |
+| --------- | ------------------- | --------------------- |
+| `id`      | INTEGER PRIMARY KEY | Order of events       |
+| `work_id` | TEXT                | The row it belongs to |
+| `at`      | TEXT                | UTC ISO text          |
+| `kind`    | TEXT                | What happened         |
+| `data`    | TEXT (JSON)         | Details, or null      |
+
+Indexed on `(work_id, id)`.
+
+### work_fts
+
+FTS5 over `work.title` and `work.summary`, external content keyed by `work`'s rowid, with the
+same tokenizer (`porter unicode61`) and trigger style as `messages_fts`. `WorkStore.search` reads
+it, so Scout can find "that invoice thing".
+
+## Work (old shape)
 
 ### jobs
 
