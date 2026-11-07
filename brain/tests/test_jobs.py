@@ -648,6 +648,15 @@ async def test_restart_fails_part_that_cannot_reload(make_rig, monkeypatch):
     assert "cannot reload" in job.parts[-1].reason
 
 
+async def test_restart_marks_expired_asks_and_questions_reported(make_rig):
+    rig = make_rig(FakeAsks())
+    work = rig.records.work
+    work.create("ask", "an ask", id="ask1", state="active")
+    work.create("question", "a question", id="q1", state="active")
+    rig.jobs.startup()
+    assert [r.id for r in work.unreported(["ask", "question"])] == []
+
+
 async def test_restart_ends_each_stopped_parts_log_once(make_rig):
     rig = make_rig(FakeAsks())
     rig.records.add_job("old", "claude_code", "t", str(rig.folder), "plan")

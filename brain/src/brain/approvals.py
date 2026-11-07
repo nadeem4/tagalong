@@ -65,7 +65,8 @@ class Approvals:
         if self._guards is not None:  # the table is read by Home and Scout, so it holds no secret
             summary = mask_json(self._guards, "approval", summary)
             input = mask_json(self._guards, "approval", input)
-        if ask_id is None or self.work.get(ask_id) is None:
+        row = self.work.get(ask_id) if ask_id else None
+        if row is None:
             ask_id = self.work.create(
                 "ask",
                 summary,
@@ -73,6 +74,8 @@ class Approvals:
                 state="active",
                 parent_id=self.work.open_goal(job_id),
             ).id
+        elif not row.title:  # an expert's ask opens with no text
+            self.work.update(ask_id, title=summary)
         self.work.add_ask(
             ask_id, source=source, tool=tool, summary=summary, input=input, group_key=group_key
         )
