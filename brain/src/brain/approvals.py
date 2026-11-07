@@ -11,9 +11,11 @@ from typing import TYPE_CHECKING
 
 from brain.guards import Guards
 from brain.masking import mask_json
-from brain.memory import Memory, Preference
+from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
+from brain.store import rules
 from brain.store.db import utc_text
+from brain.store.rules import Preference
 
 if TYPE_CHECKING:
     from brain.side_check import AskFacts
@@ -87,14 +89,15 @@ class Approvals:
             preference_id=pref.id,
             preference_sentence=pref.sentence,
         )
-        self._memory.use_preference(pref.id, utc_text(self._now()))
+        rules.use_preference(self._memory.db, pref.id, utc_text(self._now()))
         self._notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})
 
     # Preference writes live here so every writer (Home, the offer) notifies the same way.
     def add_preference(
         self, *, sentence: str, source: str | None, tool: str | None, group_key: str | None
     ) -> Preference:
-        pref = self._memory.add_preference(
+        pref = rules.add_preference(
+            self._memory.db,
             sentence=sentence,
             source=source,
             tool=tool,
@@ -105,13 +108,13 @@ class Approvals:
         return pref
 
     def edit_preference(self, id: int, sentence: str) -> bool:
-        changed = self._memory.edit_preference(id, sentence)
+        changed = rules.edit_preference(self._memory.db, id, sentence)
         if changed:
             self._notify("changed", {"what": "approvals"})
         return changed
 
     def remove_preference(self, id: int) -> bool:
-        removed = self._memory.remove_preference(id)
+        removed = rules.remove_preference(self._memory.db, id)
         if removed:
             self._notify("changed", {"what": "approvals"})
         return removed
@@ -135,7 +138,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
 
     def known_id(args: dict) -> int:
         pid = args.get("id")
-        if type(pid) is not int or all(p.id != pid for p in memory.list_preferences()):
+        if type(pid) is not int or all(p.id != pid for p in rules.list_preferences(memory.db)):
             raise refuse(f"There is no preference {pid}.")
         return pid
 
@@ -187,7 +190,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
                         "use_count": p.use_count,
                         "last_used": p.last_used,
                     }
-                    for p in memory.list_preferences()
+                    for p in rules.list_preferences(memory.db)
                 ]
             }
         )

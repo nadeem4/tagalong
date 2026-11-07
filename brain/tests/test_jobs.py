@@ -26,6 +26,7 @@ from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
+from brain.store import rules
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -877,8 +878,13 @@ class FakeSideCheck:
 
 
 def pref_in(rig, sentence="Reading files is fine"):
-    return rig.memory.add_preference(
-        sentence=sentence, source=None, tool=None, group_key=None, at="2026-10-28T09:00:00Z"
+    return rules.add_preference(
+        rig.memory.db,
+        sentence=sentence,
+        source=None,
+        tool=None,
+        group_key=None,
+        at="2026-10-28T09:00:00Z",
     )
 
 

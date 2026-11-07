@@ -24,6 +24,7 @@ from brain.mind.turn import Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
 from brain.scheduler import Scheduler
 from brain.sessions import Session
+from brain.store import rules
 from brain.store.work import ActivityEntry
 from brain.toolbox import BrainSource, ToolSpec
 
@@ -361,8 +362,13 @@ async def test_what_you_know_in_system_prompt():
 
 async def test_session_passes_current_preferences_each_turn():
     memory = Memory(":memory:")
-    memory.add_preference(
-        sentence="Set up Claude Code when I ask", source="home", tool=None, group_key=None, at="t"
+    rules.add_preference(
+        memory.db,
+        sentence="Set up Claude Code when I ask",
+        source="home",
+        tool=None,
+        group_key=None,
+        at="t",
     )
     model = Gate(["hi", "again"])
     session, _ = make(model, memory)
@@ -370,8 +376,13 @@ async def test_session_passes_current_preferences_each_turn():
     await finish(session)
     assert "Preferences the owner saved" in model.systems[0]
     assert "Set up Claude Code when I ask" in model.systems[0]
-    memory.add_preference(
-        sentence="Never touch my Downloads", source="home", tool=None, group_key=None, at="t"
+    rules.add_preference(
+        memory.db,
+        sentence="Never touch my Downloads",
+        source="home",
+        tool=None,
+        group_key=None,
+        at="t",
     )
     session.say("desktop", say("next"))
     await finish(session)

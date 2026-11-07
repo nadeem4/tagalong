@@ -4,6 +4,7 @@ import base64
 import datetime
 import json
 import re
+from functools import partial
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +18,7 @@ from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.outputs import OutputStore
 from brain.protocol import Body, ErrorCode, RpcError, Tool
+from brain.store import rules
 from brain.store.memory import MemoryRefused
 from brain.store.search import Hit
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
@@ -174,7 +176,11 @@ async def test_chat_hits_fenced_in_recall(mem, run):
 
 
 def test_brain_memory_tools_default_auto(mem):
-    box = Toolbox([BrainSource(brain_tools(mem))], mem.permission_modes, mem.set_permission_mode)
+    box = Toolbox(
+        [BrainSource(brain_tools(mem))],
+        partial(rules.permission_modes, mem.db),
+        partial(rules.set_permission_mode, mem.db),
+    )
     scout = [s for s in box.sources[0].specs() if "scout" in s.audience]
     modes = {s.name: box.mode(s) for s in scout}
     assert modes == {"remember": "auto", "recall": "auto", "forget": "auto"}
@@ -202,7 +208,7 @@ def home(mem, tmp_path):
         sent.append((method, params))
 
     def save_mode(name, mode):
-        mem.set_permission_mode(name, mode)
+        rules.set_permission_mode(mem.db, name, mode)
         notify("changed", {"what": "permissions"})  # as Session does
 
     jobs = FakeJobs()
@@ -212,7 +218,9 @@ def home(mem, tmp_path):
         + home_tools(budget, lambda: box)
         + expert_tools(jobs, lambda: owner["turn"])
     )
-    box = Toolbox([BrainSource(tools), BodySource(bodies)], mem.permission_modes, save_mode)
+    box = Toolbox(
+        [BrainSource(tools), BodySource(bodies)], partial(rules.permission_modes, mem.db), save_mode
+    )
     handlers = {spec.name: handler for spec, handler in tools}
 
     async def run(name, args=None):
@@ -738,7 +746,7 @@ async def test_list_permissions_includes_offline_body_tool_with_online_false(hom
     assert row["mode"] == "auto"
 
 
-async def test_list_permissions_marks_locked_and_mode(home):
+async def test_list_permissions_shape_unchanged(home):
     declare(home.bodies, "desktop", ("type_text", "change", True), ("see_screen", "read", None))
     tools = json.loads(await home.run("list_permissions"))["tools"]
     names = [t["name"] for t in tools]
@@ -1176,7 +1184,7 @@ async def test_save_preference_saves_on_save_it(mem):
     assert params["tool"] == "save_preference"  # so a body labels it Scout's, not an expert's
     asks.answer(params["id"], "Save it", "desktop")
     assert json.loads(await task) == {"saved": True}
-    (saved,) = [p for p in mem.list_preferences() if not p.builtin]
+    (saved,) = [p for p in rules.list_preferences(mem.db) if not p.builtin]
     assert (saved.sentence, saved.source, saved.tool, saved.group_key) == (
         "Prefer Claude Code",
         "setup",
@@ -1193,7 +1201,7 @@ async def test_save_preference_saves_nothing_on_not_now(mem):
     params = await _open_ask(bodies)
     asks.answer(params["id"], "Not now", "desktop")
     assert json.loads(await task) == {"saved": False}
-    assert [p for p in mem.list_preferences() if not p.builtin] == []
+    assert [p for p in rules.list_preferences(mem.db) if not p.builtin] == []
 
 
 async def test_save_preference_saves_nothing_on_timeout_or_nobody_online(mem):
@@ -1201,7 +1209,7 @@ async def test_save_preference_saves_nothing_on_timeout_or_nobody_online(mem):
     assert json.loads(await handler({"sentence": "s", "question": "q"})) == {"saved": False}
     _, _, (_, handler) = _preference_rig(mem, online=())
     assert json.loads(await handler({"sentence": "s", "question": "q"})) == {"saved": False}
-    assert [p for p in mem.list_preferences() if not p.builtin] == []
+    assert [p for p in rules.list_preferences(mem.db) if not p.builtin] == []
 
 
 async def test_save_preference_needs_both_arguments(mem):
@@ -1500,11 +1508,13 @@ async def test_set_permission_off_works_while_the_body_is_offline(home):
 
 async def test_set_permission_off_survives_a_new_memory_on_the_same_file(tmp_path):
     first = Memory(tmp_path / "m.db")
-    first.set_permission_mode("remember", "off")
+    rules.set_permission_mode(first.db, "remember", "off")
     first.close()
     again = Memory(tmp_path / "m.db")
     box = Toolbox(
-        [BrainSource(brain_tools(again))], again.permission_modes, again.set_permission_mode
+        [BrainSource(brain_tools(again))],
+        partial(rules.permission_modes, again.db),
+        partial(rules.set_permission_mode, again.db),
     )
     assert "remember" not in [t["name"] for t in box.model_tools()]
     again.close()
@@ -1520,7 +1530,11 @@ def test_built_in_defaults_match_the_spec_table(mem):
         + timer_tools(records_for(mem), _FakeTimers(), lambda: _T0)
         + expert_tools(jobs, lambda: True)
     )
-    box = Toolbox([BrainSource(tools)], mem.permission_modes, mem.set_permission_mode)
+    box = Toolbox(
+        [BrainSource(tools)],
+        partial(rules.permission_modes, mem.db),
+        partial(rules.set_permission_mode, mem.db),
+    )
     modes = {s.name: box.mode(s) for s in box.sources[0].specs() if "scout" in s.audience}
     auto = {
         "remember", "recall", "forget", "read_output", "set_timer", "list_timers",
@@ -1535,7 +1549,9 @@ def test_app_tools_default_to_ask_even_when_read_only(mem):
 
     from brain.app_tools import spec_for
 
-    box = Toolbox([], mem.permission_modes, mem.set_permission_mode)
+    box = Toolbox(
+        [], partial(rules.permission_modes, mem.db), partial(rules.set_permission_mode, mem.db)
+    )
     assert box.mode(spec_for("lin", tool("list_issues", read_only=True))) == "ask"
 
 

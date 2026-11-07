@@ -11,6 +11,7 @@ from brain.guards import Hook, stop
 from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.side_check import AskFacts, SideCheck
+from brain.store import rules
 
 AT = "2026-10-28T09:00:00Z"
 
@@ -63,7 +64,9 @@ def mem(tmp_path):
 
 
 def pref(mem, sentence="Fine to read files in the repo"):
-    return mem.add_preference(sentence=sentence, source=None, tool=None, group_key=None, at=AT)
+    return rules.add_preference(
+        mem.db, sentence=sentence, source=None, tool=None, group_key=None, at=AT
+    )
 
 
 def facts(locked=False, tool="Read"):
@@ -82,8 +85,8 @@ async def test_no_user_preference_means_no_model_call(mem):
 
 async def test_a_setup_preference_is_never_a_candidate(mem):
     # Setup choices are facts for Scout's prompt; an install must still open the Allow card.
-    mem.add_preference(
-        sentence="Install experts freely", source="setup", tool=None, group_key=None, at=AT
+    rules.add_preference(
+        mem.db, sentence="Install experts freely", source="setup", tool=None, group_key=None, at=AT
     )
     model = Model(approve(1))
     assert await check(mem, model).decide(facts()) is None
@@ -112,18 +115,20 @@ async def test_unknown_preference_id_is_a_pass(mem):
 
 async def test_builtin_default_cannot_be_approved_under(mem):
     other = pref(mem)
-    default = mem.list_preferences()[0]
+    default = rules.list_preferences(mem.db)[0]
     assert await check(mem, Model(approve(default.id))).decide(facts()) is None
     assert await check(mem, Model(approve(other.id))).decide(facts()) == other
 
 
 def named(mem, tool="Read", sentence="Fine to read files in the repo"):
-    return mem.add_preference(sentence=sentence, source=None, tool=tool, group_key=None, at=AT)
+    return rules.add_preference(
+        mem.db, sentence=sentence, source=None, tool=tool, group_key=None, at=AT
+    )
 
 
 async def test_side_check_locked_without_a_naming_preference_makes_no_model_call(mem):
     p = pref(mem)  # general: names no tool
-    mem.remove_preference(mem.list_preferences()[0].id)
+    rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
     model = Model(approve(p.id))
     assert await check(mem, model).decide(facts(locked=True)) is None
     assert model.calls == 0
@@ -131,7 +136,7 @@ async def test_side_check_locked_without_a_naming_preference_makes_no_model_call
 
 async def test_side_check_locked_with_general_preference_and_default_present_is_none(mem):
     p = pref(mem)
-    assert any(p.builtin for p in mem.list_preferences())
+    assert any(p.builtin for p in rules.list_preferences(mem.db))
     model = Model(approve(p.id))
     assert await check(mem, model).decide(facts(locked=True)) is None
     assert model.calls == 0
@@ -164,7 +169,7 @@ async def test_preference_removed_while_thinking_is_a_pass(mem):
 
     class Removes(Model):
         async def stream(self, system, messages, tools):
-            mem.remove_preference(p.id)
+            rules.remove_preference(mem.db, p.id)
             async for item in super().stream(system, messages, tools):
                 yield item
 

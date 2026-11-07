@@ -69,6 +69,7 @@ from brain.retry import classify, safe_to_retry
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
+from brain.store import rules
 from brain.store.conversation import compaction_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.timers import Timers
@@ -249,13 +250,16 @@ class Session:
 
         def save_mode(name: str, mode: str) -> None:
             # Every save (Home's set_permission or an "always" answer) refreshes open panels.
-            memory.set_permission_mode(name, mode)
+            rules.set_permission_mode(memory.db, name, mode)
             notify("changed", {"what": "permissions"})
+
+        def modes() -> dict[str, str]:
+            return rules.permission_modes(memory.db)
 
         # The tool gate and its ask chain: nobody online, then Scout's look, then the person.
         self.guards.add(
             tool_mode(
-                memory.permission_modes,
+                modes,
                 lambda turn_id: self._owner_turn and turn_id == self._turn_id,
             )
         )
@@ -264,7 +268,7 @@ class Session:
         self.guards.add(person_ask())
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
-            memory.permission_modes,
+            modes,
             save_mode,
             self._asks,
             approvals,
@@ -701,7 +705,7 @@ class Session:
             prepare()
         # Read once per turn so the system prompt stays identical across its steps (cache).
         know = render_know(self._memory.always_loaded())
-        prefs = render_preferences(self._memory.list_preferences())
+        prefs = render_preferences(rules.list_preferences(self._memory.db))
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(

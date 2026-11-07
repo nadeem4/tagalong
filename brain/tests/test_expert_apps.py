@@ -9,6 +9,7 @@ import contextlib
 import json
 import logging
 from datetime import UTC, datetime
+from functools import partial
 from types import SimpleNamespace
 
 import httpx2
@@ -24,6 +25,7 @@ from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.outputs import OutputStore
+from brain.store import rules
 from brain.toolbox import Toolbox
 
 SECRET = "sk-live-0123456789abcdef"
@@ -87,8 +89,8 @@ class Rig:
         )
         self.toolbox = Toolbox(
             [AppSource(self.apps)],
-            self.memory.permission_modes,
-            self.memory.set_permission_mode,
+            partial(rules.permission_modes, self.memory.db),
+            partial(rules.set_permission_mode, self.memory.db),
             self.asks,
             self.approvals,
             outputs=OutputStore(self.memory, self.guards, cap) if cap else None,
@@ -146,7 +148,7 @@ async def test_a_wrong_or_missing_token_is_refused(rig):
 
 
 async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
-    rig.memory.set_permission_mode("lin__list_issues", "auto")
+    rules.set_permission_mode(rig.memory.db, "lin__list_issues", "auto")
     grant = await rig.bridge.grant("job1", ["lin"])
     grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
@@ -193,7 +195,7 @@ async def test_a_non_ascii_authorization_header_is_a_401(rig):
 async def test_a_long_result_is_capped_without_an_output_id(tmp_path):
     rig = Rig(tmp_path, cap=50)
     try:
-        rig.memory.set_permission_mode("lin__list_issues", "auto")
+        rules.set_permission_mode(rig.memory.db, "lin__list_issues", "auto")
         rig.apps.reply = "x" * 500
         grant = await rig.bridge.grant("job1", ["lin"])
         grant.sent = True  # the person has sent the card
@@ -222,7 +224,7 @@ async def test_a_refused_ask_never_runs_the_tool(tmp_path):
 
 
 async def test_an_off_tool_is_not_listed(rig):
-    rig.memory.set_permission_mode("lin__create_issue", "off")
+    rules.set_permission_mode(rig.memory.db, "lin__create_issue", "off")
     grant = await rig.bridge.grant("job1", ["lin"])
     grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
