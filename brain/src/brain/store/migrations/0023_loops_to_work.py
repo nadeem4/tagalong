@@ -34,6 +34,10 @@ def _next_midnight() -> str:
     return utc_text(datetime.combine(tomorrow, time()).astimezone())
 
 
+def _utc(text: str | None) -> str | None:
+    return utc_text(datetime.fromisoformat(text)) if text else None
+
+
 def migrate(db) -> None:
     db.execute(
         "CREATE TABLE work_loop(work_id TEXT PRIMARY KEY, source TEXT NOT NULL, ref TEXT NOT NULL,"
@@ -49,26 +53,39 @@ def migrate(db) -> None:
         "SELECT id, source, ref, title, asks, direction, people, due, quiet_after, anchors,"
         " status, history, created, updated, snoozed_until FROM loops ORDER BY created, id"
     ).fetchall()
+    base = db.execute("SELECT COALESCE(MAX(seq), 0) FROM work WHERE parent_id IS NULL").fetchone()[
+        0
+    ]
     for i, (id, source, ref, title, asks, direction, people, due, quiet, anchors, status,
-            history, created, updated, snoozed) in enumerate(loops, start=1):  # fmt: skip
+            history, created, updated, snoozed) in enumerate(loops, start=base + 1):  # fmt: skip
         state, reason = _ENDED.get(status, ("planned", None))
         db.execute(
             "INSERT INTO work(id, root_id, seq, kind, state, title, due_at, created_at,"
             " updated_at, ended_at, end_reason, reported_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (id, id, i, "loop", state, title[:TITLE_CAP], due, created, updated,
-             updated if reason else None, reason, updated if reason else None),
+            (id, id, i, "loop", state, title[:TITLE_CAP], _utc(due), _utc(created), _utc(updated),
+             _utc(updated) if reason else None, reason, _utc(updated) if reason else None),
         )  # fmt: skip
         db.execute(
             "INSERT INTO work_loop(work_id, source, ref, direction, people, anchors, quiet_after,"
             " snoozed_until, asks) VALUES (?,?,?,?,?,?,?,?,?)",
-            (id, source, ref, direction, people, anchors, quiet, snoozed, asks),
+            (
+                id,
+                source,
+                ref,
+                direction,
+                people,
+                anchors,
+                _utc(quiet),
+                _utc(snoozed) if status == "snoozed" else None,
+                asks,
+            ),
         )
-        _event(db, id, created, "created", {"kind": "loop"})
+        _event(db, id, _utc(created), "created", {"kind": "loop"})
         for entry in json.loads(history):
             data = {"note": entry.get("note", "")}
             if entry.get("mail_at"):
                 data["mail_at"] = entry["mail_at"]
-            _event(db, id, entry.get("at") or updated, "history", data)
+            _event(db, id, _utc(entry.get("at") or updated), "history", data)
     for loop_id, anchor, day in db.execute(
         "SELECT loop_id, anchor, day FROM loop_surfaced ORDER BY rowid"
     ).fetchall():

@@ -13,7 +13,7 @@ const Loop = z.object({
   direction: z.enum(['i_owe', 'they_owe']),
   due: z.string().nullable(),
   people: z.array(z.string()),
-  status: z.enum(['held', 'surfaced', 'snoozed', 'done', 'dropped', 'stale']),
+  status: z.enum(['held', 'snoozed', 'done', 'dropped', 'stale']),
 });
 
 /** `unreadSince` is there only when mail stopped being read. */

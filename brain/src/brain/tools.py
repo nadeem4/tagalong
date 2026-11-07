@@ -618,7 +618,12 @@ def work_tools(
             return json.dumps({"found": [_work_summary(r) for r in found]})
         return json.dumps(
             {
-                "open": [_work_summary(r) for r in work.open_roots()],
+                # loops have their own tools and the digest is a quiet watch: neither belongs here
+                "open": [
+                    _work_summary(r)
+                    for r in work.open_roots()
+                    if r.kind != "loop" and not is_return_wake(r)
+                ],
                 "unreported": [_work_summary(r) for r in work.unreported()],
             }
         )

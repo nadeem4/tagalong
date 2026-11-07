@@ -447,7 +447,7 @@ sequenceDiagram
   S->>L: focus or tab
   alt mail itself in front (Gmail, Outlook)
     L-->>L: nothing
-  else an anchor of a held or surfaced loop matches
+  else an anchor of a held loop matches
     Note over L: once per loop and anchor a local day, at most one context wake per 10 minutes
     L->>Q: loop event, reason context
   end

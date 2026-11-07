@@ -74,8 +74,7 @@ async def test_work_status_no_args_lists_open_and_unreported(work, run):
     work.create("expert_call", "Step", parent_id="stuck1", state="active", id="stuck1.p1")
     work.fail("stuck1.p1", "permanent", "boom")
     out = await run({})
-    # stuck1 is blocked, still open; the loops digest watch is always there
-    assert {r["id"] for r in out["open"]} == {"open1", "stuck1", "loop-digest"}
+    assert {r["id"] for r in out["open"]} == {"open1", "stuck1"}  # stuck1 is blocked, still open
     assert {r["id"] for r in out["unreported"]} == {"stuck1", "stuck1.p1"}
 
 
@@ -89,3 +88,10 @@ async def test_work_status_by_words(work, run):
 def test_work_status_is_a_scout_read_tool(run):
     assert run.spec.audience == frozenset({"scout"})
     assert run.spec.effect == "read"
+
+
+async def test_work_status_open_leaves_out_loops_and_the_digest(work, run):
+    work.create("goal", "Open one", id="open1", state="active")
+    work.create("loop", "Reply to Sam", id="loop1")
+    out = await run({})
+    assert [r["id"] for r in out["open"]] == ["open1"]

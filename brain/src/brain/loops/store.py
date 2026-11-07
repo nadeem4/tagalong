@@ -109,7 +109,7 @@ class LoopStore:
             return
         data = {"note": self.work.mask(note)}
         if mail_at:  # when the mail itself arrived, so a later reply can be compared with it
-            data["mail_at"] = mail_at.isoformat()
+            data["mail_at"] = utc_text(mail_at)
         self.work.add_event(loop_id, "history", data)
 
     def mark_surfaced(self, loop_id: str, anchor: str, day: str) -> None:

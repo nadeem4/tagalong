@@ -82,7 +82,13 @@ def _seed(db):
         ],
     )
     _loop(db, "snz1", "snoozed", due=DEADLINE, snooze=SNOOZE)
-    _loop(db, "done1", "done")
+    _loop(db, "done1", "done", snooze=SNOOZE)  # the old code never cleared a woken snooze
+    _loop(db, "woke1", "held", snooze=SNOOZE)
+    db.execute(
+        "INSERT INTO work(id, root_id, seq, kind, state, title, created_at, updated_at)"
+        " VALUES ('g1','g1',7,'goal','planned','a goal',?,?)",
+        (T, T),
+    )
     _loop(db, "drop1", "dropped")
     _loop(db, "stale1", "stale")
     db.execute(
@@ -127,7 +133,7 @@ def _detail(db, id):
 
 def test_loop_statuses_map(work):
     got = {r.id: r for r in work.of_kind("loop")}
-    assert set(got) == {"held1", "surf1", "snz1", "done1", "drop1", "stale1"}
+    assert set(got) == {"held1", "surf1", "snz1", "done1", "drop1", "stale1", "woke1"}
     assert [got[i].state for i in ("held1", "surf1", "snz1")] == ["planned"] * 3
     assert (got["done1"].state, got["drop1"].state, got["stale1"].state) == (
         "done",
@@ -211,3 +217,22 @@ def test_empty_database_still_gets_the_digest(tmp_path):
     migrate(db)
     assert WorkStore(db, lambda: None).get("loop-digest") is not None
     assert WorkStore(db, lambda: None).of_kind("loop") == []
+
+
+def test_snooze_kept_only_for_snoozed_loops(db):
+    assert _detail(db, "snz1")[6] == SNOOZE
+    assert _detail(db, "woke1")[6] is None
+    assert _detail(db, "done1")[6] is None
+
+
+def test_loops_sit_after_existing_roots(db):
+    seqs = dict(db.execute("SELECT id, seq FROM work WHERE parent_id IS NULL"))
+    assert seqs["g1"] == 7
+    loops = [seqs[i] for i in ("held1", "surf1", "snz1", "done1", "drop1", "stale1", "woke1")]
+    assert min(loops) > 7 and len(set(loops)) == len(loops)
+    assert seqs["loop-digest"] > max(loops)
+
+
+def test_times_are_normalised_to_whole_seconds_utc(db):
+    got = db.execute("SELECT created_at FROM work WHERE id = 'held1'").fetchone()[0]
+    assert got == T  # already UTC, whole seconds: unchanged

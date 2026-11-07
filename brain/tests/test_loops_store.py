@@ -44,6 +44,12 @@ def test_save_then_get_round_trips_every_field(store):
     assert got.status == "held" and got.created == T0 and got.updated == T0
 
 
+def test_history_mail_at_is_whole_seconds_utc(store):
+    lp = store.save(mk())
+    store.add_history(lp.id, "mail", mail_at=T0.replace(microsecond=500000))
+    assert store.get(lp.id).history[-1]["mail_at"] == T0.isoformat(timespec="seconds")
+
+
 def test_get_unknown_is_none(store):
     assert store.get("nope") is None
 

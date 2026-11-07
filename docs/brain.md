@@ -1462,13 +1462,14 @@ creates a loop before that.
 - **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
   app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
   (`i_owe` or `they_owe`), people, a `due` time, a `quiet_after` time, anchors (window or page names
-  that mean "you are working on this", used later), a status (`held`, `surfaced`, `snoozed`,
+  that mean "you are working on this", used later), a status (`held`, `snoozed`,
   `done`, `dropped`, `stale`), a map of when each anchor last surfaced it, and a history.
-- **Store** (`loops/store.py`). `LoopStore` works over the connection `Memory` already opened
-  (`Memory.db`), so loops live in `tagalong.db`; see [Memory](memory.md#loops-tables). Saving the
-  same (source, ref) updates the loop and never duplicates it. Text is masked (`[secret]`) before
-  it is written, history included. `forget` removes one loop; `wipe` removes every loop, the
-  surface log and the per-app cursor.
+- **Store** (`loops/store.py`). `LoopStore` is a thin layer over the work store: a loop is a `loop`
+  work row plus a `work_loop` detail row, with its history and "surfaced" marks as events; the
+  per-app read cursors are `app_cursors` and the mail switch is `apps.reads_mail` (see
+  [Memory](memory.md#loops) and [storage.md](storage.md#work_loop)). Saving the same (source, ref)
+  updates the loop and never duplicates it. Text is masked (`[secret]`) before it is written,
+  history included. `forget` removes one loop; `wipe` removes every loop and the mail cursors.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
@@ -1487,7 +1488,7 @@ creates a loop before that.
 - **Triggers** (`loops/triggers/`: `context.py`, `due.py`, `urgent.py`, `quiet.py`, `stale.py`, pure
   rules; the service owns timing). Five reasons:
   - _context._ `Session.body_event` also hands every `focus` (app, title) and `tab` (title, url)
-    event to `loops.saw`; they stay non-waking events. A `held` or `surfaced` loop surfaces when a
+    event to `loops.saw`; they stay non-waking events. A `held` loop surfaces when a
     window or tab matches one of its anchors. An anchor matches only if, after lowercasing and
     dropping punctuation, it has at least two words that are not on the stoplist (Untitled,
     Document1, New Tab, Inbox, Home, app names and similar), or it is a file name (`Q4 pricing.pptx`:
