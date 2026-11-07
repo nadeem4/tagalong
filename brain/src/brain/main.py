@@ -181,6 +181,8 @@ async def _run() -> None:
         wakes_per_hour=config.wakes_per_hour,
         turn_timeout=config.turn_timeout,
         preview_chars=config.tool_preview_chars,
+        job_steps_max_entries=config.job_steps_max_entries,
+        job_steps_max_bytes=config.job_steps_max_bytes,
         masker=masker,
         keys=keys,
         setup_facts=partial(setup_facts, registry, inspect_machine),

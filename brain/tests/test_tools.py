@@ -103,6 +103,14 @@ def test_format_hits_fences_summaries():
     assert out.count("<data") == 1
 
 
+async def test_recall_finds_work_by_title(mem, run):
+    records_for(mem).work.create("goal", "Rename the zebra module", id="g1", state="active")
+    out = await run("recall", {"query": "zebra"})
+    assert re.search(r"g1 work \d{4}-\d{2}-\d{2} Rename the zebra module", out)
+    assert "g1" not in await run("recall", {"query": "zebra", "kind": "project"})
+    assert "g1" in await run("recall", {"query": "zebra", "kind": "work"})
+
+
 async def test_recall_no_hits_says_so(run):
     assert "no matching" in (await run("recall", {"query": "zebra"})).lower()
 
@@ -319,7 +327,8 @@ def test_expert_specs_audiences_effects_and_gate(home):
     assert specs["hand_off"].self_asks is True
     assert specs["tell_expert"].audience == scout and specs["tell_expert"].effect == "change"
     assert specs["tell_expert"].default_mode == "ask" and specs["tell_expert"].follow_up is True
-    assert specs["list_jobs"].audience == both and specs["list_jobs"].effect == "read"
+    assert specs["list_jobs"].audience == frozenset({"home"})
+    assert specs["list_jobs"].effect == "read"
     assert specs["stop_job"].audience == both and specs["stop_job"].effect == "change"
     assert specs["stop_job"].default_mode == "auto"
 
@@ -341,7 +350,7 @@ def test_expert_model_tool_schemas(home):
     assert tools["hand_off"]["properties"]["fresh"]["type"] == "boolean"
     assert tools["tell_expert"]["required"] == ["job", "note"]
     assert tools["stop_job"]["required"] == ["job"]
-    assert tools["list_jobs"]["properties"] == {}
+    assert "list_jobs" not in tools  # Home only; Scout reads work_status instead
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     assert "never guess" in described["hand_off"]
     assert "fresh" in described["hand_off"] and "same folder" in described["hand_off"]
@@ -641,7 +650,7 @@ async def test_list_and_stop_work_through_the_gate_for_home(home):
 async def test_list_permissions_shows_hand_off_as_self_asking(home):
     rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
     assert rows["hand_off"]["self_asks"] is True and rows["hand_off"]["mode"] == "auto"
-    assert "list_jobs" in rows
+    assert "list_jobs" not in rows  # Home only
 
 
 def declare(bodies, body_id, *tools):
@@ -798,7 +807,6 @@ def test_home_tools_are_not_in_model_tools(home):
         "close_job",
         "set_job_result",
         "list_experts",
-        "list_jobs",
         "stop_job",
         "job_report",
     }
@@ -1281,7 +1289,6 @@ def test_hand_off_description_points_to_watch_job_and_how_done_is_judged(home):
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     text = described["hand_off"]
     assert "watch_job" in text and "done" in text and "summary" in text
-    assert "watch list" in described["list_jobs"]
 
 
 async def test_set_timer_with_a_running_job_stores_job_id(mem, trun, records):
@@ -1461,7 +1468,7 @@ def test_built_in_defaults_match_the_spec_table(mem):
     modes = {s.name: box.mode(s) for s in box.sources[0].specs() if "scout" in s.audience}
     auto = {
         "remember", "recall", "forget", "read_output", "set_timer", "list_timers",
-        "cancel_timer", "list_jobs", "job_report", "watch_job", "close_job",
+        "cancel_timer", "job_report", "watch_job", "close_job",
         "set_job_result", "list_experts", "hand_off", "stop_job",
     }  # fmt: skip
     assert {n: modes[n] for n in auto} == {n: "auto" for n in auto}

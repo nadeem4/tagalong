@@ -173,7 +173,7 @@ class Jobs:
         work = self._records.work
         settled = work.resume_scan(self.can_resume_row)
         jobs: dict[str, None] = {}
-        for work_id, outcome in settled:
+        for work_id, _ in settled:
             row = work.get(work_id)
             if row is None or row.kind != "expert_call" or row.parent_id is None:
                 continue

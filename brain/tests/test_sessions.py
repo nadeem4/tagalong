@@ -18,11 +18,11 @@ from brain.experts import PermissionOption, PermissionRequest, Question, Questio
 from brain.guards import Hook
 from brain.masking import Masker
 from brain.memory import Memory
-from brain.store.work import ActivityEntry
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
 from brain.sessions import Session
+from brain.store.work import ActivityEntry
 from brain.toolbox import BrainSource, ToolSpec
 
 
@@ -249,18 +249,19 @@ async def test_turn_offers_the_expert_tools_and_home_gets_two():
     session.say("desktop", say("hello"))
     await finish(session)
     names = {t["name"] for t in model.tools[0]}
-    assert {"hand_off", "tell_expert", "list_jobs", "stop_job"} <= names
+    assert {"hand_off", "tell_expert", "work_status", "stop_job"} <= names
+    assert "list_jobs" not in names
     home = {t.name for t in session.home_tools()}
     assert {"list_jobs", "stop_job"} <= home
     assert not home & {"hand_off", "tell_expert"}
 
 
-def test_session_start_marks_running_jobs_stopped():
+def test_session_start_fails_running_jobs_that_cannot_reload():
     memory = Memory(":memory:")
     records_for(memory).add_job("j1", "claude_code", "task", "C:/x", "default")
     session, _ = make(Gate([]), memory)
     job = session.jobs.list()[0]
-    assert job.state == "cancelled" and job.parts[-1].reason == "brain restarted"
+    assert job.state == "failed" and job.parts[-1].reason == "brain restarted"
 
 
 class PictureApps:
@@ -2005,7 +2006,9 @@ async def test_job_ended_wake_carries_the_activity_summary():
     join(session, "desktop")
     job = end_job(memory)
     at = "2026-01-01T00:00:00+00:00"
-    records_for(memory).work.save_activity("j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0))
+    records_for(memory).work.save_activity(
+        "j1", ActivityEntry(1, 1, at, "command", "make", "done", "s", 0)
+    )
     session.jobs._on_finished(job)
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]

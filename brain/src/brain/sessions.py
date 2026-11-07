@@ -33,6 +33,8 @@ from brain.choices import Choices
 from brain.config import (
     DEFAULT_KEEP_ASKING_DAYS,
     DEFAULT_OFFER_MIN_APPROVALS,
+    DEFAULT_JOB_STEPS_MAX_BYTES,
+    DEFAULT_JOB_STEPS_MAX_ENTRIES,
     DEFAULT_OFFER_WINDOW_DAYS,
     DEFAULT_TOOL_PREVIEW_CHARS,
     DEFAULT_TURN_TIMEOUT_S,
@@ -81,6 +83,7 @@ from brain.tools import (
     question_tools,
     timer_tools,
     voice_tools,
+    work_tools,
 )
 from brain.voice import VoiceHooks
 from brain.web_tools import WebSource, without_server_blocks
@@ -90,7 +93,7 @@ log = logging.getLogger("brain")
 # Tools that name a job: they bind an unbound turn to it and are recorded on it.
 JOB_TOOLS = frozenset({"hand_off", "tell_expert", "stop_job", "close_job", "set_job_result"})
 # Job bookkeeping Scout does about the job, not work for it: never on the timeline.
-BOOKKEEPING_TOOLS = frozenset({"set_job_result", "watch_job", "list_jobs"})
+BOOKKEEPING_TOOLS = frozenset({"set_job_result", "watch_job", "work_status"})
 _ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked, then clipped
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
@@ -130,6 +133,8 @@ class Session:
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
+        job_steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
+        job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
         self._model = model
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
@@ -197,6 +202,8 @@ class Session:
             offers=offer,
             guards=self.guards,
             on_away=self._on_job_away,
+            steps_max_entries=job_steps_max_entries,
+            steps_max_bytes=job_steps_max_bytes,
             setup_facts=setup_facts,
             emit=self._emit_job_event,
             drop=self.scheduler.drop,
@@ -214,6 +221,7 @@ class Session:
             + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
+            + work_tools(self.records.work)
             + timer_tools(memory, self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)

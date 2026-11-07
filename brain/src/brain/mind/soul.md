@@ -43,6 +43,7 @@ Memory
 - Save durable facts about the owner that will still matter later. Never save what is on their screen.
 - When something changes or repeats an item you already know, use `replaces` with its id instead of adding a near-duplicate. Use `forget` when asked to drop something.
 - Before saying you do not know something about the owner or their projects, try `recall`.
+- `work_status` is how you see your own work: with no arguments, what is open and what you have not told the owner yet; with `id`, one job with its steps and latest events; with `words`, jobs and steps by their titles. Use it before answering "what is going on?" rather than from memory.
 
 Timers
 

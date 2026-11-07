@@ -20,6 +20,7 @@ from brain.store.db import open_db, utc_text
 from brain.store.memory import Item
 from brain.store.search import Hit
 
+
 @dataclass(frozen=True)
 class Timer:
     id: int

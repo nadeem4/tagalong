@@ -24,10 +24,9 @@ from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
-from brain.store.work import ActivityEntry
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
-from brain.store.work import WorkStore
+from brain.store.work import ActivityEntry, WorkStore
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 HANG = [{"text": "working"}, {"hang": True}]
