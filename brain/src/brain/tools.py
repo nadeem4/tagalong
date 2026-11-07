@@ -14,6 +14,7 @@ import logging
 import math
 import re
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -585,10 +586,11 @@ def _event_row(event: WorkEvent) -> dict:
 
 
 def work_tools(
-    work: WorkStore, on_changed: Callable[[], None] = lambda: None
+    work: WorkStore, jobs: Jobs, on_changed: Callable[[], None] = lambda: None
 ) -> list[tuple[ToolSpec, Handler]]:
     """Scout's one read of the work table (what is open, what it has not been told, one goal) and
-    the person's choice for a stuck step. on_changed re-arms the runner after a retry."""
+    the person's choice for a stuck step. on_changed re-arms the runner after a retry; jobs ends
+    a whole job for "stop", so a running expert is stopped the usual way."""
 
     async def work_status(args: dict) -> str:
         if (id := args.get("id")) is not None:
@@ -627,16 +629,22 @@ def work_tools(
         step = work.get(args["id"])
         if step is None:
             return json.dumps({"error": f"no work with id {args['id']}"})
+        if step.kind not in ("tool_call", "expert_call"):
+            return json.dumps({"error": f"{step.id} is a {step.kind}, not a step that can fail"})
         try:
             if choice == "retry":
                 row = work.retry_step(step.id)
                 on_changed()  # it is due now, so the runner should look
             elif choice == "skip":
-                row = work.transition(step.id, "cancelled", reason="skipped")
+                row = work.transition(
+                    step.id, "cancelled", reason="skipped", expect=("failed", "blocked")
+                )
             else:
-                goal = work.close_goal(step.root_id, "failed", "stopped by the person")
-                return json.dumps({"id": step.id, "choice": choice, "goal": goal.state})
-        except TransitionRefused as err:  # already handled by someone else
+                with suppress(JobError):  # nothing running is fine; a missing job fails below
+                    await jobs.stop(step.root_id)
+                jobs.close(step.root_id, "failed")
+                return json.dumps({"id": step.id, "choice": choice, "goal": "failed"})
+        except (TransitionRefused, JobError) as err:  # already handled by someone else
             return json.dumps({"error": str(err)})
         return json.dumps({"id": row.id, "choice": choice, "state": row.state})
 

@@ -228,7 +228,7 @@ class Session:
             + home_tools(budget, lambda: self.toolbox, keys)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
-            + work_tools(self.records.work, timers.changed)
+            + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now)
             + output_tools(outputs)
             + question_tools(questions)
@@ -308,6 +308,10 @@ class Session:
         for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
         self._tell_paused_watches()
+        # Steps that gave up (or that the restart scan could not vouch for) and were never told.
+        for step in self.records.work.of_kind("tool_call", ["failed"]):
+            if step.reported_at is None:
+                self._tell_given_up(step)
         timers.start()
 
     def _tell_paused_watches(self) -> None:
@@ -568,7 +572,8 @@ class Session:
         if status == "refused":
             return
         work = self.records.work
-        payload = mask_json(self.guards, "work", {"name": call.name, "input": call.input})
+        raw = {"name": call.name, "input": call.input}
+        payload = mask_json(self.guards, "work", raw)
         try:
             row = work.create(
                 "tool_call",
@@ -576,7 +581,8 @@ class Session:
                 parent_id=job,
                 state="active",
                 input=payload,
-                safe_to_retry=safe_to_retry(spec),
+                # A masked input would replay as the literal "[secret]": never repeat it on its own.
+                safe_to_retry=safe_to_retry(spec) and payload == raw,
             )
             if status == "ok":
                 work.update(row.id, summary=(result or "")[:_SUMMARY_CAP])
@@ -600,6 +606,11 @@ class Session:
         if row.state != "failed":
             self.timers.changed()  # the next try is waiting out its backoff
             return
+        self._tell_given_up(row)
+
+    def _tell_given_up(self, row: WorkRow) -> None:
+        """Scout is woken once about a step that ended failed; the wake starting marks it told."""
+        work = self.records.work
         facts = {
             "goal": row.root_id,
             "step": row.id,

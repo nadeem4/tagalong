@@ -1171,7 +1171,7 @@ flowchart TD
 | `watch_job`      | scout       | change | `auto`                       | `{job, items: [{text, done}]}`. Replaces Scout's watch list for a job (see Watch list); returns `{job, watch}` or a plain refusal line                                                                                                                                                                                                                                                                                                                      |
 | `list_jobs`      | home        | read   | `auto`                       | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                                                                                                                   |
 | `stop_job`       | scout, home | change | `auto`                       | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                                                                                                                        |
-| `resolve_step`   | scout, home | change | `auto`                       | `{id, choice}`, `choice` is `retry`, `skip` or `stop`. `retry` sends a failed or blocked step back to `planned`, due now, with its tries reset; `skip` ends it as `cancelled` ("skipped") and the job carries on; `stop` closes the whole job as failed ("stopped by the person"). Returns `{id, choice, state}` (`{id, choice, goal}` for stop), or `{error}` as a plain line when the step is gone or has already moved |
+| `resolve_step`   | scout, home | change | `auto`                       | `{id, choice}`, `choice` is `retry`, `skip` or `stop`. `retry` sends a failed or blocked step back to `planned`, due now, with its tries reset; `skip` ends it as `cancelled` ("skipped") and the job carries on; `stop` stops the job's running parts and closes the whole job as failed. Only for `tool_call` and `expert_call` rows; `retry` and `skip` only from `failed` or `blocked`. Returns `{id, choice, state}` (`{id, choice, goal}` for stop), or `{error}` as a plain line when the step is gone or has already moved |
 | `work_status`    | scout       | read   | `auto`                       | `{id?, words?}`. With `id`: `{goal, steps, events}` (the goal, its steps and the last 20 events across them); with `words`: `{found: [...]}`, the best 5 matches by title; with neither: `{open: [...], unreported: [...]}`, the open goals and timers and anything that ended or got stuck that Scout has not been told. Rows carry `id`, `kind`, `state`, `title`, `summary`, `progress`, `attempt`, `end_reason`, `due_at`. Replaces Scout's `list_jobs` |
 | `job_activity`   | home        | read   | `auto`                       | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                                                                                                             |
 | `job_report`     | scout, home | read   | `auto`                       | `{job, part}`. One part's whole report as `{"text"}`. Scout's copy is previewed by the output cap, `read_output` pages the rest; Home gets it whole                                                                                                                                                                                                                                                                                                         |
@@ -1360,17 +1360,21 @@ what happens to a failure:
   `permanent`.
 - `safe_to_retry(spec)`: only a read-effect tool whose name holds none of `pay`, `purchase`, `buy`,
   `send_money`, `delete`, `remove`, `trash`, `wipe`, `forget`. Anything else is never repeated on
-  a guess.
+  a guess. A call whose saved input was changed by masking (a secret became `[secret]`) is not
+  safe either, because replaying it would send the placeholder.
 
 A transient failure on a safe step goes back to `planned` with `due_at` after a backoff of 30 s,
-2 min, then 10 min (three tries). `Timers` finds due `tool_call` and `expert_call` rows, moves
+2 min, then 10 min: three retries, so four runs in total. `Timers` finds due `tool_call` and `expert_call` rows, moves
 them to `active` and calls the session's rerun: a tool call runs again through the toolbox as
 Scout, an `expert_call` runs again with `Jobs.run_planned` (the same row, the saved session and
 the job's mode, no card). Any other failure, or the last try, ends the step as `failed`, which
 blocks its goal and emits `work_failed` (goal, step, title, reason) so Scout is woken once. The
-person (or Scout for them) answers with `resolve_step`: retry, skip or stop. A step that ended
-while the brain was down is not repeated unless it was safe (see the resume scan in
-[storage.md](storage.md)).
+person (or Scout for them) answers with `resolve_step`: retry, skip or stop. It takes only a
+`tool_call` or `expert_call` row; retry and skip need it `failed` or `blocked`. Stop stops the
+job's running experts, then closes the job as failed through `Jobs.close`. A step that ended while
+the brain was down is not repeated unless it was safe (see the resume scan in
+[storage.md](storage.md)). A failed step nobody was told about (the wake never started, or the
+scan failed it as "unsure if it ran") is told again at the next start, once.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%

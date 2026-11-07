@@ -16,11 +16,13 @@ from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.guards import Hook
+from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
+from brain.scheduler import Scheduler
 from brain.sessions import Session
 from brain.store.work import ActivityEntry
 from brain.toolbox import BrainSource, ToolSpec
@@ -2345,6 +2347,8 @@ class FlakyApp:
 
     def __init__(self, fails, tool="files__list", error=TimeoutError):
         self.fails, self.tool, self.error, self.calls = fails, tool, error, 0
+        self.release = None  # an Event a test sets to hold every call until it chooses
+        self.waiting = False
 
     def specs(self):
         return [
@@ -2356,6 +2360,9 @@ class FlakyApp:
 
     async def run(self, call, tool):
         self.calls += 1
+        if self.release is not None and self.calls > 1:
+            self.waiting = True
+            await self.release.wait()
         if self.calls <= self.fails:
             raise self.error("slow")
         return "a.txt"
@@ -2375,10 +2382,13 @@ class Clock:
         self.at += datetime.timedelta(seconds=seconds)
 
 
-async def flaky_wake(app, clock):
+async def flaky_wake(app, clock, masker=None, **args):
     """A job_ended wake for j1 whose one tool call goes to `app`; returns the session and events."""
     memory = Memory(":memory:")
-    session, _ = make(Gate([tool_use(app.tool, path="C:/x"), "ok", "ok"]), memory, now=clock)
+    args = args or {"path": "C:/x"}
+    session, _ = make(
+        Gate([tool_use(app.tool, **args), "ok", "ok"]), memory, now=clock, masker=masker
+    )
     session.toolbox.sources.insert(1, app)
     events = []
     emit = session.scheduler.emit
@@ -2457,6 +2467,114 @@ async def test_expert_call_that_cannot_restart_is_reported_as_given_up():
     row = records.work.get("j1.p1")
     assert row.state == "failed" and "not installed" in row.end_reason
     assert len(given_up(events)) == 1
+
+
+async def test_a_tool_call_whose_input_was_masked_is_never_rerun_on_its_own():
+    clock, app = Clock(), FlakyApp(fails=1)
+    secret = "fake-token-12345678"
+    session, memory, events = await flaky_wake(
+        app, clock, masker=Masker(lambda: [secret]), path="C:/x", token=secret
+    )
+    [row] = tool_rows(memory)  # the saved input says [secret]: replaying it would be wrong
+    assert row.safe_to_retry is False
+    assert row.state == "failed" and row.end_reason.startswith("not retryable")
+    assert len(given_up(events)) == 1
+    await due_now(session, clock, 600)
+    assert app.calls == 1
+
+
+@pytest.mark.parametrize("ending", ["skip", "close"])
+@pytest.mark.parametrize("fails", [1, 9])
+async def test_a_step_ended_while_it_reruns_stays_quiet_and_not_done(ending, fails):
+    clock, app = Clock(), FlakyApp(fails=fails)
+    session, memory, events = await flaky_wake(app, clock)
+    work = records_for(memory).work
+    [row] = tool_rows(memory)
+    app.release = asyncio.Event()
+    clock.step(30)
+    session.timers.fire_due()
+    while not app.waiting:
+        await asyncio.sleep(0)
+    if ending == "skip":
+        work.transition(row.id, "cancelled", reason="skipped")
+    else:
+        work.close_goal("j1", "failed", "stopped")
+    app.release.set()
+    await asyncio.gather(*session.timers._runs)
+    assert work.get(row.id).state == "cancelled"
+    assert given_up(events) == []
+
+
+async def test_a_begin_failure_that_already_ended_the_row_is_reported_once():
+    clock = Clock()
+    session, _ = make(Gate(["ok"]), now=clock)
+    events = []
+    emit = session.scheduler.emit
+    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    records = session.records
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.update_part("j1", "p1", state="failed", reason="crash")
+    records.work.retry_step("j1.p1")
+
+    async def begin_fails(row):  # what _start_part does: end the row itself, then raise
+        records.work.fail(row.id, "permanent", "cannot start")
+        raise JobError("cannot start")
+
+    session.jobs.run_planned = begin_fails
+    await due_now(session, clock, 0)
+    await due_now(session, clock, 600)
+    assert records.work.get("j1.p1").state == "failed"
+    assert len(given_up(events)) == 1
+
+
+def work_failed_emits(monkeypatch):
+    seen = []
+    emit = Scheduler.emit
+
+    def spy(self, event, **hooks):
+        if event.kind == "work_failed":
+            seen.append(event)
+        return emit(self, event, **hooks)
+
+    monkeypatch.setattr(Scheduler, "emit", spy)
+    return seen
+
+
+async def restart(memory):
+    session, _ = make(Gate(["ok"]), memory, kinds=None)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    return session
+
+
+async def test_a_give_up_whose_wake_never_started_is_told_again_at_start_once(monkeypatch):
+    memory = Memory(":memory:")
+    records = records_for(memory)
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.work.create(
+        "tool_call", "files__list", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    records.work.fail("j1.s", "permanent", "boom")  # failed and never told
+    seen = work_failed_emits(monkeypatch)
+    await restart(memory)
+    await restart(memory)
+    assert [e.facts["step"] for e in seen] == ["j1.s"]
+    assert records.work.get("j1.s").reported_at is not None
+
+
+async def test_a_step_the_resume_scan_failed_as_unsure_is_told_once(monkeypatch):
+    memory = Memory(":memory:")
+    records = records_for(memory)
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.work.create(
+        "tool_call", "files__write", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    seen = work_failed_emits(monkeypatch)
+    await restart(memory)  # the brain died mid-call: the scan fails it, unsure it ran
+    await restart(memory)
+    assert [e.facts["step"] for e in seen] == ["j1.s"]
+    assert "unsure" in seen[0].facts["reason"]
 
 
 async def test_bookkeeping_tools_leave_no_work_rows():

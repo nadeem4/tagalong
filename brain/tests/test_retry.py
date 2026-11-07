@@ -94,16 +94,33 @@ def goal_with_step(work, kind="tool_call", state="active", safe=True):
     return work.create(kind, "step", parent_id="g1", state=state, id="g1.s", safe_to_retry=safe)
 
 
+class FakeJobs:
+    """Records what the stop choice asks of Jobs; the real route is tested in test_jobs.py."""
+
+    def __init__(self, work) -> None:
+        self.calls = []
+        self._work = work
+
+    async def stop(self, job_id):
+        self.calls.append(("stop", job_id))
+
+    def close(self, job_id, outcome):
+        self.calls.append(("close", job_id, outcome))
+        self._work.close_goal(job_id, outcome, "")
+
+
 @pytest.fixture
 def resolve(work):
     changed = []
-    tools = {s.name: (s, h) for s, h in work_tools(work, lambda: changed.append(1))}
+    jobs = FakeJobs(work)
+    tools = {s.name: (s, h) for s, h in work_tools(work, jobs, lambda: changed.append(1))}
 
     async def run(args):
         return json.loads(await tools["resolve_step"][1](args))
 
     run.spec = tools["resolve_step"][0]
     run.changed = changed
+    run.jobs = jobs
     return run
 
 
@@ -150,8 +167,8 @@ async def test_resolve_step_retry_skip_stop(work, resolve, clock):
     out = await resolve({"id": "g1.t", "choice": "stop"})
     assert work.get("g1").state == "failed"
     assert work.get("g1").end_reason == "closed by Scout"
-    assert work.get("g1").summary == "stopped by the person"
     assert out["goal"] == "failed"
+    assert resolve.jobs.calls == [("stop", "g1"), ("close", "g1", "failed")]  # through Jobs
 
 
 async def test_resolve_step_refusals_are_plain_lines(work, resolve):
@@ -159,6 +176,24 @@ async def test_resolve_step_refusals_are_plain_lines(work, resolve):
     assert "no work" in (await resolve({"id": "zzz", "choice": "retry"}))["error"]
     assert "choice" in (await resolve({"id": "g1.s", "choice": "maybe"}))["error"]
     assert "not blocked or failed" in (await resolve({"id": "g1.s", "choice": "retry"}))["error"]
+
+
+async def test_resolve_step_takes_only_tool_and_expert_calls(work, resolve):
+    goal_with_step(work)
+    work.create("timer", "later", parent_id="g1", state="planned", id="g1.t")
+    for id in ("g1", "g1.t"):  # a goal and a timer are not steps
+        for choice in ("retry", "skip", "stop"):
+            assert "error" in await resolve({"id": id, "choice": choice})
+    assert work.get("g1").state == "active" and work.get("g1.t").state == "planned"
+    assert resolve.jobs.calls == []
+
+
+async def test_resolve_step_skip_and_retry_only_when_failed_or_blocked(work, resolve):
+    work.create("goal", "tidy", id="g1", state="active")
+    work.create("expert_call", "run", parent_id="g1", state="active", id="g1.p1")
+    for choice in ("skip", "retry"):  # running: leave it alone
+        assert "error" in await resolve({"id": "g1.p1", "choice": choice})
+    assert work.get("g1.p1").state == "active"
 
 
 def test_resolve_step_is_for_scout_and_home(resolve):
