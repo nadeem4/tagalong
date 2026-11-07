@@ -250,8 +250,8 @@ class FakeJobs:
             raise self.error
         return self.started
 
-    def close(self, job_id):
-        self.calls.append(("close", job_id))
+    def close(self, job_id, outcome="done"):
+        self.calls.append(("close", job_id) + (() if outcome == "done" else (outcome,)))
         if self.error:
             raise self.error
 
@@ -1315,6 +1315,14 @@ async def test_close_job_tool_closes_and_refuses_with_a_plain_line(home):
     assert home.jobs.calls[-1] == ("close", "j1")
     home.jobs.error = JobError("job j1 is already closed")
     assert await home.run("close_job", {"job": "j1"}) == "job j1 is already closed"
+
+
+async def test_close_job_failed_outcome(home):
+    await home.run("close_job", {"job": "j1", "outcome": "failed"})
+    assert home.jobs.calls[-1] == ("close", "j1", "failed")
+    assert await home.run("close_job", {"job": "j1", "outcome": "meh"}) == (
+        "outcome must be done or failed"
+    )
 
 
 def test_close_job_spec_is_scout_only_and_automatic(home):

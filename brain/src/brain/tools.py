@@ -484,8 +484,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
 
     async def close_job(args: dict) -> str:
         _need_text("close_job", args, "job")
+        outcome = args.get("outcome", "done")
+        if outcome not in ("done", "failed"):
+            return "outcome must be done or failed"
         try:
-            jobs.close(args["job"])
+            jobs.close(args["job"], outcome)
         except JobError as err:
             return str(err)
         return f"job {args['job']} closed"
@@ -636,8 +639,16 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "close_job",
                 "Close a job when you judge its work done. It stays in the list with its last "
                 "outcome; a closed job takes no more parts. A job with a part still running "
-                "cannot be closed. A job you never close just stays open.",
-                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                "cannot be closed. A job you never close just stays open. Pass outcome failed "
+                "when the work did not get done; the default is done.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "job": job_id,
+                        "outcome": {"type": "string", "enum": ["done", "failed"]},
+                    },
+                    "required": ["job"],
+                },
                 scout,
                 effect="change",
                 default_mode="auto",

@@ -178,7 +178,11 @@ class Session:
         offer = Offers(
             model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
         )
-        self.records = JobRecords(WorkStore(memory.db, now), memory.db, now)
+        self.records = JobRecords(
+            WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text)),
+            memory.db,
+            now,
+        )
         self.jobs = Jobs(
             self.records,
             memory,
