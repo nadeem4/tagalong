@@ -333,6 +333,11 @@ def test_expert_specs_audiences_effects_and_gate(home):
     assert specs["stop_job"].default_mode == "auto"
 
 
+def test_no_scout_tool_text_mentions_list_jobs(home):
+    for tool in home.box.model_tools():
+        assert "list_jobs" not in json.dumps(tool), tool["name"]
+
+
 def test_expert_model_tool_schemas(home):
     tools = {t["name"]: t["input_schema"] for t in home.box.model_tools()}
     assert tools["hand_off"]["required"] == ["task", "folder"]

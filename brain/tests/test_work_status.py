@@ -55,6 +55,15 @@ async def test_work_status_by_id_returns_tree_and_events(work, run):
     assert len(out["events"]) <= 20
 
 
+async def test_work_status_events_hide_session_ids(work, run):
+    work.create("goal", "g", id="g1", state="active")
+    work.add_event("g1", "note", {"session_id": "s-secret", "k": 1})
+    out = await run({"id": "g1"})
+    note = next(e for e in out["events"] if e["kind"] == "note")
+    assert note["data"] == {"k": 1}
+    assert "s-secret" not in json.dumps(out)
+
+
 async def test_work_status_unknown_id_says_so(run):
     assert await run({"id": "nope"}) == {"error": "no work with id nope"}
 

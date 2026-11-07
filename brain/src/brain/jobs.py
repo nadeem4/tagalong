@@ -66,6 +66,9 @@ LIST_LIMIT = 20
 TITLE_FALLBACK_CHARS = 80
 
 
+RESTARTED = "brain restarted"  # the reason a restart gives a part it holds for a carry-on
+
+
 class JobError(Exception):
     """A plain message for the model or the user; never a crash. `facts` (JSON-able ids and
     numbers, no sentences) lets Scout reason about a setup problem and word it himself."""
@@ -172,6 +175,8 @@ class Jobs:
         its job's check-back timers go. Returns the scan's (work id, outcome) pairs."""
         work = self._records.work
         settled = work.resume_scan(self.can_resume_row)
+        # The end lines come after the scan commits; a crash between only loses them, because
+        # resume_scan is idempotent and will not settle these rows twice.
         jobs: dict[str, None] = {}
         for work_id, _ in settled:
             row = work.get(work_id)
@@ -323,6 +328,14 @@ class Jobs:
             new_job=job is None,
             apps=offered,
         )
+        if earlier_part and earlier_part.state == "blocked" and earlier_part.reason == RESTARTED:
+            # Carried on: the held part is done with, so its goal stops showing as open.
+            self._records.update_part(
+                earlier.id, earlier_part.id, state="cancelled", reason="carried on", reported=True
+            )
+            if job != earlier.id:  # a part added to the same job keeps that job open
+                self._records.work.transition(earlier.id, "cancelled", reason="carried on")
+                self._records.mark_reported(earlier.id)
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
             self._records.set_title(str(started), clean.strip())

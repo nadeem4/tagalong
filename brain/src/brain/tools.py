@@ -37,7 +37,7 @@ from brain.setup.env import is_tested
 from brain.setup.store import InstalledExpert
 from brain.store.memory import KINDS, MemoryRefused
 from brain.store.search import Hit
-from brain.store.work import WorkRow, WorkStore
+from brain.store.work import WorkEvent, WorkRow, WorkStore
 from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
@@ -462,6 +462,14 @@ def _work_summary(row: WorkRow) -> dict:
     }
 
 
+def _event_row(event: WorkEvent) -> dict:
+    """An event as Scout sees it: the expert's session id is an opaque handle it never needs."""
+    row = asdict(event)
+    if row["data"]:
+        row["data"] = {k: v for k, v in row["data"].items() if k != "session_id"}
+    return row
+
+
 def work_tools(work: WorkStore) -> list[tuple[ToolSpec, Handler]]:
     """Scout's one read of the work table: what is open, what it has not been told, one goal."""
 
@@ -480,7 +488,7 @@ def work_tools(work: WorkStore) -> list[tuple[ToolSpec, Handler]]:
                 {
                     "goal": _work_summary(goal),
                     "steps": [_work_summary(r) for r in steps],
-                    "events": [asdict(e) for e in events],
+                    "events": [_event_row(e) for e in events],
                 }
             )
         if (words := args.get("words")) is not None:
@@ -640,8 +648,11 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             raise RpcError(ErrorCode.invalid_params, str(err)) from err
 
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
-    job_id = {"type": "string", "description": "The job id from hand_off or list_jobs."}
-    part_id = {"type": "string", "description": "Optional: one part of the job, from list_jobs."}
+    job_id = {"type": "string", "description": "The job id from hand_off or work_status."}
+    part_id = {
+        "type": "string",
+        "description": "Optional: one part of the job (p1, p2, ...).",
+    }
     return [
         (
             ToolSpec(
@@ -677,7 +688,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                         },
                         "continue_job": {
                             "type": "string",
-                            "description": "A finished job's id to follow up on, from list_jobs.",
+                            "description": "A finished job's id to follow up on, from work_status.",
                         },
                         "fresh": {
                             "type": "boolean",
@@ -784,7 +795,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "(at most 10, each up to 200 characters) such as what must pass or be changed. "
                 "Call it right after hand_off returns the job id, and again to tick an item "
                 "(done: true) or reword it. The whole list is replaced each time; an empty "
-                "list clears it. You see it on every wake about the job and in list_jobs, and "
+                "list clears it. You see it on every wake about the job, and "
                 "the owner sees it, read-only, on the job page.",
                 {
                     "type": "object",
@@ -857,7 +868,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
         (
             ToolSpec(
                 "job_report",
-                "One part of a job: the expert's full report (list_jobs cuts reports short). "
+                "One part of a job: the expert's full report (work_status shows it cut short). "
                 "A long one arrives as a preview; read_output reads the rest.",
                 {
                     "type": "object",
@@ -865,7 +876,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                         "job": job_id,
                         "part": {
                             "type": "string",
-                            "description": "The part id (p1, p2...) from list_jobs.",
+                            "description": "The part id (p1, p2, ...): the end of <job>.<part>.",
                         },
                     },
                     "required": ["job", "part"],

@@ -125,3 +125,7 @@ def test_the_picture_says_not_working_without_offering_the_install_tool():
     out = picture(ocr=ocr("not-working"))
     assert "Text inside pictures cannot be read on this PC" in out
     assert "install_ocr_language" not in out
+
+
+def test_capabilities_mention_work_status():
+    assert "work_status" in picture()

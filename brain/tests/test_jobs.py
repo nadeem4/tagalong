@@ -1366,6 +1366,19 @@ async def test_continue_job_reuses_the_saved_session_id_when_the_expert_can_resu
     )
 
 
+async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    assert rig.records.get_job("old").parts[-1].state == "blocked"
+    await rig.jobs.start("two", str(rig.folder), continue_job="old")
+    old = rig.records.get_job("old")
+    assert (old.parts[-1].state, old.state) == ("cancelled", "cancelled")
+    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
+    assert "old" not in [r.id for r in rig.records.work.open_roots()]
+
+
 async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
     first = await rig.jobs.start("one", str(rig.folder))
