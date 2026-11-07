@@ -51,7 +51,7 @@ Key columns only; the full columns are in each table's section.
 erDiagram
     work ||--o{ work : "goal has expert_call rows"
     work ||--o| work_job : "goal row of a job"
-    work ||--o{ job_activity : "job_id, the goal id"
+    work ||--o{ job_steps : "job_id, the goal id"
     work ||--o{ timers : "job_id, optional"
     work ||--o{ approvals : "job_id, optional"
     preferences ||--o{ approvals : "preference_id"
@@ -71,7 +71,7 @@ erDiagram
         text agent
         text folder
     }
-    job_activity {
+    job_steps {
         text job_id PK
         int seq PK
         int rev
@@ -268,8 +268,9 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
   `planned` with `attempt + 1` and `due_at` = now + backoff (30 s, 2 min, 10 min; the last value
   repeats). Otherwise the row is `failed` ("gave up after N tries: ..." or "not retryable: ...")
   with `reported_at` null. `retry_step` is the person's retry choice.
-- Resume scan at start (`resume_scan`): open asks and questions expire ("brain restarted"); an
-  active expert call with a saved session becomes `blocked`, any other `failed`; an active tool
+- Resume scan at start (`resume_scan`, run by `Jobs.startup`): open asks and questions expire
+  ("brain restarted"); an active expert call with a saved session whose expert can reload it
+  becomes `blocked` (Scout is told and offers to carry on), any other `failed`; an active tool
   call reruns when safe, else fails; timers, watches, loops, goals and planned, paused or blocked
   rows are left alone. Running it twice changes nothing.
 
@@ -348,10 +349,11 @@ active, failed once the goal failed, otherwise the state of the part that ended 
 
 - Written by: `jobs.py` through `JobRecords` (`add_job`, `add_part`, `update_part`, `set_title`,
   `set_result`, `set_watch`, `close_job`, `mark_reported`).
-- Read by: `jobs.py`, `tools.py` (`list_jobs`), `timers.py`, `job_activity.py` through
+- Read by: `jobs.py`, `tools.py` (`list_jobs`, Home only), `timers.py`, `job_activity.py` through
   `JobRecords` (`get_job`, `parts_of`, `last_part_for`, `unreported_jobs`, `running_jobs`).
-- Retention: kept forever. Rows still active when the brain starts become `cancelled` with the
-  reason `brain restarted` (`stop_running_on_start`); their goals are cancelled too.
+- Retention: kept forever. Parts still active when the brain starts are settled by the resume scan:
+  `blocked` with the reason `brain restarted` when they saved a session the expert can reload,
+  else `failed` with that reason; either way their job's step log ends with a "stopped" line.
 - Masked: title, watch, progress, report and result yes (the work store masks them on the way in);
   `task` and `folder` no.
 - A report over 2,000 characters lives in `tool_outputs`; `prune_outputs` keeps any output a work
@@ -365,28 +367,29 @@ active, failed once the goal failed, otherwise the state of the part that ended 
 
 ## Work (old shape)
 
-### job_activity
+### job_steps
 
-A job's steps as a log: commands, output, messages and tool calls, masked and capped.
+A job's steps as a log (the old `job_activity` table, renamed by migration `0020_job_steps`): commands, output, messages and tool calls, masked and capped.
 
-| Column   | Type    | Meaning                                                                                 |
-| -------- | ------- | --------------------------------------------------------------------------------------- |
-| `job_id` | TEXT    | The job; part of the primary key `(job_id, seq)`                                        |
-| `rev`    | INTEGER | Rises on every write; the cursor readers page by. Index `job_activity_rev(job_id, rev)` |
-| `seq`    | INTEGER | Display order, fixed at insert; 0 is the `[older steps dropped]` marker                 |
-| `at`     | TEXT    | When the step was written                                                               |
-| `kind`   | TEXT    | `command`, `output`, `edit`, `read`, `search`, `other`, `say`, `plan`, `end` or `tool`  |
-| `step`   | TEXT    | The expert's step id, linking an output to its command                                  |
-| `status` | TEXT    | The step's status as the expert reports it                                              |
-| `exit`   | INTEGER | A command's exit code                                                                   |
-| `text`   | TEXT    | The step text                                                                           |
-| `part`   | TEXT    | Which part wrote it; default `p1`                                                       |
-| `source` | TEXT    | Label of the app or tool behind a Scout step                                            |
+| Column   | Type    | Meaning                                                                                |
+| -------- | ------- | -------------------------------------------------------------------------------------- |
+| `job_id` | TEXT    | The job; part of the primary key `(job_id, seq)`                                       |
+| `rev`    | INTEGER | Rises on every write; the cursor readers page by. Index `job_steps_rev(job_id, rev)`   |
+| `seq`    | INTEGER | Display order, fixed at insert; 0 is the `[older steps dropped]` marker                |
+| `at`     | TEXT    | When the step was written                                                              |
+| `kind`   | TEXT    | `command`, `output`, `edit`, `read`, `search`, `other`, `say`, `plan`, `end` or `tool` |
+| `step`   | TEXT    | The expert's step id, linking an output to its command                                 |
+| `status` | TEXT    | The step's status as the expert reports it                                             |
+| `exit`   | INTEGER | A command's exit code                                                                  |
+| `text`   | TEXT    | The step text                                                                          |
+| `part`   | TEXT    | Which part wrote it; default `p1`                                                      |
+| `source` | TEXT    | Label of the app or tool behind a Scout step                                           |
 
-- Written by: `job_activity.py` `JobActivity` through `memory.py` `save_activity`, `trim_activity`.
-- Read by: `memory.py` `activity_after`, `job_activity.py` `activity_summary`, the Home-only
-  `job_activity` tool.
-- Retention: per job, at most 2,000 entries and 1,000,000 bytes of text; the oldest are dropped
+- Written by: `job_activity.py` `JobActivity` through `WorkStore.save_activity`, `trim_activity`.
+- Read by: `WorkStore.activity_after`, `job_activity.py` `activity_summary`, the Home-only
+  `job_activity` tool (the tool keeps its name).
+- Retention: per job, at most `TAGALONG_JOB_STEPS_MAX_ENTRIES` (2,000) entries and
+  `TAGALONG_JOB_STEPS_MAX_BYTES` (1,000,000) bytes of text; the oldest are dropped
   behind the marker. Rows stay after the job ends.
 - Masked: yes, the text is masked and then capped.
 

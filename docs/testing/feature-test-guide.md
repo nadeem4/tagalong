@@ -271,8 +271,10 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 7. **Action:** start two long jobs, then ask for a third.
    **Expected:** Scout says 2 jobs are already running and names them.
 8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
-   **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes. Scout may
-   mention it once when the desktop reconnects, and not again after that.
+   **Expected:** the job step shows as stopped with reason "brain restarted" (Scout shows it as
+   blocked and offers to carry on if the expert had saved its session, else failed). Nothing
+   resumes by itself. Scout may mention it once when the desktop reconnects, and not again after
+   that. Asking "what is going on?" makes Scout read `work_status` and answer from it.
 9. **Action:** start a short job, close Home and wait for it to finish.
    **Expected:** about 30 seconds after the job ends (the brain batches job endings), Scout speaks
    up on its own with a short report of the result, though you asked nothing. A second finish report
@@ -296,10 +298,19 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Jobs as work rows (S2a):** jobs and parts are now `work` rows. Automated:
     `test_migrate_jobs.py` (a messy old database upgrades with every job, part, report, session
     and watch list kept), `test_job_records.py` (the `Job` and `JobPart` shapes, state words,
-    long reports in `tool_outputs`, restart cancel), `test_tools.py` (`list_jobs` and `close_job`
+    long reports in `tool_outputs`, a part blocked by a restart is news), `test_tools.py` (`list_jobs` and `close_job`
     keep their shapes; `close_job` takes `outcome`). **Manual check:** upgrade a database that
     has finished, failed and stopped jobs; Home → Jobs shows the same list, states and results,
     and a follow-up on an old job still continues its session.
+    **Job steps, resume and work_status (S2b):** a job's step log is now the `job_steps` table.
+    Automated: `test_work_steps.py` (the log's paging and caps, unchanged), `test_job_activity.py`
+    (`test_job_activity_paging_unchanged`, caps as settings), `test_jobs.py` and `test_sessions.py`
+    (a restart blocks a part that saved a session, fails one that cannot reload, ends its log once
+    and wakes Scout once), `test_work_status.py` (the three ways to read `work_status`),
+    `test_tools.py` (`list_jobs` is Home only; `recall` finds work by title).
+    **Manual check:** start a job, quit the brain, start it again. **Expected:** Home → Jobs still
+    pages the job's steps and the last one reads "stopped"; Scout says the step was stopped by the
+    restart and offers to carry on; asking "what is going on?" gets an answer from `work_status`.
     **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
     tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
     page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it
@@ -560,7 +571,7 @@ so allow about that long before expecting a report.
 3. **Action:** start two short jobs within 30 seconds of each other and let both end.
    **Expected:** one wake covers both: Scout speaks once about the two jobs, not twice.
 4. **Action:** start a long job, stop the brain while it runs, then start the brain again.
-   **Expected:** the job shows as stopped with reason "brain restarted". Scout reports it once after
+   **Expected:** the job step is stopped by the restart (reason "brain restarted"). Scout reports it once after
    the restart (once the desktop is connected), and not again on the next restart.
 
 5. **Action:** hand off a job that works for more than 30 minutes (for example a long build).

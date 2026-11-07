@@ -143,7 +143,7 @@ The daily limit is the one guard limit you can change in the app: **Settings →
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
 environment or its `.env` (see [brain.md](brain.md#run-it) and
-[Guardrails](brain.md#guardrails)). The turn timeout is the same kind of setting:
+[Guardrails](brain.md#guardrails)). The step log caps of a job (`TAGALONG_JOB_STEPS_MAX_ENTRIES`, `TAGALONG_JOB_STEPS_MAX_BYTES`) are the same kind of setting, passed from `main.py` through `Session` to `Jobs`. The turn timeout is the same kind of setting:
 `TAGALONG_TURN_TIMEOUT_S` (default 300 seconds, a positive number) is read by `config.py`, passed
 to the session, and ends a Scout turn that runs too long.
 
