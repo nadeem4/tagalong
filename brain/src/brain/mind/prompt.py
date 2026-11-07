@@ -14,8 +14,9 @@ from functools import cache
 from importlib.resources import files
 from typing import Any
 
-from brain.memory import Item, Preference
+from brain.memory import Preference
 from brain.protocol import Body, FilePart, ImagePart, Part, SayParams, TextPart
+from brain.store.memory import Item
 
 IMAGE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 

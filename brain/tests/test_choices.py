@@ -9,7 +9,7 @@ import pytest
 
 from brain.asks import Asks
 from brain.choices import Choices
-from brain.memory import MemoryRefused
+from brain.store.memory import MemoryRefused
 from brain.tools import choice_tools
 
 

@@ -1,7 +1,7 @@
 """Scout's long-term memory: one SQLite file in the data folder.
 
-The kinds table below is the only place caps and rules live. Refusals raise MemoryRefused
-with a plain sentence the model reads and can act on; code never evicts items silently.
+`Memory` is the one object the rest of the brain holds. Chat, memory items, apps and tool
+outputs delegate to `brain.store`; the other areas keep their SQL here until their own slice.
 """
 
 import json
@@ -13,46 +13,14 @@ from pathlib import Path
 from typing import Literal
 
 from brain.apps import AppRow
+from brain.store import connections, conversation, outputs
+from brain.store import memory as memory_store
+from brain.store import search as search_store
 from brain.store.db import open_db, utc_text
-from brain.store.search import fts_query
-
-
-@dataclass(frozen=True)
-class Kind:
-    name: str
-    written_by: Literal["model", "code"]
-    always_loaded: bool
-    max_items: int | None
-    max_chars: int | None
-
-
-# Insertion order is the order kinds appear in the prompt.
-KINDS: dict[str, Kind] = {
-    k.name: k
-    for k in (
-        Kind("instruction", "model", True, 50, 300),
-        Kind("about_you", "model", True, 50, 300),
-        Kind("tracking", "model", True, 30, 300),
-        Kind("project", "model", False, 200, 500),
-        Kind("summary", "code", False, None, None),
-    )
-}
+from brain.store.memory import Item
+from brain.store.search import Hit
 
 DROPPED_MARKER = "[older steps dropped]"
-
-
-class MemoryRefused(Exception):
-    """A refusal whose str() is the message the model sees."""
-
-
-@dataclass(frozen=True)
-class Item:
-    id: int
-    kind: str
-    text: str
-    cadence: str | None
-    created_at: str
-    updated_at: str
 
 
 @dataclass(frozen=True)
@@ -145,15 +113,6 @@ class Preference:
     last_used: str | None
 
 
-@dataclass(frozen=True)
-class Hit:
-    ref: str
-    kind: str
-    at: str
-    text: str
-
-
-_COLUMNS = "id, kind, text, cadence, created_at, updated_at"
 _JOB_COLUMNS = (
     "id, task, folder, mode, state, started_at, ended_at, parent_job, watch,"
     " title, scout_result, closed_at"
@@ -180,41 +139,6 @@ def _parse_watch(raw: str | None) -> list[dict] | None:
     return items if isinstance(items, list) else None
 
 
-_MARKERS = {"image": "[screenshot]", "document": "[document]"}
-
-
-def _compaction_text(block: dict) -> str:
-    """The summary text of a compaction block; empty when compaction failed (content null)."""
-    return block.get("content") or ""
-
-
-def _clean_block(block, texts: list[str]):
-    """Replace image/document blocks with text markers; collect searchable text.
-
-    Thinking and tool_use input are kept in content_json (the API needs them to resume) but
-    never reach the searchable text.
-    """
-    if not isinstance(block, dict):
-        return block
-    kind = block.get("type")
-    if kind in _MARKERS:
-        texts.append(_MARKERS[kind])
-        return {"type": "text", "text": _MARKERS[kind]}
-    if kind == "text":
-        texts.append(block.get("text", ""))
-    elif kind == "tool_result":
-        inner = block.get("content")
-        if isinstance(inner, str):
-            texts.append(inner)
-        elif isinstance(inner, list):
-            return {**block, "content": [_clean_block(b, texts) for b in inner]}
-    return block
-
-
-def _model_kinds() -> str:
-    return ", ".join(k.name for k in KINDS.values() if k.written_by == "model")
-
-
 class Memory:
     def __init__(
         self,
@@ -232,26 +156,6 @@ class Memory:
     def close(self) -> None:
         self._db.close()
 
-    def put_output(self, output_id: str, tool: str, text: str) -> None:
-        self._db.execute(
-            "INSERT INTO tool_outputs(id, tool, chars, text, at) VALUES (?, ?, ?, ?, ?)",
-            (output_id, tool, len(text), text, self._now().isoformat()),
-        )
-        self._db.commit()
-
-    def get_output(self, output_id: str) -> str | None:
-        row = self._db.execute("SELECT text FROM tool_outputs WHERE id=?", (output_id,)).fetchone()
-        return None if row is None else row[0]
-
-    def prune_outputs(self, keep: int) -> None:
-        """Keep the newest `keep` stored outputs (rowid order is insertion order)."""
-        self._db.execute(
-            "DELETE FROM tool_outputs WHERE rowid NOT IN "
-            "(SELECT rowid FROM tool_outputs ORDER BY rowid DESC LIMIT ?)",
-            (keep,),
-        )
-        self._db.commit()
-
     def permission_modes(self) -> dict[str, str]:
         return dict(self._db.execute("SELECT tool, mode FROM permissions"))
 
@@ -261,24 +165,6 @@ class Memory:
             " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
             (tool, mode),
         )
-
-    def list_apps(self) -> list[AppRow]:
-        rows = self._db.execute(
-            "SELECT id, name, transport, config, auth, enabled FROM apps ORDER BY rowid"
-        )
-        return [AppRow(i, n, t, json.loads(c), a, bool(e)) for i, n, t, c, a, e in rows]
-
-    def add_app(self, row: AppRow) -> None:
-        self._db.execute(
-            "INSERT INTO apps(id, name, transport, config, auth, enabled) VALUES (?,?,?,?,?,?)",
-            (row.id, row.name, row.transport, json.dumps(row.config), row.auth, int(row.enabled)),
-        )
-
-    def set_app_enabled(self, app_id: str, enabled: bool) -> None:
-        self._db.execute("UPDATE apps SET enabled=? WHERE id=?", (int(enabled), app_id))
-
-    def remove_app(self, app_id: str) -> None:
-        self._db.execute("DELETE FROM apps WHERE id=?", (app_id,))
 
     def _jobs(self, where: str = "", args: tuple = (), limit: int | None = None) -> list[Job]:
         sql = f"SELECT {_JOB_COLUMNS} FROM jobs {where} ORDER BY rowid DESC"
@@ -704,177 +590,56 @@ class Memory:
         ).fetchall()
         return [(a, o) for a, o in rows]
 
-    def _item(self, item_id: int) -> Item | None:
-        row = self._db.execute(f"SELECT {_COLUMNS} FROM memories WHERE id=?", (item_id,)).fetchone()
-        return Item(*row) if row else None
+    # Chat, memory items, apps and tool outputs keep their SQL in brain.store.
 
-    def _validate(self, kind: str, text: str, cadence: str | None) -> tuple[Kind, str]:
-        spec = KINDS.get(kind)
-        if spec is None:
-            raise MemoryRefused(f"Unknown kind '{kind}'. Use one of: {_model_kinds()}.")
-        if spec.written_by != "model":
-            raise MemoryRefused(f"'{kind}' is written by code, not by you. Use: {_model_kinds()}.")
-        text = text.strip()
-        if not text:
-            raise MemoryRefused("The text is empty.")
-        if spec.max_chars is not None and len(text) > spec.max_chars:
-            raise MemoryRefused(
-                f"That is {len(text)} characters; {kind} items are at most {spec.max_chars}."
-            )
-        if cadence is not None and kind != "tracking":
-            raise MemoryRefused("cadence is only for tracking items.")
-        return spec, text
+    def put_output(self, output_id: str, tool: str, text: str) -> None:
+        outputs.put_output(self._db, output_id, tool, text, self._now().isoformat())
+
+    def get_output(self, output_id: str) -> str | None:
+        return outputs.get_output(self._db, output_id)
+
+    def prune_outputs(self, keep: int) -> None:
+        outputs.prune_outputs(self._db, keep)
+
+    def list_apps(self) -> list[AppRow]:
+        return connections.list_apps(self._db)
+
+    def add_app(self, row: AppRow) -> None:
+        connections.add_app(self._db, row)
+
+    def set_app_enabled(self, app_id: str, enabled: bool) -> None:
+        connections.set_app_enabled(self._db, app_id, enabled)
+
+    def remove_app(self, app_id: str) -> None:
+        connections.remove_app(self._db, app_id)
 
     def remember(
         self, kind: str, text: str, cadence: str | None = None, replaces: int | None = None
     ) -> Item:
-        spec, text = self._validate(kind, text, cadence)
-        now = self._now().isoformat()
-        self._db.execute("BEGIN IMMEDIATE")
-        try:
-            item = self._write(spec, text, cadence, replaces, now)
-        except BaseException:
-            self._db.execute("ROLLBACK")
-            raise
-        self._db.execute("COMMIT")
-        return item
-
-    def _write(
-        self, spec: Kind, text: str, cadence: str | None, replaces: int | None, now: str
-    ) -> Item:
-        twin = self._db.execute(
-            "SELECT id FROM memories WHERE kind=? AND text=? AND id IS NOT ?",
-            (spec.name, text, replaces),
-        ).fetchone()
-        if replaces is None:
-            if twin:
-                return self._item(twin[0])  # type: ignore[return-value]
-            count = self._db.execute(
-                "SELECT count(*) FROM memories WHERE kind=?", (spec.name,)
-            ).fetchone()[0]
-            if spec.max_items is not None and count >= spec.max_items:
-                raise MemoryRefused(
-                    f"{spec.name} is full ({spec.max_items}). "
-                    "Use replaces=<id> to update one or forget one first."
-                )
-            cur = self._db.execute(
-                "INSERT INTO memories(kind, text, cadence, created_at, updated_at)"
-                " VALUES (?,?,?,?,?)",
-                (spec.name, text, cadence, now, now),
-            )
-            return self._item(cur.lastrowid)  # type: ignore[arg-type,return-value]
-        old = self._item(replaces)
-        if old is None or old.kind != spec.name:
-            raise MemoryRefused(f"No {spec.name} memory with id {replaces} to replace.")
-        if twin:
-            # The new text already exists as another item: drop the old one, keep that one.
-            self._db.execute("DELETE FROM memories WHERE id=?", (replaces,))
-            return self._item(twin[0])  # type: ignore[return-value]
-        # A reworded tracking item keeps its cadence unless a new one is given.
-        self._db.execute(
-            "UPDATE memories SET text=?, cadence=?, updated_at=? WHERE id=?",
-            (text, cadence if cadence is not None else old.cadence, now, replaces),
+        return memory_store.remember(
+            self._db, kind, text, cadence, replaces, self._now().isoformat()
         )
-        return self._item(replaces)  # type: ignore[return-value]
 
     def forget(self, item_id: int) -> Item:
-        item = self._item(item_id)
-        if item is None:
-            raise MemoryRefused(f"no memory with id {item_id}.")
-        self._db.execute("DELETE FROM memories WHERE id=?", (item_id,))
-        return item
+        return memory_store.forget(self._db, item_id)
 
     def list_items(self, limit: int) -> list[Item]:
-        """Every kind, newest first (by last change); for Home's memory list."""
-        rows = self._db.execute(
-            f"SELECT {_COLUMNS} FROM memories ORDER BY updated_at DESC, id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-        return [Item(*r) for r in rows]
+        return memory_store.list_items(self._db, limit)
 
     def always_loaded(self) -> dict[str, list[Item]]:
-        out: dict[str, list[Item]] = {}
-        for spec in KINDS.values():
-            if not spec.always_loaded:
-                continue
-            rows = self._db.execute(
-                f"SELECT {_COLUMNS} FROM memories WHERE kind=? ORDER BY id", (spec.name,)
-            ).fetchall()
-            if rows:
-                out[spec.name] = [Item(*r) for r in rows]
-        return out
+        return memory_store.always_loaded(self._db)
 
     def add_summary(self, text: str) -> Item:
-        """Code-written compaction summary; skips the model-write checks and caps."""
-        now = self._now().isoformat()
-        cur = self._db.execute(
-            "INSERT INTO memories(kind, text, cadence, created_at, updated_at)"
-            " VALUES ('summary',?,NULL,?,?)",
-            (text.strip(), now, now),
-        )
-        return self._item(cur.lastrowid)  # type: ignore[arg-type,return-value]
+        return memory_store.add_summary(self._db, text, self._now().isoformat())
 
     def save_messages(self, messages: list[dict]) -> None:
-        now = self._now().isoformat()
-        self._db.execute("BEGIN IMMEDIATE")
-        try:
-            for m in messages:
-                content, text = _encode_message(m)
-                self._db.execute(
-                    "INSERT INTO messages(at, role, content_json, text) VALUES (?,?,?,?)",
-                    (now, m["role"], content, text),
-                )
-        except BaseException:
-            self._db.execute("ROLLBACK")
-            raise
-        self._db.execute("COMMIT")
+        conversation.save_messages(self._db, messages, self._now().isoformat())
 
     def replace_last_message(self, message: dict) -> None:
-        """Rewrite the newest saved message: a spoken-over reply keeps only what was said."""
-        content, text = _encode_message(message)
-        self._db.execute(
-            "UPDATE messages SET content_json=?, text=? WHERE id=(SELECT MAX(id) FROM messages)",
-            (content, text),
-        )
+        conversation.replace_last_message(self._db, message)
 
     def load_messages(self) -> list[dict]:
-        rows = self._db.execute("SELECT role, content_json FROM messages ORDER BY id")
-        return [{"role": r, "content": json.loads(c)} for r, c in rows]
+        return conversation.load_messages(self._db)
 
     def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
-        match = fts_query(query)
-        if not match or (kind is not None and kind != "chat" and kind not in KINDS):
-            return []
-        hits: list[Hit] = []
-        if kind != "chat":
-            sql = (
-                "SELECT m.id, m.kind, m.updated_at, m.text FROM memories_fts"
-                " JOIN memories m ON m.id = memories_fts.rowid WHERE memories_fts MATCH ?"
-            )
-            args: list = [match]
-            if kind is not None:
-                sql += " AND m.kind = ?"
-                args.append(kind)
-            sql += " ORDER BY bm25(memories_fts) LIMIT ?"
-            args.append(limit)
-            hits = [Hit(str(i), k, at, t) for i, k, at, t in self._db.execute(sql, args)]
-        if kind is None or kind == "chat":
-            rows = self._db.execute(
-                "SELECT m.id, m.at, m.text FROM messages_fts"
-                " JOIN messages m ON m.id = messages_fts.rowid WHERE messages_fts MATCH ?"
-                " ORDER BY bm25(messages_fts) LIMIT ?",
-                (match, limit - len(hits)),
-            )
-            hits += [Hit(f"chat:{i}", "chat", at, t) for i, at, t in rows]
-        return hits
-
-
-def _encode_message(m: dict) -> tuple[str, str]:
-    """The stored JSON of a message and its searchable text."""
-    texts: list[str] = []
-    content = m["content"]
-    if not isinstance(content, str):
-        content = [_clean_block(b, texts) for b in content]
-    else:
-        texts.append(content)
-    return json.dumps(content), "\n".join(t for t in texts if t)
+        return search_store.search(self._db, query, kind, limit)

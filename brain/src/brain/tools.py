@@ -28,12 +28,14 @@ from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.jobs import JobError, Jobs, job_title
-from brain.memory import KINDS, Hit, JobPart, Memory, MemoryRefused
+from brain.memory import JobPart, Memory
 from brain.outputs import OutputStore
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
 from brain.setup.store import InstalledExpert
+from brain.store.memory import KINDS, MemoryRefused
+from brain.store.search import Hit
 from brain.timers import MIN_REPEAT_S, Timers
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks

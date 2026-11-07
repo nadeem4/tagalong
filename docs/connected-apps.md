@@ -8,15 +8,15 @@ one Scout tool: reads run at once, changes ask first, and risky ones ask every t
 
 ## Where it lives
 
-| File                             | What it holds                                                                |
-| -------------------------------- | ---------------------------------------------------------------------------- |
-| `brain/src/brain/apps.py`        | `AppRow`, `validate_app`, `slug_for`, `expand_env`, `TokenFile`, `Apps`      |
-| `brain/src/brain/app_tools.py`   | `classify`, `specs_for`, `format_result`, `AppSource`, `app_home_tools`      |
-| `brain/src/brain/app_oauth.py`   | `FileTokenStorage`, the loopback callback listener, the OAuth provider       |
-| `brain/src/brain/memory.py`      | The `apps` table: `list_apps`, `add_app`, `set_app_enabled`, `remove_app`    |
-| `brain/src/brain/sessions.py`    | Adds `AppSource` as the toolbox's third source, and Home's app calls         |
-| `brain/src/brain/main.py`        | Builds `Apps`, starts it after the server is up, shuts it down before memory |
-| `brain/tests/fake_mcp_server.py` | A small stdio and http MCP server for tests                                  |
+| File                                   | What it holds                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------- |
+| `brain/src/brain/apps.py`              | `AppRow`, `validate_app`, `slug_for`, `expand_env`, `TokenFile`, `Apps`      |
+| `brain/src/brain/app_tools.py`         | `classify`, `specs_for`, `format_result`, `AppSource`, `app_home_tools`      |
+| `brain/src/brain/app_oauth.py`         | `FileTokenStorage`, the loopback callback listener, the OAuth provider       |
+| `brain/src/brain/store/connections.py` | The `apps` table: `list_apps`, `add_app`, `set_app_enabled`, `remove_app`    |
+| `brain/src/brain/sessions.py`          | Adds `AppSource` as the toolbox's third source, and Home's app calls         |
+| `brain/src/brain/main.py`              | Builds `Apps`, starts it after the server is up, shuts it down before memory |
+| `brain/tests/fake_mcp_server.py`       | A small stdio and http MCP server for tests                                  |
 
 ## How it works
 
