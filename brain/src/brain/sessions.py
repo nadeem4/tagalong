@@ -154,7 +154,10 @@ class Session:
         self._step_cap = step_cap
         self._turn_timeout = turn_timeout
         self._memory = memory
-        self._asks = Asks(bodies)
+        # One WorkStore for the jobs, asks, questions and the ask log: a job that ends takes its
+        # open asks and questions with it, which only holds when they share the store's hooks.
+        work = WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text))
+        self._asks = Asks(bodies, work)
         # One set of spend guards for the loop, the scheduler, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
@@ -180,19 +183,15 @@ class Session:
             wakes_per_hour=wakes_per_hour,
             kinds=kinds or EVENT_KINDS,
         )
-        questions = ScoutQuestions(self.scheduler.emit)
-        approvals = self.approvals = Approvals(memory, notify, now, guards=self.guards)
+        questions = ScoutQuestions(self.scheduler.emit, work)
+        approvals = self.approvals = Approvals(memory, work, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
-        side_check = SideCheck(model, budget, memory, guards=self.guards)
+        side_check = SideCheck(model, budget, memory, work, guards=self.guards)
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
         offer = Offers(
             model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
         )
-        self.records = JobRecords(
-            WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text)),
-            memory.db,
-            now,
-        )
+        self.records = JobRecords(work, memory.db, now)
         self.jobs = Jobs(
             self.records,
             self._asks,

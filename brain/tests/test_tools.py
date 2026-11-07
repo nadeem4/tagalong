@@ -8,7 +8,8 @@ from functools import partial
 from types import SimpleNamespace
 
 import pytest
-from job_rows import end_job, records_for
+from ask_log import approvals_on
+from job_rows import end_job, fresh_work, records_for
 
 from brain.bodies import Bodies
 from brain.guardrails import Budget
@@ -1148,7 +1149,6 @@ def test_speak_sample_is_a_home_only_tool():
 
 
 def _preference_rig(mem, online=("desktop",), timeout=300.0):
-    from brain.approvals import Approvals
     from brain.asks import Asks
 
     class _Bodies:
@@ -1162,8 +1162,8 @@ def _preference_rig(mem, online=("desktop",), timeout=300.0):
             self.sent.append((method, params))
 
     bodies = _Bodies()
-    asks = Asks(bodies)
-    approvals = Approvals(mem, bodies.notify, lambda: datetime.datetime(2026, 11, 1))
+    asks = Asks(bodies, fresh_work())
+    approvals = approvals_on(mem, bodies.notify, lambda: datetime.datetime(2026, 11, 1))
     handler = {s.name: (s, h) for s, h in preference_tools(approvals, asks, timeout)}
     return bodies, asks, handler["save_preference"]
 

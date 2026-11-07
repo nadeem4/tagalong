@@ -214,7 +214,7 @@ when Scout calls one of their tools in a turn you started.
   long to show in full (over 4,000 characters) is not offered at all. A change that cannot be undone
   (the app says so, or its name says send, delete, merge and the like) is labelled "Can’t be undone".
 - **Approvals.** Each change waiting for you, and each hand-off ask (the card where you pick a mode), is saved as an ask in
-  `tagalong.db` on this computer, listed in Home › **Approvals**, where you can answer it too. An
+  `tagalong.db` on this computer (the same store as your jobs, so it ends and is kept with them), listed in Home › **Approvals**, where you can answer it too. An
   ask keeps Scout's summary of what will happen (the app, the tool and what Scout filled in, with
   keys and passwords hidden). Tagalong never puts a window
   title, your selection or window text into an ask by itself, though the summary keeps what Scout

@@ -107,7 +107,7 @@ class Offers:
         if any(o == "keep_asking" and at > quiet_since for at, o in offers):
             return
         since = utc_text(now - timedelta(days=self._settings.window_days))
-        count = self._memory.person_approvals_since(group_key, since)
+        count = self._approvals.work.person_asks_since(group_key, since)
         if count < self._settings.min_approvals:
             return
         verdict = await self._guards.run(Hook.model_call, ModelCallCtx("offer", None, 0))
@@ -141,7 +141,7 @@ class Offers:
     async def _stream(self, group_key: str, count: int) -> Final | None:
         recent = [
             a.summary
-            for a in self._memory.list_approvals("all", HISTORY_SCAN, None)
+            for a in self._approvals.work.list_asks("all", HISTORY_SCAN, None)
             if a.group_key == group_key and a.outcome == "approved" and a.decided_by == "person"
         ][:HISTORY_ROWS]
         text = "\n".join(

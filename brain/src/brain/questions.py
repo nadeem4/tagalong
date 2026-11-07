@@ -2,16 +2,19 @@
 
 ask() emits a job_question wake and waits; answer() or pass_to_user() settle it. A question
 that Scout never settles (wake dropped, turn ended) resolves to None, which means "ask the
-owner", so the expert is never left hanging on a silent Scout.
+owner", so the expert is never left hanging on a silent Scout. Each question is a `question`
+row under its job, so a job that ends takes its open questions with it.
 """
 
 import asyncio
+import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from brain.events import Event
 from brain.experts import Question
+from brain.store.work import State, TransitionRefused, WorkStore
 
 ANSWERED = "answered"
 PASSED = "passed to the owner"
@@ -34,16 +37,25 @@ def _line(field) -> str:
 
 
 class ScoutQuestions:
-    def __init__(self, emit: Callable[..., None]) -> None:
+    def __init__(self, emit: Callable[..., None], work: WorkStore) -> None:
         self._emit = emit
+        self._work = work
         self._open: dict[str, _Open] = {}
+        work.on_transition(self._row_ended)
 
     async def ask(self, job_id: str, question: Question) -> dict | None:
         qid = uuid.uuid4().hex[:8]
-        while qid in self._open:
+        while qid in self._open or self._work.get(qid) is not None:
             qid = uuid.uuid4().hex[:8]
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         self._open[qid] = _Open(job_id, question, future)
+        self._work.create(
+            "question",
+            question.message,
+            id=qid,
+            state="active",
+            parent_id=self._work.open_goal(job_id),
+        )
         facts = {
             "question": qid,
             "job": job_id,
@@ -51,7 +63,7 @@ class ScoutQuestions:
             "fields": "\n".join(_line(f) for f in question.fields),
         }
         # Resolving twice is harmless: on_end fires after an answer too, so settle() guards.
-        settle = lambda: self._settle(qid, None)  # noqa: E731
+        settle = lambda: self._settle(qid, None, "expired", "Scout did not answer")  # noqa: E731
         try:
             self._emit(Event("job_question", facts, key=None), on_drop=settle, on_end=settle)
             return await future
@@ -79,22 +91,34 @@ class ScoutQuestions:
                 content[field.key] = value
             else:
                 content[f"{field.key}_custom"] = str(value)
-        self._settle(question_id, content)
+        self._work.update(question_id, summary=json.dumps(content, ensure_ascii=False))
+        self._settle(question_id, content, "done", "answered")
         return ANSWERED
 
     def pass_to_user(self, question_id: str) -> str:
         entry = self._open.get(question_id)
         if entry is None or entry.future.done():
             return f"no open question {question_id}."
-        self._settle(question_id, None)
+        self._work.add_event(question_id, "passed")
+        self._settle(question_id, None, "done", PASSED)
         return PASSED
 
     def cancel_job(self, job_id: str) -> None:
         for qid, entry in list(self._open.items()):
             if entry.job_id == job_id:
-                self._settle(qid, None)
+                self._settle(qid, None, "expired", "job ended")
 
-    def _settle(self, question_id: str, content: dict | None) -> None:
+    def _settle(self, question_id: str, content: dict | None, to: State, reason: str) -> None:
         entry = self._open.get(question_id)
         if entry is not None and not entry.future.done():
             entry.future.set_result(content)
+            try:
+                self._work.settle(question_id, to, reason)
+            except TransitionRefused:
+                pass  # its job already ended it
+
+    def _row_ended(self, work_id: str, kind: str, to: str) -> None:
+        """The row ended from outside (its job closed): the expert is asked the owner instead."""
+        entry = self._open.get(work_id) if kind == "question" else None
+        if entry is not None and not entry.future.done():
+            entry.future.set_result(None)

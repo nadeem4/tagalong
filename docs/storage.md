@@ -35,14 +35,13 @@ connection from `store.db.open_db`; nothing else opens the file.
   `job_records.py` (S2a); the other areas move over in later slices.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0023_loops_to_work`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0024_asks`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
 
 `Memory` keeps its public methods and each one calls the matching store function with its
-connection. The other table (approvals) keeps
-its SQL in `memory.py` until the slice that rewrites them moves them.
+connection. No table keeps its SQL in `memory.py` any more.
 
 ## Tables and relations
 
@@ -55,8 +54,8 @@ erDiagram
     work ||--o| work_job : "goal row of a job"
     work ||--o{ job_steps : "job_id, the goal id"
     work ||--o| work_timer : "timer and watch rows"
-    work ||--o{ approvals : "job_id, optional"
-    rules ||--o{ approvals : "preference_id, a sentence rule"
+    work ||--o| work_ask : "ask rows"
+    rules ||--o{ work_ask : "rule_id, a sentence rule"
     work ||--o| work_loop : "loop rows"
     apps ||--o{ app_cursors : "app_id"
     memories ||--|| memories_fts : "triggers"
@@ -83,10 +82,10 @@ erDiagram
         text work_id PK
         int repeat_s
     }
-    approvals {
+    work_ask {
         int id PK
-        text job_id
-        int preference_id
+        text work_id
+        int rule_id
     }
     rules {
         int id PK
@@ -121,7 +120,7 @@ erDiagram
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
 row does not cascade. `tool_outputs` stands alone. An offer rule's `group_key`
-and `approvals.group_key` name the same kind of action. A continued job keeps the earlier job's
+and `work_ask.group_key` name the same kind of action. A continued job keeps the earlier job's
 id in a `continued` event on its goal row.
 
 ## Conversation
@@ -490,7 +489,7 @@ an offered sentence. `kind` tells them apart. Code reaches it only through `stor
 
 | Column       | Type                | Meaning                                                                                               |
 | ------------ | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | Rule id (a preference keeps its old id, which `approvals.preference_id` names)                        |
+| `id`         | INTEGER PRIMARY KEY | Rule id (a preference keeps its old id, which `work_ask.rule_id` names)                               |
 | `kind`       | TEXT                | `mode` (a tool's off/ask/auto), `sentence` (a preference), `offer` (an offer Scout made)              |
 | `tool`       | TEXT                | `mode`: the tool. `sentence`: optional scope, the tool                                                |
 | `source`     | TEXT                | Optional scope: where the ask comes from                                                              |
@@ -525,30 +524,54 @@ Indexes: `(kind, tool)` and `(kind, group_key)`.
 - Retention: kept until changed; a removed preference is kept as a `removed` row.
 - Masked: no.
 
-### approvals
+### work_ask
 
-The log of how each ask ended.
+An `ask` row in `work` is a permission ask, from the moment it is opened until it ends. Its
+`title` is the one-line summary, its `parent_id` the job the ask belongs to (a root row when it
+has none, or the job is gone). The row id is the ask id the bodies see, so an open ask and its
+log entry are one row. Home's log is the ask rows that were decided.
 
-| Column                | Type                | Meaning                                                                            |
-| --------------------- | ------------------- | ---------------------------------------------------------------------------------- |
-| `id`                  | INTEGER PRIMARY KEY | Log id                                                                             |
-| `source`              | TEXT                | `scout_tool`, `claude_code` or `app` (CHECK)                                       |
-| `tool`                | TEXT                | The tool asked about                                                               |
-| `summary`             | TEXT                | One-line description of the action                                                 |
-| `input`               | TEXT                | The tool input                                                                     |
-| `job_id`              | TEXT                | The job, for an expert's ask                                                       |
-| `group_key`           | TEXT                | The kind of action, to group like asks                                             |
-| `outcome`             | TEXT                | `approved`, `refused`, `timed_out` or `no_one` (CHECK)                             |
-| `decided_by`          | TEXT                | `person`, `scout` or `none` (CHECK)                                                |
-| `preference_id`       | INTEGER             | The preference Scout approved under                                                |
-| `at`                  | TEXT                | When it ended                                                                      |
-| `preference_sentence` | TEXT                | That preference's sentence as it was then, so editing it later rewrites no history |
+| Work state  | Meaning                                                                    |
+| ----------- | -------------------------------------------------------------------------- |
+| `active`    | Open: a body can answer it                                                 |
+| `done`      | Approved                                                                   |
+| `cancelled` | Refused (a refused ask does not block its job)                             |
+| `expired`   | Timed out, nobody online, cancelled, or ended with its job or by a restart |
 
-- Written by: `approvals.py` `Approvals` through `memory.py` `add_approval`.
-- Read by: `memory.py` `list_approvals`, `approval_counts`, `person_approvals_since`; `offers.py`;
-  Home.
-- Retention: kept forever.
+`end_reason` is the outcome word (`approved`, `refused`, `timed_out`, `no_one`) once decided.
+An ask that ended before it was decided (answered, timed out) first ends with its own reason
+and is re-ended with the outcome when `Approvals.record` decides it.
+
+| Column          | Type                | Meaning                                                                      |
+| --------------- | ------------------- | ---------------------------------------------------------------------------- |
+| `id`            | INTEGER PRIMARY KEY | Log id: Home's approval id and paging cursor                                 |
+| `work_id`       | TEXT UNIQUE         | The `ask` row                                                                |
+| `source`        | TEXT                | `scout_tool`, `claude_code` or `app`                                         |
+| `tool`          | TEXT                | The tool asked about                                                         |
+| `summary`       | TEXT                | One-line description of the action                                           |
+| `input`         | TEXT                | The tool input as JSON                                                       |
+| `group_key`     | TEXT                | The kind of action, to group like asks                                       |
+| `decided_by`    | TEXT                | `person`, `scout` or `none`; NULL while undecided                            |
+| `rule_id`       | INTEGER             | The `sentence` rule Scout approved under                                     |
+| `rule_sentence` | TEXT                | That rule's sentence as it was then, so editing it later rewrites no history |
+
+- Events on the row: `decided` (`outcome`, `decided_by`); an answered ask also keeps the chosen
+  `option` in its end event.
+- Written by: `asks.py` `Asks` (opens and ends the row), `approvals.py` `Approvals.record`
+  (`store/work.py` `add_ask`, `decide_ask`).
+- Read by: `store/work.py` `list_asks`, `ask_counts`, `person_asks_since`; `offers.py`,
+  `side_check.py`; Home.
+- Retention: the same as other work rows; the log shows decided asks only.
 - Masked: `summary` and `input` yes.
+- Migration `0024_asks` turned every `approvals` row into an ended ask row (`a<id>`, under the
+  job when that job exists) and kept the ids. A `preference_id` is kept only when it still names
+  a `sentence` rule: since rules share one table, an old id could name a mode or offer rule.
+  Home's ask `job_id` is the row's `parent_id`, so it is null when the job was gone at migration
+  or had closed before `record` ran.
+
+An expert's question to Scout is a `question` row under its job: `active` while waiting,
+`done` when answered or passed, `expired` when Scout never answered or the job ended. Its
+`title` is the question and its `summary` the answer.
 
 ## Apps
 
@@ -607,8 +630,8 @@ These are lost when the brain restarts.
 
 | State                | Where                           | What a restart means                                                                                  |
 | -------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Open asks            | `asks.py` `Asks`                | A pending permission ask is gone; the body no longer lists it                                         |
-| Expert questions     | `questions.py` `ScoutQuestions` | A question waiting on Scout is gone                                                                   |
+| Open asks            | `asks.py` `Asks`                | The waiting is gone; its `ask` row is expired ("brain restarted") and the body no longer lists it     |
+| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                |
 | Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                       |
 | Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start |
 | Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                               |

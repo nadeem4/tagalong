@@ -1,9 +1,11 @@
 """Asks: open an ask to the bodies, wait for one person's answer.
 
 `permission` is the tool gate's turn-bound confirm ask; `open` is for work with no turn
-(expert jobs): custom options, optional typed answer, no default timeout. Asks live only in
-memory; open ones are listed so a reconnecting body can see them. The first answer wins;
-later ones are not_found. Timeout and cancel close the ask for every body.
+(expert jobs): custom options, optional typed answer, no default timeout. The waiting future
+lives in memory; the `ask` work row beside it is the record, so a restart leaves an expired
+row instead of nothing. A row ends with its ask (answered, timed out, cancelled) or with its
+parent job. The first answer wins; later ones are not_found. Timeout and cancel close the ask
+for every body. How the person's choice counts (approved, refused) is written by Approvals.
 """
 
 import asyncio
@@ -14,6 +16,7 @@ from dataclasses import dataclass
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
+from brain.store.work import State, TransitionRefused, WorkStore
 
 
 @dataclass(frozen=True)
@@ -36,20 +39,29 @@ ASK_TIMEOUT_S = 300.0  # how long a permission ask waits for the person
 
 
 class Asks:
-    def __init__(self, bodies: Bodies, timeout: float = ASK_TIMEOUT_S) -> None:
+    def __init__(self, bodies: Bodies, work: WorkStore, timeout: float = ASK_TIMEOUT_S) -> None:
         self._bodies = bodies
+        self._work = work
         self._timeout = timeout
         self._open: dict[str, _Open] = {}
+        work.on_transition(self._row_ended)
 
     def anyone_online(self) -> bool:
         return bool(self._bodies.display_ids())  # a body that shows nothing cannot be asked
 
-    async def permission(self, call: Call, spec_name: str, locked: bool) -> str:
+    async def permission(
+        self,
+        call: Call,
+        spec_name: str,
+        locked: bool,
+        *,
+        ask_id: str | None = None,
+        parent_id: str | None = None,
+    ) -> str:
         if not self.anyone_online():
             return "deny"
-        ask_id = uuid.uuid4().hex
         params = {
-            "id": ask_id,
+            "id": ask_id or uuid.uuid4().hex,
             "state": "open",
             "text": call.text,
             "options": ["allow", "deny"] if locked else ["allow", "always", "deny"],
@@ -60,7 +72,7 @@ class Asks:
         if call.turn:  # an expert's call belongs to no turn of Scout's
             params["turn"] = call.turn
         entry = _Open(params, asyncio.get_running_loop().create_future())
-        return (await self._wait(entry, self._timeout)).option or "deny"
+        return (await self._wait(entry, self._timeout, parent_id)).option or "deny"
 
     async def open(
         self,
@@ -73,6 +85,7 @@ class Asks:
         free_text: bool = False,
         ask_id: str | None = None,
         recommended: str | None = None,
+        parent_id: str | None = None,
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
@@ -94,11 +107,12 @@ class Asks:
         if input is not None:
             params["input"] = input
         entry = _Open(params, asyncio.get_running_loop().create_future(), free_text)
-        return await self._wait(entry, timeout)
+        return await self._wait(entry, timeout, parent_id)
 
-    async def _wait(self, entry: _Open, timeout: float | None) -> Answer:
+    async def _wait(self, entry: _Open, timeout: float | None, parent_id: str | None) -> Answer:
         ask_id = entry.params["id"]
         self._open[ask_id] = entry
+        self._record_open(entry.params, parent_id)
         self._bodies.notify("ask", entry.params)
         try:
             async with asyncio.timeout(timeout):
@@ -121,6 +135,7 @@ class Asks:
                 del self._open[ask_id]
                 entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
                 self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
+                self._end_row(ask_id, "expired", "ask cancelled")
 
     def answer(
         self,
@@ -140,6 +155,7 @@ class Asks:
         entry.future.set_result(Answer(option, text, None if apps is None else tuple(apps)))
         closed = {"id": ask_id, "state": "closed", "reason": "answered"}
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
+        self._end_row(ask_id, "done", "answered", {"option": option})
 
     def open_asks(self) -> list[dict]:
         return [dict(e.params) for e in self._open.values()]
@@ -147,3 +163,30 @@ class Asks:
     def _close(self, ask_id: str, reason: str) -> None:
         if self._open.pop(ask_id, None) is not None:
             self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": reason})
+            self._end_row(
+                ask_id, "expired", "timed out" if reason == "timeout" else "ask cancelled"
+            )
+
+    def _row_ended(self, work_id: str, kind: str, to: str) -> None:
+        """The row ended from outside (its job closed, or a restart scan): the waiter is done."""
+        entry = self._open.pop(work_id, None) if kind == "ask" else None
+        if entry is not None and not entry.future.done():
+            entry.future.set_exception(RpcError(ErrorCode.timeout, "the job ended"))
+            self._bodies.notify("ask", {"id": work_id, "state": "closed", "reason": "timeout"})
+
+    def _record_open(self, params: dict, parent_id: str | None) -> None:
+        ask_id = params["id"]
+        self._work.create(
+            "ask",
+            params["text"],
+            id=ask_id,
+            state="active",
+            parent_id=self._work.open_goal(parent_id),
+        )
+        self._work.add_ask(ask_id, tool=params.get("tool"))
+
+    def _end_row(self, ask_id: str, to: State, reason: str, data: dict | None = None) -> None:
+        try:
+            self._work.settle(ask_id, to, reason, data)
+        except TransitionRefused:
+            pass  # its job already ended it

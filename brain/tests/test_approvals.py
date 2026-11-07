@@ -3,8 +3,8 @@
 from datetime import UTC, datetime
 
 import pytest
+from ask_log import add_approval, approvals_on, list_approvals
 
-from brain.approvals import Approvals
 from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
@@ -19,7 +19,7 @@ def mem(tmp_path):
 
 
 def make(mem, sent):
-    return Approvals(mem, lambda method, params: sent.append((method, params)), lambda: NOW)
+    return approvals_on(mem, lambda method, params: sent.append((method, params)), lambda: NOW)
 
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
@@ -44,7 +44,7 @@ def test_record_notifies_changed_approvals(mem):
         outcome="approved",
     )
     assert sent == [("changed", {"what": "approvals"})]
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome, row.decided_by, row.source) == (
         "t",
         "approved",
@@ -54,10 +54,67 @@ def test_record_notifies_changed_approvals(mem):
     assert row.at == "2026-10-28T09:00:00+00:00"
 
 
+def _record(a, **kw):
+    a.record(
+        **{
+            "source": "scout_tool",
+            "tool": "t",
+            "summary": "s",
+            "input": {},
+            "group_key": "t",
+            "outcome": "approved",
+            **kw,
+        }
+    )
+
+
+def test_record_makes_an_ended_ask_row_under_its_job(mem):
+    a = make(mem, [])
+    a.work.create("goal", "a job", id="j1", state="active")
+    _record(a, job_id="j1", outcome="refused")
+    [ask] = a.work.children("j1")
+    assert (ask.kind, ask.state, ask.parent_id, ask.end_reason) == (
+        "ask", "cancelled", "j1", "refused",
+    )  # fmt: skip
+
+
+def test_record_decides_the_open_ask_row_it_is_given(mem):
+    a = make(mem, [])
+    row = a.work.create("ask", "open ask", id="ask1", state="active")
+    a.work.add_ask("ask1", tool="t")
+    _record(a, ask_id="ask1", summary="the line", outcome="approved")
+    [logged] = list_approvals(mem)
+    assert (logged.summary, logged.outcome, logged.decided_by) == ("the line", "approved", "person")
+    assert a.work.get(row.id).state == "done"
+
+
+def test_record_decides_an_ask_its_waiter_already_ended(mem):
+    a = make(mem, [])
+    a.work.create("ask", "open ask", id="ask1", state="active")
+    a.work.settle("ask1", "expired", "timed out")
+    _record(a, ask_id="ask1", outcome="timed_out", decided_by="none")
+    [logged] = list_approvals(mem)
+    assert (logged.outcome, logged.decided_by) == ("timed_out", "none")
+
+
+def test_record_titles_an_untitled_ask_row_with_its_summary(mem):
+    a = make(mem, [])
+    a.work.create("ask", "", id="ask1", state="active")
+    _record(a, ask_id="ask1", summary="create issue", outcome="approved")
+    assert a.work.get("ask1").title == "create issue"
+
+
+def test_a_refused_ask_leaves_its_job_running(mem):
+    a = make(mem, [])
+    a.work.create("goal", "a job", id="j1", state="active")
+    _record(a, job_id="j1", outcome="refused")
+    assert a.work.get("j1").state == "active"
+
+
 def test_record_masks_summary_and_input(mem):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
-    Approvals(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
+    approvals_on(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
         source="scout_tool",
         tool="t",
         summary="call with fake-token-12345678",
@@ -65,7 +122,7 @@ def test_record_masks_summary_and_input(mem):
         group_key="t",
         outcome="approved",
     )
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert row.summary == "call with [secret]"
     assert row.input == {"url": "https://x/y?token=[secret]", "h": "Bearer [secret]"}
 
@@ -74,7 +131,7 @@ def test_record_masks_an_api_key_value(mem):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: [])))
     key = "sk-ant-" + "a1B2" * 6
-    Approvals(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
+    approvals_on(mem, lambda m, p: None, lambda: NOW, guards=guards).record(
         source="scout_tool",
         tool="t",
         summary=f"uses {key}",
@@ -82,7 +139,7 @@ def test_record_masks_an_api_key_value(mem):
         group_key="t",
         outcome="approved",
     )
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert row.summary == "uses [secret]" and row.input == {"k": "[secret]", "name": "[secret]"}
 
 
@@ -107,7 +164,8 @@ def add_row(
     tool="t",
     preference_sentence=None,
 ):
-    return mem.add_approval(
+    return add_approval(
+        mem,
         source="scout_tool",
         tool=tool,
         summary="s",
@@ -140,6 +198,44 @@ async def test_list_approvals_returns_counts_and_cursor(mem):
     second = json.loads(await h({"before": first["next"]}))
     assert len(second["approvals"]) == 2
     assert second["next"] is None
+
+
+async def test_list_approvals_shape_unchanged(mem):
+    a = make(mem, [])
+    a.work.create("goal", "a job", id="j1", state="active")
+    pref = rules.add_preference(
+        mem.db, sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
+    )
+    a.record(
+        source="claude_code",
+        tool="claude_code:ls",
+        summary="ls -la",
+        input={"c": 1},
+        group_key="claude_code:/repo",
+        outcome="approved",
+        job_id="j1",
+        decided_by="scout",
+        preference_id=pref.id,
+        preference_sentence=pref.sentence,
+    )
+    _, h = tools(mem, [])["list_approvals"]
+    out = json.loads(await h({}))
+    [row] = out["approvals"]
+    assert isinstance(row.pop("id"), int)
+    assert row == {
+        "source": "claude_code",
+        "tool": "claude_code:ls",
+        "summary": "ls -la",
+        "input": {"c": 1},
+        "job_id": "j1",
+        "outcome": "approved",
+        "decided_by": "scout",
+        "preference_id": pref.id,
+        "preference": "Allow reads",
+        "at": "2026-10-28T09:00:00+00:00",
+    }
+    assert out["counts"] == {"total": 1, "scout": 1, "refused": 0}
+    assert out["next"] is None
 
 
 async def test_list_approvals_scout_filter_includes_stored_preference_sentence(mem):
@@ -264,14 +360,16 @@ def test_scout_approved_records_uses_and_notifies(mem):
     sent = []
     facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo", False)
 
-    make(mem, sent).scout_approved(facts, pref, "ls -la", job_id="j1")
+    approvals = make(mem, sent)
+    approvals.work.create("goal", "a job", id="j1", state="active")  # job_id is the row's parent
+    approvals.scout_approved(facts, pref, "ls -la", job_id="j1")
 
-    [row] = mem.list_approvals("all", 10, None)
-    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "scout", pref.id)
+    [row] = list_approvals(mem, "all", 10, None)
+    assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "scout", pref.id)
     assert (row.source, row.tool, row.group_key, row.job_id, row.input) == (
         "claude_code", "claude_code:ls", "claude_code:/repo", "j1", {"c": 1},
     )  # fmt: skip
-    assert (row.summary, row.preference_sentence) == ("ls -la", "Allow reads")
+    assert (row.summary, row.rule_sentence) == ("ls -la", "Allow reads")
     used = next(p for p in rules.list_preferences(mem.db) if p.id == pref.id)
     assert used.use_count == 1 and used.last_used == "2026-10-28T09:00:00+00:00"
     assert (

@@ -6,6 +6,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from ask_log import add_approval, work_on
 
 from brain.guards import Hook, stop
 from brain.memory import Memory
@@ -74,7 +75,7 @@ def facts(locked=False, tool="Read"):
 
 
 def check(mem, model, budget=None, timeout=20.0):
-    return SideCheck(model, budget or Budget(), mem, timeout)
+    return SideCheck(model, budget or Budget(), mem, work_on(mem), timeout)
 
 
 async def test_no_user_preference_means_no_model_call(mem):
@@ -209,7 +210,7 @@ async def test_no_tool_use_block_is_a_pass(mem):
 
 async def test_history_for_the_same_tool_is_shown(mem):
     pref(mem)
-    mem.add_approval(
+    add_approval(mem, 
         source="claude_code", tool="Read", summary="Read old.txt", input={}, job_id=None,
         group_key="/repo", outcome="approved", decided_by="person", preference_id=None, at=AT,
     )  # fmt: skip
@@ -242,6 +243,6 @@ async def test_decide_stops_when_the_guards_stop(mem):
     pref(mem)
     model = Model(approve(1))
     guards = StopGuards()
-    side = SideCheck(model, Budget(), mem, guards=guards)
+    side = SideCheck(model, Budget(), mem, work_on(mem), guards=guards)
     assert await side.decide(facts()) is None
     assert model.calls == 0 and guards.hooks == [Hook.model_call]

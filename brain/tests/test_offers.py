@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
+from ask_log import add_approval, approvals_on
 
-from brain.approvals import Approvals
 from brain.asks import Answer
 from brain.guards import stop
 from brain.memory import Memory
@@ -94,7 +94,7 @@ class Rig:
         self.asks = asks or FakeAsks()
         self.sent = []
         self.clock = NOW
-        approvals = Approvals(mem, lambda m, p: self.sent.append((m, p)), lambda: self.clock)
+        approvals = approvals_on(mem, lambda m, p: self.sent.append((m, p)), lambda: self.clock)
         self.offers = Offers(
             self.model, self.budget, mem, self.asks, approvals, settings, lambda: self.clock
         )
@@ -102,7 +102,7 @@ class Rig:
     def approve(self, days_ago=1, by="person", group=GROUP, tool="Read", n=1, summary="read a"):
         at = utc_text(NOW - timedelta(days=days_ago))
         for _ in range(n):
-            self.mem.add_approval(
+            add_approval(self.mem, 
                 source="scout_tool", tool=tool, summary=summary, input={}, job_id=None,
                 group_key=group, outcome="approved", decided_by=by, preference_id=None, at=at,
             )  # fmt: skip
@@ -304,7 +304,7 @@ async def test_consider_skips_look_when_the_guards_stop(mem):
 
     r = Rig(mem)
     r.offers = Offers(
-        r.model, r.budget, mem, r.asks, Approvals(mem, lambda m, p: None, lambda: NOW),
+        r.model, r.budget, mem, r.asks, approvals_on(mem, lambda m, p: None, lambda: NOW),
         SETTINGS, lambda: NOW, guards=StopGuards(),
     )  # fmt: skip
     r.approve(n=3)
