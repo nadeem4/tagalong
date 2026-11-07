@@ -97,6 +97,13 @@ def test_record_decides_an_ask_its_waiter_already_ended(mem):
     assert (logged.outcome, logged.decided_by) == ("timed_out", "none")
 
 
+def test_record_titles_an_untitled_ask_row_with_its_summary(mem):
+    a = make(mem, [])
+    a.work.create("ask", "", id="ask1", state="active")
+    _record(a, ask_id="ask1", summary="create issue", outcome="approved")
+    assert a.work.get("ask1").title == "create issue"
+
+
 def test_a_refused_ask_leaves_its_job_running(mem):
     a = make(mem, [])
     a.work.create("goal", "a job", id="j1", state="active")

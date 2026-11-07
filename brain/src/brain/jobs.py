@@ -176,6 +176,9 @@ class Jobs:
         # resume_scan is idempotent and will not settle these rows twice.
         for work_id, _ in settled:
             row = work.get(work_id)
+            if row is not None and row.kind in ("ask", "question"):
+                work.mark_reported(work_id)  # nobody is told of an ask that died with the brain
+                continue
             if row is None or row.kind != "expert_call" or row.parent_id is None:
                 continue
             job_id = row.parent_id

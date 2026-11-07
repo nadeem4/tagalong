@@ -120,7 +120,7 @@ erDiagram
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
 row does not cascade. `tool_outputs` stands alone. An offer rule's `group_key`
-and `approvals.group_key` name the same kind of action. A continued job keeps the earlier job's
+and `work_ask.group_key` name the same kind of action. A continued job keeps the earlier job's
 id in a `continued` event on its goal row.
 
 ## Conversation
@@ -489,7 +489,7 @@ an offered sentence. `kind` tells them apart. Code reaches it only through `stor
 
 | Column       | Type                | Meaning                                                                                               |
 | ------------ | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | Rule id (a preference keeps its old id, which `approvals.preference_id` names)                        |
+| `id`         | INTEGER PRIMARY KEY | Rule id (a preference keeps its old id, which `work_ask.rule_id` names)                               |
 | `kind`       | TEXT                | `mode` (a tool's off/ask/auto), `sentence` (a preference), `offer` (an offer Scout made)              |
 | `tool`       | TEXT                | `mode`: the tool. `sentence`: optional scope, the tool                                                |
 | `source`     | TEXT                | Optional scope: where the ask comes from                                                              |
@@ -566,6 +566,8 @@ and is re-ended with the outcome when `Approvals.record` decides it.
 - Migration `0024_asks` turned every `approvals` row into an ended ask row (`a<id>`, under the
   job when that job exists) and kept the ids. A `preference_id` is kept only when it still names
   a `sentence` rule: since rules share one table, an old id could name a mode or offer rule.
+  Home's ask `job_id` is the row's `parent_id`, so it is null when the job was gone at migration
+  or had closed before `record` ran.
 
 An expert's question to Scout is a `question` row under its job: `active` while waiting,
 `done` when answered or passed, `expired` when Scout never answered or the job ended. Its
