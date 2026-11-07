@@ -227,6 +227,13 @@ class WorkStore:
             (work_id, agent, folder, mode, task),
         )
 
+    def set_text(self, id: str, summary: str | None, detail_id: str | None) -> None:
+        """Replace a row's summary and its pointer to the whole text together (None clears)."""
+        self.db.execute(
+            "UPDATE work SET summary = ?, detail_id = ?, updated_at = ? WHERE id = ?",
+            (None if summary is None else self.mask(summary), detail_id, self._stamp(), id),
+        )
+
     def job_detail(self, work_id: str) -> dict | None:
         return self.job_details([work_id]).get(work_id)
 
