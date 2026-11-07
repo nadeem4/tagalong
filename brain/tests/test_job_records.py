@@ -3,6 +3,7 @@
 Real temp database and a hand-moved clock; no expert is involved.
 """
 
+import sys
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -257,6 +258,13 @@ def test_last_part_for_uses_the_parts_folder_and_expert_in_a_mixed_job(records):
 
 
 def test_last_part_for_matches_folder_spelling_variants(records):
+    records.add_job("a", "claude-acp", "t", "/a/b/", "ask")
+    records.update_part("a", "p1", session_id="s", state="done", reason="done")
+    assert records.last_part_for("claude-acp", "/a/b") is not None  # a trailing slash is nothing
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="drive letters and case are Windows rules")
+def test_last_part_for_matches_windows_folder_spellings(records):
     records.add_job("a", "claude-acp", "t", "C:/Proj/", "ask")
     records.update_part("a", "p1", session_id="s", state="done", reason="done")
     assert records.last_part_for("claude-acp", "C:/Proj") is not None
