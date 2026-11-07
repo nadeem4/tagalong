@@ -19,13 +19,13 @@ def _version(db: sqlite3.Connection) -> int:
 
 
 def test_migrations_are_numbered_without_gaps():
-    assert [m.number for m in load_migrations()] == list(range(1, 22))
+    assert [m.number for m in load_migrations()] == list(range(1, 23))
 
 
 def test_fresh_file_reaches_latest(tmp_path):
     db = open_db(tmp_path / "t.db")
     assert _version(db) == LATEST
-    columns = [r[1] for r in db.execute("PRAGMA table_info(loops)")]
+    columns = [r[1] for r in db.execute("PRAGMA table_info(work_loop)")]
     assert "snoozed_until" in columns
     db.close()
 
