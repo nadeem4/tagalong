@@ -235,15 +235,16 @@ class JobRecords:
         if unknown:
             raise ValueError(f"Unknown part fields: {', '.join(sorted(unknown))}")
         work_id = f"{job_id}.{part_id}"
-        if isinstance(fields.get("progress"), str):
+        moving = fields.get("state") is not None
+        if moving:  # first: a refused late writer must not overwrite what the part already says
+            self.work.transition(work_id, fields["state"], reason=fields.get("reason"))
+        if isinstance(fields.get("progress"), str) and not moving:  # a move may end the row
             self.work.update(work_id, progress=fields["progress"][-JOB_PROGRESS_CAP:])
         if "session_id" in fields:  # None forgets the session
             session = fields["session_id"]
             self.work.update(work_id, checkpoint={"session_id": session} if session else {})
         if isinstance(fields.get("report"), str):
             self._store_text(work_id, fields["report"])
-        if fields.get("state") is not None:
-            self.work.transition(work_id, fields["state"], reason=fields.get("reason"))
         if fields.get("reported"):
             self.work.mark_reported(work_id)
 

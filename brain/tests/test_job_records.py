@@ -85,6 +85,14 @@ def test_update_part_state_uses_transition(records, work):
         records.update_part("j2", "p1", colour="red")
 
 
+def test_a_refused_late_writer_leaves_the_report_alone(records):
+    records.add_job("j1", "claude-acp", "t", "C:/a", "ask")
+    records.update_part("j1", "p1", state="done", reason="done", report="first")
+    with pytest.raises(TransitionRefused):
+        records.update_part("j1", "p1", state="failed", reason="late", report="late words")
+    assert records.get_job("j1").parts[0].report == "first"
+
+
 def test_update_part_session_progress_and_reported(records, work):
     records.add_job("j1", "claude-acp", "t", "C:/a", "ask")
     records.update_part("j1", "p1", session_id="s-9", progress="x" * 3000)

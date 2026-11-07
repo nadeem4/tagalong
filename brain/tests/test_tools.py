@@ -510,7 +510,34 @@ async def test_home_list_jobs_shape_unchanged(home, records):
     }
     assert rows["bad"]["parts"][0]["reason"] == "boom"
     assert rows["ok"]["parts"][0]["reason"] is None
-    assert set(rows["ok"]) >= {"id", "task", "folder", "mode", "state", "started_at", "ended_at"}
+    assert set(rows["ok"]) == {
+        "id",
+        "task",
+        "folder",
+        "mode",
+        "state",
+        "started_at",
+        "ended_at",
+        "parent_job",
+        "watch",
+        "title",
+        "scout_result",
+        "closed_at",
+        "parts",
+        "activity",
+        "summary",
+    }
+    assert set(rows["ok"]["parts"][0]) == {
+        "id",
+        "expert",
+        "state",
+        "reason",
+        "progress",
+        "result",
+        "session_id_known",
+        "started_at",
+        "ended_at",
+    }
 
 
 async def test_list_jobs_rows_have_parts(home, mem, records):

@@ -7,6 +7,7 @@ runner holds the transaction, and `executescript` would commit it.
 """
 
 import json
+import logging
 import uuid
 
 SUMMARY_CAP = 2_000
@@ -15,6 +16,7 @@ EPOCH = "1970-01-01T00:00:00+00:00"  # a stand-in for a row that never saved a s
 
 _JOB_STATE = {"running": "active", "done": "done", "stopped": "cancelled", "error": "failed"}
 _ENDED = ("done", "failed", "cancelled", "expired")
+log = logging.getLogger(__name__)
 
 
 def _state(old: str | None) -> str:
@@ -73,19 +75,31 @@ def migrate(db) -> None:
     by_job: dict[str, list] = {}
     for p in parts:
         by_job.setdefault(p[0], []).append(p)
+    known = {job[0] for job in jobs}
+    orphans = [p for p in parts if p[0] not in known]
+    if orphans:  # a part with no job has no goal to hang under; say so rather than drop quietly
+        log.warning("migration 0019 dropped %d job part(s) with no job", len(orphans))
     for seq, job in enumerate(jobs, 1):
-        _goal(db, seq, job)
-        for number, part in enumerate(by_job.get(job[0], ()), 1):
+        mine = by_job.get(job[0], [])
+        _goal(db, seq, job, any(p[4] == "error" for p in mine))
+        for number, part in enumerate(mine, 1):
             _call(db, job, part, number)
     db.execute("DROP TABLE job_parts")
     db.execute("DROP TABLE jobs")
 
 
-def _goal(db, seq: int, job: tuple) -> None:
+def _goal(db, seq: int, job: tuple, part_failed: bool) -> None:
+    """Only a job Scout closed (closed_at set) becomes an ended goal. An open job stays open,
+    blocked when a part failed, so a follow-up part can still be added to it."""
     id, task, folder, mode, old, started, ended, parent, watch, title, result, closed = job
-    state = _state(old)
     created = started or ended or closed or EPOCH
-    summary, detail_id = _summary(db, result, ended or closed or created)
+    summary, detail_id = _summary(db, result, closed or ended or created)
+    if closed:
+        state = _state(old)
+        if state not in _ENDED:
+            state = "cancelled"
+    else:
+        state = "blocked" if part_failed else "active"
     stopped = state in _ENDED
     _insert(
         db,
@@ -100,10 +114,10 @@ def _goal(db, seq: int, job: tuple) -> None:
             "summary": summary,
             "detail_id": detail_id,
             "created_at": created,
-            "updated_at": ended or closed or created,
-            "ended_at": (ended or closed or created) if stopped else None,
+            "updated_at": closed or ended or created,
+            "ended_at": closed if stopped else None,
             "end_reason": (old or "stopped") if stopped else None,
-            "reported_at": closed,
+            "reported_at": closed if stopped else None,
         },
     )
     db.execute(
@@ -155,7 +169,7 @@ def _call(db, job: tuple, part: tuple, number: int) -> None:
             "input": json.dumps({"task": task or ""}),
             "summary": summary,
             "detail_id": detail_id,
-            "progress": progress,
+            "progress": None if stopped else progress,  # an ended row has none, as at runtime
             "checkpoint": json.dumps({"session_id": session}) if session else None,
             "created_at": created,
             "updated_at": ended_at or created,
