@@ -11,7 +11,7 @@ from datetime import datetime
 
 from brain.loops.loop import Loop
 from brain.loops.service import LoopService
-from brain.memory import MemoryRefused
+from brain.store.memory import MemoryRefused
 from brain.toolbox import Handler, ToolSpec
 
 _ID = {"id": {"type": "string", "description": "the loop id from the wake or loops_open"}}

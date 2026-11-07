@@ -44,7 +44,7 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.jobs import Jobs
 from brain.loops.service import LoopService
 from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
-from brain.memory import Job, Memory, _compaction_text
+from brain.memory import Job, Memory
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
@@ -65,6 +65,7 @@ from brain.reading_tools import reading_home_tools
 from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
+from brain.store.conversation import compaction_text
 from brain.timers import Timers
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
@@ -746,7 +747,7 @@ class Session:
                 if message["role"] != "assistant" or isinstance(message["content"], str):
                     continue
                 for block in message["content"]:
-                    if block.get("type") == "compaction" and (text := _compaction_text(block)):
+                    if block.get("type") == "compaction" and (text := compaction_text(block)):
                         self._memory.add_summary(text)
         except Exception:
             log.exception("could not save the chat")

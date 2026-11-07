@@ -12,8 +12,8 @@ from collections.abc import Callable
 
 from brain.asks import Asks
 from brain.events import Event
-from brain.memory import MemoryRefused
 from brain.protocol import RpcError
+from brain.store.memory import MemoryRefused
 
 log = logging.getLogger("brain")
 

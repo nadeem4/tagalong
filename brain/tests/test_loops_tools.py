@@ -17,7 +17,8 @@ from brain.loops.sources.gmail import GmailSource
 from brain.loops.store import LoopStore
 from brain.loops.tools import loop_tools
 from brain.masking import Masker
-from brain.memory import Memory, MemoryRefused
+from brain.memory import Memory
+from brain.store.memory import MemoryRefused
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
 SECRET = "sk-test-secret-value-1234"

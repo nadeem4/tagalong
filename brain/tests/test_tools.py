@@ -12,10 +12,12 @@ from brain.bodies import Bodies
 from brain.guardrails import Budget
 from brain.guards import Guards
 from brain.jobs import JobError, JobId
-from brain.memory import Hit, Memory, MemoryRefused
+from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.outputs import OutputStore
 from brain.protocol import Body, ErrorCode, RpcError, Tool
+from brain.store.memory import MemoryRefused
+from brain.store.search import Hit
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
 from brain.tools import (
     RECALL_MAX_CHARS,

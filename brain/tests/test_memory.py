@@ -7,9 +7,11 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 
 from brain import memory
-from brain.memory import Memory, MemoryRefused
+from brain.memory import Memory
 from brain.store import search
+from brain.store.conversation import compaction_text
 from brain.store.db import load_migrations, migrate
+from brain.store.memory import MemoryRefused
 from brain.store.search import fts_query
 
 # The schema before jobs held parts: what the old-database tests seed, whatever is added after.
@@ -353,8 +355,8 @@ def test_add_summary_is_search_only_kind(mem):
 
 
 def test_compaction_text_reads_content():
-    assert memory._compaction_text({"type": "compaction", "content": "sum"}) == "sum"
-    assert memory._compaction_text({"type": "compaction", "content": None}) == ""
+    assert compaction_text({"type": "compaction", "content": "sum"}) == "sum"
+    assert compaction_text({"type": "compaction", "content": None}) == ""
 
 
 def test_upgrade_from_v1_keeps_items(tmp_path):

@@ -9,7 +9,7 @@ from importlib.resources import files
 import pytest
 
 from brain.events import load_notes
-from brain.memory import Item, Preference
+from brain.memory import Preference
 from brain.mind.prompt import (
     interruption_block,
     render_know,
@@ -18,6 +18,7 @@ from brain.mind.prompt import (
     user_content,
 )
 from brain.protocol import Body, SayParams
+from brain.store.memory import Item
 
 NOW = datetime(2026, 10, 25, 15, 24, 59)
 

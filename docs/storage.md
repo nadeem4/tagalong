@@ -20,12 +20,24 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/db.py`: `open_db(path)` makes the folder, runs the FTS5 probe, sets WAL and runs the
   migrations. `migrate(db, migrations, upto)` applies every migration newer than `user_version`,
   `transaction(db)` is a `BEGIN IMMEDIATE` block, and `utc_text(at)` writes the stored time text.
-- `store/search.py`: the SQLite-only full-text helpers, `probe_fts5` and `fts_query`.
+- `store/search.py`: the SQLite-only full-text helpers, `probe_fts5` and `fts_query`, plus
+  `search(db, query, kind, limit)` over `memories_fts` and `messages_fts` and its `Hit`.
+- `store/conversation.py`: owns `messages` (`save_messages`, `replace_last_message`,
+  `load_messages`).
+- `store/memory.py`: owns `memories` (`remember`, `forget`, `list_items`, `always_loaded`,
+  `add_summary`), with the kinds table, `Item` and `MemoryRefused`.
+- `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`).
+- `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
+
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
   `0001_memories` to `0017_loops_snooze`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
+
+`Memory` keeps its public methods and each one calls the matching store function with its
+connection. The other tables (jobs, timers, approvals, preferences, permissions, offers) keep
+their SQL in `memory.py` until the slice that rewrites them moves them.
 
 ## Tables and relations
 
@@ -126,14 +138,15 @@ The saved chat, so a restart picks the conversation back up.
 | `content_json` | TEXT                | The message content as JSON, rebuilt into model history at start                               |
 | `text`         | TEXT                | Searchable text of the message; images and documents appear as `[screenshot]` and `[document]` |
 
-- Written by: `memory.py` `save_messages`, `replace_last_message` (called from `sessions.py`).
-- Read by: `memory.py` `load_messages` (via `mind/resume.py` `rebuild_history`) and `search`.
+- Written by: `store/conversation.py` `save_messages`, `replace_last_message` (through `Memory`,
+  called from `sessions.py`).
+- Read by: `store/conversation.py` `load_messages` (via `mind/resume.py` `rebuild_history`) and `search`.
 - Retention: kept forever.
 - Masked: yes, through the `save` guard (`mask_message`) before saving. Image and document blocks
   are replaced by text markers and never stored.
 
 `messages_fts` is an FTS5 index over `messages.text` (external content, tokenizer
-`porter unicode61`), kept in step by insert, update and delete triggers. `memory.py` `search` ranks
+`porter unicode61`), kept in step by insert, update and delete triggers. `store/search.py` `search` ranks
 it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 ## Memory
@@ -151,9 +164,9 @@ What Scout remembers across restarts, by kind.
 | `created_at` | TEXT                | When it was saved                                              |
 | `updated_at` | TEXT                | When it last changed                                           |
 
-- Written by: `memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
+- Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
   compaction in `sessions.py`).
-- Read by: `memory.py` `always_loaded` (the prompt), `list_items`, `search`.
+- Read by: `store/memory.py` `always_loaded` (the prompt), `list_items`; `store/search.py` `search`.
 - Retention: kept until forgotten or replaced. Caps per kind: `instruction` 50 items of 300
   characters, `about_you` 50 of 300, `tracking` 30 of 300, `project` 200 of 500; `summary` is
   uncapped and written by code.
@@ -411,8 +424,8 @@ Connected apps (MCP servers).
 | `auth`      | TEXT             | `none`, `token` or `oauth` (CHECK)                 |
 | `enabled`   | INTEGER          | 0 or 1; default 1                                  |
 
-- Written by: `apps.py` `Apps` through `memory.py` `add_app`, `set_app_enabled`, `remove_app`.
-- Read by: `memory.py` `list_apps`.
+- Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
+- Read by: `store/connections.py` `list_apps`.
 - Retention: until the app is removed.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
@@ -432,8 +445,8 @@ A long tool result stored whole, so Scout can read the rest of a capped preview 
 | `text`  | TEXT             | The full masked text                   |
 | `at`    | TEXT             | When it was stored                     |
 
-- Written by: `outputs.py` `OutputStore.put` through `memory.py` `put_output`.
-- Read by: `memory.py` `get_output` (paged by `OutputStore.page`).
+- Written by: `outputs.py` `OutputStore.put` through `store/outputs.py` `put_output` (via `Memory`).
+- Read by: `store/outputs.py` `get_output` (via `Memory`), paged by `OutputStore.page`.
 - Retention: the newest 200 are kept; older rows are deleted at brain start (`prune_outputs`).
 - Masked: yes, before storing.
 
