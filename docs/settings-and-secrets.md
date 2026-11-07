@@ -136,7 +136,7 @@ directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directo
 [brain.md](brain.md#run-it)). Every store of the brain is mapped in [storage.md](storage.md).
 
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
-here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
+here: they are brain state in the `rules` table of `tagalong.db`, read and set through the
 brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
 
 The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit (USD)** calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`

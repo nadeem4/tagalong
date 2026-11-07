@@ -17,6 +17,7 @@ from brain.guards import Guards, Hook, ModelCallCtx
 from brain.memory import Memory
 from brain.mind.turn import Final, Model
 from brain.side_check import prompt_section
+from brain.store import rules
 from brain.store.db import utc_text
 
 log = logging.getLogger(__name__)
@@ -96,10 +97,10 @@ class Offers:
 
     async def _consider(self, group_key: str, source: str, tool: str) -> None:
         # Cheap checks first: most approvals end here without a model call.
-        if not self._asks.anyone_online() or self._memory.has_preference_for(group_key):
+        if not self._asks.anyone_online() or rules.has_preference_for(self._memory.db, group_key):
             return
         now = self._now()
-        offers = self._memory.offers_for(group_key)
+        offers = rules.offers_for(self._memory.db, group_key)
         if offers and offers[0][0] > utc_text(now - LOOK_GAP):
             return
         quiet_since = utc_text(now - timedelta(days=self._settings.keep_asking_days))
@@ -114,10 +115,10 @@ class Offers:
             return
         sentence = await self._look(group_key, count)
         if sentence is None:
-            self._memory.add_offer(group_key, utc_text(self._now()), "none")
+            rules.add_offer(self._memory.db, group_key, utc_text(self._now()), "none")
             return
         outcome = await self._offer(group_key, source, tool, count, sentence)
-        self._memory.add_offer(group_key, utc_text(self._now()), outcome)
+        rules.add_offer(self._memory.db, group_key, utc_text(self._now()), outcome)
 
     async def _look(self, group_key: str, count: int) -> str | None:
         """The model's one-sentence offer, or None for no offer (errors included)."""

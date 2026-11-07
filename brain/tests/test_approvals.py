@@ -8,6 +8,7 @@ from brain.approvals import Approvals
 from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
+from brain.store import rules
 
 
 @pytest.fixture
@@ -142,8 +143,8 @@ async def test_list_approvals_returns_counts_and_cursor(mem):
 
 
 async def test_list_approvals_scout_filter_includes_stored_preference_sentence(mem):
-    pref = mem.add_preference(
-        sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
+    pref = rules.add_preference(
+        mem.db, sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
     )
     add_row(mem)
     add_row(mem, decided_by="scout", preference_id=pref.id, preference_sentence=pref.sentence)
@@ -155,10 +156,10 @@ async def test_list_approvals_scout_filter_includes_stored_preference_sentence(m
     assert out["counts"]["total"] == 2  # counts ignore the filter
 
     # The row keeps the sentence it was approved under, whatever happens to the preference.
-    mem.edit_preference(pref.id, "Allow nothing")
+    rules.edit_preference(mem.db, pref.id, "Allow nothing")
     out = json.loads(await h({"filter": "scout"}))
     assert out["approvals"][0]["preference"] == "Allow reads"
-    mem.remove_preference(pref.id)
+    rules.remove_preference(mem.db, pref.id)
     out = json.loads(await h({"filter": "scout"}))
     assert out["approvals"][0]["preference"] == "Allow reads"
 
@@ -178,20 +179,24 @@ async def test_list_approvals_rejects_bad_args(mem):
 
 
 async def test_remove_preference_changes_and_notifies(mem):
-    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    pref = rules.add_preference(
+        mem.db, sentence="x", source=None, tool=None, group_key=None, at="t"
+    )
     sent = []
     t = tools(mem, sent)
 
     await t["remove_preference"][1]({"id": pref.id})
 
-    assert pref.id not in [p.id for p in mem.list_preferences()]
+    assert pref.id not in [p.id for p in rules.list_preferences(mem.db)]
     assert sent == [("changed", {"what": "approvals"})]
     listed = json.loads(await t["list_preferences"][1]({}))["preferences"]
     assert all(p["id"] != pref.id for p in listed)
 
 
-async def test_list_preferences_shape(mem):
-    pref = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
+async def test_list_preferences_shape_unchanged(mem):
+    pref = rules.add_preference(
+        mem.db, sentence="x", source="app", tool="t", group_key="g", at="t0"
+    )
     listed = json.loads(await tools(mem, [])["list_preferences"][1]({}))["preferences"]
     row = next(p for p in listed if p["id"] == pref.id)
     assert row == {
@@ -201,22 +206,26 @@ async def test_list_preferences_shape(mem):
 
 
 async def test_remove_default_is_allowed(mem):
-    default = mem.list_preferences()[0]
+    default = rules.list_preferences(mem.db)[0]
     await tools(mem, [])["remove_preference"][1]({"id": default.id})
-    assert not any(p.builtin for p in mem.list_preferences())
+    assert not any(p.builtin for p in rules.list_preferences(mem.db))
 
 
 async def test_edit_preference_rewrites_and_notifies(mem):
-    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    pref = rules.add_preference(
+        mem.db, sentence="x", source=None, tool=None, group_key=None, at="t"
+    )
     sent = []
     await tools(mem, sent)["edit_preference"][1]({"id": pref.id, "sentence": "  new  "})
-    assert [p.sentence for p in mem.list_preferences() if p.id == pref.id] == ["new"]
+    assert [p.sentence for p in rules.list_preferences(mem.db) if p.id == pref.id] == ["new"]
     assert sent == [("changed", {"what": "approvals"})]
 
 
 @pytest.mark.parametrize("sentence", ["", "   ", "x" * 301, 5, None])
 async def test_edit_preference_rejects_empty_and_overlong(mem, sentence):
-    pref = mem.add_preference(sentence="x", source=None, tool=None, group_key=None, at="t")
+    pref = rules.add_preference(
+        mem.db, sentence="x", source=None, tool=None, group_key=None, at="t"
+    )
     sent = []
     with pytest.raises(RpcError) as e:
         await tools(mem, sent)["edit_preference"][1]({"id": pref.id, "sentence": sentence})
@@ -249,8 +258,8 @@ def test_home_tools_not_offered_to_the_model(mem):
 def test_scout_approved_records_uses_and_notifies(mem):
     from brain.side_check import AskFacts
 
-    pref = mem.add_preference(
-        sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
+    pref = rules.add_preference(
+        mem.db, sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
     )
     sent = []
     facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo", False)
@@ -263,7 +272,7 @@ def test_scout_approved_records_uses_and_notifies(mem):
         "claude_code", "claude_code:ls", "claude_code:/repo", "j1", {"c": 1},
     )  # fmt: skip
     assert (row.summary, row.preference_sentence) == ("ls -la", "Allow reads")
-    used = next(p for p in mem.list_preferences() if p.id == pref.id)
+    used = next(p for p in rules.list_preferences(mem.db) if p.id == pref.id)
     assert used.use_count == 1 and used.last_used == "2026-10-28T09:00:00+00:00"
     assert (
         "approved",
@@ -289,7 +298,7 @@ def test_edit_and_remove_preference_notify_only_when_something_changed(mem):
     pref = service.add_preference(sentence="a", source=None, tool=None, group_key=None)
     sent.clear()
     assert service.edit_preference(pref.id, "b") is True
-    assert [p.sentence for p in mem.list_preferences() if p.id == pref.id] == ["b"]
+    assert [p.sentence for p in rules.list_preferences(mem.db) if p.id == pref.id] == ["b"]
     assert service.remove_preference(pref.id) is True
     assert service.remove_preference(pref.id) is False
     assert service.edit_preference(pref.id, "c") is False

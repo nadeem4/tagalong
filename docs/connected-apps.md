@@ -243,7 +243,7 @@ to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-car
 | Where                         | Holds                                                                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`                                                    |
-| `permissions` table           | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
+| `rules` table (`mode` rows)   | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
 | `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows |
 | `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                          |
 

@@ -33,14 +33,14 @@ connection from `store.db.open_db`; nothing else opens the file.
   `job_records.py` (S2a); the other areas move over in later slices.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0019_jobs_to_work`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0022_rules`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
 
 `Memory` keeps its public methods and each one calls the matching store function with its
-connection. The other tables (approvals, preferences, permissions, offers) keep
-their SQL in `memory.py` until the slice that rewrites them moves them.
+connection. The other table (approvals) keeps
+its SQL in `memory.py` until the slice that rewrites them moves them.
 
 ## Tables and relations
 
@@ -54,7 +54,7 @@ erDiagram
     work ||--o{ job_steps : "job_id, the goal id"
     work ||--o| work_timer : "timer and watch rows"
     work ||--o{ approvals : "job_id, optional"
-    preferences ||--o{ approvals : "preference_id"
+    rules ||--o{ approvals : "preference_id, a sentence rule"
     loops ||--o{ loop_surfaced : "loop_id"
     apps ||--o{ loop_cursor : "app_id, with key prefixes"
     memories ||--|| memories_fts : "triggers"
@@ -86,8 +86,11 @@ erDiagram
         text job_id
         int preference_id
     }
-    preferences {
+    rules {
         int id PK
+        text kind
+        text tool
+        text group_key
     }
     loops {
         text id PK
@@ -112,20 +115,13 @@ erDiagram
         int id PK
         text role
     }
-    permissions {
-        text tool PK
-    }
-    offers {
-        int id PK
-        text group_key
-    }
     tool_outputs {
         text id PK
     }
 ```
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
-row does not cascade. `permissions`, `offers` and `tool_outputs` stand alone. `offers.group_key`
+row does not cascade. `tool_outputs` stands alone. An offer rule's `group_key`
 and `approvals.group_key` name the same kind of action. A continued job keeps the earlier job's
 id in a `continued` event on its goal row.
 
@@ -183,7 +179,7 @@ What Scout remembers across restarts, by kind.
 
 The work model. Every job, step, ask, timer and loop becomes one row in `work`; each area moves
 over in its own slice and drops its old tables. Jobs and their parts have moved (S2a, see
-"Jobs as work rows" below); the sections after that, up to Permissions, still describe the old
+"Jobs as work rows" below); the sections after that, up to Rules and approvals, still describe the old
 shape and go away slice by slice. `store/work.py` (`WorkStore`) is the only code that touches the
 three tables below, plus `work_job`.
 
@@ -474,41 +470,48 @@ How far each app's mail has been read, plus a few per-app flags kept under prefi
 - Retention: `on:<app>` is removed when the app is switched off; everything goes on `wipe`.
 - Masked: no.
 
-## Permissions
+## Rules and approvals
 
-### permissions
+### rules
 
-The person's choice for each tool. No row means the tool's default applies.
+One table for what the person has decided about asks: a tool's mode, a standing sentence, and
+an offered sentence. `kind` tells them apart. Code reaches it only through `store/rules.py`.
 
-| Column | Type             | Meaning                        |
-| ------ | ---------------- | ------------------------------ |
-| `tool` | TEXT PRIMARY KEY | The tool name                  |
-| `mode` | TEXT             | `off`, `ask` or `auto` (CHECK) |
+| Column       | Type                | Meaning                                                                                               |
+| ------------ | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `id`         | INTEGER PRIMARY KEY | Rule id (a preference keeps its old id, which `approvals.preference_id` names)                        |
+| `kind`       | TEXT                | `mode` (a tool's off/ask/auto), `sentence` (a preference), `offer` (an offer Scout made)              |
+| `tool`       | TEXT                | `mode`: the tool. `sentence`: optional scope, the tool                                                |
+| `source`     | TEXT                | Optional scope: where the ask comes from                                                              |
+| `group_key`  | TEXT                | Optional scope: the kind of action                                                                    |
+| `effect`     | TEXT                | `mode`: `off`, `ask` or `auto`. `offer`: the outcome word (`yes`, `keep_asking`, `none`, `no_answer`) |
+| `sentence`   | TEXT                | `sentence`: what Scout checks an ask against                                                          |
+| `state`      | TEXT                | `active`, `offered`, `declined` or `removed`                                                          |
+| `decided_at` | TEXT                | When an offer was answered                                                                            |
+| `expires_at` | TEXT                | Optional; nothing sets it yet                                                                         |
+| `builtin`    | INTEGER             | 0 or 1: the default sentence seeded by the first migration                                            |
+| `use_count`  | INTEGER             | How many asks a sentence has covered                                                                  |
+| `last_used`  | TEXT                | When it last covered one                                                                              |
+| `created_at` | TEXT                | When it was added (an offer: when it was made)                                                        |
 
-- Written by: `memory.py` `set_permission_mode` (the `set_permission` tool).
-- Read by: `memory.py` `permission_modes`, used by `toolbox.py`.
-- Retention: kept until changed.
-- Masked: no.
+Indexes: `(kind, tool)` and `(kind, group_key)`.
 
-### preferences
-
-The person's standing sentences, such as "Always ask me before risky actions".
-
-| Column       | Type                | Meaning                                         |
-| ------------ | ------------------- | ----------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | Preference id                                   |
-| `sentence`   | TEXT                | The sentence Scout checks an ask against        |
-| `source`     | TEXT                | Optional scope: where the ask comes from        |
-| `tool`       | TEXT                | Optional scope: the tool                        |
-| `group_key`  | TEXT                | Optional scope: the kind of action              |
-| `builtin`    | INTEGER             | 0 or 1: the default row seeded by the migration |
-| `created_at` | TEXT                | When it was added                               |
-| `use_count`  | INTEGER             | How many asks it has covered                    |
-| `last_used`  | TEXT                | When it last covered one                        |
-
-- Written by: `memory.py` `add_preference`, `edit_preference`, `remove_preference`,
-  `use_preference`; read by `side_check.py`, `offers.py`, Home.
-- Retention: until the person removes it.
+- A tool has no `mode` row until the person sets one; then its default applies. Setting it
+  again updates the one row.
+- A preference is `kind=sentence`, `state=active`. Removing it sets `state=removed`; it is no
+  longer listed or used, and the row stays so the approval log never points at nothing.
+- An offer's state follows its outcome: `yes` is `active`, `keep_asking` and `none` are
+  `declined`, `no_answer` is `offered`. The outcome word stays in `effect` so the
+  keep-asking window in `offers.py` reads it.
+- Migration `0022_rules` moved the old `permissions`, `preferences` and `offers` tables into
+  it (preferences first, keeping their ids) and dropped them.
+- Written by: `store/rules.py` (`set_permission_mode`, `add_preference`, `edit_preference`,
+  `remove_preference`, `use_preference`, `add_offer`) for the `set_permission` tool, Home,
+  `approvals.py` and `offers.py`.
+- Read by: `store/rules.py` (`permission_modes`, `list_preferences`, `has_user_preferences`,
+  `has_preference_for`, `offers_for`) for `toolbox.py`, `side_check.py`, `offers.py`, Home and
+  the prompt.
+- Retention: kept until changed; a removed preference is kept as a `removed` row.
 - Masked: no.
 
 ### approvals
@@ -535,21 +538,6 @@ The log of how each ask ended.
   Home.
 - Retention: kept forever.
 - Masked: `summary` and `input` yes.
-
-### offers
-
-Each "want me to handle these?" Scout made, so it does not nag.
-
-| Column      | Type                | Meaning                                             |
-| ----------- | ------------------- | --------------------------------------------------- |
-| `id`        | INTEGER PRIMARY KEY | Offer id                                            |
-| `group_key` | TEXT                | The kind of action offered about                    |
-| `at`        | TEXT                | When it was made                                    |
-| `outcome`   | TEXT                | `yes`, `keep_asking`, `no_answer` or `none` (CHECK) |
-
-- Written by: `offers.py` `Offers` through `memory.py` `add_offer`; read by `offers_for`.
-- Retention: kept forever.
-- Masked: no.
 
 ## Apps
 

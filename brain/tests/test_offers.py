@@ -15,6 +15,7 @@ from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.offers import Offers, OfferSettings
 from brain.protocol import ErrorCode, RpcError
+from brain.store import rules
 from brain.store.db import utc_text
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
@@ -160,7 +161,7 @@ async def test_no_offer_still_caps_looks_to_one_per_day(mem):
     rig.approve(n=3)
     await rig.consider()
     assert rig.model.calls == 1 and rig.asks.opened == []
-    assert [o for _, o in mem.offers_for(GROUP)] == ["none"]
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["none"]
     await rig.consider()
     assert rig.model.calls == 1  # a second approval the same day looks no more
     rig.clock = NOW + timedelta(days=1, minutes=1)
@@ -174,14 +175,14 @@ async def test_model_error_still_counts_as_a_look(mem):
     rig.approve(n=3)
     await rig.consider()  # must not raise
     assert rig.asks.opened == []
-    assert [o for _, o in mem.offers_for(GROUP)] == ["none"]
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["none"]
 
 
 async def test_keep_asking_blocks_for_seven_days_then_allows(mem):
     rig = Rig(mem, asks=FakeAsks(Answer(KEEP)))
     rig.approve(n=3)
     await rig.consider()
-    assert [o for _, o in mem.offers_for(GROUP)] == ["keep_asking"]
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["keep_asking"]
     rig.clock = NOW + timedelta(days=3)
     rig.approve(days_ago=-3, n=1)
     await rig.consider()
@@ -194,8 +195,8 @@ async def test_keep_asking_blocks_for_seven_days_then_allows(mem):
 
 async def test_group_with_a_preference_is_never_offered(rig):
     rig.approve(n=3)
-    rig.mem.add_preference(
-        sentence="read away", source=None, tool=None, group_key=GROUP, at=utc_text(NOW)
+    rules.add_preference(
+        rig.mem.db, sentence="read away", source=None, tool=None, group_key=GROUP, at=utc_text(NOW)
     )
     await rig.consider()
     assert rig.model.calls == 0
@@ -204,19 +205,19 @@ async def test_group_with_a_preference_is_never_offered(rig):
 async def test_yes_saves_the_preference_with_source_tool_group(rig):
     rig.approve(n=3)
     await rig.consider()
-    [pref] = [p for p in rig.mem.list_preferences() if not p.builtin]
+    [pref] = [p for p in rules.list_preferences(rig.mem.db) if not p.builtin]
     assert (pref.sentence, pref.source, pref.tool, pref.group_key) == (
         "Fine to read files", "scout_tool", "Read", GROUP,
     )  # fmt: skip
     assert ("changed", {"what": "approvals"}) in rig.sent
-    assert [o for _, o in rig.mem.offers_for(GROUP)] == ["yes"]
+    assert [o for _, o in rules.offers_for(rig.mem.db, GROUP)] == ["yes"]
 
 
 async def test_keep_asking_saves_nothing(mem):
     rig = Rig(mem, asks=FakeAsks(Answer(KEEP)))
     rig.approve(n=3)
     await rig.consider()
-    assert not any(not p.builtin for p in mem.list_preferences())
+    assert not any(not p.builtin for p in rules.list_preferences(mem.db))
 
 
 @pytest.mark.parametrize(
@@ -233,8 +234,8 @@ async def test_ask_failure_saves_nothing_and_records_no_answer(mem, answer):
     rig = Rig(mem, asks=FakeAsks(answer))
     rig.approve(n=3)
     await rig.consider()
-    assert not any(not p.builtin for p in mem.list_preferences())
-    assert [o for _, o in mem.offers_for(GROUP)] == ["no_answer"]
+    assert not any(not p.builtin for p in rules.list_preferences(mem.db))
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["no_answer"]
 
 
 async def test_nobody_online_or_over_budget_skips(mem):
@@ -244,7 +245,7 @@ async def test_nobody_online_or_over_budget_skips(mem):
     assert offline.model.calls == 0
     broke = Rig(mem, budget=Budget(allows=False))
     await broke.consider()
-    assert broke.model.calls == 0 and mem.offers_for(GROUP) == []
+    assert broke.model.calls == 0 and rules.offers_for(mem.db, GROUP) == []
 
 
 async def test_offer_text_names_the_sentence(rig):
@@ -272,7 +273,7 @@ async def test_blank_sentence_is_no_offer(mem):
     rig.approve(n=3)
     await rig.consider()
     assert rig.asks.opened == []
-    assert [o for _, o in mem.offers_for(GROUP)] == ["none"]
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["none"]
 
 
 async def test_two_concurrent_considers_make_one_offer(mem):
@@ -308,4 +309,4 @@ async def test_consider_skips_look_when_the_guards_stop(mem):
     )  # fmt: skip
     r.approve(n=3)
     await r.consider()
-    assert r.model.calls == 0 and mem.offers_for(GROUP) == []
+    assert r.model.calls == 0 and rules.offers_for(mem.db, GROUP) == []
