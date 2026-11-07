@@ -290,9 +290,16 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     the desktop pull and the job page on the fake brain.
     **Parts (SP2):** a job holds one part per expert hand-off. Automated: `test_jobs.py` (one part
     per start, separate asks per part, `tell` needs a part when several run, `stop` stops all),
-    `test_memory.py` (the migration), `test_job_activity.py` (one ordered log, expert tags in the
-    wake summary). **Manual check:** open Home → Jobs on a database from before this change: an
-    old job opens as one part, with its steps, result and times intact.
+    `test_job_records.py` (parts as expert_call rows), `test_job_activity.py` (one ordered log,
+    expert tags in the wake summary). **Manual check:** open Home → Jobs on a database from before
+    this change: an old job opens as one part, with its steps, result and times intact.
+    **Jobs as work rows (S2a):** jobs and parts are now `work` rows. Automated:
+    `test_migrate_jobs.py` (a messy old database upgrades with every job, part, report, session
+    and watch list kept), `test_job_records.py` (the `Job` and `JobPart` shapes, state words,
+    long reports in `tool_outputs`, restart cancel), `test_tools.py` (`list_jobs` and `close_job`
+    keep their shapes; `close_job` takes `outcome`). **Manual check:** upgrade a database that
+    has finished, failed and stopped jobs; Home → Jobs shows the same list, states and results,
+    and a follow-up on an old job still continues its session.
     **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
     tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
     page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it
@@ -310,13 +317,13 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     with the list (ticked items show a check); if Scout ticks one while the page is open, the
     header updates without a reload. A job Scout never wrote a list for shows no list and no empty
     box. Automated: `test_jobs.py` (`set_watch`, refusals, masking, `wake_facts`), `test_tools.py`,
-    `test_memory.py` (the column and its migration), `watch-list.test.tsx`, `job-page.test.tsx`
+    `test_job_records.py` (the watch list), `watch-list.test.tsx`, `job-page.test.tsx`
     and `e2e/jobs.spec.ts` (`setWatch` on the fake brain).
     **Title, parts, closing (manual):** ask Scout for a task that needs two experts (or two steps) in
     one folder. **Expected:** Scout opens the job with a title of its own words, adds a second
     hand-off to the same job id (`list_jobs` shows `p1`, `p2`), and calls `close_job` when it is
     satisfied; a closed job refuses new parts. A job it never closes stays open and listed. Automated:
-    `test_jobs.py` (title, `job=`, close), `test_tools.py`, `test_memory.py`, `test_prompt.py`.
+    `test_jobs.py` (title, `job=`, close), `test_tools.py`, `test_job_records.py`, `test_prompt.py`.
     **Result and Scout's steps (manual):** hand a job to Claude Code, and when it ends let Scout
     answer the wake. **Expected:** Scout calls `set_job_result` with a short result in its own
     words (`list_jobs` shows it as `scout_result`); calling it again replaces it, and a job it never

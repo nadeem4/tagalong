@@ -1,6 +1,6 @@
 """Jobs: Scout's hand-offs to Claude Code, from the folder check to the finished row.
 Owns the running ExpertRuns, asks the user to pick a mode (the hand-off ask), relays Claude
-Code's own permission and question prompts as turn-less asks, and keeps the jobs table current.
+Code's own permission and question prompts as turn-less asks, and keeps the job records current.
 It tells bodies through the injected notify (`changed: jobs`, `changed: job_activity`).
 """
 

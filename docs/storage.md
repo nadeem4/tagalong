@@ -29,16 +29,17 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/work.py`: `WorkStore` over the `work`, `work_events` and `work_fts` tables: create, the
-  state machine, rollup, retry, due queries, search and the resume scan. Nothing calls it yet.
+  state machine, rollup, retry, due queries, search and the resume scan. Jobs use it through
+  `job_records.py` (S2a); the other areas move over in later slices.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0018_work`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0019_jobs_to_work`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
 
 `Memory` keeps its public methods and each one calls the matching store function with its
-connection. The other tables (jobs, timers, approvals, preferences, permissions, offers) keep
+connection. The other tables (timers, approvals, preferences, permissions, offers) keep
 their SQL in `memory.py` until the slice that rewrites them moves them.
 
 ## Tables and relations
@@ -48,26 +49,27 @@ Key columns only; the full columns are in each table's section.
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 erDiagram
-    jobs ||--o{ job_parts : "has parts"
-    job_parts ||--o{ job_activity : "logs steps"
-    jobs ||--o{ job_activity : "job_id"
-    jobs ||--o{ timers : "job_id, optional"
-    jobs ||--o{ approvals : "job_id, optional"
+    work ||--o{ work : "goal has expert_call rows"
+    work ||--o| work_job : "goal row of a job"
+    work ||--o{ job_activity : "job_id, the goal id"
+    work ||--o{ timers : "job_id, optional"
+    work ||--o{ approvals : "job_id, optional"
     preferences ||--o{ approvals : "preference_id"
     loops ||--o{ loop_surfaced : "loop_id"
     apps ||--o{ loop_cursor : "app_id, with key prefixes"
     memories ||--|| memories_fts : "triggers"
     messages ||--|| messages_fts : "triggers"
 
-    jobs {
+    work {
         text id PK
+        text parent_id
+        text kind
         text state
-        text parent_job
     }
-    job_parts {
-        text job_id PK
-        text id PK
-        text session_id
+    work_job {
+        text work_id PK
+        text agent
+        text folder
     }
     job_activity {
         text job_id PK
@@ -124,7 +126,8 @@ erDiagram
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
 row does not cascade. `permissions`, `offers` and `tool_outputs` stand alone. `offers.group_key`
-and `approvals.group_key` name the same kind of action. `parent_job` points at another `jobs.id`.
+and `approvals.group_key` name the same kind of action. A continued job keeps the earlier job's
+id in a `continued` event on its goal row.
 
 ## Conversation
 
@@ -179,10 +182,11 @@ What Scout remembers across restarts, by kind.
 
 ## Work
 
-The work model (added in S1; nothing writes it yet). Every job, step, ask, timer and loop will
-become one row in `work`; later slices move each area over and drop its old tables. The sections
-after this one, up to Permissions, describe the old shape and go away slice by slice.
-`store/work.py` (`WorkStore`) is the only code that touches the three tables below.
+The work model. Every job, step, ask, timer and loop becomes one row in `work`; each area moves
+over in its own slice and drops its old tables. Jobs and their parts have moved (S2a, see
+"Jobs as work rows" below); the sections after that, up to Permissions, still describe the old
+shape and go away slice by slice. `store/work.py` (`WorkStore`) is the only code that touches the
+three tables below, plus `work_job`.
 
 ### work
 
@@ -291,59 +295,72 @@ same tokenizer (`porter unicode61`) and trigger style as `messages_fts`. `WorkSt
 it, so Scout can find "that invoice thing". Any rebuild of `work` must copy `rowid` explicitly and
 then run `INSERT INTO work_fts(work_fts) VALUES('rebuild')`, because the index is keyed by rowid.
 
+## Jobs as work rows
+
+One hand-off of a task to an expert, seen from Scout's side, is a goal row in `work` with the
+job's id. Each expert's share of it (part `p1`, then `p2` for a follow-up) is an `expert_call`
+row under that goal, named `<job>.<part>`. `job_records.py` (`JobRecords`) turns the `Job` and
+`JobPart` shapes the rest of the brain reads into `WorkStore` moves and back; it has no SQL of its
+own. Home and Scout's tools see the same words as before (`running`, `done`, `error`, `stopped`):
+`home_state` maps `active`, `done`, `failed` and everything else.
+
+### work_job
+
+What a job row needs that `work` has no column for. One row per goal and per expert call.
+
+| Column    | Type             | Meaning                                   |
+| --------- | ---------------- | ----------------------------------------- |
+| `work_id` | TEXT PRIMARY KEY | The goal or expert_call row it describes  |
+| `agent`   | TEXT             | Which expert ran it (expert calls)        |
+| `folder`  | TEXT             | The folder the expert works in            |
+| `mode`    | TEXT             | The expert's mode the person chose (goal) |
+| `task`    | TEXT             | What was asked first (goal)               |
+
+- Written by: `job_records.py` through `WorkStore.set_job_detail`.
+- Read by: `job_records.py` through `WorkStore.job_details`.
+- Retention: kept with its work row. Not masked: `task` and `folder` never were.
+
+### The goal row (a job)
+
+| `work` column | Holds                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `state`       | `active` while Scout works on it; `blocked` when a part failed; Scout's close ends it                                                 |
+| `title`       | Scout's short title, masked, capped at 200                                                                                            |
+| `input`       | `{"watch": [{text, done}, ...]}`: what Scout expects from the job                                                                     |
+| `summary`     | Scout's write-up of the result, masked; over 2,000 characters the rest is in `tool_outputs` through `detail_id` (capped at 1,000,000) |
+| `ended_at`    | When Scout closed it (`close_job`, outcome `done` or `failed`)                                                                        |
+
+A continued job (a hand-off that resumes an earlier job's session) records the earlier job's id
+in a `continued` event. The job's own state is derived, as before: running while any part is
+active, failed once the goal failed, otherwise the state of the part that ended last.
+
+### The expert_call row (a part)
+
+| `work` column | Holds                                                                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `state`       | `active`, then `done`, `failed` or `cancelled` (a stopped part)                                                                                                   |
+| `input`       | `{"task": ...}`: what this part was asked                                                                                                                         |
+| `progress`    | A running tail of what the expert last said, capped at 2,000; cleared when it ends                                                                                |
+| `checkpoint`  | `{"session_id": ...}`: the expert's own session id, used to resume it                                                                                             |
+| `summary`     | The expert's final report, masked; the first 2,000 characters, with the whole text in `tool_outputs` (pointed at by `detail_id`) when longer, capped at 1,000,000 |
+| `end_reason`  | Why it ended, such as `end_turn` or `brain restarted`                                                                                                             |
+| `reported_at` | Null until Scout has been told it ended                                                                                                                           |
+
+- Written by: `jobs.py` through `JobRecords` (`add_job`, `add_part`, `update_part`, `set_title`,
+  `set_result`, `set_watch`, `close_job`, `mark_reported`).
+- Read by: `jobs.py`, `tools.py` (`list_jobs`), `timers.py`, `job_activity.py` through
+  `JobRecords` (`get_job`, `parts_of`, `last_part_for`, `unreported_jobs`, `running_jobs`).
+- Retention: kept forever. Rows still active when the brain starts become `cancelled` with the
+  reason `brain restarted` (`stop_running_on_start`); their goals are cancelled too.
+- Masked: title, watch, progress, report and result yes (the work store masks them on the way in);
+  `task` and `folder` no.
+- A report over 2,000 characters lives in `tool_outputs`; `prune_outputs` keeps any output a work
+  row points at.
+- Upgrade: migration `0019_jobs_to_work` moves every `jobs` and `job_parts` row into this shape
+  (old states `running`, `done`, `stopped`, `error` become `active`, `done`, `cancelled`,
+  `failed`), then drops both tables.
+
 ## Work (old shape)
-
-### jobs
-
-One hand-off of a task to an expert, seen from Scout's side. A job holds one or more parts.
-
-| Column         | Type             | Meaning                                                      |
-| -------------- | ---------------- | ------------------------------------------------------------ |
-| `id`           | TEXT PRIMARY KEY | Job id                                                       |
-| `task`         | TEXT             | What was asked                                               |
-| `folder`       | TEXT             | The folder the expert works in                               |
-| `mode`         | TEXT             | The expert's mode the person chose                           |
-| `state`        | TEXT             | `running`, `done`, `stopped` or `error`; set from its parts  |
-| `started_at`   | TEXT             | When it began                                                |
-| `ended_at`     | TEXT             | When the last part ended; null while running                 |
-| `parent_job`   | TEXT             | The earlier job whose session this one continues             |
-| `watch`        | TEXT             | JSON list of `{text, done}`: what Scout expects from the job |
-| `title`        | TEXT             | Scout's short title                                          |
-| `scout_result` | TEXT             | Scout's write-up of the result                               |
-| `closed_at`    | TEXT             | When Scout finished with it; null while open                 |
-
-- Written by: `jobs.py` through `memory.py` `add_job`, `update_job`, `set_title`, `set_result`,
-  `set_watch`, `close_job`.
-- Read by: `jobs.py`, `tools.py` (`list_jobs`), `memory.py` `unreported_jobs`, `running_jobs`.
-- Retention: kept forever. Rows still `running` when the brain starts become `stopped`
-  (`stop_running_on_start`).
-- Masked: `title`, `watch` and `scout_result` yes; `task` and `folder` no. `scout_result` is
-  capped at 1,000,000 characters, `title` at 200.
-
-### job_parts
-
-One expert's share of a job: a job starts with part `p1` and a follow-up hand-off adds more.
-
-| Column       | Type    | Meaning                                                                 |
-| ------------ | ------- | ----------------------------------------------------------------------- |
-| `job_id`     | TEXT    | The job; part of the primary key `(job_id, id)`                         |
-| `id`         | TEXT    | Part id, `p1`, `p2`, ...                                                |
-| `agent`      | TEXT    | Which expert ran it                                                     |
-| `task`       | TEXT    | What this part was asked                                                |
-| `state`      | TEXT    | `running`, `done`, `stopped` or `error`                                 |
-| `reason`     | TEXT    | Why it ended, such as `end_turn` or `brain restarted`                   |
-| `progress`   | TEXT    | A running tail of what the expert last said, capped at 2,000 characters |
-| `session_id` | TEXT    | The expert's own session id, used to resume it                          |
-| `report`     | TEXT    | The expert's final report, capped at 1,000,000 characters               |
-| `reported`   | INTEGER | 0 or 1: whether Scout has been told it ended                            |
-| `started_at` | TEXT    | When it began                                                           |
-| `ended_at`   | TEXT    | When it ended                                                           |
-| `folder`     | TEXT    | The folder it worked in                                                 |
-
-- Written by: `jobs.py` through `memory.py` `add_part`, `update_part`, `mark_reported`.
-- Read by: `jobs.py`, `memory.py` `parts_of`, `last_part_for`, `unreported_jobs`.
-- Retention: kept forever.
-- Masked: `progress` and `report` yes; `task` no.
 
 ### job_activity
 
@@ -585,7 +602,7 @@ These are lost when the brain restarts.
 | Expert questions     | `questions.py` `ScoutQuestions` | A question waiting on Scout is gone                                                                   |
 | Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                       |
 | Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start |
-| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `stopped`                                                 |
+| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                               |
 | Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                               |
 | App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                         |
 | Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                            |
