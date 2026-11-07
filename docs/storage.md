@@ -30,18 +30,24 @@ connection from `store.db.open_db`; nothing else opens the file.
   the mail switch `set_reads_mail` and `reads_mail_apps`) and `app_cursors` (`cursor`, `set_cursor`,
   `clear_mail`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
-- `store/work.py`: `WorkStore` over the `work`, `work_events` and `work_fts` tables: create, the
-  state machine, rollup, retry, due queries, search and the resume scan. Jobs use it through
-  `job_records.py` (S2a); the other areas move over in later slices.
+- `store/rules.py`: owns `rules` (modes, preferences, offers).
+- `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
+  `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
+  rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
+  all reach it through their own modules (`job_records.py`, `asks.py`, `timers.py`,
+  `loops/store.py`).
+
+Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if any other module
+under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0024_asks`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0025_memory_layers`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
 
 `Memory` keeps its public methods and each one calls the matching store function with its
-connection. No table keeps its SQL in `memory.py` any more.
+connection. It keeps no SQL of its own.
 
 ## Tables and relations
 
@@ -50,7 +56,9 @@ Key columns only; the full columns are in each table's section.
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 erDiagram
-    work ||--o{ work : "goal has expert_call rows"
+    work ||--o{ work : "parent_id, the tree"
+    work ||--o{ work_events : "work_id"
+    work |o--o| tool_outputs : "detail_id, the full text"
     work ||--o| work_job : "goal row of a job"
     work ||--o{ job_steps : "job_id, the goal id"
     work ||--o| work_timer : "timer and watch rows"
@@ -66,6 +74,11 @@ erDiagram
         text parent_id
         text kind
         text state
+    }
+    work_events {
+        int id PK
+        text work_id
+        text kind
     }
     work_job {
         text work_id PK
@@ -108,6 +121,8 @@ erDiagram
     memories {
         int id PK
         text kind
+        text layer
+        text source_work_id
     }
     messages {
         int id PK
@@ -119,8 +134,9 @@ erDiagram
 ```
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
-row does not cascade. `tool_outputs` stands alone. An offer rule's `group_key`
-and `approvals.group_key` name the same kind of action. A continued job keeps the earlier job's
+row does not cascade; [the sweep](#cleanup) deletes a whole tree's rows itself. An offer rule's
+`group_key` and `work_ask.group_key` name the same kind of action. `memories.source_work_id` and
+`source_msg_from`/`source_msg_to` are for the memory work that comes later; nothing sets them yet. A continued job keeps the earlier job's
 id in a `continued` event on its goal row.
 
 ## Conversation
@@ -154,13 +170,20 @@ it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 What Scout remembers across restarts, by kind.
 
-| Column       | Type                | Meaning                                            |
-| ------------ | ------------------- | -------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item   |
-| `kind`       | TEXT                | `instruction`, `about_you`, `project` or `summary` |
-| `text`       | TEXT                | The item                                           |
-| `created_at` | TEXT                | When it was saved                                  |
-| `updated_at` | TEXT                | When it last changed                               |
+| Column            | Type                | Meaning                                                           |
+| ----------------- | ------------------- | ----------------------------------------------------------------- |
+| `id`              | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item                  |
+| `kind`            | TEXT                | `instruction`, `about_you`, `project` or `summary`                |
+| `text`            | TEXT                | The item, masked                                                  |
+| `created_at`      | TEXT                | When it was saved                                                 |
+| `updated_at`      | TEXT                | When it last changed                                              |
+| `layer`           | TEXT                | `core` (default) or `episodic`; see [memory.md](memory.md#layers) |
+| `period`          | TEXT                | `day` for an episodic entry; null for core                        |
+| `span_start`      | TEXT                | Start of the time an episodic entry covers; null for core         |
+| `span_end`        | TEXT                | End of that time                                                  |
+| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet           |
+| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                   |
+| `source_work_id`  | TEXT                | The work row it describes; not set yet                            |
 
 - Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
   compaction in `sessions.py`).
@@ -168,18 +191,20 @@ What Scout remembers across restarts, by kind.
 - Retention: kept until forgotten or replaced. Caps per kind: `instruction` 50 items of 300
   characters, `about_you` 50 of 300, `project` 200 of 500; `summary` is
   uncapped and written by code.
-- Masked: no.
+- Masked: yes. `Memory` masks the text on its way in (`remember`, `add_summary`) with the
+  session's `save` guard, so a pasted key is stored as `[secret]`.
+- Upgrade: migration `0025_memory_layers` adds the layer columns. Every old row is `core`
+  except `summary` rows, which become `episodic`, period `day`, spanning their `created_at`.
+  `kind` is untouched, so Home's list is the same.
 
 `memories_fts` is an FTS5 index over `memories.text`, built and searched the same way as
 `messages_fts`; it backs the `recall` tool.
 
 ## Work
 
-The work model. Every job, step, ask, timer and loop becomes one row in `work`; each area moves
-over in its own slice and drops its old tables. Jobs and their parts have moved (S2a, see
-"Jobs as work rows" below); the sections after that, up to Rules and approvals, still describe the old
-shape and go away slice by slice. `store/work.py` (`WorkStore`) is the only code that touches the
-three tables below, plus `work_job`.
+The work model. Every job, step, ask, timer, watch and loop is one row in `work`, in a tree,
+with one state, an append-only `work_events` log and a small detail table for what `work` has no
+column for. `store/work.py` (`WorkStore`) is the only code that touches these tables.
 
 ### work
 
@@ -348,13 +373,14 @@ active, failed once the goal failed, otherwise the state of the part that ended 
   `set_result`, `set_watch`, `close_job`, `mark_reported`).
 - Read by: `jobs.py`, `tools.py` (`list_jobs`, Home only), `timers.py`, `job_activity.py` through
   `JobRecords` (`get_job`, `parts_of`, `last_part_for`, `unreported_jobs`, `running_jobs`).
-- Retention: kept forever. Parts still active when the brain starts are settled by the resume scan:
+- Retention: swept with the whole job `TAGALONG_WORK_KEEP_DAYS` after it ended (see
+  [Cleanup](#cleanup)). Parts still active when the brain starts are settled by the resume scan:
   `blocked` with the reason `brain restarted` when they saved a session the expert can reload,
   else `failed` with that reason; either way their job's step log ends with a "stopped" line.
 - Masked: title, watch, progress, report and result yes (the work store masks them on the way in);
   `task` and `folder` no.
 - A report over 2,000 characters lives in `tool_outputs`; `prune_outputs` keeps any output a work
-  row points at.
+  row points at, and the sweep deletes it with the row.
 - Upgrade: migration `0019_jobs_to_work` moves every `jobs` and `job_parts` row into this shape
   (old part states `running`, `done`, `stopped`, `error` become `active`, `done`, `cancelled`,
   `failed`), then drops both tables. Only a job Scout closed (`closed_at` set) becomes an ended
@@ -362,7 +388,7 @@ active, failed once the goal failed, otherwise the state of the part that ended 
   (`blocked` if its last part failed) so it can still take a follow-up part. Ended parts have no
   progress, as at runtime. A part with no job is dropped and counted in the log.
 
-## Work (old shape)
+## Steps, timers and loops
 
 ### job_steps
 
@@ -387,7 +413,7 @@ A job's steps as a log (the old `job_activity` table, renamed by migration `0020
   `job_activity` tool (the tool keeps its name).
 - Retention: per job, at most `TAGALONG_JOB_STEPS_MAX_ENTRIES` (2,000) entries and
   `TAGALONG_JOB_STEPS_MAX_BYTES` (1,000,000) bytes of text; the oldest are dropped
-  behind the marker. Rows stay after the job ends.
+  behind the marker. They leave with the job's tree when [the sweep](#cleanup) removes it.
 - Masked: yes, the text is masked and then capped.
 
 ### work_timer
@@ -406,7 +432,7 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
 - Written by: `tools.py` (`set_timer`, `cancel_timer`, `watch`) through `store/work.py`
   (`create`, `set_repeat`, `transition`); `timers.py` `Timers` moves due rows.
 - Read by: `timers.py` (`due`, `repeat_of`), `list_timers`, `watch list`.
-- Retention: a cancelled or fired row stays like any ended work. Closing a job cancels its
+- Retention: a cancelled or fired row stays until the sweep takes it, like any ended work. Closing a job cancels its
   timers (a restart does not). A repeat keeps its row `planned` and moves
   `due_at` forward from now, so a brain that was off fires an overdue repeat once.
 - Migrated: the old `timers` table became `timer` rows (`t<id>`), and each `tracking` memory
@@ -451,8 +477,8 @@ There is no `surfaced` status: when a loop comes up it gets a `surfaced` event.
   New mail on a `done` or `stale` loop reopens it (the loop-only move back to `planned`); a
   dropped one stays dropped.
 - Read by: `loops/store.py`, `loops/service.py`, `loops/triggers/`.
-- Retention: kept until `forget` (one loop) or `wipe` (every loop, its events and the cursors);
-  done and dropped loops stay.
+- Retention: kept until `forget` (one loop) or `wipe` (every loop, its events and the cursors).
+  A done, dropped or stale loop is swept like other ended work; a held or snoozed one never is.
 - Masked: `title`, `asks`, `people`, `anchors` and history notes yes (the mask is wired in
   `main.py`).
 
@@ -561,7 +587,8 @@ and is re-ended with the outcome when `Approvals.record` decides it.
   (`store/work.py` `add_ask`, `decide_ask`).
 - Read by: `store/work.py` `list_asks`, `ask_counts`, `person_asks_since`; `offers.py`,
   `side_check.py`; Home.
-- Retention: the same as other work rows; the log shows decided asks only.
+- Retention: the same as other work rows (swept after `TAGALONG_WORK_KEEP_DAYS`, so the log
+  shows the last 30 days by default); the log shows decided asks only.
 - Masked: `summary` and `input` yes.
 - Migration `0024_asks` turned every `approvals` row into an ended ask row (`a<id>`, under the
   job when that job exists) and kept the ids. A `preference_id` is kept only when it still names
@@ -610,17 +637,33 @@ A long tool result stored whole, so Scout can read the rest of a capped preview 
 
 - Written by: `outputs.py` `OutputStore.put` through `store/outputs.py` `put_output` (via `Memory`).
 - Read by: `store/outputs.py` `get_output` (via `Memory`), paged by `OutputStore.page`.
-- Retention: the newest 200 are kept; older rows are deleted at brain start (`prune_outputs`).
+- Retention: at brain start `prune_outputs` keeps the newest `TAGALONG_OUTPUTS_KEEP` (200) rows
+  that no work row names and deletes older ones. A row a work row points at (`detail_id`) is never
+  counted or cut; it goes with its tree in the sweep.
 - Masked: yes, before storing.
+
+## Cleanup
+
+At brain start, `Session` runs two things, in this order:
+
+1. `WorkStore.sweep(TAGALONG_WORK_KEEP_DAYS)` (default 30). A tree is removed when its root
+   is `done`, `failed`, `cancelled` or `expired`, its `ended_at` is older than the setting, and
+   every row under the root has ended too. So an open watch, a repeating timer, a held loop, or a
+   goal with a running child is never swept. Per root, in one transaction, it deletes the `work`
+   rows, their `work_events`, the job's `job_steps`, the `work_job`, `work_timer`, `work_loop` and
+   `work_ask` rows, and the `tool_outputs` rows named by `detail_id`. A crash leaves whole trees.
+2. `prune_outputs(TAGALONG_OUTPUTS_KEEP)` (default 200), for outputs no work row names.
+
+Chat, memories, rules, apps and cursors are not swept.
 
 ## Masking
 
 The `Masker` (`masking.py`) replaces exact secret values (8 characters or more) and common key
 shapes (`sk-ant-`, `Bearer`, GitHub, Slack and AWS keys, `?token=` style query parameters) with
 `[secret]`. It runs as the `save` guard on the chat, approvals, job titles, results, progress and
-activity, tool outputs and loops, and as a filter on every log handler. Scout's live turn is not
-masked, only what reaches disk or logs. Memories, timer notes, preference sentences and job `task`
-text are not covered.
+activity, tool outputs, loops and memories, and as a filter on every log handler. Scout's live
+turn is not masked, only what reaches disk or logs. Preference sentences and job `task` text are
+not covered.
 
 ## In memory only
 
