@@ -63,10 +63,10 @@ def test_timers_become_timer_rows(work):
     assert work.repeat_of("t3") is None
 
 
-def test_fired_one_off_done(work):
-    row = work.get("t2")
-    assert (row.state, row.end_reason) == ("done", "fired")
-    assert row.reported_at is not None  # Scout already heard it
+def test_fired_one_off_stays_active_so_start_re_emits_it(work):
+    row = work.get("t2")  # fired=1 on main: fired, but Scout's turn may never have started
+    assert row.state == "active"
+    assert (row.ended_at, row.end_reason, row.reported_at) == (None, None, None)
 
 
 def test_timer_job_becomes_parent(work):

@@ -409,13 +409,15 @@ def timer_tools(
                 end(row, "cancelled by Scout")
             elif action == "pause":
                 work.transition(wid, "paused", reason="paused by Scout", expect="planned")
+                work.mark_reported(wid)  # the person's own pause is not news to Scout
             else:
-                if args.get("every_minutes") is not None:
-                    work.set_repeat(wid, whole_minutes(args["every_minutes"], "every_minutes") * 60)
                 repeat_s = work.repeat_of(wid)
+                if args.get("every_minutes") is not None:
+                    repeat_s = whole_minutes(args["every_minutes"], "every_minutes") * 60
                 if not repeat_s:
                     raise MemoryRefused("watch switch_on needs every_minutes: no repeat is saved.")
                 work.transition(wid, "planned", reason="switched on", expect="paused")
+                work.set_repeat(wid, repeat_s)
                 work.update(wid, due_at=current + timedelta(seconds=repeat_s))
         except TransitionRefused as err:
             raise MemoryRefused(f"watch {wid}: {err}") from None

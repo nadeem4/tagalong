@@ -7,7 +7,6 @@ the transaction, and `executescript` would commit it.
 """
 
 import json
-from datetime import UTC, datetime
 
 from brain.masking import Masker
 from brain.store.work import TITLE_CAP, parse_cadence
@@ -44,7 +43,6 @@ def _text_fields(text: str, extra: dict) -> tuple[str, str | None]:
 
 def migrate(db) -> None:
     db.execute("CREATE TABLE work_timer(work_id TEXT PRIMARY KEY, repeat_s INTEGER)")
-    now = datetime.now(UTC).isoformat(timespec="seconds")
     goals = {r[0]: r[1] for r in db.execute("SELECT id, root_id FROM work WHERE kind = 'goal'")}
     timers = db.execute(
         "SELECT id, note, next_at, repeat_s, created_at, fired, job_id FROM timers ORDER BY id"
@@ -52,7 +50,6 @@ def migrate(db) -> None:
     for id, note, next_at, repeat_s, created, fired, job_id in timers:
         parent = job_id if job_id in goals else None
         title, input = _text_fields(note, {})
-        ended = bool(fired)
         _insert(
             db,
             {
@@ -61,15 +58,12 @@ def migrate(db) -> None:
                 "root_id": goals[parent] if parent else f"t{id}",
                 "seq": _next_seq(db, parent),
                 "kind": "timer",
-                "state": "done" if ended else "planned",
+                "state": "active" if fired else "planned",
                 "title": title,
                 "input": input,
                 "due_at": next_at,
                 "created_at": created,
                 "updated_at": created,
-                "ended_at": now if ended else None,
-                "end_reason": "fired" if ended else None,
-                "reported_at": now if ended else None,
             },
             repeat_s,
         )

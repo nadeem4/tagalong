@@ -4,6 +4,7 @@ about watches a migration paused.
 
 import datetime
 import json
+import re
 
 import pytest
 from job_rows import records_for
@@ -114,3 +115,42 @@ async def test_paused_watches_wake_once():
     assert "Event: watches_paused" in told[0] and "the build" in told[0] and "daily" in told[0]
     assert "already told" not in told[0]
     assert work.get(row.id).state == "paused"  # Scout mentions it; the person decides
+
+
+async def test_a_refused_switch_on_changes_nothing(rig):
+    made = json.loads(await rig(action="add", note="the build", every_minutes=30))
+    with pytest.raises(MemoryRefused):  # not paused
+        await rig(action="switch_on", id=made["id"], every_minutes=60)
+    assert rig.work.repeat_of(made["id"]) == 1800
+
+
+async def test_a_watch_the_person_paused_is_not_announced():
+    memory = Memory(":memory:")
+    records = records_for(memory, lambda: T0)
+    handlers = {s.name: h for s, h in timer_tools(records, FakeTimers(), lambda: T0)}
+    made = json.loads(await handlers["watch"]({"action": "add", "note": "x", "every_minutes": 30}))
+    await handlers["watch"]({"action": "pause", "id": made["id"]})
+    kinds = {"watches_paused": EventKind("watches_paused", batch_seconds=0, max_per_hour=2)}
+    for _ in range(2):
+        model = Gate(["ok"])
+        session, _ = make(model, memory, kinds=kinds)
+        join(session, "desktop")
+        session.scheduler.pump()
+        await idle(session)
+        assert model.seen == []
+
+
+async def test_paused_watch_facts_cut_on_whole_entries():
+    memory = Memory(":memory:")
+    work = records_for(memory).work
+    for _ in range(30):
+        work.create("watch", "x" * 100, state="paused")
+    kinds = {"watches_paused": EventKind("watches_paused", batch_seconds=0, max_per_hour=2)}
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds)
+    join(session, "desktop")
+    session.scheduler.pump()
+    await idle(session)
+    text = model.seen[0][-1]["content"][-1]["text"]
+    sizes = [len(m) for m in re.findall(r"x{5,}", text)]
+    assert 0 < len(sizes) < 30 and set(sizes) == {100}

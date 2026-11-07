@@ -42,7 +42,7 @@ This is your own message to yourself, set earlier with set_timer. Do what it say
 
 ## watches_paused
 
-Watches the owner had before an update were switched off, because they were free text and not a schedule. The wake lists them as watches. Mention it once, briefly: say which are paused and offer to set each up again with `watch` switch_on and a time. Do not switch any on yourself.
+Watches the owner had before an update were paused, so none fires until they say so. The wake lists them as watches; a schedule in brackets means one was found, and a watch without one needs a time. Mention it once, briefly: say which are paused and offer to switch each on with `watch` switch_on (add a time where there is none). Do not switch any on yourself.
 
 ## loop
 

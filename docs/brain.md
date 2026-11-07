@@ -1342,8 +1342,8 @@ flowchart LR
   running and saved a session whose expert can reload it (`can_resume`) becomes `blocked` with the
   reason `brain restarted`; its job stays open and Scout is told once (`job_ended`) and offers to
   carry on with `hand_off` and `continue_job`. Any other running part becomes `failed` with the same
-  reason. Each such part's step log ends with a `# stopped` line, and the job's check-back timers
-  are cancelled (unless a part is held for a carry-on). Running it twice changes nothing.
+  reason. Each such part's step log ends with a `# stopped` line; the job's timers stay planned
+  (only closing the job removes them). Running it twice changes nothing.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
   running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
   sends no report: those jobs stay unreported and are told about at the next start.
@@ -1425,8 +1425,8 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
   `Jobs.wake_facts` (`activity`, the masked summary of its steps, and `watching`, Scout's watch
   list), so Scout decides from those whether to speak, nudge the job or set the next check. A
   job's timers are cancelled, with any held wake dropped and the sleeper re-armed, when Scout
-  closes the job (`Jobs.close`), and, for a job a dead brain left running, when the brain starts
-  (`Jobs.startup`). A run that merely ends leaves them alone. This is cleanup, not a decision.
+  closes the job (`Jobs.close`). A run that merely ends, or a restart that stops it, leaves them
+  planned. This is cleanup, not a decision.
 - **One-offs.** A due one-off moves `planned` to `active` and to `done` ("fired") once Scout's wake
   turn starts. If the brain stops before that, the `active` row is emitted again at the next start.
   A race with `cancel_timer` is harmless: the move is refused and nothing is emitted.
@@ -1443,11 +1443,14 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
 `note` (it names the connected app and what counts as worth saying) and `every_minutes` (5 to 525600) and plans the first fire one interval from now; `list` returns `{"watches": [{id, note,
 state, every_minutes, next_at, cadence_text}]}` for planned and paused watches; `pause` moves a
 planned watch to `paused`; `switch_on` moves a paused one back to `planned` one interval from now
-and needs a repeat (`every_minutes`, or one already saved); `cancel` ends it. A paused watch never
-fires. The old `tracking` memories became paused watches when the database was migrated; on the
-next start the Session emits `watches_paused` once (0 s batch, 2 an hour) with the facts `watches`
-(one `id: note (cadence)` entry per watch), and Scout mentions them and offers to switch each on.
-It does not switch any on itself.
+and needs a repeat (`every_minutes`, or one already saved); a refused `switch_on` changes nothing.
+`cancel` ends it. A paused watch never fires. Scout's own `pause` marks the watch told, so it is
+not announced. The old `tracking` memories became paused watches when the database was migrated;
+on the next start the Session emits `watches_paused` once (0 s batch, 2 an hour) with the facts
+`watches` (whole `id: note (cadence)` entries, up to 1500 characters; any left over are told at
+the next start), and Scout mentions them and offers to switch each on. It does not switch any on
+itself. Timers the migration found already fired but not yet delivered stay `active`, so the next
+start emits them again, as before.
 
 ## Loops
 

@@ -413,7 +413,7 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
   (`create`, `set_repeat`, `transition`); `timers.py` `Timers` moves due rows.
 - Read by: `timers.py` (`due`, `repeat_of`), `list_timers`, `watch list`.
 - Retention: a cancelled or fired row stays like any ended work. Closing a job cancels its
-  timers; a job stopped by a restart drops them too. A repeat keeps its row `planned` and moves
+  timers (a restart does not). A repeat keeps its row `planned` and moves
   `due_at` forward from now, so a brain that was off fires an overdue repeat once.
 - Migrated: the old `timers` table became `timer` rows (`t<id>`), and each `tracking` memory
   became a `paused` `watch` row (`w<id>`) with its cadence in `repeat_s` when it parsed (daily,
