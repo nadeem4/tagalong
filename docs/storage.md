@@ -160,13 +160,13 @@ it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 What Scout remembers across restarts, by kind.
 
-| Column       | Type                | Meaning                                                        |
-| ------------ | ------------------- | -------------------------------------------------------------- |
-| `id`         | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item               |
-| `kind`       | TEXT                | `instruction`, `about_you`, `project` or `summary`             |
-| `text`       | TEXT                | The item                                                       |
-| `created_at` | TEXT                | When it was saved                                              |
-| `updated_at` | TEXT                | When it last changed                                           |
+| Column       | Type                | Meaning                                            |
+| ------------ | ------------------- | -------------------------------------------------- |
+| `id`         | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item   |
+| `kind`       | TEXT                | `instruction`, `about_you`, `project` or `summary` |
+| `text`       | TEXT                | The item                                           |
+| `created_at` | TEXT                | When it was saved                                  |
+| `updated_at` | TEXT                | When it last changed                               |
 
 - Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
   compaction in `sessions.py`).
@@ -400,10 +400,10 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
 `active` fired but Scout has not heard it yet, `done` a one-off that fired, `cancelled`, or
 `paused` (a watch that is switched off).
 
-| Column     | Type             | Meaning                                                           |
-| ---------- | ---------------- | ----------------------------------------------------------------- |
-| `work_id`  | TEXT PRIMARY KEY | The `timer` or `watch` row                                        |
-| `repeat_s` | INTEGER          | Seconds between fires; null for a one-off (at least 300)          |
+| Column     | Type             | Meaning                                                  |
+| ---------- | ---------------- | -------------------------------------------------------- |
+| `work_id`  | TEXT PRIMARY KEY | The `timer` or `watch` row                               |
+| `repeat_s` | INTEGER          | Seconds between fires; null for a one-off (at least 300) |
 
 - Written by: `tools.py` (`set_timer`, `cancel_timer`, `watch`) through `store/work.py`
   (`create`, `set_repeat`, `transition`); `timers.py` `Timers` moves due rows.
