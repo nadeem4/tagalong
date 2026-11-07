@@ -12,6 +12,7 @@ from brain.bodies import Bodies
 from brain.guards import ALLOW, Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
+from brain.store import rules
 from brain.toolbox import INSTALL_OCR_TIMEOUT_S, BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
@@ -817,7 +818,9 @@ def scouted(mem, check, online=("desktop",), locked=False):
 
 
 def preference(mem, sentence="Fine to run t"):
-    return mem.add_preference(sentence=sentence, source=None, tool=None, group_key=None, at=AT)
+    return rules.add_preference(
+        mem.db, sentence=sentence, source=None, tool=None, group_key=None, at=AT
+    )
 
 
 async def test_scout_approval_runs_the_tool_without_asking_the_person(mem):
@@ -838,7 +841,7 @@ async def test_scout_approval_row_and_notification(mem):
     )  # fmt: skip
     assert row.preference_sentence == pref.sentence
     assert ("approved", {"tool": "t", "text": "Doing it.", "preference": pref.sentence}) in sent
-    used = next(p for p in mem.list_preferences() if p.id == pref.id)
+    used = next(p for p in rules.list_preferences(mem.db) if p.id == pref.id)
     assert used.use_count == 1
 
 
@@ -890,7 +893,7 @@ async def test_removed_preference_sends_next_ask_to_the_person(mem):
     box, _, bodies, _, _ = scouted(mem, check)
     await box.run(call_with_text("t"))
     assert bodies.sent == []
-    mem.remove_preference(pref.id)
+    rules.remove_preference(mem.db, pref.id)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))  # the person is asked now
     box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
@@ -1061,8 +1064,8 @@ async def test_chain_error_in_an_ask_guard_refuses_the_tool():
 
 async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_the_person(mem):
     preference(mem)
-    mem.remove_preference(mem.list_preferences()[0].id)
-    check = SideCheck(_ApprovingModel(mem.list_preferences()[0].id), _OpenBudget(), mem)
+    rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
+    check = SideCheck(_ApprovingModel(rules.list_preferences(mem.db)[0].id), _OpenBudget(), mem)
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
@@ -1072,10 +1075,10 @@ async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_
 
 
 async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_person(mem):
-    pref = mem.add_preference(
-        sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
+    pref = rules.add_preference(
+        mem.db, sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
     )
-    mem.remove_preference(mem.list_preferences()[0].id)
+    rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
     check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     assert await box.run(call_with_text("t")) == "ran t"

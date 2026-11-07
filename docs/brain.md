@@ -74,7 +74,7 @@ the total can run a little low.
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                                                                                                           |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                            |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`                                                                                                                                                                                                                                                                 |
-| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`) |
+| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/asks.py`              | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (`approvals` table), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `scout_approved` (logs a Scout approval and reports it)                                                                                       |
@@ -383,12 +383,9 @@ locked tool is `ask`; then the tool's own default; then the effect. The same fun
 | Locked (`confirm: true` from the body)          | `ask`, until you set it to `auto` on Home                            |
 | Always-ask (`confirm: "always"` from the body)  | `ask` every time; cannot be set to `auto`, no preference approves it |
 
-The user's saved choices live in the `permissions` table in `tagalong.db`:
-
-| Column | Holds                            |
-| ------ | -------------------------------- |
-| `tool` | The full tool name (primary key) |
-| `mode` | `off`, `ask` or `auto`           |
+The user's saved choices live in `tagalong.db` as `mode` rows of the `rules` table (`tool` is the full
+tool name, `effect` is `off`, `ask` or `auto`); `brain.store.rules` reads and writes them
+(see [storage.md](storage.md#rules)).
 
 No row means the tool's default applies. `Toolbox.set_mode` accepts `auto` for a locked tool: that
 is the explicit unlock, made with the Home switch (which warns first, see
@@ -401,8 +398,7 @@ its mode is `auto` unless Off; `Toolbox.set_mode` refuses Auto for it ("<name> a
 
 ### Off
 
-Off is the third per-tool state, stored in the same `permissions` table (the CHECK was widened by a
-migration that keeps every saved row), so it holds for every body, survives a restart and survives
+Off is the third per-tool state, stored in the same `mode` rows of `rules`, so it holds for every body, survives a restart and survives
 a body reconnecting. `resolve_mode` returns `off` before any other rule, so it also beats `locked`,
 `self_asks` and `person_only`: those tools may be set Off or Ask (never Auto). Off does three things:
 

@@ -43,7 +43,11 @@ def test_use_and_edit_preference(db):
     rules.use_preference(db, p.id, "2026-02-01T00:00:00+00:00")
     assert rules.edit_preference(db, p.id, "better") is True
     got = next(x for x in rules.list_preferences(db) if x.id == p.id)
-    assert (got.sentence, got.use_count, got.last_used) == ("better", 1, "2026-02-01T00:00:00+00:00")
+    assert (got.sentence, got.use_count, got.last_used) == (
+        "better",
+        1,
+        "2026-02-01T00:00:00+00:00",
+    )
 
 
 def test_offers_for_returns_outcome_words(db):

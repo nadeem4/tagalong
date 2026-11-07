@@ -472,7 +472,8 @@ next section.
 6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
    stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is
-   `invalid_params`.
+   `invalid_params`. A preference you removed does not come back, and a saved preference still
+   lets Scout auto-approve a matching ask after a restart (`test_side_check.py`, `test_offers.py`).
 7. **Note:** a Claude Code permission ask has no timeout, so a Claude Code row is never
    `timed_out`; leaving one unanswered leaves it open until the job ends.
 
@@ -1912,6 +1913,8 @@ Folders come from Home → Settings → **Files Scout may use**; none by default
    desktop: it is still **Off**. Choose **Ask** (or **Auto**) and it works again. Automated:
    `test_toolbox.py`, `test_tools.py`, `test_memory.py`, `test_builtin_guards.py`,
    `permissions.test.ts`, `permissions-panel.test.tsx`, `three-way.test.tsx`, `permissions.spec.ts`.
+   Choose **Auto** for a tool, quit and restart the brain: it is still **Auto** (the choice lives in
+   the `rules` table). Automated: `test_store_rules.py`, `test_migrate_rules.py`.
 7. **Never Auto.** Find a tool that always needs your yes (for example a connected app's delete
    tool). **Expected:** it says "Always asks" and offers only **Off** and **Ask**. Claude Code's
    own tool says "Asks itself" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).

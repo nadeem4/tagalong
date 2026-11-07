@@ -7,7 +7,7 @@ import pytest
 
 from brain import memory
 from brain.memory import Memory
-from brain.store import search
+from brain.store import rules, search
 from brain.store.conversation import compaction_text
 from brain.store.db import load_migrations, migrate
 from brain.store.memory import MemoryRefused
@@ -377,31 +377,31 @@ def test_upgrade_from_v1_keeps_items(tmp_path):
 
 def test_migration_creates_permissions_and_survives_reopen(tmp_path):
     m = Memory(tmp_path / "p.db")
-    assert m.permission_modes() == {}
-    m.set_permission_mode("x", "auto")
+    assert rules.permission_modes(m.db) == {}
+    rules.set_permission_mode(m.db, "x", "auto")
     m.close()
     m = Memory(tmp_path / "p.db")
-    assert m.permission_modes() == {"x": "auto"}
+    assert rules.permission_modes(m.db) == {"x": "auto"}
     m.close()
 
 
 def test_set_permission_mode_upserts(mem):
-    mem.set_permission_mode("x", "ask")
-    mem.set_permission_mode("x", "auto")
-    assert mem.permission_modes() == {"x": "auto"}
+    rules.set_permission_mode(mem.db, "x", "ask")
+    rules.set_permission_mode(mem.db, "x", "auto")
+    assert rules.permission_modes(mem.db) == {"x": "auto"}
 
 
 def test_set_permission_mode_rejects_other_modes(mem):
     with pytest.raises(sqlite3.IntegrityError):
-        mem.set_permission_mode("x", "maybe")
+        rules.set_permission_mode(mem.db, "x", "maybe")
 
 
 def test_off_is_a_stored_permission_and_survives_reopen(tmp_path):
     m = Memory(tmp_path / "o.db")
-    m.set_permission_mode("x", "off")
+    rules.set_permission_mode(m.db, "x", "off")
     m.close()
     m = Memory(tmp_path / "o.db")
-    assert m.permission_modes() == {"x": "off"}
+    assert rules.permission_modes(m.db) == {"x": "off"}
     m.close()
 
 
@@ -413,9 +413,9 @@ def test_off_migration_keeps_rows_stored_before_it(tmp_path):
     db.commit()
     db.close()
     m = Memory(path)
-    assert m.permission_modes() == {"x": "auto"}
-    m.set_permission_mode("x", "off")
-    assert m.permission_modes() == {"x": "off"}
+    assert rules.permission_modes(m.db) == {"x": "auto"}
+    rules.set_permission_mode(m.db, "x", "off")
+    assert rules.permission_modes(m.db) == {"x": "off"}
     m.close()
 
 
@@ -517,32 +517,32 @@ def _ap(mem, outcome="approved", by="person", group="g1", at="2026-01-01T00:00:0
 
 
 def test_fresh_db_has_only_the_risky_default(mem):
-    prefs = mem.list_preferences()
+    prefs = rules.list_preferences(mem.db)
     assert len(prefs) == 1
     assert prefs[0].builtin is True
     assert prefs[0].sentence == "Always ask me before risky actions"
-    assert mem.has_user_preferences() is False
+    assert rules.has_user_preferences(mem.db) is False
 
 
 def test_default_is_not_reseeded_after_removal(tmp_path):
     m = Memory(tmp_path / "d.db")
-    assert m.remove_preference(m.list_preferences()[0].id) is True
+    assert rules.remove_preference(m.db, rules.list_preferences(m.db)[0].id) is True
     m.close()
     m = Memory(tmp_path / "d.db")
-    assert m.list_preferences() == []
-    assert not any(p.builtin for p in m.list_preferences())
+    assert rules.list_preferences(m.db) == []
+    assert not any(p.builtin for p in rules.list_preferences(m.db))
     m.close()
 
 
 def test_add_preference_and_listing_order(mem):
-    p = mem.add_preference(
-        sentence="Run tests freely", source="scout_tool", tool="run", group_key="g1", at="t"
+    p = rules.add_preference(
+        mem.db, sentence="Run tests freely", source="scout_tool", tool="run", group_key="g1", at="t"
     )
     assert p.builtin is False and p.use_count == 0 and p.last_used is None
-    assert [x.builtin for x in mem.list_preferences()] == [True, False]
-    assert mem.has_user_preferences() is True
-    assert mem.has_preference_for("g1") is True
-    assert mem.has_preference_for("other") is False
+    assert [x.builtin for x in rules.list_preferences(mem.db)] == [True, False]
+    assert rules.has_user_preferences(mem.db) is True
+    assert rules.has_preference_for(mem.db, "g1") is True
+    assert rules.has_preference_for(mem.db, "other") is False
 
 
 def test_list_approvals_filters(mem):
@@ -575,26 +575,26 @@ def test_person_approvals_since_counts_only_person_approved_in_group(mem):
 
 
 def test_use_preference_bumps_count_and_last_used(mem):
-    p = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
-    mem.use_preference(p.id, "t1")
-    mem.use_preference(p.id, "t2")
-    got = next(x for x in mem.list_preferences() if x.id == p.id)
+    p = rules.add_preference(mem.db, sentence="x", source="app", tool="t", group_key="g", at="t0")
+    rules.use_preference(mem.db, p.id, "t1")
+    rules.use_preference(mem.db, p.id, "t2")
+    got = next(x for x in rules.list_preferences(mem.db) if x.id == p.id)
     assert (got.use_count, got.last_used) == (2, "t2")
 
 
 def test_edit_and_remove_report_missing_ids(mem):
-    p = mem.add_preference(sentence="x", source="app", tool="t", group_key="g", at="t0")
-    assert mem.edit_preference(p.id, "y") is True
-    assert mem.edit_preference(999, "y") is False
-    assert mem.remove_preference(p.id) is True
-    assert mem.remove_preference(p.id) is False
+    p = rules.add_preference(mem.db, sentence="x", source="app", tool="t", group_key="g", at="t0")
+    assert rules.edit_preference(mem.db, p.id, "y") is True
+    assert rules.edit_preference(mem.db, 999, "y") is False
+    assert rules.remove_preference(mem.db, p.id) is True
+    assert rules.remove_preference(mem.db, p.id) is False
 
 
 def test_offers_newest_first(mem):
-    mem.add_offer("g", "2026-01-01", "no_answer")
-    mem.add_offer("g", "2026-01-02", "yes")
-    mem.add_offer("h", "2026-01-03", "none")
-    assert mem.offers_for("g") == [("2026-01-02", "yes"), ("2026-01-01", "no_answer")]
+    rules.add_offer(mem.db, "g", "2026-01-01", "no_answer")
+    rules.add_offer(mem.db, "g", "2026-01-02", "yes")
+    rules.add_offer(mem.db, "h", "2026-01-03", "none")
+    assert rules.offers_for(mem.db, "g") == [("2026-01-02", "yes"), ("2026-01-01", "no_answer")]
 
 
 def test_migration_is_one_step_after_timers(tmp_path):
@@ -606,7 +606,7 @@ def test_migration_is_one_step_after_timers(tmp_path):
     m = Memory(path)
     v = m._db.execute("PRAGMA user_version").fetchone()[0]
     assert v == len(load_migrations())
-    assert any(p.builtin for p in m.list_preferences())
+    assert any(p.builtin for p in rules.list_preferences(m.db))
     m.close()
 
 

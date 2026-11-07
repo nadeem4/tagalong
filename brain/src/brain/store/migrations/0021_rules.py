@@ -15,7 +15,8 @@ def migrate(db) -> None:
         "CREATE TABLE rules(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, tool TEXT, source TEXT,"
         " group_key TEXT, effect TEXT, sentence TEXT, state TEXT NOT NULL, decided_at TEXT,"
         " expires_at TEXT, builtin INTEGER NOT NULL DEFAULT 0,"
-        " use_count INTEGER NOT NULL DEFAULT 0, last_used TEXT, created_at TEXT NOT NULL)"
+        " use_count INTEGER NOT NULL DEFAULT 0, last_used TEXT, created_at TEXT NOT NULL,"
+        " CHECK(kind <> 'mode' OR effect IN ('off','ask','auto')))"
     )
     db.execute("CREATE INDEX rules_kind_tool ON rules(kind, tool)")
     db.execute("CREATE INDEX rules_kind_group ON rules(kind, group_key)")

@@ -23,7 +23,8 @@ def db(tmp_path):
         db.execute("INSERT INTO permissions(tool, mode) VALUES (?,?)", (tool, mode))
     db.execute(
         "INSERT INTO preferences(id, sentence, source, tool, group_key, builtin, created_at,"
-        " use_count, last_used) VALUES (7, 'Only small files', 'app', 'read', 'app:read', 0, ?, 3, ?)",
+        " use_count, last_used)"
+        " VALUES (7, 'Only small files', 'app', 'read', 'app:read', 0, ?, 3, ?)",
         (T, "2026-01-02T00:00:00+00:00"),
     )
     db.execute("INSERT INTO preferences(id, sentence, created_at) VALUES (9, 'Bare', ?)", (T,))
