@@ -439,3 +439,49 @@ class WorkStore:
             list(kinds),
         ).fetchone()[0]
         return None if text is None else datetime.fromisoformat(text)
+
+    # ---- restart ----
+
+    def resume_scan(self, can_resume: Callable[[WorkRow], bool | None]) -> list[tuple[str, str]]:
+        """Settle every unfinished row once, at start; returns (work_id, outcome) pairs.
+
+        Idempotent: each row it touches ends or moves to a state the scan leaves alone, so a
+        second start changes nothing and Scout is woken once per row (reported_at stays null).
+        `can_resume(row)` says whether an expert call's saved session can be reopened.
+        """
+        done: list[tuple[str, str]] = []
+        with transaction(self.db):
+            for seen in self._select("state IN ('planned','active','blocked')", (), "rowid"):
+                row = self._need(seen.id)  # an earlier move may have ended it
+                outcome = self._settle(row, can_resume)
+                if outcome is not None:
+                    done.append((row.id, outcome))
+        return done
+
+    def _settle(self, row: WorkRow, can_resume: Callable[[WorkRow], bool | None]) -> str | None:
+        unreported = {"reported_at": None}
+        if row.kind in ("ask", "question") and row.state in ("planned", "active", "blocked"):
+            self._move(row, "expired", "brain restarted", extra=unreported)
+            return "expired"
+        if row.state != "active":
+            return None
+        if row.kind == "expert_call":
+            session = (row.checkpoint or {}).get("session_id")
+            if session and can_resume(row) is not False:
+                self._move(row, "blocked", "brain restarted", extra=unreported)
+                self.add_event(row.id, "resumed", {"session_id": session})
+                return "blocked"
+            reason = "brain restarted, session cannot reload"
+            self._move(row, "failed", reason, extra=unreported)
+            self.add_event(row.id, "failed on restart", {"reason": reason})
+            return "failed"
+        if row.kind == "tool_call" and row.safe_to_retry:
+            extra = {**unreported, "due_at": self._stamp()}
+            self._move(row, "planned", None, extra=extra)
+            self.add_event(row.id, "resumed")
+            return "rerun"
+        if row.kind == "tool_call":
+            self._move(row, "failed", "brain restarted, unsure if it ran", extra=unreported)
+            self.add_event(row.id, "failed on restart")
+            return "failed"
+        return None
