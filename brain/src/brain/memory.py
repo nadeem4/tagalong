@@ -37,19 +37,6 @@ class Approval:
     preference_sentence: str | None = None
 
 
-@dataclass(frozen=True)
-class Preference:
-    id: int
-    sentence: str
-    source: str | None
-    tool: str | None
-    group_key: str | None
-    builtin: bool
-    created_at: str
-    use_count: int
-    last_used: str | None
-
-
 class Memory:
     def __init__(
         self,
@@ -66,16 +53,6 @@ class Memory:
 
     def close(self) -> None:
         self._db.close()
-
-    def permission_modes(self) -> dict[str, str]:
-        return dict(self._db.execute("SELECT tool, mode FROM permissions"))
-
-    def set_permission_mode(self, tool: str, mode: str) -> None:
-        self._db.execute(
-            "INSERT INTO permissions(tool, mode) VALUES (?,?)"
-            " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
-            (tool, mode),
-        )
 
     def add_approval(
         self,
@@ -133,58 +110,6 @@ class Memory:
             " AND decided_by='person' AND at>=?",
             (group_key, since_iso),
         ).fetchone()[0]
-
-    def _preferences(self, where: str = "", args: tuple = ()) -> list[Preference]:
-        rows = self._db.execute(
-            "SELECT id, sentence, source, tool, group_key, builtin, created_at, use_count,"
-            f" last_used FROM preferences {where} ORDER BY builtin DESC, id",
-            args,
-        ).fetchall()
-        return [Preference(*r[:5], bool(r[5]), *r[6:]) for r in rows]
-
-    def add_preference(
-        self, *, sentence: str, source: str | None, tool: str | None, group_key: str | None, at: str
-    ) -> Preference:
-        cur = self._db.execute(
-            "INSERT INTO preferences(sentence, source, tool, group_key, created_at)"
-            " VALUES (?,?,?,?,?)",
-            (sentence, source, tool, group_key, at),
-        )
-        return self._preferences("WHERE id=?", (cur.lastrowid,))[0]
-
-    def list_preferences(self) -> list[Preference]:
-        return self._preferences()
-
-    def remove_preference(self, id: int) -> bool:
-        return self._db.execute("DELETE FROM preferences WHERE id=?", (id,)).rowcount > 0
-
-    def edit_preference(self, id: int, sentence: str) -> bool:
-        cur = self._db.execute("UPDATE preferences SET sentence=? WHERE id=?", (sentence, id))
-        return cur.rowcount > 0
-
-    def use_preference(self, id: int, at: str) -> None:
-        self._db.execute(
-            "UPDATE preferences SET use_count=use_count+1, last_used=? WHERE id=?", (at, id)
-        )
-
-    def has_user_preferences(self) -> bool:
-        return bool(self._db.execute("SELECT 1 FROM preferences WHERE builtin=0").fetchone())
-
-    def has_preference_for(self, group_key: str) -> bool:
-        row = self._db.execute("SELECT 1 FROM preferences WHERE group_key=?", (group_key,))
-        return bool(row.fetchone())
-
-    def add_offer(self, group_key: str, at: str, outcome: str) -> None:
-        self._db.execute(
-            "INSERT INTO offers(group_key, at, outcome) VALUES (?,?,?)", (group_key, at, outcome)
-        )
-
-    def offers_for(self, group_key: str) -> list[tuple[str, str]]:
-        rows = self._db.execute(
-            "SELECT at, outcome FROM offers WHERE group_key=? ORDER BY at DESC, id DESC",
-            (group_key,),
-        ).fetchall()
-        return [(a, o) for a, o in rows]
 
     # Chat, memory items, apps and tool outputs keep their SQL in brain.store.
 

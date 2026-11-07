@@ -26,7 +26,9 @@ from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
+from brain.store import rules
 from brain.store.work import ActivityEntry, WorkStore
+from brain.tools import work_tools
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 HANG = [{"text": "working"}, {"hang": True}]
@@ -876,8 +878,13 @@ class FakeSideCheck:
 
 
 def pref_in(rig, sentence="Reading files is fine"):
-    return rig.memory.add_preference(
-        sentence=sentence, source=None, tool=None, group_key=None, at="2026-10-28T09:00:00Z"
+    return rules.add_preference(
+        rig.memory.db,
+        sentence=sentence,
+        source=None,
+        tool=None,
+        group_key=None,
+        at="2026-10-28T09:00:00Z",
     )
 
 
@@ -2828,3 +2835,18 @@ async def test_run_planned_refuses_when_the_job_is_closed(make_rig):
     rig.records.work.close_goal("old", "failed", "gave up")
     with pytest.raises(JobError):
         await rig.jobs.run_planned(row)
+
+
+async def test_resolve_step_stop_stops_running_parts_before_closing(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    job = await rig.jobs.start("one", str(rig.folder))
+    await second_part(rig, job)
+    work = rig.records.work
+    work.create("tool_call", "read", parent_id=job, state="active", id=f"{job}.t1")
+    work.fail(f"{job}.t1", "permanent", "boom")
+    tools = {spec.name: handler for spec, handler in work_tools(work, rig.jobs)}
+    out = json.loads(await tools["resolve_step"]({"id": f"{job}.t1", "choice": "stop"}))
+    got = rig.records.get_job(job)
+    assert out["goal"] == "failed" and got.closed_at
+    assert [p.state for p in got.parts] == ["cancelled", "cancelled"]  # no expert left running
+    assert rig.jobs._runs == {}

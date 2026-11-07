@@ -458,6 +458,7 @@ conversations) in the database on this computer, until you delete it.
   day it was saved. Each has a delete button; deleting is for good, and Scout no longer recalls it.
 - **Ask Scout to forget.** "Forget that I like tea": Scout finds the matching memories and deletes
   the one you mean.
+- Your saved preferences, and your Off, Ask or Auto choice for each tool, are stored as rules in the same database file on your computer.
 - Your saved preferences are shown to the AI with each question (the newest 40, cut to 300 characters each) so Scout can follow them.
 - Deleting a memory does not take back what was already sent to the AI in earlier questions.
 - The Chrome extension cannot read or delete them.

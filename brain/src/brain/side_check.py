@@ -13,8 +13,10 @@ from importlib.resources import files
 from brain.builtin_guards import spend_guards
 from brain.config import DEFAULT_STEP_CAP
 from brain.guards import Guards, Hook, ModelCallCtx
-from brain.memory import Memory, Preference
+from brain.memory import Memory
 from brain.mind.turn import Final, Model
+from brain.store import rules
+from brain.store.rules import Preference
 
 log = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ class SideCheck:
 
     async def decide(self, facts: AskFacts) -> Preference | None:
         # Order matters: the cheap checks run first so a person with no preferences pays nothing.
-        if not self._memory.has_user_preferences():
+        if not rules.has_user_preferences(self._memory.db):
             return None
         candidates = self._candidates(facts)
         if not candidates:
@@ -113,7 +115,9 @@ class SideCheck:
         general preference never unlocks it, so the person's explicit word is required."""
         # Setup preferences are prompt facts only: an install must still open the Allow card.
         prefs = [
-            p for p in self._memory.list_preferences() if not p.builtin and p.source != "setup"
+            p
+            for p in rules.list_preferences(self._memory.db)
+            if not p.builtin and p.source != "setup"
         ]
         if facts.locked:
             prefs = [p for p in prefs if p.tool == facts.tool]
@@ -130,7 +134,7 @@ class SideCheck:
     def _message(self, facts: AskFacts, candidates: list[Preference]) -> list[dict]:
         shown = candidates
         if not facts.locked:  # the default shows as context, never as a choice
-            shown = self._memory.list_preferences()
+            shown = rules.list_preferences(self._memory.db)
         prefs = [f"{p.id}{' (default)' if p.builtin else ''}: {p.sentence}" for p in shown]
         history = [
             f"{a.outcome} by {a.decided_by}: {a.summary}"

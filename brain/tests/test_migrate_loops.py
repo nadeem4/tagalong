@@ -1,4 +1,4 @@
-"""Migration 0022: loops, their surface log and cursors become work rows and app cursors.
+"""Migration 0023: loops, their surface log and cursors become work rows and app cursors.
 
 Runs on a file seeded at version 21 with one loop per status, a surfaced loop with two anchors,
 a snoozed loop that also has a deadline, and every form of cursor key a real file holds.
@@ -13,7 +13,7 @@ import pytest
 from brain.store.db import migrate
 from brain.store.work import WorkStore
 
-BEFORE = 21
+BEFORE = 22
 T = "2026-01-01T10:00:00+00:00"
 LATER = "2026-01-05T10:00:00+00:00"
 DEADLINE = "2026-02-01T10:00:00+00:00"

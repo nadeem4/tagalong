@@ -491,11 +491,13 @@ class WorkStore:
         *,
         reason: str | None = None,
         data: dict | None = None,
-        expect: State | None = None,
+        expect: State | tuple[State, ...] | None = None,
     ) -> WorkRow:
         with transaction(self.db):
             row = self._need(id)
-            if expect is not None and row.state != expect:
+            if expect is not None and row.state not in (
+                (expect,) if isinstance(expect, str) else expect
+            ):
                 raise TransitionRefused(f"{id} is {row.state}, expected {expect}")
             self._move(row, to, reason, data)
         return self._need(id)

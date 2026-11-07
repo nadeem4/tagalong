@@ -60,7 +60,7 @@ Keeping an eye on something is no longer a memory: it is a `watch` (see below). 
 
 ### Loops
 
-Loops are `loop` rows in the work tree (migration 22): `work` holds the title, deadline and state,
+Loops are `loop` rows in the work tree (migration 23): `work` holds the title, deadline and state,
 `work_loop` the source, thread ref, people, anchors, asks and the snooze time, and `work_events`
 the history notes and the "surfaced" marks. How far each app's mail was read, and whether reading
 is on, live in `app_cursors` and `apps.reads_mail`; the daily digest is the `loop-digest` watch.

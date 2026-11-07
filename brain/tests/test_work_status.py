@@ -25,7 +25,7 @@ def work(tmp_path):
 
 @pytest.fixture
 def run(work):
-    tools = {spec.name: (spec, handler) for spec, handler in work_tools(work)}
+    tools = {spec.name: (spec, handler) for spec, handler in work_tools(work, None)}
 
     async def run(args):
         return json.loads(await tools["work_status"][1](args))
