@@ -2347,6 +2347,127 @@ async def test_goal_turn_failed_tool_call_row_fails_and_keeps_the_error():
     assert records_for(memory).work.get("j1").state == "blocked"  # a given-up step holds the goal
 
 
+class FlakyApp:
+    """A connected app whose one tool times out `fails` times, then answers."""
+
+    approval_source = "app"
+
+    def __init__(self, fails, tool="files__list", error=TimeoutError):
+        self.fails, self.tool, self.error, self.calls = fails, tool, error, 0
+
+    def specs(self):
+        return [
+            ToolSpec(self.tool, "lists", {"type": "object"}, frozenset({"scout"}), effect="read")
+        ]
+
+    def known_specs(self):
+        return self.specs()
+
+    async def run(self, call, tool):
+        self.calls += 1
+        if self.calls <= self.fails:
+            raise self.error("slow")
+        return "a.txt"
+
+    def unavailable(self, name):
+        return None
+
+
+class Clock:
+    def __init__(self):
+        self.at = datetime.datetime(2026, 1, 1, 9, tzinfo=datetime.UTC)
+
+    def __call__(self):
+        return self.at
+
+    def step(self, seconds):
+        self.at += datetime.timedelta(seconds=seconds)
+
+
+async def flaky_wake(app, clock):
+    """A job_ended wake for j1 whose one tool call goes to `app`; returns the session and events."""
+    memory = Memory(":memory:")
+    session, _ = make(Gate([tool_use(app.tool, path="C:/x"), "ok", "ok"]), memory, now=clock)
+    session.toolbox.sources.insert(1, app)
+    events = []
+    emit = session.scheduler.emit
+
+    def spy(event, **hooks):
+        events.append(event)
+        return emit(event, **hooks)
+
+    session.scheduler.emit = spy
+    join(session, "desktop")
+    session.jobs._on_finished(end_job(memory))
+    await idle(session)
+    return session, memory, events
+
+
+def given_up(events):
+    return [e for e in events if e.kind == "work_failed"]
+
+
+async def due_now(session, clock, seconds):
+    clock.step(seconds)
+    session.timers.fire_due()
+    await asyncio.gather(*session.timers._runs)
+
+
+async def test_transient_tool_call_retried_after_backoff():
+    clock, app = Clock(), FlakyApp(fails=2)
+    session, memory, events = await flaky_wake(app, clock)
+    [row] = tool_rows(memory)
+    assert (row.state, row.attempt, row.error_kind) == ("planned", 1, "transient")
+    await due_now(session, clock, 30)
+    assert tool_rows(memory)[0].state == "planned" and tool_rows(memory)[0].attempt == 2
+    await due_now(session, clock, 120)
+    [row] = tool_rows(memory)
+    assert (row.state, row.summary, app.calls) == ("done", "a.txt", 3)
+    assert given_up(events) == []  # a step that recovered is not news
+
+
+async def test_exhausted_retry_emits_work_failed_and_blocks_goal():
+    clock, app = Clock(), FlakyApp(fails=9)
+    session, memory, events = await flaky_wake(app, clock)
+    await due_now(session, clock, 30)
+    await due_now(session, clock, 120)
+    await due_now(session, clock, 600)
+    [row] = tool_rows(memory)
+    assert row.state == "failed" and row.end_reason.startswith("gave up after 3 tries")
+    assert records_for(memory).work.get("j1").state == "blocked"
+    [event] = given_up(events)
+    assert (event.kind, event.key) == ("work_failed", f"work_failed:{row.id}")
+    assert event.facts["goal"] == "j1" and event.facts["step"] == row.id
+    assert event.facts["title"] == "files__list" and "gave up" in event.facts["reason"]
+
+
+async def test_unsafe_tool_call_not_retried():
+    clock = Clock()
+    app = FlakyApp(fails=1, tool="files__delete_cache")  # reads, but the name says delete
+    session, memory, events = await flaky_wake(app, clock)
+    [row] = tool_rows(memory)
+    assert row.state == "failed" and row.end_reason.startswith("not retryable")
+    assert len(given_up(events)) == 1
+    await due_now(session, clock, 600)
+    assert app.calls == 1
+
+
+async def test_expert_call_that_cannot_restart_is_reported_as_given_up():
+    clock = Clock()
+    session, _ = make(Gate(["ok"]), now=clock)
+    events = []
+    emit = session.scheduler.emit
+    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    records = session.records
+    records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    records.update_part("j1", "p1", state="failed", reason="crash")
+    records.work.retry_step("j1.p1")  # the person chose retry, but no expert is installed
+    await due_now(session, clock, 0)
+    row = records.work.get("j1.p1")
+    assert row.state == "failed" and "not installed" in row.end_reason
+    assert len(given_up(events)) == 1
+
+
 async def test_bookkeeping_tools_leave_no_work_rows():
     session, memory = await wake_with([tool_use("list_jobs", "a"), tool_use("work_status", "b")])
     assert tool_rows(memory) == []

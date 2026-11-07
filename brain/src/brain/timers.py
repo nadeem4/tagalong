@@ -1,12 +1,13 @@
 """Timers: runs the due `timer` and `watch` work rows as `timer` events and keeps one wake armed.
 
 Rows live in the work table so they survive a restart; this class only decides when to emit.
-The scheduler decides when Scout actually hears it.
+The scheduler decides when Scout actually hears it. It also hands a due `tool_call` or
+`expert_call` step (a retry that waited out its backoff) to `rerun`.
 """
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from brain.events import Event
@@ -19,6 +20,7 @@ MIN_REPEAT_S = 300
 # Re-check at least hourly so a wall-clock change cannot strand the timer.
 _MAX_SLEEP_S = 3600
 KINDS = ("timer", "watch")
+RERUN_KINDS = ("tool_call", "expert_call")
 
 
 def note_of(row: WorkRow) -> str:
@@ -37,12 +39,15 @@ class Timers:
         emit: Callable[..., None],
         now: Callable[[], datetime],
         job_facts: Callable[[str], dict] = lambda job_id: {},
+        rerun: Callable[[WorkRow], Awaitable[None]] | None = None,
     ) -> None:
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._work = work
         self._emit = emit
         self._now = now
         self._handle: asyncio.TimerHandle | None = None
+        self._rerun = rerun
+        self._runs: set[asyncio.Task] = set()
 
     def start(self) -> None:
         # A one-off that fired but whose wake never began is re-delivered.
@@ -68,7 +73,33 @@ class Timers:
             except TransitionRefused:
                 continue  # cancelled or paused as it came due: already handled
             self._emit_one(row, repeat_s)
+        self._rerun_due()
         self._arm()
+
+    def _rerun_due(self) -> None:
+        if self._rerun is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no loop yet: the rows stay planned until the next call
+        for row in self._work.due(RERUN_KINDS):
+            try:
+                active = self._work.transition(row.id, "active", expect="planned")
+            except TransitionRefused:
+                continue  # cancelled or resolved as it came due: already handled
+            task = loop.create_task(self._run_step(active))
+            self._runs.add(task)
+            task.add_done_callback(self._runs.discard)
+
+    async def _run_step(self, row: WorkRow) -> None:
+        assert self._rerun is not None
+        try:
+            await self._rerun(row)
+        except Exception:
+            log.exception("rerun of %s failed", row.id)
+        finally:
+            self._arm()  # a failed try may have set the next backoff
 
     def changed(self) -> None:
         self._arm()
@@ -108,7 +139,7 @@ class Timers:
         # Not next_due(): a skipped row (a return wake) would stay overdue and spin this loop.
         times = [
             r.due_at
-            for kind in KINDS
+            for kind in (*KINDS, *(RERUN_KINDS if self._rerun else ()))
             for r in self._work.of_kind(kind, ["planned"])
             if r.due_at and not _skipped(r)
         ]

@@ -2798,3 +2798,33 @@ async def test_send_marks_the_grant_sent(make_rig):
     rig = apps_rig(make_rig, Answer("Plan"))
     await rig.jobs.start("task", str(rig.folder), apps=["lin"])
     assert rig.bridge.grants[0].sent is True
+
+
+async def test_run_planned_restarts_expert_call(make_rig):
+    # A part held after a restart goes back to planned by retry; the due runner marks it active
+    # and run_planned reopens the saved session on the same row, with no card and no new part.
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "do it", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    work = rig.records.work
+    work.retry_step("old.p1")
+    row = work.transition("old.p1", "active", expect="planned")
+    await rig.jobs.run_planned(row)
+    await until(lambda: rig.records.get_job("old").parts[0].state == "done")
+    job = rig.records.get_job("old")
+    assert [p.id for p in job.parts] == ["p1"]
+    loads = [f for f in rig.frames() if f.get("method") == "session/load"]
+    assert loads[0]["params"]["sessionId"] == "s1"
+    assert rig.asks.opened == []  # the person already chose the mode
+
+
+async def test_run_planned_refuses_when_the_job_is_closed(make_rig):
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "do it", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    row = rig.records.work.get("old.p1")
+    rig.records.work.close_goal("old", "failed", "gave up")
+    with pytest.raises(JobError):
+        await rig.jobs.run_planned(row)

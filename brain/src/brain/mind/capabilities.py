@@ -76,6 +76,7 @@ def capability_picture(
     else:
         lines.append("Apps connected: none")
     lines.append("Your own work (jobs, timers, what you have not told the owner yet): work_status.")
+    lines.append("A step that gave up (work_failed): resolve_step with retry, skip or stop.")
     if experts:
         lines.append(
             "Experts (for long or many-stepped jobs; each works only with what it is given):"

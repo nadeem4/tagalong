@@ -1,6 +1,10 @@
-"""Retry rules: which errors are transient, which tools are safe to run again.
-Fakes only; the runner and resolve_step tests join this file in the next task.
+"""Retry rules: which errors are transient, which tools are safe to run again, how the due
+runner reruns a step, and how the person resolves a stuck one. Fakes only.
 """
+
+import asyncio
+import json
+from datetime import UTC, datetime, timedelta
 
 import anthropic
 import httpx2 as httpx
@@ -8,7 +12,11 @@ import pytest
 
 from brain.protocol import ErrorCode, RpcError
 from brain.retry import classify, safe_to_retry
+from brain.store.db import open_db
+from brain.store.work import WorkStore
+from brain.timers import Timers
 from brain.toolbox import ToolSpec
+from brain.tools import work_tools
 
 _REQUEST = httpx.Request("POST", "https://example.invalid")
 
@@ -53,3 +61,105 @@ def test_safe_to_retry_read_only():
 def test_pay_and_delete_never_safe():
     assert not safe_to_retry(_spec("delete_cache", "read"))
     assert not safe_to_retry(_spec("app__pay_invoice", "read"))
+
+
+NOW = datetime(2026, 1, 1, 9, tzinfo=UTC)
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.at = NOW
+
+    def __call__(self) -> datetime:
+        return self.at
+
+    def step(self, seconds: int) -> None:
+        self.at += timedelta(seconds=seconds)
+
+
+@pytest.fixture
+def clock():
+    return Clock()
+
+
+@pytest.fixture
+def work(tmp_path, clock):
+    db = open_db(tmp_path / "t.db")
+    yield WorkStore(db, clock)
+    db.close()
+
+
+def goal_with_step(work, kind="tool_call", state="active", safe=True):
+    work.create("goal", "tidy", id="g1", state="active")
+    return work.create(kind, "step", parent_id="g1", state=state, id="g1.s", safe_to_retry=safe)
+
+
+@pytest.fixture
+def resolve(work):
+    changed = []
+    tools = {s.name: (s, h) for s, h in work_tools(work, lambda: changed.append(1))}
+
+    async def run(args):
+        return json.loads(await tools["resolve_step"][1](args))
+
+    run.spec = tools["resolve_step"][0]
+    run.changed = changed
+    return run
+
+
+async def test_timers_rerun_a_due_step_and_leave_it_to_the_callback(work, clock):
+    step = goal_with_step(work)
+    work.fail(step.id, "transient", "timeout")
+    seen = []
+
+    async def rerun(row):
+        seen.append((row.id, row.state))
+
+    timers = Timers(work, lambda *a, **k: None, clock, rerun=rerun)
+    timers.fire_due()
+    assert seen == []  # not due yet
+    clock.step(30)
+    timers.fire_due()
+    await asyncio.gather(*timers._runs)
+    assert seen == [("g1.s", "active")]  # the runner moves it to active before the callback
+
+
+async def test_timers_without_a_rerun_leave_steps_planned(work, clock):
+    step = goal_with_step(work)
+    work.fail(step.id, "transient", "timeout")
+    clock.step(60)
+    Timers(work, lambda *a, **k: None, clock).fire_due()
+    assert work.get(step.id).state == "planned"
+
+
+async def test_resolve_step_retry_skip_stop(work, resolve, clock):
+    goal_with_step(work)
+    work.fail("g1.s", "permanent", "boom")  # failed: the goal is blocked
+    assert work.get("g1").state == "blocked"
+    out = await resolve({"id": "g1.s", "choice": "retry"})
+    assert out["state"] == "planned" and resolve.changed == [1]
+    assert work.get("g1.s").due_at is not None and work.get("g1").state == "active"
+
+    work.transition("g1.s", "active", expect="planned")
+    work.fail("g1.s", "permanent", "boom again")
+    out = await resolve({"id": "g1.s", "choice": "skip"})
+    assert out["state"] == "cancelled" and work.get("g1").state == "active"
+
+    work.create("tool_call", "next", parent_id="g1", state="active", id="g1.t")
+    work.fail("g1.t", "permanent", "no")
+    out = await resolve({"id": "g1.t", "choice": "stop"})
+    assert work.get("g1").state == "failed"
+    assert work.get("g1").end_reason == "closed by Scout"
+    assert work.get("g1").summary == "stopped by the person"
+    assert out["goal"] == "failed"
+
+
+async def test_resolve_step_refusals_are_plain_lines(work, resolve):
+    goal_with_step(work)
+    assert "no work" in (await resolve({"id": "zzz", "choice": "retry"}))["error"]
+    assert "choice" in (await resolve({"id": "g1.s", "choice": "maybe"}))["error"]
+    assert "not blocked or failed" in (await resolve({"id": "g1.s", "choice": "retry"}))["error"]
+
+
+def test_resolve_step_is_for_scout_and_home(resolve):
+    assert resolve.spec.audience == frozenset({"scout", "home"})
