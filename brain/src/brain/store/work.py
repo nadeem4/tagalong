@@ -55,6 +55,14 @@ class RetrySettings:
 
 _DEFAULT_RETRY = RetrySettings()
 
+# How an ask ended, as the approval log words it, and the state that records it.
+_ASK_STATE = {
+    "approved": "done",
+    "refused": "cancelled",
+    "timed_out": "expired",
+    "no_one": "expired",
+}
+
 
 @dataclass(frozen=True)
 class WorkRow:
@@ -91,6 +99,24 @@ class WorkEvent:
     at: str
     kind: str
     data: dict | None
+
+
+@dataclass(frozen=True)
+class AskLogRow:
+    """One decided ask as Home's approval log shows it."""
+
+    id: int  # work_ask.id: the approval id and paging cursor
+    source: str
+    tool: str
+    summary: str
+    input: dict
+    job_id: str | None
+    group_key: str
+    outcome: str
+    decided_by: str
+    rule_id: int | None
+    at: str
+    rule_sentence: str | None
 
 
 @dataclass(frozen=True)
@@ -166,6 +192,7 @@ class WorkStore:
         self.now = now
         self.mask = mask
         self.retry = retry
+        self._listeners: list[Callable[[str, str, str], None]] = []
 
     def _stamp(self) -> str:
         return utc_text(self.now())
@@ -541,6 +568,9 @@ class WorkStore:
         if ending:
             self._end_children(row.id, reason or "")
         self._rollup(row, to)
+        if ending and row.kind in ("ask", "question"):
+            for listener in self._listeners:
+                listener(row.id, row.kind, to)
 
     def _end_children(self, parent_id: str, reason: str) -> None:
         for child in self.children(parent_id):
@@ -617,6 +647,138 @@ class WorkStore:
             extra = {"summary": self.mask(summary), "reported_at": self._stamp()}
             self._move(row, outcome, "closed by Scout", via_close=True, extra=extra)
         return self._need(goal_id)
+
+    # ---- asks and questions: rows while open, the approval log once decided ----
+
+    def on_transition(self, listener: Callable[[str, str, str], None]) -> None:
+        """Call `listener(id, kind, new_state)` whenever an ask or question ends, whoever ended
+        it, so a waiter in memory learns that its parent closed."""
+        self._listeners.append(listener)
+
+    def open_goal(self, job_id: str | None) -> str | None:
+        """The id back when it names a goal that can still take a child, else None."""
+        row = None if job_id is None else self.get(job_id)
+        return row.id if row is not None and row.kind == "goal" and row.state in OPEN else None
+
+    def settle(self, id: str, to: State, reason: str, data: dict | None = None) -> WorkRow:
+        """The owner of an open ask or question ends it: its own end is no news to Scout."""
+        with transaction(self.db):
+            row = self._need(id)
+            if row.state not in OPEN:
+                raise TransitionRefused(f"{id} is {row.state}, expected an open row")
+            self._move(row, to, reason, data, extra={"reported_at": self._stamp()})
+        return self._need(id)
+
+    def add_ask(
+        self,
+        work_id: str,
+        *,
+        source: str | None = None,
+        tool: str | None = None,
+        summary: str | None = None,
+        input: dict | None = None,
+        group_key: str | None = None,
+    ) -> int:
+        """Save an ask's facts; a field left at None keeps what was saved. Returns the ask id."""
+        self.db.execute(
+            "INSERT INTO work_ask(work_id, source, tool, summary, input, group_key)"
+            " VALUES (?,?,?,?,?,?) ON CONFLICT(work_id) DO UPDATE SET"
+            " source = COALESCE(excluded.source, source), tool = COALESCE(excluded.tool, tool),"
+            " summary = COALESCE(excluded.summary, summary),"
+            " input = COALESCE(excluded.input, input),"
+            " group_key = COALESCE(excluded.group_key, group_key)",
+            (
+                work_id,
+                source,
+                tool,
+                None if summary is None else self.mask(summary),
+                _dumps(input),
+                group_key,
+            ),
+        )
+        row = self.db.execute("SELECT id FROM work_ask WHERE work_id = ?", (work_id,))
+        return row.fetchone()[0]
+
+    def ask_detail(self, work_id: str) -> dict | None:
+        r = self.db.execute(
+            "SELECT id, source, tool, summary, input, group_key, decided_by, rule_id, rule_sentence"
+            " FROM work_ask WHERE work_id = ?",
+            (work_id,),
+        ).fetchone()
+        if r is None:
+            return None
+        keys = ("id", "source", "tool", "summary", "input", "group_key", "decided_by")
+        return {
+            **dict(zip(keys, r, strict=False)),
+            "input": _loads(r[4]),
+            "rule_id": r[7],
+            "rule_sentence": r[8],
+        }
+
+    def decide_ask(
+        self,
+        work_id: str,
+        outcome: str,
+        decided_by: str,
+        rule_id: int | None = None,
+        rule_sentence: str | None = None,
+    ) -> None:
+        """Record how an ask ended, once. An ask whose waiter already ended it (answered, timed
+        out) is re-ended with the outcome; one still open ends with it."""
+        to = _ASK_STATE[outcome]
+        with transaction(self.db):
+            row = self._need(work_id)
+            detail = self.ask_detail(work_id)
+            if row.kind != "ask" or detail is None:
+                raise TransitionRefused(f"{work_id} is not an ask with facts")
+            if detail["decided_by"] is not None:
+                raise TransitionRefused(f"{work_id} was already decided")
+            extra = {"reported_at": self._stamp()}
+            self._move(row, to, outcome, force=row.state in TERMINAL, extra=extra)
+            self.db.execute(
+                "UPDATE work_ask SET decided_by = ?, rule_id = ?, rule_sentence = ?"
+                " WHERE work_id = ?",
+                (decided_by, rule_id, rule_sentence, work_id),
+            )
+            self.add_event(work_id, "decided", {"outcome": outcome, "decided_by": decided_by})
+
+    def list_asks(
+        self, filter: Literal["all", "scout", "refused"], limit: int, before: int | None
+    ) -> list[AskLogRow]:
+        """Decided asks, newest first; open and undecided ones are not in the log."""
+        where, args = ["a.decided_by IS NOT NULL"], []
+        if filter == "scout":
+            where.append("a.decided_by = 'scout'")
+        elif filter == "refused":
+            where.append("w.end_reason = 'refused'")
+        if before is not None:
+            where.append("a.id < ?")
+            args.append(before)
+        rows = self.db.execute(
+            "SELECT a.id, a.source, a.tool, a.summary, a.input, w.parent_id, a.group_key,"
+            " w.end_reason, a.decided_by, a.rule_id, w.ended_at, a.rule_sentence"
+            f" FROM work_ask a JOIN work w ON w.id = a.work_id WHERE {' AND '.join(where)}"
+            " ORDER BY a.id DESC LIMIT ?",
+            (*args, limit),
+        ).fetchall()
+        return [AskLogRow(*r[:4], json.loads(r[4]), *r[5:]) for r in rows]
+
+    def ask_counts(self) -> dict[str, int]:
+        total, scout, refused = self.db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(a.decided_by = 'scout'), 0),"
+            " COALESCE(SUM(w.end_reason = 'refused'), 0)"
+            " FROM work_ask a JOIN work w ON w.id = a.work_id WHERE a.decided_by IS NOT NULL"
+        ).fetchone()
+        return {"total": total, "scout": scout, "refused": refused}
+
+    def person_asks_since(self, group_key: str, since: str) -> int:
+        """How many asks of this group the person approved since `since` (UTC text)."""
+        return self.db.execute(
+            "SELECT COUNT(*) FROM work_ask a JOIN work w ON w.id = a.work_id"
+            " WHERE a.group_key = ? AND w.end_reason = 'approved' AND a.decided_by = 'person'"
+            " AND w.ended_at >= ?",
+            (group_key, since),
+        ).fetchone()[0]
 
     # ---- work_timer: how often a timer or watch comes back ----
 

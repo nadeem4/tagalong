@@ -424,21 +424,6 @@ def test_an_older_database_migrates_forward(tmp_path):
     m.close()
 
 
-def _ap(mem, outcome="approved", by="person", group="g1", at="2026-01-01T00:00:00+00:00"):
-    return mem.add_approval(
-        source="scout_tool",
-        tool="run",
-        summary="s",
-        input={"a": 1},
-        job_id=None,
-        group_key=group,
-        outcome=outcome,
-        decided_by=by,
-        preference_id=None,
-        at=at,
-    )
-
-
 def test_fresh_db_has_only_the_risky_default(mem):
     prefs = rules.list_preferences(mem.db)
     assert len(prefs) == 1
@@ -466,35 +451,6 @@ def test_add_preference_and_listing_order(mem):
     assert rules.has_user_preferences(mem.db) is True
     assert rules.has_preference_for(mem.db, "g1") is True
     assert rules.has_preference_for(mem.db, "other") is False
-
-
-def test_list_approvals_filters(mem):
-    a = _ap(mem)
-    b = _ap(mem, by="scout")
-    c = _ap(mem, outcome="refused", by="person")
-    assert [x.id for x in mem.list_approvals("all", 10, None)] == [c, b, a]
-    assert [x.id for x in mem.list_approvals("scout", 10, None)] == [b]
-    assert [x.id for x in mem.list_approvals("refused", 10, None)] == [c]
-    assert [x.id for x in mem.list_approvals("all", 1, None)] == [c]
-    assert [x.id for x in mem.list_approvals("all", 10, b)] == [a]
-    assert mem.list_approvals("all", 10, None)[0].input == {"a": 1}
-
-
-def test_approval_counts(mem):
-    _ap(mem)
-    _ap(mem, by="scout")
-    _ap(mem, outcome="refused")
-    assert mem.approval_counts() == {"total": 3, "scout": 1, "refused": 1}
-
-
-def test_person_approvals_since_counts_only_person_approved_in_group(mem):
-    _ap(mem, at="2026-01-02T00:00:00+00:00")
-    _ap(mem, at="2026-01-03T00:00:00+00:00")
-    _ap(mem, by="scout", at="2026-01-03T00:00:00+00:00")
-    _ap(mem, outcome="refused", at="2026-01-03T00:00:00+00:00")
-    _ap(mem, group="g2", at="2026-01-03T00:00:00+00:00")
-    _ap(mem, at="2025-12-01T00:00:00+00:00")
-    assert mem.person_approvals_since("g1", "2026-01-01T00:00:00+00:00") == 2
 
 
 def test_use_preference_bumps_count_and_last_used(mem):
@@ -530,38 +486,4 @@ def test_migration_is_one_step_after_timers(tmp_path):
     v = m._db.execute("PRAGMA user_version").fetchone()[0]
     assert v == len(load_migrations())
     assert any(p.builtin for p in rules.list_preferences(m.db))
-    m.close()
-
-
-def test_approval_stores_the_preference_sentence_it_was_made_under(mem):
-    mem.add_approval(
-        source="scout_tool",
-        tool="run",
-        summary="s",
-        input={},
-        job_id=None,
-        group_key="g",
-        outcome="approved",
-        decided_by="scout",
-        preference_id=7,
-        at="2026-01-01T00:00:00+00:00",
-        preference_sentence="Allow reads",
-    )
-    assert mem.list_approvals("all", 10, None)[0].preference_sentence == "Allow reads"
-    _ap(mem)
-    assert mem.list_approvals("all", 1, None)[0].preference_sentence is None
-
-
-def test_preference_sentence_column_is_added_to_an_older_database(tmp_path):
-    path = tmp_path / "old.db"
-    db = sqlite3.connect(path, isolation_level=None)
-    n = _PARTS_MIGRATION
-    migrate(db, upto=n)
-    db.execute(
-        "INSERT INTO approvals(source, tool, summary, input, group_key, outcome, decided_by, at)"
-        " VALUES ('app','t','s','{}','g','approved','person','2026-01-01T00:00:00+00:00')"
-    )
-    db.close()
-    m = Memory(path)
-    assert m.list_approvals("all", 10, None)[0].preference_sentence is None
     m.close()

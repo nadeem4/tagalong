@@ -14,12 +14,12 @@ from types import SimpleNamespace
 
 import httpx2
 import pytest
+from ask_log import approvals_on, list_approvals
 from mcp import ClientSession
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
 from brain.app_tools import AppSource
-from brain.approvals import Approvals
 from brain.expert_apps import ExpertApps
 from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
@@ -71,7 +71,7 @@ class FakeAsks:
     def anyone_online(self):
         return True
 
-    async def permission(self, call, spec_name, locked):
+    async def permission(self, call, spec_name, locked, **ids):
         self.asked.append((spec_name, call.turn))
         self.texts.append(call.text)
         return self.answer
@@ -84,7 +84,7 @@ class Rig:
         self.guards = Guards()
         self.guards.add(mask_secrets(Masker(lambda: [SECRET])))
         self.asks = FakeAsks(answer)
-        self.approvals = Approvals(
+        self.approvals = approvals_on(
             self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC)
         )
         self.toolbox = Toolbox(
@@ -161,13 +161,14 @@ async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
 
 
 async def test_a_change_tool_asks_and_the_approval_row_names_the_job(rig):
+    rig.approvals.work.create("goal", "a job", id="job7", state="active")  # the ask hangs off it
     grant = await rig.bridge.grant("job7", ["lin"])
     grant.sent = True  # the person has sent the card
     async with Client(grant.descriptor, headers_of(grant)) as s:
         out = await s.call_tool("lin__create_issue", {"title": "t"})
     assert not out.is_error
     assert [name for name, _ in rig.asks.asked] == ["lin__create_issue"]
-    rows = rig.memory.list_approvals("all", 10, None)
+    rows = list_approvals(rig.memory, "all", 10, None)
     assert [(r.tool, r.job_id, r.outcome) for r in rows] == [
         ("lin__create_issue", "job7", "approved")
     ]

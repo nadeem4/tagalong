@@ -211,7 +211,7 @@ class StubAsks:
     def anyone_online(self):
         return True
 
-    async def permission(self, call, spec_name, locked):
+    async def permission(self, call, spec_name, locked, **ids):
         self.asked.append(call.input)
         self.locked = locked
         return self.answer

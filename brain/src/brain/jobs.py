@@ -853,12 +853,12 @@ class Jobs:
 
     async def _open_ask(self, *, job_id: str | None = None, part: str = "p1", **kw) -> Answer:
         """Open an ask and raise its RpcError, so callers can tell a timeout from a cancel."""
-        ask_id = uuid.uuid4().hex
+        ask_id = kw.pop("ask_id", None) or uuid.uuid4().hex
         key = (job_id, part)
         if job_id is not None:
             self._ask_ids.setdefault(key, set()).add(ask_id)
         try:
-            return await self._asks.open(ask_id=ask_id, **kw)
+            return await self._asks.open(ask_id=ask_id, parent_id=job_id, **kw)
         finally:
             if job_id is not None:
                 self._ask_ids.get(key, set()).discard(ask_id)
@@ -887,6 +887,7 @@ class Jobs:
         tool = f"{agent}:{request.title}"
         approvals = self._approvals
         picked = None  # the option the person chose, kept for the return value
+        ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
 
         async def ask_person() -> str:
             nonlocal picked
@@ -894,6 +895,7 @@ class Jobs:
             answer = await self._open_ask(
                 job_id=job_id,
                 part=part,
+                ask_id=ask_id,
                 text="",
                 tool=tool,
                 input=request.input,
@@ -934,7 +936,7 @@ class Jobs:
                 outcome, result = "refused", picked.id
         # Anything else (a failed guard, an allow nobody vouched for) refuses: no option picked.
         if outcome is not None:
-            self._record(job_id, request, outcome, part)
+            self._record(job_id, request, outcome, part, ask_id)
         if outcome == "approved":
             self._offer(job_id, request, part)
         self._changed()
@@ -947,7 +949,9 @@ class Jobs:
             agent = _prefix(self._agent_of(job, part))
             self._offers.consider(f"{agent}:{job.folder}", AGENT, f"{agent}:{request.title}")
 
-    def _record(self, job_id: str, request: PermissionRequest, outcome: str, part: str) -> None:
+    def _record(
+        self, job_id: str, request: PermissionRequest, outcome: str, part: str, ask_id: str
+    ) -> None:
         job = self._records.get_job(job_id)
         if self._approvals is None or job is None:
             return
@@ -963,6 +967,7 @@ class Jobs:
             outcome=outcome,
             job_id=job_id,
             decided_by="person" if answered else "none",
+            ask_id=ask_id,
         )
 
     async def _question(self, job_id: str, question: Question, part: str = "p1") -> dict | None:

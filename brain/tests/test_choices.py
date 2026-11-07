@@ -6,6 +6,7 @@ import asyncio
 import json
 
 import pytest
+from job_rows import fresh_work
 
 from brain.asks import Asks
 from brain.choices import Choices
@@ -36,7 +37,7 @@ async def settle():
 def rig(online=("desktop",), timeout=600.0):
     bodies = FakeBodies(online)
     events = []
-    choices = Choices(Asks(bodies), events.append, timeout)
+    choices = Choices(Asks(bodies, fresh_work()), events.append, timeout)
     return bodies, events, choices
 
 

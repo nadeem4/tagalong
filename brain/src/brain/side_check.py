@@ -17,6 +17,7 @@ from brain.memory import Memory
 from brain.mind.turn import Final, Model
 from brain.store import rules
 from brain.store.rules import Preference
+from brain.store.work import WorkStore
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ class SideCheck:
         model: Model,
         budget,
         memory: Memory,
+        work: WorkStore,
         timeout: float = 20.0,
         guards: Guards | None = None,
     ) -> None:
@@ -79,6 +81,7 @@ class SideCheck:
         self._model = model
         self._budget = budget
         self._memory = memory
+        self._work = work  # the ask log it reads history from
         self._timeout = timeout
 
     async def decide(self, facts: AskFacts) -> Preference | None:
@@ -138,7 +141,7 @@ class SideCheck:
         prefs = [f"{p.id}{' (default)' if p.builtin else ''}: {p.sentence}" for p in shown]
         history = [
             f"{a.outcome} by {a.decided_by}: {a.summary}"
-            for a in self._memory.list_approvals("all", HISTORY_SCAN, None)
+            for a in self._work.list_asks("all", HISTORY_SCAN, None)
             if a.tool == facts.tool or a.group_key == facts.group_key
         ][:HISTORY_ROWS]
         text = "\n".join(

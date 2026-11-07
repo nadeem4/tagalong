@@ -9,6 +9,11 @@ from brain.store.work import WorkStore
 _WORK = {"done": "done", "error": "failed", "stopped": "cancelled"}
 
 
+def fresh_work(now=lambda: datetime.now(UTC)) -> WorkStore:
+    """A WorkStore on its own in-memory database."""
+    return WorkStore(Memory(":memory:").db, now)
+
+
 def records_for(memory: Memory, now=lambda: datetime.now(UTC)) -> JobRecords:
     return JobRecords(WorkStore(memory.db, now), memory.db, now)
 

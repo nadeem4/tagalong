@@ -1,10 +1,12 @@
 """Approvals: the log of every permission ask and how it ended.
 
-The tool gate (and later expert jobs) call `record`; it stores one row and tells open panels
-the log changed. `summarise` makes the one line shown in that log.
+The log is the decided `ask` work rows. The tool gate and expert jobs call `record`; it decides
+the ask's row (or makes one when no ask was ever opened) and tells open panels the log changed.
+`summarise` makes the one line shown in that log.
 """
 
 import json
+import uuid
 from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,6 +18,7 @@ from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.db import utc_text
 from brain.store.rules import Preference
+from brain.store.work import WorkStore
 
 if TYPE_CHECKING:
     from brain.side_check import AskFacts
@@ -28,11 +31,13 @@ class Approvals:
     def __init__(
         self,
         memory: Memory,
+        work: WorkStore,
         notify: Callable[[str, dict], None],
         now: Callable[[], datetime],
         guards: Guards | None = None,
     ) -> None:
         self._memory = memory
+        self.work = work
         self._notify = notify
         self._now = now
         self._guards = guards  # None: rows are stored as given
@@ -54,23 +59,24 @@ class Approvals:
         decided_by: str = "person",
         preference_id: int | None = None,
         preference_sentence: str | None = None,
+        ask_id: str | None = None,
     ) -> None:
+        """`ask_id` names the open ask this decides; without one the ask row is made here."""
         if self._guards is not None:  # the table is read by Home and Scout, so it holds no secret
             summary = mask_json(self._guards, "approval", summary)
             input = mask_json(self._guards, "approval", input)
-        self._memory.add_approval(
-            source=source,
-            tool=tool,
-            summary=summary,
-            input=input,
-            job_id=job_id,
-            group_key=group_key,
-            outcome=outcome,
-            decided_by=decided_by,
-            preference_id=preference_id,
-            at=utc_text(self._now()),
-            preference_sentence=preference_sentence,
+        if ask_id is None or self.work.get(ask_id) is None:
+            ask_id = self.work.create(
+                "ask",
+                summary,
+                id=ask_id or uuid.uuid4().hex,
+                state="active",
+                parent_id=self.work.open_goal(job_id),
+            ).id
+        self.work.add_ask(
+            ask_id, source=source, tool=tool, summary=summary, input=input, group_key=group_key
         )
+        self.work.decide_ask(ask_id, outcome, decided_by, preference_id, preference_sentence)
         self._notify("changed", {"what": "approvals"})
 
     def scout_approved(
@@ -132,6 +138,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
     from brain.toolbox import ToolSpec
 
     memory = approvals._memory
+    work = approvals.work
 
     def refuse(message: str) -> RpcError:
         return RpcError(ErrorCode.invalid_params, message)
@@ -150,7 +157,7 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
         if before is not None and type(before) is not int:
             raise refuse("before is an approval id.")
         # One extra row tells whether another page exists.
-        rows = memory.list_approvals(filter, PAGE + 1, before)
+        rows = work.list_asks(filter, PAGE + 1, before)
         more = len(rows) > PAGE
         rows = rows[:PAGE]
         return json.dumps(
@@ -165,13 +172,13 @@ def approval_home_tools(approvals: Approvals) -> "list[tuple[ToolSpec, Handler]]
                         "job_id": r.job_id,
                         "outcome": r.outcome,
                         "decided_by": r.decided_by,
-                        "preference_id": r.preference_id,
-                        "preference": r.preference_sentence,
+                        "preference_id": r.rule_id,
+                        "preference": r.rule_sentence,
                         "at": r.at,
                     }
                     for r in rows
                 ],
-                "counts": memory.approval_counts(),
+                "counts": work.ask_counts(),
                 "next": rows[-1].id if more else None,
             }
         )

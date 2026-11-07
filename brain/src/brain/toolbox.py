@@ -7,6 +7,7 @@ Home calls skip that step.
 """
 
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Literal, Protocol
@@ -294,6 +295,7 @@ class Toolbox:
         expert job a call comes from, so its approval rows say so."""
         assert self._asks is not None
         approvals = self._approvals
+        ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
 
         def record(outcome: str, decided_by: str = "person") -> None:
             if approvals is not None:
@@ -306,6 +308,7 @@ class Toolbox:
                     outcome=outcome,
                     decided_by=decided_by,
                     job_id=job_id,
+                    ask_id=ask_id,
                 )
 
         if spec.card is not None:
@@ -319,7 +322,9 @@ class Toolbox:
             spec.name,
             spec.locked,
             call.turn or None,
-            lambda: self._asks.permission(call, spec.name, spec.locked),
+            lambda: self._asks.permission(
+                call, spec.name, spec.locked, ask_id=ask_id, parent_id=job_id
+            ),
             job_id=job_id,
             person_only=spec.person_only,
         )

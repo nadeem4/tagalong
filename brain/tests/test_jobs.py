@@ -12,10 +12,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from ask_log import approvals_on, list_approvals
 from fake_clock import FakeClock
 from job_rows import add_timer, end_job
 
-from brain.approvals import Approvals
 from brain.asks import Answer
 from brain.events import Event
 from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
@@ -173,7 +173,7 @@ class Rig:
         self.experts = [installed()] if experts is None else experts
         self.expert_ids: list[str] = []
         self.approvals = (
-            Approvals(self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC))
+            approvals_on(self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC))
             if approvals
             else None
         )
@@ -776,7 +776,7 @@ def with_approvals(make_rig, asks, steps, side_check=None, **kw):
 
 
 def logged(rig):
-    return rig.memory.list_approvals("all", 50, None)
+    return list_approvals(rig.memory, "all", 50, None)
 
 
 OPTS = [
@@ -907,8 +907,8 @@ async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
     assert len(asks.opened) == 1  # only the hand-off ask
     [row] = logged(rig)
     assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
-    assert row.preference_id == check.result.id and row.job_id == rig.finished[0].id
-    assert row.preference_sentence == "Reading files is fine"
+    assert row.rule_id == check.result.id and row.job_id == rig.finished[0].id
+    assert row.rule_sentence == "Reading files is fine"
     [facts] = check.facts
     assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
         "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}", False,
@@ -934,7 +934,7 @@ async def test_claude_code_pass_falls_through_to_the_person(make_rig):
     await until(lambda: rig.finished)
     assert len(check.facts) == 1
     [row] = logged(rig)
-    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "person", None)
+    assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "person", None)
 
 
 async def test_claude_code_no_one_online_skips_side_check(make_rig):

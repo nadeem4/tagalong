@@ -4,13 +4,10 @@
 outputs delegate to `brain.store`; the other areas keep their SQL here until their own slice.
 """
 
-import json
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
 
 from brain.apps import AppRow
 from brain.store import connections, conversation, outputs
@@ -19,22 +16,6 @@ from brain.store import search as search_store
 from brain.store.db import open_db
 from brain.store.memory import Item
 from brain.store.search import Hit
-
-
-@dataclass(frozen=True)
-class Approval:
-    id: int
-    source: str
-    tool: str
-    summary: str
-    input: dict
-    job_id: str | None
-    group_key: str
-    outcome: str
-    decided_by: str
-    preference_id: int | None
-    at: str
-    preference_sentence: str | None = None
 
 
 class Memory:
@@ -53,63 +34,6 @@ class Memory:
 
     def close(self) -> None:
         self._db.close()
-
-    def add_approval(
-        self,
-        *,
-        source: str,
-        tool: str,
-        summary: str,
-        input: dict,
-        job_id: str | None,
-        group_key: str,
-        outcome: str,
-        decided_by: str,
-        preference_id: int | None,
-        at: str,
-        preference_sentence: str | None = None,
-    ) -> int:
-        cur = self._db.execute(
-            "INSERT INTO approvals(source, tool, summary, input, job_id, group_key, outcome,"
-            " decided_by, preference_id, at, preference_sentence) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (source, tool, summary, json.dumps(input), job_id, group_key, outcome, decided_by,
-             preference_id, at, preference_sentence),
-        )  # fmt: skip
-        return cur.lastrowid
-
-    def list_approvals(
-        self, filter: Literal["all", "scout", "refused"], limit: int, before: int | None
-    ) -> list[Approval]:
-        where, args = [], []
-        if filter == "scout":
-            where.append("decided_by='scout'")
-        elif filter == "refused":
-            where.append("outcome='refused'")
-        if before is not None:
-            where.append("id<?")
-            args.append(before)
-        clause = f"WHERE {' AND '.join(where)}" if where else ""
-        rows = self._db.execute(
-            f"SELECT id, source, tool, summary, input, job_id, group_key, outcome, decided_by,"
-            f" preference_id, at, preference_sentence FROM approvals {clause}"
-            " ORDER BY id DESC LIMIT ?",
-            (*args, limit),
-        ).fetchall()
-        return [Approval(r[0], r[1], r[2], r[3], json.loads(r[4]), *r[5:]) for r in rows]
-
-    def approval_counts(self) -> dict[str, int]:
-        total, scout, refused = self._db.execute(
-            "SELECT COUNT(*), COALESCE(SUM(decided_by='scout'),0),"
-            " COALESCE(SUM(outcome='refused'),0) FROM approvals"
-        ).fetchone()
-        return {"total": total, "scout": scout, "refused": refused}
-
-    def person_approvals_since(self, group_key: str, since_iso: str) -> int:
-        return self._db.execute(
-            "SELECT COUNT(*) FROM approvals WHERE group_key=? AND outcome='approved'"
-            " AND decided_by='person' AND at>=?",
-            (group_key, since_iso),
-        ).fetchone()[0]
 
     # Chat, memory items, apps and tool outputs keep their SQL in brain.store.
 

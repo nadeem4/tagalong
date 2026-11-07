@@ -6,6 +6,8 @@ import logging
 from types import SimpleNamespace
 
 import pytest
+from ask_log import approvals_on, list_approvals, work_on
+from job_rows import fresh_work
 
 from brain.asks import Asks
 from brain.bodies import Bodies
@@ -420,7 +422,7 @@ def gated(tool_effect="change", locked=False, online=("desktop",), stored=None, 
         ]
     )
     stored = {} if stored is None else stored
-    return Toolbox([source], stored, Asks(bodies)), source, bodies, stored
+    return Toolbox([source], stored, Asks(bodies, fresh_work())), source, bodies, stored
 
 
 def call_with_text(name, call_id="c1", text="Doing it."):
@@ -541,7 +543,7 @@ async def test_two_calls_in_one_step_open_independent_asks_with_shared_text():
 async def test_home_caller_skips_the_ask():
     spec_home = ToolSpec("h", "h", {"type": "object"}, frozenset({"home", "scout"}))
     bodies = AskBodies()
-    box = Toolbox([FakeSource([spec_home])], asks=Asks(bodies))
+    box = Toolbox([FakeSource([spec_home])], asks=Asks(bodies, fresh_work()))
     assert await box.run(call("h"), caller="home") == "ran h"
     assert bodies.sent == []
 
@@ -549,7 +551,7 @@ async def test_home_caller_skips_the_ask():
 async def test_other_caller_in_audience_is_still_asked():
     spec_x = ToolSpec("x", "x", {"type": "object"}, frozenset({"scout", "expert"}))
     bodies = AskBodies()
-    box = Toolbox([FakeSource([spec_x])], asks=Asks(bodies))
+    box = Toolbox([FakeSource([spec_x])], asks=Asks(bodies, fresh_work()))
     task = asyncio.create_task(box.run(call("x"), caller="expert"))
     await until(lambda: opened_asks(bodies))
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
@@ -753,7 +755,7 @@ async def test_app_tool_row_has_source_app():
     bodies = AskBodies()
     log = FakeApprovals()
     source = AppLike([ToolSpec("a__x", "x", {"type": "object"})])
-    box = Toolbox([source], asks=Asks(bodies), approvals=log)
+    box = Toolbox([source], asks=Asks(bodies, fresh_work()), approvals=log)
     task = asyncio.create_task(box.run(call("a__x")))
     await until(lambda: opened_asks(bodies))
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
@@ -778,7 +780,6 @@ async def test_toolbox_without_approvals_behaves_as_before():
 
 from datetime import UTC, datetime  # noqa: E402
 
-from brain.approvals import Approvals  # noqa: E402
 from brain.memory import Memory  # noqa: E402
 from brain.mind.turn import Final  # noqa: E402
 from brain.side_check import SideCheck  # noqa: E402
@@ -809,11 +810,13 @@ def mem(tmp_path):
 
 def scouted(mem, check, online=("desktop",), locked=False):
     sent = []
-    approvals = Approvals(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
+    approvals = approvals_on(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
     bodies = AskBodies(online)
     source = FakeSource([ToolSpec("t", "t tool", {"type": "object"}, locked=locked)])
     stored = {}
-    box = RealToolbox([source], lambda: stored, stored.__setitem__, Asks(bodies), approvals, check)
+    box = RealToolbox(
+        [source], lambda: stored, stored.__setitem__, Asks(bodies, fresh_work()), approvals, check
+    )
     return box, source, bodies, stored, sent
 
 
@@ -834,12 +837,12 @@ async def test_scout_approval_row_and_notification(mem):
     pref = preference(mem)
     box, _, _, _, sent = scouted(mem, FakeSideCheck(pref))
     await box.run(call_with_text("t"))
-    [row] = mem.list_approvals("all", 10, None)
-    assert (row.outcome, row.decided_by, row.preference_id) == ("approved", "scout", pref.id)
+    [row] = list_approvals(mem, "all", 10, None)
+    assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "scout", pref.id)
     assert (row.source, row.tool, row.group_key, row.summary) == (
         "scout_tool", "t", "t", "Doing it.",
     )  # fmt: skip
-    assert row.preference_sentence == pref.sentence
+    assert row.rule_sentence == pref.sentence
     assert ("approved", {"tool": "t", "text": "Doing it.", "preference": pref.sentence}) in sent
     used = next(p for p in rules.list_preferences(mem.db) if p.id == pref.id)
     assert used.use_count == 1
@@ -856,8 +859,8 @@ async def test_pass_falls_through_to_the_person_ask(mem):
     assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
         "scout_tool", "t", "t", True,
     )  # fmt: skip
-    [row] = mem.list_approvals("all", 10, None)
-    assert (row.decided_by, row.preference_id, row.preference_sentence) == ("person", None, None)
+    [row] = list_approvals(mem, "all", 10, None)
+    assert (row.decided_by, row.rule_id, row.rule_sentence) == ("person", None, None)
 
 
 async def test_allow_always_is_never_used_for_scout(mem):
@@ -889,7 +892,7 @@ class _OpenBudget:
 
 async def test_removed_preference_sends_next_ask_to_the_person(mem):
     pref = preference(mem)
-    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
+    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem, work_on(mem))
     box, _, bodies, _, _ = scouted(mem, check)
     await box.run(call_with_text("t"))
     assert bodies.sent == []
@@ -907,7 +910,7 @@ async def test_no_one_online_skips_side_check(mem):
     with pytest.raises(RpcError):
         await box.run(call_with_text("t"))
     assert check.facts == []
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
 
 
@@ -1065,7 +1068,9 @@ async def test_chain_error_in_an_ask_guard_refuses_the_tool():
 async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_the_person(mem):
     preference(mem)
     rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
-    check = SideCheck(_ApprovingModel(rules.list_preferences(mem.db)[0].id), _OpenBudget(), mem)
+    check = SideCheck(
+        _ApprovingModel(rules.list_preferences(mem.db)[0].id), _OpenBudget(), mem, work_on(mem)
+    )
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
@@ -1079,7 +1084,7 @@ async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_p
         mem.db, sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
     )
     rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
-    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem)
+    check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem, work_on(mem))
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
     assert await box.run(call_with_text("t")) == "ran t"
     assert bodies.sent == []  # Scout approved under the named preference: nobody was asked
@@ -1087,20 +1092,20 @@ async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_p
 
 
 async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
-    approvals = Approvals(mem, lambda m, p: None, lambda: NOW)
+    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
     source = FakeSource([spec("a")])
     guards = Guards()
     guards.add(Guard("ask_all", Hook.tool_call, lambda ctx: ask("needs your yes")))
     guards.add(Guard("always_allow", Hook.ask, lambda ctx: ALLOW))  # allows, but not once
+    asks = Asks(AskBodies(("desktop",)), fresh_work())
     box = RealToolbox(
-        [source], lambda: {}, lambda n, m: None, Asks(AskBodies(("desktop",))), approvals,
-        guards=guards,
+        [source], lambda: {}, lambda n, m: None, asks, approvals, guards=guards
     )  # fmt: skip
     with pytest.raises(RpcError) as err:
         await box.run(call("a"))
     assert err.value.code == ErrorCode.denied
     assert source.ran == []
-    assert mem.list_approvals("all", 10, None) == []
+    assert list_approvals(mem, "all", 10, None) == []
 
 
 def test_a_person_only_tool_always_asks_and_its_mode_cannot_be_changed():
@@ -1132,13 +1137,13 @@ def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
     tools = [t for t in expert_tools(jobs, lambda: owner) if t[0].name == "tell_expert"]
     sent = []
     bodies = AskBodies(online)
-    approvals = Approvals(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
+    approvals = approvals_on(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
     stored = {}
     box = RealToolbox(
         [BrainSource(tools)],
         lambda: stored,
         stored.__setitem__,
-        Asks(bodies),
+        Asks(bodies, fresh_work()),
         approvals,
         check,
         offers,
@@ -1168,7 +1173,7 @@ async def test_tell_expert_on_an_owner_turn_runs_without_an_ask(mem):
     box, jobs, bodies, _ = nudger(mem, FakeSideCheck(None), owner=True)
     assert await box.run(nudge()) == "note queued for job j1"
     assert bodies.sent == [] and jobs.told == [("j1", "try tabs")]
-    assert mem.list_approvals("all", 10, None) == []
+    assert list_approvals(mem, "all", 10, None) == []
 
 
 async def test_tell_expert_on_a_brain_turn_asks_the_owner(mem):
@@ -1180,7 +1185,7 @@ async def test_tell_expert_on_a_brain_turn_asks_the_owner(mem):
     assert jobs.told == []  # held on the ask
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "note queued for job j1"
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "person")
     assert offers.considered == [("tell_expert", "scout_tool", "tell_expert")]
 
@@ -1189,7 +1194,7 @@ async def test_tell_expert_on_a_brain_turn_with_a_covering_preference_runs_via_s
     box, jobs, bodies, _ = nudger(mem, FakeSideCheck(preference(mem, "Nudge my jobs")))
     assert await box.run(nudge()) == "note queued for job j1"
     assert bodies.sent == [] and jobs.told == [("j1", "try tabs")]
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "scout")
 
 
@@ -1218,7 +1223,7 @@ async def test_tell_expert_on_a_brain_turn_with_nobody_online_is_refused_and_log
         await box.run(nudge())
     assert "Nobody was there to ask" in str(err.value)
     assert jobs.told == []
-    [row] = mem.list_approvals("all", 10, None)
+    [row] = list_approvals(mem, "all", 10, None)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
 
 
