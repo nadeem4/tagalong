@@ -2358,7 +2358,13 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    reply is sent once at `done`, a reply after 24 hours is dropped.
 2. `pnpm --filter @tagalong/whatsapp build`: writes `bodies/whatsapp/dist/index.js`, one file that
    imports only `node:` modules.
-3. By hand: start it with the five `TAGALONG_WHATSAPP_*` values set and its stdin closed
+3. Asks and long replies, same command, on the fake brain: an open ask is sent as reply buttons (one
+   to three short options) or numbered text; a tap or a typed `yes` answers the one open ask with the
+   `answer` call; two open asks make a typed text reply `More than one question is open: please tap a
+button`; a tap on a closed, unknown or refused ask replies `That question is closed.`; text with no
+   ask open is a normal `say`; after a resync the re-sent ask is shown once; a reply needing more than
+   four messages ends with `(cut: ask me for the rest)`.
+4. By hand: start it with the five `TAGALONG_WHATSAPP_*` values set and its stdin closed
    (`node bodies/whatsapp/dist/index.js < /dev/null`): it prints that it is listening and exits at
    once. With a value missing it prints a message naming the variable and exits 1.
 

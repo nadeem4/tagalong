@@ -21,7 +21,7 @@ describe('splitReply', () => {
 
   test('test_every_part_is_within_the_limit', () => {
     const text = Array.from({ length: 300 }, (_, i) => `word${i}`).join(' ');
-    const parts = splitReply(text, 100);
+    const parts = splitReply(text, 100, 1000);
     expect(parts.length).toBeGreaterThan(1);
     for (const p of parts) {
       expect(p.length).toBeLessThanOrEqual(100);
@@ -33,5 +33,27 @@ describe('splitReply', () => {
   test('test_empty_is_no_parts', () => {
     expect(splitReply('')).toEqual([]);
     expect(splitReply('  \n ')).toEqual([]);
+  });
+
+  test('test_reply_past_four_messages_is_cut_with_the_note', () => {
+    const text = Array.from({ length: 5 }, (_, i) => String(i).repeat(40)).join('\n\n');
+    const parts = splitReply(text, 60, 4);
+    expect(parts).toHaveLength(4);
+    expect(parts.slice(0, 3)).toEqual(['0'.repeat(40), '1'.repeat(40), '2'.repeat(40)]);
+    // 60 minus the 27-character note leaves room for 33 characters of the fourth part.
+    expect(parts[3]).toBe(`${'3'.repeat(33)}\n(cut: ask me for the rest)`);
+  });
+
+  test('test_the_cut_part_is_still_within_the_limit', () => {
+    const parts = splitReply('x'.repeat(500), 50, 4);
+    expect(parts).toHaveLength(4);
+    for (const p of parts) expect(p.length).toBeLessThanOrEqual(50);
+    expect(parts[3]?.endsWith('\n(cut: ask me for the rest)')).toBe(true);
+    expect(parts[3]?.startsWith('x')).toBe(true);
+  });
+
+  test('test_exactly_four_parts_has_no_note', () => {
+    const parts = splitReply('x'.repeat(200), 50, 4);
+    expect(parts).toEqual(['x'.repeat(50), 'x'.repeat(50), 'x'.repeat(50), 'x'.repeat(50)]);
   });
 });
