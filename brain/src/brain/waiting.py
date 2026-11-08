@@ -50,6 +50,7 @@ class WaitingAsks:
         self._handle: asyncio.TimerHandle | None = None
         self._expiring: set[str] = set()  # freed at the deadline, their end not yet logged
         self._returning: asyncio.Task | None = None
+        self._redeciding: set[str] = set()  # being decided again: the deadline waits for that
         self._unseen: set[str] = set()  # waiting while nobody could see them, until shown again
 
     def claim(self, tool: str, input: dict, ask_id: str) -> str | None:
@@ -110,7 +111,7 @@ class WaitingAsks:
         """Each waiting ask's next moment: its notice if not yet given, else its deadline."""
         out = []
         for row in self._work.waiting_asks():
-            if row.id in self._expiring or row.due_at is None:
+            if row.id in self._expiring or row.id in self._redeciding or row.due_at is None:
                 continue
             due = datetime.fromisoformat(row.due_at)
             if self._work.event_of(row.id, "notice") is None:
@@ -125,7 +126,7 @@ class WaitingAsks:
         rows = self._work.waiting_asks()
         self._expiring &= {r.id for r in rows}  # an id whose end never logged must not linger
         for row in rows:
-            if row.id in self._expiring or row.due_at is None:
+            if row.id in self._expiring or row.id in self._redeciding or row.due_at is None:
                 continue
             try:
                 due = datetime.fromisoformat(row.due_at)
@@ -264,15 +265,22 @@ class WaitingAsks:
         for row in self._work.waiting_asks():  # oldest first
             if self._asks.is_open(row.id):
                 continue
+            self._redeciding.add(row.id)
             try:
                 again = await self._decide_again(toolbox, row)
             except Exception:
                 # Left waiting: its deadline still ends it, and the next join tries again.
                 log.exception("a waiting ask could not be decided again: %s", row.id)
                 continue
+            finally:
+                self._redeciding.discard(row.id)
             if again is not None:
                 kept.append(again)
+        still = {r.id for r in self._work.waiting_asks()}
+        self.changed()  # deadlines held back during the return are armed again
         for call, req in kept:  # only the person can say yes now; all cards open together
+            if req.ask_id not in still:
+                continue  # it ended while the others were decided
             person = replace(req, can_allow_once=False)
             self.adopt(asyncio.create_task(toolbox.redecide(person)), call, person)
         await asyncio.sleep(0)  # the cards go out in order before the wake names them
@@ -295,6 +303,9 @@ class WaitingAsks:
         facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
         self._emit(Event("asks_waiting", facts, key="asks_waiting"))
 
+    def _lapsed(self, row: WorkRow) -> bool:
+        return row.due_at is not None and self._now() >= datetime.fromisoformat(row.due_at)
+
     async def _decide_again(
         self, toolbox: "Toolbox", row: WorkRow
     ) -> tuple[Call, AskRequest] | None:
@@ -309,15 +320,27 @@ class WaitingAsks:
             turn="",
             text=saved.get("text") or "",
         )
+        if not row.safe_to_retry:
+            self._end_unlive(row, "held a secret")  # its saved call would replay as `[secret]`
+            return None
         found = toolbox.spec_named(call.name)
         if found is None:
             self._end_unlive(row, "tool gone")
             return None
         spec, kind = found
         req = await toolbox.ask_request(call, spec, kind, job_id=None, ask_id=row.id, reopen=True)
+        if self._lapsed(row):
+            self._end_unlive(row, "no answer")
+            return None
         decision = await toolbox.redecide(replace(req, how_to_ask=None))
+        current = self._work.get(row.id)
+        if current is None or current.state not in ("active", "done"):
+            return None  # it ended while being decided; nothing to run or show
+        if current.state == "active" and self._lapsed(row):
+            self._end_unlive(row, "no answer")
+            return None
         if decision.allowed:
-            if (current := self._work.get(row.id)) is not None and current.state == "active":
+            if current.state == "active":
                 # An Auto tool is allowed without the engine writing a row: log the rule's yes.
                 self._approvals.record(
                     source=kind,

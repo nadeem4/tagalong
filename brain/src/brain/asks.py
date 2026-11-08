@@ -150,7 +150,10 @@ class Asks:
             self._close(ask_id, "timeout")
             raise RpcError(ErrorCode.timeout, "nobody answered the ask in time") from None
         except asyncio.CancelledError:
-            self._close(ask_id, "cancelled")
+            if ask_id in self._parked:
+                self._open.pop(ask_id, None)  # the brain is closing: the row stays for next start
+            else:
+                self._close(ask_id, "cancelled")
             raise
         finally:
             self._parked.discard(ask_id)  # answered, timed out, cancelled or ended with its job

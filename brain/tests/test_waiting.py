@@ -686,3 +686,52 @@ async def test_carried_out_call_goes_through_the_floor_again():
     [shown] = rig.opened()
     assert shown["id"] == ask_id and shown["options"] == ["allow", "deny"]
     assert rig.work.get(ask_id).state == "active"
+
+
+# --- review fixes: no expiry or replay races in the return ---
+
+
+async def test_a_deadline_passing_mid_return_runs_nothing_and_ends_once():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    gate = asyncio.Event()
+
+    async def slow_card(input):
+        await gate.wait()
+        return input
+
+    rig.source._specs[0] = ToolSpec(
+        "t", "t tool", {"type": "object"}, card=slow_card, tier=Tier.auto
+    )
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.clock = NOW + timedelta(days=4)  # past the 3 day deadline while the return waits
+    rig.waiting.fire_due()  # must not end the row under the return's feet
+    gate.set()
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == []
+    assert rig.work.get(ask_id).state == "expired"
+    assert [e.facts["outcome"] for e in ended(rig)] == ["expired"]
+
+
+async def test_return_expires_a_secret_holding_row_it_finds():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.work.db.execute("UPDATE work SET safe_to_retry = 0 WHERE id = ?", (ask_id,))
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == []
+    [event] = ended(rig)
+    assert event.facts["reason"] == "held a secret"
+
+
+async def test_shutdown_cancelling_a_returned_ask_leaves_it_waiting():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    for task in list(rig.waiting._tasks):
+        task.cancel()
+    await rig.settle()
+    assert rig.work.get(ask_id).state == "active"
+    assert ended(rig) == []
