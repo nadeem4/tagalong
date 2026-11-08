@@ -47,6 +47,8 @@ export const IPC = {
   loopsSet: 'tagalong:loops:set',
   loopForget: 'tagalong:loops:forget',
   loopsWipe: 'tagalong:loops:wipe',
+  bodiesState: 'tagalong:bodies:state',
+  whatsappSet: 'tagalong:bodies:whatsapp-set',
   listJobs: 'tagalong:jobs:list',
   stopJob: 'tagalong:jobs:stop',
   jobActivity: 'tagalong:jobs:activity',
