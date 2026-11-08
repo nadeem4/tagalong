@@ -91,8 +91,12 @@ class Approvals:
             preference_id=pref.id,
             preference_sentence=pref.sentence,
         )
+        self.preference_used(pref, facts.tool, summary)
+
+    def preference_used(self, pref: Preference, tool: str, summary: str) -> None:
+        """Count a preference's use and tell the person what Scout did under it."""
         rules.use_preference(self._memory.db, pref.id, utc_text(self._now()))
-        self._notify("approved", {"tool": facts.tool, "text": summary, "preference": pref.sentence})
+        self._notify("approved", {"tool": tool, "text": summary, "preference": pref.sentence})
 
     # Preference writes live here so every writer (Home, the offer) notifies the same way.
     def add_preference(

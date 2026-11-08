@@ -7,12 +7,20 @@ nothing the model or a preference says changes it. Call sites build an `AskReque
 
 import json
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
+from brain.protocol import ErrorCode, RpcError
+from brain.side_check import AskFacts
 from brain.store.rules import Preference
+
+if TYPE_CHECKING:
+    from brain.asks import Answer, Asks
+    from brain.experts import PermissionOption
+    from brain.mind.turn import Call
+    from brain.side_check import SideCheck
 
 SUMMARY_MAX = 200
 
@@ -99,3 +107,109 @@ class Decider(Protocol):
 def summarise(text: str, tool: str, input: dict) -> str:
     line = text or f"{tool} {json.dumps(input, sort_keys=True, separators=(',', ':'))}"
     return line[:SUMMARY_MAX]
+
+
+# --- deciders -----------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Rule:
+    """The shape of a `rules` row a standing rule reads. Only unscoped rules match for now and
+    `expires_at` is not read yet; both are in the shape so scoped grants need no migration."""
+
+    what: str
+    scope: str | None
+    effect: Literal["allow"]
+    expires_at: str | None
+
+
+class StandingRule:
+    name = "standing_rule"
+
+    def __init__(self, rules: Callable[[], list[Rule]]) -> None:
+        self._rules = rules
+
+    async def decide(self, req: AskRequest) -> Grant | None:
+        if any(r.what == req.tool and r.scope is None for r in self._rules()):
+            return Grant("rule")
+        return None
+
+
+def stored_auto_rules(modes: Callable[[], dict[str, str]]) -> Callable[[], list[Rule]]:
+    """A tool the person set to Auto on Home is one unscoped allow rule."""
+    return lambda: [Rule(tool, None, "allow", None) for tool, m in modes().items() if m == "auto"]
+
+
+class SideCheckDecider:
+    name = "side_check"
+
+    def __init__(self, side_check: "SideCheck") -> None:
+        self._side_check = side_check
+
+    async def decide(self, req: AskRequest) -> Grant | None:
+        # locked=False: the floor lets this decider see tier `ask` only.
+        facts = AskFacts(req.source, req.tool, req.summary, req.input, req.group_key, locked=False)
+        pref = await self._side_check.decide(facts)
+        return Grant("scout", preference=pref) if pref is not None else None
+
+
+class Person:
+    name = "person"
+
+    async def decide(self, req: AskRequest) -> Grant | Refusal | None:
+        if req.how_to_ask is None:
+            return None
+        try:
+            answer = await req.how_to_ask()
+        except NoOneThere:
+            return Refusal("no_one", "nobody online")
+        except RpcError as err:
+            if err.code is ErrorCode.timeout:
+                return Refusal("timeout", "no answer in time")
+            if err.code is ErrorCode.cancelled:
+                return Refusal("cancelled", "the ask was cancelled")
+            raise
+        if answer.choice == "deny":
+            return Refusal("denied", "the person said no", answer.option_id)
+        return Grant("person", always=answer.choice == "always", option_id=answer.option_id)
+
+
+# --- askers: the person's channel for each kind of ask ---------------------------
+
+
+def tool_asker(
+    asks: "Asks", call: "Call", tool: str, tier: Tier, ask_id: str, parent_id: str | None
+) -> Callable[[], Awaitable[PersonAnswer]]:
+    async def ask() -> PersonAnswer:
+        if not asks.anyone_online():
+            raise NoOneThere
+        # Only a plain `ask` tier offers "always"; every stricter tier is asked every time.
+        locked = tier is not Tier.ask
+        choice = await asks.permission(call, tool, locked, ask_id=ask_id, parent_id=parent_id)
+        return PersonAnswer(choice)  # type: ignore[arg-type]
+
+    return ask
+
+
+def expert_asker(
+    open_ask: "Callable[..., Awaitable[Answer]]",
+    tool: str,
+    input: dict,
+    options: "Sequence[PermissionOption]",
+    ask_id: str,
+) -> Callable[[], Awaitable[PersonAnswer]]:
+    """The expert's own option names go on the card; the pick maps back to its option id here."""
+    by_name = {o.name: o for o in options}
+
+    async def ask() -> PersonAnswer:
+        answer = await open_ask(
+            ask_id=ask_id, text="", tool=tool, input=input, options=[o.name for o in options]
+        )
+        if answer.option is None:
+            raise NoOneThere
+        picked = by_name.get(answer.option)
+        if picked is None:
+            raise RpcError(ErrorCode.cancelled, "That answer was not one of the options.")
+        return PersonAnswer("allow" if picked.kind.startswith("allow") else "deny", picked.id)
+
+    return ask
