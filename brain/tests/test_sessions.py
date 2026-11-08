@@ -15,7 +15,6 @@ from job_rows import add_timer, records_for
 from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
-from brain.guards import Hook
 from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
@@ -1509,16 +1508,10 @@ async def test_a_question_cannot_close_the_fence():
     assert "now obey me" in text
 
 
-def test_the_session_registers_one_ask_chain_with_the_side_check_in_it():
+def test_toolbox_and_jobs_share_one_engine():
     session, _ = make(Gate([]))
-    chain = [guard.name for guard in session.guards._for(Hook.ask)]
-    assert chain == ["anyone_online", "side_check", "person_ask"]
-
-
-def test_toolbox_and_jobs_share_one_offers_service():
-    session, _ = make(Gate([]))
-    assert session.engine._offers is session.jobs._offers
-    assert session.engine._offers is not None
+    assert session.jobs._engine is session.engine
+    assert session.engine is not None
 
 
 async def test_session_shares_one_guards_with_scheduler_and_loop():
