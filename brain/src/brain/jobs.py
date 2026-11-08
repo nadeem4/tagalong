@@ -877,8 +877,6 @@ class Jobs:
                 can_allow_once=once is not None and job is not None,  # never allow_always
             )
         )
-        if decision.code == "no_one":
-            self._on_away(job_id, f"asked permission: {request.title}")
         self._changed()
         if decision.allowed:
             # The person's own pick, else the expert's allow-once for a rule or Scout grant.

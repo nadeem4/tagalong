@@ -129,3 +129,9 @@ def test_the_picture_says_not_working_without_offering_the_install_tool():
 
 def test_capabilities_mention_work_status():
     assert "work_status" in picture()
+
+
+def test_capabilities_names_the_wait_argument():
+    assert "ask_wait_hours" not in picture()
+    line = next(ln for ln in picture(asks=True).splitlines() if "ask_wait_hours" in ln)
+    assert "1 to 168" in line and "default 72" in line

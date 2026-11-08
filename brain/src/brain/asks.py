@@ -12,11 +12,15 @@ import asyncio
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import State, TransitionRefused, WorkStore
+
+if TYPE_CHECKING:
+    from brain.permission import OpenRecord
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,14 @@ class Answer:
     )
 
 
+class AskExpired(Exception):
+    """The ask ended without an answer because the job above it ended."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 @dataclass
 class _Open:
     params: dict
@@ -35,14 +47,13 @@ class _Open:
     free_text: bool = False
 
 
-ASK_TIMEOUT_S = 300.0  # how long a permission ask waits for the person
+ASK_TIMEOUT_S = 300.0  # how long a turn-bound card (choices, offers, setup) waits
 
 
 class Asks:
-    def __init__(self, bodies: Bodies, work: WorkStore, timeout: float = ASK_TIMEOUT_S) -> None:
+    def __init__(self, bodies: Bodies, work: WorkStore) -> None:
         self._bodies = bodies
         self._work = work
-        self._timeout = timeout
         self._open: dict[str, _Open] = {}
         work.on_transition(self._row_ended)
 
@@ -57,9 +68,10 @@ class Asks:
         *,
         ask_id: str | None = None,
         parent_id: str | None = None,
+        record: "OpenRecord | None" = None,
     ) -> str:
-        if not self.anyone_online():
-            return "deny"
+        # Nobody displaying is no reason to refuse: the ask stays open, and a body that shows
+        # one later gets the open-ask replay.
         params = {
             "id": ask_id or uuid.uuid4().hex,
             "state": "open",
@@ -72,7 +84,7 @@ class Asks:
         if call.turn:  # an expert's call belongs to no turn of Scout's
             params["turn"] = call.turn
         entry = _Open(params, asyncio.get_running_loop().create_future())
-        return (await self._wait(entry, self._timeout, parent_id)).option or "deny"
+        return (await self._wait(entry, None, parent_id, record)).option or "deny"
 
     async def open(
         self,
@@ -93,7 +105,8 @@ class Asks:
             raise ValueError(f"ask {ask_id} is already open")
         if recommended is not None and recommended not in options:
             raise ValueError("recommended must be one of the options")
-        if not self.anyone_online():
+        # A job's ask waits for the person; a turn-bound card has nobody to wait for.
+        if parent_id is None and not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
         params["options"] = options
@@ -109,10 +122,16 @@ class Asks:
         entry = _Open(params, asyncio.get_running_loop().create_future(), free_text)
         return await self._wait(entry, timeout, parent_id)
 
-    async def _wait(self, entry: _Open, timeout: float | None, parent_id: str | None) -> Answer:
+    async def _wait(
+        self,
+        entry: _Open,
+        timeout: float | None,
+        parent_id: str | None,
+        record: "OpenRecord | None" = None,
+    ) -> Answer:
         ask_id = entry.params["id"]
         self._open[ask_id] = entry
-        self._record_open(entry.params, parent_id)
+        self._record_open(entry.params, parent_id, record)
         self._bodies.notify("ask", entry.params)
         try:
             async with asyncio.timeout(timeout):
@@ -157,6 +176,12 @@ class Asks:
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
         self._end_row(ask_id, "done", "answered", {"option": option})
 
+    def park(self, ask_id: str) -> None:
+        """The turn that raised this ask is over: a replayed card must not name it."""
+        entry = self._open.get(ask_id)
+        if entry is not None:
+            entry.params.pop("turn", None)
+
     def open_asks(self) -> list[dict]:
         return [dict(e.params) for e in self._open.values()]
 
@@ -171,10 +196,17 @@ class Asks:
         """The row ended from outside (its job closed, or a restart scan): the waiter is done."""
         entry = self._open.pop(work_id, None) if kind == "ask" else None
         if entry is not None and not entry.future.done():
-            entry.future.set_exception(RpcError(ErrorCode.timeout, "the job ended"))
+            row = self._work.get(work_id)
+            why = (row.end_reason if row is not None and row.end_reason else to).removeprefix(
+                "parent ended: "
+            )
+            reason = f"job ended: {why}" if row is not None and row.parent_id else why
+            entry.future.set_exception(AskExpired(reason))
             self._bodies.notify("ask", {"id": work_id, "state": "closed", "reason": "timeout"})
 
-    def _record_open(self, params: dict, parent_id: str | None) -> None:
+    def _record_open(
+        self, params: dict, parent_id: str | None, record: "OpenRecord | None" = None
+    ) -> None:
         ask_id = params["id"]
         self._work.create(
             "ask",
@@ -182,8 +214,21 @@ class Asks:
             id=ask_id,
             state="active",
             parent_id=self._work.open_goal(parent_id),
+            input=None if record is None else record.call,
+            due_at=None if record is None else record.due_at,
+            safe_to_retry=record is not None and record.safe_to_retry,
         )
-        self._work.add_ask(ask_id, tool=params.get("tool"))
+        if record is None:
+            self._work.add_ask(ask_id, tool=params.get("tool"))
+        else:
+            self._work.add_ask(
+                ask_id,
+                source=record.source,
+                tool=params.get("tool"),
+                summary=record.summary,
+                input=record.input,
+                group_key=record.group_key,
+            )
 
     def _end_row(self, ask_id: str, to: State, reason: str, data: dict | None = None) -> None:
         try:

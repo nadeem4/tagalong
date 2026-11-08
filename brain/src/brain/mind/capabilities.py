@@ -57,6 +57,7 @@ def capability_picture(
     apps: list[AppCaps],
     experts: list[ExpertCaps],
     ocr: ReadingRow | None = None,
+    asks: bool = False,
 ) -> str:
     lines = ["What you can do:", _names("Built in: ", builtin)]
     if bodies:
@@ -77,6 +78,11 @@ def capability_picture(
         lines.append("Apps connected: none")
     lines.append("Your own work (jobs, timers, what you have not told the owner yet): work_status.")
     lines.append("A step that gave up (work_failed): resolve_step with retry, skip or stop.")
+    if asks:  # a fixed line: the argument and its bounds, never Scout's wording
+        lines.append(
+            "A tool in ask mode takes ask_wait_hours (1 to 168, default 72): how long the ask "
+            "waits for the person's yes if they are away."
+        )
     if experts:
         lines.append(
             "Experts (for long or many-stepped jobs; each works only with what it is given):"

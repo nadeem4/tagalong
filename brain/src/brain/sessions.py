@@ -205,6 +205,7 @@ class Session:
             approvals,
             offer,
             set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
+            now=now,
         )
         self.records = JobRecords(work, memory.db, now)
         self.jobs = Jobs(
@@ -783,7 +784,14 @@ class Session:
             for app_id, specs in by_app.items()
         ]
         experts = [ExpertCaps(e.id, e.logged_in) for e in self._experts_live()]
-        return capability_picture(builtin, bodies, apps, experts, self.reading.ocr_problem())
+        asking = any(
+            self.toolbox.mode(s) == "ask"
+            for s in self.toolbox.active_specs()
+            if "scout" in s.audience and s.server_tool is None
+        )
+        return capability_picture(
+            builtin, bodies, apps, experts, self.reading.ocr_problem(), asks=asking
+        )
 
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:

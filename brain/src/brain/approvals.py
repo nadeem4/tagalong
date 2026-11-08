@@ -38,6 +38,10 @@ class Approvals:
         self._now = now
         self._guards = guards  # None: rows are stored as given
 
+    def mask(self, value):
+        """The log's masking, for anything saved beside it (an ask's saved call)."""
+        return value if self._guards is None else mask_json(self._guards, "approval", value)
+
     def record(
         self,
         *,
@@ -51,6 +55,7 @@ class Approvals:
         decided_by: str = "person",
         preference: Preference | None = None,
         ask_id: str | None = None,
+        reason: str | None = None,
     ) -> None:
         """`ask_id` names the open ask this decides; without one the ask row is made here.
         `preference` is the one Scout answered under: it is counted as used and the person is
@@ -80,6 +85,7 @@ class Approvals:
             decided_by,
             preference.id if preference else None,
             preference.sentence if preference else None,
+            reason,
         )
         self._notify("changed", {"what": "approvals"})
         if preference is not None:

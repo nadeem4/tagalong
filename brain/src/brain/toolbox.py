@@ -10,6 +10,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from typing import Literal, Protocol
 
 from pydantic import ValidationError
@@ -20,9 +21,11 @@ from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.outputs import OutputStore, preview
 from brain.permission import (
+    ASK_WAIT_ARG,
     AskRequest,
     Engine,
     Tier,
+    ask_wait,
     gate_tier,
     resolve_mode,
     summarise,
@@ -38,6 +41,12 @@ UNCAPPED = frozenset({"read_output"})
 NAME_MAX = 64  # the model API rejects longer tool names
 
 Handler = Callable[[dict], Awaitable[str]]
+
+_WAIT_PROPERTY = {
+    "type": "number",
+    "description": "Hours this may wait for the person's yes if they are away: 1 to 168, "
+    "default 72.",
+}
 
 
 @dataclass(frozen=True)
@@ -264,17 +273,23 @@ class Toolbox:
             if spec.server_tool is not None:
                 out.append(spec.server_tool)
                 continue
-            out.append(
-                {
-                    "name": spec.name,
-                    "description": spec.description,
-                    "input_schema": spec.input_schema,
+            schema = spec.input_schema
+            if self.mode(spec) == "ask":  # only a tool that can ask has a wait to name
+                schema = {
+                    **schema,
+                    "properties": {**schema.get("properties", {}), ASK_WAIT_ARG: _WAIT_PROPERTY},
                 }
-            )
+            out.append({"name": spec.name, "description": spec.description, "input_schema": schema})
         return out
 
     async def _ask(
-        self, call: Call, spec: ToolSpec, source_kind: str, job_id: str | None, gate: Tier
+        self,
+        call: Call,
+        spec: ToolSpec,
+        source_kind: str,
+        job_id: str | None,
+        gate: Tier,
+        wait: timedelta | None,
     ) -> None:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so."""
@@ -295,6 +310,10 @@ class Toolbox:
             job_id=job_id,
             turn_id=call.turn or None,
             ask_id=ask_id,
+            wait=wait,
+            call={"name": call.name, "input": call.input, "text": call.text}
+            if wait is not None
+            else None,
         )
         decision = await self._engine.decide(req)
         if decision.allowed:
@@ -306,8 +325,8 @@ class Toolbox:
                 raise RpcError(ErrorCode.denied, f"The user said no to {name}.")
             case "no_one":
                 raise RpcError(ErrorCode.denied, f"Nobody was there to ask, so {name} was not run.")
-            case "timeout":
-                raise RpcError(ErrorCode.timeout, "nobody answered the ask in time")
+            case "expired":
+                raise RpcError(ErrorCode.timeout, decision.reason)
             case "cancelled":
                 raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
             case _:
@@ -317,8 +336,13 @@ class Toolbox:
         self, call: Call, caller: str = "scout", job_id: str | None = None
     ) -> str | list[dict]:
         found: list = []  # [spec, source kind, ran?] once a servable tool is matched
+        # The wait is the model's to name for its own asks only; no tool, card or log sees it.
+        hours = call.input.get(ASK_WAIT_ARG)
+        if ASK_WAIT_ARG in call.input:
+            call = replace(call, input={k: v for k, v in call.input.items() if k != ASK_WAIT_ARG})
+        wait = ask_wait(hours) if caller == "scout" and job_id is None else None
         try:
-            out = await self._run(call, caller, found, job_id)
+            out = await self._run(call, caller, found, job_id, wait)
         except Exception as err:
             if found:
                 status = "failed" if found[2] else "refused"
@@ -353,7 +377,9 @@ class Toolbox:
         except Exception:
             log.exception("on_call hook failed")
 
-    async def _gate(self, call: Call, spec: ToolSpec, kind: str, job_id: str | None) -> None:
+    async def _gate(
+        self, call: Call, spec: ToolSpec, kind: str, job_id: str | None, wait: timedelta | None
+    ) -> None:
         stored = self._modes().get(spec.name)
         gate = gate_tier(spec, stored)
         if gate is Tier.off:
@@ -365,10 +391,10 @@ class Toolbox:
         # wake goes through the engine.
         if spec.follow_up and gate is not Tier.person_only and self._owner_turn(call.turn):
             return
-        await self._ask(call, spec, kind, job_id, gate)
+        await self._ask(call, spec, kind, job_id, gate, wait)
 
     async def _run(
-        self, call: Call, caller: str, found: list, job_id: str | None
+        self, call: Call, caller: str, found: list, job_id: str | None, wait: timedelta | None
     ) -> str | list[dict]:
         for source in self.sources:
             for spec in source.specs():
@@ -378,7 +404,7 @@ class Toolbox:
                     kind = getattr(source, "approval_source", "scout_tool")
                     found[:] = [spec, kind, False]
                     if caller != "home":
-                        await self._gate(call, spec, kind, job_id)
+                        await self._gate(call, spec, kind, job_id, wait)
                     found[2] = True
                     return await source.run(call, call.name)
         for source in self.sources:

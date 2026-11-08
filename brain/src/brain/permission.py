@@ -9,10 +9,12 @@ import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from brain.asks import AskExpired
 from brain.protocol import ErrorCode, RpcError
 from brain.side_check import AskFacts
 from brain.store.rules import Preference
@@ -29,6 +31,25 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 SUMMARY_MAX = 200
+
+# A Scout ask waits for the person: Scout may name how long, but never outside these bounds.
+ASK_WAIT_ARG = "ask_wait_hours"
+ASK_WAIT_DEFAULT = timedelta(days=3)
+ASK_WAIT_MIN = timedelta(hours=1)
+ASK_WAIT_MAX = timedelta(days=7)
+PARK_AFTER_S = 300.0  # how long a tool call waits in its turn before it is parked
+
+
+def ask_wait(value: object) -> timedelta:
+    """The model's hours, clamped; anything that is not a number is the default."""
+    if isinstance(value, bool) or not isinstance(value, int | float) or value != value:
+        return ASK_WAIT_DEFAULT
+    # Compared as hours before converting, so an int too big for a float still clamps.
+    if value >= ASK_WAIT_MAX / timedelta(hours=1):
+        return ASK_WAIT_MAX
+    if value <= ASK_WAIT_MIN / timedelta(hours=1):
+        return ASK_WAIT_MIN
+    return timedelta(hours=value)
 
 
 class Tier(StrEnum):
@@ -91,7 +112,28 @@ class PersonAnswer:
 
 
 class NoOneThere(Exception):
-    """Raised by an asker when nobody displaying can be asked."""
+    """Raised by an asker when a turn-bound card finds nobody displaying to ask."""
+
+
+class Parked(Exception):
+    """A Scout ask is still waiting for the person; the call did not run and the turn goes on."""
+
+    def __init__(self, ask_id: str) -> None:
+        super().__init__(ask_id)
+        self.ask_id = ask_id
+
+
+@dataclass(frozen=True)
+class OpenRecord:
+    """What an ask row saves when it opens, already masked."""
+
+    source: str
+    summary: str
+    input: dict
+    group_key: str
+    call: dict  # {"name", "input", "text"}
+    safe_to_retry: bool  # false when masking changed the call: it could not be run again as saved
+    due_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -103,12 +145,17 @@ class AskRequest:
     summary: str
     input: dict
     tier: Tier
-    how_to_ask: Callable[[], Awaitable[PersonAnswer]] | None
+    how_to_ask: Callable[..., Awaitable[PersonAnswer]] | None  # given `record` when one is set
     job_id: str | None = None
     turn_id: str | None = None
     ask_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     can_allow_once: bool = True
     offer: bool = True
+    # A Scout-owned ask only (no job, caller scout): how long it may wait, and the model's raw
+    # call. The engine masks the call into `record`, which the asker saves on the ask row.
+    wait: timedelta | None = None
+    call: dict | None = None
+    record: OpenRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -121,7 +168,7 @@ class Grant:
 
 @dataclass(frozen=True)
 class Refusal:
-    code: Literal["denied", "timeout", "cancelled", "no_one"]
+    code: Literal["denied", "expired", "cancelled", "no_one"]
     reason: str
     option_id: str | None = None
 
@@ -129,10 +176,11 @@ class Refusal:
 @dataclass(frozen=True)
 class Decision:
     kind: Literal["allow_once", "allow_always", "deny", "parked"]
-    code: str = ""  # deny: off, denied, timeout, cancelled, no_one, no_decider
+    code: str = ""  # deny: off, denied, expired, cancelled, no_one, no_decider
     decided_by: str = "none"
     option_id: str | None = None
     ask_id: str = ""
+    reason: str = ""  # plain words, never tool text
 
     @property
     def allowed(self) -> bool:
@@ -200,12 +248,15 @@ class Person:
         if req.how_to_ask is None:
             return None
         try:
-            answer = await req.how_to_ask()
+            if req.record is None:
+                answer = await req.how_to_ask()
+            else:
+                answer = await req.how_to_ask(req.record)
         except NoOneThere:
             return Refusal("no_one", "nobody online")
+        except AskExpired as err:
+            return Refusal("expired", err.reason)
         except RpcError as err:
-            if err.code is ErrorCode.timeout:
-                return Refusal("timeout", "no answer in time")
             if err.code is ErrorCode.cancelled:
                 return Refusal("cancelled", "the ask was cancelled")
             raise
@@ -220,12 +271,12 @@ class Person:
 def tool_asker(
     asks: "Asks", call: "Call", tool: str, tier: Tier, ask_id: str, parent_id: str | None
 ) -> Callable[[], Awaitable[PersonAnswer]]:
-    async def ask() -> PersonAnswer:
-        if not asks.anyone_online():
-            raise NoOneThere
+    async def ask(record: OpenRecord | None = None) -> PersonAnswer:
         # Only a plain `ask` tier offers "always"; every stricter tier is asked every time.
         locked = tier is not Tier.ask
-        choice = await asks.permission(call, tool, locked, ask_id=ask_id, parent_id=parent_id)
+        choice = await asks.permission(
+            call, tool, locked, ask_id=ask_id, parent_id=parent_id, record=record
+        )
         return PersonAnswer(choice)  # type: ignore[arg-type]
 
     return ask
@@ -261,7 +312,7 @@ _GRANTED_BY = {"standing_rule": "rule", "side_check": "scout", "person": "person
 _NEEDS_ALLOW_ONCE = frozenset({"standing_rule", "side_check"})  # an expert may offer no allow_once
 _REFUSAL_ROW = {
     "denied": ("refused", "person"),
-    "timeout": ("timed_out", "none"),
+    "expired": ("expired", "none"),
     "no_one": ("no_one", "none"),
 }
 
@@ -275,13 +326,17 @@ class Engine:
         approvals: "Approvals | None",
         offers: "Offers | None",
         set_auto: Callable[[str], None],
+        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._deciders = list(deciders)
         self._approvals = approvals  # None writes no rows
         self._offers = offers
         self._set_auto = set_auto
+        self._now = now
 
     async def decide(self, req: AskRequest) -> Decision:
+        if req.wait is not None and req.record is None:
+            req = replace(req, record=self._open_record(req))
         if req.tier is Tier.off:
             return Decision("deny", "off", ask_id=req.ask_id)
         if req.tier is Tier.auto:
@@ -308,6 +363,22 @@ class Engine:
             if isinstance(result, Refusal):
                 return self._refused(req, result)
         return Decision("deny", "no_decider", ask_id=req.ask_id)
+
+    def _open_record(self, req: AskRequest) -> OpenRecord:
+        """The ask row's saved call, masked like the log; a changed call is not safe to rerun."""
+        assert req.wait is not None
+        raw = req.call or {"name": req.tool, "input": req.input, "text": ""}
+        mask = self._approvals.mask if self._approvals is not None else lambda value: value
+        call = mask(raw)
+        return OpenRecord(
+            req.source,
+            mask(req.summary),
+            mask(req.input),
+            req.group_key,
+            call,
+            call == raw,
+            self._now() + req.wait,
+        )
 
     def _granted(self, req: AskRequest, decider: str, grant: Grant) -> Decision:
         # "Always" widens only when the person asks for it, on a tier that can be widened.
@@ -336,8 +407,8 @@ class Engine:
         # A cancelled ask is not a final outcome, so it writes no row.
         outcome, by = _REFUSAL_ROW.get(refusal.code, (None, "none"))
         if outcome is not None:
-            self._record(req, outcome, by)
-        return Decision("deny", refusal.code, by, refusal.option_id, req.ask_id)
+            self._record(req, outcome, by, reason=refusal.reason)
+        return Decision("deny", refusal.code, by, refusal.option_id, req.ask_id, refusal.reason)
 
     def _record(
         self,
@@ -345,6 +416,7 @@ class Engine:
         outcome: str,
         decided_by: str,
         preference: Preference | None = None,
+        reason: str | None = None,
     ) -> None:
         if self._approvals is None:
             return
@@ -359,4 +431,5 @@ class Engine:
             decided_by=decided_by,
             preference=preference,
             ask_id=req.ask_id,
+            reason=reason,
         )

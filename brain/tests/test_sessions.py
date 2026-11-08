@@ -2853,13 +2853,3 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
     [card] = open_asks(sent)
     session.answer(card["id"], "allow", "desktop")
     assert await task == "a.txt"
-
-
-async def test_nobody_online_still_logs_no_one():
-    memory = Memory(":memory:")
-    session, _ = make(Gate([]), memory)
-    session.toolbox.sources.insert(1, ChangeApp())
-    with pytest.raises(RpcError):
-        await session.toolbox.run(tool_call())
-    [row] = records_for(memory).work.list_asks("all", 10, None)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
