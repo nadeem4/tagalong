@@ -65,10 +65,6 @@ def gate_tier(spec: "ToolSpec", stored: str | None) -> Tier:
     if spec.tier is Tier.auto:
         return Tier.auto  # asks for itself
     own = tier(spec)
-    if own is Tier.person_only:
-        return own  # a stored auto never opens it
-    if stored == "auto":
-        return Tier.auto  # the owner's explicit unlock, a locked tool too
     if own is Tier.auto and stored == "ask":
         return Tier.ask
     return own
