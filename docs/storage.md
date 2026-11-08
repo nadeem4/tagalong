@@ -41,7 +41,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0025_memory_layers`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0026_message_body`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -158,6 +158,7 @@ The saved chat, so a restart picks the conversation back up.
   called from `sessions.py`).
 - Read by: `store/conversation.py` `load_messages` (via `mind/resume.py` `rebuild_history`) and `search`.
 - Retention: kept forever.
+- Upgrade: migration `0026_message_body` adds `body`; every old row reads `desktop`.
 - Masked: yes, through the `save` guard (`mask_message`) before saving. Image and document blocks
   are replaced by text markers and never stored.
 

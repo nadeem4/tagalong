@@ -2908,3 +2908,14 @@ async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
     session._bodies.disconnect("wa", peer)
     await finish(session)
     assert _saved_bodies(session) == ["whatsapp"]
+
+
+async def test_a_say_joining_a_whatsapp_turn_keeps_every_row_whatsapp():
+    gate = Gate(["hi"])
+    session, _ = make(gate)
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
+    join(session, "desktop")
+    session.say("wa", say("hello"))
+    assert session.say("desktop", say("also")).joined is True
+    await finish(session)
+    assert _saved_bodies(session) == ["whatsapp"]
