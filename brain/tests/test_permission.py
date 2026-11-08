@@ -530,6 +530,9 @@ def test_gate_tier_turns_a_read_set_to_ask_into_ask():
     assert gate_tier(spec(tier=Tier.auto), "ask") is Tier.auto
     assert gate_tier(spec(tier=Tier.locked), "ask") is Tier.locked
     assert gate_tier(spec(tier=Tier.person_only), "auto") is Tier.person_only
+    # A stored Auto stays a standing rule at the gate: the engine grants it and logs it.
+    assert gate_tier(spec(effect="change"), "auto") is Tier.ask
+    assert gate_tier(spec(tier=Tier.locked), "auto") is Tier.locked
 
 
 def test_body_confirm_maps_to_tier():
