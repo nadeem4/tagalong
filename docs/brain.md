@@ -14,6 +14,12 @@ uv sync
 uv run brain
 ```
 
+Once it holds the port, the brain writes its process id and creation time to `<TAGALONG_HOME>/brain.pid` while it runs and removes it on a
+clean exit. The desktop starts the brain detached and never stops it, so `uv run tagalong stop`
+ends it: it reads the pid file, checks the live process at that pid has the same creation time (a reused pid is never killed), ends it, and says `Stopped the brain.`, `The brain is
+not running.` (a stale file is removed) or `The brain did not stop (pid N).` (exit 1). On Windows
+the process is ended hard, so the brain's shutdown code does not run.
+
 It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl+C.
 
 Scout needs an Anthropic key to think, but the brain does not. With no key it still starts, logs
@@ -112,6 +118,7 @@ the total can run a little low.
 | `brain/src/brain/voice/__init__.py`    | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/voice/ears.py`        | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
+| `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                       |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 - The first message must be `hello`. Anything else, including bad JSON, gets an error and the
@@ -240,8 +247,9 @@ method, params)` writes one frame with no `seq` straight to the body's current c
 
 The desktop app (`bodies/desktop`) is a body of this brain.
 
-- `pnpm dev:desktop` starts the brain if none is running (or run `cd brain && uv run brain`
-  yourself first). The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
+- `pnpm dev:desktop` starts the brain if none is running, detached, with its output in
+  `<TAGALONG_HOME>/brain.log`; quitting the app leaves it running (`uv run tagalong stop` ends it).
+  Or run `cd brain && uv run brain` yourself first. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
   variable the brain listens on) and retries every 2 s, so either order works.
 - It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
   `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.

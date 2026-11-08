@@ -1,18 +1,19 @@
-/** Tests for launchBrain: when it spawns `uv run brain`, what it passes, and how it stops. */
+/** Tests for launchBrain: when it spawns `uv run brain`, what it passes, and that it never stops it. */
 import type { SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isLocal, launchBrain, probeAddr } from './launch';
+import { brainLogPath, isLocal, launchBrain, probeAddr } from './launch';
 import type { LaunchOptions } from './launch';
 
 class FakeChild extends EventEmitter {
   pid = 4242;
   stdout = new EventEmitter();
   stderr = new EventEmitter();
-  killed = false;
-  kill(): void {
-    this.killed = true;
+  unrefed = false;
+  unref(): void {
+    this.unrefed = true;
   }
 }
 
@@ -20,10 +21,14 @@ function setup(over: Partial<LaunchOptions> = {}) {
   const spawned: { cmd: string; args: string[]; opts: SpawnOptions }[] = [];
   const children: FakeChild[] = [];
   const err: string[] = [];
+  const opened: string[] = [];
+  const closed: number[] = [];
   const options: LaunchOptions = {
     env: {},
     brainDir: 'C:/repo/brain',
-    platform: 'win32',
+    logPath: 'C:/home/brain.log',
+    openLog: (path) => (opened.push(path), 77),
+    closeLog: (fd) => void closed.push(fd),
     probe: async () => false,
     exists: () => true,
     spawn: (cmd, args, opts) => {
@@ -35,7 +40,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
     log: { warn: (line) => err.push(line) },
     ...over,
   };
-  return { options, spawned, children, err };
+  return { options, spawned, children, err, opened, closed };
 }
 
 describe('isLocal', () => {
@@ -98,10 +103,25 @@ describe('launchBrain', () => {
     expect(spawned).toEqual([]);
   });
 
-  it('lets the child write to the terminal instead of the log', async () => {
-    const { options, spawned } = setup();
+  it('spawns the brain detached, logging to brain.log, and lets go of it', async () => {
+    const { options, spawned, children, opened, closed } = setup();
+    const result = await launchBrain(options);
+    expect(opened).toEqual(['C:/home/brain.log']);
+    expect(spawned[0]?.opts).toMatchObject({
+      detached: true,
+      stdio: ['ignore', 77, 77],
+      windowsHide: true,
+    });
+    expect(children[0]?.unrefed).toBe(true);
+    expect(closed).toEqual([77]);
+    expect(result).toBeUndefined();
+  });
+
+  it('leaves a running brain alone and opens no log', async () => {
+    const { options, spawned, opened } = setup({ probe: async () => true });
     await launchBrain(options);
-    expect(spawned[0]?.opts.stdio).toEqual(['ignore', 'inherit', 'inherit']);
+    expect(spawned).toEqual([]);
+    expect(opened).toEqual([]);
   });
 
   it('logs one line when spawning fails, and does not respawn', async () => {
@@ -119,38 +139,12 @@ describe('launchBrain', () => {
     children[0]?.emit('exit', 1);
     expect(err).toEqual(['brain exited with code 1; the desktop keeps retrying']);
   });
+});
 
-  it('stop kills the process tree on Windows', async () => {
-    const { options, spawned } = setup();
-    const handle = await launchBrain(options);
-    handle.stop();
-    expect(spawned[1]).toMatchObject({
-      cmd: 'taskkill',
-      args: ['/pid', '4242', '/t', '/f'],
-      opts: { windowsHide: true },
-    });
-  });
-
-  it('stop kills the child directly elsewhere', async () => {
-    const { options, children } = setup({ platform: 'linux' });
-    const handle = await launchBrain(options);
-    handle.stop();
-    expect(children[0]?.killed).toBe(true);
-  });
-
-  it('stop does nothing when it started no child', async () => {
-    const { options, spawned } = setup({ probe: async () => true });
-    const handle = await launchBrain(options);
-    handle.stop();
-    expect(spawned).toEqual([]);
-  });
-
-  it('stop does nothing once the child has exited', async () => {
-    const { options, children, spawned } = setup();
-    const handle = await launchBrain(options);
-    children[0]?.emit('exit', 0);
-    handle.stop();
-    expect(spawned).toHaveLength(1);
+describe('brainLogPath', () => {
+  it('follows TAGALONG_HOME, else the .tagalong folder in the home directory', () => {
+    expect(brainLogPath({ TAGALONG_HOME: 'D:/t' }, 'C:/Users/me')).toBe(join('D:/t', 'brain.log'));
+    expect(brainLogPath({}, 'C:/Users/me')).toBe(join('C:/Users/me', '.tagalong', 'brain.log'));
   });
 });
 

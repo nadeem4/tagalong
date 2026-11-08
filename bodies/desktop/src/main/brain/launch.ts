@@ -1,13 +1,15 @@
 /**
  * Starts the brain for the desktop: when the brain address is local and nothing answers
- * there, runs `uv run brain` from the repo's brain/ folder, so one command is enough.
- * It never touches a brain it did not start, and a failure only logs: the client retries.
+ * there, runs `uv run brain` from the repo's brain/ folder, detached, its output going to
+ * <TAGALONG_HOME>/brain.log. The desktop never stops it (`tagalong stop` does), so the brain
+ * outlives the app. A failure only logs: the client retries.
  */
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { connect } from 'node:net';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
@@ -15,7 +17,12 @@ export interface LaunchOptions {
   env: NodeJS.ProcessEnv;
   /** The repo's brain/ folder; absent in a packaged app, where nothing is spawned. */
   brainDir: string;
-  platform: NodeJS.Platform;
+  /** Where the detached brain's output goes. */
+  logPath: string;
+  /** Opens the log for append and returns its fd. */
+  openLog: (path: string) => number;
+  /** Closes that fd in this process once the child has its own copy. */
+  closeLog: (fd: number) => void;
   /** True when something accepts a connection at host:port. */
   probe: (addr: string) => Promise<boolean>;
   exists: (path: string) => boolean;
@@ -23,9 +30,9 @@ export interface LaunchOptions {
   log: { warn: (line: string) => void };
 }
 
-export interface BrainProcess {
-  /** Stops the child this desktop started; nothing if it started none. */
-  stop: () => void;
+/** The brain's own data folder rule (config.py): TAGALONG_HOME, else ~/.tagalong. */
+export function brainLogPath(env: NodeJS.ProcessEnv, home: string): string {
+  return join(env.TAGALONG_HOME || join(home, '.tagalong'), 'brain.log');
 }
 
 function hostOf(addr: string): string {
@@ -53,14 +60,16 @@ export function probeAddr(addr: string): Promise<boolean> {
   });
 }
 
-export function realLaunch(
-  brainDir: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<BrainProcess> {
+export function realLaunch(brainDir: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   return launchBrain({
     env,
     brainDir,
-    platform: process.platform,
+    logPath: brainLogPath(env, homedir()),
+    openLog: (path) => {
+      mkdirSync(dirname(path), { recursive: true });
+      return openSync(path, 'a');
+    },
+    closeLog: closeSync,
     probe: probeAddr,
     exists: existsSync,
     spawn: nodeSpawn,
@@ -68,21 +77,22 @@ export function realLaunch(
   });
 }
 
-export async function launchBrain(options: LaunchOptions): Promise<BrainProcess> {
-  const { env, brainDir, platform, probe, exists, spawn, log } = options;
-  const none: BrainProcess = { stop: () => undefined };
+export async function launchBrain(options: LaunchOptions): Promise<void> {
+  const { env, brainDir, logPath, openLog, closeLog, probe, exists, spawn, log } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
-  if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return none;
-  if (!exists(join(brainDir, 'pyproject.toml'))) return none;
-  if (await probe(addr)) return none;
+  if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return;
+  if (!exists(join(brainDir, 'pyproject.toml'))) return;
+  if (await probe(addr)) return;
 
+  const fd = openLog(logPath);
   const child = spawn('uv', ['run', 'brain'], {
     cwd: brainDir,
     env,
-    // The brain's own output goes to the dev terminal, not into tagalong.log as warnings.
-    stdio: ['ignore', 'inherit', 'inherit'],
+    detached: true,
+    stdio: ['ignore', fd, fd],
     windowsHide: true,
   });
+  closeLog(fd); // the child holds its own copy; ours would leak
   let running = true;
   child.on('error', (error) => {
     running = false;
@@ -93,18 +103,6 @@ export async function launchBrain(options: LaunchOptions): Promise<BrainProcess>
     running = false;
     log.warn(`brain exited with code ${code}; the desktop keeps retrying`);
   });
-
-  return {
-    stop: () => {
-      if (!running) return;
-      running = false;
-      // uv starts python as a child; /t takes the whole tree down with it.
-      if (platform === 'win32') {
-        spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true }).on(
-          'error',
-          () => undefined,
-        );
-      } else child.kill();
-    },
-  };
+  // Detached and unreferenced: quitting the app leaves the brain running.
+  child.unref();
 }

@@ -20,7 +20,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/main/index.ts`                        | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
 | `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
-| `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; stops only that child on quit                                               |
+| `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached, output to `brain.log`, never stopped                              |
 | `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
 | `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
 | `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
@@ -103,9 +103,10 @@ running.
 Before dialing, an unpackaged desktop runs `launchBrain` (`brain/launch.ts`). If the address is
 local (`127.0.0.1`, `localhost` or `::1`), the repo's `brain/` folder has a `pyproject.toml`, and a
 TCP connect to the address is refused, it spawns `uv run brain` there with the environment passed
-through; the child writes to the dev terminal, not to `tagalong.log`. If something already answers, or the address is remote, it spawns nothing. On
-quit it stops only the child it started (on Windows `taskkill /pid <pid> /t /f`, so uv's Python
-child dies too). If `uv` is missing or the child exits, it logs one line and does not respawn; the
+through, detached and unreferenced, with its output appended to `<TAGALONG_HOME>/brain.log`
+(default `~/.tagalong/brain.log`), not `tagalong.log`. If something already answers, or the address
+is remote, it spawns nothing. The desktop never stops the brain, so it keeps running after quit;
+`uv run tagalong stop` ends it. If `uv` is missing or the child exits, it logs one line and does not respawn; the
 client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
 
 - **Body tools.** `list_windows` returns visible and minimized windows as JSON text.

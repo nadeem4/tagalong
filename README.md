@@ -48,11 +48,14 @@ cd brain
 uv sync
 cd ..
 pnpm install
-pnpm dev:desktop    # starts the brain too, and stops it when you quit
+pnpm dev:desktop    # starts the brain too; it keeps running after you quit the app
 ```
 
 To run the brain on its own instead (for example on another machine), use
 `cd brain && uv run brain`; the desktop connects to it and leaves it running.
+
+The desktop never stops the brain, whoever started it. Its output goes to `~/.tagalong/brain.log`
+(or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
 To let Scout hand work to an expert (Claude Code, Codex or Gemini, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the

@@ -29,7 +29,6 @@ import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { realLaunch } from './brain/launch';
-import type { BrainProcess } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import {
@@ -193,8 +192,6 @@ app.on('window-all-closed', () => {});
 
 /** Stops the key hook that watches the talk key; nothing until it has started. */
 let stopTalkKey: () => void = () => {};
-/** The brain this app started, if any (see brain/launch.ts). */
-let brainProcess: Promise<BrainProcess> | null = null;
 
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
@@ -203,8 +200,6 @@ app.on('before-quit', () => {
   stopPresence();
   stopFocusWatch();
   desktop?.brain.stop();
-  // Only the brain this app started; a brain it found already running is left alone.
-  void brainProcess?.then((started) => started.stop());
 });
 
 async function start(): Promise<void> {
@@ -229,7 +224,10 @@ async function start(): Promise<void> {
 
   // In dev, start the brain if none is running; the client below dials it and retries.
   if (!app.isPackaged) {
-    brainProcess = realLaunch(resolve(app.getAppPath(), '..', '..', 'brain'));
+    // A failure to start the brain only logs: the client below keeps retrying.
+    realLaunch(resolve(app.getAppPath(), '..', '..', 'brain')).catch((error: unknown) =>
+      console.warn(`could not start the brain (${String(error)}); the desktop keeps retrying`),
+    );
   }
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,

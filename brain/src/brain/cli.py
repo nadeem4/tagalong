@@ -1,8 +1,9 @@
 """`tagalong`: set Tagalong up from a terminal, for a brain machine with no screen.
 
 A thin front end over the brain's own setup package (facts, registry, install, login, store,
-apps). It reads and writes the same files under TAGALONG_HOME and never talks to a running
-brain; the brain re-reads those files when it next needs them. Keys are never printed or taken
+apps). It reads and writes the same files under TAGALONG_HOME and talks to no running brain
+(except `stop`, which ends it by its pid file); the brain re-reads those files when it next
+needs them. Keys are never printed or taken
 from the command line.
 """
 
@@ -19,6 +20,7 @@ from typing import NoReturn, TextIO
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.events import Event
+from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
@@ -60,6 +62,7 @@ def _parser() -> argparse.ArgumentParser:
     p.error = _no_echo_error(p)  # type: ignore[method-assign]
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("doctor", help="show what this machine has and what is missing")
+    sub.add_parser("stop", help="stop the brain the desktop left running")
     key = sub.add_parser("key", help="the Anthropic key").add_subparsers(dest="sub", required=True)
     setter = key.add_parser("set", help="save the key (read from a hidden prompt or stdin)")
     setter.add_argument("--stdin", action="store_true", help="read the key from standard input")
@@ -88,6 +91,7 @@ def main(
     ask: Callable[[str], str] = input,
     secret: Callable[[str], str] = getpass.getpass,
     stdin: TextIO | None = None,
+    stop: Callable[[Path], str] = stop_real_brain,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -102,6 +106,8 @@ def main(
     async def go() -> None:
         if args.cmd == "doctor":
             await _doctor(home, env, reg, machine, out)
+        elif args.cmd == "stop":
+            _stop(home, stop, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -122,6 +128,20 @@ def main(
     except KeyboardInterrupt:
         return 130
     return 0
+
+
+def _stop(home: Path, stop: Callable[[Path], str], out) -> None:
+    pid = pid_path(home).read_text().strip() if pid_path(home).exists() else "?"
+    try:
+        result = stop(home)
+    except OSError:  # never a traceback for the person
+        result = "failed"
+    if result == "stopped":
+        out("Stopped the brain.")
+    elif result == "not_running":
+        out("The brain is not running.")
+    else:
+        raise _Fail(f"The brain did not stop (pid {pid}).")
 
 
 def _fact(err: Exception) -> str:
