@@ -275,7 +275,8 @@ class Engine:
             and req.tier in (Tier.ask, Tier.locked)
             and req.kind == "tool"
         )
-        pref = grant.preference
+        # Only Scout's own look approves under a preference; any other grant carries none.
+        pref = grant.preference if decider == "side_check" else None
         self._record(
             req,
             "approved",

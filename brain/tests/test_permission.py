@@ -447,3 +447,16 @@ async def test_scout_grant_marks_the_preference_used_and_notifies_approved(mem):
     [used] = [x for x in rules_store.list_preferences(mem.db) if x.id == p.id]
     assert used.use_count == 1
     assert ("approved", {"tool": "t", "text": "s", "preference": "files are fine"}) in rig.sent
+
+
+async def test_a_standing_rule_grant_never_uses_a_preference(mem):
+    p = rules_store.add_preference(
+        mem.db, sentence="files are fine", source=None, tool=None, group_key=None, at="2026-11-07"
+    )
+    rig = Rig(mem, [Fake("standing_rule", Grant("rule", preference=p))])
+    await rig.engine.decide(req())
+    [seen] = [x for x in rules_store.list_preferences(mem.db) if x.id == p.id]
+    assert seen.use_count == 0
+    assert not any(kind == "approved" for kind, _ in rig.sent)
+    [row] = rig.rows()
+    assert (row.decided_by, row.rule_id, row.rule_sentence) == ("rule", None, None)
