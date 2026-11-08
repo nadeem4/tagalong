@@ -20,7 +20,6 @@ from brain.bodies import Bodies
 from brain.builtin_guards import (
     anyone_online,
     person_ask,
-    resolve_mode,
     side_check_guard,
     tool_mode,
 )
@@ -29,7 +28,7 @@ from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
-from brain.permission import summarise
+from brain.permission import Tier, resolve_mode, summarise, tier
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 from brain.side_check import SideCheck
 
@@ -50,11 +49,10 @@ class ToolSpec:
     audience: frozenset[str] = frozenset({"scout"})  # the design's `for`; a Python keyword
     effect: Literal["read", "change"] = "change"  # unknown effect is treated as a change
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
-    locked: bool = False  # asks until the person sets it to auto; no "Always" button
-    self_asks: bool = False  # runs its own ask with the user, so the gate adds none
-    # Only the person may allow it, every time: no stored Auto, no Scout approval under a
-    # preference. Set it with `locked` (which also hides the Always button).
-    person_only: bool = False
+    # A fixed floor set by the source: `person_only` (only the person, every time), `locked` (asks
+    # until the person sets it to auto; no "Always" button) or `auto` (runs its own ask, so the
+    # gate adds none). None: the tier comes from `default_mode` or `effect`. See permission.tier.
+    tier: Tier | None = None
     # A nudge or follow-up on an expert's job: the owner's own chat message counts as the yes, so
     # on an owner-driven turn the gate adds no ask; on a wake turn it asks like any ask-mode tool.
     follow_up: bool = False
@@ -136,8 +134,13 @@ class BodySource:
                 tool.input_schema,
                 effect=tool.effect or "change",
                 # "always" (delete, overwrite): person only, never Auto.
-                locked=tool.confirm is True or tool.confirm == "always",
-                person_only=tool.confirm == "always",
+                tier=(
+                    Tier.person_only
+                    if tool.confirm == "always"
+                    else Tier.locked
+                    if tool.confirm is True
+                    else None
+                ),
             )
             for body_id, tools in sorted(tools_by_body.items())
             for tool in tools
@@ -232,9 +235,9 @@ class Toolbox:
                 ErrorCode.invalid_params, f"{name} runs on Anthropic's side; Off or Auto."
             )
         if mode == "auto":  # Off and Ask are always the owner's to choose
-            if spec.self_asks:
+            if spec.tier is Tier.auto:
                 raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
-            if spec.person_only:
+            if tier(spec) is Tier.person_only:
                 raise RpcError(ErrorCode.invalid_params, f"{name} always needs your yes.")
         self._save_mode(name, mode)
 
@@ -312,6 +315,8 @@ class Toolbox:
                     ask_id=ask_id,
                 )
 
+        floor = tier(spec)
+        fixed = floor in (Tier.locked, Tier.person_only)  # no Always button
         if spec.card is not None:
             call = replace(call, input=await spec.card(call.input))
         summary = summarise(call.text, spec.name, call.input)
@@ -321,13 +326,11 @@ class Toolbox:
             summary,
             call.input,
             spec.name,
-            spec.locked,
+            fixed,
             call.turn or None,
-            lambda: self._asks.permission(
-                call, spec.name, spec.locked, ask_id=ask_id, parent_id=job_id
-            ),
+            lambda: self._asks.permission(call, spec.name, fixed, ask_id=ask_id, parent_id=job_id),
             job_id=job_id,
-            person_only=spec.person_only,
+            person_only=floor is Tier.person_only,
         )
         verdict = await self._guards.run(Hook.ask, ctx)
         if verdict.kind in ("block", "stop"):
@@ -353,7 +356,7 @@ class Toolbox:
         record("approved")
         if verdict.value == "always":
             self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
-        elif self._offers is not None and not spec.person_only:
+        elif self._offers is not None and floor is not Tier.person_only:
             self._offers.consider(spec.name, source_kind, spec.name)
 
     async def run(

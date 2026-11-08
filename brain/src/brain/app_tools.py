@@ -34,6 +34,7 @@ from brain.apps import (
 )
 from brain.bodies import Bodies
 from brain.mind.turn import Call
+from brain.permission import Tier, tier
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import NAME_MAX, SEP, Handler, ToolSpec
 from brain.tools import Notify, _fence_safe
@@ -43,8 +44,11 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("brain")
 
-# Whole words that mean money or data leaves or is lost; these always ask.
-RISKY = frozenset({"send", "delete", "remove", "destroy", "trash", "pay", "charge"})
+# Whole words that mean money leaves or data is lost for good: only the person may allow these,
+# every time. The next set may be unlocked on Home. Neither is Scout's to approve under a preference
+# unless Home unlocked it.
+PERSON_ONLY_WORDS = frozenset({"pay", "charge", "delete"})
+LOCKED_WORDS = frozenset({"send", "remove", "destroy", "trash"})
 
 
 def _words(name: str) -> list[str]:
@@ -53,12 +57,18 @@ def _words(name: str) -> list[str]:
     return [w.lower() for w in re.split(r"[_\-. ]+", spaced) if w]
 
 
-def classify(tool: Tool) -> tuple[Literal["read", "change"], bool]:
-    """Return (effect, locked). No annotations means a change; risk wins over hints."""
+def classify(tool: Tool) -> tuple[Literal["read", "change"], Tier]:
+    """Return (effect, floor). No annotations means a change; risk wins over hints."""
     hints = tool.annotations
-    locked = bool(hints and hints.destructive_hint) or bool(RISKY & set(_words(tool.name)))
-    read = bool(hints and hints.read_only_hint) and not locked
-    return ("read" if read else "change"), locked
+    words = set(_words(tool.name))
+    if PERSON_ONLY_WORDS & words:
+        floor = Tier.person_only
+    elif LOCKED_WORDS & words or (hints and hints.destructive_hint):
+        floor = Tier.locked
+    else:
+        floor = Tier.ask
+    read = bool(hints and hints.read_only_hint) and floor is Tier.ask
+    return ("read" if read else "change"), floor
 
 
 def _tool_part(name: str, app_id: str) -> str:
@@ -70,7 +80,7 @@ def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
     part = _tool_part(tool.name, app_id)
     if not part:
         return None
-    effect, locked = classify(tool)
+    effect, floor = classify(tool)
     return ToolSpec(
         f"{app_id}{SEP}{part}",
         tool.description or "",
@@ -78,7 +88,7 @@ def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
         frozenset({"scout", "expert"}),  # an expert reaches an app only through the bridge
         effect=effect,
         default_mode="ask",  # an app's own hints never open it: the person decides
-        locked=locked,
+        tier=floor if floor is not Tier.ask else None,  # only a fixed floor is set on the spec
     )
 
 
@@ -230,7 +240,11 @@ def app_home_tools(
         for row in memory.list_apps():
             status = apps.status(row.id)
             tools = [
-                {"name": s.name, "effect": s.effect, "locked": s.locked}
+                {
+                    "name": s.name,
+                    "effect": s.effect,
+                    "locked": tier(s) in (Tier.locked, Tier.person_only),
+                }
                 for s in specs_for(row.id, apps.tools(row.id))
             ]
             rows.append(

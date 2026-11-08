@@ -11,6 +11,7 @@ import pytest
 from mcp.types import Tool, ToolAnnotations
 
 from brain.app_tools import _words, classify, spec_for, specs_for
+from brain.permission import Tier
 from brain.toolbox import NAME_MAX, Toolbox
 
 
@@ -24,20 +25,36 @@ def tool(name: str, read_only: bool | None = None, destructive: bool | None = No
 @pytest.mark.parametrize(
     ("t", "expected"),
     [
-        (tool("list_files", read_only=True, destructive=False), ("read", False)),
-        (tool("list_files", read_only=True), ("read", False)),
-        (tool("list_files"), ("change", False)),
-        (tool("write_file", read_only=False), ("change", False)),
-        (tool("wipe", destructive=True), ("change", True)),
-        (tool("sendEmail", read_only=True), ("change", True)),
-        (tool("delete-file", read_only=True), ("change", True)),
-        (tool("trash message", read_only=True), ("change", True)),
-        (tool("pay.invoice"), ("change", True)),
-        (tool("resend_status", read_only=True), ("read", False)),
+        (tool("list_files", read_only=True, destructive=False), ("read", Tier.ask)),
+        (tool("list_files", read_only=True), ("read", Tier.ask)),
+        (tool("list_files"), ("change", Tier.ask)),
+        (tool("write_file", read_only=False), ("change", Tier.ask)),
+        (tool("wipe", destructive=True), ("change", Tier.locked)),
+        (tool("sendEmail", read_only=True), ("change", Tier.locked)),
+        (tool("remove-file", read_only=True), ("change", Tier.locked)),
+        (tool("trash message", read_only=True), ("change", Tier.locked)),
+        (tool("destroy_all"), ("change", Tier.locked)),
+        (tool("pay.invoice"), ("change", Tier.person_only)),
+        (tool("charge_card", read_only=True), ("change", Tier.person_only)),
+        (tool("delete-file", read_only=True), ("change", Tier.person_only)),
+        (tool("pay_and_send"), ("change", Tier.person_only)),  # person_only words win
+        (tool("pay", destructive=True), ("change", Tier.person_only)),
+        (tool("resend_status", read_only=True), ("read", Tier.ask)),
     ],
 )
 def test_classify(t, expected):
     assert classify(t) == expected
+
+
+def test_classify_pay_charge_delete_are_person_only():
+    for name in ("pay_invoice", "chargeCard", "delete.file"):
+        assert classify(tool(name))[1] is Tier.person_only
+
+
+def test_classify_send_remove_destroy_trash_or_hint_are_locked():
+    for name in ("send_mail", "removeItem", "destroy", "trash-it"):
+        assert classify(tool(name))[1] is Tier.locked
+    assert classify(tool("wipe", destructive=True))[1] is Tier.locked
 
 
 def test_words_split_on_separators_and_camel_case():
@@ -55,7 +72,7 @@ def test_spec_for_builds_a_spec_for_scout_and_experts():
     assert spec.input_schema == {"type": "object"}
     assert spec.audience == frozenset({"scout", "expert"})
     assert spec.effect == "read"
-    assert not spec.locked
+    assert spec.tier is None
 
 
 def test_missing_description_becomes_empty_string():
@@ -113,6 +130,13 @@ def test_toolbox_modes_follow_classification():
     assert _mode(tool("list", read_only=True)) == "ask"  # apps ask until the person changes it
     assert _mode(tool("write")) == "ask"
     assert _mode(tool("sendEmail", read_only=True)) == "ask"
+    assert _mode(tool("pay_invoice")) == "ask"
+
+
+def test_spec_for_sets_a_tier_only_for_a_fixed_floor():
+    assert spec_for("a", tool("sendEmail")).tier is Tier.locked
+    assert spec_for("a", tool("pay_invoice")).tier is Tier.person_only
+    assert spec_for("a", tool("write")).tier is None
 
 
 # ---- Task 4: results and AppSource ----

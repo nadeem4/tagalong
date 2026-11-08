@@ -70,8 +70,8 @@ def pref(mem, sentence="Fine to read files in the repo"):
     )
 
 
-def facts(locked=False, tool="Read"):
-    return AskFacts("claude_code", tool, "Read a file", {"path": "a"}, "/repo", locked)
+def facts(tool="Read"):
+    return AskFacts("claude_code", tool, "Read a file", {"path": "a"}, "/repo")
 
 
 def check(mem, model, budget=None, timeout=20.0):
@@ -127,42 +127,17 @@ def named(mem, tool="Read", sentence="Fine to read files in the repo"):
     )
 
 
-async def test_side_check_locked_without_a_naming_preference_makes_no_model_call(mem):
-    p = pref(mem)  # general: names no tool
-    rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
-    model = Model(approve(p.id))
-    assert await check(mem, model).decide(facts(locked=True)) is None
-    assert model.calls == 0
-
-
-async def test_side_check_locked_with_general_preference_and_default_present_is_none(mem):
-    p = pref(mem)
-    assert any(p.builtin for p in rules.list_preferences(mem.db))
-    model = Model(approve(p.id))
-    assert await check(mem, model).decide(facts(locked=True)) is None
-    assert model.calls == 0
-
-
-async def test_side_check_locked_approves_under_a_preference_naming_the_tool(mem):
-    p = named(mem, tool="Read")
-    assert await check(mem, Model(approve(p.id))).decide(facts(locked=True)) == p
-
-
-async def test_side_check_locked_candidates_exclude_other_tools_preferences(mem):
+async def test_side_check_never_sees_a_tool_naming_preference_as_special(mem):
+    # The floor decides which asks Scout sees (tier `ask` only); inside that, a preference that
+    # names a tool is a candidate like any other, and the default shows as context only.
     mine = named(mem, tool="Read")
     other = named(mem, tool="Write", sentence="Fine to write files")
     general = pref(mem, "Anything in the repo is fine")
-    model = Model(approve(mine.id))
-    await check(mem, model).decide(facts(locked=True))
+    model = Model(approve(general.id))
+    assert await check(mem, model).decide(facts()) == general
     text = str(model.seen[0][1])
-    assert mine.sentence in text
-    assert other.sentence not in text and general.sentence not in text
-    assert await check(mem, Model(approve(other.id))).decide(facts(locked=True)) is None
-
-
-async def test_side_check_locked_unknown_preference_id_is_none(mem):
-    named(mem, tool="Read")
-    assert await check(mem, Model(approve(999))).decide(facts(locked=True)) is None
+    assert mine.sentence in text and other.sentence in text and "(default)" in text
+    assert await check(mem, Model(approve(mine.id))).decide(facts()) == mine
 
 
 async def test_preference_removed_while_thinking_is_a_pass(mem):
@@ -222,7 +197,7 @@ async def test_history_for_the_same_tool_is_shown(mem):
 async def test_a_huge_input_is_truncated_in_the_prompt(mem):
     pref(mem)
     model = Model(PASS)
-    big = AskFacts("claude_code", "Write", "Write a file", {"text": "x" * 50_000}, "/repo", False)
+    big = AskFacts("claude_code", "Write", "Write a file", {"text": "x" * 50_000}, "/repo")
     await check(mem, model).decide(big)
     text = model.seen[0][1][0]["content"]
     assert "x" * 100 in text and len(text) < 8_000

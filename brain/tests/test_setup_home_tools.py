@@ -10,6 +10,7 @@ import pytest
 
 from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine
 from brain.setup.home_tools import SetupProgress, home_setup_tools
@@ -228,7 +229,10 @@ async def test_every_tool_is_home_only_and_setup_ones_ask_for_themselves(tmp_pat
     for name in ("setup_overview", "setup_expert", "setup_app"):
         assert rig.tools[name][0].audience == frozenset({"home"})
     assert rig.tools["setup_overview"][0].effect == "read"
-    assert rig.tools["setup_expert"][0].self_asks and rig.tools["setup_app"][0].self_asks
+    assert (
+        rig.tools["setup_expert"][0].tier is Tier.auto
+        and rig.tools["setup_app"][0].tier is Tier.auto
+    )
 
 
 async def test_a_failed_install_is_reported_until_the_next_try(tmp_path):

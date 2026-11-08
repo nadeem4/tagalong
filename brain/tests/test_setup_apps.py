@@ -18,6 +18,7 @@ from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.permission import Tier, resolve_mode
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.apps import app_params, app_setup_tools
@@ -25,7 +26,7 @@ from brain.setup.facts import Machine, NodePaths, ToolVersion, node_paths
 from brain.setup.install import InstallError, NoBuild
 from brain.setup.paths import node_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
-from brain.toolbox import BrainSource, resolve_mode
+from brain.toolbox import BrainSource
 from brain.toolbox import Toolbox as RealToolbox
 
 FIX = Path(__file__).parent / "fixtures"
@@ -299,7 +300,7 @@ def rig(tmp_path):
 async def test_the_tool_is_locked_person_only_with_a_card(rig):
     spec = rig().spec
     assert spec.name == "install_app" and spec.effect == "change"
-    assert spec.locked and spec.person_only and spec.card is not None
+    assert spec.tier is Tier.person_only and spec.card is not None
     assert resolve_mode(spec, "auto") == "ask"
 
 

@@ -9,7 +9,7 @@ hook then runs anyone_online, side_check_guard and person_ask in that order.
 import dataclasses
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from brain.guards import (
     ALLOW,
@@ -29,7 +29,7 @@ from brain.guards import (
 from brain.protocol import ErrorCode, RpcError
 
 if TYPE_CHECKING:
-    from brain.toolbox import ToolSpec
+    pass
 
 log = logging.getLogger("brain")
 _WINDOW = 3600  # seconds in the rolling wake-cap window
@@ -86,28 +86,13 @@ def spend_guards(budget, cap: int) -> Guards:
     return guards
 
 
-def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["off", "ask", "auto"]:
-    """The mode a tool runs in; Home's permission list uses this too, so both always agree."""
-    if stored == "off":
-        return "off"  # the owner's switch beats every flag, self-asking and person-only too
-    if spec.self_asks:
-        return "auto"
-    if spec.person_only:
-        return "ask"  # a stored auto never opens it
-    if stored in ("ask", "auto"):
-        return stored  # for a locked tool too: the Home switch is its explicit unlock
-    if spec.locked:
-        return "ask"  # default_mode and effect never open a locked tool
-    if spec.default_mode is not None:
-        return spec.default_mode
-    return "auto" if spec.effect == "read" else "ask"
-
-
 def tool_mode(
     modes: Callable[[], dict[str, str]],
     owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
 ) -> Guard:
     def check(ctx: ToolCallCtx) -> Verdict:
+        from brain.permission import Tier, resolve_mode, tier  # permission imports this module
+
         if ctx.caller == "home":
             return ALLOW
         mode = resolve_mode(ctx.spec, modes().get(ctx.spec.name))
@@ -117,7 +102,11 @@ def tool_mode(
         if mode == "ask":
             # A follow-up the owner asked for in chat is already their yes; one Scout starts
             # on a wake goes through the ask chain.
-            if ctx.spec.follow_up and not ctx.spec.person_only and owner_turn(ctx.turn_id):
+            if (
+                ctx.spec.follow_up
+                and tier(ctx.spec) is not Tier.person_only
+                and owner_turn(ctx.turn_id)
+            ):
                 return ALLOW
             return ask("needs your yes")
         return ALLOW
@@ -136,11 +125,13 @@ def anyone_online(asks) -> Guard:
 
 def side_check_guard(side_check, approvals) -> Guard:
     async def check(ctx: AskCtx) -> Verdict:
-        if not ctx.can_approve or ctx.person_only:
+        if (
+            not ctx.can_approve or ctx.person_only or ctx.locked
+        ):  # the floor: Scout never sees these
             return ALLOW
         from brain.side_check import AskFacts  # side_check imports this module
 
-        facts = AskFacts(ctx.source, ctx.tool, ctx.summary, ctx.input, ctx.group_key, ctx.locked)
+        facts = AskFacts(ctx.source, ctx.tool, ctx.summary, ctx.input, ctx.group_key)
         try:
             pref = await side_check.decide(facts)
             if pref is None:

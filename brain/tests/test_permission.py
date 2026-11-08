@@ -26,13 +26,17 @@ from brain.permission import (
     StandingRule,
     Tier,
     expert_asker,
+    gate_tier,
+    resolve_mode,
     stored_auto_rules,
     summarise,
+    tier,
     tool_asker,
 )
 from brain.protocol import ErrorCode, RpcError
 from brain.store import rules as rules_store
 from brain.store.rules import Preference
+from brain.toolbox import BodySource, ToolSpec
 
 
 def test_allowed_table_is_the_floor():
@@ -109,13 +113,12 @@ async def test_side_check_decider_grants_under_the_preference():
     grant = await decider.decide(req())
     assert grant == Grant("scout", preference=pref())
     f = check.facts
-    assert (f.source, f.tool, f.summary, f.input, f.group_key, f.locked) == (
+    assert (f.source, f.tool, f.summary, f.input, f.group_key) == (
         "scout_tool",
         "t",
         "s",
         {"a": 1},
         "t",
-        False,
     )
 
 
@@ -447,3 +450,92 @@ async def test_scout_grant_marks_the_preference_used_and_notifies_approved(mem):
     [used] = [x for x in rules_store.list_preferences(mem.db) if x.id == p.id]
     assert used.use_count == 1
     assert ("approved", {"tool": "t", "text": "s", "preference": "files are fine"}) in rig.sent
+
+
+async def test_a_standing_rule_grant_never_uses_a_preference(mem):
+    p = rules_store.add_preference(
+        mem.db, sentence="files are fine", source=None, tool=None, group_key=None, at="2026-11-07"
+    )
+    rig = Rig(mem, [Fake("standing_rule", Grant("rule", preference=p))])
+    await rig.engine.decide(req())
+    [seen] = [x for x in rules_store.list_preferences(mem.db) if x.id == p.id]
+    assert seen.use_count == 0
+    assert not any(kind == "approved" for kind, _ in rig.sent)
+    [row] = rig.rows()
+    assert (row.decided_by, row.rule_id, row.rule_sentence) == ("rule", None, None)
+
+
+# --- one tier per tool -----------------------------------------------------------------------
+
+
+def spec(**kw) -> ToolSpec:
+    return ToolSpec("t", "d", {"type": "object"}, **kw)
+
+
+@pytest.mark.parametrize(
+    ("kw", "stored", "expected"),
+    [
+        # stored off beats everything: every flag, self-asking and person-only too
+        ({}, "off", "off"),
+        ({"tier": Tier.auto}, "off", "off"),
+        ({"tier": Tier.person_only}, "off", "off"),
+        ({"tier": Tier.locked}, "off", "off"),
+        # a self-asking tool is auto
+        ({"tier": Tier.auto}, None, "auto"),
+        ({"tier": Tier.auto}, "ask", "auto"),
+        # person-only is ask even with a stored auto
+        ({"tier": Tier.person_only}, None, "ask"),
+        ({"tier": Tier.person_only}, "auto", "ask"),
+        ({"tier": Tier.person_only}, "ask", "ask"),
+        # a locked tool: the stored choice is its unlock; otherwise ask, ignoring default and read
+        ({"tier": Tier.locked}, "auto", "auto"),
+        ({"tier": Tier.locked}, "ask", "ask"),
+        ({"tier": Tier.locked}, None, "ask"),
+        ({"tier": Tier.locked, "default_mode": "auto"}, None, "ask"),
+        ({"tier": Tier.locked, "effect": "read"}, None, "ask"),
+        # default_mode beats effect
+        ({"effect": "read", "default_mode": "ask"}, None, "ask"),
+        ({"effect": "change", "default_mode": "auto"}, None, "auto"),
+        # a read is auto, a change is ask; a stored choice wins
+        ({"effect": "read"}, None, "auto"),
+        ({"effect": "change"}, None, "ask"),
+        ({}, None, "ask"),  # unknown effect is a change
+        ({"effect": "read"}, "ask", "ask"),
+        ({"effect": "change"}, "auto", "auto"),
+    ],
+)
+def test_resolve_mode_keeps_every_old_answer(kw, stored, expected):
+    assert resolve_mode(spec(**kw), stored) == expected
+
+
+def test_tier_from_spec():
+    assert tier(spec(tier=Tier.locked, default_mode="auto")) is Tier.locked
+    assert tier(spec(default_mode="auto", effect="change")) is Tier.auto
+    assert tier(spec(default_mode="ask", effect="read")) is Tier.ask
+    assert tier(spec(effect="read")) is Tier.auto
+    assert tier(spec(effect="change")) is Tier.ask
+    assert tier(spec()) is Tier.ask
+
+
+def test_gate_tier_turns_a_read_set_to_ask_into_ask():
+    assert gate_tier(spec(effect="read"), "ask") is Tier.ask
+    assert gate_tier(spec(effect="read"), None) is Tier.auto
+    assert gate_tier(spec(effect="read"), "auto") is Tier.auto
+    assert gate_tier(spec(effect="change"), "ask") is Tier.ask
+    assert gate_tier(spec(effect="change"), "off") is Tier.off
+    assert gate_tier(spec(tier=Tier.auto), "ask") is Tier.auto
+    assert gate_tier(spec(tier=Tier.locked), "ask") is Tier.locked
+    assert gate_tier(spec(tier=Tier.person_only), "auto") is Tier.person_only
+
+
+def test_body_confirm_maps_to_tier():
+    from brain.protocol import Tool
+
+    def specs(confirm):
+        extra = {} if confirm is None else {"confirm": confirm}
+        tool = Tool(name="x", description="d", input_schema={"type": "object"}, **extra)
+        return BodySource._specs_of({"b": [tool]})[0]
+
+    assert specs(None).tier is None
+    assert specs(True).tier is Tier.locked
+    assert specs("always").tier is Tier.person_only

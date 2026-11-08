@@ -23,6 +23,7 @@ from brain.apps import AppError, Apps, OpenUrl, TokenFile
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine
 from brain.setup.install import (
@@ -283,8 +284,7 @@ def app_setup_tools(
             "required": ["id"],
         },
         effect="change",
-        locked=True,  # the card has no Always button
-        person_only=True,  # only the person allows it, every time
+        tier=Tier.person_only,  # only the person allows it, every time; no Always button
         card=card,
     )
 

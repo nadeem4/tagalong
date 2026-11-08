@@ -13,6 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from brain.events import Event
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine, RunCmd
 from brain.setup.install import InstallError, install_card, install_expert
@@ -123,8 +124,7 @@ def expert_setup_tools(
         "later as a setup_done event.",
         _ID_SCHEMA,
         effect="change",
-        locked=True,  # the card has no Always button
-        person_only=True,  # only the person allows it, every time
+        tier=Tier.person_only,  # only the person allows it, every time; no Always button
         card=card,
     )
     return [(spec, install)], stop
@@ -183,8 +183,7 @@ def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler
         "the end comes later as a setup_login event. Never ask for or relay a code or link.",
         _ID_SCHEMA,
         effect="change",
-        locked=True,
-        person_only=True,
+        tier=Tier.person_only,
         card=card,
     )
     return [(spec, login)]
