@@ -364,7 +364,7 @@ message `{type: 'status'}` and shows:
 
 You can ask Scout out loud from the popup. The browser only listens: it says `display: false`, so
 Scout's spoken answer plays on the desktop, together with the text in the bubble. With only the
-browser online the ask is refused, as for any ask (see "Only the browser is online").
+browser online an approval Scout needs waits for the desktop, as for any ask (see "Only the browser is online").
 
 Audio goes only to your own brain and is never stored; with the brain on this computer it never
 leaves it. The microphone is open only while **Done talking** is showing.
@@ -490,7 +490,7 @@ unpacked**.
 | `tab_actions`, Chrome refuses    | `tool_failed`: "I could not close that tab: ..." with the reason          |
 | Only the browser is online       | Scout can still read tabs, but an ask waits for the desktop; see below    |
 | Ask from the page, brain down    | Waits up to 5 s for the link, then drops it; the popup says it is down    |
-| `tab_actions`, only browser up   | Refused at once: the approval has nowhere to show                         |
+| `tab_actions`, only browser up   | Waits for the desktop: the ask parks and shows when it joins              |
 
 ## Only the browser is online
 

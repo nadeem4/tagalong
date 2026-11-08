@@ -301,3 +301,12 @@ async def test_the_claim_is_released_when_the_decision_ends():
     await rig.settle()
     await rig.box.run(call(call_id="c2"))
     assert len(rig.opened()) == 2
+
+
+async def test_a_parked_id_is_forgotten_once_the_ask_ends():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    assert ask_id in rig.asks._parked
+    rig.asks.answer(ask_id, "deny", "desktop")
+    await rig.settle()
+    assert rig.asks._parked == set()

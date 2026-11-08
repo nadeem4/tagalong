@@ -148,6 +148,8 @@ class Asks:
         except asyncio.CancelledError:
             self._close(ask_id, "cancelled")
             raise
+        finally:
+            self._parked.discard(ask_id)  # answered, timed out, cancelled or ended with its job
 
     def cancel_all(self, ask_ids: Iterable[str]) -> None:
         """Close the named open asks as cancelled; their waiters get a cancelled error."""
