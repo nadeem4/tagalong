@@ -70,6 +70,8 @@ class FakeBrain {
 function fakeFetch() {
   const bodies: { to: string; text: { body: string } }[] = [];
   const fn = (async (_url: string | URL | Request, init?: RequestInit) => {
+    // A slow first send would let a second turn's parts slip in between.
+    await new Promise((r) => setTimeout(r, bodies.length === 0 ? 30 : 0));
     bodies.push(JSON.parse(String(init?.body)));
     return new Response('{}', { status: 200 });
   }) as typeof fetch;
@@ -180,6 +182,20 @@ describe('bridge', () => {
     brain.reply('whatsapp', { done: true });
     await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
     expect(graph.bodies.map((b) => b.text.body)).toEqual([first, second]);
+  });
+
+  test('test_parts_of_two_turns_never_interleave', async () => {
+    const { brain, graph, inbound } = await setup();
+    await online(brain);
+    await inbound('hi');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
+    const a = ['a'.repeat(3000), 'b'.repeat(3000)];
+    brain.reply('whatsapp', { delta: a.join('\n\n') }, 't1');
+    brain.reply('whatsapp', { delta: 'second turn' }, 't2');
+    brain.reply('whatsapp', { done: true }, 't1');
+    brain.reply('whatsapp', { done: true }, 't2');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(3));
+    expect(graph.bodies.map((b) => b.text.body)).toEqual([...a, 'second turn']);
   });
 
   test('test_replies_for_other_bodies_are_not_sent', async () => {

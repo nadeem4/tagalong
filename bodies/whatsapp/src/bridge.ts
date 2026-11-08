@@ -10,7 +10,7 @@ import type { WhatsAppConfig } from './config';
 import { createGraph } from './graph';
 import { splitReply } from './split';
 import { createWebhook, type Inbound } from './webhook';
-import { Window } from './window';
+import { ReplyWindow } from './window';
 
 export const BODY = { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp' } as const;
 export const CONTEXT = {
@@ -32,7 +32,7 @@ export function createBridge(deps: BridgeDeps): {
   webhook: Server;
 } {
   const { config, openSocket, now = Date.now, log = () => undefined } = deps;
-  const window = new Window(now);
+  const window = new ReplyWindow(now);
   const graph = createGraph({
     phoneNumberId: config.phoneNumberId,
     accessToken: config.accessToken,
@@ -41,6 +41,9 @@ export function createBridge(deps: BridgeDeps): {
   });
   // Reply text per turn, held until that turn's `done`.
   const buffers = new Map<string, string[]>();
+
+  // One chain for all sends, so parts of two turns never interleave.
+  let sending: Promise<void> = Promise.resolve();
 
   const flush = async (turn: string): Promise<void> => {
     const text = (buffers.get(turn) ?? []).join('');
@@ -58,7 +61,7 @@ export function createBridge(deps: BridgeDeps): {
     const parsed = ReplyParams.safeParse(params);
     if (!parsed.success || parsed.data.body !== BODY.id) return;
     const reply = parsed.data;
-    if ('done' in reply && reply.done) void flush(reply.turn);
+    if ('done' in reply && reply.done) sending = sending.then(() => flush(reply.turn));
     else if ('delta' in reply) {
       const parts = buffers.get(reply.turn) ?? [];
       parts.push(reply.delta);

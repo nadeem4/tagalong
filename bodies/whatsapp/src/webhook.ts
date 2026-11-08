@@ -23,13 +23,21 @@ const SEEN_LIMIT = 1000;
 function validSignature(secret: string, raw: Buffer, header: string | undefined): boolean {
   if (!header) return false;
   const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`);
-  const given = Buffer.from(header);
-  // timingSafeEqual throws on unequal lengths.
-  return given.length === expected.length && timingSafeEqual(given, expected);
+  return safeEqual(header, expected.toString());
 }
 
-/** Reads the raw body, or null when it goes over the cap. */
-function readBody(req: IncomingMessage, max: number): Promise<Buffer | null> {
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  // timingSafeEqual throws on unequal lengths.
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** Numbers arrive as digits only; the person may have typed "+1 (555) ...". */
+const digits = (s: string): string => s.replace(/\D/g, '');
+
+/** Reads the raw body; 'over' past the cap, 'error' when the socket failed. */
+function readBody(req: IncomingMessage, max: number): Promise<Buffer | 'over' | 'error'> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -40,13 +48,13 @@ function readBody(req: IncomingMessage, max: number): Promise<Buffer | null> {
       if (size > max) {
         over = true;
         chunks.length = 0;
-        resolve(null);
+        resolve('over');
         return;
       }
       chunks.push(chunk);
     });
     req.on('end', () => !over && resolve(Buffer.concat(chunks)));
-    req.on('error', () => resolve(null));
+    req.on('error', () => resolve('error'));
   });
 }
 
@@ -86,7 +94,7 @@ export function createWebhook(options: WebhookOptions): Server {
   const verify = (url: URL, res: ServerResponse): void => {
     const ok =
       url.searchParams.get('hub.mode') === 'subscribe' &&
-      url.searchParams.get('hub.verify_token') === config.verifyToken;
+      safeEqual(url.searchParams.get('hub.verify_token') ?? '', config.verifyToken);
     if (!ok) return void res.writeHead(403).end();
     res
       .writeHead(200, { 'content-type': 'text/plain' })
@@ -95,7 +103,8 @@ export function createWebhook(options: WebhookOptions): Server {
 
   const receive = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const raw = await readBody(req, maxBodyBytes);
-    if (raw === null) {
+    if (raw === 'error') return void res.destroy();
+    if (raw === 'over') {
       // Stop a sender that keeps streaming past the cap once the refusal is out.
       res.on('finish', () => req.destroy());
       return void res.writeHead(413, { connection: 'close' }).end();
@@ -114,7 +123,7 @@ export function createWebhook(options: WebhookOptions): Server {
     }
     for (const m of textMessages(parsed)) {
       if (m.type !== 'text' || typeof m.id !== 'string') continue;
-      if (m.from !== config.allowedNumber) continue;
+      if (typeof m.from !== 'string' || digits(m.from) !== digits(config.allowedNumber)) continue;
       const body = m.text?.body;
       if (typeof body !== 'string' || !remember(m.id)) continue;
       onInbound({ kind: 'text', id: m.id, text: body });

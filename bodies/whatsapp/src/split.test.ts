@@ -30,6 +30,13 @@ describe('splitReply', () => {
     expect(parts.join(' ').replace(/\s+/g, ' ')).toBe(text);
   });
 
+  test('test_hard_cut_never_splits_a_surrogate_pair', () => {
+    const text = `${'x'.repeat(9)}😀${'y'.repeat(5)}`;
+    const parts = splitReply(text, 10);
+    expect(parts.join('')).toBe(text);
+    for (const p of parts) expect(p).not.toMatch(/[\ud800-\udbff]$/);
+  });
+
   test('test_empty_is_no_parts', () => {
     expect(splitReply('')).toEqual([]);
     expect(splitReply('  \n ')).toEqual([]);

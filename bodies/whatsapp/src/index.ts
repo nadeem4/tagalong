@@ -3,7 +3,8 @@
  * a stdin pipe: when the pipe closes the brain is gone, so the bridge exits too, even if the
  * brain was killed without cleanup. Logs go to stdout, where the brain's logger masks secrets.
  */
-import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { BrainSocket } from '@tagalong/contract';
 import { createBridge } from './bridge';
 import { readConfig } from './config';
@@ -21,6 +22,12 @@ function webSocket(url: string): BrainSocket {
     // An error is always followed by close, which is where reconnecting starts.
     onClose: (f) => ws.addEventListener('close', () => f()),
   };
+}
+
+function samePath(a: string, b: string): boolean {
+  const [x, y] = [resolve(a), resolve(b)];
+  // Windows paths differ in case and in the slash a spawner uses.
+  return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y;
 }
 
 /** Starts the bridge, or says why not and exits 1. Returns null on a bad setup. */
@@ -47,7 +54,7 @@ export function main(
 }
 
 // Run only as the entry, not when a test imports main.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && samePath(fileURLToPath(import.meta.url), process.argv[1])) {
   const bridge = main(process.env, (code) => process.exit(code), console.log);
   if (bridge) {
     const quit = (): void => {
