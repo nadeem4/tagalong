@@ -273,7 +273,7 @@ class Session:
             lambda: self.toolbox,
             self.scheduler.emit,
             now,
-            approvals.mask,
+            approvals,
         )
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
@@ -325,6 +325,7 @@ class Session:
             if step.reported_at is None:
                 self._tell_given_up(step)
         timers.start()
+        self.waiting.start()
 
     def _tell_paused_watches(self) -> None:
         """Watches a migration paused are mentioned once, then marked told."""

@@ -567,7 +567,8 @@ log entry are one row. Home's log is the ask rows that were decided.
 `end_reason` is the outcome word (`approved`, `refused`, `expired`, `timed_out`, `no_one`) once decided.
 A Scout ask (no job above it) also saves its call: `input` is `{name, input, text}` masked by the
 log's guards, `due_at` the deadline from `ask_wait_hours`, and `safe_to_retry` is true when the
-masking changed nothing. An `expired` ask's `decided` event keeps a plain reason.
+masking changed nothing. At two-thirds of the wait the row gets one `notice` event. An `expired`
+ask's `decided` event keeps a plain reason (`no answer` at the deadline).
 An ask that ended before it was decided (answered, timed out) first ends with its own reason
 and is re-ended with the outcome when `Approvals.record` decides it.
 

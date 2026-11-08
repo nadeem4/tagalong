@@ -232,6 +232,22 @@ describe('ApprovalsView history', () => {
     expect((await history()).getByText('No one online')).toBeVisible();
   });
 
+  it('shows the expired outcome', async () => {
+    renderPage(
+      createFakeHostBridge({
+        approvalRows: [{ ...TIMED_OUT, outcome: 'expired', decidedBy: 'none' }],
+      }),
+    );
+    expect((await history()).getByText('Expired')).toBeVisible();
+  });
+
+  it('a row a standing rule decided shows its chip and no decided-by line', async () => {
+    renderPage(createFakeHostBridge({ approvalRows: [{ ...BY_PERSON, decidedBy: 'rule' }] }));
+    const [row] = (await history()).getAllByRole('listitem') as [HTMLElement];
+    expect(within(row).getByText('Approved')).toBeVisible();
+    expect(within(row).queryByText(/Decided by|Scout decided/)).toBeNull();
+  });
+
   it('rows group under Today and Yesterday', async () => {
     renderPage(createFakeHostBridge({ approvalRows: [BY_PERSON, REFUSED, TIMED_OUT] }));
     await history();

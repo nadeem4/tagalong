@@ -489,6 +489,13 @@ next section.
    **Expected:** the ask is waiting and is shown when the desktop joins; no `no_one` row.
 5. **Action:** press **Stop** on the turn while its ask is open, and run a read tool.
    **Expected:** no row for either.
+   5b. **Action:** ask Scout for a change tool and say it may wait 1 hour for you; leave the card
+   unanswered. After 40 minutes Scout may remind you once (`ask_notice`). After the hour, open
+   Home, Approvals.
+   **Expected:** the card is gone on every open body, the call never ran, Scout says it expired,
+   and the history shows an **Expired** row with `decided_by: "none"` and reason `no answer`
+   (`test_deadline_expires_with_no_answer_closes_the_card_and_wakes_scout`). With no wait given,
+   the deadline is 3 days.
    5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
    **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
    `decided_by: "rule"` (`test_stored_auto_run_is_logged_as_rule`). A Claude Code permission ask

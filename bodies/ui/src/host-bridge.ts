@@ -159,8 +159,8 @@ export interface ApprovalRow {
   source: 'scout_tool' | 'claude_code' | 'app';
   tool: string;
   summary: string;
-  outcome: 'approved' | 'refused' | 'timed_out' | 'no_one';
-  decidedBy: 'person' | 'scout' | 'none';
+  outcome: 'approved' | 'refused' | 'timed_out' | 'no_one' | 'expired';
+  decidedBy: 'person' | 'scout' | 'rule' | 'none';
   /** The sentence Scout approved under; null when the person (or nobody) decided. */
   preference: string | null;
   at: string;

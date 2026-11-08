@@ -215,6 +215,12 @@ def test_work_failed_wakes_unbatched_with_a_cap():
     assert (kind.wakes, kind.batch_seconds, kind.max_per_hour) == (True, 0, 10)
 
 
+def test_ask_notice_kind_has_a_note():
+    kind = EVENT_KINDS["ask_notice"]
+    assert (kind.batch_seconds, kind.max_per_hour) == (60, 6)
+    assert load_notes()["ask_notice"].strip()
+
+
 def test_ask_ended_kind_has_a_note():
     kind = EVENT_KINDS["ask_ended"]
     assert kind.wakes and kind.batch_seconds == 30 and kind.max_per_hour == 10

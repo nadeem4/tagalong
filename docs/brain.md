@@ -79,7 +79,7 @@ the total can run a little low.
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/asks.py`              | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                   |
-| `brain/src/brain/waiting.py`           | `WaitingAsks`: Scout asks parked past their turn; finds a repeated call, carries a saved call out on a late yes and emits `ask_ended`                                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/waiting.py`           | `WaitingAsks`: Scout asks parked past their turn; finds a repeated call, carries a saved call out on a late yes and emits `ask_ended`; arms the deadline timer, emits `ask_notice` and expires an unanswered ask                                                                                                                                                                                                                                   |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                          |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/offers.py`            | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                                                                                                                                                                        |
@@ -608,6 +608,32 @@ again: a tool turned off since then refuses), and `WaitingAsks` emits a waking `
 `refused`, `expired` or `failed` (yes, but it could not run). A cancelled ask emits nothing. A
 second answer to a closed ask gets `not_found`. A restart expires parked asks ("brain
 restarted").
+
+_Deadline, notice, expiry._ `WaitingAsks` arms one `call_later` for the earliest moment over the
+open Scout asks (`WorkStore.waiting_asks`): the notice at two-thirds of the wait
+(`created_at + 2/3 * (due_at - created_at)`) for a row with no `notice` event yet, else its
+`due_at`. It re-arms when an ask is adopted or ends, and at start. At the notice it adds a `notice`
+event to the row (once) and emits `ask_notice` `{ask, tool, summary, age_s, left_s}` keyed
+`ask:<id>`; Scout writes any reminder. At the deadline `Asks.expire` frees the waiter with
+`AskExpired("no answer")` and closes the card for every body (reason `timeout`); the adopted
+decision then logs the ask `expired`, `decided_by: none`, and emits `ask_ended` with outcome
+`expired` and reason `no answer`. An ask with no waiter is logged and announced the same way
+directly. An expired ask runs nothing; the deadline never changes what is allowed.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+stateDiagram-v2
+    [*] --> Waiting: Scout ask raised, call saved, deadline set
+    Waiting --> Parked: five minutes in the turn, or nobody displaying
+    Waiting --> Done: person answers in the turn
+    Parked --> Done: person answers
+    Parked --> Notice: two-thirds of the wait
+    Notice --> Done: person answers
+    Notice --> Expired: no answer at the deadline
+    Parked --> Expired: no answer at the deadline
+    Done --> [*]: carried out or refused, logged
+    Expired --> [*]: logged with reason, Scout woken
+```
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -1202,6 +1228,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 
 | Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
 | ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ask_notice`      | 60 s         | 6            | A parked Scout ask is still waiting and two-thirds of its wait has passed (facts: ask, tool, summary, age_s, left_s); Scout may remind the person once or stay silent                        |
 | `ask_ended`       | 30 s         | 10           | A parked Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                     |
 | `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |

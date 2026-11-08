@@ -5,7 +5,7 @@ toolbox, engine, asks and work rows wired the way a session wires them.
 """
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -93,7 +93,15 @@ class Rig:
             lambda name: self.stored.__setitem__(name, "auto"),
             now=now,
         )
-        self.waiting = WaitingAsks(self.work, self.asks, lambda: self.box, self.events.append, now)
+        self.clock = NOW  # the waiting asks' own clock; tests move it past a notice or deadline
+        self.waiting = WaitingAsks(
+            self.work,
+            self.asks,
+            lambda: self.box,
+            self.events.append,
+            lambda: self.clock,
+            self.approvals,
+        )
         self.box = RealToolbox(
             [self.source],
             lambda: self.stored,
@@ -310,3 +318,111 @@ async def test_a_parked_id_is_forgotten_once_the_ask_ends():
     rig.asks.answer(ask_id, "deny", "desktop")
     await rig.settle()
     assert rig.asks._parked == set()
+
+
+# --- deadline, notice and expiry ---
+
+
+def waits(hours, n=1):
+    return Call(id="c1", name="t", input={"n": n, "ask_wait_hours": hours}, turn="t1", text="Go.")
+
+
+def notices(rig):
+    return [e for e in rig.events if e.kind == "ask_notice"]
+
+
+async def test_notice_fires_once_at_two_thirds_with_facts_only():
+    rig = Rig()
+    await rig.box.run(waits(3))
+    ask_id = rig.opened()[-1]["id"]
+    rig.clock = NOW + timedelta(hours=2) - timedelta(seconds=1)
+    rig.waiting.fire_due()
+    assert notices(rig) == []
+    rig.clock = NOW + timedelta(hours=2)
+    rig.waiting.fire_due()
+    rig.waiting.fire_due()  # once only
+    [event] = notices(rig)
+    assert event.key == f"ask:{ask_id}"
+    assert event.facts == {
+        "ask": ask_id,
+        "tool": "t",
+        "summary": rig.work.ask_detail(ask_id)["summary"],
+        "age_s": 7200,
+        "left_s": 3600,
+    }
+    assert rig.source.ran == []
+
+
+async def test_deadline_expires_with_no_answer_closes_the_card_and_wakes_scout():
+    rig = Rig()
+    await rig.box.run(waits(1))
+    ask_id = rig.opened()[-1]["id"]
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    await rig.settle()
+    assert {"id": ask_id, "state": "closed", "reason": "timeout"} in rig.closed()
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "expired" and event.facts["reason"] == "no answer"
+    row = rig.work.get(ask_id)
+    assert (row.state, row.end_reason) == ("expired", "expired")
+    assert rig.work.ask_detail(ask_id)["decided_by"] == "none"
+    assert rig.work.events_of_kind(ask_id, "decided")[-1].data["reason"] == "no answer"
+    rig.waiting.fire_due()  # nothing is left to expire
+    await rig.settle()
+    assert len(ended(rig)) == 1
+
+
+async def test_expired_ask_runs_nothing():
+    rig = Rig()
+    await rig.box.run(waits(1))
+    ask_id = rig.opened()[-1]["id"]
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    await rig.settle()
+    with pytest.raises(RpcError) as err:  # a late yes finds a closed ask
+        rig.asks.answer(ask_id, "allow", "desktop")
+    assert err.value.code == ErrorCode.not_found
+    assert rig.source.ran == []
+
+
+async def test_expiry_of_an_ask_no_longer_live_is_logged_directly():
+    rig = Rig()
+    row = rig.work.create(
+        "ask",
+        "Do it",
+        id="old",
+        state="active",
+        input={"name": "t", "input": {"n": 1}, "text": "Go."},
+        due_at=NOW + timedelta(hours=1),
+    )
+    rig.work.add_ask(row.id, source="scout_tool", tool="t", summary="Do it", input={"n": 1})
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    assert rig.work.get("old").state == "expired"
+    assert rig.work.ask_detail("old")["decided_by"] == "none"
+    [event] = ended(rig)
+    assert event.facts == {
+        "ask": "old",
+        "tool": "t",
+        "summary": "Do it",
+        "outcome": "expired",
+        "reason": "no answer",
+    }
+
+
+async def test_default_wait_is_three_days():
+    rig = Rig()
+    await rig.box.run(call())
+    ask_id = rig.opened()[-1]["id"]
+    assert rig.work.get(ask_id).due_at == (NOW + timedelta(days=3)).isoformat(timespec="seconds")
+
+
+async def test_one_timer_is_armed_for_the_earliest_moment_and_dropped_when_idle():
+    rig = Rig()
+    assert rig.waiting._handle is None
+    await rig.box.run(waits(3))
+    assert rig.waiting._handle is not None
+    ask_id = rig.opened()[-1]["id"]
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    assert rig.waiting._handle is None
