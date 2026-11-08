@@ -119,6 +119,7 @@ the total can run a little low.
 | `brain/src/brain/voice/ears.py`        | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
 | `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/bodies_tools.py`      | `bodies_tools`: the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set` (which bodies are connected, and WhatsApp setup; see [WhatsApp setup tools](#whatsapp-setup-tools))                                                                                                                                                                                                                                                           |
 | `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                       |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -1043,6 +1044,24 @@ process of the brain, on Tagalong's own Node only (`ensure_node`; the system Nod
 - The child's output is logged by the `brain.bridge` logger, so it reaches `brain.log` through the
   secret filter; the access token, app secret and verify token are masked like the Anthropic key. The phone
   number id and the person's own number are not secret and are kept as written.
+
+### WhatsApp setup tools
+
+`bodies_tools.py` gives Home three tools (never offered to Scout; `main.py` passes the bridge
+supervisor as a getter, because it is built once the brain's port is known):
+
+| Tool              | Input                                                          | Result text (JSON)                                                                                                                                |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                         |
+| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value |
+| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                |
+
+`whatsapp_set` changes only the keys given. Each is written once to `<TAGALONG_HOME>/.env`
+(`upsert_env_value`, `enabled` as `1` or `0`) and to the running environment, then the supervisor
+applies it (start, stop or restart) and the brain tells bodies `changed { what: "bodies" }`. The number is
+kept as digits only. A bad value is refused with fixed text that never quotes it; a failed write says
+where (`Scout could not save the WhatsApp settings to <path>.`) and applies nothing. Writes run
+one at a time. No frame is added to contract v1.
 
 ## Experts
 

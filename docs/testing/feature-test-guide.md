@@ -2349,6 +2349,15 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 5. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
    `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
+## Home Bodies section and WhatsApp setup
+
+1. Automated: `cd brain && uv run pytest tests/test_bodies_tools.py -q` (status never holds a secret, absent keys are unchanged, a bad value is refused unquoted, a failed write applies nothing); `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/bodies.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/home/bodies-panel.test.tsx`.
+2. By hand, Home > Connections: the Bodies card lists Desktop (Connected), Browser and WhatsApp. WhatsApp shows `WhatsApp is off.`, the switch is disabled with `Save all five values to switch WhatsApp on.`
+3. Type the five values (use the setup in [whatsapp.md](../whatsapp.md)) and press Save. The fields clear and each shows Saved; no value is shown again. The switch becomes usable.
+4. Switch WhatsApp on. The line reads `WhatsApp is starting.` then `WhatsApp is running.` (`The WhatsApp bridge is not built yet.` if the bridge was not built). Send `hello` from the phone: Scout answers there.
+5. Answer a permission ask by its button on the phone; ask for something long and check it arrives in a few messages; quit the desktop and message again: the brain is still running and answers.
+6. Switch it off: the line reads `WhatsApp is off.` and the bridge process is gone. Stop the brain with `cd brain && uv run tagalong stop`: no `node` bridge is left.
+
 ## Not supported
 
 Do not test these here.
