@@ -57,6 +57,9 @@ To run the brain on its own instead (for example on another machine), use
 The desktop never stops the brain, whoever started it. Its output goes to `~/.tagalong/brain.log`
 (or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
+The brain can also run the WhatsApp bridge (it starts only when `TAGALONG_WHATSAPP_*` are set; see
+`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)).
+
 To let Scout hand work to an expert (Claude Code, Codex or Gemini, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the
 one to use (`list_experts` shows them). Each runs on your own login, never an API key. To run one

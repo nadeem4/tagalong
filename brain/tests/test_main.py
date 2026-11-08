@@ -372,3 +372,65 @@ def test_a_second_brain_that_cannot_bind_leaves_the_first_pid_file(monkeypatch, 
     with pytest.raises(OSError):
         asyncio.run(_run())
     assert (tmp_path / "brain.pid").read_text() == "999999 t1"
+
+
+def test_bridge_starts_after_the_server_and_stops_at_shutdown(monkeypatch, tmp_path):
+    calls = []
+
+    class SpyBridges:
+        def __init__(self, **kw):
+            calls.append(("built", kw["brain_addr"]))
+
+        async def start(self):
+            calls.append("start")
+
+        async def stop(self):
+            calls.append("stop")
+
+    class Sock:
+        def getsockname(self):
+            return ("127.0.0.1", 1)
+
+    class Server:
+        sockets = [Sock()]
+
+        async def serve_forever(self):
+            calls.append("serving")
+            raise RuntimeError("stop")
+
+    async def start_server(*args):
+        return Server()
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.delenv("TAGALONG_BRAIN_ADDR", raising=False)
+    monkeypatch.setattr(main, "BridgeSupervisor", SpyBridges)
+    monkeypatch.setattr(main, "start_server", start_server)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    assert calls == [("built", "127.0.0.1:47321"), "start", "serving", "stop"]
+
+
+def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
+    async def start_server(*args):
+        logging.getLogger("brain.bridge").error("leak %s", "wa-token-0123456789")
+        raise RuntimeError("stop")
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    root = logging.getLogger()
+    root.addHandler(handler)
+    before = {h: list(h.filters) for h in root.handlers}
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setenv("TAGALONG_WHATSAPP_ACCESS_TOKEN", "wa-token-0123456789")
+    monkeypatch.setattr(main, "start_server", start_server)
+    try:
+        with pytest.raises(RuntimeError):
+            asyncio.run(_run())
+    finally:
+        root.removeHandler(handler)
+        for h, filters in before.items():
+            h.filters[:] = filters
+    out = stream.getvalue()
+    assert "wa-token-0123456789" not in out and "leak [secret]" in out
