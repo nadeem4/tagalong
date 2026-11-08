@@ -508,4 +508,48 @@ describe('asks', () => {
     expect(graph.bodies[0]?.type).toBe('text');
     expect(graph.bodies[0]?.text.body).toContain('shell');
   });
+
+  test('test_a_throwing_send_task_does_not_stop_later_sends', async () => {
+    let boom = false;
+    const { brain, graph, logs } = await ready({
+      now: () => {
+        if (boom) {
+          boom = false;
+          throw new Error('clock failed');
+        }
+        return 0;
+      },
+    });
+    boom = true;
+    brain.ask('a1');
+    await vi.waitFor(() => expect(logs.some((l) => l.includes('Error'))).toBe(true));
+    brain.reply('whatsapp', { delta: 'still here' });
+    brain.reply('whatsapp', { done: true });
+    await vi.waitFor(() => expect(graph.bodies.map((b) => b.text.body)).toEqual(['still here']));
+  });
+
+  test('test_a_dropped_reply_does_not_stop_text_answering_the_ask', async () => {
+    let now = 0;
+    const { brain, graph, inbound } = await ready({ now: () => now });
+    brain.ask('a1');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    now = 25 * 3_600_000;
+    brain.reply('whatsapp', { delta: 'too late' });
+    brain.reply('whatsapp', { done: true });
+    await settle();
+    await inbound('yes');
+    await vi.waitFor(() => expect(brain.answers()).toEqual([{ ask: 'a1', option: 'allow' }]));
+  });
+
+  test('test_a_free_text_ask_after_a_reply_is_a_say', async () => {
+    const { brain, graph, inbound } = await ready();
+    brain.ask('q1', ['reply'], { free_text: true });
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    brain.reply('whatsapp', { delta: 'meanwhile' });
+    brain.reply('whatsapp', { done: true });
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
+    await inbound('some chat');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(2));
+    expect(brain.answers()).toEqual([]);
+  });
 });

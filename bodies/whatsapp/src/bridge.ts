@@ -66,7 +66,10 @@ export function createBridge(deps: BridgeDeps): {
   let replies = 0;
   // Every phone send goes through the one chain, so nothing lands between the parts of a reply.
   const enqueue = (task: () => Promise<void>): void => {
-    sending = sending.then(task);
+    // A throwing task must not break the chain, or every later send would be lost.
+    sending = sending.then(task).catch((e: unknown) => {
+      log(`whatsapp: a send task failed (${e instanceof Error ? e.name : 'error'})`);
+    });
   };
   const line = (text: string): void =>
     enqueue(() => graph.sendText(config.allowedNumber, text).then(() => undefined));
@@ -117,7 +120,7 @@ export function createBridge(deps: BridgeDeps): {
     const parsed = ReplyParams.safeParse(params);
     if (!parsed.success || parsed.data.body !== BODY.id) return;
     const reply = parsed.data;
-    if ('done' in reply && reply.done) sending = sending.then(() => flush(reply.turn));
+    if ('done' in reply && reply.done) enqueue(() => flush(reply.turn));
     else if ('delta' in reply) {
       const parts = buffers.get(reply.turn) ?? [];
       parts.push(reply.delta);
