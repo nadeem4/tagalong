@@ -209,7 +209,9 @@ async def _run() -> None:
         + login
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + loop_tools(loops)
-        + bodies_tools(bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify)
+        + bodies_tools(
+            bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
+        )
         + home_setup_tools(
             registry,
             inspect_machine,

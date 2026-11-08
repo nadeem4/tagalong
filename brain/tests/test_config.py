@@ -9,7 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from brain.config import load_config, load_env_file, session_id, split_command, upsert_env_value
+from brain.config import (
+    load_config,
+    load_env_file,
+    session_id,
+    split_command,
+    upsert_env_value,
+    upsert_env_values,
+)
 
 
 def test_defaults():
@@ -201,6 +208,15 @@ def test_upsert_replaces_existing_line_keeps_comments_and_others(tmp_path):
     path.write_bytes(b"# note\r\nOTHER=1\r\nA_KEY=old\r\nLAST=z\r\n")
     upsert_env_value(tmp_path, "A_KEY", "new", {})
     assert path.read_bytes() == b"# note\r\nOTHER=1\r\nA_KEY=new\r\nLAST=z\r\n"
+
+
+def test_upsert_values_writes_all_in_one_file_and_updates_env_after(tmp_path):
+    path = tmp_path / ".env"
+    path.write_bytes(b"# note\r\nA=old\r\nZ=z\r\n")
+    env = {}
+    upsert_env_values(tmp_path, {"A": "new", "B": "b"}, env)
+    assert path.read_bytes() == b"# note\r\nA=new\r\nZ=z\r\nB=b\r\n"
+    assert env == {"A": "new", "B": "b"}
 
 
 def test_upsert_appends_with_the_files_line_ending(tmp_path):

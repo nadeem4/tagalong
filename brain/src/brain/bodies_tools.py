@@ -15,7 +15,7 @@ from typing import Any, Protocol
 
 from brain.bodies import Bodies
 from brain.bridges import DEFAULT_PORT, WhatsAppSettings
-from brain.config import upsert_env_value
+from brain.config import upsert_env_values
 from brain.protocol import BODY_BROWSER, BODY_DESKTOP, BODY_WHATSAPP, ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
@@ -62,7 +62,10 @@ def _checked(args: dict) -> dict[str, str]:
         if not isinstance(value, str) or not value.strip():
             raise _refuse(f"{name} must be a non-empty string.")
         value = value.strip()
-        if any(ord(c) < 32 for c in value):  # a newline would add a line to .env
+        # A line break would add a line to .env. splitlines also splits on \x85, U+2028 and
+        # U+2029, which the file reader treats as breaks; isprintable rejects the other
+        # control characters.
+        if len(value.splitlines()) != 1 or not value.isprintable():
             raise _refuse(f"{name} must be one line.")
         if name == "allowed_number":
             value = re.sub(r"[ +\-]", "", value)
@@ -78,9 +81,14 @@ def bodies_tools(
     data_dir: Path,
     env: MutableMapping[str, str],
     notify: Callable[[str, dict], Any],
+    on_saved: Callable[[], Any],
 ) -> list[tuple[ToolSpec, Handler]]:
-    """`bridges` is a getter: the supervisor needs the brain's port, known after the tools."""
-    lock = asyncio.Lock()  # one write at a time
+    """`bridges` is a getter: the supervisor needs the brain's port, known after the tools.
+    `on_saved` runs after the write and before the bridge restarts, so the log masker knows
+    the new secrets before the respawned bridge prints its first line."""
+    # Serialises apply() only. The file write is atomic on its own; a `tagalong key set` in
+    # another process is not covered by this lock.
+    lock = asyncio.Lock()
     env_path = data_dir / ".env"
 
     def whatsapp_json() -> str:
@@ -113,14 +121,14 @@ def bodies_tools(
     async def whatsapp_set(args: dict) -> str:
         changes = _checked(args)
         async with lock:
-            for var, value in changes.items():
-                try:
-                    upsert_env_value(data_dir, var, value, env)
-                except OSError as err:
-                    raise RpcError(
-                        ErrorCode.tool_failed,
-                        f"Scout could not save the WhatsApp settings to {env_path}.",
-                    ) from err
+            try:
+                upsert_env_values(data_dir, changes, env)  # all values or none
+            except OSError as err:
+                raise RpcError(
+                    ErrorCode.tool_failed,
+                    f"Scout could not save the WhatsApp settings to {env_path}.",
+                ) from err
+            on_saved()
             supervisor = bridges()
             if supervisor is not None:
                 await supervisor.apply()

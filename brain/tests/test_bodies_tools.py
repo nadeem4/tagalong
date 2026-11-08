@@ -41,6 +41,7 @@ class Rig:
         self.env = {}
         self.bridges = FakeBridges(self.env)
         self.notes = []
+        self.saved = []  # (env, applies so far) each time on_saved ran
         self.data_dir = data_dir
         pairs = bodies_tools(
             FakeBodies(*kinds),
@@ -48,6 +49,7 @@ class Rig:
             data_dir,
             self.env,
             lambda m, p: self.notes.append((m, p)),
+            lambda: self.saved.append((dict(self.env), len(self.bridges.applied))),
         )
         self.handlers = {s.name: h for s, h in pairs}
         self.specs = {s.name: s for s, _ in pairs}
@@ -151,6 +153,39 @@ async def test_a_failed_write_says_where_and_applies_nothing(tmp_path):
     assert str(blocker / ".env") in err.value.message and TOKEN not in err.value.message
     assert r.bridges.applied == [] and r.notes == []
     assert "TAGALONG_WHATSAPP_ACCESS_TOKEN" not in r.env
+
+
+@pytest.mark.parametrize("value", ["a\nB=c", "a\x85B=c", "a B=c", "a B=c", "a\x00b", "a\rb"])
+async def test_a_value_that_could_split_a_line_is_refused(rig, value):
+    with pytest.raises(RpcError) as err:
+        await rig.run("whatsapp_set", {"verify_token": value})
+    assert err.value.code == ErrorCode.invalid_params
+    assert err.value.message == "verify_token must be one line."
+    assert not (rig.data_dir / ".env").exists() and rig.bridges.applied == []
+
+
+async def test_the_masker_is_refreshed_after_the_write_and_before_apply(rig):
+    await rig.run("whatsapp_set", FULL)
+    env_at_save, applied_at_save = rig.saved[0]
+    assert env_at_save["TAGALONG_WHATSAPP_ACCESS_TOKEN"] == TOKEN
+    assert applied_at_save == 0 and len(rig.bridges.applied) == 1
+
+
+async def test_a_failed_batch_changes_nothing(tmp_path, monkeypatch):
+    before = "OTHER=1\nTAGALONG_WHATSAPP_VERIFY_TOKEN=old\n"
+    (tmp_path / ".env").write_text(before)
+
+    def broken(*args, **kwargs):
+        raise OSError("disk full")
+
+    r = Rig(tmp_path)
+    monkeypatch.setattr("brain.config.os.replace", broken)
+    with pytest.raises(RpcError) as err:
+        await r.run("whatsapp_set", {**FULL, "enabled": True})
+    assert err.value.code == ErrorCode.tool_failed
+    assert (tmp_path / ".env").read_text() == before
+    assert r.env == {} and r.bridges.applied == [] and r.notes == [] and r.saved == []
+    assert not (tmp_path / ".env.tmp").exists()
 
 
 async def test_switching_off_stops_the_bridge(rig):
