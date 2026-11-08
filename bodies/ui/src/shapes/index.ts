@@ -6,6 +6,7 @@
  */
 export * from './addressing';
 export * from './apps';
+export * from './bodies';
 export * from './context';
 export * from './echo';
 export * from './loops';

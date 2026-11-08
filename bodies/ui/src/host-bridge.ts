@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import type {
   AppAddParams,
   AppsList,
+  BodiesState,
   ContextSnapshot,
   FixTarget,
   LoopsState,
@@ -17,6 +18,7 @@ import type {
   SetupOverview,
   SetupResult,
   TurnEvent,
+  WhatsAppChange,
 } from './shapes';
 import type { HealthFacts } from './health';
 
@@ -281,6 +283,17 @@ export interface HostBridge {
   forgetLoop(id: string): Promise<void>;
   /** Stop and wipe: every switch off, every loop and mail cursor deleted. */
   wipeLoops(): Promise<void>;
+  /**
+   * Home's Bodies section: which bodies are connected and how WhatsApp is set up (which values
+   * are saved, never the values). Changes arrive as `changed bodies`. Rejects while the brain is
+   * away.
+   */
+  bodiesState(): Promise<BodiesState>;
+  /**
+   * Saves WhatsApp settings and switches the bridge. Only the fields given change; a secret goes
+   * to the brain once and is never read back. Rejects with one fixed sentence on failure.
+   */
+  setWhatsApp(change: WhatsAppChange): Promise<void>;
   /**
    * How Scout reads the screen on this PC, as the brain's reading_status answer (JSON text; read
    * it with readingRowsOf). Changes arrive as `changed reading`. Rejects while the brain is away.
