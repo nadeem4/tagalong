@@ -238,9 +238,13 @@ run it on its own for those.
 
 1. **Setup:** make sure nothing listens on `127.0.0.1:47321`, then run `pnpm dev:desktop` alone.
    **Expected:** a `uv` process (and its `python` child) appears, Scout appears, and no "Scout's
-   brain is not running." mark stays. An ask works. The brain's output shows in the terminal.
+   brain is not running." mark stays. An ask works. The brain's output goes to `brain.log` in your Tagalong home folder (`~/.tagalong` by default).
 2. **Action:** quit the app from the tray.
-   **Expected:** the `uv` and `python` processes the app started are gone.
+   **Expected:** the `uv` and `python` processes stay up, and `brain.pid` is in the Tagalong home folder.
+   Starting the app again connects to that brain and spawns no second one.
+   2b. **Action:** in `brain/`, run `uv run tagalong stop`.
+   **Expected:** it prints `Stopped the brain.`, the processes are gone and `brain.pid` is removed.
+   Run it again: `The brain is not running.`
 3. **Action:** start `cd brain && uv run brain` yourself, then `pnpm dev:desktop`. Quit the app.
    **Expected:** the app starts no second brain, and your brain is still running after quit.
 4. **Action:** set `TAGALONG_BRAIN_ADDR=10.0.0.5:9000` (or `TAGALONG_START_BRAIN=0`) and start the app.
