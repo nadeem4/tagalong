@@ -350,7 +350,7 @@ def test_scout_approved_records_uses_and_notifies(mem):
         mem.db, sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
     )
     sent = []
-    facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo", False)
+    facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo")
 
     approvals = make(mem, sent)
     approvals.work.create("goal", "a job", id="j1", state="active")  # job_id is the row's parent
