@@ -1,16 +1,21 @@
 """Tests for the permission engine: the floor table, the deciders, the askers and Engine.decide."""
 
 import asyncio
+from datetime import UTC, datetime
 
 import pytest
+from ask_log import approvals_on, list_approvals
 
 from brain.asks import Answer
 from brain.experts import PermissionOption
+from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import (
     ALLOWED,
     SUMMARY_MAX,
     AskRequest,
+    Decision,
+    Engine,
     Grant,
     NoOneThere,
     Person,
@@ -26,6 +31,7 @@ from brain.permission import (
     tool_asker,
 )
 from brain.protocol import ErrorCode, RpcError
+from brain.store import rules as rules_store
 from brain.store.rules import Preference
 
 
@@ -230,3 +236,214 @@ async def test_expert_asker_maps_option_kinds():
     chosen["pick"] = None
     with pytest.raises(NoOneThere):
         await how()
+
+
+# --- Engine.decide -------------------------------------------------------------
+
+NOW = datetime(2026, 11, 7, 9, 0, 0, tzinfo=UTC)
+
+
+class Fake:
+    """A decider that returns a set result and counts its calls."""
+
+    def __init__(self, name, result=None, raises=None):
+        self.name = name
+        self.result = result
+        self.raises = raises
+        self.calls = 0
+
+    async def decide(self, req):
+        self.calls += 1
+        if self.raises is not None:
+            raise self.raises
+        return self.result
+
+
+class FakeOffers:
+    def __init__(self):
+        self.seen = []
+
+    def consider(self, group_key, source, tool):
+        self.seen.append((group_key, source, tool))
+
+
+@pytest.fixture
+def mem(tmp_path):
+    m = Memory(tmp_path / "t.db")
+    yield m
+    m.close()
+
+
+class Rig:
+    def __init__(self, mem, deciders):
+        self.sent = []
+        self.auto = []
+        self.offers = FakeOffers()
+        self.approvals = approvals_on(mem, lambda m, p: self.sent.append((m, p)), lambda: NOW)
+        self.engine = Engine(deciders, self.approvals, self.offers, self.auto.append)
+        self.mem = mem
+
+    def rows(self):
+        return list_approvals(self.mem, "all", 50, None)
+
+
+def granting():
+    return [
+        Fake("standing_rule", Grant("rule")),
+        Fake("side_check", Grant("scout")),
+        Fake("person", Grant("person")),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("tier", "called", "kind", "code"),
+    [
+        (Tier.off, [], "deny", "off"),
+        (Tier.person_only, ["person"], "allow_once", ""),
+        (Tier.locked, ["standing_rule"], "allow_once", ""),
+        (Tier.ask, ["standing_rule"], "allow_once", ""),
+        (Tier.auto, [], "allow_once", ""),
+    ],
+)
+async def test_floor_table(mem, tier, called, kind, code):
+    deciders = granting()
+    d = await Rig(mem, deciders).engine.decide(req(tier=tier))
+    assert (d.kind, d.code) == (kind, code)
+    assert [x.name for x in deciders if x.calls] == called
+
+
+@pytest.mark.parametrize("tier", list(Tier))
+async def test_floor_table_when_every_decider_passes(mem, tier):
+    deciders = [Fake(n) for n in ("standing_rule", "side_check", "person")]
+    d = await Rig(mem, deciders).engine.decide(req(tier=tier))
+    assert {x.name for x in deciders if x.calls} == ALLOWED[tier]
+    if tier is Tier.off:
+        assert (d.kind, d.code) == ("deny", "off")
+    elif tier is Tier.auto:
+        assert d.allowed
+    else:
+        assert (d.kind, d.code) == ("deny", "no_decider")
+
+
+async def test_a_side_check_grant_never_opens_person_only(mem):
+    side = Fake("side_check", Grant("scout"))
+    d = await Rig(mem, [side]).engine.decide(req(tier=Tier.person_only))
+    assert (d.kind, d.code, side.calls) == ("deny", "no_decider", 0)
+
+
+async def test_a_grant_from_the_wrong_decider_is_a_pass(mem):
+    rig = Rig(mem, [Fake("side_check", Grant("person"))])
+    assert (await rig.engine.decide(req())).code == "no_decider"
+    assert rig.rows() == []
+
+
+async def test_a_raising_decider_is_a_pass(mem):
+    deciders = [Fake("standing_rule", raises=RuntimeError("boom")), Fake("person", Grant("person"))]
+    d = await Rig(mem, deciders).engine.decide(req())
+    assert (d.kind, d.decided_by) == ("allow_once", "person")
+
+
+async def test_a_garbage_result_is_a_pass(mem):
+    deciders = [Fake("standing_rule", "yes please"), Fake("side_check", True)]
+    assert (await Rig(mem, deciders).engine.decide(req())).code == "no_decider"
+
+
+async def test_all_pass_is_deny_with_no_row(mem):
+    rig = Rig(mem, [Fake("person")])
+    d = await rig.engine.decide(req())
+    assert (d.kind, d.code, d.decided_by) == ("deny", "no_decider", "none")
+    assert rig.rows() == []
+
+
+async def test_always_widens_only_from_the_person_on_ask_or_locked(mem):
+    rig = Rig(mem, [Fake("person", Grant("person", always=True))])
+    d = await rig.engine.decide(req("t", tier=Tier.ask))
+    assert d.kind == "allow_always"
+    assert rig.auto == ["t"]
+    assert rig.offers.seen == []  # now Auto: an offer would be noise
+
+    rig = Rig(mem, [Fake("person", Grant("person", always=True))])
+    assert (await rig.engine.decide(req("t", tier=Tier.locked))).kind == "allow_always"
+
+    rig = Rig(mem, [Fake("person", Grant("person", always=True))])
+    assert (await rig.engine.decide(req("t", tier=Tier.person_only))).kind == "allow_once"
+    assert rig.auto == []
+
+    rig = Rig(mem, [Fake("side_check", Grant("scout", always=True))])
+    assert (await rig.engine.decide(req("t"))).kind == "allow_once"
+    assert rig.auto == []
+
+    rig = Rig(mem, [Fake("person", Grant("person", always=True))])
+    assert (await rig.engine.decide(req("t", kind="expert_request"))).kind == "allow_once"
+    assert rig.auto == []
+
+
+async def test_cannot_allow_once_skips_rule_and_side_check(mem):
+    deciders = granting()
+    d = await Rig(mem, deciders).engine.decide(req(can_allow_once=False))
+    assert [x.name for x in deciders if x.calls] == ["person"]
+    assert d.decided_by == "person"
+
+
+async def test_each_outcome_writes_one_row(mem):
+    p = Preference(7, "files are fine", None, None, None, False, "2026-11-07", 0, None)
+    cases = [
+        (Grant("rule"), "standing_rule", ("approved", "rule")),
+        (Grant("scout", preference=p), "side_check", ("approved", "scout")),
+        (Grant("person"), "person", ("approved", "person")),
+        (Refusal("denied", "no"), "person", ("refused", "person")),
+        (Refusal("timeout", "late"), "person", ("timed_out", "none")),
+        (Refusal("no_one", "alone"), "person", ("no_one", "none")),
+    ]
+    seen = []
+    for result, name, expected in cases:
+        rig = Rig(mem, [Fake(name, result)])
+        before = len(rig.rows())
+        await rig.engine.decide(req())
+        rows = rig.rows()
+        assert len(rows) == before + 1
+        seen.append((rows[0].outcome, rows[0].decided_by))
+        assert seen[-1] == expected
+    scout_row = next(r for r in rig.rows() if r.decided_by == "scout")
+    assert (scout_row.rule_id, scout_row.rule_sentence) == (7, "files are fine")
+
+
+async def test_cancelled_writes_no_row(mem):
+    rig = Rig(mem, [Fake("person", Refusal("cancelled", "stopped"))])
+    d = await rig.engine.decide(req())
+    assert (d.kind, d.code) == ("deny", "cancelled")
+    assert rig.rows() == []
+
+
+async def test_a_denial_carries_the_option_id(mem):
+    rig = Rig(mem, [Fake("person", Refusal("denied", "no", "o2"))])
+    d = await rig.engine.decide(req())
+    assert d == Decision("deny", "denied", "person", "o2", d.ask_id)
+
+
+@pytest.mark.parametrize(
+    ("decider", "result", "extra", "tier", "offered"),
+    [
+        ("person", Grant("person"), {}, Tier.ask, True),
+        ("standing_rule", Grant("rule"), {}, Tier.ask, False),
+        ("side_check", Grant("scout"), {}, Tier.ask, False),
+        ("person", Grant("person", always=True), {}, Tier.ask, False),
+        ("person", Grant("person"), {}, Tier.person_only, False),
+        ("person", Grant("person"), {"offer": False}, Tier.ask, False),
+    ],
+)
+async def test_offer_follows_only_a_persons_once_allow(mem, decider, result, extra, tier, offered):
+    rig = Rig(mem, [Fake(decider, result)])
+    await rig.engine.decide(req("t", tier=tier, **extra))
+    assert rig.offers.seen == ([("t", "scout_tool", "t")] if offered else [])
+
+
+async def test_scout_grant_marks_the_preference_used_and_notifies_approved(mem):
+    p = rules_store.add_preference(
+        mem.db, sentence="files are fine", source=None, tool=None, group_key=None, at="2026-11-07"
+    )
+    rig = Rig(mem, [Fake("side_check", Grant("scout", preference=p))])
+    await rig.engine.decide(req())
+    [used] = [x for x in rules_store.list_preferences(mem.db) if x.id == p.id]
+    assert used.use_count == 1
+    assert ("approved", {"tool": "t", "text": "s", "preference": "files are fine"}) in rig.sent
