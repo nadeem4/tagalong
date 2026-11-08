@@ -500,11 +500,20 @@ next section.
    **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
    `decided_by: "rule"` (`test_stored_auto_run_is_logged_as_rule`). A Claude Code permission ask
    still shows Claude Code's own option names on the card.
-   5b. **Action:** leave a permission ask open and quit the brain, then start it again.
+   5b. **Action:** leave a Claude Code permission ask open and quit the brain, then start it again.
    **Expected:** the ask is gone from the body, and it is not in `list_approvals` (it was never
    decided). The ask is an `ask` work row that now reads expired, "brain restarted". The
    `list_approvals` shape and counts are the same as before asks moved onto work rows
    (`test_list_approvals_shape_unchanged`).
+   5c. **Action:** close every screen, have Scout call a change tool so its ask parks, quit the
+   brain, start it again and open the desktop.
+   **Expected:** the card is back, and Scout says how old the ask is
+   (`test_return_shows_two_parked_asks_oldest_first_with_one_wake`,
+   `test_restart_keeps_a_waiting_scout_ask_with_its_deadline`). Set the tool to Auto before
+   opening the desktop: it runs by itself and Scout says so (`test_return_runs_an_ask_a_new_auto_now_allows`).
+   Set it Off instead: the ask expires with reason "turned off" (`test_return_refuses_an_ask_whose_tool_was_turned_off`).
+   With a secret in the call the ask expires at start instead and Scout says it held a secret
+   (`test_restart_expires_a_waiting_ask_that_held_a_secret`).
 6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
    stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is

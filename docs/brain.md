@@ -564,13 +564,16 @@ flowchart TD
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
   `TAGALONG_KEEP_ASKING_DAYS`.
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
-- **No answer.** A Scout ask has no timeout of its own: it waits in its turn for five minutes, then
-  parks (see [Asks that wait](#asks-that-wait)). A job's ask waits with its job.
+- **No answer.** A Scout ask waits in its turn for five minutes, then parks and waits for you up
+  to its deadline (see [Asks that wait](#asks-that-wait)). A job's ask has no deadline and waits
+  with its job.
 - **Nobody online.** The ask is still opened and saved. Only bodies that display count: with
   just a `display: false` body (the browser) online, a Scout ask parks at once, and the card
   is replayed to the first displaying body that joins.
 - **Turn cancelled.** An open ask closes with `reason: "cancelled"` and nothing is left behind.
-- **Reconnect.** The waiting lives in memory; each open ask is also an `active` `ask` work row, which a restart expires ("brain restarted"), so the body never sees it again. A body that joins with no `last_seq`, or that is told
+- **Reconnect.** The waiting lives in memory; each open ask is also an `active` `ask` work row. A restart expires a job's ask and a turn-bound card ("brain restarted"), but keeps a Scout ask
+  with its deadline: it comes back when a body that shows cards joins (see
+  [Restart and return](#restart-and-return)). A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
 - **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=, recommended=)`
@@ -601,13 +604,14 @@ under `WaitingAsks` (`waiting.py`), the card loses its `turn`, and the call retu
 "<tool> is waiting for the person's answer (ask <id>). It runs by itself if they allow it; do not
 call it again." The same call again (same tool, same masked input) while one is parked gets the
 same ask, never a second card. Stopping the turn withdraws only the ask it is still waiting on.
+Nobody is refused for being away: a Scout ask raised with no body displaying parks at once.
 
 When the person answers later, `Toolbox.carry_out` runs the saved call once (it checks the mode
 again: a tool turned off since then refuses), and `WaitingAsks` emits a waking `ask_ended` event
 `{ask, tool, summary, outcome, result | reason}` keyed `ask:<id>`. `outcome` is `approved`,
 `refused`, `expired` or `failed` (yes, but it could not run). A cancelled ask emits nothing. A
-second answer to a closed ask gets `not_found`. A restart expires parked asks ("brain
-restarted").
+second answer to a closed ask gets `not_found`. A restart does not end a parked ask (see
+[Restart and return](#restart-and-return)).
 
 _Deadline, notice, expiry._ `WaitingAsks` arms one `call_later` for the earliest moment over the
 open Scout asks (`WorkStore.waiting_asks`): the notice at two-thirds of the wait
@@ -626,7 +630,9 @@ stateDiagram-v2
     [*] --> Waiting: Scout ask raised, call saved, deadline set
     Waiting --> Parked: five minutes in the turn, or nobody displaying
     Waiting --> Done: person answers in the turn
-    Parked --> Done: person answers
+    Parked --> Parked: brain restart, decided afresh when a body joins
+    Parked --> Done: person answers, or a rule now allows it
+    Parked --> Expired: held a secret, tool off or gone
     Parked --> Notice: two-thirds of the wait
     Notice --> Done: person answers
     Notice --> Expired: no answer at the deadline
@@ -650,6 +656,53 @@ sequenceDiagram
     P->>W: answers later
     W->>T: carry_out(saved call)
     W->>S: ask_ended wake (outcome and result)
+```
+
+### Restart and return
+
+A Scout ask is owned by Scout, a job's ask by its job, and the owner decides how it ends. A job's
+ask (and a turn-bound card such as a choice) ends with its source; a restart expires it
+("brain restarted"). A Scout ask outlives the turn, your absence and a brain restart.
+
+_At start._ `WorkStore.resume_scan` leaves an `active` Scout ask (no job above it, a `due_at`)
+alone when `safe_to_retry` is true. When it is false (masking changed the saved call, so it would
+replay as the literal `[secret]`) the ask ends `expired` at once, `decided_by: none`, with a
+`decided` event whose reason is `held a secret`, and `reported_at` stays null. `WaitingAsks.start`
+then emits `ask_ended` (outcome `expired`, reason `held a secret`) for each such row and marks it
+reported when that wake starts, so Scout hears of it once. Every surviving ask is remembered as
+_unseen_, and `fire_due` expires any whose deadline passed while the brain was down.
+
+_On return._ `Session._on_connect` calls `WaitingAsks.rejoined` when the joining body displays
+(a `display: false` body such as the browser does nothing). It acts only when an ask is unseen
+(parked while nobody displayed, or kept across a restart) or has no card live in `Asks`. One task
+then decides each waiting ask with no live card, oldest first, rebuilding the call from the saved
+row and asking the engine again without the person step:
+
+- A rule or Scout's side-check now allows it: `Toolbox.carry_out` runs it and `ask_ended`
+  (`approved`, or `failed`) wakes Scout; the log row says `rule` or `scout`.
+- The floor refuses it: the tool turned Off ends it `expired` ("turned off"), a tool that no longer
+  exists ends it `expired` ("tool gone"); each is logged and wakes Scout with `ask_ended`.
+- Otherwise only the person can decide: the card is opened again for the same ask id, with no
+  `turn`, for every body. All such cards open together, in order, and each decision is adopted as
+  a parked one is, so a later yes carries the call out.
+
+Then one `asks_waiting` wake `{count, asks}` names the unseen asks still open, each `{ask, tool,
+summary, age_s}`, oldest first; Scout says how old each is in his own words. An ask that was live
+and shown to a displaying body is not decided again. The call goes through the floor again on
+return: a `person_only` tool is never allowed by a rule, only shown.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart TD
+  S[brain starts] --> Q{Scout ask held a secret?}
+  Q -- yes --> X[expired, held a secret; Scout woken]
+  Q -- no --> K[stays waiting with its deadline, unseen]
+  K --> J[a body that displays joins]
+  J --> D{decide again without the person}
+  D -- rule or side-check allows --> R[carried out; ask_ended]
+  D -- off or tool gone --> E[expired with reason; ask_ended]
+  D -- only the person can --> C[card opens again, oldest first]
+  C --> W[one asks_waiting wake with ages]
 ```
 
 ### Choices and preferences

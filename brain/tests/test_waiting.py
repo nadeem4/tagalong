@@ -5,6 +5,7 @@ toolbox, engine, asks and work rows wired the way a session wires them.
 """
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -14,7 +15,7 @@ from brain.asks import Asks
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
-from brain.permission import Engine, Person, StandingRule, stored_auto_rules
+from brain.permission import Engine, Person, StandingRule, Tier, stored_auto_rules
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import TransitionRefused, WorkStore
 from brain.toolbox import Toolbox as RealToolbox
@@ -544,3 +545,144 @@ async def test_start_wakes_scout_once_about_a_secret_expiry():
     third = restarted(rig)
     third.waiting.start()
     assert third.events == []
+
+
+# --- return: a displaying body joins and every waiting ask is decided afresh ---
+
+
+async def away_asks(count=2, **kw):
+    """Park `count` asks while nobody displays, then bring the brain back with a body online."""
+    first = Rig(online=(), **kw)
+    for n in range(1, count + 1):
+        await first.box.run(call(n, call_id=f"c{n}"))
+    ids = [r.id for r in first.work.waiting_asks()]
+    return first, ids
+
+
+def back(first, **kw):
+    """A fresh brain on the same database with the person's desktop connected."""
+    rig = Rig(online=("desktop",), memory=first.memory, **kw)
+    rig.work.resume_scan(lambda row: None)
+    rig.waiting.start()
+    return rig
+
+
+def wakes(rig):
+    return [e for e in rig.events if e.kind == "asks_waiting"]
+
+
+async def test_return_shows_two_parked_asks_oldest_first_with_one_wake():
+    first, ids = await away_asks(2)
+    rig = back(first)
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert [p["id"] for p in rig.opened()] == ids
+    assert all("turn" not in p for p in rig.opened())
+    [wake] = wakes(rig)
+    assert wake.key == "asks_waiting" and wake.facts["count"] == 2
+    asks = json.loads(wake.facts["asks"])
+    assert [a["ask"] for a in asks] == ids
+    assert asks[0] == {"ask": ids[0], "tool": "t", "summary": "Doing it.", "age_s": 3600}
+    assert rig.source.ran == []
+
+
+async def test_return_twice_does_not_show_or_wake_again():
+    first, _ = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1 and len(wakes(rig)) == 1
+
+
+async def test_a_yes_to_a_returned_ask_runs_the_call():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    assert [e.facts["outcome"] for e in ended(rig)] == ["approved"]
+    assert rig.work.get(ask_id).state == "done"
+
+
+async def test_return_runs_an_ask_a_new_auto_now_allows():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.stored["t"] = "auto"
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    assert rig.opened() == [] and wakes(rig) == []
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "approved"
+    assert rig.work.ask_detail(ask_id)["decided_by"] == "rule"
+
+
+async def test_return_refuses_an_ask_whose_tool_was_turned_off():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.stored["t"] = "off"
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == [] and wakes(rig) == []
+    row = rig.work.get(ask_id)
+    assert (row.state, rig.work.ask_detail(ask_id)["decided_by"]) == ("expired", "none")
+    [event] = ended(rig)
+    assert (event.facts["outcome"], event.facts["reason"]) == ("expired", "turned off")
+
+
+async def test_return_refuses_an_ask_whose_tool_is_gone():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first, names=("other",))
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.opened() == [] and wakes(rig) == []
+    assert rig.work.get(ask_id).state == "expired"
+    [event] = ended(rig)
+    assert (event.facts["outcome"], event.facts["reason"]) == ("expired", "tool gone")
+
+
+async def test_return_does_not_redecide_a_live_ask():
+    rig = Rig(park_after=0.05)  # a body shows the card: parked, still live in this session
+    await rig.box.run(call())
+    rig.stored["t"] = "auto"  # a rule that would allow it now
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1 and rig.source.ran == []
+    assert wakes(rig) == []  # it was shown to a body when it was raised
+
+
+async def test_return_wakes_for_a_live_ask_raised_to_an_empty_room():
+    rig = Rig(online=())
+    await rig.box.run(call())
+    [ask_id] = [r.id for r in rig.work.waiting_asks()]
+    rig.bodies.online.append("desktop")
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1  # not shown a second time: the replay path owns it
+    [wake] = wakes(rig)
+    assert [a["ask"] for a in json.loads(wake.facts["asks"])] == [ask_id]
+
+
+async def test_return_with_nothing_waiting_does_nothing():
+    rig = Rig()
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.events == [] and rig.bodies.sent == []
+
+
+async def test_carried_out_call_goes_through_the_floor_again():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.source._specs[0] = ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.person_only)
+    rig.stored["t"] = "auto"  # a stored Auto never opens a person-only tool
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == []
+    [shown] = rig.opened()
+    assert shown["id"] == ask_id and shown["options"] == ["allow", "deny"]
+    assert rig.work.get(ask_id).state == "active"

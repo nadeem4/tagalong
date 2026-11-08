@@ -70,9 +70,11 @@ class Asks:
         ask_id: str | None = None,
         parent_id: str | None = None,
         record: "OpenRecord | None" = None,
+        reopen: bool = False,
     ) -> str:
-        # Nobody displaying is no reason to refuse: the ask stays open, and a body that shows
-        # one later gets the open-ask replay.
+        # `reopen`: the ask row already exists (a waiting ask shown again after a restart), so
+        # only the card goes out. Nobody displaying is no reason to refuse: the ask stays open,
+        # and a body that shows one later gets the open-ask replay.
         params = {
             "id": ask_id or uuid.uuid4().hex,
             "state": "open",
@@ -86,7 +88,7 @@ class Asks:
         if call.turn and params["id"] not in self._parked:
             params["turn"] = call.turn
         entry = _Open(params, asyncio.get_running_loop().create_future())
-        return (await self._wait(entry, None, parent_id, record)).option or "deny"
+        return (await self._wait(entry, None, parent_id, record, reopen)).option or "deny"
 
     async def open(
         self,
@@ -132,10 +134,12 @@ class Asks:
         timeout: float | None,
         parent_id: str | None,
         record: "OpenRecord | None" = None,
+        reopen: bool = False,
     ) -> Answer:
         ask_id = entry.params["id"]
         self._open[ask_id] = entry
-        self._record_open(entry.params, parent_id, record)
+        if not reopen:
+            self._record_open(entry.params, parent_id, record)
         self._bodies.notify("ask", entry.params)
         try:
             async with asyncio.timeout(timeout):
@@ -199,6 +203,10 @@ class Asks:
         entry.future.set_exception(AskExpired(reason))
         self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
         return True
+
+    def is_open(self, ask_id: str) -> bool:
+        """The ask has a card showing in this session (a restart leaves none)."""
+        return ask_id in self._open
 
     def open_asks(self) -> list[dict]:
         return [dict(e.params) for e in self._open.values()]

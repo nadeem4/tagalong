@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -48,6 +49,7 @@ class WaitingAsks:
         self._claims: dict[str, str] = {}  # call key -> ask id, until its decision ends
         self._handle: asyncio.TimerHandle | None = None
         self._expiring: set[str] = set()  # freed at the deadline, their end not yet logged
+        self._returning: asyncio.Task | None = None
         self._unseen: set[str] = set()  # waiting while nobody could see them, until shown again
 
     def claim(self, tool: str, input: dict, ask_id: str) -> str | None:
@@ -159,6 +161,10 @@ class WaitingAsks:
         if self._asks.expire(row.id, reason):
             self._expiring.add(row.id)
             return
+        self._end_unlive(row, reason)
+
+    def _end_unlive(self, row: WorkRow, reason: str) -> None:
+        """End a waiting ask that has no card showing: log it expired and wake Scout."""
         detail = self._work.ask_detail(row.id) or {}
         tool = detail.get("tool") or ""
         summary = detail.get("summary") or row.title
@@ -212,6 +218,10 @@ class WaitingAsks:
         except Exception:
             log.exception("a parked ask failed")
             return
+        await self._conclude(decision, call, req)
+
+    async def _conclude(self, decision: Decision, call: Call, req: AskRequest) -> None:
+        """Act on a decision that came after the turn moved on, then wake Scout with the facts."""
         facts: dict[str, str | int] = {"ask": req.ask_id, "tool": call.name, "summary": req.summary}
         if decision.allowed:
             try:
@@ -230,3 +240,98 @@ class WaitingAsks:
         else:
             facts.update(outcome="refused", reason=decision.reason)
         self._emit(Event("ask_ended", facts, key=f"ask:{req.ask_id}"))
+
+    # ---- return: a body that shows cards joined ----
+
+    def rejoined(self, body_id: str) -> None:
+        """A body that displays joined: decide afresh every waiting ask with no card showing and
+        wake Scout once about those the person has not seen. Nothing to do when all were seen."""
+        rows = self._work.waiting_asks()
+        if not any(r.id in self._unseen or not self._asks.is_open(r.id) for r in rows):
+            return
+        if self._returning is not None and not self._returning.done():
+            return
+        try:
+            self._returning = asyncio.get_running_loop().create_task(self._return())
+        except RuntimeError:
+            return  # no loop yet (a body joining before the server runs): nothing to show with
+        self._tasks.add(self._returning)
+        self._returning.add_done_callback(self._tasks.discard)
+
+    async def _return(self) -> None:
+        toolbox = self._toolbox()
+        kept: list[tuple[Call, AskRequest]] = []
+        for row in self._work.waiting_asks():  # oldest first
+            if self._asks.is_open(row.id):
+                continue
+            try:
+                again = await self._decide_again(toolbox, row)
+            except Exception:
+                # Left waiting: its deadline still ends it, and the next join tries again.
+                log.exception("a waiting ask could not be decided again: %s", row.id)
+                continue
+            if again is not None:
+                kept.append(again)
+        for call, req in kept:  # only the person can say yes now; all cards open together
+            person = replace(req, can_allow_once=False)
+            self.adopt(asyncio.create_task(toolbox.redecide(person)), call, person)
+        await asyncio.sleep(0)  # the cards go out in order before the wake names them
+        left = [r for r in self._work.waiting_asks() if r.id in self._unseen]
+        self._unseen.clear()
+        if not left:
+            return
+        now = self._now()
+        asks = []
+        for row in left:
+            detail = self._work.ask_detail(row.id) or {}
+            asks.append(
+                {
+                    "ask": row.id,
+                    "tool": detail.get("tool") or "",
+                    "summary": detail.get("summary") or row.title,
+                    "age_s": int((now - datetime.fromisoformat(row.created_at)).total_seconds()),
+                }
+            )
+        facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
+        self._emit(Event("asks_waiting", facts, key="asks_waiting"))
+
+    async def _decide_again(
+        self, toolbox: "Toolbox", row: WorkRow
+    ) -> tuple[Call, AskRequest] | None:
+        """One waiting ask through the floor and the rules again, the person's step left out.
+        Carried out or ended here when they settle it; the request comes back when it needs the
+        person."""
+        saved = row.input or {}
+        call = Call(
+            id=f"ask:{row.id}",
+            name=saved.get("name") or "",
+            input=saved.get("input") or {},
+            turn="",
+            text=saved.get("text") or "",
+        )
+        found = toolbox.spec_named(call.name)
+        if found is None:
+            self._end_unlive(row, "tool gone")
+            return None
+        spec, kind = found
+        req = await toolbox.ask_request(call, spec, kind, job_id=None, ask_id=row.id, reopen=True)
+        decision = await toolbox.redecide(replace(req, how_to_ask=None))
+        if decision.allowed:
+            if (current := self._work.get(row.id)) is not None and current.state == "active":
+                # An Auto tool is allowed without the engine writing a row: log the rule's yes.
+                self._approvals.record(
+                    source=kind,
+                    tool=spec.name,
+                    summary=req.summary,
+                    input=req.input,
+                    group_key=req.group_key,
+                    outcome="approved",
+                    decided_by="rule",
+                    ask_id=row.id,
+                )
+            await self._conclude(decision, call, req)
+            return None
+        if decision.code == "no_decider":
+            return call, req
+        self._end_unlive(row, "turned off" if decision.code == "off" else decision.reason)
+        return None

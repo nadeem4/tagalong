@@ -85,7 +85,10 @@ connects by itself once the brain is up.
 
 When Scout's brain wants to use a tool that needs your say-so, the bubble asks in Scout's words
 with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
-queue and show one at a time; if the brain is offline when you click, the card stays up.
+queue and show one at a time; if the brain is offline when you click, the card stays up. One
+engine decides every ask, and an ask waits for you, up to a deadline Scout sets (3 days by default,
+7 at most), even if you are away or the brain restarts; when you come back the cards are there again
+and Scout tells you how long each has waited.
 
 The brain keeps a history of every such ask and how it ended (approved, refused, timed out, or no
 one was there), for Scout's tools, connected-app tools and Claude Code's permission asks. It also keeps plain-sentence

@@ -300,7 +300,6 @@ class Toolbox:
         spec: ToolSpec,
         source_kind: str,
         job_id: str | None,
-        gate: Tier,
         wait: timedelta | None,
     ) -> None:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
@@ -313,7 +312,7 @@ class Toolbox:
             if earlier is not None:  # the same call again: the same ask, no second card
                 raise Parked(earlier)
         try:
-            await self._ask_claimed(call, spec, source_kind, job_id, gate, wait, ask_id)
+            await self._ask_claimed(call, spec, source_kind, job_id, wait, ask_id)
         except Parked:
             raise  # the parked decision keeps the claim until it ends
         except BaseException:
@@ -329,30 +328,12 @@ class Toolbox:
         spec: ToolSpec,
         source_kind: str,
         job_id: str | None,
-        gate: Tier,
         wait: timedelta | None,
         ask_id: str,
     ) -> None:
         assert self._asks is not None and self._engine is not None
-        shown = call
-        if spec.card is not None:
-            shown = replace(call, input=await spec.card(call.input))
-        req = AskRequest(
-            kind="tool",
-            source=source_kind,
-            tool=spec.name,
-            group_key=spec.name,
-            summary=summarise(call.text, spec.name, shown.input),
-            input=shown.input,
-            tier=gate,
-            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id),
-            job_id=job_id,
-            turn_id=call.turn or None,
-            ask_id=ask_id,
-            wait=wait,
-            call={"name": call.name, "input": call.input, "text": call.text}
-            if wait is not None
-            else None,
+        req = await self.ask_request(
+            call, spec, source_kind, job_id=job_id, ask_id=ask_id, wait=wait
         )
         decision = await self._decide(req, call)
         if decision.allowed:
@@ -370,6 +351,63 @@ class Toolbox:
                 raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
             case _:
                 raise RpcError(ErrorCode.denied, f"Nobody approved {name}, so it was not run.")
+
+    async def ask_request(
+        self,
+        call: Call,
+        spec: ToolSpec,
+        kind: str,
+        *,
+        job_id: str | None,
+        ask_id: str,
+        wait: timedelta | None = None,
+        reopen: bool = False,
+    ) -> AskRequest:
+        """The engine's request for one tool call: the one shape a new ask and a waiting ask
+        decided again share. `reopen` shows the card of an ask whose row already exists."""
+        assert self._asks is not None
+        gate = gate_tier(spec, self._modes().get(spec.name))
+        shown = call
+        if spec.card is not None:
+            shown = replace(call, input=await spec.card(call.input))
+        return AskRequest(
+            kind="tool",
+            source=kind,
+            tool=spec.name,
+            group_key=spec.name,
+            summary=summarise(call.text, spec.name, shown.input),
+            input=shown.input,
+            tier=gate,
+            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id, reopen),
+            job_id=job_id,
+            turn_id=call.turn or None,
+            ask_id=ask_id,
+            wait=wait,
+            call={"name": call.name, "input": call.input, "text": call.text}
+            if wait is not None
+            else None,
+        )
+
+    def spec_named(self, name: str) -> tuple[ToolSpec, str] | None:
+        """A tool Scout can call by this name, with its source kind; None when it is gone."""
+        found = self._servable(name)
+        return (
+            None
+            if found is None
+            else (found[1], getattr(found[0], "approval_source", "scout_tool"))
+        )
+
+    def _servable(self, name: str) -> tuple[Source, ToolSpec] | None:
+        for source in self.sources:
+            for spec in source.specs():
+                if spec.name == name:
+                    return (source, spec) if "scout" in spec.audience else None
+        return None
+
+    async def redecide(self, req: AskRequest) -> Decision:
+        """The engine's decision for a request `ask_request` built, with no parking."""
+        assert self._engine is not None
+        return await self._engine.decide(req)
 
     async def _decide(self, req: AskRequest, call: Call) -> Decision:
         """The engine's decision. A Scout ask waits in its turn for `park_after` seconds (not at all
@@ -433,23 +471,20 @@ class Toolbox:
     async def carry_out(self, call: Call) -> str | list[dict]:
         """Run a parked call after the person's late yes. The yes is the ask, so the gate does
         not ask again, but a tool turned off since then still refuses."""
-        for source in self.sources:
-            for spec in source.specs():
-                if spec.name != call.name:
-                    continue
-                if "scout" not in spec.audience:
-                    break
-                if gate_tier(spec, self._modes().get(spec.name)) is Tier.off:
-                    raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
-                kind = getattr(source, "approval_source", "scout_tool")
-                try:
-                    out = await source.run(call, call.name)
-                except Exception as err:
-                    self._report(call, spec, kind, "failed", None, err)
-                    raise
-                self._report(call, spec, kind, "ok", out if isinstance(out, str) else None)
-                return self._cap(call, out, "scout")
-        raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
+        found = self._servable(call.name)
+        if found is None:
+            raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
+        source, spec = found
+        if gate_tier(spec, self._modes().get(spec.name)) is Tier.off:
+            raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
+        kind = getattr(source, "approval_source", "scout_tool")
+        try:
+            out = await source.run(call, call.name)
+        except Exception as err:
+            self._report(call, spec, kind, "failed", None, err)
+            raise
+        self._report(call, spec, kind, "ok", out if isinstance(out, str) else None)
+        return self._cap(call, out, "scout")
 
     def _report(
         self,
@@ -481,7 +516,7 @@ class Toolbox:
         # wake goes through the engine.
         if spec.follow_up and gate is not Tier.person_only and self._owner_turn(call.turn):
             return
-        await self._ask(call, spec, kind, job_id, gate, wait)
+        await self._ask(call, spec, kind, job_id, wait)
 
     async def _run(
         self, call: Call, caller: str, found: list, job_id: str | None, wait: timedelta | None

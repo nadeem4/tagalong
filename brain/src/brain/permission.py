@@ -269,13 +269,19 @@ class Person:
 
 
 def tool_asker(
-    asks: "Asks", call: "Call", tool: str, tier: Tier, ask_id: str, parent_id: str | None
+    asks: "Asks",
+    call: "Call",
+    tool: str,
+    tier: Tier,
+    ask_id: str,
+    parent_id: str | None,
+    reopen: bool = False,
 ) -> Callable[[], Awaitable[PersonAnswer]]:
     async def ask(record: OpenRecord | None = None) -> PersonAnswer:
         # Only a plain `ask` tier offers "always"; every stricter tier is asked every time.
         locked = tier is not Tier.ask
         choice = await asks.permission(
-            call, tool, locked, ask_id=ask_id, parent_id=parent_id, record=record
+            call, tool, locked, ask_id=ask_id, parent_id=parent_id, record=record, reopen=reopen
         )
         return PersonAnswer(choice)  # type: ignore[arg-type]
 

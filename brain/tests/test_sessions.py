@@ -2852,3 +2852,18 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
     [card] = open_asks(sent)
     session.answer(card["id"], "allow", "desktop")
     assert await task == "a.txt"
+
+
+# --- return: only a body that shows cards brings the waiting asks back ---
+
+
+async def test_return_with_a_display_less_body_does_nothing():
+    session, _ = make(Gate([]))
+    seen = []
+    session.waiting.rejoined = seen.append
+    join_headless(session)
+    assert seen == []
+    session._bodies.connect(
+        Body(id="desktop", kind="desktop", name="Desktop"), [], QuietPeer(), None
+    )
+    assert seen == ["desktop"]

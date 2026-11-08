@@ -515,6 +515,9 @@ class Session:
                     log.exception("loops.saw failed")
             self.scheduler.emit(event)
         self.scheduler.pump()  # also starts a wake that was waiting for a body
+        body = self._bodies.body(body_id)
+        if body is not None and body.display is not False:
+            self.waiting.rejoined(body_id)  # asks that waited for a screen are decided again
 
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
