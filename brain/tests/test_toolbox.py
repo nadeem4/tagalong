@@ -681,9 +681,6 @@ class FakeApprovals:
     def __init__(self):
         self.rows = []
 
-    def summarise(self, text, tool, input):
-        return text or tool
-
     def record(self, **row):
         self.rows.append(row)
 

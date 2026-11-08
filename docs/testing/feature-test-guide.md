@@ -459,6 +459,12 @@ tea or coffee, and recommend one."
    **Expected:** a card with "Save it" and "Not now". "Save it" adds the sentence under Home, Approvals;
    "Not now" saves nothing. A later question shows Scout acting under it, and an install still asks first.
 
+## Permission engine (unit tests only)
+
+No user-visible change yet: the floor, the deciders and `Engine.decide` (P1) are covered by
+`brain/tests/test_permission.py`. The tool gate and expert jobs move onto them in P2 and P3,
+which add the manual steps.
+
 ## Approvals history (real brain)
 
 Needs the real brain and the desktop, and the hand-off setup above for the Claude Code steps. Read

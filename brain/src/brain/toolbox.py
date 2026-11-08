@@ -29,6 +29,7 @@ from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
+from brain.permission import summarise
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 from brain.side_check import SideCheck
 
@@ -313,7 +314,7 @@ class Toolbox:
 
         if spec.card is not None:
             call = replace(call, input=await spec.card(call.input))
-        summary = approvals.summarise(call.text, spec.name, call.input) if approvals else ""
+        summary = summarise(call.text, spec.name, call.input)
         ctx = AskCtx(
             source_kind,
             spec.name,
