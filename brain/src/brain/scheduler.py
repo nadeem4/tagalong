@@ -203,7 +203,7 @@ class Scheduler:
 
     def _choose_body(self) -> str | None:
         last = self._last_body()
-        shown = self._bodies.display_ids()  # a wake is never labelled with a display-less body
+        shown = self._bodies.wake_ids()  # never a display-less body or a phone chat
         if last is not None and last in shown:
             return last
         return shown[0] if shown else None  # none: the next connect retries

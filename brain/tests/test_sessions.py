@@ -909,6 +909,32 @@ async def test_say_from_a_display_less_body_routes_the_turn_to_the_last_displayi
     assert turn_body(sent) == "desktop"
 
 
+async def test_say_from_a_display_less_body_never_lands_on_whatsapp():
+    session, sent = make(Gate(["a", "b"]))
+    join(session, "whatsapp")
+    join(session, "desktop")
+    join_headless(session)
+    session.say("whatsapp", say("hi from the phone"))
+    await finish_quietly(session)
+    sent.clear()
+    session.say("browser", say("from the page"))
+    await finish_quietly(session)
+    assert turn_body(sent) == "desktop"
+
+
+async def test_wake_never_goes_to_a_whatsapp_body_even_if_it_was_last():
+    memory = Memory(":memory:")
+    session, sent = make(Gate(["a", "b"]), memory)
+    join(session, "desktop")
+    join(session, "whatsapp")
+    session.say("whatsapp", say("hi"))
+    await finish_quietly(session)
+    sent.clear()
+    session.jobs._on_finished(end_job(memory))
+    await finish_quietly(session)
+    assert wake_started(sent) == ["desktop"]
+
+
 async def test_say_from_a_display_less_body_falls_back_to_any_displaying_body():
     session, sent = make(Gate(["a"]))
     join_headless(session)
