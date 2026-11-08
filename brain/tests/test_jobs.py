@@ -2073,7 +2073,7 @@ async def test_brain_started_continue_card_cancel_starts_nothing_and_records_no_
 
 async def test_brain_started_continue_with_nobody_online_is_not_started_and_logs_no_one(make_rig):
     check = FakeSideCheck(None)
-    asks = FakeAsks(Answer("Plan"))
+    asks = FakeAsks(Answer("Plan"), Answer(None))  # the card finds nobody, as the real Asks does
     rig = continuing(make_rig, asks, check)
     first = await first_job(rig)
     asks.online = False
