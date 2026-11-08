@@ -389,7 +389,7 @@ def test_bridge_starts_after_the_server_and_stops_at_shutdown(monkeypatch, tmp_p
 
     class Sock:
         def getsockname(self):
-            return ("127.0.0.1", 1)
+            return ("0.0.0.0", 1)
 
     class Server:
         sockets = [Sock()]
@@ -408,12 +408,14 @@ def test_bridge_starts_after_the_server_and_stops_at_shutdown(monkeypatch, tmp_p
     monkeypatch.setattr(main, "start_server", start_server)
     with pytest.raises(RuntimeError):
         asyncio.run(_run())
-    assert calls == [("built", "127.0.0.1:47321"), "start", "serving", "stop"]
+    assert calls == [("built", "127.0.0.1:1"), "start", "serving", "stop"]
 
 
 def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
     async def start_server(*args):
-        logging.getLogger("brain.bridge").error("leak %s", "wa-token-0123456789")
+        logging.getLogger("brain.bridge").error(
+            "leak %s to %s", "wa-token-0123456789", "15551234567"
+        )
         raise RuntimeError("stop")
 
     stream = io.StringIO()
@@ -424,6 +426,7 @@ def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
     monkeypatch.setenv("TAGALONG_WHATSAPP_ACCESS_TOKEN", "wa-token-0123456789")
+    monkeypatch.setenv("TAGALONG_WHATSAPP_ALLOWED_NUMBER", "15551234567")
     monkeypatch.setattr(main, "start_server", start_server)
     try:
         with pytest.raises(RuntimeError):
@@ -433,4 +436,6 @@ def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
         for h, filters in before.items():
             h.filters[:] = filters
     out = stream.getvalue()
-    assert "wa-token-0123456789" not in out and "leak [secret]" in out
+    assert (
+        "wa-token-0123456789" not in out and "leak [secret] to 15551234567" in out
+    )  # the person's own number stays

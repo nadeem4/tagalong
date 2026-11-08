@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,9 +32,12 @@ _SECRETS = (
     "TAGALONG_WHATSAPP_PHONE_NUMBER_ID",
     "TAGALONG_WHATSAPP_ALLOWED_NUMBER",
 )
+WHATSAPP_SECRETS = _SECRETS[:3]  # only these are secret: the numbers are the person's own
 WHATSAPP_VARS = ("TAGALONG_WHATSAPP_ENABLED", *_SECRETS, "TAGALONG_WHATSAPP_PORT")
 _OS_BASICS = ("PATH", "SystemRoot")  # enough for Node to start on Windows and elsewhere
 _MAX_WAIT = 30.0
+_STEADY_S = 60.0  # a bridge that ran this long was healthy: its next failure starts over at 1 s
+_GRACE_S = 5.0  # how long a stopped child gets to exit before it is killed
 ENTRY = Path(__file__).parents[3] / "bodies" / "whatsapp" / "dist" / "index.js"
 
 State = Literal["off", "incomplete", "starting", "running", "not_built", "node_failed"]
@@ -71,6 +75,8 @@ class Child(Protocol):
 
     def terminate(self) -> None: ...
 
+    def kill(self) -> None: ...
+
 
 Spawn = Callable[[list[str], dict[str, str]], Awaitable[Child]]
 
@@ -86,6 +92,10 @@ class _Process:
     def terminate(self) -> None:
         with contextlib.suppress(ProcessLookupError):  # already gone
             self._proc.terminate()
+
+    def kill(self) -> None:
+        with contextlib.suppress(ProcessLookupError):
+            self._proc.kill()
 
 
 async def real_spawn(argv: list[str], env: dict[str, str]) -> Child:
@@ -124,6 +134,8 @@ class BridgeSupervisor:
         ensure_node: Callable[[], Awaitable[Path]],
         spawn: Spawn,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        clock: Callable[[], float] = time.monotonic,
+        grace: float = _GRACE_S,
     ) -> None:
         self._env = env
         self._addr = brain_addr
@@ -131,6 +143,8 @@ class BridgeSupervisor:
         self._ensure_node = ensure_node
         self._spawn = spawn
         self._sleep = sleep
+        self._clock = clock
+        self._grace = grace
         self._task: asyncio.Task | None = None
         self.state: State = "off"
 
@@ -178,7 +192,13 @@ class BridgeSupervisor:
         env = settings.child_env(self._addr)
         wait = 1.0
         while True:
-            await self._run_once([str(node), str(self._entry)], env)
+            started = self._clock()
+            try:
+                await self._run_once([str(node), str(self._entry)], env)
+            except Exception as err:  # one bad line or spawn error must not end the watch
+                log.warning("the WhatsApp bridge failed: %s: %s", type(err).__name__, err)
+            if self._clock() - started >= _STEADY_S:
+                wait = 1.0
             self.state = "starting"
             await self._sleep(wait)
             wait = min(wait * 2, _MAX_WAIT)
@@ -198,3 +218,9 @@ class BridgeSupervisor:
             log.warning("the WhatsApp bridge exited (%s); starting it again", code)
         finally:
             child.terminate()  # on cancel this ends it; after an exit it does nothing
+            # Wait for it, so a new bridge never meets the old one still holding the port.
+            with contextlib.suppress(Exception):
+                try:
+                    await asyncio.wait_for(asyncio.shield(child.wait()), self._grace)
+                except TimeoutError:
+                    child.kill()

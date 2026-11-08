@@ -17,7 +17,7 @@ from anthropic import AsyncAnthropic
 
 from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
-from brain.bridges import ENTRY, WHATSAPP_VARS, BridgeSupervisor, private_node, real_spawn
+from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
@@ -114,7 +114,7 @@ async def _run() -> None:
         lambda: [
             *apps.secret_values(),
             os.environ.get("ANTHROPIC_API_KEY"),
-            *(os.environ.get(name) for name in WHATSAPP_VARS),  # the bridge's output is logged
+            *(os.environ.get(name) for name in WHATSAPP_SECRETS),  # the bridge's output is logged
         ],
         1.0,
     )
@@ -225,13 +225,7 @@ async def _run() -> None:
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),
     )
-    bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when switched on and set up
-        env=os.environ,
-        brain_addr=f"{config.host}:{config.port}",
-        entry=ENTRY,
-        ensure_node=private_node(config.data_dir, inspect_machine),
-        spawn=real_spawn,
-    )
+    bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     session.voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
@@ -244,8 +238,15 @@ async def _run() -> None:
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         await apps.start()  # connects in the background, so a slow app never delays boot
-        await bridges.start()  # likewise: Node and the bridge come up on their own task
         port = server.sockets[0].getsockname()[1]
+        bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when on and set up
+            env=os.environ,
+            brain_addr=f"127.0.0.1:{port}",  # the bridge is local, whatever host we listen on
+            entry=ENTRY,
+            ensure_node=private_node(config.data_dir, inspect_machine),
+            spawn=real_spawn,
+        )
+        await bridges.start()  # Node and the bridge come up on their own task
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
@@ -254,7 +255,8 @@ async def _run() -> None:
         await stop_installs()  # cancel running installs; each removes what it staged
         await stop_watches()  # before apps.shutdown(), which would end each watch with an event
         await logins.stop()
-        await bridges.stop()  # before the brain goes, so no bridge is left running
+        if bridges is not None:
+            await bridges.stop()  # before the brain goes, so no bridge is left running
         await session.jobs.shutdown()
         await apps.shutdown()
         memory.close()

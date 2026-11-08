@@ -2342,8 +2342,12 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    a timer or held-mail wake never goes to a `whatsapp` body, even when it was the last one used.
 3. `uv run pytest tests/test_main.py -q -k "bridge or whatsapp"`: the brain starts the bridge after
    the server and stops it at shutdown.
-4. By hand, once the bridge exists (a later slice): set the five values and `TAGALONG_WHATSAPP_ENABLED=1`,
-   start the brain and check `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
+4. By hand, before the bridge package exists: set `TAGALONG_WHATSAPP_ENABLED=1` and five fake values
+   (in `<TAGALONG_HOME>/.env`) and start the brain. `brain.log` gets one plain line saying the bridge is
+   not built and to run `pnpm --filter @tagalong/whatsapp build`; no `node` process starts and the brain
+   keeps working.
+5. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
+   `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
 ## Not supported
 

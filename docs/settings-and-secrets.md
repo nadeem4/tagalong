@@ -96,7 +96,9 @@ by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 The seven `TAGALONG_WHATSAPP_*` variables (enabled, access token, app secret, verify token, phone
 number id, allowed number, port) are read from the brain's environment or `<TAGALONG_HOME>/.env`
 and listed in `.env.example`. The brain builds the WhatsApp bridge's environment from them and
-nothing else; the values are masked in logs, including the bridge's own output. See
+nothing else. Only the access token, app secret and verify token are masked (in logs,
+including the bridge's own output, and in saved text); the numbers are the person's own and are
+not. See
 [the brain](brain.md#whatsapp-bridge).
 
 ### Secrets on the way out

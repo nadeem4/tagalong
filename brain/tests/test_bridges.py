@@ -6,10 +6,14 @@ The process spawner, Node and sleep are fakes; nothing real is started.
 import asyncio
 import io
 import logging
+import os
+import sys
 from pathlib import Path
 
-from brain.bridges import DEFAULT_PORT, BridgeSupervisor, WhatsAppSettings
+from brain import bridges
+from brain.bridges import DEFAULT_PORT, BridgeSupervisor, WhatsAppSettings, real_spawn
 from brain.masking import Masker, SecretLogFilter
+from brain.setup.facts import NodePaths
 
 SECRETS = {
     "TAGALONG_WHATSAPP_ACCESS_TOKEN": "tok-secret-123456",
@@ -22,16 +26,21 @@ ON = {"TAGALONG_WHATSAPP_ENABLED": "1", **SECRETS}
 
 
 class FakeChild:
-    def __init__(self, lines: list[bytes] | None = None) -> None:
+    def __init__(self, lines: list[bytes] | None = None, *, broken=False, stubborn=False) -> None:
         self.done = asyncio.Event()
         self.code = 0
         self.terminated = False
+        self.killed = False
+        self.stubborn = stubborn  # ignores terminate, like a child stuck in cleanup
+        self._broken = broken
         self._lines = lines or []
         self.stdout = self._read()
 
     async def _read(self):
         for line in self._lines:
             yield line
+        if self._broken:
+            raise ValueError("Separator is not found, and chunk exceed the limit")
         await self.done.wait()
 
     async def wait(self) -> int:
@@ -40,6 +49,11 @@ class FakeChild:
 
     def terminate(self) -> None:
         self.terminated = True
+        if not self.stubborn:
+            self.done.set()
+
+    def kill(self) -> None:
+        self.killed = True
         self.done.set()
 
     def exit(self, code: int = 1) -> None:
@@ -48,7 +62,9 @@ class FakeChild:
 
 
 class Rig:
-    def __init__(self, tmp_path: Path, env: dict | None = None, built: bool = True) -> None:
+    def __init__(
+        self, tmp_path: Path, env: dict | None = None, built: bool = True, grace: float = 5.0
+    ) -> None:
         self.env = dict(ON if env is None else env)
         self.entry = tmp_path / "index.js"
         if built:
@@ -58,6 +74,10 @@ class Rig:
         self.lines: list[bytes] = []
         self.sleeps: list[float] = []
         self.node_error: Exception | None = None
+        self.events: list[str] = []
+        self.now = 0.0
+        self.broken_first = False
+        self.stubborn = False
         self.supervisor = BridgeSupervisor(
             env=self.env,
             brain_addr="127.0.0.1:47321",
@@ -65,16 +85,22 @@ class Rig:
             ensure_node=self._node,
             spawn=self._spawn,
             sleep=self._sleep,
+            clock=lambda: self.now,
+            grace=grace,
         )
 
     async def _node(self) -> Path:
+        self.events.append("node")
         if self.node_error:
             raise self.node_error
         return Path("node-private")
 
     async def _spawn(self, argv, env):
+        self.events.append("spawn")
         self.spawned.append((argv, env))
-        child = FakeChild(self.lines)
+        child = FakeChild(
+            self.lines, broken=self.broken_first and not self.children, stubborn=self.stubborn
+        )
         self.children.append(child)
         return child
 
@@ -186,7 +212,7 @@ async def test_a_node_that_cannot_be_made_runs_nothing(tmp_path, caplog):
     assert len(caplog.records) == 1
 
 
-async def test_child_output_is_logged_through_the_filter(tmp_path):
+async def test_child_output_is_logged_through_the_filter(tmp_path, caplog):
     rig = Rig(tmp_path)
     token = SECRETS["TAGALONG_WHATSAPP_ACCESS_TOKEN"]
     rig.lines = [f"sent with {token}\n".encode(), b"listening\n"]
@@ -195,12 +221,124 @@ async def test_child_output_is_logged_through_the_filter(tmp_path):
     handler.addFilter(SecretLogFilter(Masker(lambda: [token])))
     log = logging.getLogger("brain.bridge")
     log.addHandler(handler)
-    log.setLevel(logging.INFO)
     try:
-        await rig.supervisor.start()
-        await settle()
-        await rig.supervisor.stop()
+        with caplog.at_level(logging.INFO, logger="brain.bridge"):  # restores the level after
+            await rig.supervisor.start()
+            await settle()
+            await rig.supervisor.stop()
     finally:
         log.removeHandler(handler)
     out = stream.getvalue()
     assert token not in out and "sent with [secret]" in out and "listening" in out
+
+
+async def test_a_failing_output_stream_does_not_end_the_watch(tmp_path, caplog):
+    rig = Rig(tmp_path)
+    rig.broken_first = True
+    with caplog.at_level(logging.INFO, logger="brain.bridge"):
+        await rig.supervisor.start()
+        await settle()
+    assert len(rig.spawned) == 2 and rig.sleeps == [1]
+    assert rig.supervisor.state == "running"
+    assert any("ValueError" in r.getMessage() for r in caplog.records)
+    await rig.supervisor.stop()
+
+
+async def test_stop_waits_for_the_child_and_kills_one_that_will_not_go(tmp_path):
+    rig = Rig(tmp_path, grace=0.01)
+    rig.stubborn = True
+    await rig.supervisor.start()
+    await settle()
+    await rig.supervisor.stop()
+    child = rig.children[0]
+    assert child.terminated and child.killed and child.done.is_set()
+
+
+async def test_stop_returns_after_the_child_has_exited(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.supervisor.start()
+    await settle()
+    await rig.supervisor.stop()
+    assert rig.children[0].done.is_set() and not rig.children[0].killed
+
+
+async def test_stop_twice_is_fine(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.supervisor.start()
+    await settle()
+    await rig.supervisor.stop()
+    await rig.supervisor.stop()
+    assert rig.supervisor.state == "off" and len(rig.spawned) == 1
+
+
+async def test_apply_starts_the_waits_over_at_one_second(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.supervisor.start()
+    for _ in range(3):
+        await settle()
+        rig.children[-1].exit(1)
+    await settle()
+    assert rig.sleeps == [1, 2, 4]
+    await rig.supervisor.apply()
+    await settle()
+    rig.children[-1].exit(1)
+    await settle()
+    assert rig.sleeps == [1, 2, 4, 1]
+    await rig.supervisor.stop()
+
+
+async def test_a_long_healthy_run_resets_the_wait(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.supervisor.start()
+    for _ in range(3):
+        await settle()
+        rig.children[-1].exit(1)
+    await settle()
+    rig.now = 120.0  # the fourth bridge ran two minutes
+    rig.children[-1].exit(1)
+    await settle()
+    assert rig.sleeps == [1, 2, 4, 1]
+    await rig.supervisor.stop()
+
+
+async def test_the_runtime_is_installed_first_when_missing(tmp_path):
+    rig = Rig(tmp_path)
+    await rig.supervisor.start()
+    await settle()
+    assert rig.events[:2] == ["node", "spawn"]
+    await rig.supervisor.stop()
+
+
+async def test_private_node_asks_for_tagalongs_own_node(monkeypatch, tmp_path):
+    seen = {}
+
+    async def fake_ensure(home, floor, fetch, get_json, os_name, arch, progress):
+        seen["args"] = (home, floor, os_name, arch)
+        return NodePaths(Path("own-node"), Path("npm"))
+
+    class Machine:
+        os, arch = "windows", "x64"
+
+    async def inspect_machine():
+        return Machine()
+
+    monkeypatch.setattr(bridges, "ensure_node", fake_ensure)
+    node = await bridges.private_node(tmp_path, inspect_machine)()
+    assert node == Path("own-node")
+    assert seen["args"] == (tmp_path, bridges.NODE_FLOOR, "windows", "x64")
+
+
+async def test_real_spawn_pipes_stdin_and_merges_stderr():
+    code = (
+        "import sys; print('out', flush=True); "
+        "print('err', file=sys.stderr, flush=True); sys.stdin.read()"
+    )
+    child = await real_spawn([sys.executable, "-c", code], dict(os.environ))
+    lines = []
+    async for line in child.stdout:
+        lines.append(line.strip())
+        if len(lines) == 2:
+            break
+    assert sorted(lines) == [b"err", b"out"]
+    child._proc.stdin.close()  # the bridge's signal to exit
+    assert await asyncio.wait_for(child.wait(), 10) == 0

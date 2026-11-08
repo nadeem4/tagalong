@@ -118,7 +118,7 @@ the total can run a little low.
 | `brain/src/brain/voice/__init__.py`    | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/voice/ears.py`        | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
-| `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain |
+| `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                       |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -1030,15 +1030,19 @@ process of the brain, on Tagalong's own Node only (`ensure_node`; the system Nod
   token, phone number id and allowed number are all set. Otherwise nothing runs.
   `BridgeSupervisor.state` is `off`, `incomplete`, `starting`, `running`, `not_built` (the file is
   missing: one log line says to run `pnpm --filter @tagalong/whatsapp build`) or `node_failed`.
-- The child's environment is built by the brain: `TAGALONG_BRAIN_ADDR`, the five values, the
+- The child's environment is built by the brain: `TAGALONG_BRAIN_ADDR` (always `127.0.0.1` and the port the brain actually bound), the five values, the
   port (default 47322) and `PATH`/`SystemRoot`. It never sees the Anthropic key and never reads
   `.env`.
-- A bridge that exits is started again after 1, 2, 4, 8, 16 s and then every 30 s.
+- A bridge that exits (or whose output stream fails) is started again after 1, 2, 4, 8, 16 s
+  and then every 30 s; a bridge that ran for a minute or more starts the waits over at 1 s.
+  Stopping waits for the child to exit (5 s, then it is killed), so a new bridge never meets the
+  old one on its port.
 - `main.py` starts it after the server is up and stops it before the jobs shut down. The brain
   also holds the child's stdin pipe, which the bridge exits on when it closes, so a brain that is
   killed hard (`tagalong stop` on Windows) leaves no bridge behind.
 - The child's output is logged by the `brain.bridge` logger, so it reaches `brain.log` through the
-  secret filter; the seven values are masked like the Anthropic key.
+  secret filter; the access token, app secret and verify token are masked like the Anthropic key. The phone
+  number id and the person's own number are not secret and are kept as written.
 
 ## Experts
 
