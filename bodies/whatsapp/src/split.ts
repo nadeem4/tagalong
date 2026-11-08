@@ -9,7 +9,10 @@ export function splitReply(text: string, maxLen = 4000): string[] {
   while (rest.length > maxLen) {
     const window = rest.slice(0, maxLen + 1);
     const at = ['\n\n', '\n', ' '].map((sep) => window.lastIndexOf(sep)).find((i) => i > 0);
-    const cut = at ?? maxLen;
+    let cut = at ?? maxLen;
+    // Never cut between the two halves of an emoji or other surrogate pair.
+    const before = rest.charCodeAt(cut - 1);
+    if (at === undefined && before >= 0xd800 && before <= 0xdbff) cut -= 1;
     const part = rest.slice(0, cut).trim();
     if (part) parts.push(part);
     rest = rest.slice(cut).trim();

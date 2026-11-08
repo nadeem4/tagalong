@@ -5,7 +5,7 @@
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export class Window {
+export class ReplyWindow {
   private last: number | null = null;
 
   constructor(private readonly now: () => number) {}

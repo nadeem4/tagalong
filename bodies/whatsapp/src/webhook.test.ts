@@ -11,10 +11,10 @@ import { createWebhook, type Inbound } from './webhook';
 const CONFIG = { appSecret: 'app-secret', verifyToken: 'verify-me', allowedNumber: '15550001111' };
 const servers: Server[] = [];
 
-async function start(maxBodyBytes?: number) {
+async function start(maxBodyBytes?: number, allowedNumber = CONFIG.allowedNumber) {
   const inbound: Inbound[] = [];
   const server = createWebhook({
-    config: CONFIG,
+    config: { ...CONFIG, allowedNumber },
     onInbound: (m) => inbound.push(m),
     ...(maxBodyBytes === undefined ? {} : { maxBodyBytes }),
   });
@@ -97,6 +97,12 @@ describe('POST /webhook', () => {
     const res = await post(base, payload([text('m1', '15559998888')]));
     expect(res.status).toBe(200);
     expect(inbound).toEqual([]);
+  });
+
+  test('test_allowed_number_with_plus_and_spaces_matches', async () => {
+    const { base, inbound } = await start(undefined, '+1 (555) 000-1111');
+    await post(base, payload([text('m1', '15550001111')]));
+    expect(inbound).toHaveLength(1);
   });
 
   test('test_repeated_message_id_is_ignored', async () => {
