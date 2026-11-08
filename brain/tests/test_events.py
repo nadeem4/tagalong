@@ -225,3 +225,9 @@ def test_ask_ended_kind_has_a_note():
     kind = EVENT_KINDS["ask_ended"]
     assert kind.wakes and kind.batch_seconds == 30 and kind.max_per_hour == 10
     assert load_notes()["ask_ended"].strip()
+
+
+def test_asks_waiting_kind_has_a_note():
+    kind = EVENT_KINDS["asks_waiting"]
+    assert kind.wakes and kind.batch_seconds is None and kind.max_per_hour is None
+    assert load_notes()["asks_waiting"].strip()

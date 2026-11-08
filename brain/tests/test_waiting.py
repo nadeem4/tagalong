@@ -5,6 +5,7 @@ toolbox, engine, asks and work rows wired the way a session wires them.
 """
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -14,7 +15,7 @@ from brain.asks import Asks
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
-from brain.permission import Engine, Person, StandingRule, stored_auto_rules
+from brain.permission import Engine, Person, StandingRule, Tier, stored_auto_rules
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import TransitionRefused, WorkStore
 from brain.toolbox import Toolbox as RealToolbox
@@ -77,14 +78,17 @@ class SlowCheck:
 
 
 class Rig:
-    def __init__(self, online=("desktop",), headless=(), park_after=0.05, names=("t",), slow=0.0):
-        self.memory = Memory(":memory:")
+    def __init__(
+        self, online=("desktop",), headless=(), park_after=0.05, names=("t",), slow=0.0, memory=None
+    ):
+        self.memory = memory or Memory(":memory:")
         self.work = WorkStore(self.memory.db, now)
         self.bodies = Bodies(online, headless)
         self.asks = Asks(self.bodies, self.work)
         self.approvals = Approvals(self.memory, self.work, lambda m, p: None, now)
         self.stored: dict[str, str] = {}
         self.events: list[Event] = []
+        self.starts: list = []  # each emitted wake's on_start hook, run when its turn begins
         self.source = Source(*names)
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), SlowCheck(slow), Person()],
@@ -98,7 +102,7 @@ class Rig:
             self.work,
             self.asks,
             lambda: self.box,
-            self.events.append,
+            self._emit,
             lambda: self.clock,
             self.approvals,
         )
@@ -111,6 +115,10 @@ class Rig:
             waiting=self.waiting,
             park_after=park_after,
         )
+
+    def _emit(self, event, on_start=None):
+        self.events.append(event)
+        self.starts.append(on_start)
 
     def opened(self):
         return [p for p in self.bodies.sent if p["state"] == "open"]
@@ -497,3 +505,233 @@ async def test_one_timer_is_armed_for_the_earliest_moment_and_dropped_when_idle(
     rig.asks.answer(ask_id, "allow", "desktop")
     await rig.settle()
     assert rig.waiting._handle is None
+
+
+# --- restart: a waiting ask keeps its deadline; one that held a secret expires at start ---
+
+
+def restarted(rig):
+    """The same database in a fresh brain: new asks, new waiting, nothing in memory."""
+    return Rig(online=(), memory=rig.memory)
+
+
+async def test_start_wakes_scout_once_about_a_secret_expiry():
+    rig = Rig(online=())
+    rig.work.create(
+        "ask",
+        "Send it",
+        id="a1",
+        state="active",
+        input={"name": "t", "input": {}, "text": ""},
+        due_at=NOW + timedelta(days=1),
+        safe_to_retry=False,
+    )
+    rig.work.add_ask("a1", source="scout_tool", tool="t", summary="Send it", group_key="t")
+    again = restarted(rig)
+    again.work.resume_scan(lambda row: None)
+    again.waiting.start()
+    [event] = again.events
+    assert event.kind == "ask_ended" and event.key == "ask:a1"
+    assert event.facts == {
+        "ask": "a1",
+        "tool": "t",
+        "summary": "Send it",
+        "outcome": "expired",
+        "reason": "held a secret",
+    }
+    assert again.work.get("a1").reported_at is None  # told only when the wake starts
+    again.starts[0]()
+    assert again.work.get("a1").reported_at is not None
+    third = restarted(rig)
+    third.waiting.start()
+    assert third.events == []
+
+
+# --- return: a displaying body joins and every waiting ask is decided afresh ---
+
+
+async def away_asks(count=2, **kw):
+    """Park `count` asks while nobody displays, then bring the brain back with a body online."""
+    first = Rig(online=(), **kw)
+    for n in range(1, count + 1):
+        await first.box.run(call(n, call_id=f"c{n}"))
+    ids = [r.id for r in first.work.waiting_asks()]
+    return first, ids
+
+
+def back(first, **kw):
+    """A fresh brain on the same database with the person's desktop connected."""
+    rig = Rig(online=("desktop",), memory=first.memory, **kw)
+    rig.work.resume_scan(lambda row: None)
+    rig.waiting.start()
+    return rig
+
+
+def wakes(rig):
+    return [e for e in rig.events if e.kind == "asks_waiting"]
+
+
+async def test_return_shows_two_parked_asks_oldest_first_with_one_wake():
+    first, ids = await away_asks(2)
+    rig = back(first)
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert [p["id"] for p in rig.opened()] == ids
+    assert all("turn" not in p for p in rig.opened())
+    [wake] = wakes(rig)
+    assert wake.key == "asks_waiting" and wake.facts["count"] == 2
+    asks = json.loads(wake.facts["asks"])
+    assert [a["ask"] for a in asks] == ids
+    assert asks[0] == {"ask": ids[0], "tool": "t", "summary": "Doing it.", "age_s": 3600}
+    assert rig.source.ran == []
+
+
+async def test_return_twice_does_not_show_or_wake_again():
+    first, _ = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1 and len(wakes(rig)) == 1
+
+
+async def test_a_yes_to_a_returned_ask_runs_the_call():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    assert [e.facts["outcome"] for e in ended(rig)] == ["approved"]
+    assert rig.work.get(ask_id).state == "done"
+
+
+async def test_return_runs_an_ask_a_new_auto_now_allows():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.stored["t"] = "auto"
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    assert rig.opened() == [] and wakes(rig) == []
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "approved"
+    assert rig.work.ask_detail(ask_id)["decided_by"] == "rule"
+
+
+async def test_return_refuses_an_ask_whose_tool_was_turned_off():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.stored["t"] = "off"
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == [] and wakes(rig) == []
+    row = rig.work.get(ask_id)
+    assert (row.state, rig.work.ask_detail(ask_id)["decided_by"]) == ("expired", "none")
+    [event] = ended(rig)
+    assert (event.facts["outcome"], event.facts["reason"]) == ("expired", "turned off")
+
+
+async def test_return_refuses_an_ask_whose_tool_is_gone():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first, names=("other",))
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.opened() == [] and wakes(rig) == []
+    assert rig.work.get(ask_id).state == "expired"
+    [event] = ended(rig)
+    assert (event.facts["outcome"], event.facts["reason"]) == ("expired", "tool gone")
+
+
+async def test_return_does_not_redecide_a_live_ask():
+    rig = Rig(park_after=0.05)  # a body shows the card: parked, still live in this session
+    await rig.box.run(call())
+    rig.stored["t"] = "auto"  # a rule that would allow it now
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1 and rig.source.ran == []
+    assert wakes(rig) == []  # it was shown to a body when it was raised
+
+
+async def test_return_wakes_for_a_live_ask_raised_to_an_empty_room():
+    rig = Rig(online=())
+    await rig.box.run(call())
+    [ask_id] = [r.id for r in rig.work.waiting_asks()]
+    rig.bodies.online.append("desktop")
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert len(rig.opened()) == 1  # not shown a second time: the replay path owns it
+    [wake] = wakes(rig)
+    assert [a["ask"] for a in json.loads(wake.facts["asks"])] == [ask_id]
+
+
+async def test_return_with_nothing_waiting_does_nothing():
+    rig = Rig()
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.events == [] and rig.bodies.sent == []
+
+
+async def test_carried_out_call_goes_through_the_floor_again():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.source._specs[0] = ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.person_only)
+    rig.stored["t"] = "auto"  # a stored Auto never opens a person-only tool
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == []
+    [shown] = rig.opened()
+    assert shown["id"] == ask_id and shown["options"] == ["allow", "deny"]
+    assert rig.work.get(ask_id).state == "active"
+
+
+# --- review fixes: no expiry or replay races in the return ---
+
+
+async def test_a_deadline_passing_mid_return_runs_nothing_and_ends_once():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    gate = asyncio.Event()
+
+    async def slow_card(input):
+        await gate.wait()
+        return input
+
+    rig.source._specs[0] = ToolSpec(
+        "t", "t tool", {"type": "object"}, card=slow_card, tier=Tier.auto
+    )
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    rig.clock = NOW + timedelta(days=4)  # past the 3 day deadline while the return waits
+    rig.waiting.fire_due()  # must not end the row under the return's feet
+    gate.set()
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == []
+    assert rig.work.get(ask_id).state == "expired"
+    assert [e.facts["outcome"] for e in ended(rig)] == ["expired"]
+
+
+async def test_return_expires_a_secret_holding_row_it_finds():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.work.db.execute("UPDATE work SET safe_to_retry = 0 WHERE id = ?", (ask_id,))
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    assert rig.source.ran == [] and rig.opened() == []
+    [event] = ended(rig)
+    assert event.facts["reason"] == "held a secret"
+
+
+async def test_shutdown_cancelling_a_returned_ask_leaves_it_waiting():
+    first, [ask_id] = await away_asks(1)
+    rig = back(first)
+    rig.waiting.rejoined("desktop")
+    await rig.settle()
+    for task in list(rig.waiting._tasks):
+        task.cancel()
+    await rig.settle()
+    assert rig.work.get(ask_id).state == "active"
+    assert ended(rig) == []

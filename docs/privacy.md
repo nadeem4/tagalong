@@ -218,7 +218,10 @@ when Scout calls one of their tools in a turn you started.
   ask keeps Scout's summary of what will happen (the app, the tool and what Scout filled in, with
   keys and passwords hidden). Tagalong never puts a window
   title, your selection or window text into an ask by itself, though the summary keeps what Scout
-  wrote, which can quote the screen when you asked for that (a bug report, say).
+  wrote, which can quote the screen when you asked for that (a bug report, say). A change that
+  waits for you is saved with its call so it can run when you say yes, even after a restart; a call
+  that held a secret is never saved to be replayed (the secret would be the literal `[secret]`),
+  so after a restart that ask simply expires and Scout tells you.
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
   written in it, and the app cannot end that fence early. An app's error message is fenced the
   same way. It goes to Scout's brain provider like any window text, and is not stored.

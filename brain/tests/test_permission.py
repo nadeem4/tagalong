@@ -181,7 +181,9 @@ class FakeAsks:
     def anyone_online(self):
         return self.online
 
-    async def permission(self, call, spec_name, locked, *, ask_id, parent_id, record=None):
+    async def permission(
+        self, call, spec_name, locked, *, ask_id, parent_id, record=None, reopen=False
+    ):
         self.locked = locked
         self.seen = (call, spec_name, ask_id, parent_id)
         return self.option

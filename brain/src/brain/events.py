@@ -37,6 +37,7 @@ _KINDS = (
     EventKind("job_ended", batch_seconds=30, max_per_hour=10),
     EventKind("ask_notice", batch_seconds=60, max_per_hour=6),
     EventKind("ask_ended", batch_seconds=30, max_per_hour=10),
+    EventKind("asks_waiting", batch_seconds=None, max_per_hour=None),
     EventKind("job_quiet", batch_seconds=0, max_per_hour=3),
     EventKind("job_step_failed", batch_seconds=120, max_per_hour=4),
     EventKind("work_failed", batch_seconds=0, max_per_hour=10),

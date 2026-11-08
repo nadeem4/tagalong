@@ -169,8 +169,10 @@ class Jobs:
         settled = work.resume_scan(self.can_resume_row)
         # The end lines come after the scan commits; a crash between only loses them, because
         # resume_scan is idempotent and will not settle these rows twice.
-        for work_id, _ in settled:
+        for work_id, outcome in settled:
             row = work.get(work_id)
+            if outcome == "held a secret":
+                continue  # Scout's own ask: the waiting asks tell him once, when his wake starts
             if row is not None and row.kind in ("ask", "question"):
                 work.mark_reported(work_id)  # nobody is told of an ask that died with the brain
                 continue
