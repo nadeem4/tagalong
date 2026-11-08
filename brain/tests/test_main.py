@@ -214,6 +214,27 @@ def _key_source(monkeypatch, tmp_path, env_key, file_key):
     return seen["status"]
 
 
+def test_home_has_the_bodies_tools(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    seen = {}
+
+    async def stop(host, port, bodies, session_id, session):
+        seen["bodies"] = json.loads(await session.call_home("bodies_status", {}))
+        seen["wa"] = json.loads(await session.call_home("whatsapp_status", {}))
+        raise Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.delenv("TAGALONG_WHATSAPP_ENABLED", raising=False)
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    assert [b["kind"] for b in seen["bodies"]["bodies"]] == ["desktop", "browser", "whatsapp"]
+    assert seen["wa"]["enabled"] is False and seen["wa"]["state"] == "off"
+
+
 def test_key_source_is_environment_when_the_variable_is_set(monkeypatch, tmp_path):
     status = _key_source(monkeypatch, tmp_path, "sk-ant-example-env-key", "sk-ant-example-file-key")
     assert status["source"] == "environment" and status["has_key"] is True
