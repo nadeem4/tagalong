@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from brain.protocol import LIMITS, Body, ErrorCode, RpcError, Tool
+from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Tool
 
 log = logging.getLogger("brain")
 
@@ -180,6 +180,15 @@ class Bodies:
     def display_ids(self) -> list[str]:
         # Bodies that can show a turn or an ask; a body with display=false shows nothing.
         return [i for i, o in self._online.items() if o.body.display is not False]
+
+    def wake_ids(self) -> list[str]:
+        # Where Scout may speak first. A phone chat is never interrupted by a timer or held
+        # mail: it answers the person, it does not open the conversation.
+        return [
+            i
+            for i, o in self._online.items()
+            if o.body.display is not False and o.body.kind != BODY_WHATSAPP
+        ]
 
     def body(self, body_id: str) -> Body | None:
         current = self._online.get(body_id)

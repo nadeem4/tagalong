@@ -40,12 +40,16 @@ class FakeBodies(Bodies):
         super().__init__()
         self.ids = online
         self.headless: set[str] = set()
+        self.phones: set[str] = set()
 
     def online_ids(self) -> list[str]:
         return list(self.ids)
 
     def display_ids(self) -> list[str]:
         return [i for i in self.ids if i not in self.headless]
+
+    def wake_ids(self) -> list[str]:
+        return [i for i in self.display_ids() if i not in self.phones]
 
     def is_online(self, body_id: str) -> bool:
         return body_id in self.ids
@@ -122,6 +126,20 @@ def test_wake_never_goes_to_a_display_less_body():
     rig.bodies.headless = {"browser"}
     rig.scheduler.emit(ev())
     assert [b for b, _ in rig.starts] == ["desktop"]
+
+
+def test_wake_never_goes_to_a_whatsapp_body_even_if_it_was_last():
+    rig = Rig(online=("whatsapp", "desktop"), last="whatsapp")
+    rig.bodies.phones = {"whatsapp"}
+    rig.scheduler.emit(ev())
+    assert [b for b, _ in rig.starts] == ["desktop"]
+
+
+def test_wake_waits_when_only_a_whatsapp_body_is_online():
+    rig = Rig(online=("whatsapp",), last="whatsapp")
+    rig.bodies.phones = {"whatsapp"}
+    rig.scheduler.emit(ev())
+    assert rig.starts == []
 
 
 def test_wake_waits_when_only_display_less_bodies_are_online():

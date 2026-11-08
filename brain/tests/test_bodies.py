@@ -420,6 +420,15 @@ def test_display_ids_skip_display_false_bodies():
     assert bodies.online_ids() == ["a", "b", "c"]
 
 
+def test_wake_ids_skip_display_less_and_whatsapp_bodies():
+    bodies = Bodies()
+    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None)
+    bodies.connect(Body(id="w", kind="whatsapp", name="WhatsApp"), [], FakePeer(), None)
+    assert bodies.wake_ids() == ["a"]
+    assert bodies.display_ids() == ["a", "w"]  # an ask may still reach the phone
+
+
 def test_body_lookup_is_online_only():
     bodies = Bodies()
     peer = FakePeer()

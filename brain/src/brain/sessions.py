@@ -460,7 +460,7 @@ class Session:
         self.voice.spoken(turn, shown_on, voice, speed, ask.system_voice if ask else False)
 
     def _display_target(self) -> str | None:
-        shown = self._bodies.display_ids()
+        shown = self._bodies.wake_ids()
         if self._last_body in shown:
             return self._last_body
         return shown[0] if shown else None
