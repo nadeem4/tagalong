@@ -20,7 +20,7 @@ from brain.events import Event
 from brain.mind.turn import Call
 from brain.permission import AskRequest, Decision
 from brain.protocol import RpcError
-from brain.store.work import WorkRow, WorkStore
+from brain.store.work import TransitionRefused, WorkRow, WorkStore
 
 if TYPE_CHECKING:
     from brain.toolbox import Toolbox
@@ -98,16 +98,24 @@ class WaitingAsks:
 
     def fire_due(self) -> None:
         now = self._now()
-        for row in self._work.waiting_asks():
+        rows = self._work.waiting_asks()
+        self._expiring &= {r.id for r in rows}  # an id whose end never logged must not linger
+        for row in rows:
             if row.id in self._expiring or row.due_at is None:
                 continue
-            due = datetime.fromisoformat(row.due_at)
-            if now >= due:
-                self._expire(row)
-            elif self._work.event_of(row.id, "notice") is None:
-                start = datetime.fromisoformat(row.created_at)
-                if now >= start + (due - start) * 2 / 3:
-                    self._notice(row, now, due)
+            try:
+                due = datetime.fromisoformat(row.due_at)
+                if now >= due:
+                    self._expire(row)
+                elif self._work.event_of(row.id, "notice") is None:
+                    start = datetime.fromisoformat(row.created_at)
+                    if now >= start + (due - start) * 2 / 3:
+                        self._notice(row, now, due)
+            except Exception:
+                # One bad row must not stop the timer or the brain starting; skip it from now on
+                # so the re-armed timer does not spin on it.
+                log.exception("an ask could not be timed: %s", row.id)
+                self._expiring.add(row.id)
         self.changed()
 
     def _notice(self, row: WorkRow, now: datetime, due: datetime) -> None:
@@ -132,17 +140,21 @@ class WaitingAsks:
         detail = self._work.ask_detail(row.id) or {}
         tool = detail.get("tool") or ""
         summary = detail.get("summary") or row.title
-        self._approvals.record(
-            source=detail.get("source") or "scout_tool",
-            tool=tool,
-            summary=summary,
-            input=detail.get("input") or {},
-            group_key=detail.get("group_key") or tool,
-            outcome="expired",
-            decided_by="none",
-            ask_id=row.id,
-            reason=reason,
-        )
+        try:
+            self._approvals.record(
+                source=detail.get("source") or "scout_tool",
+                tool=tool,
+                summary=summary,
+                input=detail.get("input") or {},
+                group_key=detail.get("group_key") or tool,
+                outcome="expired",
+                decided_by="none",
+                ask_id=row.id,
+                reason=reason,
+            )
+        except TransitionRefused:
+            self._work.settle(row.id, "expired", reason)  # leave waiting_asks, nothing to log
+            return
         facts = {"ask": row.id, "tool": tool, "summary": summary, "outcome": "expired"}
         self._emit(Event("ask_ended", {**facts, "reason": reason}, key=f"ask:{row.id}"))
 

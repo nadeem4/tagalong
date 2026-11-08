@@ -16,7 +16,7 @@ from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import Engine, Person, StandingRule, stored_auto_rules
 from brain.protocol import ErrorCode, RpcError
-from brain.store.work import WorkStore
+from brain.store.work import TransitionRefused, WorkStore
 from brain.toolbox import Toolbox as RealToolbox
 from brain.toolbox import ToolSpec
 from brain.waiting import WaitingAsks
@@ -370,6 +370,77 @@ async def test_deadline_expires_with_no_answer_closes_the_card_and_wakes_scout()
     rig.waiting.fire_due()  # nothing is left to expire
     await rig.settle()
     assert len(ended(rig)) == 1
+
+
+async def test_firing_twice_before_the_end_lands_wakes_and_logs_once():
+    rig = Rig()
+    await rig.box.run(waits(1))
+    ask_id = rig.opened()[-1]["id"]
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    rig.waiting.fire_due()  # before the adopted decision has settled
+    await rig.settle()
+    assert len(ended(rig)) == 1
+    assert len(rig.work.events_of_kind(ask_id, "decided")) == 1
+
+
+async def test_after_expiry_the_same_call_opens_a_new_ask():
+    rig = Rig()
+    await rig.box.run(waits(1))
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    await rig.settle()
+    await rig.box.run(waits(1))
+    assert len(rig.opened()) == 2  # the claim was released with the end
+
+
+async def test_one_bad_row_does_not_stop_the_others_from_expiring(monkeypatch):
+    rig = Rig()
+    for rid in ("bad", "good"):
+        rig.work.create(
+            "ask",
+            rid,
+            id=rid,
+            state="active",
+            input={"name": "t", "input": {"n": 1}},
+            due_at=NOW + timedelta(hours=1),
+        )
+    real = rig.approvals.record
+
+    def record(**kw):
+        if kw["ask_id"] == "bad":
+            raise TransitionRefused("bad is not an ask with facts")
+        real(**kw)
+
+    monkeypatch.setattr(rig.approvals, "record", record)
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()  # must not raise
+    assert rig.work.get("good").state == "expired"
+    assert rig.work.get("bad").state == "expired"  # left waiting_asks, so it cannot recur
+
+
+async def test_an_unexpected_error_on_one_row_is_logged_and_skipped(monkeypatch):
+    rig = Rig()
+    for rid in ("bad", "good"):
+        rig.work.create(
+            "ask",
+            rid,
+            id=rid,
+            state="active",
+            input={"name": "t", "input": {"n": 1}},
+            due_at=NOW + timedelta(hours=1),
+        )
+    real = rig.approvals.record
+
+    def record(**kw):
+        if kw["ask_id"] == "bad":
+            raise RuntimeError("boom")
+        real(**kw)
+
+    monkeypatch.setattr(rig.approvals, "record", record)
+    rig.clock = NOW + timedelta(hours=1)
+    rig.waiting.fire_due()
+    assert rig.work.get("good").state == "expired"
 
 
 async def test_expired_ask_runs_nothing():
