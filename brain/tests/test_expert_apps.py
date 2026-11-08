@@ -25,6 +25,7 @@ from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.outputs import OutputStore
+from brain.permission import Engine, Person
 from brain.store import rules
 from brain.toolbox import Toolbox
 
@@ -92,7 +93,7 @@ class Rig:
             partial(rules.permission_modes, self.memory.db),
             partial(rules.set_permission_mode, self.memory.db),
             self.asks,
-            self.approvals,
+            Engine([Person()], self.approvals, None, lambda n: None),
             outputs=OutputStore(self.memory, self.guards, cap) if cap else None,
         )
         self.bridge = ExpertApps(self.apps, lambda: self.toolbox, self.guards)

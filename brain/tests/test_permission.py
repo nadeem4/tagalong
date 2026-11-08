@@ -539,3 +539,18 @@ def test_body_confirm_maps_to_tier():
     assert specs(None).tier is None
     assert specs(True).tier is Tier.locked
     assert specs("always").tier is Tier.person_only
+
+
+async def test_side_check_grant_whose_preference_use_raises_is_a_pass(mem):
+    pref = Preference(1, "ok", None, None, None, False, "", 0, None)
+    rig = Rig(
+        mem, [Fake("side_check", Grant("scout", preference=pref)), Fake("person", Grant("person"))]
+    )
+
+    def boom(*a):
+        raise RuntimeError("db")
+
+    rig.approvals.preference_used = boom
+    d = await rig.engine.decide(req())
+    assert (d.kind, d.decided_by) == ("allow_once", "person")
+    assert [r.decided_by for r in rig.rows()] == ["person"]

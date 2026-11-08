@@ -72,7 +72,7 @@ the total can run a little low.
 | `brain/src/brain/guardrails.py`        | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/masking.py`           | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                                                                                                                                                                               |
 | `brain/src/brain/guards.py`            | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                                                                                                                                                                               |
-| `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), `tool_mode` (tool_call) and the ask chain `anyone_online`, `side_check`, `person_ask`                                                                                                                                                                                                                                                         |
+| `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), and the ask chain `anyone_online`, `side_check`, `person_ask` (only `Jobs` still uses the chain)                                                                                                                                                                                                                                              |
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                                                                                                                                                                             |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                       |
@@ -367,10 +367,8 @@ by the desktop, so it is person-only: no side check or offer touches it.
 ## Permission engine
 
 `permission.py` is the one place that answers "may this happen?". Call sites build an `AskRequest`
-and take the `Decision`; the floor, the deciders and the outcome mapping live here. P1 added the
-engine and its tests; the tool gate (`toolbox.py`) and the expert jobs (`jobs.py`) still run their
-own ask chains and move onto it in P2 and P3, which delete the old chains. Until then they use only
-`summarise` (the one line shown in the approvals log) from it.
+and take the `Decision`; the floor, the deciders and the outcome mapping live here. The tool gate (`toolbox.py`) asks it for every tool call. Expert jobs (`jobs.py`) still run their
+own ask chain (below) and move onto it in P3.
 
 ### The floor
 
@@ -437,7 +435,7 @@ Every tool has a mode: `off`, `ask` or `auto`. `Toolbox.mode(spec)` picks it in 
 `off` first (see [Off](#off)); a tool that
 asks for itself (below) is `auto`; then the user's saved choice (a locked tool included); then a
 locked tool is `ask`; then the tool's own default; then the effect. The same function,
-`resolve_mode` in `builtin_guards.py`, feeds Home's permission list, so the list and the gate agree.
+`resolve_mode` in `permission.py`, feeds Home's permission list, so the list and the gate agree.
 
 | Tool                                            | Default mode                                                         |
 | ----------------------------------------------- | -------------------------------------------------------------------- |
@@ -462,9 +460,9 @@ is the explicit unlock, made with the Home switch (which warns first, see
 [Home tools](#home-tools)), and a stored `auto` counts even if it was saved before the tool became
 locked. Flip it back to `ask` and the tool asks again. Only a tool that asks for itself or is person-only is refused Auto.
 
-A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
+A tool whose `ToolSpec.tier` is `auto` (it asks for itself) runs its own ask with the user, so the gate opens none:
 its mode is `auto` unless Off; `Toolbox.set_mode` refuses Auto for it ("<name> asks for itself.") but accepts Off, and Ask (which puts it back to normal).
-`list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
+`list_permissions` rows carry `self_asks` (true for such a tool) next to `locked`; `locked` stays false for it.
 
 ### Off
 
@@ -474,7 +472,7 @@ a body reconnecting. `resolve_mode` returns `off` before any other rule, so it a
 
 - `Toolbox.active_specs()` skips the tool, and `model_tools()` and the capability picture
   read only that list, so Scout never sees it and routes around it.
-- The `tool_mode` guard blocks a call to it with `denied` and "<name> is turned off by the owner.",
+- The gate (`Toolbox._gate`) refuses a call to it with `denied` and "<name> is turned off by the owner.",
   for a model that still calls it. Home's own calls are not blocked. The guard chain now runs even
   for a toolbox with no `Asks`; only the ask itself needs one.
 - `set_mode` looks in `known_specs`, so a tool of a body that is offline right now can be turned Off
@@ -510,24 +508,23 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
   `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
 - **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
-  (Scout's tools in `Toolbox._ask`, Claude Code in `Jobs._permission`). When it approves, no ask
+  (Scout's tools through the engine's side-check decider, Claude Code in `Jobs._permission`). When it approves, no ask
   opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
   `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
   approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
-  A locked tool gets this look only under a preference you made that names the tool; the
-  built-in default and general preferences never approve it. A tool stays in `ask` mode.
+  The floor keeps a locked or person-only tool from this look: only a standing rule or you decide it.
 - **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
   true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed
   into it (a wake turn they join becomes theirs once their message is drained into history, so a
   nudge already in flight when they joined still asks). It ends with the turn, so the next timer wake starts
   as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
-  owner turn `tool_mode` waves it through (their message was the yes, no ask, no log entry;
+  owner turn the gate waves it through (their message was the yes, no ask, no log entry;
   never for a `person_only` tool); on a
-  wake turn it runs the normal chain (`anyone_online`, the side-check, the Allow card, with offers
+  wake turn it runs the normal decision (the side-check, the Allow card, with offers
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
   nobody online the nudge is refused ("Nobody was there to ask...") and Scout is told. `hand_off`
   with an explicit `continue_job` on an owner turn skips the chain and shows the mode card as
-  always; on a wake turn it runs the same chain first (source `claude_code`,
+  always; on a wake turn it asks the same way first (source `claude_code`,
   tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
   and skips the mode card (Scout's row says `decided_by: "scout"`, no offer follows). Otherwise the mode card is the
   owner's question: the chain's own person step answers at once so nothing is asked twice, and the
@@ -779,8 +776,8 @@ words what the person reads (guidance in `mind/soul.md`).
   because the CLI writes the same file; writes are atomic; a corrupt file is kept as
   `experts.json.bad` and read as empty.
 - `install.py`, `expert_tools.py`: the `install_expert(id)` tool installs one expert from the ACP
-  registry into `tools/<id>/`. Only the person can allow it: the tool is `locked` (no Always
-  button) and `person_only` (a new `ToolSpec` flag), so a stored Auto never opens it, `set_mode`
+  registry into `tools/<id>/`. Only the person can allow it: the tool is `person_only` (`ToolSpec.tier`; no Always
+  button), so a stored Auto never opens it, `set_mode`
   refuses it and the side-check never sees the ask; a preference in Scout's prompt cannot skip
   the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
   folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
@@ -807,7 +804,7 @@ words what the person reads (guidance in `mind/soul.md`).
   facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
   `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`.
 - `login.py`, `terminal.py`, `env.py`: the `login_expert(id)` tool logs an installed expert in on
-  the person's own subscription. Like install it is `locked` and `person_only`; the card (built by
+  the person's own subscription. Like install it is `person_only`; the card (built by
   code) shows `expert`, the chosen `method` and `opens` (`terminal window` or `browser`), so
   nothing opens before the OK. `LoginDriver.check` spawns the adapter with
   `clientCapabilities.auth.terminal = true` (without it Claude lists no methods), calls
@@ -832,7 +829,7 @@ words what the person reads (guidance in `mind/soul.md`).
   switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them; every expert also loses
   `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
   for the login child and the check, and by expert runs later.
-- `apps.py`: `install_app` (Scout, `change`, `locked` and `person_only` like `install_expert`: the
+- `apps.py`: `install_app` (Scout, `change`, `person_only` like `install_expert`: the
   Allow card cannot be skipped by a preference or a stored Auto, and has no Always). `app_params`
   turns an MCP Registry entry into the params `validate_app` takes, and `app_tools.save_app` (the
   same path Home's `add_app` uses) stores it. An `npx` package becomes a stdio app that runs
@@ -1724,15 +1721,13 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model_call` | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
 | `emit`       | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
-| `tool_call`  | Before a tool runs                            | `tool_mode` (an `ask` verdict when the tool's mode is `ask`; Home calls skip it)                                                                                                    |
 | `ask`        | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
 | `save`       | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
 The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
 body that displays is connected (a `display: false` body does not count). `side_check` lets Scout approve once under a preference (an allow-once, so the
-rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Scout's tools
-(`Toolbox`) and Claude Code's permission asks (`Jobs._permission`) share this one chain, so the
-order lives in one place. A side-check that raises or times out falls through to `person_ask`.
+rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Only Claude Code's permission asks (`Jobs._permission`) use this chain now; Scout's tools use the
+engine (P3 moves Jobs over and deletes the chain). A side-check that raises or times out falls through to `person_ask`.
 
 The `save` hook runs through `mask_message` over the new chat messages (`Session._persist`, which
 saves a masked copy while `history` keeps the real values for the live turn), an approval's

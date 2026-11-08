@@ -297,10 +297,22 @@ class Engine:
                 log.warning("decider %s failed: %s", decider.name, type(err).__name__)
                 continue
             if isinstance(result, Grant) and result.decided_by == _GRANTED_BY[decider.name]:
+                if decider.name == "side_check" and not self._use_preference(req, result):
+                    continue  # Scout's grant could not be counted: leave it to the person
                 return self._granted(req, decider.name, result)
             if isinstance(result, Refusal):
                 return self._refused(req, result)
         return Decision("deny", "no_decider", ask_id=req.ask_id)
+
+    def _use_preference(self, req: AskRequest, grant: Grant) -> bool:
+        if grant.preference is None or self._approvals is None:
+            return True
+        try:
+            self._approvals.preference_used(grant.preference, req.tool, req.summary)
+        except Exception as err:  # a decider that fails is a pass
+            log.warning("side_check preference use failed: %s", type(err).__name__)
+            return False
+        return True
 
     def _granted(self, req: AskRequest, decider: str, grant: Grant) -> Decision:
         # "Always" widens only when the person asks for it, on a tier that can be widened.
@@ -319,8 +331,6 @@ class Engine:
             pref.id if pref else None,
             pref.sentence if pref else None,
         )
-        if pref is not None and self._approvals is not None:
-            self._approvals.preference_used(pref, req.tool, req.summary)
         if always:
             self._set_auto(req.tool)  # now Auto: an offer would be noise
         elif decider == "person" and req.offer and req.tier is not Tier.person_only:

@@ -18,7 +18,15 @@ from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
-from brain.permission import Tier, resolve_mode
+from brain.permission import (
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    Tier,
+    resolve_mode,
+    stored_auto_rules,
+)
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.apps import app_params, app_setup_tools
@@ -327,10 +335,20 @@ async def test_card_refusals_are_facts_and_ask_nothing(rig):
         await r.spec.card({"id": "acme/keyed"})
 
 
+def person_engine():
+    return Engine([Person()], None, None, lambda n: None)
+
+
 async def test_install_app_asks_first_and_adds_the_app(rig):
     r = rig(env={"ACME_KEY": "k"})
     asks = StubAsks()
-    box = RealToolbox([BrainSource([(r.spec, r.handler)])], lambda: {}, lambda n, m: None, asks)
+    box = RealToolbox(
+        [BrainSource([(r.spec, r.handler)])],
+        lambda: {},
+        lambda n, m: None,
+        asks,
+        engine=person_engine(),
+    )
     out = await box.run(Call("c1", "install_app", {"id": "acme/notes"}, "t1", ""))
     assert asks.asked[0]["app"] == "acme/notes" and asks.locked
     assert json.loads(out)["status"] == "connected"
@@ -341,7 +359,11 @@ async def test_install_app_asks_first_and_adds_the_app(rig):
 async def test_a_refused_card_adds_nothing(rig):
     r = rig()
     box = RealToolbox(
-        [BrainSource([(r.spec, r.handler)])], lambda: {}, lambda n, m: None, StubAsks("deny")
+        [BrainSource([(r.spec, r.handler)])],
+        lambda: {},
+        lambda n, m: None,
+        StubAsks("deny"),
+        engine=person_engine(),
     )
     with pytest.raises(RpcError):
         await box.run(Call("c1", "install_app", {"id": "acme/notes"}, "t1", ""))
@@ -349,9 +371,6 @@ async def test_a_refused_card_adds_nothing(rig):
 
 
 async def test_a_preference_and_a_stored_auto_still_reach_the_person(rig):
-    from brain.builtin_guards import anyone_online, person_ask, side_check_guard, tool_mode
-    from brain.guards import Guards
-
     class Side:
         asked = 0
 
@@ -359,19 +378,17 @@ async def test_a_preference_and_a_stored_auto_still_reach_the_person(rig):
             Side.asked += 1
             return "any-pref"
 
-    class Approvals:
-        def scout_approved(self, *a, **k):
-            raise AssertionError("Scout must not approve an install")
-
     r = rig(env={"ACME_KEY": "k"})
     asks = StubAsks()
     modes = lambda: {"install_app": "auto"}  # noqa: E731
-    guards = Guards()
-    for g in (tool_mode(modes), anyone_online(asks), side_check_guard(Side(), Approvals())):
-        guards.add(g)
-    guards.add(person_ask())
+    engine = Engine(
+        [StandingRule(stored_auto_rules(modes)), SideCheckDecider(Side()), Person()],
+        None,
+        None,
+        lambda n: None,
+    )
     box = RealToolbox(
-        [BrainSource([(r.spec, r.handler)])], modes, lambda n, m: None, asks, guards=guards
+        [BrainSource([(r.spec, r.handler)])], modes, lambda n, m: None, asks, engine=engine
     )
     await box.run(Call("c1", "install_app", {"id": "acme/notes"}, "t1", ""))
     assert asks.asked and Side.asked == 0

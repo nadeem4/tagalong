@@ -16,14 +16,12 @@ from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from brain.events import EventKind
-    from brain.toolbox import ToolSpec
 
 log = logging.getLogger("brain.guardrails")
 
 
 class Hook(StrEnum):
     model_call = "model_call"
-    tool_call = "tool_call"
     ask = "ask"
     emit = "emit"
     save = "save"
@@ -74,15 +72,6 @@ class ModelCallCtx:
     kind: Literal["turn", "side_check", "offer"]
     turn_id: str | None
     steps: int
-
-
-@dataclass(frozen=True)
-class ToolCallCtx:
-    spec: "ToolSpec"
-    input: dict
-    caller: str
-    source_kind: str
-    turn_id: str | None
 
 
 @dataclass(frozen=True)

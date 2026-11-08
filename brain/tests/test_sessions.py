@@ -20,7 +20,7 @@ from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
-from brain.mind.turn import Final
+from brain.mind.turn import Call, Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
 from brain.scheduler import Scheduler
 from brain.sessions import Session
@@ -1517,8 +1517,8 @@ def test_the_session_registers_one_ask_chain_with_the_side_check_in_it():
 
 def test_toolbox_and_jobs_share_one_offers_service():
     session, _ = make(Gate([]))
-    assert session.toolbox._offers is session.jobs._offers
-    assert session.toolbox._offers is not None
+    assert session.engine._offers is session.jobs._offers
+    assert session.engine._offers is not None
 
 
 async def test_session_shares_one_guards_with_scheduler_and_loop():
@@ -2826,3 +2826,46 @@ async def test_home_gets_reading_status_and_scout_is_told_when_pictures_cannot_b
     session.say("desktop", say("hello"))
     await finish(session)
     assert "Text inside pictures cannot be read on this PC" in model.systems[0]
+
+
+class ChangeApp(AppLike):
+    """A fake app with one tool that changes something, so every call is asked."""
+
+    def specs(self):
+        return [ToolSpec("files__tidy", "tidies", {"type": "object"}, frozenset({"scout"}))]
+
+
+def tool_call(turn="t1"):
+    return Call("c1", "files__tidy", {}, turn, "Tidying up.")
+
+
+async def test_session_tool_ask_runs_side_check_then_the_person():
+    memory = Memory(":memory:")
+    pref = rules.add_preference(
+        memory.db, sentence="Tidying is fine", source=None, tool=None, group_key=None, at="t"
+    )
+    model = Gate([tool_use("approve_under_preference", preference=pref.id), "unused"])
+    session, sent = make(model, memory)
+    session.toolbox.sources.insert(1, ChangeApp())
+    join(session, "desktop")
+    assert await session.toolbox.run(tool_call()) == "a.txt"
+    assert open_asks(sent) == []  # Scout's look under the preference was enough
+    assert [
+        (r.decided_by, r.rule_id) for r in records_for(memory).work.list_asks("all", 10, None)
+    ] == [("scout", pref.id)]
+    rules.remove_preference(memory.db, pref.id)  # now nothing covers it: the person is asked
+    task = asyncio.create_task(session.toolbox.run(tool_call()))
+    await settle()
+    [card] = open_asks(sent)
+    session.answer(card["id"], "allow", "desktop")
+    assert await task == "a.txt"
+
+
+async def test_nobody_online_still_logs_no_one():
+    memory = Memory(":memory:")
+    session, _ = make(Gate([]), memory)
+    session.toolbox.sources.insert(1, ChangeApp())
+    with pytest.raises(RpcError):
+        await session.toolbox.run(tool_call())
+    [row] = records_for(memory).work.list_asks("all", 10, None)
+    assert (row.outcome, row.decided_by) == ("no_one", "none")

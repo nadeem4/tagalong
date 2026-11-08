@@ -26,7 +26,6 @@ from brain.builtin_guards import (
     person_ask,
     side_check_guard,
     spend_guards,
-    tool_mode,
     wake_caps,
 )
 from brain.choices import Choices
@@ -63,6 +62,7 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
 from brain.outputs import OutputStore
+from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
 from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
@@ -262,13 +262,14 @@ class Session:
         def modes() -> dict[str, str]:
             return rules.permission_modes(memory.db)
 
-        # The tool gate and its ask chain: nobody online, then Scout's look, then the person.
-        self.guards.add(
-            tool_mode(
-                modes,
-                lambda turn_id: self._owner_turn and turn_id == self._turn_id,
-            )
+        # Tool calls: the engine asks a standing rule, then Scout's look, then the person.
+        self.engine = Engine(
+            [StandingRule(stored_auto_rules(modes)), SideCheckDecider(side_check), Person()],
+            approvals,
+            offer,
+            set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
         )
+        # Jobs still runs expert asks through this chain until P3 moves them onto the engine.
         self.guards.add(anyone_online(self._asks))
         self.guards.add(side_check_guard(side_check, approvals))
         self.guards.add(person_ask())
@@ -277,10 +278,8 @@ class Session:
             modes,
             save_mode,
             self._asks,
-            approvals,
-            side_check,
-            offer,
-            guards=self.guards,
+            self.engine,
+            owner_turn=lambda turn_id: self._owner_turn and turn_id == self._turn_id,
             on_call=self._on_tool_call,
             outputs=outputs,
         )
