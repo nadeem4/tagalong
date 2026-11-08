@@ -222,6 +222,23 @@ describe('bridge', () => {
     });
   });
 
+  test('test_a_huge_reply_sends_four_messages_and_the_note', async () => {
+    const { brain, graph, inbound } = await setup();
+    await online(brain);
+    await inbound('hi');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
+    brain.reply('whatsapp', {
+      delta: Array.from({ length: 6 }, () => 'z'.repeat(3500)).join('\n\n'),
+    });
+    brain.reply('whatsapp', { done: true });
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(4));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(graph.bodies).toHaveLength(4);
+    const last = graph.bodies[3]?.text.body ?? '';
+    expect(last.endsWith('\n(cut: ask me for the rest)')).toBe(true);
+    for (const b of graph.bodies) expect(b.text.body.length).toBeLessThanOrEqual(4000);
+  });
+
   test('test_a_long_reply_is_sent_as_ordered_parts', async () => {
     const { brain, graph, inbound } = await setup();
     await online(brain);
