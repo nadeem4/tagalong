@@ -393,6 +393,9 @@ class Toolbox:
             raise
         if found:
             self._report(call, found[0], found[1], "ok", out if isinstance(out, str) else None)
+        return self._cap(call, out, caller)
+
+    def _cap(self, call: Call, out: str | list[dict], caller: str) -> str | list[dict]:
         # Only what a model reads is capped: Home's own calls get their JSON whole.
         if (
             self._outputs is not None
@@ -403,6 +406,27 @@ class Toolbox:
             # An expert cannot call read_output, so it gets no id to follow.
             return preview(self._outputs, call.name, out, readable=caller == "scout")
         return out
+
+    async def carry_out(self, call: Call) -> str | list[dict]:
+        """Run a parked call after the person's late yes. The yes is the ask, so the gate does
+        not ask again, but a tool turned off since then still refuses."""
+        for source in self.sources:
+            for spec in source.specs():
+                if spec.name != call.name:
+                    continue
+                if "scout" not in spec.audience:
+                    break
+                if gate_tier(spec, self._modes().get(spec.name)) is Tier.off:
+                    raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
+                kind = getattr(source, "approval_source", "scout_tool")
+                try:
+                    out = await source.run(call, call.name)
+                except Exception as err:
+                    self._report(call, spec, kind, "failed", None, err)
+                    raise
+                self._report(call, spec, kind, "ok", out if isinstance(out, str) else None)
+                return self._cap(call, out, "scout")
+        raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
 
     def _report(
         self,

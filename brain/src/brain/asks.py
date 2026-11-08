@@ -98,6 +98,7 @@ class Asks:
         ask_id: str | None = None,
         recommended: str | None = None,
         parent_id: str | None = None,
+        stay_open: bool = False,
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
@@ -105,8 +106,9 @@ class Asks:
             raise ValueError(f"ask {ask_id} is already open")
         if recommended is not None and recommended not in options:
             raise ValueError("recommended must be one of the options")
-        # A job's ask waits for the person; a turn-bound card has nobody to wait for.
-        if parent_id is None and not self.anyone_online():
+        # A question or card is told to the person later by other means; a job's permission
+        # ask says `stay_open` and waits for somebody to come back.
+        if not stay_open and not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
         params["options"] = options

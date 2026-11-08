@@ -866,7 +866,7 @@ class Jobs:
                 input=request.input,
                 tier=Tier.ask,
                 how_to_ask=expert_asker(
-                    partial(self._open_ask, job_id=job_id, part=part),
+                    partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
                     tool,
                     request.input,
                     request.options,

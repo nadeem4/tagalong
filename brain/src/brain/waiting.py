@@ -2,7 +2,7 @@
 
 A tool call that needs the person's yes waits in its turn, then parks: the turn goes on and the
 decision keeps running here. This module owns that still-running decision, finds a repeated call
-for it, and (later in this slice) carries the call out when the person finally answers.
+for it, and carries the call out when the person finally answers, then wakes Scout with the facts.
 """
 
 import asyncio
@@ -15,6 +15,7 @@ from brain.asks import Asks
 from brain.events import Event
 from brain.mind.turn import Call
 from brain.permission import AskRequest, Decision
+from brain.protocol import RpcError
 from brain.store.work import WorkStore
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ class WaitingAsks:
         self._emit = emit
         self._now = now
         self._mask = mask  # the same masking the saved call went through
-        self._tasks: set[asyncio.Task[Decision]] = set()
+        self._tasks: set[asyncio.Task] = set()
 
     def find(self, tool: str, input: dict) -> str | None:
         """The id of an open Scout ask already saved for this very call, if any."""
@@ -51,7 +52,35 @@ class WaitingAsks:
         return None
 
     def adopt(self, task: "asyncio.Task[Decision]", call: Call, req: AskRequest) -> None:
-        """Keep the decision still running after its turn moved on."""
+        """Keep the decision still running after its turn moved on, and act on its end."""
         self._asks.park(req.ask_id)
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+        watcher = asyncio.create_task(self._finish(task, call, req))
+        self._tasks.add(watcher)
+        watcher.add_done_callback(self._tasks.discard)
+
+    async def _finish(self, task: "asyncio.Task[Decision]", call: Call, req: AskRequest) -> None:
+        try:
+            decision = await task
+        except asyncio.CancelledError:
+            return  # withdrawn (the brain is closing); nobody to tell
+        except Exception:
+            log.exception("a parked ask failed")
+            return
+        facts: dict[str, str | int] = {"ask": req.ask_id, "tool": call.name, "summary": req.summary}
+        if decision.allowed:
+            try:
+                out = await self._toolbox().carry_out(call)
+            except RpcError as err:
+                facts.update(outcome="failed", reason=err.message)
+            except Exception:
+                log.exception("a parked call failed")
+                facts.update(outcome="failed", reason="the call raised an error")
+            else:
+                facts.update(outcome="approved", result=out if isinstance(out, str) else "")
+        elif decision.code == "cancelled":
+            return  # withdrawn by the person's own action: no wake
+        elif decision.code == "expired":
+            facts.update(outcome="expired", reason=decision.reason)
+        else:
+            facts.update(outcome="refused", reason=decision.reason)
+        self._emit(Event("ask_ended", facts, key=f"ask:{req.ask_id}"))

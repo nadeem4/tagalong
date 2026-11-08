@@ -59,8 +59,8 @@ class FakeAsks:
 
     async def open(self, **kw):
         self.opened.append(kw)
-        if kw.get("parent_id") is None and not self.online:
-            return Answer(None)  # a turn-bound card finds nobody; a job's ask waits
+        if not kw.get("stay_open") and not self.online:
+            return Answer(None)  # a question finds nobody; a permission ask stays open
         ask_id = kw["ask_id"]
         self.open_ids.add(ask_id)
         try:

@@ -1594,22 +1594,21 @@ async def test_question_while_nobody_is_online_is_told_when_someone_returns():
     assert "Event: job_question" in text and "Which database?" in text and "j1" in text
 
 
-async def test_permission_while_nobody_is_online_is_told_when_someone_returns():
+async def test_permission_while_nobody_is_online_waits_and_is_shown_when_someone_returns():
     memory = Memory(":memory:")
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=AWAY_KINDS)
-    # added after the Session starts, which stops rows left running by a dead brain
-    records_for(memory).add_job("j1", "claude_code", "fix the build", "C:/x", "default")
+    records_for(memory).add_job("j1", "claude_code", "fix build", "C:/x", "default")
     request = PermissionRequest(
         "Run rm -rf build", "execute", {}, [PermissionOption("a", "Allow once", "allow_once")]
     )
-    assert await session.jobs._permission("j1", request) is None
+    waiting = asyncio.create_task(session.jobs._permission("j1", request))
     await settle()
-    assert model.seen == []
+    assert not waiting.done()  # the job's ask waits; it is not refused for nobody being there
     join(session, "desktop")
-    await idle(session)
-    text = told(model)[0]
-    assert "Event: job_question" in text and "Run rm -rf build" in text and "j1" in text
+    [shown] = session.asks.open_asks()
+    assert shown["tool"] == "claude_code:Run rm -rf build"
+    waiting.cancel()
 
 
 async def test_news_is_told_once_not_twice():

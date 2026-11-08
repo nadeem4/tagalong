@@ -374,12 +374,12 @@ async def test_scout_ask_row_saves_the_masked_call_and_deadline():
     task.cancel()
 
 
-async def test_job_ask_waits_with_nobody_online():
+async def test_stay_open_ask_waits_with_nobody_online():
     bodies = FakeBodies(online=[])
     work = fresh_work()
     asks = Asks(bodies, work)
     task = asyncio.create_task(
-        asks.open(text="Which?", options=["a"], ask_id="x1", parent_id=goal(work))
+        asks.open(text="Which?", options=["a"], ask_id="x1", parent_id=goal(work), stay_open=True)
     )
     await asyncio.sleep(0)
     assert not task.done() and work.get("x1").state == "active"

@@ -15,7 +15,7 @@ from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import Engine, Person, StandingRule, stored_auto_rules
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.store.work import WorkStore
 from brain.toolbox import Toolbox as RealToolbox
 from brain.toolbox import ToolSpec
@@ -180,3 +180,75 @@ async def test_a_call_that_needs_no_ask_never_parks():
     rig.stored["t"] = "auto"
     assert await rig.box.run(call()) == "ran t"
     assert rig.opened() == []
+
+
+def ended(rig):
+    return [e for e in rig.events if e.kind == "ask_ended"]
+
+
+async def park(rig, n=1):
+    await rig.box.run(call(n))
+    return rig.opened()[-1]["id"]
+
+
+async def test_late_yes_runs_the_call_once_and_wakes_scout():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    [event] = ended(rig)
+    assert event.key == f"ask:{ask_id}"
+    assert event.facts == {
+        "ask": ask_id,
+        "tool": "t",
+        "summary": rig.work.ask_detail(ask_id)["summary"],
+        "outcome": "approved",
+        "result": "ran t",
+    }
+    with pytest.raises(RpcError) as err:  # a second answer finds a closed ask
+        rig.asks.answer(ask_id, "allow", "desktop")
+    assert err.value.code == ErrorCode.not_found
+    assert len(rig.source.ran) == 1 and len(ended(rig)) == 1
+
+
+async def test_late_no_wakes_scout_with_refused():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    rig.asks.answer(ask_id, "deny", "desktop")
+    await rig.settle()
+    assert rig.source.ran == []
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "refused"
+    assert event.facts["ask"] == ask_id
+
+
+async def test_late_yes_for_a_tool_now_off_runs_nothing():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    rig.stored["t"] = "off"
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    assert rig.source.ran == []
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "failed"
+    assert "turned off" in event.facts["reason"]
+
+
+async def test_late_yes_that_fails_wakes_scout_with_the_reason():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    rig.source.fail = RpcError(ErrorCode.tool_failed, "disk full")
+    rig.asks.answer(ask_id, "allow", "desktop")
+    await rig.settle()
+    [event] = ended(rig)
+    assert event.facts["outcome"] == "failed" and "disk full" in event.facts["reason"]
+
+
+async def test_same_call_while_parked_returns_the_same_ask():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    out = await rig.box.run(call(1, call_id="c2"))
+    assert ask_id in out
+    assert len(rig.opened()) == 1
+    assert len(rig.asks.open_asks()) == 1
