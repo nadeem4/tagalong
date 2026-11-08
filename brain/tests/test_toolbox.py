@@ -13,6 +13,7 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.guards import ALLOW, Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
+from brain.permission import Tier
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
 from brain.toolbox import INSTALL_OCR_TIMEOUT_S, BodySource, BrainSource, ToolSpec
@@ -269,8 +270,8 @@ def test_mode_defaults():
     assert Toolbox([], stored).mode(mode_spec(effect="read")) == "ask"
     stored = {"a": "auto"}
     assert Toolbox([], stored).mode(mode_spec(effect="change", default_mode="ask")) == "auto"
-    assert Toolbox([], {}).mode(mode_spec(locked=True, default_mode="auto")) == "ask"
-    assert Toolbox([], {}).mode(mode_spec(locked=True, effect="read")) == "ask"
+    assert Toolbox([], {}).mode(mode_spec(tier=Tier.locked, default_mode="auto")) == "ask"
+    assert Toolbox([], {}).mode(mode_spec(tier=Tier.locked, effect="read")) == "ask"
 
 
 def test_body_tool_without_effect_asks():
@@ -278,7 +279,7 @@ def test_body_tool_without_effect_asks():
     connect(bodies, "desktop")
     box = body_box(bodies)
     (s,) = BodySource(bodies).specs()
-    assert s.effect == "change" and not s.locked
+    assert s.effect == "change" and s.tier is None
     assert box.mode(s) == "ask"
 
 
@@ -299,7 +300,7 @@ def test_body_tool_confirm_true_is_locked():
         Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
     )
     (s,) = BodySource(bodies).specs()
-    assert s.locked
+    assert s.tier is Tier.locked
     assert Toolbox([BodySource(bodies)], {}).mode(s) == "ask"
 
 
@@ -310,7 +311,7 @@ def test_body_tool_confirm_always_is_person_only_and_always_asks():
         Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
     )
     (s,) = BodySource(bodies).specs()
-    assert s.locked and s.person_only
+    assert s.tier is Tier.person_only
     stored = {"desktop__rm": "auto"}
     box = Toolbox([BodySource(bodies)], stored)
     assert box.mode(s) == "ask"
@@ -327,7 +328,7 @@ def test_set_mode_saves_and_changes_mode():
 
 
 def test_set_mode_auto_on_locked_tool_is_saved():
-    locked = ToolSpec("a", "d", {"type": "object"}, locked=True)
+    locked = ToolSpec("a", "d", {"type": "object"}, tier=Tier.locked)
     stored = {}
     box = Toolbox([FakeSource([locked])], stored)
     box.set_mode("a", "auto")
@@ -336,13 +337,13 @@ def test_set_mode_auto_on_locked_tool_is_saved():
 
 
 def test_self_asking_tool_is_auto_even_when_locked_or_stored_ask():
-    spec = mode_spec(locked=True, self_asks=True)
+    spec = mode_spec(tier=Tier.auto)
     assert Toolbox([], {"a": "ask"}).mode(spec) == "auto"
 
 
 def test_set_mode_refuses_auto_on_self_asking_tool_but_accepts_ask():
     stored = {}
-    box = Toolbox([FakeSource([mode_spec(self_asks=True)])], stored)
+    box = Toolbox([FakeSource([mode_spec(tier=Tier.auto)])], stored)
     with pytest.raises(RpcError) as e:
         box.set_mode("a", "auto")
     assert e.value.code == ErrorCode.invalid_params
@@ -354,8 +355,8 @@ def test_set_mode_refuses_auto_on_self_asking_tool_but_accepts_ask():
 
 def test_off_then_ask_gives_the_normal_mode_for_self_asking_and_person_only_tools():
     stored = {}
-    a = mode_spec("a", self_asks=True)
-    b = mode_spec("b", person_only=True)
+    a = mode_spec("a", tier=Tier.auto)
+    b = mode_spec("b", tier=Tier.person_only)
     box = Toolbox([FakeSource([a, b])], stored)
     for name in ("a", "b"):
         box.set_mode(name, "off")
@@ -416,8 +417,7 @@ def gated(tool_effect="change", locked=False, online=("desktop",), stored=None, 
                 "t tool",
                 {"type": "object"},
                 effect=tool_effect,
-                locked=locked,
-                self_asks=self_asks,
+                tier=Tier.auto if self_asks else Tier.locked if locked else None,
             )
         ]
     )
@@ -658,8 +658,9 @@ def test_app_tool_default_modes_and_locked():
     assert box.mode(by_name["lin__get"]) == "ask"  # read-only too: apps ask until changed
     assert box.mode(by_name["lin__update"]) == "ask"
     assert box.mode(by_name["lin__delete_issue"]) == "ask"
-    box.set_mode("lin__delete_issue", "auto")  # the Home switch unlocks it
-    assert box.mode(by_name["lin__delete_issue"]) == "auto"
+    with pytest.raises(RpcError):  # delete is person-only: no Auto, even from Home
+        box.set_mode("lin__delete_issue", "auto")
+    assert box.mode(by_name["lin__delete_issue"]) == "ask"
     box.set_mode("lin__get", "ask")  # modes reuse the permissions store, no new storage
 
 
@@ -809,7 +810,9 @@ def scouted(mem, check, online=("desktop",), locked=False):
     sent = []
     approvals = approvals_on(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
     bodies = AskBodies(online)
-    source = FakeSource([ToolSpec("t", "t tool", {"type": "object"}, locked=locked)])
+    source = FakeSource(
+        [ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.locked if locked else None)]
+    )
     stored = {}
     box = RealToolbox(
         [source], lambda: stored, stored.__setitem__, Asks(bodies, fresh_work()), approvals, check
@@ -852,10 +855,7 @@ async def test_pass_falls_through_to_the_person_ask(mem):
     await until(lambda: opened_asks(bodies))
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
-    [facts] = check.facts
-    assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
-        "scout_tool", "t", "t", True,
-    )  # fmt: skip
+    assert check.facts == []  # a locked ask is never shown to Scout: the floor
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.decided_by, row.rule_id, row.rule_sentence) == ("person", None, None)
 
@@ -958,7 +958,7 @@ async def test_person_only_tool_approval_is_never_offered(mem):
     # A confirm "always" tool can never be Auto, so offering to auto-approve it would be noise.
     offers = FakeOffers()
     box, source, bodies, _, _ = scouted(mem, FakeSideCheck(None))
-    source._specs = [ToolSpec("t", "t tool", {"type": "object"}, locked=True, person_only=True)]
+    source._specs = [ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.person_only)]
     box._offers = offers
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
@@ -1076,16 +1076,18 @@ async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_
     assert await task == "ran t"
 
 
-async def test_locked_tool_with_a_preference_naming_it_runs_without_asking_the_person(mem):
+async def test_locked_tool_with_a_preference_naming_it_still_asks_the_person(mem):
     pref = rules.add_preference(
         mem.db, sentence="Fine to run t", source=None, tool="t", group_key=None, at=AT
     )
     rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
     check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem, work_on(mem))
     box, source, bodies, _, _ = scouted(mem, check, locked=True)
-    assert await box.run(call_with_text("t")) == "ran t"
-    assert bodies.sent == []  # Scout approved under the named preference: nobody was asked
-    assert source.ran == ["t"]
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    assert source.ran == []  # a locked tool is never Scout's to approve: the floor
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
 
 
 async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
@@ -1106,7 +1108,7 @@ async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
 
 
 def test_a_person_only_tool_always_asks_and_its_mode_cannot_be_changed():
-    spec = ToolSpec("a", "d", {"type": "object"}, locked=True, person_only=True)
+    spec = ToolSpec("a", "d", {"type": "object"}, tier=Tier.person_only)
     stored = {"a": "auto"}  # even a stored auto (an old Home switch) never opens it
     box = Toolbox([FakeSource([spec])], stored)
     assert box.mode(spec) == "ask"
@@ -1341,7 +1343,8 @@ async def test_off_tool_still_runs_for_home():
 def test_set_mode_off_allowed_for_self_asking_and_person_only_tools():
     stored = {}
     box = Toolbox(
-        [FakeSource([mode_spec("a", self_asks=True), mode_spec("b", person_only=True)])], stored
+        [FakeSource([mode_spec("a", tier=Tier.auto), mode_spec("b", tier=Tier.person_only)])],
+        stored,
     )
     box.set_mode("a", "off")
     box.set_mode("b", "off")
@@ -1405,7 +1408,7 @@ def test_install_ocr_language_declared_always_is_person_only_with_no_new_gate():
         Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
     )
     (s,) = BodySource(bodies).specs()
-    assert s.person_only and s.locked
+    assert s.tier is Tier.person_only
 
 
 def test_the_install_wait_is_longer_than_the_desktops_own_limit():

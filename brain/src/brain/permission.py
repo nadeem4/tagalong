@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from brain.mind.turn import Call
     from brain.offers import Offers
     from brain.side_check import SideCheck
+    from brain.toolbox import ToolSpec
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,41 @@ ALLOWED: dict[Tier, frozenset[str]] = {
     Tier.ask: frozenset({"standing_rule", "side_check", "person"}),
     Tier.auto: frozenset(),
 }
+
+
+def tier(spec: "ToolSpec") -> Tier:
+    """A tool's own floor: what its source fixed, else its default mode, else its effect."""
+    if spec.tier is not None:
+        return spec.tier
+    if spec.default_mode is not None:
+        return Tier(spec.default_mode)
+    return Tier.auto if spec.effect == "read" else Tier.ask
+
+
+def gate_tier(spec: "ToolSpec", stored: str | None) -> Tier:
+    """The tier one call is decided at, given the owner's stored choice for the tool."""
+    if stored == "off":
+        return Tier.off  # the owner's switch beats every floor
+    if spec.tier is Tier.auto:
+        return Tier.auto  # asks for itself
+    own = tier(spec)
+    if own is Tier.auto and stored == "ask":
+        return Tier.ask
+    return own
+
+
+def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["off", "ask", "auto"]:
+    """The mode a tool runs in; Home's permission list reads this too, so both always agree."""
+    gate = gate_tier(spec, stored)
+    if gate is Tier.off:
+        return "off"
+    if gate is Tier.auto:
+        return "auto"
+    if gate is Tier.person_only:
+        return "ask"  # a stored auto never opens it
+    if stored in ("ask", "auto"):
+        return stored  # for a locked tool too: the Home switch is its explicit unlock
+    return "ask"
 
 
 @dataclass(frozen=True)
@@ -152,8 +188,7 @@ class SideCheckDecider:
         self._side_check = side_check
 
     async def decide(self, req: AskRequest) -> Grant | None:
-        # locked=False: the floor lets this decider see tier `ask` only.
-        facts = AskFacts(req.source, req.tool, req.summary, req.input, req.group_key, locked=False)
+        facts = AskFacts(req.source, req.tool, req.summary, req.input, req.group_key)
         pref = await self._side_check.decide(facts)
         return Grant("scout", preference=pref) if pref is not None else None
 

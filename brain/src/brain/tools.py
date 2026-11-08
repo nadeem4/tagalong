@@ -32,6 +32,7 @@ from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
 from brain.memory import Memory
 from brain.outputs import OutputStore
+from brain.permission import Tier, tier
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
@@ -886,7 +887,7 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 },
                 scout,
                 effect="change",
-                self_asks=True,
+                tier=Tier.auto,  # asks for itself, so the gate adds none
             ),
             hand_off,
         ),
@@ -1140,9 +1141,9 @@ def home_tools(
                 "description": s.description,
                 "effect": s.effect,
                 "mode": box.mode(s),
-                "locked": s.locked,
-                "self_asks": s.self_asks,
-                "person_only": s.person_only,
+                "locked": tier(s) in (Tier.locked, Tier.person_only),
+                "self_asks": s.tier is Tier.auto,
+                "person_only": tier(s) is Tier.person_only,
                 "server_tool": s.server_tool is not None,
                 "online": s.name in current,
                 "source": origin[s.name][0],
@@ -1481,7 +1482,7 @@ def preference_tools(
                 },
                 frozenset({"scout"}),
                 effect="change",
-                self_asks=True,
+                tier=Tier.auto,  # asks for itself, so the gate adds none
             ),
             save_preference,
         )

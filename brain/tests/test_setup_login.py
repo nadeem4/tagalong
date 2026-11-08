@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from brain.events import Event
+from brain.permission import Tier
 from brain.protocol import RpcError
 from brain.setup.env import expert_env
 from brain.setup.login import (
@@ -296,7 +297,7 @@ async def test_login_tool_is_a_change_that_asks_and_shows_the_method(tmp_path, e
     d, events, _ = driver(tmp_path, window)
     tools = login_tools(tmp_path, d)
     spec, handler = tools[0]
-    assert spec.name == "login_expert" and spec.effect == "change" and spec.person_only
+    assert spec.name == "login_expert" and spec.effect == "change" and spec.tier is Tier.person_only
     assert await spec.card({"id": "claude-acp"}) == {
         "expert": "claude-acp",
         "method": "claude-ai-login",

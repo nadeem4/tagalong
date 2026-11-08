@@ -12,6 +12,7 @@ from typing import Any
 
 from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.env import is_tested
 from brain.setup.facts import Machine
@@ -231,7 +232,7 @@ def home_setup_tools(
                 schema(),
                 home,
                 effect="change",
-                self_asks=True,
+                tier=Tier.auto,  # asks for itself, so the gate adds none
             ),
             setup_expert,
         ),
@@ -242,7 +243,7 @@ def home_setup_tools(
                 schema("query"),
                 home,
                 effect="change",
-                self_asks=True,
+                tier=Tier.auto,  # asks for itself, so the gate adds none
             ),
             setup_app,
         ),

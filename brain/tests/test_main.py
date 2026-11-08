@@ -10,9 +10,9 @@ import sys
 import pytest
 
 from brain import main
-from brain.builtin_guards import resolve_mode
 from brain.main import _run
 from brain.masking import Masker, SecretLogFilter
+from brain.permission import resolve_mode
 from brain.voice.service import VoiceService
 
 

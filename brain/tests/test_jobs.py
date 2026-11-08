@@ -919,8 +919,8 @@ async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
     assert row.rule_id == check.result.id and row.job_id == rig.finished[0].id
     assert row.rule_sentence == "Reading files is fine"
     [facts] = check.facts
-    assert (facts.source, facts.tool, facts.group_key, facts.locked) == (
-        "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}", False,
+    assert (facts.source, facts.tool, facts.group_key) == (
+        "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}",
     )  # fmt: skip
 
 

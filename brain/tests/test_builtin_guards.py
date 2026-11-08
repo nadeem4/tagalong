@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 
 from brain.builtin_guards import (
     daily_budget,
-    resolve_mode,
     spend_guards,
     step_cap,
     tool_mode,
@@ -16,6 +15,7 @@ from brain.builtin_guards import (
 )
 from brain.events import EventKind
 from brain.guards import EmitCtx, Hook, ModelCallCtx, ToolCallCtx
+from brain.permission import Tier
 from brain.toolbox import ToolSpec
 
 NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
@@ -83,8 +83,8 @@ def test_tool_mode_stored_auto_allows():
 
 
 def test_tool_mode_self_asks_tool_is_allowed():
-    # self_asks runs its own ask, so the gate adds none; the guard still resolves it as auto.
-    assert tool_mode(lambda: {}).check(tool_ctx(self_asks=True)).kind == "allow"
+    # A self-asking tool runs its own ask, so the gate adds none.
+    assert tool_mode(lambda: {}).check(tool_ctx(tier=Tier.auto)).kind == "allow"
 
 
 def test_tool_mode_home_caller_skips_the_ask():
@@ -96,11 +96,6 @@ def test_tool_mode_default_mode_beats_effect():
     assert (
         tool_mode(lambda: {}).check(tool_ctx(effect="change", default_mode="auto")).kind == "allow"
     )
-
-
-def test_resolve_mode_off_beats_every_flag():
-    for kw in ({}, {"self_asks": True}, {"person_only": True}, {"locked": True}):
-        assert resolve_mode(ToolSpec("t", "d", {"type": "object"}, **kw), "off") == "off"
 
 
 def test_tool_mode_blocks_an_off_tool_with_a_plain_code():
@@ -173,10 +168,9 @@ async def test_side_check_guard_allow_once_with_preference_and_records_scout_row
         "approved under a preference",
     )
     [(facts, pref, summary)] = approvals.scouted
-    assert (facts.tool, facts.group_key, facts.locked, pref, summary) == (
+    assert (facts.tool, facts.group_key, pref, summary) == (
         "t",
         "t",
-        False,
         "pref",
         "Doing it.",
     )
@@ -315,5 +309,5 @@ def test_tool_mode_stored_ask_is_waved_through_only_on_an_owner_turn():
 
 def test_tool_mode_asks_for_a_person_only_follow_up_even_on_an_owner_turn():
     guard = tool_mode(lambda: {}, lambda turn_id: True)
-    ctx = tool_ctx(effect="change", default_mode="ask", follow_up=True, person_only=True)
+    ctx = tool_ctx(effect="change", default_mode="ask", follow_up=True, tier=Tier.person_only)
     assert guard.check(ctx).kind == "ask"

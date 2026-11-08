@@ -18,6 +18,7 @@ from brain.jobs import JobError, JobId
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.outputs import OutputStore
+from brain.permission import Tier
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
 from brain.store.memory import MemoryRefused
@@ -344,7 +345,7 @@ def test_expert_specs_audiences_effects_and_gate(home):
     specs = expert_specs(home)
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
     assert specs["hand_off"].audience == scout and specs["hand_off"].effect == "change"
-    assert specs["hand_off"].self_asks is True
+    assert specs["hand_off"].tier is Tier.auto
     assert specs["tell_expert"].audience == scout and specs["tell_expert"].effect == "change"
     assert specs["tell_expert"].default_mode == "ask" and specs["tell_expert"].follow_up is True
     assert specs["list_jobs"].audience == frozenset({"home"})
@@ -685,7 +686,7 @@ def declare(bodies, body_id, *tools):
             description=f"{n} d",
             input_schema={"type": "object"},
             effect=e,
-            **({"confirm": True} if confirm else {}),
+            **({"confirm": confirm} if confirm else {}),
         )
         for n, e, confirm in tools
     ]
@@ -748,7 +749,13 @@ async def test_list_permissions_includes_offline_body_tool_with_online_false(hom
 
 
 async def test_list_permissions_shape_unchanged(home):
-    declare(home.bodies, "desktop", ("type_text", "change", True), ("see_screen", "read", None))
+    declare(
+        home.bodies,
+        "desktop",
+        ("type_text", "change", True),
+        ("see_screen", "read", None),
+        ("wipe_disk", "change", "always"),
+    )
     tools = json.loads(await home.run("list_permissions"))["tools"]
     names = [t["name"] for t in tools]
     assert names == sorted(names)
@@ -773,6 +780,14 @@ async def test_list_permissions_shape_unchanged(home):
     assert by_name["desktop__type_text"]["locked"] is True
     assert by_name["desktop__type_text"]["mode"] == "ask"
     assert by_name["desktop__see_screen"]["locked"] is False
+    wipe = by_name["desktop__wipe_disk"]  # person-only: locked too, never self-asking
+    assert (wipe["locked"], wipe["person_only"], wipe["self_asks"], wipe["mode"]) == (
+        True,
+        True,
+        False,
+        "ask",
+    )
+    assert by_name["desktop__type_text"]["person_only"] is False
     assert by_name["remember"]["online"] is True
     assert by_name["remember"]["mode"] == "auto"
     for hidden in ("list_memories", "spend_today", "list_permissions", "set_permission"):
@@ -781,7 +796,7 @@ async def test_list_permissions_shape_unchanged(home):
 
 
 async def test_list_permissions_reports_self_asks_and_set_permission_refuses(home):
-    spec = ToolSpec("hand_off", "d", {"type": "object"}, locked=False, self_asks=True)
+    spec = ToolSpec("hand_off", "d", {"type": "object"}, tier=Tier.auto)
     home.box.sources.append(BrainSource([(spec, None)]))
     row = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}[
         "hand_off"
@@ -1183,7 +1198,7 @@ async def test_save_preference_saves_on_save_it(mem):
     import asyncio
 
     bodies, asks, (spec, handler) = _preference_rig(mem)
-    assert spec.self_asks and spec.effect == "change"
+    assert spec.tier is Tier.auto and spec.effect == "change"
     task = asyncio.create_task(handler({"sentence": "Prefer Claude Code", "question": "Keep it?"}))
     params = await _open_ask(bodies)
     assert params["text"] == "Keep it?" and params["options"] == ["Save it", "Not now"]

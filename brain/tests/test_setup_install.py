@@ -18,6 +18,7 @@ import pytest
 
 from brain.events import Event
 from brain.mind.turn import Call
+from brain.permission import Tier, resolve_mode
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.expert_tools import expert_setup_tools
@@ -32,7 +33,7 @@ from brain.setup.install import (
 from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
-from brain.toolbox import BrainSource, resolve_mode
+from brain.toolbox import BrainSource
 from brain.toolbox import Toolbox as RealToolbox
 
 FIX = Path(__file__).parent / "fixtures"
@@ -573,8 +574,8 @@ async def test_install_tool_needs_the_allow_card_and_shows_the_node_download(tmp
     tools, emitted, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
     # Only the person can allow it: no Always, no stored mode, no preference.
-    assert spec.effect == "change" and spec.default_mode is None and not spec.self_asks
-    assert spec.locked and spec.person_only
+    assert spec.effect == "change" and spec.default_mode is None
+    assert spec.tier is Tier.person_only
     assert resolve_mode(spec, None) == "ask" and resolve_mode(spec, "auto") == "ask"
     asks = StubAsks()
     box = RealToolbox([BrainSource([(spec, handler)])], lambda: {}, lambda n, m: None, asks)
