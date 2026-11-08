@@ -14,27 +14,32 @@ from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from dataclasses import asdict
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from brain.approvals import Approvals
 from brain.asks import Answer, Asks
-from brain.builtin_guards import anyone_online, person_ask, side_check_guard
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
 from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
-from brain.guards import AskCtx, Guards, Hook
+from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.offers import Offers
 from brain.outputs import OutputStore, preview
-from brain.permission import summarise
+from brain.permission import (
+    AskRequest,
+    Engine,
+    NoOneThere,
+    PersonAnswer,
+    Tier,
+    expert_asker,
+    summarise,
+)
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
-from brain.side_check import SideCheck
 from brain.store.work import OPEN, ActivityEntry, TransitionRefused, WorkRow
 
 log = logging.getLogger("brain")
@@ -59,7 +64,6 @@ def _prefix(agent: str) -> str:
 _WORK_STATE = {"done": "done", "error": "failed", "stopped": "cancelled"}
 
 CANCEL = "cancel"
-HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
@@ -111,9 +115,7 @@ class Jobs:
         on_finished: Callable[[Job], object] = lambda job: None,
         clock: Callable[[], float] = time.monotonic,
         scout_questions: ScoutQuestions | None = None,
-        approvals: Approvals | None = None,
-        side_check: SideCheck | None = None,
-        offers: Offers | None = None,
+        engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
@@ -147,16 +149,8 @@ class Jobs:
         self._on_away = on_away  # an ask found nobody online: (job id, what it asked)
         self._clock = clock
         self._scout = scout_questions
-        self._approvals = approvals  # None records nothing
-        self._offers = offers  # None: no offers to auto-approve
-        if guards is None:
-            # Standalone jobs: build the same ask chain the Session registers.
-            guards = Guards()
-            guards.add(anyone_online(asks))
-            if side_check is not None and approvals is not None:
-                guards.add(side_check_guard(side_check, approvals))
-            guards.add(person_ask())
-        self._guards = guards
+        self._engine = engine  # decides every expert ask; None refuses them all
+        self._guards = guards if guards is not None else Guards()  # masking only
         self._runs: dict[str, dict[str, ExpertRun]] = {}  # job -> part -> its running expert
         self._activity: dict[str, dict[str, JobActivity]] = {}
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
@@ -419,47 +413,12 @@ class Jobs:
             mode_id = None
             if redo is not None:
                 mode_id = self._redo_mode(job_id, by_name.values())
-            # The chain runs only when the earlier mode can be reused, so a Scout row always
-            # means a mode was chosen; otherwise the card is the owner's question as today.
-            # Apps on the card are the person's to approve, so a covering preference never skips it.
-            if (
-                scout_follow_up
-                and not apps
-                and earlier.mode in by_name.values()
-                and await self._follow_up_ask(chosen, earlier, task, path)
-            ):
-                mode_id = earlier.mode  # covered: same mode as before, no card
+            kept = apps
             if mode_id is None:
-                timed_out = False
-                answer = None
-                card: dict = {"folder": str(path)}
-                if apps:
-                    card["apps"] = self._card_apps(apps)
-                try:
-                    answer = await self._open_ask(
-                        text=task,
-                        tool="hand_off",
-                        input=card,
-                        options=[*by_name, CANCEL],
-                        timeout=HANDOFF_TIMEOUT_S,
-                    )
-                except RpcError as err:
-                    timed_out = err.code == ErrorCode.timeout
-                mode_id = by_name.get(answer.option) if answer else None
-                if mode_id is None:  # cancel, a timeout, or nobody online
-                    if scout_follow_up and timed_out:
-                        self._record_hand_off(chosen, path, task, "timed_out", "none")
-                    raise JobError("not started")
-                # Send is the approval for the apps still on the card; the answer can only narrow.
-                kept = apps
-                if apps and answer.apps is not None:
-                    kept = tuple(a for a in apps if a in answer.apps)
+                mode_id, kept = await self._hand_off_mode(
+                    chosen, earlier, task, path, by_name, apps, scout_follow_up
+                )
                 await run.keep_apps(kept)
-                logged = {"folder": str(path), **({"apps": list(kept)} if apps else {})}
-                if scout_follow_up:
-                    self._card_picked(chosen, task, path, logged)
-                elif apps:
-                    self._record_hand_off(chosen, path, task, "approved", "person", logged)
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
             elif new_job:
@@ -546,65 +505,71 @@ class Jobs:
         taken.add(part)
         return part
 
-    async def _follow_up_ask(
-        self, chosen: InstalledExpert, earlier: Job, task: str, path: Path
-    ) -> bool:
-        """The ask chain for a follow-up Scout chose to start. True when a preference covers it
-        (Scout's own row is logged); False means show the mode card, which is the owner's real
-        question, so the chain's own person step answers at once and nothing is asked twice."""
-        group = f"{_prefix(chosen.id)}:{path}"
-        tool_input = {"folder": str(path), "mode": earlier.mode}  # the mode being reused
-
-        async def card_follows() -> str:
-            return "allow"
-
-        ctx = AskCtx(
-            AGENT,
-            "hand_off",
-            summarise(task, "hand_off", tool_input) if self._approvals else task,
-            tool_input,
-            group,
-            False,
-            None,
-            card_follows,
-            can_approve=True,
-        )
-        verdict = await self._guards.run(Hook.ask, ctx)
-        if verdict.kind in ("block", "stop"):
-            if verdict.guard == "anyone_online":
-                self._record_hand_off(chosen, path, task, "no_one", "none", tool_input)
-            raise JobError("not started")
-        return verdict.kind == "allow" and verdict.guard == "side_check"
-
-    def _card_picked(
-        self, chosen: InstalledExpert, task: str, path: Path, tool_input: dict | None = None
-    ) -> None:
-        """The owner picked a mode on the card for Scout's follow-up: log it, maybe offer."""
-        self._record_hand_off(chosen, path, task, "approved", "person", tool_input)
-        if self._offers is not None:
-            self._offers.consider(f"{_prefix(chosen.id)}:{path}", AGENT, "hand_off")
-
-    def _record_hand_off(
+    async def _hand_off_mode(
         self,
         chosen: InstalledExpert,
-        path: Path,
+        earlier: Job | None,
         task: str,
-        outcome: str,
-        decided_by: str,
-        tool_input: dict | None = None,
-    ) -> None:
-        if self._approvals is None:
-            return
-        tool_input = tool_input or {"folder": str(path)}
-        self._approvals.record(
-            source=AGENT,
-            tool="hand_off",
-            summary=summarise(task, "hand_off", tool_input),
-            input=tool_input,
-            group_key=f"{_prefix(chosen.id)}:{path}",
-            outcome=outcome,
-            decided_by=decided_by,
+        path: Path,
+        by_name: dict[str, str],
+        apps: tuple[str, ...],
+        scout_follow_up: bool,
+    ) -> tuple[str, tuple[str, ...]]:
+        """The mode to start in, and the apps kept. The card is the owner's own question; the
+        engine is asked only when Scout started the follow-up or apps ride along, so a covering
+        preference can skip the card and the person's pick is logged and offered. Apps on the
+        card are the person's to approve, so nothing but the person answers for them."""
+        kept = apps
+
+        async def card() -> PersonAnswer:
+            nonlocal kept
+            shown: dict = {"folder": str(path)}
+            if apps:
+                shown["apps"] = self._card_apps(apps)
+            answer = await self._open_ask(
+                text=task, tool="hand_off", input=shown, options=[*by_name, CANCEL]
+            )
+            if answer.option is None:
+                raise NoOneThere
+            mode = by_name.get(answer.option)
+            if mode is None:
+                raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
+            # Send is the approval for the apps still on the card; the answer can only narrow.
+            if apps and answer.apps is not None:
+                kept = tuple(a for a in apps if a in answer.apps)
+                facts["apps"] = list(kept)
+            return PersonAnswer("allow", option_id=mode)
+
+        reusable = scout_follow_up and not apps and earlier.mode in by_name.values()
+        facts: dict = {"folder": str(path)}
+        if reusable:
+            facts["mode"] = earlier.mode  # the mode being reused
+        elif apps:
+            facts["apps"] = list(apps)
+        if self._engine is None or not (scout_follow_up or apps):
+            try:
+                return (await card()).option_id, kept
+            except (NoOneThere, RpcError) as err:
+                raise JobError("not started") from err
+        decision = await self._engine.decide(
+            AskRequest(
+                kind="hand_off_followup",
+                source=AGENT,
+                tool="hand_off",
+                group_key=f"{_prefix(chosen.id)}:{path}",
+                summary=summarise(task, "hand_off", facts),
+                input=facts,
+                tier=Tier.ask,
+                how_to_ask=card,
+                can_allow_once=reusable,
+                offer=scout_follow_up,
+            )
         )
+        if not decision.allowed:
+            raise JobError("not started")
+        if decision.decided_by == "person" and decision.option_id is not None:
+            return decision.option_id, kept
+        return earlier.mode, kept  # a preference covered it: same mode as before, no card
 
     @staticmethod
     def _started(job_id: str, part: str, earlier: JobPart | None, run: ExpertRun) -> JobId:
@@ -883,96 +848,42 @@ class Jobs:
     async def _permission(
         self, job_id: str, request: PermissionRequest, part: str = "p1"
     ) -> str | None:
-        by_name = {o.name: o for o in request.options}
+        if self._engine is None:
+            return None
         once = next((o for o in request.options if o.kind == "allow_once"), None)
         job = self._records.get_job(job_id)
         folder = job.folder if job is not None else ""
         agent = _prefix(self._agent_of(job, part))
         tool = f"{agent}:{request.title}"
-        approvals = self._approvals
-        picked = None  # the option the person chose, kept for the return value
         ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
-
-        async def ask_person() -> str:
-            nonlocal picked
-            # No `confirm`: that flag only allows the fixed allow/deny sets.
-            answer = await self._open_ask(
-                job_id=job_id,
-                part=part,
-                ask_id=ask_id,
-                text="",
+        decision = await self._engine.decide(
+            AskRequest(
+                kind="expert_request",
+                source=AGENT,
                 tool=tool,
+                group_key=f"{agent}:{folder}",
+                summary=summarise(request.title, tool, request.input),
                 input=request.input,
-                options=list(by_name),
+                tier=Tier.ask,
+                how_to_ask=expert_asker(
+                    partial(self._open_ask, job_id=job_id, part=part),
+                    tool,
+                    request.input,
+                    request.options,
+                    ask_id,
+                ),
+                job_id=job_id,
+                ask_id=ask_id,
+                can_allow_once=once is not None and job is not None,  # never allow_always
             )
-            picked = by_name.get(answer.option)
-            if picked is None:  # no usable pick: not a decision, so no row
-                raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
-            return "allow" if picked.kind.startswith("allow") else "deny"
-
-        ctx = AskCtx(
-            AGENT,
-            tool,
-            summarise(request.title, tool, request.input) if approvals else "",
-            request.input,
-            f"{agent}:{folder}",
-            False,
-            None,
-            ask_person,
-            job_id=job_id,
-            can_approve=once is not None and job is not None,  # never allow_always
         )
-        verdict = await self._guards.run(Hook.ask, ctx)
-        outcome = None  # stays None when cancelled or failed: not a final outcome, so no row
-        result: str | None = None
-        if verdict.kind == "allow" and verdict.guard == "side_check" and once is not None:
-            result = once.id  # the guard already logged Scout's row
-        elif verdict.kind == "allow" and verdict.guard == "person_ask" and picked is not None:
-            outcome, result = "approved", picked.id
-        elif verdict.kind in ("block", "stop"):
-            # Matches person_ask/denied by guard and code, as Toolbox._ask does.
-            if verdict.guard == "anyone_online":
-                outcome = "no_one"
-                self._on_away(job_id, f"asked permission: {request.title}")
-            elif verdict.guard == "person_ask" and verdict.code == "timeout":
-                outcome = "timed_out"
-            elif verdict.guard == "person_ask" and verdict.code == "denied" and picked is not None:
-                outcome, result = "refused", picked.id
-        # Anything else (a failed guard, an allow nobody vouched for) refuses: no option picked.
-        if outcome is not None:
-            self._record(job_id, request, outcome, part, ask_id)
-        if outcome == "approved":
-            self._offer(job_id, request, part)
+        if decision.code == "no_one":
+            self._on_away(job_id, f"asked permission: {request.title}")
         self._changed()
-        return result
-
-    def _offer(self, job_id: str, request: PermissionRequest, part: str) -> None:
-        """A person allowed this: Scout may offer to approve the whole folder's kind of ask."""
-        job = self._records.get_job(job_id)
-        if self._offers is not None and job is not None:
-            agent = _prefix(self._agent_of(job, part))
-            self._offers.consider(f"{agent}:{job.folder}", AGENT, f"{agent}:{request.title}")
-
-    def _record(
-        self, job_id: str, request: PermissionRequest, outcome: str, part: str, ask_id: str
-    ) -> None:
-        job = self._records.get_job(job_id)
-        if self._approvals is None or job is None:
-            return
-        agent = _prefix(self._agent_of(job, part))
-        tool = f"{agent}:{request.title}"
-        answered = outcome in ("approved", "refused")
-        self._approvals.record(
-            source=AGENT,
-            tool=tool,
-            summary=summarise(request.title, tool, request.input),
-            input=request.input,
-            group_key=f"{agent}:{job.folder}",
-            outcome=outcome,
-            job_id=job_id,
-            decided_by="person" if answered else "none",
-            ask_id=ask_id,
-        )
+        if decision.allowed:
+            # The person's own pick, else the expert's allow-once for a rule or Scout grant.
+            return decision.option_id or (once.id if once is not None else None)
+        return decision.option_id  # the person's reject; None when nobody picked
 
     async def _question(self, job_id: str, question: Question, part: str = "p1") -> dict | None:
         if self._scout is not None and self._asks.anyone_online():

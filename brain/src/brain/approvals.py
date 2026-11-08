@@ -20,7 +20,6 @@ from brain.store.rules import Preference
 from brain.store.work import WorkStore
 
 if TYPE_CHECKING:
-    from brain.side_check import AskFacts
     from brain.toolbox import Handler, ToolSpec
 
 
@@ -50,11 +49,14 @@ class Approvals:
         outcome: str,
         job_id: str | None = None,
         decided_by: str = "person",
-        preference_id: int | None = None,
-        preference_sentence: str | None = None,
+        preference: Preference | None = None,
         ask_id: str | None = None,
     ) -> None:
-        """`ask_id` names the open ask this decides; without one the ask row is made here."""
+        """`ask_id` names the open ask this decides; without one the ask row is made here.
+        `preference` is the one Scout answered under: it is counted as used and the person is
+        told what Scout did, but only after the use is saved, so a failure writes no row."""
+        if preference is not None:
+            rules.use_preference(self._memory.db, preference.id, utc_text(self._now()))
         if self._guards is not None:  # the table is read by Home and Scout, so it holds no secret
             summary = mask_json(self._guards, "approval", summary)
             input = mask_json(self._guards, "approval", input)
@@ -72,31 +74,18 @@ class Approvals:
         self.work.add_ask(
             ask_id, source=source, tool=tool, summary=summary, input=input, group_key=group_key
         )
-        self.work.decide_ask(ask_id, outcome, decided_by, preference_id, preference_sentence)
-        self._notify("changed", {"what": "approvals"})
-
-    def scout_approved(
-        self, facts: "AskFacts", pref: Preference, summary: str, job_id: str | None = None
-    ) -> None:
-        """Log an ask Scout answered under a preference and tell the person what he did."""
-        self.record(
-            source=facts.source,
-            tool=facts.tool,
-            summary=summary,
-            input=facts.input,
-            group_key=facts.group_key,
-            outcome="approved",
-            job_id=job_id,
-            decided_by="scout",
-            preference_id=pref.id,
-            preference_sentence=pref.sentence,
+        self.work.decide_ask(
+            ask_id,
+            outcome,
+            decided_by,
+            preference.id if preference else None,
+            preference.sentence if preference else None,
         )
-        self.preference_used(pref, facts.tool, summary)
-
-    def preference_used(self, pref: Preference, tool: str, summary: str) -> None:
-        """Count a preference's use and tell the person what Scout did under it."""
-        rules.use_preference(self._memory.db, pref.id, utc_text(self._now()))
-        self._notify("approved", {"tool": tool, "text": summary, "preference": pref.sentence})
+        self._notify("changed", {"what": "approvals"})
+        if preference is not None:
+            self._notify(
+                "approved", {"tool": tool, "text": summary, "preference": preference.sentence}
+            )
 
     # Preference writes live here so every writer (Home, the offer) notifies the same way.
     def add_preference(

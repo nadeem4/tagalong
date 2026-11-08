@@ -22,9 +22,6 @@ from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.builtin_guards import (
-    anyone_online,
-    person_ask,
-    side_check_guard,
     spend_guards,
     wake_caps,
 )
@@ -198,6 +195,17 @@ class Session:
         offer = Offers(
             model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
         )
+
+        def modes() -> dict[str, str]:
+            return rules.permission_modes(memory.db)
+
+        # Tool calls and expert asks: a standing rule, then Scout's look, then the person.
+        self.engine = Engine(
+            [StandingRule(stored_auto_rules(modes)), SideCheckDecider(side_check), Person()],
+            approvals,
+            offer,
+            set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
+        )
         self.records = JobRecords(work, memory.db, now)
         self.jobs = Jobs(
             self.records,
@@ -207,9 +215,7 @@ class Session:
             make_run,
             on_finished=self._on_job_finished,
             scout_questions=questions,
-            approvals=approvals,
-            side_check=side_check,
-            offers=offer,
+            engine=self.engine,
             guards=self.guards,
             on_away=self._on_job_away,
             steps_max_entries=job_steps_max_entries,
@@ -259,20 +265,6 @@ class Session:
             rules.set_permission_mode(memory.db, name, mode)
             notify("changed", {"what": "permissions"})
 
-        def modes() -> dict[str, str]:
-            return rules.permission_modes(memory.db)
-
-        # Tool calls: the engine asks a standing rule, then Scout's look, then the person.
-        self.engine = Engine(
-            [StandingRule(stored_auto_rules(modes)), SideCheckDecider(side_check), Person()],
-            approvals,
-            offer,
-            set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
-        )
-        # Jobs still runs expert asks through this chain until P3 moves them onto the engine.
-        self.guards.add(anyone_online(self._asks))
-        self.guards.add(side_check_guard(side_check, approvals))
-        self.guards.add(person_ask())
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             modes,

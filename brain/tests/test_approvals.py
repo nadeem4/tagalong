@@ -207,8 +207,7 @@ async def test_list_approvals_shape_unchanged(mem):
         outcome="approved",
         job_id="j1",
         decided_by="scout",
-        preference_id=pref.id,
-        preference_sentence=pref.sentence,
+        preference=pref,
     )
     _, h = tools(mem, [])["list_approvals"]
     out = json.loads(await h({}))
@@ -340,21 +339,27 @@ def test_home_tools_not_offered_to_the_model(mem):
     assert all(s.audience == frozenset({"home"}) for s in specs)
 
 
-# --- scout_approved ----------------------------------------------------------------------
+# --- record with a preference ------------------------------------------------------------
 
 
-def test_scout_approved_records_uses_and_notifies(mem):
-    from brain.side_check import AskFacts
-
+def test_record_with_a_preference_marks_it_used_and_notifies(mem):
     pref = rules.add_preference(
         mem.db, sentence="Allow reads", source=None, tool=None, group_key=None, at="t"
     )
     sent = []
-    facts = AskFacts("claude_code", "claude_code:ls", "ls", {"c": 1}, "claude_code:/repo")
-
     approvals = make(mem, sent)
     approvals.work.create("goal", "a job", id="j1", state="active")  # job_id is the row's parent
-    approvals.scout_approved(facts, pref, "ls -la", job_id="j1")
+    approvals.record(
+        source="claude_code",
+        tool="claude_code:ls",
+        summary="ls -la",
+        input={"c": 1},
+        group_key="claude_code:/repo",
+        outcome="approved",
+        job_id="j1",
+        decided_by="scout",
+        preference=pref,
+    )
 
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "scout", pref.id)

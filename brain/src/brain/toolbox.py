@@ -359,8 +359,8 @@ class Toolbox:
         if gate is Tier.off:
             # Plain words the model reads; it should route around, not retry.
             raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
-        if resolve_mode(spec, stored) != "ask" or self._engine is None or self._asks is None:
-            return
+        if gate is Tier.auto or self._engine is None or self._asks is None:
+            return  # nobody is asked and nothing is logged
         # A follow-up the owner asked for in chat is already their yes; one Scout starts on a
         # wake goes through the engine.
         if spec.follow_up and gate is not Tier.person_only and self._owner_turn(call.turn):

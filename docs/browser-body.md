@@ -247,7 +247,7 @@ Each source asks for its own optional permission first, in one window (see below
 
 Does one thing with the browser's tabs. It changes the browser, but only in ways you can see and
 undo, so the tool declares no confirm of its own. The brain gates it all the same: its effect is
-`change`, so the brain's tool gate (`resolve_mode` in `builtin_guards.py`) defaults it to "ask".
+`change`, so the brain's tool gate (`resolve_mode` in `permission.py`) defaults it to "ask".
 Every action opens an approval in the desktop bubble, and it runs only after you allow it, until you
 set `tab_actions` to auto in Home. With only the browser online there is nowhere to show that
 approval, so the call is refused at once (see "Only the browser is online"). After the approval,

@@ -1,7 +1,7 @@
 """The guard runner: one ordered list of checks per hook, folded into a single verdict.
 
 Refusals go through here so precedence and logging live once: the budget, the step cap, the wake
-caps, the tool gate, asks and the save mask. A guard that raises or returns a non-Verdict counts
+caps and the save mask. A guard that raises or returns a non-Verdict counts
 as a block, so spend and tool hooks fail closed.
 """
 
@@ -22,7 +22,6 @@ log = logging.getLogger("brain.guardrails")
 
 class Hook(StrEnum):
     model_call = "model_call"
-    ask = "ask"
     emit = "emit"
     save = "save"
 
@@ -33,7 +32,6 @@ class Verdict:
     reason: str = ""
     code: str = ""  # machine reason: over_budget, step_cap, an ErrorCode value
     value: Any = None
-    once: bool = False  # allow for this one call only (side-check approval)
     guard: str = ""  # filled by the runner
 
 
@@ -56,10 +54,6 @@ def rewrite(value: Any) -> Verdict:
     return Verdict("rewrite", value=value)
 
 
-def allow_once(reason: str, value: Any = None) -> Verdict:
-    return Verdict("allow", reason, value=value, once=True)
-
-
 @dataclass(frozen=True)
 class Guard:
     name: str
@@ -72,23 +66,6 @@ class ModelCallCtx:
     kind: Literal["turn", "side_check", "offer"]
     turn_id: str | None
     steps: int
-
-
-@dataclass(frozen=True)
-class AskCtx:
-    """One ask on the way to the person; `ask_person` does the wire work and returns the choice."""
-
-    source: str
-    tool: str
-    summary: str
-    input: dict
-    group_key: str
-    locked: bool
-    turn_id: str | None
-    ask_person: Callable[[], Awaitable[str]]
-    job_id: str | None = None  # an expert's job, so Scout's approval row names it
-    can_approve: bool = True  # False: Scout may not answer (an expert offered no allow-once)
-    person_only: bool = False  # only the person answers: the side-check never sees this ask
 
 
 @dataclass(frozen=True)
@@ -120,9 +97,6 @@ class _Fold:
         v = dataclasses.replace(verdict, guard=guard.name)
         if v.kind in ("block", "stop"):
             self._log(v)
-            self.final = v
-            return True
-        if v.kind == "allow" and v.once and self.hook is Hook.ask:
             self.final = v
             return True
         if v.kind == "ask":

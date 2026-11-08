@@ -397,7 +397,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   **Refused** filter with its counts, and rows grouped by local day (Today, Yesterday, then the date):
   time, what was asked, where it came from (Expert, Scout tool, Connected app), who
   decided, and a chip (Approved, Refused, Timed out, No one online). A Scout row reads "Scout decided,
-  per your preference" with the sentence it relied on, and an "Auto" pill. **Show more** pages back
+  per your preference" with the sentence it relied on, and an "Auto" pill. A row a standing rule decided (a tool set to Auto, `decided_by: "rule"`) shows its chip and no "decided by" line. **Show more** pages back
   with `before: next`; a click while that read is out is ignored, and an answer for a list since
   re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert.
   `e2e/approvals.spec.ts` covers it on the fake brain.

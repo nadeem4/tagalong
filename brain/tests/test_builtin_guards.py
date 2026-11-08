@@ -1,9 +1,8 @@
-"""Checks the built-in spend guards: the daily budget and the per-turn step cap.
+"""Checks the built-in spend guards: the daily budget, the per-turn step cap and the wake caps.
 
 They guard the model_call hook; side-check and offer calls are never counted as turn steps.
 """
 
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from brain.builtin_guards import (
@@ -60,126 +59,6 @@ async def test_spend_guards_check_budget_before_step_cap():
     assert v.code == "step_cap"
 
 
-# --- the ask chain: anyone_online, side_check_guard, person_ask ----------------------------
-
-from types import SimpleNamespace  # noqa: E402
-
-from brain.builtin_guards import anyone_online, person_ask, side_check_guard  # noqa: E402
-from brain.guards import AskCtx  # noqa: E402
-from brain.protocol import ErrorCode, RpcError  # noqa: E402
-
-
-def ask_ctx(ask_person=None):
-    async def default():
-        return "allow"
-
-    return AskCtx("scout_tool", "t", "Doing it.", {"a": 1}, "t", False, "t1", ask_person or default)
-
-
-def test_anyone_online_blocks_with_denied_when_nobody_is_online():
-    v = anyone_online(SimpleNamespace(anyone_online=lambda: False)).check(ask_ctx())
-    assert (v.kind, v.code, v.reason) == (
-        "block",
-        "denied",
-        "nobody online",
-    )
-
-
-def test_anyone_online_allows_when_someone_is_online():
-    assert anyone_online(SimpleNamespace(anyone_online=lambda: True)).check(ask_ctx()).kind == (
-        "allow"
-    )
-
-
-class StubSideCheck:
-    def __init__(self, result=None, boom=False):
-        self.result, self.boom, self.facts = result, boom, []
-
-    async def decide(self, facts):
-        self.facts.append(facts)
-        if self.boom:
-            raise RuntimeError("boom")
-        return self.result
-
-
-class StubApprovals:
-    def __init__(self):
-        self.scouted = []
-
-    def scout_approved(self, facts, pref, summary, job_id=None):
-        self.scouted.append((facts, pref, summary))
-
-
-async def test_side_check_guard_allow_once_with_preference_and_records_scout_row():
-    approvals = StubApprovals()
-    v = await side_check_guard(StubSideCheck("pref"), approvals).check(ask_ctx())
-    assert (v.kind, v.once, v.value, v.reason) == (
-        "allow",
-        True,
-        "pref",
-        "approved under a preference",
-    )
-    [(facts, pref, summary)] = approvals.scouted
-    assert (facts.tool, facts.group_key, pref, summary) == (
-        "t",
-        "t",
-        "pref",
-        "Doing it.",
-    )
-
-
-async def test_side_check_guard_falls_through_when_decide_returns_none():
-    v = await side_check_guard(StubSideCheck(None), StubApprovals()).check(ask_ctx())
-    assert (v.kind, v.once) == ("allow", False)
-
-
-async def test_side_check_guard_falls_through_when_decide_raises():
-    v = await side_check_guard(StubSideCheck(boom=True), StubApprovals()).check(ask_ctx())
-    assert (v.kind, v.once) == ("allow", False)
-
-
-async def test_person_ask_allow():
-    v = await person_ask().check(ask_ctx())
-    assert (v.kind, v.once, v.value) == ("allow", True, "allow")
-
-
-async def test_person_ask_always_value():
-    async def always():
-        return "always"
-
-    v = await person_ask().check(ask_ctx(always))
-    assert (v.once, v.value) == (True, "always")
-
-
-async def test_person_ask_deny_blocks_with_denied():
-    async def deny():
-        return "deny"
-
-    v = await person_ask().check(ask_ctx(deny))
-    assert (v.kind, v.code, v.reason) == ("block", "denied", "the person said no")
-
-
-async def test_person_ask_timeout_blocks_with_timeout_code():
-    async def late():
-        raise RpcError(ErrorCode.timeout, "No answer in time.")
-
-    v = await person_ask().check(ask_ctx(late))
-    assert (v.kind, v.code, v.reason) == ("block", "timeout", "nobody answered the ask in time")
-
-
-def test_ask_chain_order_is_online_then_side_check_then_person():
-    from brain.bodies import Bodies
-    from brain.memory import Memory
-    from brain.sessions import Session
-
-    session = Session(object(), object(), Bodies(), 10, Memory(":memory:"))
-    assert [g.name for g in session.guards._for(Hook.ask)] == [
-        "anyone_online",
-        "side_check",
-        "person_ask",
-    ]
-
-
 # wake_caps: the per-kind and overall hourly caps on the emit hook.
 TIMER = EventKind("timer", max_per_hour=2)
 
@@ -215,11 +94,3 @@ def test_wake_caps_ignore_kinds_without_a_cap():
 def test_wake_caps_wait_is_zero_after_the_window_ages_out():
     wakes = [(NOW - timedelta(hours=2), "timer"), (NOW - timedelta(hours=1), "timer")]
     assert wake_caps(1).check(_wake_ctx(wakes)).kind == "allow"
-
-
-async def test_side_check_guard_never_decides_a_person_only_ask():
-    side = StubSideCheck("pref")
-    ctx = replace(ask_ctx(), person_only=True)
-    v = await side_check_guard(side, StubApprovals()).check(ctx)
-    assert (v.kind, v.once) == ("allow", False)  # falls through to the person
-    assert side.facts == []
