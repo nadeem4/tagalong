@@ -422,7 +422,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     row says it was Scout's decision, and a follow-up reuses the earlier mode with no card. Type a
     message into a wake turn that is already running: once it reaches Scout, the next nudge goes
     through with no ask (a nudge already waiting on its card still asks). With the bubble
-    closed (nobody online) the nudge is refused and Scout says so.
+    closed (nobody online) the nudge waits like any Scout ask and runs if you allow it later.
 
 ## Claude Code asks Scout first (real brain, real Claude Code)
 
@@ -475,17 +475,18 @@ next section.
 1. **Action:** call `list_preferences` on a fresh data folder.
    **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
 2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow
-   once**. Ask again and press **Deny**. Ask a third time and let it sit for 5 minutes.
-   **Expected:** `list_approvals` lists three rows for that tool, newest first: `timed_out`
-   (`decided_by: "none"`), `refused` and `approved` (both `decided_by: "person"`), with
-   `source: "scout_tool"` and a summary of the words Scout wrote before the call. `counts.total` is 3 and
-   `counts.refused` is 1.
+   once**. Ask again and press **Deny**. Ask a third time and leave the card
+   for 5 minutes: Scout's turn goes on and says the call is waiting. Then press **Allow once**.
+   **Expected:** the call runs by itself and Scout tells you. `list_approvals` lists three rows for
+   that tool, newest first: `approved`, `refused` and `approved`, all `decided_by: "person"`, with `source: "scout_tool"` and a summary of the words Scout wrote before the
+   call. Ask for the same thing again while a card is parked: no second card appears.
 3. **Action:** hand off a task that edits a file in Manual mode. Allow one permission ask and
    refuse another.
    **Expected:** two more rows with `source: "claude_code"`, `tool` starting `claude_code:`, and a
    `job_id`. `list_approvals {filter: "refused"}` returns only the refused ones.
-4. **Action:** with nobody connected, a job asks for permission (close the desktop mid-job).
-   **Expected:** a row with `outcome: "no_one"`.
+4. **Action:** with nobody connected, a job asks for permission (close the desktop mid-job), then
+   reopen the desktop.
+   **Expected:** the ask is waiting and is shown when the desktop joins; no `no_one` row.
 5. **Action:** press **Stop** on the turn while its ask is open, and run a read tool.
    **Expected:** no row for either.
    5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
@@ -1363,8 +1364,8 @@ the apps in C1 to C7 use a command or a pasted key.
       app, what will change. Nothing has changed yet.
 - [ ] Press **Cancel**. Scout says nothing was changed.
 - [ ] Ask again and press **Allow once**. The file appears.
-- [ ] Ask again and leave the card for 5 minutes. Home › **Approvals** lists it as Timed out, and
-      nothing was changed.
+- [ ] Ask again and leave the card for 5 minutes. Scout says it is waiting; nothing was changed
+      yet. Press **Allow once** later: the file appears and Scout tells you.
 
 ### C4. A web app with a pasted key
 
@@ -1772,9 +1773,9 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
    needs approval has not been set to `auto` (for example one of the desktop tools).
 2. **Action:** from the browser, right-click an ask (X.21) that makes Scout use a tool needing your
    approval, or wait for Scout to need one.
-3. **Expected:** no approval is requested anywhere, the tool does not run, and Scout is told
-   nobody was there to ask. `tab_actions` is refused the same way (open a tab, bookmark a page)
-   unless it was set to auto in Home.
+3. **Expected:** the tool does not run yet and Scout is told the call is waiting for your answer;
+   the card shows when a displaying body (the desktop) joins. `tab_actions` waits the same way
+   (open a tab, bookmark a page) unless it was set to auto in Home.
 4. **Action:** leave only the browser connected while something would wake Scout (for example a
    timer set earlier, or a finished expert job), then start the desktop app.
 5. **Expected:** no wake is shown on the browser (it shows nothing); the wake waits and appears in

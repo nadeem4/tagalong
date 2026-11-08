@@ -17,7 +17,7 @@ from fake_clock import FakeClock
 from fake_engine import FakeEngine
 from job_rows import add_timer, end_job
 
-from brain.asks import Answer
+from brain.asks import Answer, AskExpired
 from brain.events import Event
 from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
@@ -59,6 +59,8 @@ class FakeAsks:
 
     async def open(self, **kw):
         self.opened.append(kw)
+        if not kw.get("stay_open") and not self.online:
+            return Answer(None)  # a question finds nobody; a permission ask stays open
         ask_id = kw["ask_id"]
         self.open_ids.add(ask_id)
         try:
@@ -830,32 +832,14 @@ async def test_permission_reject_kinds_record_refused(make_rig, pick):
     assert (row.outcome, row.decided_by) == ("refused", "person")
 
 
-async def test_permission_no_answer_records_timed_out(make_rig):
+async def test_permission_ask_that_expires_records_expired_with_its_reason(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
-    timeout = RpcError(ErrorCode.timeout, "nobody answered")
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), timeout), steps)
+    expired = AskExpired("job ended: stopped")
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), expired), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
-    assert (row.outcome, row.decided_by) == ("timed_out", "none")
-
-
-async def test_permission_nobody_online_records_no_one(make_rig):
-    steps = [{"permission": {"title": "rm x"}}]
-    asks = FakeAsks(Answer("Plan"), Answer(None))
-    rig = with_approvals(make_rig, asks, steps)
-    real_open = asks.open
-
-    async def open_then_go_offline(**kw):
-        if kw.get("tool"):  # also the hand-off ask (tool="hand_off"): offline before _permission
-            asks.online = False
-        return await real_open(**kw)
-
-    asks.open = open_then_go_offline
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.finished)
-    (row,) = logged(rig)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
+    assert (row.outcome, row.decided_by) == ("expired", "none")
 
 
 async def test_cancelled_permission_records_nothing(make_rig):
@@ -959,25 +943,6 @@ async def test_claude_code_pass_falls_through_to_the_person(make_rig):
     assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "person", None)
 
 
-async def test_nobody_online_still_logs_no_one_after_scout_looks(make_rig):
-    steps = [{"permission": {"title": "rm x"}}]
-    asks = FakeAsks(Answer("Plan"), Answer(None))
-    rig, check = make_scouted(make_rig, asks, steps, approve=False)
-    real_open = asks.open
-
-    async def open_then_go_offline(**kw):
-        if kw.get("tool"):
-            asks.online = False
-        return await real_open(**kw)
-
-    asks.open = open_then_go_offline
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.finished)
-    assert len(check.facts) == 1  # Scout looks first; only a pass finds nobody there
-    [row] = logged(rig)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
-
-
 # --- Scout offers to auto-approve after the person allows a Claude Code ask ---------------
 
 
@@ -1078,16 +1043,6 @@ async def test_an_engine_refusal_picks_no_option(make_rig):
     assert reply["result"]["outcome"]["outcome"] != "selected"
 
 
-async def test_nobody_online_tells_scout_the_job_is_waiting(make_rig):
-    steps = [{"permission": {"title": "rm x"}}]
-    rig, _ = engine_rig(make_rig, Decision("deny", "no_one"), steps)
-    away: list = []
-    rig.jobs._on_away = lambda job_id, what: away.append((job_id, what))
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.finished)
-    assert [what for _, what in away] == ["asked permission: rm x"]
-
-
 async def test_permission_side_check_approval_picks_allow_once_option_never_allow_always(make_rig):
     steps = [{"permission": {"title": "ls", "options": [OPTS[1], OPTS[0], OPTS[2]]}}]
     rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
@@ -1097,20 +1052,9 @@ async def test_permission_side_check_approval_picks_allow_once_option_never_allo
     assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
 
 
-@pytest.mark.parametrize("scenario", ["denied", "nobody_online"])
-async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
+async def test_permission_refusal_logs_no_tool_text(make_rig, caplog):
     steps = [{"permission": {"title": "rm secret-file", "options": OPTS}}]
-    asks = FakeAsks(Answer("Plan"), Answer("Nope"))
-    rig = with_approvals(make_rig, asks, steps)
-    if scenario == "nobody_online":
-        real_open = asks.open
-
-        async def open_then_go_offline(**kw):
-            if kw.get("tool"):
-                asks.online = False
-            return await real_open(**kw)
-
-        asks.open = open_then_go_offline
+    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer("Nope")), steps)
     with caplog.at_level("INFO"):
         await rig.jobs.start("go", str(rig.folder))
         await until(lambda: rig.finished)
@@ -2183,16 +2127,6 @@ async def test_hand_off_card_has_no_timeout(make_rig):
     first = await first_job(rig)
     await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
     assert "timeout" not in asks.opened[1]  # the card ends with its turn or its job, not a clock
-
-
-async def test_follow_up_card_that_times_out_anyway_records_timed_out(make_rig):
-    timeout = RpcError(ErrorCode.timeout, "nobody answered the ask in time")
-    rig = continuing(make_rig, FakeAsks(Answer("Plan"), timeout), FakeSideCheck(None))
-    first = await first_job(rig)
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    [row] = hand_off_rows(rig)
-    assert (row.outcome, row.decided_by) == ("timed_out", "none")
 
 
 async def test_a_new_job_without_continue_always_shows_the_card_even_on_a_brain_turn(make_rig):

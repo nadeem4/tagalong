@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -57,6 +58,7 @@ class FakeSource:
         self._specs = specs
         self.offline = set(offline)
         self.ran = []
+        self.inputs = []
 
     def specs(self):
         return [s for s in self._specs if s.name not in self.offline]
@@ -66,6 +68,7 @@ class FakeSource:
 
     async def run(self, call, tool):
         self.ran.append(tool)
+        self.inputs.append(call.input)
         return f"ran {tool}"
 
     def unavailable(self, name):
@@ -576,15 +579,6 @@ async def test_other_caller_in_audience_is_still_asked():
     assert await task == "ran x"
 
 
-async def test_nobody_online_says_nobody_was_there():
-    box, source, bodies, _ = gated(online=())
-    with pytest.raises(RpcError) as err:
-        await box.run(call("t"))
-    assert err.value.code == ErrorCode.denied
-    assert str(err.value) == "Nobody was there to ask, so t was not run."
-    assert source.ran == []
-
-
 async def test_turn_cancel_mid_ask_closes_it_cancelled_and_leaves_nothing():
     box, source, bodies, _ = gated()
     task = asyncio.create_task(box.run(call("t")))
@@ -700,6 +694,9 @@ class FakeApprovals:
     def __init__(self):
         self.rows = []
 
+    def mask(self, value):
+        return value
+
     def record(self, **row):
         self.rows.append(row)
 
@@ -745,23 +742,6 @@ async def test_deny_records_refused_and_still_raises_denied():
         await task
     assert str(err.value) == "The user said no to t."
     assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("refused", "person")]
-
-
-async def test_timeout_records_timed_out_and_reraises():
-    box, _, bodies, log = recorded()
-    box._asks._timeout = 0.01
-    with pytest.raises(RpcError) as err:
-        await box.run(call("t"))
-    assert err.value.code == ErrorCode.timeout
-    assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("timed_out", "none")]
-
-
-async def test_nobody_online_records_no_one():
-    box, _, _, log = recorded(online=())
-    with pytest.raises(RpcError) as err:
-        await box.run(call("t"))
-    assert str(err.value) == "Nobody was there to ask, so t was not run."
-    assert [(r["outcome"], r["decided_by"]) for r in log.rows] == [("no_one", "none")]
 
 
 async def test_app_tool_row_has_source_app():
@@ -963,17 +943,6 @@ async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem, monke
     assert await task == "ran t"
     [row] = list_approvals(mem, "all", 10, None)
     assert row.decided_by == "person"
-
-
-async def test_nobody_online_still_logs_no_one(mem):
-    # Scout looks first (spec section 9); only when it passes does the person step find nobody.
-    check = FakeSideCheck(None)
-    box, _, _, _, _ = scouted(mem, check, online=())
-    with pytest.raises(RpcError):
-        await box.run(call_with_text("t"))
-    assert len(check.facts) == 1
-    [row] = list_approvals(mem, "all", 10, None)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
 
 
 async def test_side_check_runs_while_a_turn_is_running(mem):
@@ -1201,16 +1170,6 @@ async def test_a_failing_side_check_on_a_nudge_asks_the_owner_not_allows(mem):
     assert jobs.told == []
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     await task
-
-
-async def test_tell_expert_on_a_brain_turn_with_nobody_online_is_refused_and_logged(mem):
-    box, jobs, _, _ = nudger(mem, FakeSideCheck(None), online=())
-    with pytest.raises(RpcError) as err:
-        await box.run(nudge())
-    assert "Nobody was there to ask" in str(err.value)
-    assert jobs.told == []
-    [row] = list_approvals(mem, "all", 10, None)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
 
 
 async def test_a_stored_auto_nudge_runs_without_an_ask_on_a_brain_turn(mem):
@@ -1449,13 +1408,13 @@ async def test_a_card_gives_the_engine_the_facts_as_input():
     [
         ("denied", ErrorCode.denied, "The user said no to t."),
         ("no_one", ErrorCode.denied, "Nobody was there to ask, so t was not run."),
-        ("timeout", ErrorCode.timeout, "nobody answered the ask in time"),
+        ("expired", ErrorCode.timeout, "job ended: done"),
         ("cancelled", ErrorCode.cancelled, "the ask was cancelled"),
         ("no_decider", ErrorCode.denied, "Nobody approved t, so it was not run."),
     ],
 )
 async def test_engine_refusals_keep_todays_words(code, error, message):
-    box, source, _ = _engine_box(Decision("deny", code))
+    box, source, _ = _engine_box(Decision("deny", code, reason="job ended: done"))
     with pytest.raises(RpcError) as err:
         await box.run(call_with_text("t"))
     assert (err.value.code, err.value.message) == (error, message)
@@ -1508,3 +1467,66 @@ async def test_stored_auto_runs_without_the_engine_asking_the_person():
     )
     assert await box.run(call_with_text("t")) == "ran t"
     assert bodies.sent == []
+
+
+# --- P4: the model's wait for a Scout ask ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("given", "hours"),
+    [
+        ("2", 72),
+        (-1, 1),
+        (0, 1),
+        (float("nan"), 72),
+        (float("inf"), 168),
+        (1e9, 168),
+        (10**400, 168),
+        (True, 72),
+        (None, 72),
+        (5, 5),
+        (200, 168),
+    ],
+)
+async def test_ask_wait_hours_is_clamped_and_stripped(given, hours):
+    seen = []
+
+    async def card(args):
+        seen.append(dict(args))
+        return {"shown": 1}
+
+    spec_ = ToolSpec("t", "t tool", {"type": "object"}, card=card)
+    box, source, engine = _engine_box(Decision("allow_once"), spec_)
+    args = {"a": 1} if given is None else {"a": 1, "ask_wait_hours": given}
+    await box.run(Call("c1", "t", args, "t1", "Doing it."))
+    [req] = engine.requests
+    assert req.wait == timedelta(hours=hours)
+    assert req.call == {"name": "t", "input": {"a": 1}, "text": "Doing it."}
+    assert source.inputs == [{"a": 1}] and seen == [{"a": 1}]
+
+
+async def test_ask_wait_hours_is_stripped_on_an_auto_tool_too():
+    box, source, engine = _engine_box(
+        Decision("allow_once"), ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.auto)
+    )
+    await box.run(Call("c1", "t", {"a": 1, "ask_wait_hours": 9}, "t1", ""))
+    assert source.inputs == [{"a": 1}] and engine.requests == []
+
+
+def test_ask_wait_hours_only_on_ask_mode_schemas():
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+    asking = ToolSpec("asks", "x", schema)
+    reading = ToolSpec("reads", "x", schema, effect="read")
+    box = Toolbox([FakeSource([asking, reading])])
+    by_name = {t["name"]: t["input_schema"] for t in box.model_tools()}
+    assert set(by_name["asks"]["properties"]) == {"a", "ask_wait_hours"}
+    assert by_name["asks"]["properties"]["ask_wait_hours"]["type"] == "number"
+    assert set(by_name["reads"]["properties"]) == {"a"}
+    assert set(schema["properties"]) == {"a"}  # the tool's own schema is never edited
+
+
+async def test_job_owned_request_has_no_wait():
+    both = ToolSpec("t", "t tool", {"type": "object"}, frozenset({"scout", "expert"}))
+    box, _, engine = _engine_box(Decision("allow_once"), both)
+    await box.run(call_with_text("t"), caller="expert", job_id="job1")
+    assert engine.requests[0].wait is None and engine.requests[0].call is None

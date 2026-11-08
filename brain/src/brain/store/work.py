@@ -59,6 +59,7 @@ _DEFAULT_RETRY = RetrySettings()
 _ASK_STATE = {
     "approved": "done",
     "refused": "cancelled",
+    "expired": "expired",
     "timed_out": "expired",
     "no_one": "expired",
 }
@@ -722,6 +723,7 @@ class WorkStore:
         decided_by: str,
         rule_id: int | None = None,
         rule_sentence: str | None = None,
+        reason: str | None = None,
     ) -> None:
         """Record how an ask ended, once. An ask whose waiter already ended it (answered, timed
         out) is re-ended with the outcome; one still open ends with it."""
@@ -740,7 +742,10 @@ class WorkStore:
                 " WHERE work_id = ?",
                 (decided_by, rule_id, rule_sentence, work_id),
             )
-            self.add_event(work_id, "decided", {"outcome": outcome, "decided_by": decided_by})
+            event = {"outcome": outcome, "decided_by": decided_by}
+            if reason:
+                event["reason"] = reason
+            self.add_event(work_id, "decided", event)
 
     def list_asks(
         self, filter: Literal["all", "scout", "refused"], limit: int, before: int | None
@@ -762,6 +767,14 @@ class WorkStore:
             (*args, limit),
         ).fetchall()
         return [AskLogRow(*r[:4], json.loads(r[4]), *r[5:]) for r in rows]
+
+    def waiting_asks(self) -> list[WorkRow]:
+        """Open Scout asks (no job above them) that carry a deadline, oldest first."""
+        return self._select(
+            "kind = 'ask' AND parent_id IS NULL AND due_at IS NOT NULL AND state = 'active'",
+            (),
+            "created_at, rowid",
+        )
 
     def ask_counts(self) -> dict[str, int]:
         total, scout, refused = self.db.execute(

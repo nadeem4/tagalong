@@ -866,7 +866,7 @@ class Jobs:
                 input=request.input,
                 tier=Tier.ask,
                 how_to_ask=expert_asker(
-                    partial(self._open_ask, job_id=job_id, part=part),
+                    partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
                     tool,
                     request.input,
                     request.options,
@@ -877,8 +877,6 @@ class Jobs:
                 can_allow_once=once is not None and job is not None,  # never allow_always
             )
         )
-        if decision.code == "no_one":
-            self._on_away(job_id, f"asked permission: {request.title}")
         self._changed()
         if decision.allowed:
             # The person's own pick, else the expert's allow-once for a rule or Scout grant.

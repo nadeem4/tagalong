@@ -6,12 +6,14 @@ validated against the contract's AskParams.
 
 import asyncio
 import time
+from datetime import UTC, datetime
 
 import pytest
 from job_rows import fresh_work
 
-from brain.asks import Answer, Asks
+from brain.asks import Answer, AskExpired, Asks
 from brain.mind.turn import Call
+from brain.permission import OpenRecord
 from brain.protocol import AskParams, ErrorCode, RpcError
 
 
@@ -104,27 +106,31 @@ async def test_answer_with_unoffered_option_is_invalid_params():
     assert await task == "allow"
 
 
-async def test_no_body_online_denies_without_opening():
+async def test_ask_with_nobody_online_stays_open_without_a_frame_to_anyone():
     bodies = FakeBodies(online=[])
-    asks = Asks(bodies, fresh_work())
-    assert await asks.permission(call(), "desktop__x", False) == "deny"
-    assert bodies.sent == []
+    work = fresh_work()
+    asks = Asks(bodies, work)
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    await asyncio.sleep(0)
     assert asks.anyone_online() is False
-    assert asks.open_asks() == []
+    assert [a["tool"] for a in asks.open_asks()] == ["desktop__x"]  # kept for a body that joins
+    assert not task.done()
+    task.cancel()
 
 
 def test_anyone_online_follows_bodies():
     assert Asks(FakeBodies(["desktop"]), fresh_work()).anyone_online() is True
 
 
-async def test_ask_with_only_a_display_less_body_online_is_refused_like_nobody_online():
+async def test_ask_with_only_a_display_less_body_online_stays_open_too():
     bodies = FakeBodies(online=["browser"])
     bodies.headless = {"browser"}
     asks = Asks(bodies, fresh_work())
     assert asks.anyone_online() is False
-    assert await asks.permission(call(), "desktop__x", False) == "deny"
-    assert bodies.sent == []
-    assert asks.open_asks() == []
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    await asyncio.sleep(0)
+    assert len(asks.open_asks()) == 1
+    task.cancel()
 
 
 async def test_ask_opens_when_a_displaying_body_is_online():
@@ -139,9 +145,9 @@ async def test_ask_opens_when_a_displaying_body_is_online():
 
 async def test_timeout_closes_ask_and_raises_timeout():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work(), timeout=0.01)
+    asks = Asks(bodies, fresh_work())
     with pytest.raises(RpcError) as err:
-        await asks.permission(call(), "desktop__x", False)
+        await asks.open(text="Which?", options=["allow"], timeout=0.01)
     assert err.value.code == ErrorCode.timeout
     closed = bodies.sent[-1][1]
     assert closed["state"] == "closed" and closed["reason"] == "timeout"
@@ -204,9 +210,9 @@ async def test_open_asks_returns_copies():
 
 async def test_answer_after_timeout_is_not_found():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work(), timeout=0.01)
+    asks = Asks(bodies, fresh_work())
     with pytest.raises(RpcError):
-        await asks.permission(call(), "desktop__x", False)
+        await asks.open(text="Which?", options=["allow"], timeout=0.01)
     ask_id = bodies.sent[0][1]["id"]
     with pytest.raises(RpcError) as err:
         asks.answer(ask_id, "allow", "desktop")
@@ -217,8 +223,8 @@ async def test_answer_in_the_tick_after_timeout_fired_is_not_found():
     # Both timers come due in one loop pass: the timeout cancels the wait first, then the
     # answer runs before the handler has closed the ask. It must not hit a finished future.
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work(), timeout=0.05)
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks = Asks(bodies, fresh_work())
+    task = asyncio.create_task(asks.open(text="Which?", options=["allow"], timeout=0.05))
     params = await opened(bodies)
     seen: list[RpcError] = []
 
@@ -238,14 +244,14 @@ async def test_answer_in_the_tick_after_timeout_fired_is_not_found():
 
 async def test_answer_landing_just_before_timeout_wins():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work(), timeout=0.05)
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks = Asks(bodies, fresh_work())
+    task = asyncio.create_task(asks.open(text="Which?", options=["allow"], timeout=0.05))
     params = await opened(bodies)
     asyncio.get_running_loop().call_later(
         0.01, lambda: asks.answer(params["id"], "allow", "desktop")
     )
     time.sleep(0.1)  # answer and timeout both due in one loop pass, the answer first
-    assert await task == "allow"
+    assert (await task).option == "allow"
     assert asks.open_asks() == []
 
 
@@ -315,7 +321,7 @@ async def test_unlisted_option_is_invalid_without_free_text():
 
 async def test_open_has_no_default_timeout():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work(), timeout=0.01)  # applies to permission(), not open()
+    asks = Asks(bodies, fresh_work())
     task = asyncio.create_task(asks.open(text="Which?", options=["a"]))
     params = await opened(bodies)
     await asyncio.sleep(0.05)
@@ -338,6 +344,52 @@ async def test_open_with_nobody_online_returns_unanswered():
     asks = Asks(bodies, fresh_work())
     assert await asks.open(text="Which?", options=["a"]) == Answer(None, None)
     assert bodies.sent == []
+
+
+async def test_scout_ask_row_saves_the_masked_call_and_deadline():
+    bodies = FakeBodies()
+    work = fresh_work()
+    asks = Asks(bodies, work)
+    due = datetime(2026, 11, 10, 9, 0, tzinfo=UTC)
+    saved = {"name": "desktop__x", "input": {"a": "[secret]"}, "text": "Opening it."}
+    record = OpenRecord(
+        "scout_tool", "Opening it.", {"a": "[secret]"}, "desktop__x", saved, False, due
+    )
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False, record=record))
+    params = await opened(bodies)
+    row = work.get(params["id"])
+    assert (row.input, row.due_at, row.safe_to_retry, row.parent_id) == (
+        saved,
+        "2026-11-10T09:00:00+00:00",
+        False,
+        None,
+    )
+    detail = work.ask_detail(params["id"])
+    assert (detail["source"], detail["group_key"], detail["input"]) == (
+        "scout_tool",
+        "desktop__x",
+        {"a": "[secret]"},
+    )
+    assert [r.id for r in work.waiting_asks()] == [params["id"]]
+    task.cancel()
+
+
+async def test_stay_open_ask_waits_with_nobody_online():
+    bodies = FakeBodies(online=[])
+    work = fresh_work()
+    asks = Asks(bodies, work)
+    task = asyncio.create_task(
+        asks.open(text="Which?", options=["a"], ask_id="x1", parent_id=goal(work), stay_open=True)
+    )
+    await asyncio.sleep(0)
+    assert not task.done() and work.get("x1").state == "active"
+    bodies.online = ["desktop"]  # a body that joins is replayed the open ask
+    assert [a["id"] for a in asks.open_asks()] == ["x1"]
+    work.close_goal("job1", "done", "finished")
+    with pytest.raises(AskExpired) as err:
+        await task
+    assert err.value.reason == "job ended: closed by Scout"
+    assert work.get("x1").state == "expired"
 
 
 async def test_cancel_all_closes_named_asks_and_waiters_get_cancelled():
@@ -477,9 +529,9 @@ async def test_answered_ask_done_with_the_option_in_its_event():
 async def test_timed_out_and_cancelled_asks_expire():
     bodies = FakeBodies()
     work = fresh_work()
-    asks = Asks(bodies, work, timeout=0.01)
+    asks = Asks(bodies, work)
     with pytest.raises(RpcError):
-        await asks.permission(call(), "desktop__x", False)
+        await asks.open(text="Which?", options=["a"], timeout=0.01)
     timed = bodies.sent[0][1]["id"]
     assert (work.get(timed).state, work.get(timed).end_reason) == ("expired", "timed out")
     task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="x1"))
@@ -505,9 +557,9 @@ async def test_goal_close_expires_open_ask_and_resolves_future():
     )
     await opened(bodies)
     work.close_goal("job1", "done", "finished")
-    with pytest.raises(RpcError) as err:
+    with pytest.raises(AskExpired) as err:
         await task
-    assert err.value.code == ErrorCode.timeout
+    assert err.value.reason == "job ended: closed by Scout"
     assert work.get("x1").state == "expired"
     assert asks.open_asks() == []
     assert bodies.sent[-1][1] == {"id": "x1", "state": "closed", "reason": "timeout"}
@@ -527,5 +579,5 @@ async def test_open_ask_expired_after_restart():
     assert (row.state, row.end_reason) == ("expired", "brain restarted")
     assert row.reported_at is None  # Scout can still say what happened
     assert work.resume_scan(lambda row: None) == []
-    with pytest.raises(RpcError):  # this test's waiter outlived the "crash"; a real one cannot
+    with pytest.raises(AskExpired):  # this test's waiter outlived the "crash"; a real one cannot
         await task

@@ -1,17 +1,21 @@
 """Tests for the permission engine: the floor table, the deciders, the askers and Engine.decide."""
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from ask_log import approvals_on, list_approvals
 
-from brain.asks import Answer
+from brain.asks import Answer, AskExpired
 from brain.experts import PermissionOption
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import (
     ALLOWED,
+    ASK_WAIT_DEFAULT,
+    ASK_WAIT_MAX,
+    ASK_WAIT_MIN,
+    PARK_AFTER_S,
     SUMMARY_MAX,
     AskRequest,
     Decision,
@@ -25,6 +29,7 @@ from brain.permission import (
     SideCheckDecider,
     StandingRule,
     Tier,
+    ask_wait,
     expert_asker,
     gate_tier,
     resolve_mode,
@@ -143,8 +148,8 @@ def answering(choice, option_id=None, raises=None):
         (answering("deny", "o2"), Refusal("denied", "the person said no", "o2")),
         (answering("allow", raises=NoOneThere()), Refusal("no_one", "nobody online")),
         (
-            answering("allow", raises=RpcError(ErrorCode.timeout, "late")),
-            Refusal("timeout", "no answer in time"),
+            answering("allow", raises=AskExpired("job ended: done")),
+            Refusal("expired", "job ended: done"),
         ),
         (
             answering("allow", raises=RpcError(ErrorCode.cancelled, "stopped")),
@@ -176,7 +181,7 @@ class FakeAsks:
     def anyone_online(self):
         return self.online
 
-    async def permission(self, call, spec_name, locked, *, ask_id, parent_id):
+    async def permission(self, call, spec_name, locked, *, ask_id, parent_id, record=None):
         self.locked = locked
         self.seen = (call, spec_name, ask_id, parent_id)
         return self.option
@@ -185,10 +190,9 @@ class FakeAsks:
 CALL = Call("c1", "t", {"a": 1}, "turn1", "text")
 
 
-async def test_tool_asker_raises_no_one_there_when_nobody_displays():
-    how = tool_asker(FakeAsks(online=False), CALL, "t", Tier.ask, "a1", None)
-    with pytest.raises(NoOneThere):
-        await how()
+async def test_tool_asker_asks_even_when_nobody_displays():
+    asks = FakeAsks(online=False)
+    assert await tool_asker(asks, CALL, "t", Tier.ask, "a1", None)() == PersonAnswer("allow")
 
 
 @pytest.mark.parametrize(
@@ -395,7 +399,7 @@ async def test_each_outcome_writes_one_row(mem):
         (Grant("scout", preference=p), "side_check", ("approved", "scout")),
         (Grant("person"), "person", ("approved", "person")),
         (Refusal("denied", "no"), "person", ("refused", "person")),
-        (Refusal("timeout", "late"), "person", ("timed_out", "none")),
+        (Refusal("expired", "no answer"), "person", ("expired", "none")),
         (Refusal("no_one", "alone"), "person", ("no_one", "none")),
     ]
     seen = []
@@ -421,7 +425,7 @@ async def test_cancelled_writes_no_row(mem):
 async def test_a_denial_carries_the_option_id(mem):
     rig = Rig(mem, [Fake("person", Refusal("denied", "no", "o2"))])
     d = await rig.engine.decide(req())
-    assert d == Decision("deny", "denied", "person", "o2", d.ask_id)
+    assert d == Decision("deny", "denied", "person", "o2", d.ask_id, "no")
 
 
 @pytest.mark.parametrize(
@@ -557,3 +561,45 @@ async def test_side_check_grant_whose_preference_use_raises_is_a_pass(mem, monke
     d = await rig.engine.decide(req())
     assert (d.kind, d.decided_by) == ("allow_once", "person")
     assert [r.decided_by for r in rig.rows()] == ["person"]
+
+
+async def test_a_scout_ask_gets_a_masked_saved_call_and_a_deadline(mem):
+    from brain.guards import Guards
+    from brain.masking import Masker, mask_secrets
+
+    guards = Guards()
+    guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
+    seen = []
+
+    async def how(record):
+        seen.append(record)
+        return PersonAnswer("allow")
+
+    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW, guards=guards)
+    clean = {"name": "t", "input": {"a": 1}, "text": "Doing it."}
+    for raw, safe in [(clean, True), ({**clean, "input": {"a": "fake-token-12345678"}}, False)]:
+        engine = Engine([Person()], approvals, None, lambda n: None, now=lambda: NOW)
+        r = req(how_to_ask=how, wait=timedelta(hours=2), call=raw)
+        await engine.decide(r)
+        record = seen[-1]
+        assert record.safe_to_retry is safe
+        assert record.due_at == NOW + timedelta(hours=2)
+        assert "fake-token-12345678" not in str(record.call)
+
+
+def test_ask_wait_default_and_bounds():
+    assert ask_wait(None) == ASK_WAIT_DEFAULT == timedelta(days=3)
+    assert (ASK_WAIT_MIN, ASK_WAIT_MAX, PARK_AFTER_S) == (
+        timedelta(hours=1),
+        timedelta(days=7),
+        300.0,
+    )
+
+
+async def test_an_expired_ask_logs_its_reason(mem):
+    rig = Rig(mem, [Fake("person", Refusal("expired", "no answer"))])
+    d = await rig.engine.decide(req())
+    assert (d.kind, d.code, d.reason) == ("deny", "expired", "no answer")
+    work = rig.approvals.work
+    [event] = [e for e in work.events(d.ask_id) if e.kind == "decided"]
+    assert event.data == {"outcome": "expired", "decided_by": "none", "reason": "no answer"}

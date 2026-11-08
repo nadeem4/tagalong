@@ -250,7 +250,7 @@ undo, so the tool declares no confirm of its own. The brain gates it all the sam
 `change`, so the brain's tool gate (`resolve_mode` in `permission.py`) defaults it to "ask".
 Every action opens an approval in the desktop bubble, and it runs only after you allow it, until you
 set `tab_actions` to auto in Home. With only the browser online there is nowhere to show that
-approval, so the call is refused at once (see "Only the browser is online"). After the approval,
+approval, so the call waits (see "Only the browser is online") until the desktop joins. After the approval,
 each action asks for the one browser permission it needs.
 
 ```json
@@ -364,7 +364,7 @@ message `{type: 'status'}` and shows:
 
 You can ask Scout out loud from the popup. The browser only listens: it says `display: false`, so
 Scout's spoken answer plays on the desktop, together with the text in the bubble. With only the
-browser online the ask is refused, as for any ask (see "Only the browser is online").
+browser online an approval Scout needs waits for the desktop, as for any ask (see "Only the browser is online").
 
 Audio goes only to your own brain and is never stored; with the brain on this computer it never
 leaves it. The microphone is open only while **Done talking** is showing.
@@ -488,17 +488,17 @@ unpacked**.
 | Search source not supported      | `tool_failed` with the browser's reason ("not supported in this browser") |
 | `tab_actions` bad input          | `invalid_params`; non-web addresses (`javascript:`, `file:`) never open   |
 | `tab_actions`, Chrome refuses    | `tool_failed`: "I could not close that tab: ..." with the reason          |
-| Only the browser is online       | Scout can still read tabs, but an ask is refused at once; see below       |
+| Only the browser is online       | Scout can still read tabs, but an ask waits for the desktop; see below    |
 | Ask from the page, brain down    | Waits up to 5 s for the link, then drops it; the popup says it is down    |
-| `tab_actions`, only browser up   | Refused at once: the approval has nowhere to show                         |
+| `tab_actions`, only browser up   | Waits for the desktop: the ask parks and shows when it joins              |
 
 ## Only the browser is online
 
 A body with `display: false` shows nothing, so the brain never counts it when it picks where to
 show a turn, and never opens an ask on it. If the desktop is closed and only the browser is
-connected, a tool that needs your approval is not run: the ask is refused at once, as if nobody were
-online, and Scout is told nobody was there to ask. `tab_actions` is such a tool unless you set it to
-auto in Home, so it is refused too. A wake (Scout speaking first) is never labelled with the
+connected, a tool that needs your approval is not run yet: the ask is saved and parked at once, Scout is told
+the call is waiting for your answer, and the card shows when the desktop joins (the call then runs by
+itself if you allow it). `tab_actions` is such a tool unless you set it to auto in Home, so it waits too. A wake (Scout speaking first) is never labelled with the
 browser either. Tools that need no approval, like `tabs` `list`, still work. The rule is in
 "Permissions and asks" and "Wake and finish a turn" in [brain.md](brain.md).
 
