@@ -2333,6 +2333,18 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    survives the body leaving mid-turn.
 3. By hand, after a chat: open `tagalong.db` and run `SELECT DISTINCT body FROM messages;`. It shows `desktop`.
 
+## WhatsApp bridge supervisor (automated, brain)
+
+1. `cd brain && uv run pytest tests/test_bridges.py -q`: off or incomplete setup runs nothing, a
+   bridge that exits is restarted after 1, 2, 4, 8, 16, 30 s, `stop` ends the child, and a secret in
+   the child's output is masked in the log.
+2. `uv run pytest tests/test_bodies.py tests/test_scheduler.py tests/test_sessions.py -q -k "whatsapp or wake_ids"`:
+   a timer or held-mail wake never goes to a `whatsapp` body, even when it was the last one used.
+3. `uv run pytest tests/test_main.py -q -k "bridge or whatsapp"`: the brain starts the bridge after
+   the server and stops it at shutdown.
+4. By hand, once the bridge exists (a later slice): set the five values and `TAGALONG_WHATSAPP_ENABLED=1`,
+   start the brain and check `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
+
 ## Not supported
 
 Do not test these here.

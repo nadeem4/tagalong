@@ -91,6 +91,14 @@ rules and the missing-key error are in [connected apps](connected-apps.md).
 Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
 by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
+### WhatsApp values in the Python brain
+
+The seven `TAGALONG_WHATSAPP_*` variables (enabled, access token, app secret, verify token, phone
+number id, allowed number, port) are read from the brain's environment or `<TAGALONG_HOME>/.env`
+and listed in `.env.example`. The brain builds the WhatsApp bridge's environment from them and
+nothing else; the values are masked in logs, including the bridge's own output. See
+[the brain](brain.md#whatsapp-bridge).
+
 ### Secrets on the way out
 
 `hideSecrets(text)` (`bodies/desktop/src/main/hide-secrets.ts`) replaces each match with
