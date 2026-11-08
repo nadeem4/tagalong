@@ -364,6 +364,73 @@ pictures cannot be read on this PC, and why); it names the body tool `install_oc
 for a missing language pack. The model words any offer. That tool is declared `confirm: "always"`
 by the desktop, so it is person-only: no side check or offer touches it.
 
+## Permission engine
+
+`permission.py` is the one place that answers "may this happen?". Call sites build an `AskRequest`
+and take the `Decision`; the floor, the deciders and the outcome mapping live here. P1 added the
+engine and its tests; the tool gate (`toolbox.py`) and the expert jobs (`jobs.py`) still run their
+own ask chains and move onto it in P2 and P3, which delete the old chains. Until then they use only
+`summarise` (the one line shown in the approvals log) from it.
+
+### The floor
+
+`Tier` is derived once per tool and fixed in code; `ALLOWED` says which deciders may speak for it.
+Nothing the model, a preference or a sentence says changes a tier.
+
+| Tier          | Who may decide                                                          |
+| ------------- | ----------------------------------------------------------------------- |
+| `off`         | Nobody: refused before any decider runs                                 |
+| `person_only` | The person, every time. No stored Auto, no side-check, no standing rule |
+| `locked`      | A standing rule (the Home switch's stored Auto) or the person           |
+| `ask`         | Standing rule, side-check, then the person                              |
+| `auto`        | Nobody is asked: allowed                                                |
+
+### Deciders and the engine
+
+Deciders run in order: `StandingRule` (a stored Auto is one unscoped allow `Rule`; scope and
+expiry are in the shape but not matched yet), `SideCheckDecider` (Scout under a preference
+sentence; it sees tier `ask` only) and `Person` (awaits the request's `how_to_ask`, built by
+`tool_asker` or `expert_asker`). `Engine.decide` skips a decider the tier does not allow and, when
+the request cannot be allowed once, the rule and the side-check. Each decider returns a `Grant`, a
+`Refusal` or `None` (pass).
+
+The always-hold rules the engine enforces:
+
+1. Off refuses before any decider runs.
+2. A decider the tier does not allow is skipped, and a grant is honoured only from the decider
+   that returned it, so a buggy side-check cannot approve a `person_only` ask.
+3. Fail closed: a decider that raises or returns anything else is a pass; if all pass, the answer
+   is deny (`no_decider`) and no row is written.
+4. An allow is once only. The one way to widen is the person's "always" (a stored Auto), and only
+   on `ask` and `locked` tiers for a `tool` request: never `person_only`, never an expert request.
+5. A cancelled ask is not a final outcome and writes no row.
+
+One approvals row is written per outcome: `approved` (decided by `rule`, `scout` with the
+preference, or `person`), `refused`, `timed_out` or `no_one`. A person's once-allow may be
+followed by an offer (not after a rule, Scout, an "always", a `person_only` tool or `offer=False`).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart TD
+    C[Call site: tool, expert request, follow-up, install] --> R[AskRequest]
+    R --> F{Floor: tier}
+    F -->|off| D[Deny]
+    F -->|auto| A[Allow]
+    F -->|ask, locked, person_only| L[Deciders the tier allows, in order]
+    L --> S1[Standing rule]
+    S1 -->|pass| S2[Side-check]
+    S2 -->|pass| S3[Person]
+    S1 -->|allow once| G[Decision]
+    S2 -->|allow once| G
+    S3 -->|allow, always, deny| G
+    S3 -->|pass| N[Deny: no decider]
+    D --> G
+    A --> G
+    N --> G
+    G --> LOG[One approvals row]
+    LOG --> O[Offer may follow a person's yes]
+```
+
 ## Permissions and asks
 
 Every tool has a mode: `off`, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a stored
