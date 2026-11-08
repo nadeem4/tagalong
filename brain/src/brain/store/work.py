@@ -975,6 +975,16 @@ class WorkStore:
 
     def _settle(self, row: WorkRow, can_resume: Callable[[WorkRow], bool | None]) -> str | None:
         unreported = {"reported_at": None}
+        if row.kind == "ask" and row.parent_id is None and row.due_at and row.state == "active":
+            # Scout's own ask outlives the brain with its deadline; one that held a secret cannot
+            # be carried out (its saved call says `[secret]`), so it ends here and Scout is told.
+            if row.safe_to_retry:
+                return None
+            self._move(row, "expired", "expired", extra=unreported)
+            self.db.execute("UPDATE work_ask SET decided_by = 'none' WHERE work_id = ?", (row.id,))
+            data = {"outcome": "expired", "decided_by": "none", "reason": "held a secret"}
+            self.add_event(row.id, "decided", data)
+            return "held a secret"
         if row.kind in ("ask", "question") and row.state in ("planned", "active", "blocked"):
             self._move(row, "expired", "brain restarted", extra=unreported)
             return "expired"

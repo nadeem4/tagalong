@@ -77,14 +77,17 @@ class SlowCheck:
 
 
 class Rig:
-    def __init__(self, online=("desktop",), headless=(), park_after=0.05, names=("t",), slow=0.0):
-        self.memory = Memory(":memory:")
+    def __init__(
+        self, online=("desktop",), headless=(), park_after=0.05, names=("t",), slow=0.0, memory=None
+    ):
+        self.memory = memory or Memory(":memory:")
         self.work = WorkStore(self.memory.db, now)
         self.bodies = Bodies(online, headless)
         self.asks = Asks(self.bodies, self.work)
         self.approvals = Approvals(self.memory, self.work, lambda m, p: None, now)
         self.stored: dict[str, str] = {}
         self.events: list[Event] = []
+        self.starts: list = []  # each emitted wake's on_start hook, run when its turn begins
         self.source = Source(*names)
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), SlowCheck(slow), Person()],
@@ -98,7 +101,7 @@ class Rig:
             self.work,
             self.asks,
             lambda: self.box,
-            self.events.append,
+            self._emit,
             lambda: self.clock,
             self.approvals,
         )
@@ -111,6 +114,10 @@ class Rig:
             waiting=self.waiting,
             park_after=park_after,
         )
+
+    def _emit(self, event, on_start=None):
+        self.events.append(event)
+        self.starts.append(on_start)
 
     def opened(self):
         return [p for p in self.bodies.sent if p["state"] == "open"]
@@ -497,3 +504,43 @@ async def test_one_timer_is_armed_for_the_earliest_moment_and_dropped_when_idle(
     rig.asks.answer(ask_id, "allow", "desktop")
     await rig.settle()
     assert rig.waiting._handle is None
+
+
+# --- restart: a waiting ask keeps its deadline; one that held a secret expires at start ---
+
+
+def restarted(rig):
+    """The same database in a fresh brain: new asks, new waiting, nothing in memory."""
+    return Rig(online=(), memory=rig.memory)
+
+
+async def test_start_wakes_scout_once_about_a_secret_expiry():
+    rig = Rig(online=())
+    rig.work.create(
+        "ask",
+        "Send it",
+        id="a1",
+        state="active",
+        input={"name": "t", "input": {}, "text": ""},
+        due_at=NOW + timedelta(days=1),
+        safe_to_retry=False,
+    )
+    rig.work.add_ask("a1", source="scout_tool", tool="t", summary="Send it", group_key="t")
+    again = restarted(rig)
+    again.work.resume_scan(lambda row: None)
+    again.waiting.start()
+    [event] = again.events
+    assert event.kind == "ask_ended" and event.key == "ask:a1"
+    assert event.facts == {
+        "ask": "a1",
+        "tool": "t",
+        "summary": "Send it",
+        "outcome": "expired",
+        "reason": "held a secret",
+    }
+    assert again.work.get("a1").reported_at is None  # told only when the wake starts
+    again.starts[0]()
+    assert again.work.get("a1").reported_at is not None
+    third = restarted(rig)
+    third.waiting.start()
+    assert third.events == []

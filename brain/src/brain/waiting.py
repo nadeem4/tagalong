@@ -34,7 +34,7 @@ class WaitingAsks:
         work: WorkStore,
         asks: Asks,
         toolbox: "Callable[[], Toolbox]",
-        emit: Callable[[Event], None],
+        emit: Callable[..., None],  # (event, on_start=hook): the scheduler's emit
         now: Callable[[], datetime],
         approvals: Approvals,
     ) -> None:
@@ -48,6 +48,7 @@ class WaitingAsks:
         self._claims: dict[str, str] = {}  # call key -> ask id, until its decision ends
         self._handle: asyncio.TimerHandle | None = None
         self._expiring: set[str] = set()  # freed at the deadline, their end not yet logged
+        self._unseen: set[str] = set()  # waiting while nobody could see them, until shown again
 
     def claim(self, tool: str, input: dict, ask_id: str) -> str | None:
         """The ask already holding this very call, else register `ask_id` for it. Synchronous
@@ -61,12 +62,33 @@ class WaitingAsks:
 
     def _ended(self, ask_id: str) -> None:
         self.release(ask_id)
+        self._unseen.discard(ask_id)
         self._expiring.discard(ask_id)
         self.changed()
 
     def start(self) -> None:
-        """Called once the toolbox exists: act on what came due while the brain was away."""
+        """Called once the toolbox exists: tell Scout of asks the restart expired, remember the
+        survivors as unseen, and act on what came due while the brain was away."""
+        for row in self._work.unreported(["ask"]):
+            if row.parent_id is None and row.due_at is not None:  # Scout's own, ended at start
+                self._tell_expired(row)
+        self._unseen = {row.id for row in self._work.waiting_asks()}
         self.fire_due()
+
+    def _tell_expired(self, row: WorkRow) -> None:
+        detail = self._work.ask_detail(row.id) or {}
+        decided = self._work.event_of(row.id, "decided")
+        facts: dict[str, str | int] = {
+            "ask": row.id,
+            "tool": detail.get("tool") or "",
+            "summary": detail.get("summary") or row.title,
+            "outcome": "expired",
+            "reason": (decided.data or {}).get("reason", "") if decided else "",
+        }
+        self._emit(
+            Event("ask_ended", facts, key=f"ask:{row.id}"),
+            on_start=lambda: self._work.mark_reported(row.id),
+        )
 
     def changed(self) -> None:
         """Re-arm the one timer for the earliest notice or deadline among waiting asks."""
@@ -174,6 +196,8 @@ class WaitingAsks:
     def adopt(self, task: "asyncio.Task[Decision]", call: Call, req: AskRequest) -> None:
         """Keep the decision still running after its turn moved on, and act on its end."""
         self._asks.park(req.ask_id)
+        if not self._asks.anyone_online():
+            self._unseen.add(req.ask_id)  # raised to an empty room: the person has not seen it
         watcher = asyncio.create_task(self._finish(task, call, req))
         self._tasks.add(watcher)
         watcher.add_done_callback(self._tasks.discard)
