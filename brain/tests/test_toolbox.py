@@ -7,23 +7,41 @@ from types import SimpleNamespace
 
 import pytest
 from ask_log import approvals_on, list_approvals, work_on
+from fake_engine import FakeEngine
 from job_rows import fresh_work
 
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.guards import ALLOW, Guard, Guards, Hook, ask, block, stop
 from brain.mind.turn import Call
-from brain.permission import Tier
+from brain.permission import (
+    Decision,
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    Tier,
+    stored_auto_rules,
+)
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
 from brain.toolbox import INSTALL_OCR_TIMEOUT_S, BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
 
-def Toolbox(sources, stored=None, asks=None, approvals=None):
-    """A toolbox whose stored modes are a plain dict, as the tests need no database."""
+def Toolbox(sources, stored=None, asks=None, approvals=None, engine=None, deciders=None):
+    """A toolbox whose stored modes are a plain dict, as the tests need no database.
+
+    With `asks` it gets a real engine: a standing rule, then (when given) `deciders`, then the
+    person. `approvals=None` writes no rows."""
     stored = {} if stored is None else stored
-    return RealToolbox(sources, lambda: stored, stored.__setitem__, asks, approvals)
+    if engine is None and asks is not None:
+        engine = Engine(
+            [StandingRule(stored_auto_rules(lambda: stored)), *(deciders or []), Person()],
+            approvals,
+            None,
+            set_auto=lambda name: stored.__setitem__(name, "auto"),
+        )
+    return RealToolbox(sources, lambda: stored, stored.__setitem__, asks, engine)
 
 
 def spec(name, audience=("scout",)):
@@ -689,7 +707,7 @@ class FakeApprovals:
 def recorded(online=("desktop",), **kw):
     box, source, bodies, stored = gated(online=online, **kw)
     log = FakeApprovals()
-    box._approvals = log
+    box._engine._approvals = log
     return box, source, bodies, log
 
 
@@ -769,7 +787,7 @@ async def test_auto_tool_records_nothing():
 
 async def test_toolbox_without_approvals_behaves_as_before():
     box, source, bodies, _ = gated()
-    assert box._approvals is None
+    assert box._engine._approvals is None
     task = await answer_with(box, bodies, "allow")
     assert await task == "ran t"
 
@@ -814,8 +832,8 @@ def scouted(mem, check, online=("desktop",), locked=False):
         [ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.locked if locked else None)]
     )
     stored = {}
-    box = RealToolbox(
-        [source], lambda: stored, stored.__setitem__, Asks(bodies, fresh_work()), approvals, check
+    box = Toolbox(
+        [source], stored, Asks(bodies, fresh_work()), approvals, deciders=[SideCheckDecider(check)]
     )
     return box, source, bodies, stored, sent
 
@@ -901,12 +919,28 @@ async def test_removed_preference_sends_next_ask_to_the_person(mem):
         await task
 
 
-async def test_no_one_online_skips_side_check(mem):
-    check = FakeSideCheck(preference(mem))
+async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem):
+    box, source, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
+
+    def boom(*a):
+        raise RuntimeError("db")
+
+    box._engine._approvals.preference_used = boom
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))  # Scout's grant was a pass: the person is asked
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran t"
+    [row] = list_approvals(mem, "all", 10, None)
+    assert row.decided_by == "person"
+
+
+async def test_nobody_online_still_logs_no_one(mem):
+    # Scout looks first (spec section 9); only when it passes does the person step find nobody.
+    check = FakeSideCheck(None)
     box, _, _, _, _ = scouted(mem, check, online=())
     with pytest.raises(RpcError):
         await box.run(call_with_text("t"))
-    assert check.facts == []
+    assert len(check.facts) == 1
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
 
@@ -937,7 +971,7 @@ class FakeOffers:
 
 def offered(mem, check=None, offers=None):
     box, source, bodies, stored, sent = scouted(mem, check or FakeSideCheck(None))
-    box._offers = offers
+    box._engine._offers = offers
     return box, bodies
 
 
@@ -959,7 +993,7 @@ async def test_person_only_tool_approval_is_never_offered(mem):
     offers = FakeOffers()
     box, source, bodies, _, _ = scouted(mem, FakeSideCheck(None))
     source._specs = [ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.person_only)]
-    box._offers = offers
+    box._engine._offers = offers
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
@@ -997,71 +1031,6 @@ async def test_side_check_that_raises_still_asks_the_person(mem):
     await _still_asks_the_person(box, bodies)
 
 
-async def test_scout_approved_that_raises_still_asks_the_person(mem):
-    box, _, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
-
-    def boom(*args, **kwargs):
-        raise RuntimeError("boom")
-
-    box._approvals.scout_approved = boom
-    await _still_asks_the_person(box, bodies)
-
-
-async def test_run_blocks_when_a_tool_call_guard_blocks():
-    source = FakeSource([spec("a")])
-    guards = Guards()
-    guards.add(Guard("no", Hook.tool_call, lambda ctx: block("not today", "denied")))
-    box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
-    with pytest.raises(RpcError) as err:
-        await box.run(call("a"))
-    assert (err.value.code, err.value.message) == (ErrorCode.denied, "not today")
-    assert source.ran == []
-
-
-def _box_with(guard):
-    source = FakeSource([spec("a")])
-    guards = Guards()
-    guards.add(guard)
-    box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
-    return box, source
-
-
-async def test_run_refuses_when_a_tool_call_guard_raises():
-    def boom(ctx):
-        raise RuntimeError("secret input text")
-
-    box, source = _box_with(Guard("boom", Hook.tool_call, boom))
-    with pytest.raises(RpcError) as err:
-        await box.run(call("a"))
-    assert err.value.code == ErrorCode.denied
-    assert "secret" not in err.value.message
-    assert source.ran == []
-
-
-async def test_run_refuses_when_a_tool_call_guard_stops():
-    box, source = _box_with(Guard("halt", Hook.tool_call, lambda ctx: stop("halted", "denied")))
-    with pytest.raises(RpcError) as err:
-        await box.run(call("a"))
-    assert (err.value.code, err.value.message) == (ErrorCode.denied, "halted")
-    assert source.ran == []
-
-
-async def test_chain_error_in_an_ask_guard_refuses_the_tool():
-    def boom(ctx):
-        raise RuntimeError("secret input text")
-
-    source = FakeSource([spec("a")])
-    guards = Guards()
-    guards.add(Guard("ask_all", Hook.tool_call, lambda ctx: ask("needs your yes")))
-    guards.add(Guard("boom", Hook.ask, boom))
-    box = RealToolbox([source], lambda: {}, lambda n, m: None, SimpleNamespace(), guards=guards)
-    with pytest.raises(RpcError) as err:
-        await box.run(call("a"))
-    assert err.value.code == ErrorCode.denied
-    assert "secret" not in err.value.message
-    assert source.ran == []
-
-
 async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_the_person(mem):
     preference(mem)
     rules.remove_preference(mem.db, rules.list_preferences(mem.db)[0].id)
@@ -1088,23 +1057,6 @@ async def test_locked_tool_with_a_preference_naming_it_still_asks_the_person(mem
     assert source.ran == []  # a locked tool is never Scout's to approve: the floor
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
-
-
-async def test_ask_chain_ending_in_an_always_allow_refuses_the_tool(mem):
-    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
-    source = FakeSource([spec("a")])
-    guards = Guards()
-    guards.add(Guard("ask_all", Hook.tool_call, lambda ctx: ask("needs your yes")))
-    guards.add(Guard("always_allow", Hook.ask, lambda ctx: ALLOW))  # allows, but not once
-    asks = Asks(AskBodies(("desktop",)), fresh_work())
-    box = RealToolbox(
-        [source], lambda: {}, lambda n, m: None, asks, approvals, guards=guards
-    )  # fmt: skip
-    with pytest.raises(RpcError) as err:
-        await box.run(call("a"))
-    assert err.value.code == ErrorCode.denied
-    assert source.ran == []
-    assert list_approvals(mem, "all", 10, None) == []
 
 
 def test_a_person_only_tool_always_asks_and_its_mode_cannot_be_changed():
@@ -1138,14 +1090,18 @@ def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
     bodies = AskBodies(online)
     approvals = approvals_on(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
     stored = {}
+    engine = Engine(
+        [StandingRule(stored_auto_rules(lambda: stored)), SideCheckDecider(check), Person()],
+        approvals,
+        offers,
+        set_auto=lambda name: stored.__setitem__(name, "auto"),
+    )
     box = RealToolbox(
         [BrainSource(tools)],
         lambda: stored,
         stored.__setitem__,
         Asks(bodies, fresh_work()),
-        approvals,
-        check,
-        offers,
+        engine,
         owner_turn=lambda turn_id: owner and turn_id == "t1",
     )
     return box, jobs, bodies, stored
@@ -1217,7 +1173,7 @@ async def test_a_failing_side_check_on_a_nudge_asks_the_owner_not_allows(mem):
 
 
 async def test_tell_expert_on_a_brain_turn_with_nobody_online_is_refused_and_logged(mem):
-    box, jobs, _, _ = nudger(mem, FakeSideCheck(preference(mem)), online=())
+    box, jobs, _, _ = nudger(mem, FakeSideCheck(None), online=())
     with pytest.raises(RpcError) as err:
         await box.run(nudge())
     assert "Nobody was there to ask" in str(err.value)
@@ -1241,14 +1197,14 @@ class RaisingSource(FakeSource):
         raise RpcError(ErrorCode.tool_failed, "it broke")
 
 
-def _reporting_box(source, guards=None):
+def _reporting_box(source, engine=None):
     seen = []
     box = RealToolbox(
         [source],
         lambda: {},
         lambda n, m: None,
-        SimpleNamespace() if guards else None,
-        guards=guards,
+        SimpleNamespace() if engine else None,
+        engine,
         on_call=lambda *a: seen.append(a),
     )
     return box, seen
@@ -1277,9 +1233,7 @@ async def test_on_call_reports_a_failed_call_and_the_error_still_propagates():
 
 
 async def test_on_call_reports_a_refused_call_as_refused():
-    guards = Guards()
-    guards.add(Guard("no", Hook.tool_call, lambda ctx: block("not today", "denied")))
-    box, seen = _reporting_box(FakeSource([spec("a")]), guards)
+    box, seen = _reporting_box(FakeSource([spec("a")]), FakeEngine(Decision("deny", "no_decider")))
     with pytest.raises(RpcError):
         await box.run(call("a"))
     assert [s[3] for s in seen] == ["refused"]
@@ -1413,3 +1367,113 @@ def test_install_ocr_language_declared_always_is_person_only_with_no_new_gate():
 
 def test_the_install_wait_is_longer_than_the_desktops_own_limit():
     assert INSTALL_OCR_TIMEOUT_S >= 660
+
+
+# --- P2: the toolbox hands every ask-mode call to the engine --------------------------------
+
+
+def _engine_box(decision, spec_=None, stored=None, owner=False):
+    engine = FakeEngine(decision)
+    source = FakeSource([spec_ or ToolSpec("t", "t tool", {"type": "object"})])
+    asks = Asks(AskBodies(), fresh_work())
+    stored = {} if stored is None else stored
+    box = RealToolbox(
+        [source],
+        lambda: stored,
+        stored.__setitem__,
+        asks,
+        engine,
+        owner_turn=lambda turn_id: owner,
+    )
+    return box, source, engine
+
+
+async def test_ask_mode_call_goes_through_the_engine():
+    box, source, engine = _engine_box(Decision("allow_once"))
+    assert await box.run(call_with_text("t")) == "ran t"
+    [req] = engine.requests
+    assert (req.kind, req.tool, req.group_key, req.source, req.summary) == (
+        "tool",
+        "t",
+        "t",
+        "scout_tool",
+        "Doing it.",
+    )
+    assert req.tier is Tier.ask and req.turn_id == "t1" and req.how_to_ask is not None
+
+
+async def test_a_card_gives_the_engine_the_facts_as_input():
+    async def card(args):
+        return {"to": "ann"}
+
+    box, _, engine = _engine_box(
+        Decision("allow_once"), ToolSpec("t", "t tool", {"type": "object"}, card=card)
+    )
+    await box.run(call_with_text("t"))
+    assert engine.requests[0].input == {"to": "ann"}
+
+
+@pytest.mark.parametrize(
+    ("code", "error", "message"),
+    [
+        ("denied", ErrorCode.denied, "The user said no to t."),
+        ("no_one", ErrorCode.denied, "Nobody was there to ask, so t was not run."),
+        ("timeout", ErrorCode.timeout, "nobody answered the ask in time"),
+        ("cancelled", ErrorCode.cancelled, "the ask was cancelled"),
+        ("no_decider", ErrorCode.denied, "Nobody approved t, so it was not run."),
+    ],
+)
+async def test_engine_refusals_keep_todays_words(code, error, message):
+    box, source, _ = _engine_box(Decision("deny", code))
+    with pytest.raises(RpcError) as err:
+        await box.run(call_with_text("t"))
+    assert (err.value.code, err.value.message) == (error, message)
+    assert source.ran == []
+
+
+async def test_off_tool_is_refused_before_the_engine():
+    box, source, engine = _engine_box(Decision("allow_once"), stored={"t": "off"})
+    with pytest.raises(RpcError):
+        await box.run(call_with_text("t"))
+    assert engine.requests == [] and source.ran == []
+
+
+async def test_follow_up_on_the_owners_turn_skips_the_engine():
+    box, _, engine = _engine_box(
+        Decision("deny", "denied"),
+        ToolSpec("t", "t tool", {"type": "object"}, follow_up=True),
+        owner=True,
+    )
+    assert await box.run(call_with_text("t")) == "ran t"
+    assert engine.requests == []
+
+
+async def test_home_caller_skips_the_gate():
+    box, _, engine = _engine_box(
+        Decision("deny", "denied"),
+        ToolSpec("t", "d", {"type": "object"}, audience=frozenset({"home"})),
+    )
+    assert await box.run(call_with_text("t"), caller="home") == "ran t"
+    assert engine.requests == []
+
+
+async def test_stored_auto_runs_without_the_engine_asking_the_person():
+    # A stored auto is the standing rule inside the engine; the toolbox still hands it over.
+    stored = {}
+    engine = Engine(
+        [StandingRule(stored_auto_rules(lambda: stored)), Person()],
+        None,
+        None,
+        set_auto=lambda n: None,
+    )
+    stored["t"] = "auto"
+    bodies = AskBodies()
+    box = RealToolbox(
+        [FakeSource([ToolSpec("t", "t tool", {"type": "object"})])],
+        lambda: stored,
+        stored.__setitem__,
+        Asks(bodies, fresh_work()),
+        engine,
+    )
+    assert await box.run(call_with_text("t")) == "ran t"
+    assert bodies.sent == []

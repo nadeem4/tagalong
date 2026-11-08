@@ -1,14 +1,13 @@
-"""Built-in guards: the spend caps (daily budget, step cap), wake caps and the tool-mode gate.
+"""Built-in guards: the spend caps (daily budget, step cap), wake caps and the expert ask chain.
 
 The budget also sits on emit so the scheduler drops wakes; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
-tool_mode is the tool_call guard that asks the person before a tool runs in ask mode; the ask
-hook then runs anyone_online, side_check_guard and person_ask in that order.
+The ask hook runs anyone_online, side_check_guard and person_ask in that order; only Jobs still
+uses it (P3 moves it onto the permission engine, which already decides every tool call).
 """
 
 import dataclasses
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from brain.guards import (
@@ -19,10 +18,8 @@ from brain.guards import (
     Guards,
     Hook,
     ModelCallCtx,
-    ToolCallCtx,
     Verdict,
     allow_once,
-    ask,
     block,
     stop,
 )
@@ -84,34 +81,6 @@ def spend_guards(budget, cap: int) -> Guards:
     guards.add(daily_budget_on_emit(budget))
     guards.add(step_cap(cap))
     return guards
-
-
-def tool_mode(
-    modes: Callable[[], dict[str, str]],
-    owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
-) -> Guard:
-    def check(ctx: ToolCallCtx) -> Verdict:
-        from brain.permission import Tier, resolve_mode, tier  # permission imports this module
-
-        if ctx.caller == "home":
-            return ALLOW
-        mode = resolve_mode(ctx.spec, modes().get(ctx.spec.name))
-        if mode == "off":
-            # Plain words the model reads; it should route around, not retry.
-            return block(f"{ctx.spec.name} is turned off by the owner.", "denied")
-        if mode == "ask":
-            # A follow-up the owner asked for in chat is already their yes; one Scout starts
-            # on a wake goes through the ask chain.
-            if (
-                ctx.spec.follow_up
-                and tier(ctx.spec) is not Tier.person_only
-                and owner_turn(ctx.turn_id)
-            ):
-                return ALLOW
-            return ask("needs your yes")
-        return ALLOW
-
-    return Guard("tool_mode", Hook.tool_call, check)
 
 
 def anyone_online(asks) -> Guard:

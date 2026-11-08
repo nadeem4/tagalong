@@ -2,8 +2,8 @@
 
 A Source owns a set of tools (the brain's own, or a body's). The toolbox lists what Scout may
 see, and gates each call: unknown name, wrong caller, or a source that cannot serve it now.
-A tool_call guard then decides: an ask-mode tool waits for a person's allow (gate step 3);
-Home calls skip that step.
+The permission engine then decides: an ask-mode tool waits for an allow from a standing rule,
+Scout's side-check or the person (gate step 3); Home calls skip that step.
 """
 
 import logging
@@ -14,23 +14,22 @@ from typing import Literal, Protocol
 
 from pydantic import ValidationError
 
-from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.bodies import Bodies
-from brain.builtin_guards import (
-    anyone_online,
-    person_ask,
-    side_check_guard,
-    tool_mode,
-)
-from brain.guards import AskCtx, Guards, Hook, ToolCallCtx
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
-from brain.offers import Offers
 from brain.outputs import OutputStore, preview
-from brain.permission import Tier, resolve_mode, summarise, tier
+from brain.permission import (
+    AskRequest,
+    Engine,
+    Tier,
+    gate_tier,
+    resolve_mode,
+    summarise,
+    tier,
+    tool_asker,
+)
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
-from brain.side_check import SideCheck
 
 log = logging.getLogger("brain")
 
@@ -175,11 +174,6 @@ class BodySource:
         return None
 
 
-def _error_code(name: str) -> ErrorCode:
-    # Guard codes are ErrorCode names; "" or "error" (a guard that raised) means denied.
-    return ErrorCode[name] if name in ErrorCode.__members__ else ErrorCode.denied
-
-
 class Toolbox:
     def __init__(
         self,
@@ -187,10 +181,7 @@ class Toolbox:
         modes: Callable[[], dict[str, str]],
         save_mode: Callable[[str, str], None],
         asks: Asks | None = None,
-        approvals: Approvals | None = None,
-        side_check: SideCheck | None = None,
-        offers: Offers | None = None,
-        guards: Guards | None = None,
+        engine: Engine | None = None,
         owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
         on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
         | None = None,
@@ -206,18 +197,8 @@ class Toolbox:
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
-        self._approvals = approvals  # None records nothing
-        self._offers = offers  # None: no offers to auto-approve
-        if guards is None:
-            # Standalone toolbox: build the same chain the Session registers.
-            guards = Guards()
-            guards.add(tool_mode(modes, owner_turn))  # also refuses an Off tool
-            if asks is not None:
-                guards.add(anyone_online(asks))
-                if side_check is not None and approvals is not None:
-                    guards.add(side_check_guard(side_check, approvals))
-                guards.add(person_ask())
-        self._guards = guards
+        self._engine = engine  # None skips it too
+        self._owner_turn = owner_turn
 
     def mode(self, spec: ToolSpec) -> Literal["off", "ask", "auto"]:
         return resolve_mode(spec, self._modes().get(spec.name))
@@ -293,71 +274,44 @@ class Toolbox:
         return out
 
     async def _ask(
-        self, call: Call, spec: ToolSpec, source_kind: str, job_id: str | None = None
+        self, call: Call, spec: ToolSpec, source_kind: str, job_id: str | None, gate: Tier
     ) -> None:
-        """Gate step 3: run the ask chain; return only if the call may run. `job_id` names the
+        """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so."""
-        assert self._asks is not None
-        approvals = self._approvals
+        assert self._asks is not None and self._engine is not None
         ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
-
-        def record(outcome: str, decided_by: str = "person") -> None:
-            if approvals is not None:
-                approvals.record(
-                    source=source_kind,
-                    tool=spec.name,
-                    summary=summary,
-                    input=call.input,
-                    group_key=spec.name,
-                    outcome=outcome,
-                    decided_by=decided_by,
-                    job_id=job_id,
-                    ask_id=ask_id,
-                )
-
-        floor = tier(spec)
-        fixed = floor in (Tier.locked, Tier.person_only)  # no Always button
+        shown = call
         if spec.card is not None:
-            call = replace(call, input=await spec.card(call.input))
-        summary = summarise(call.text, spec.name, call.input)
-        ctx = AskCtx(
-            source_kind,
-            spec.name,
-            summary,
-            call.input,
-            spec.name,
-            fixed,
-            call.turn or None,
-            lambda: self._asks.permission(call, spec.name, fixed, ask_id=ask_id, parent_id=job_id),
+            shown = replace(call, input=await spec.card(call.input))
+        req = AskRequest(
+            kind="tool",
+            source=source_kind,
+            tool=spec.name,
+            group_key=spec.name,
+            summary=summarise(call.text, spec.name, shown.input),
+            input=shown.input,
+            tier=gate,
+            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id),
             job_id=job_id,
-            person_only=floor is Tier.person_only,
+            turn_id=call.turn or None,
+            ask_id=ask_id,
         )
-        verdict = await self._guards.run(Hook.ask, ctx)
-        if verdict.kind in ("block", "stop"):
-            if verdict.guard == "anyone_online":
-                record("no_one", "none")
-            elif verdict.guard == "person_ask" and verdict.code == "timeout":
-                record("timed_out", "none")
-            elif verdict.guard == "person_ask" and verdict.code == "denied":
-                record("refused")
-            # A cancelled ask is not a final outcome, so it records no row.
-            # Logged guard reasons hold no tool text; the user-facing line is built here.
-            reason = verdict.reason
-            if verdict.guard == "anyone_online":
-                reason = f"Nobody was there to ask, so {spec.name} was not run."
-            elif verdict.guard == "person_ask" and verdict.code == "denied":
-                reason = f"The user said no to {spec.name}."
-            raise RpcError(_error_code(verdict.code), reason)
-        if verdict.guard == "side_check":
-            return  # the guard already logged Scout's row
-        if verdict.guard != "person_ask":
-            # An allow nobody vouched for (not a once-allow from side_check or person_ask) refuses.
-            raise RpcError(ErrorCode.denied, f"Nobody approved {spec.name}, so it was not run.")
-        record("approved")
-        if verdict.value == "always":
-            self.set_mode(spec.name, "auto")  # now Auto: an offer would be noise
-        elif self._offers is not None and floor is not Tier.person_only:
-            self._offers.consider(spec.name, source_kind, spec.name)
+        decision = await self._engine.decide(req)
+        if decision.allowed:
+            return
+        # Plain words the model reads; logged reasons never carry tool text.
+        name = spec.name
+        match decision.code:
+            case "denied":
+                raise RpcError(ErrorCode.denied, f"The user said no to {name}.")
+            case "no_one":
+                raise RpcError(ErrorCode.denied, f"Nobody was there to ask, so {name} was not run.")
+            case "timeout":
+                raise RpcError(ErrorCode.timeout, "nobody answered the ask in time")
+            case "cancelled":
+                raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
+            case _:
+                raise RpcError(ErrorCode.denied, f"Nobody approved {name}, so it was not run.")
 
     async def run(
         self, call: Call, caller: str = "scout", job_id: str | None = None
@@ -399,6 +353,20 @@ class Toolbox:
         except Exception:
             log.exception("on_call hook failed")
 
+    async def _gate(self, call: Call, spec: ToolSpec, kind: str, job_id: str | None) -> None:
+        stored = self._modes().get(spec.name)
+        gate = gate_tier(spec, stored)
+        if gate is Tier.off:
+            # Plain words the model reads; it should route around, not retry.
+            raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
+        if resolve_mode(spec, stored) != "ask" or self._engine is None or self._asks is None:
+            return
+        # A follow-up the owner asked for in chat is already their yes; one Scout starts on a
+        # wake goes through the engine.
+        if spec.follow_up and gate is not Tier.person_only and self._owner_turn(call.turn):
+            return
+        await self._ask(call, spec, kind, job_id, gate)
+
     async def _run(
         self, call: Call, caller: str, found: list, job_id: str | None
     ) -> str | list[dict]:
@@ -409,12 +377,8 @@ class Toolbox:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
                     kind = getattr(source, "approval_source", "scout_tool")
                     found[:] = [spec, kind, False]
-                    ctx = ToolCallCtx(spec, call.input, caller, kind, call.turn)
-                    verdict = await self._guards.run(Hook.tool_call, ctx)
-                    if verdict.kind in ("block", "stop"):
-                        raise RpcError(_error_code(verdict.code), verdict.reason)
-                    if verdict.kind == "ask" and self._asks is not None:
-                        await self._ask(call, spec, kind, job_id)
+                    if caller != "home":
+                        await self._gate(call, spec, kind, job_id)
                     found[2] = True
                     return await source.run(call, call.name)
         for source in self.sources:

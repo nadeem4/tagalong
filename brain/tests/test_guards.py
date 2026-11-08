@@ -8,12 +8,12 @@ import logging
 
 from brain.guards import (
     ALLOW,
+    AskCtx,
     Guard,
     Guards,
     Hook,
     ModelCallCtx,
     SaveCtx,
-    ToolCallCtx,
     allow_once,
     ask,
     block,
@@ -71,15 +71,15 @@ async def test_stop_short_circuits_and_keeps_code():
 
 async def test_block_beats_ask():
     g = make(
-        Guard("a", Hook.tool_call, lambda c: ask("sure?")),
-        Guard("b", Hook.tool_call, lambda c: block("never")),
+        Guard("a", Hook.emit, lambda c: ask("sure?")),
+        Guard("b", Hook.emit, lambda c: block("never")),
     )
-    assert (await g.run(Hook.tool_call, None)).kind == "block"
+    assert (await g.run(Hook.emit, None)).kind == "block"
 
 
 async def test_ask_when_only_asks():
-    g = make(Guard("a", Hook.tool_call, lambda c: ask("sure?")))
-    v = await g.run(Hook.tool_call, None)
+    g = make(Guard("a", Hook.emit, lambda c: ask("sure?")))
+    v = await g.run(Hook.emit, None)
     assert v.kind == "ask" and v.reason == "sure?"
 
 
@@ -117,10 +117,8 @@ async def test_allow_once_counts_as_allow_elsewhere():
         seen.append(1)
         return ALLOW
 
-    g = make(
-        Guard("a", Hook.tool_call, lambda c: allow_once("fine")), Guard("b", Hook.tool_call, later)
-    )
-    v = await g.run(Hook.tool_call, None)
+    g = make(Guard("a", Hook.emit, lambda c: allow_once("fine")), Guard("b", Hook.emit, later))
+    v = await g.run(Hook.emit, None)
     assert v.kind == "allow" and seen == [1]
 
 
@@ -132,19 +130,19 @@ async def test_raising_guard_is_block_with_code_error():
         raise RuntimeError("secret detail")
 
     for fn in (boom, aboom):
-        v = await make(Guard("x", Hook.tool_call, fn)).run(Hook.tool_call, None)
+        v = await make(Guard("x", Hook.emit, fn)).run(Hook.emit, None)
         assert v.kind == "block" and v.code == "error"
         assert "secret detail" not in v.reason and v.reason
 
 
 async def test_non_verdict_return_is_block_with_one_log_line(caplog):
     caplog.set_level(logging.INFO, logger="brain.guardrails")
-    g = make(Guard("x", Hook.tool_call, lambda c: None))
-    v = await g.run(Hook.tool_call, None)
+    g = make(Guard("x", Hook.emit, lambda c: None))
+    v = await g.run(Hook.emit, None)
     assert v.kind == "block" and v.code == "error"
     assert len([r for r in caplog.records if r.name == "brain.guardrails"]) == 1
     caplog.clear()
-    v = g.run_sync(Hook.tool_call, None)
+    v = g.run_sync(Hook.emit, None)
     assert v.kind == "block" and v.code == "error"
     assert len([r for r in caplog.records if r.name == "brain.guardrails"]) == 1
 
@@ -161,7 +159,7 @@ async def test_raising_guard_logs_class_name_not_message(caplog):
     def boom(ctx):
         raise RuntimeError("secret detail")
 
-    await make(Guard("x", Hook.tool_call, boom)).run(Hook.tool_call, None)
+    await make(Guard("x", Hook.emit, boom)).run(Hook.emit, None)
     assert "guard failed (RuntimeError)" in caplog.text
     assert "secret detail" not in caplog.text
 
@@ -222,8 +220,6 @@ async def test_log_line_omits_turn_when_unknown(caplog):
 
 async def test_log_never_contains_tool_input(caplog):
     caplog.set_level(logging.INFO, logger="brain.guardrails")
-    ctx = ToolCallCtx(
-        spec=None, input={"secret": "hunter2"}, caller="scout", source_kind="user", turn_id="t1"
-    )
-    await make(Guard("b", Hook.tool_call, lambda c: block("not allowed"))).run(Hook.tool_call, ctx)
+    ctx = AskCtx("user", "t", "Doing it.", {"secret": "hunter2"}, "t", False, "t1", lambda: None)
+    await make(Guard("b", Hook.ask, lambda c: block("not allowed"))).run(Hook.ask, ctx)
     assert "hunter2" not in caplog.text and caplog.records

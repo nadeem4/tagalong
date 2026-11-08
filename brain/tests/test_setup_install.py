@@ -18,7 +18,15 @@ import pytest
 
 from brain.events import Event
 from brain.mind.turn import Call
-from brain.permission import Tier, resolve_mode
+from brain.permission import (
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    Tier,
+    resolve_mode,
+    stored_auto_rules,
+)
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.expert_tools import expert_setup_tools
@@ -570,6 +578,10 @@ class StubAsks:
         return self.answer
 
 
+def person_engine():
+    return Engine([Person()], None, None, lambda n: None)
+
+
 async def test_install_tool_needs_the_allow_card_and_shows_the_node_download(tmp_path, ensure):
     tools, emitted, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
@@ -578,7 +590,13 @@ async def test_install_tool_needs_the_allow_card_and_shows_the_node_download(tmp
     assert spec.tier is Tier.person_only
     assert resolve_mode(spec, None) == "ask" and resolve_mode(spec, "auto") == "ask"
     asks = StubAsks()
-    box = RealToolbox([BrainSource([(spec, handler)])], lambda: {}, lambda n, m: None, asks)
+    box = RealToolbox(
+        [BrainSource([(spec, handler)])],
+        lambda: {},
+        lambda n, m: None,
+        asks,
+        engine=person_engine(),
+    )
     await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert asks.asked[0]["node_download"] is not None
     assert asks.asked[0]["expert"] == "claude-acp"
@@ -588,9 +606,6 @@ async def test_install_tool_needs_the_allow_card_and_shows_the_node_download(tmp
 
 
 async def test_a_preference_and_a_stored_auto_still_reach_the_person(tmp_path, ensure):
-    from brain.builtin_guards import anyone_online, person_ask, side_check_guard, tool_mode
-    from brain.guards import Guards
-
     class Side:
         def __init__(self):
             self.asked = 0
@@ -599,21 +614,19 @@ async def test_a_preference_and_a_stored_auto_still_reach_the_person(tmp_path, e
             self.asked += 1
             return "any-pref"
 
-    class Approvals:
-        def scout_approved(self, *a, **k):
-            raise AssertionError("Scout must not approve an install")
-
     tools, emitted, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
     side = Side()
     asks = StubAsks()
     modes = lambda: {"install_expert": "auto"}  # noqa: E731
-    guards = Guards()
-    for g in (tool_mode(modes), anyone_online(asks), side_check_guard(side, Approvals())):
-        guards.add(g)
-    guards.add(person_ask())
+    engine = Engine(
+        [StandingRule(stored_auto_rules(modes)), SideCheckDecider(side), Person()],
+        None,
+        None,
+        lambda n: None,
+    )
     box = RealToolbox(
-        [BrainSource([(spec, handler)])], modes, lambda n, m: None, asks, guards=guards
+        [BrainSource([(spec, handler)])], modes, lambda n, m: None, asks, engine=engine
     )
     await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))
     assert asks.asked and side.asked == 0
@@ -625,7 +638,11 @@ async def test_a_refused_card_installs_nothing(tmp_path, ensure):
     tools, _, _, stop = make_tools(tmp_path, Npm())
     spec, handler = tools["install_expert"]
     box = RealToolbox(
-        [BrainSource([(spec, handler)])], lambda: {}, lambda n, m: None, StubAsks("deny")
+        [BrainSource([(spec, handler)])],
+        lambda: {},
+        lambda n, m: None,
+        StubAsks("deny"),
+        engine=person_engine(),
     )
     with pytest.raises(RpcError):
         await box.run(Call("c1", "install_expert", {"id": "claude-acp"}, "t1", ""))

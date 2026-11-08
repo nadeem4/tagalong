@@ -533,8 +533,9 @@ history and preferences with `call` as in the section above.
    preference is saved. Set the values lower in `.env` to check this faster.
 6. **Action:** with a preference saved, trigger a locked tool (one that asks until unlocked on Home) while the
    built-in "Always ask me before risky actions" default still exists.
-   **Expected:** it still asks you. Scout does not look at it, and a general preference never
-   approves it, even after the default is deleted. Only a preference that names that tool can.
+   **Expected:** it still asks you. Scout does not look at it, and no preference
+   approves it, even after the default is deleted. Only the Home switch (Auto) lets it run unasked.
+   An app tool named `pay_invoice`, `charge_card` or `delete_file` shows no Auto choice on Home and always opens the Allow card.
    A tool a body declares `confirm: "always"` (delete, overwrite) is stricter: its Home switch cannot
    be set to Auto and even a preference that names it never approves it. (Pinned by brain tests until a
    body declares one.)

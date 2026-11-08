@@ -119,11 +119,14 @@ flowchart TD
 - **read**: the tool says `readOnlyHint` and is not locked (this sets its effect only; it never
   sets its mode);
 - **change**: anything else, including a tool with no hints at all;
-- **locked**: `destructiveHint`, or a whole word in the name (split on `_`, `-`, `.`, spaces and
-  camelCase) of `send`, `delete`, `remove`, `destroy`, `trash`, `pay` or `charge`. A risky word wins
-  over a read-only hint, since hints are the app's own claim. Locked tools ask every time until you
-  unlock one on Home: it reads "Risky action", and choosing **Auto** first
-  warns that Scout will no longer ask. Choose **Ask** again to undo.
+- **person-only**: whole word in name (split on `_`, `-`, `.`, spaces and camelCase) of `pay`,
+  `charge` or `delete`. Only you decide it, every time: Home offers Off or Ask, never Auto, and
+  no preference or Always button ever skips the Allow card;
+- **locked**: `destructiveHint`, or whole word in name of `send`, `remove`, `destroy` or `trash`.
+  A risky word wins over a read-only hint, since hints are the app's own claim. Locked tools ask
+  every time until you unlock one on Home: reads "Risky action", and choosing **Auto** first
+  warns Scout will no longer ask. Choose **Ask** again to undo. Scout's own side-check never
+  looks at a locked tool.
 
 Modes are the toolbox's usual ones (see [brain.md](brain.md)), but every app tool starts at `ask`,
 read-only ones too (`default_mode="ask"`): the app's own hint never lets a tool run unasked. The
@@ -217,8 +220,7 @@ connected by searching.
 
 ## Adding an app from the registry
 
-`install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `locked`
-and `person_only`: the Allow card names the transport, the package and version (or the host), the
+`install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `person_only`: the Allow card names the transport, the package and version (or the host), the
 environment variable names it needs and any Node download, and neither a saved preference nor a
 stored Auto skips it. After Allow it saves the app through the same code as `add_app`. A connected
 app is reported with its tool names in the result; a sign-in or slow start that ends later sends
