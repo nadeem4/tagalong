@@ -87,6 +87,7 @@ from brain.tools import (
     work_tools,
 )
 from brain.voice import VoiceHooks
+from brain.waiting import WaitingAsks
 from brain.web_tools import WebSource, without_server_blocks
 
 log = logging.getLogger("brain")
@@ -266,6 +267,14 @@ class Session:
             rules.set_permission_mode(memory.db, name, mode)
             notify("changed", {"what": "permissions"})
 
+        self.waiting = WaitingAsks(
+            work,
+            self._asks,
+            lambda: self.toolbox,
+            self.scheduler.emit,
+            now,
+            approvals.mask,
+        )
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             modes,
@@ -275,6 +284,7 @@ class Session:
             owner_turn=lambda turn_id: self._owner_turn and turn_id == self._turn_id,
             on_call=self._on_tool_call,
             outputs=outputs,
+            waiting=self.waiting,
         )
         if apps is not None and isinstance(make_run, ExpertHosts):
             # Experts reach apps only through the brain, by the same gate as Scout's own calls.

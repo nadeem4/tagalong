@@ -6,12 +6,13 @@ The permission engine then decides: an ask-mode tool waits for an allow from a s
 Scout's side-check or the person (gate step 3); Home calls skip that step.
 """
 
+import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import timedelta
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import ValidationError
 
@@ -22,8 +23,11 @@ from brain.mind.turn import Call
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     ASK_WAIT_ARG,
+    PARK_AFTER_S,
     AskRequest,
+    Decision,
     Engine,
+    Parked,
     Tier,
     ask_wait,
     gate_tier,
@@ -33,6 +37,9 @@ from brain.permission import (
     tool_asker,
 )
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
+
+if TYPE_CHECKING:
+    from brain.waiting import WaitingAsks
 
 log = logging.getLogger("brain")
 
@@ -195,7 +202,12 @@ class Toolbox:
         on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
         | None = None,
         outputs: OutputStore | None = None,
+        waiting: "WaitingAsks | None" = None,
+        park_after: float = PARK_AFTER_S,
     ) -> None:
+        # A Scout ask that finds nobody in time is parked with this; None keeps it in its turn.
+        self._waiting = waiting
+        self._park_after = park_after
         # Long text results reach the model as a capped preview; None leaves them whole.
         self._outputs = outputs
         # Told after every call of a known tool: (call, spec, source kind, "ok" | "failed" |
@@ -294,6 +306,10 @@ class Toolbox:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so."""
         assert self._asks is not None and self._engine is not None
+        if wait is not None and self._waiting is not None:
+            earlier = self._waiting.find(spec.name, call.input)
+            if earlier is not None:  # the same call again: the same ask, no second card
+                raise Parked(earlier)
         ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
         shown = call
         if spec.card is not None:
@@ -315,7 +331,7 @@ class Toolbox:
             if wait is not None
             else None,
         )
-        decision = await self._engine.decide(req)
+        decision = await self._decide(req, call)
         if decision.allowed:
             return
         # Plain words the model reads; logged reasons never carry tool text.
@@ -332,6 +348,25 @@ class Toolbox:
             case _:
                 raise RpcError(ErrorCode.denied, f"Nobody approved {name}, so it was not run.")
 
+    async def _decide(self, req: AskRequest, call: Call) -> Decision:
+        """The engine's decision. A Scout ask waits in its turn for `park_after` seconds (not at all
+        when nobody displays a body), then keeps running on its own and the call is parked."""
+        assert self._engine is not None and self._asks is not None
+        if req.wait is None or self._waiting is None:
+            return await self._engine.decide(req)
+        task = asyncio.create_task(self._engine.decide(req))
+        try:
+            await asyncio.wait(
+                {task}, timeout=self._park_after if self._asks.anyone_online() else 0
+            )
+        except asyncio.CancelledError:
+            task.cancel()  # the turn stopped: the ask it is waiting on is withdrawn
+            raise
+        if task.done():
+            return task.result()
+        self._waiting.adopt(task, call, req)
+        raise Parked(req.ask_id)
+
     async def run(
         self, call: Call, caller: str = "scout", job_id: str | None = None
     ) -> str | list[dict]:
@@ -343,6 +378,14 @@ class Toolbox:
         wait = ask_wait(hours) if caller == "scout" and job_id is None else None
         try:
             out = await self._run(call, caller, found, job_id, wait)
+        except Parked as parked:
+            # Not run, not failed: the call waits for the person. Plain facts for the model.
+            if found:
+                self._report(call, found[0], found[1], "refused", None, parked)
+            return (
+                f"{call.name} is waiting for the person's answer (ask {parked.ask_id}). "
+                "It runs by itself if they allow it; do not call it again."
+            )
         except Exception as err:
             if found:
                 status = "failed" if found[2] else "refused"
