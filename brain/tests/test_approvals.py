@@ -207,8 +207,7 @@ async def test_list_approvals_shape_unchanged(mem):
         outcome="approved",
         job_id="j1",
         decided_by="scout",
-        preference_id=pref.id,
-        preference_sentence=pref.sentence,
+        preference=pref,
     )
     _, h = tools(mem, [])["list_approvals"]
     out = json.loads(await h({}))
