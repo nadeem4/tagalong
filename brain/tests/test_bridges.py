@@ -26,11 +26,14 @@ ON = {"TAGALONG_WHATSAPP_ENABLED": "1", **SECRETS}
 
 
 class FakeChild:
-    def __init__(self, lines: list[bytes] | None = None, *, broken=False, stubborn=False) -> None:
+    def __init__(
+        self, lines: list[bytes] | None = None, *, broken=False, stubborn=False, slow=False
+    ) -> None:
         self.done = asyncio.Event()
         self.code = 0
         self.terminated = False
         self.killed = False
+        self.slow = slow  # exits a moment after terminate, like a real process
         self.stubborn = stubborn  # ignores terminate, like a child stuck in cleanup
         self._broken = broken
         self._lines = lines or []
@@ -49,7 +52,9 @@ class FakeChild:
 
     def terminate(self) -> None:
         self.terminated = True
-        if not self.stubborn:
+        if self.slow:
+            asyncio.get_running_loop().call_later(0.02, self.done.set)
+        elif not self.stubborn:
             self.done.set()
 
     def kill(self) -> None:
@@ -78,6 +83,7 @@ class Rig:
         self.now = 0.0
         self.broken_first = False
         self.stubborn = False
+        self.slow = False
         self.supervisor = BridgeSupervisor(
             env=self.env,
             brain_addr="127.0.0.1:47321",
@@ -99,7 +105,10 @@ class Rig:
         self.events.append("spawn")
         self.spawned.append((argv, env))
         child = FakeChild(
-            self.lines, broken=self.broken_first and not self.children, stubborn=self.stubborn
+            self.lines,
+            broken=self.broken_first and not self.children,
+            stubborn=self.stubborn,
+            slow=self.slow,
         )
         self.children.append(child)
         return child
@@ -256,6 +265,7 @@ async def test_stop_waits_for_the_child_and_kills_one_that_will_not_go(tmp_path)
 
 async def test_stop_returns_after_the_child_has_exited(tmp_path):
     rig = Rig(tmp_path)
+    rig.slow = True  # without the wait in stop, the child would still be running here
     await rig.supervisor.start()
     await settle()
     await rig.supervisor.stop()
@@ -334,11 +344,20 @@ async def test_real_spawn_pipes_stdin_and_merges_stderr():
         "print('err', file=sys.stderr, flush=True); sys.stdin.read()"
     )
     child = await real_spawn([sys.executable, "-c", code], dict(os.environ))
-    lines = []
-    async for line in child.stdout:
-        lines.append(line.strip())
-        if len(lines) == 2:
-            break
-    assert sorted(lines) == [b"err", b"out"]
-    child._proc.stdin.close()  # the bridge's signal to exit
-    assert await asyncio.wait_for(child.wait(), 10) == 0
+
+    async def read_two() -> list[bytes]:
+        lines = []
+        async for line in child.stdout:
+            lines.append(line.strip())
+            if len(lines) == 2:
+                break
+        return lines
+
+    try:
+        lines = await asyncio.wait_for(read_two(), 10)
+        assert sorted(lines) == [b"err", b"out"]
+        child._proc.stdin.close()  # the bridge's signal to exit
+        assert await asyncio.wait_for(child.wait(), 10) == 0
+    finally:  # a failing assert must not leave the child running
+        child.kill()
+        await asyncio.wait_for(child.wait(), 10)
