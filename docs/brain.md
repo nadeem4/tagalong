@@ -118,6 +118,7 @@ the total can run a little low.
 | `brain/src/brain/voice/__init__.py`    | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/voice/ears.py`        | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
+| `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain |
 | `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would end the process                                                                                                                                                                                                                                                              |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -328,6 +329,11 @@ cache prefix long.
 `Session._capabilities()` reads `Toolbox.active_specs()` on each prompt build and groups the
 specs by source type (brain, body, app), so a tool set Off drops out of the picture as it does from
 the model's tool list.
+
+Scout-first messages (timers, held mail, finished jobs) never go to a body whose kind is
+`whatsapp`: `Bodies.wake_ids()` is `display_ids()` without it, and the scheduler and the
+display-less-say fallback pick from it. If the person last talked on the phone, the wake goes to
+the desktop, or waits until one connects. An ask can still reach the phone (`display_ids`).
 
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
 tools, a body's tools and connected apps; hand over to an expert only when one is installed and
@@ -1014,6 +1020,25 @@ words what the person reads (guidance in `mind/soul.md`).
   `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits
   for the result; where no window can open it prints the command to run yourself. A failure
   prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
+
+## WhatsApp bridge
+
+`bridges.py` runs the WhatsApp bridge (`bodies/whatsapp`, built to `dist/index.js`) as a child
+process of the brain, on Tagalong's own Node only (`ensure_node`; the system Node is never used).
+
+- It runs only when `TAGALONG_WHATSAPP_ENABLED` is `1` and the access token, app secret, verify
+  token, phone number id and allowed number are all set. Otherwise nothing runs.
+  `BridgeSupervisor.state` is `off`, `incomplete`, `starting`, `running`, `not_built` (the file is
+  missing: one log line says to run `pnpm --filter @tagalong/whatsapp build`) or `node_failed`.
+- The child's environment is built by the brain: `TAGALONG_BRAIN_ADDR`, the five values, the
+  port (default 47322) and `PATH`/`SystemRoot`. It never sees the Anthropic key and never reads
+  `.env`.
+- A bridge that exits is started again after 1, 2, 4, 8, 16 s and then every 30 s.
+- `main.py` starts it after the server is up and stops it before the jobs shut down. The brain
+  also holds the child's stdin pipe, which the bridge exits on when it closes, so a brain that is
+  killed hard (`tagalong stop` on Windows) leaves no bridge behind.
+- The child's output is logged by the `brain.bridge` logger, so it reaches `brain.log` through the
+  secret filter; the seven values are masked like the Anthropic key.
 
 ## Experts
 
