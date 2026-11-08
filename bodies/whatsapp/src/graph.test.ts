@@ -78,3 +78,44 @@ describe('sendText', () => {
     }
   });
 });
+
+describe('sendButtons', () => {
+  test('test_send_buttons_posts_the_interactive_body', async () => {
+    const { fn, calls } = fakeFetch([200]);
+    const graph = createGraph({ phoneNumberId: '1234', accessToken: 'tok', fetch: fn });
+    await graph.sendButtons('15550001111', 'Run it?', [
+      { id: 'ask:a1:0', title: 'allow' },
+      { id: 'ask:a1:1', title: 'deny' },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      messaging_product: 'whatsapp',
+      to: '15550001111',
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: 'Run it?' },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: 'ask:a1:0', title: 'allow' } },
+            { type: 'reply', reply: { id: 'ask:a1:1', title: 'deny' } },
+          ],
+        },
+      },
+    });
+  });
+
+  test('test_send_buttons_retries_once_and_fails_quietly', async () => {
+    const { fn, calls } = fakeFetch([503, 500]);
+    const logs: string[] = [];
+    const graph = createGraph({
+      phoneNumberId: '1',
+      accessToken: 't',
+      fetch: fn,
+      log: (l) => logs.push(l),
+    });
+    await expect(graph.sendButtons('1', 'q', [{ id: 'a', title: 'b' }])).resolves.toBeUndefined();
+    expect(calls).toHaveLength(2);
+    expect(logs).toHaveLength(1);
+  });
+});
