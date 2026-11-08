@@ -1884,6 +1884,11 @@ blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
 prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
+Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`): `Session._start_turn`
+reads the turn body's `kind` once, so it holds even if the body leaves first, and `Session._persist(body)` passes
+it to `Memory.save_messages`. A turn with no body (a wake) or no longer-online body reads `desktop`. The
+kinds are the `BODY_*` constants in `protocol.py`. Nothing reads the column yet.
+
 `model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
 offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports
 `over_budget` even when the step cap is also reached.

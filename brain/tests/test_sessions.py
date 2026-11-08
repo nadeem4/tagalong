@@ -2867,3 +2867,44 @@ async def test_return_with_a_display_less_body_does_nothing():
         Body(id="desktop", kind="desktop", name="Desktop"), [], QuietPeer(), None
     )
     assert seen == ["desktop"]
+
+
+# --- saved messages record the body the turn was shown on (W1) ---
+
+
+def _saved_bodies(session):
+    rows = session._memory.db.execute("SELECT DISTINCT body FROM messages").fetchall()
+    return [r[0] for r in rows]
+
+
+async def test_saved_messages_record_the_body_of_the_turn():
+    session, _ = make(Gate(["hi"]))
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
+    session.say("wa", say("hello"))
+    await finish(session)
+    assert _saved_bodies(session) == ["whatsapp"]
+
+
+async def test_a_desktop_turn_is_tagged_desktop():
+    session, _ = make(Gate(["hi"]))
+    join(session, "desktop")
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert _saved_bodies(session) == ["desktop"]
+
+
+async def test_a_turn_with_no_body_is_tagged_desktop():
+    session, _ = make(Gate(["hi"]))
+    session._start_wake(None, [{"type": "text", "text": "wake"}])
+    await finish(session)
+    assert _saved_bodies(session) == ["desktop"]
+
+
+async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
+    peer = QuietPeer()
+    session, _ = make(Gate(["hi"]))
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], peer, None)
+    session.say("wa", say("hello"))
+    session._bodies.disconnect("wa", peer)
+    await finish(session)
+    assert _saved_bodies(session) == ["whatsapp"]

@@ -60,7 +60,7 @@ from brain.mind.turn import Call, Model, run_turn
 from brain.offers import Offers, OfferSettings
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
-from brain.protocol import ReadAloudData, ReadingData, SayParams, SayResult, Tool
+from brain.protocol import BODY_DESKTOP, ReadAloudData, ReadingData, SayParams, SayResult, Tool
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
 from brain.reading_tools import reading_home_tools
@@ -763,7 +763,10 @@ class Session:
 
         task = asyncio.create_task(run())
         self._task = task
-        task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead))
+        # resolved now: the body may leave before the turn ends, and the saved rows keep its kind
+        shown = self._bodies.body(body_id) if body_id is not None else None
+        body_kind = shown.kind if shown is not None else BODY_DESKTOP
+        task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead, body_kind))
         return turn_id
 
     def _capabilities(self) -> str:
@@ -855,7 +858,9 @@ class Session:
             if message["role"] == "user" and isinstance(message["content"], list):
                 message["content"][:] = [b for b in message["content"] if not _is_in(b, lead)]
 
-    def _ended(self, task: asyncio.Task, turn_id: str, body_id: str, lead: list) -> None:
+    def _ended(
+        self, task: asyncio.Task, turn_id: str, body_id: str, lead: list, body_kind: str
+    ) -> None:
         self._drop_lead(lead)
         if task.cancelled():
             reason = "cancelled"
@@ -873,7 +878,7 @@ class Session:
             self._owner_turn = False
             self._task = None
         self._last_turn = turn_id
-        self._persist()
+        self._persist(body_kind)
         if turn_id in self._spoken:
             self._spoken.discard(turn_id)
             if self.voice is not None:
@@ -899,12 +904,12 @@ class Session:
             return False
         return mask_json(self.guards, "chat", block.get("thinking", "")) != block.get("thinking")
 
-    def _persist(self) -> None:
+    def _persist(self, body: str) -> None:
         # Saving is best effort: a full disk must not stop the ended notification.
         try:
             # A masked copy goes to disk; self.history keeps the real values for the live turn.
             new = [self._masked(m) for m in self.history[self._saved :]]
-            self._memory.save_messages(new)
+            self._memory.save_messages(new, body)
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
             for message in new:
                 if message["role"] != "assistant" or isinstance(message["content"], str):

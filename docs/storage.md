@@ -145,13 +145,14 @@ id in a `continued` event on its goal row.
 
 The saved chat, so a restart picks the conversation back up.
 
-| Column         | Type                | Meaning                                                                                        |
-| -------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
-| `id`           | INTEGER PRIMARY KEY | Order of the message                                                                           |
-| `at`           | TEXT                | When it was saved                                                                              |
-| `role`         | TEXT                | `user` or `assistant`                                                                          |
-| `content_json` | TEXT                | The message content as JSON, rebuilt into model history at start                               |
-| `text`         | TEXT                | Searchable text of the message; images and documents appear as `[screenshot]` and `[document]` |
+| Column         | Type                | Meaning                                                                                                                                       |
+| -------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`           | INTEGER PRIMARY KEY | Order of the message                                                                                                                          |
+| `at`           | TEXT                | When it was saved                                                                                                                             |
+| `role`         | TEXT                | `user` or `assistant`                                                                                                                         |
+| `content_json` | TEXT                | The message content as JSON, rebuilt into model history at start                                                                              |
+| `text`         | TEXT                | Searchable text of the message; images and documents appear as `[screenshot]` and `[document]`                                                |
+| `body`         | TEXT                | Kind of body the turn was shown on (`desktop`, `browser` or `whatsapp`); old rows and turns with no body read `desktop`. Nothing reads it yet |
 
 - Written by: `store/conversation.py` `save_messages`, `replace_last_message` (through `Memory`,
   called from `sessions.py`).
