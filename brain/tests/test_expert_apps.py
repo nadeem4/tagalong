@@ -25,7 +25,7 @@ from brain.guards import Guards
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.outputs import OutputStore
-from brain.permission import Engine, Person
+from brain.permission import Engine, Person, StandingRule, stored_auto_rules
 from brain.store import rules
 from brain.toolbox import Toolbox
 
@@ -88,12 +88,18 @@ class Rig:
         self.approvals = approvals_on(
             self.memory, lambda m, p: None, lambda: datetime(2026, 1, 1, tzinfo=UTC)
         )
+        modes = partial(rules.permission_modes, self.memory.db)
         self.toolbox = Toolbox(
             [AppSource(self.apps)],
-            partial(rules.permission_modes, self.memory.db),
+            modes,
             partial(rules.set_permission_mode, self.memory.db),
             self.asks,
-            Engine([Person()], self.approvals, None, lambda n: None),
+            Engine(
+                [StandingRule(stored_auto_rules(modes)), Person()],
+                self.approvals,
+                None,
+                lambda n: None,
+            ),
             outputs=OutputStore(self.memory, self.guards, cap) if cap else None,
         )
         self.bridge = ExpertApps(self.apps, lambda: self.toolbox, self.guards)
@@ -149,6 +155,7 @@ async def test_a_wrong_or_missing_token_is_refused(rig):
 
 
 async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
+    rig.approvals.work.create("goal", "a job", id="job1", state="active")  # ask hangs off it
     rules.set_permission_mode(rig.memory.db, "lin__list_issues", "auto")
     grant = await rig.bridge.grant("job1", ["lin"])
     grant.sent = True  # the person has sent the card
@@ -159,6 +166,14 @@ async def test_an_auto_tool_runs_without_asking_and_is_masked(rig):
     assert SECRET not in text and "[secret]" in text
     assert rig.apps.calls == [("lin", "list_issues", {"q": "x"})]
     assert rig.asks.asked == []
+    # A stored Auto is a standing rule: granted without asking, and logged as one.
+    [row] = list_approvals(rig.memory, "all", 10, None)
+    assert (row.tool, row.job_id, row.outcome, row.decided_by) == (
+        "lin__list_issues",
+        "job1",
+        "approved",
+        "rule",
+    )
 
 
 async def test_a_change_tool_asks_and_the_approval_row_names_the_job(rig):
