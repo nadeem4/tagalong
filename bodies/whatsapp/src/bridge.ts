@@ -81,6 +81,7 @@ export function createBridge(deps: BridgeDeps): {
   });
 
   const onInbound = (m: Inbound): void => {
+    if (m.kind !== 'text') return;
     window.touch();
     client.say({ text: m.text, context: CONTEXT }).catch(() => {
       // Nothing goes to the phone: the person simply sees no answer, as with a brain that is down.

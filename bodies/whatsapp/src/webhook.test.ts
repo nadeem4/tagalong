@@ -130,6 +130,35 @@ describe('POST /webhook', () => {
   });
 });
 
+describe('button taps', () => {
+  const tap = (id: string, from = CONFIG.allowedNumber, buttonId = 'ask:a1:0') => ({
+    id,
+    from,
+    type: 'interactive',
+    interactive: { type: 'button_reply', button_reply: { id: buttonId, title: 'allow' } },
+  });
+
+  test('test_a_button_tap_from_the_allowed_sender_reaches_onInbound', async () => {
+    const { base, inbound } = await start();
+    await post(base, payload([tap('m1')]));
+    await post(base, payload([tap('m1')]));
+    expect(inbound).toEqual([{ kind: 'button', id: 'm1', buttonId: 'ask:a1:0' }]);
+  });
+
+  test('test_a_button_tap_from_another_sender_is_dropped', async () => {
+    const { base, inbound } = await start();
+    const res = await post(base, payload([tap('m1', '15559999999')]));
+    expect(res.status).toBe(200);
+    expect(inbound).toEqual([]);
+  });
+
+  test('test_a_malformed_tap_is_ignored', async () => {
+    const { base, inbound } = await start();
+    await post(base, payload([{ id: 'm1', from: CONFIG.allowedNumber, type: 'interactive' }]));
+    expect(inbound).toEqual([]);
+  });
+});
+
 test('test_only_the_webhook_path_exists', async () => {
   const { base } = await start();
   expect((await fetch(`${base}/`)).status).toBe(404);
