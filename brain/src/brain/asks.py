@@ -54,6 +54,7 @@ class Asks:
     def __init__(self, bodies: Bodies, work: WorkStore) -> None:
         self._bodies = bodies
         self._work = work
+        self._parked: set[str] = set()
         self._open: dict[str, _Open] = {}
         work.on_transition(self._row_ended)
 
@@ -81,7 +82,8 @@ class Asks:
             "tool": spec_name,
             "input": call.input,
         }
-        if call.turn:  # an expert's call belongs to no turn of Scout's
+        # An expert's call belongs to no turn of Scout's; a parked ask's turn is already over.
+        if call.turn and params["id"] not in self._parked:
             params["turn"] = call.turn
         entry = _Open(params, asyncio.get_running_loop().create_future())
         return (await self._wait(entry, None, parent_id, record)).option or "deny"
@@ -180,6 +182,7 @@ class Asks:
 
     def park(self, ask_id: str) -> None:
         """The turn that raised this ask is over: a replayed card must not name it."""
+        self._parked.add(ask_id)  # the row may not be open yet (nobody displays)
         entry = self._open.get(ask_id)
         if entry is not None:
             entry.params.pop("turn", None)

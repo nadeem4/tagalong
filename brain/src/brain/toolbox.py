@@ -306,11 +306,34 @@ class Toolbox:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so."""
         assert self._asks is not None and self._engine is not None
-        if wait is not None and self._waiting is not None:
-            earlier = self._waiting.find(spec.name, call.input)
+        ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
+        claimed = wait is not None and self._waiting is not None
+        if claimed:  # no await between the check and the registration
+            earlier = self._waiting.claim(spec.name, call.input, ask_id)
             if earlier is not None:  # the same call again: the same ask, no second card
                 raise Parked(earlier)
-        ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
+        try:
+            await self._ask_claimed(call, spec, source_kind, job_id, gate, wait, ask_id)
+        except Parked:
+            raise  # the parked decision keeps the claim until it ends
+        except BaseException:
+            if claimed:
+                self._waiting.release(ask_id)
+            raise
+        if claimed:
+            self._waiting.release(ask_id)
+
+    async def _ask_claimed(
+        self,
+        call: Call,
+        spec: ToolSpec,
+        source_kind: str,
+        job_id: str | None,
+        gate: Tier,
+        wait: timedelta | None,
+        ask_id: str,
+    ) -> None:
+        assert self._asks is not None and self._engine is not None
         shown = call
         if spec.card is not None:
             shown = replace(call, input=await spec.card(call.input))

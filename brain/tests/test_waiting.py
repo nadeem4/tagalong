@@ -63,8 +63,21 @@ def now():
     return NOW
 
 
+class SlowCheck:
+    """A decider that takes a while and passes, like a side-check model call."""
+
+    name = "slow_check"
+
+    def __init__(self, delay):
+        self.delay = delay
+
+    async def decide(self, req):
+        await asyncio.sleep(self.delay)
+        return None
+
+
 class Rig:
-    def __init__(self, online=("desktop",), headless=(), park_after=0.05, names=("t",)):
+    def __init__(self, online=("desktop",), headless=(), park_after=0.05, names=("t",), slow=0.0):
         self.memory = Memory(":memory:")
         self.work = WorkStore(self.memory.db, now)
         self.bodies = Bodies(online, headless)
@@ -74,7 +87,7 @@ class Rig:
         self.events: list[Event] = []
         self.source = Source(*names)
         self.engine = Engine(
-            [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
+            [StandingRule(stored_auto_rules(lambda: self.stored)), SlowCheck(slow), Person()],
             self.approvals,
             None,
             lambda name: self.stored.__setitem__(name, "auto"),
@@ -252,3 +265,39 @@ async def test_same_call_while_parked_returns_the_same_ask():
     assert ask_id in out
     assert len(rig.opened()) == 1
     assert len(rig.asks.open_asks()) == 1
+
+
+async def test_parked_at_once_card_has_no_turn_when_a_body_joins():
+    rig = Rig(online=("browser",), headless=("browser",), park_after=300.0)
+    await asyncio.wait_for(rig.box.run(call()), 5)
+    await rig.settle()
+    rig.bodies.online.append("desktop")
+    [replay] = rig.asks.open_asks()
+    assert "turn" not in replay
+
+
+async def test_two_identical_parallel_calls_open_one_card_under_a_slow_check():
+    rig = Rig(park_after=0.3, slow=0.1)
+    first, second = await asyncio.gather(
+        rig.box.run(call(call_id="c1")), rig.box.run(call(call_id="c2"))
+    )
+    [ask] = rig.opened()
+    assert ask["id"] in first and ask["id"] in second
+
+
+async def test_a_recall_right_after_an_immediate_park_gets_the_same_ask():
+    rig = Rig(online=("browser",), headless=("browser",), park_after=300.0, slow=0.1)
+    first = await rig.box.run(call(call_id="c1"))
+    second = await rig.box.run(call(call_id="c2"))
+    await asyncio.sleep(0.2)
+    [ask] = rig.asks.open_asks()
+    assert ask["id"] in first and ask["id"] in second
+
+
+async def test_the_claim_is_released_when_the_decision_ends():
+    rig = Rig(park_after=0.05)
+    ask_id = await park(rig)
+    rig.asks.answer(ask_id, "deny", "desktop")
+    await rig.settle()
+    await rig.box.run(call(call_id="c2"))
+    assert len(rig.opened()) == 2

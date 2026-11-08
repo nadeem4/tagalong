@@ -6,6 +6,7 @@ for it, and carries the call out when the person finally answers, then wakes Sco
 """
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable
 from datetime import datetime
@@ -41,6 +42,21 @@ class WaitingAsks:
         self._now = now
         self._mask = mask  # the same masking the saved call went through
         self._tasks: set[asyncio.Task] = set()
+        self._claims: dict[str, str] = {}  # call key -> ask id, until its decision ends
+
+    def claim(self, tool: str, input: dict, ask_id: str) -> str | None:
+        """The ask already holding this very call, else register `ask_id` for it. Synchronous
+        on purpose: two identical parallel calls must not both pass before either registers."""
+        key = tool + json.dumps(self._mask(input), sort_keys=True, default=str)
+        earlier = self._claims.get(key) or self.find(tool, input)
+        if earlier is not None:
+            return earlier
+        self._claims[key] = ask_id
+        return None
+
+    def release(self, ask_id: str) -> None:
+        for key in [k for k, v in self._claims.items() if v == ask_id]:
+            del self._claims[key]
 
     def find(self, tool: str, input: dict) -> str | None:
         """The id of an open Scout ask already saved for this very call, if any."""
@@ -57,6 +73,7 @@ class WaitingAsks:
         watcher = asyncio.create_task(self._finish(task, call, req))
         self._tasks.add(watcher)
         watcher.add_done_callback(self._tasks.discard)
+        watcher.add_done_callback(lambda _: self.release(req.ask_id))
 
     async def _finish(self, task: "asyncio.Task[Decision]", call: Call, req: AskRequest) -> None:
         try:
