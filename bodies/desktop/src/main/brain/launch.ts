@@ -6,7 +6,7 @@
  */
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
-import { existsSync, mkdirSync, openSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -21,6 +21,8 @@ export interface LaunchOptions {
   logPath: string;
   /** Opens the log for append and returns its fd. */
   openLog: (path: string) => number;
+  /** Closes that fd in this process once the child has its own copy. */
+  closeLog: (fd: number) => void;
   /** True when something accepts a connection at host:port. */
   probe: (addr: string) => Promise<boolean>;
   exists: (path: string) => boolean;
@@ -67,6 +69,7 @@ export function realLaunch(brainDir: string, env: NodeJS.ProcessEnv = process.en
       mkdirSync(dirname(path), { recursive: true });
       return openSync(path, 'a');
     },
+    closeLog: closeSync,
     probe: probeAddr,
     exists: existsSync,
     spawn: nodeSpawn,
@@ -75,7 +78,7 @@ export function realLaunch(brainDir: string, env: NodeJS.ProcessEnv = process.en
 }
 
 export async function launchBrain(options: LaunchOptions): Promise<void> {
-  const { env, brainDir, logPath, openLog, probe, exists, spawn, log } = options;
+  const { env, brainDir, logPath, openLog, closeLog, probe, exists, spawn, log } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
   if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return;
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
@@ -89,6 +92,7 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
     stdio: ['ignore', fd, fd],
     windowsHide: true,
   });
+  closeLog(fd); // the child holds its own copy; ours would leak
   let running = true;
   child.on('error', (error) => {
     running = false;

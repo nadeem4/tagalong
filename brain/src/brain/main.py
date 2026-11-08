@@ -20,7 +20,7 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
-from brain.lifecycle import clear_pid, write_pid
+from brain.lifecycle import clear_pid, real_started, write_pid
 from brain.loops.home_tools import loop_home_tools
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
@@ -97,7 +97,6 @@ async def _run() -> None:
     except RuntimeError as err:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
-    write_pid(config.data_dir, os.getpid())  # so `tagalong stop` can end this brain
     bodies = Bodies()
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
@@ -227,6 +226,8 @@ async def _run() -> None:
         server = await start_server(
             config.host, config.port, bodies, session_id(config.data_dir), session
         )
+        # Only now, with the port ours: a second brain that failed to bind must not touch it.
+        write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         await apps.start()  # connects in the background, so a slow app never delays boot
         port = server.sockets[0].getsockname()[1]
         log.info("brain listening on ws://%s:%d", config.host, port)

@@ -22,11 +22,13 @@ function setup(over: Partial<LaunchOptions> = {}) {
   const children: FakeChild[] = [];
   const err: string[] = [];
   const opened: string[] = [];
+  const closed: number[] = [];
   const options: LaunchOptions = {
     env: {},
     brainDir: 'C:/repo/brain',
     logPath: 'C:/home/brain.log',
     openLog: (path) => (opened.push(path), 77),
+    closeLog: (fd) => void closed.push(fd),
     probe: async () => false,
     exists: () => true,
     spawn: (cmd, args, opts) => {
@@ -38,7 +40,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
     log: { warn: (line) => err.push(line) },
     ...over,
   };
-  return { options, spawned, children, err, opened };
+  return { options, spawned, children, err, opened, closed };
 }
 
 describe('isLocal', () => {
@@ -102,7 +104,7 @@ describe('launchBrain', () => {
   });
 
   it('spawns the brain detached, logging to brain.log, and lets go of it', async () => {
-    const { options, spawned, children, opened } = setup();
+    const { options, spawned, children, opened, closed } = setup();
     const result = await launchBrain(options);
     expect(opened).toEqual(['C:/home/brain.log']);
     expect(spawned[0]?.opts).toMatchObject({
@@ -111,6 +113,7 @@ describe('launchBrain', () => {
       windowsHide: true,
     });
     expect(children[0]?.unrefed).toBe(true);
+    expect(closed).toEqual([77]);
     expect(result).toBeUndefined();
   });
 

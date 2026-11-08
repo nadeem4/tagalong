@@ -336,14 +336,39 @@ def test_one_key_reaches_both_models():
 def test_main_writes_and_clears_the_pid_file(monkeypatch, tmp_path):
     seen = {}
 
-    async def stop(*args):
-        seen["pid"] = (tmp_path / "brain.pid").read_text().strip()
-        raise RuntimeError("stop")
+    class Sock:
+        def getsockname(self):
+            return ("127.0.0.1", 1)
+
+    class Server:
+        sockets = [Sock()]
+
+        async def serve_forever(self):
+            seen["pid"] = (tmp_path / "brain.pid").read_text().split()[0]
+            raise RuntimeError("stop")
+
+    async def bound(*args):
+        assert not (tmp_path / "brain.pid").exists()  # written only once the port is ours
+        return Server()
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
-    monkeypatch.setattr(main, "start_server", stop)
+    monkeypatch.setattr(main, "start_server", bound)
     with pytest.raises(RuntimeError):
         asyncio.run(_run())
     assert seen["pid"] == str(os.getpid())
     assert not (tmp_path / "brain.pid").exists()
+
+
+def test_a_second_brain_that_cannot_bind_leaves_the_first_pid_file(monkeypatch, tmp_path):
+    (tmp_path / "brain.pid").write_text("999999 t1")
+
+    async def stop(*args):
+        raise OSError("address in use")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(OSError):
+        asyncio.run(_run())
+    assert (tmp_path / "brain.pid").read_text() == "999999 t1"

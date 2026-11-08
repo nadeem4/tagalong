@@ -1,8 +1,9 @@
 """`tagalong`: set Tagalong up from a terminal, for a brain machine with no screen.
 
 A thin front end over the brain's own setup package (facts, registry, install, login, store,
-apps). It reads and writes the same files under TAGALONG_HOME and never talks to a running
-brain; the brain re-reads those files when it next needs them. Keys are never printed or taken
+apps). It reads and writes the same files under TAGALONG_HOME and talks to no running brain
+(except `stop`, which ends it by its pid file); the brain re-reads those files when it next
+needs them. Keys are never printed or taken
 from the command line.
 """
 
@@ -131,7 +132,10 @@ def main(
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:
     pid = pid_path(home).read_text().strip() if pid_path(home).exists() else "?"
-    result = stop(home)
+    try:
+        result = stop(home)
+    except OSError:  # never a traceback for the person
+        result = "failed"
     if result == "stopped":
         out("Stopped the brain.")
     elif result == "not_running":

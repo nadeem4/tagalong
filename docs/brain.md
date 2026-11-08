@@ -14,9 +14,9 @@ uv sync
 uv run brain
 ```
 
-The brain writes its process id to `<TAGALONG_HOME>/brain.pid` while it runs and removes it on a
+Once it holds the port, the brain writes its process id and creation time to `<TAGALONG_HOME>/brain.pid` while it runs and removes it on a
 clean exit. The desktop starts the brain detached and never stops it, so `uv run tagalong stop`
-ends it: it reads the pid file, ends that process, and says `Stopped the brain.`, `The brain is
+ends it: it reads the pid file, checks the live process at that pid has the same creation time (a reused pid is never killed), ends it, and says `Stopped the brain.`, `The brain is
 not running.` (a stale file is removed) or `The brain did not stop (pid N).` (exit 1). On Windows
 the process is ended hard, so the brain's shutdown code does not run.
 
@@ -118,7 +118,7 @@ the total can run a little low.
 | `brain/src/brain/voice/__init__.py`    | `VoiceHooks`: the seam the server routes `listen`, `mic`, `unlisten` and `hush` to, and the session reports spoken turns to (`Session.voice`)                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/voice/ears.py`        | `Ears`: one listening session as a synchronous state machine over the `Vad`, `StreamingStt` and `EndOfTurn` protocols                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
-| `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would end the process                                                                                                                                                                                                                                                              |
+| `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                       |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 - The first message must be `hello`. Anything else, including bad JSON, gets an error and the

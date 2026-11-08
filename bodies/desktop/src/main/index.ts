@@ -224,7 +224,10 @@ async function start(): Promise<void> {
 
   // In dev, start the brain if none is running; the client below dials it and retries.
   if (!app.isPackaged) {
-    void realLaunch(resolve(app.getAppPath(), '..', '..', 'brain'));
+    // A failure to start the brain only logs: the client below keeps retrying.
+    realLaunch(resolve(app.getAppPath(), '..', '..', 'brain')).catch((error: unknown) =>
+      console.warn(`could not start the brain (${String(error)}); the desktop keeps retrying`),
+    );
   }
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,
