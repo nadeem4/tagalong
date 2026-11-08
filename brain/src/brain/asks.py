@@ -189,6 +189,17 @@ class Asks:
         if entry is not None:
             entry.params.pop("turn", None)
 
+    def expire(self, ask_id: str, reason: str) -> bool:
+        """The deadline passed: free the waiter with `reason` and close the card for every body.
+        False when the ask is not live here; the caller then logs the end itself."""
+        entry = self._open.get(ask_id)
+        if entry is None or entry.future.done():
+            return False
+        del self._open[ask_id]
+        entry.future.set_exception(AskExpired(reason))
+        self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
+        return True
+
     def open_asks(self) -> list[dict]:
         return [dict(e.params) for e in self._open.values()]
 

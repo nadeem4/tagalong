@@ -42,6 +42,7 @@ const OUTCOME: Record<ApprovalRow['outcome'], { label: string; chip: string }> =
   refused: { label: 'Refused', chip: 'tg-chip tg-chip--err' },
   timed_out: { label: 'Timed out', chip: 'tg-chip tg-chip--warn' },
   no_one: { label: 'No one online', chip: 'tg-chip' },
+  expired: { label: 'Expired', chip: 'tg-chip' },
 };
 
 const FILTERS: readonly { id: ApprovalFilter; label: string; count: keyof ApprovalCounts }[] = [
