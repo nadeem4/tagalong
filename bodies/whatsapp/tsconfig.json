@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Vite owns dist/ (the one bundled file the brain runs), so tsc is a typecheck that
+    // emits only declarations, somewhere else.
+    "outDir": "./out",
+    "rootDir": "./src",
+    "emitDeclarationOnly": true,
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [{ "path": "../../protocol/ts" }]
+}
