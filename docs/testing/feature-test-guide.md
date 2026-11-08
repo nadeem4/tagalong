@@ -2349,6 +2349,19 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 5. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
    `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
+## WhatsApp bridge core (automated, no Meta account)
+
+1. `pnpm --filter @tagalong/whatsapp exec vitest run`: the signed webhook (wrong or missing
+   signature is 401 before parsing, another sender and a repeated id are dropped, an oversize body is
+   413), the Graph send (one retry, no token or text in logs), the splitter, the 24-hour window and
+   the body itself on a fake brain: hello is kind `whatsapp` with no tools, a text becomes a `say`, a
+   reply is sent once at `done`, a reply after 24 hours is dropped.
+2. `pnpm --filter @tagalong/whatsapp build`: writes `bodies/whatsapp/dist/index.js`, one file that
+   imports only `node:` modules.
+3. By hand: start it with the five `TAGALONG_WHATSAPP_*` values set and its stdin closed
+   (`node bodies/whatsapp/dist/index.js < /dev/null`): it prints that it is listening and exits at
+   once. With a value missing it prints a message naming the variable and exits 1.
+
 ## Not supported
 
 Do not test these here.
