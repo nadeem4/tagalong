@@ -6,12 +6,14 @@
 import type {
   AppAddParams,
   AppInfo,
+  BodiesState,
   LoopsState,
   Pet,
   MemoryEntry,
   SetupOverview,
   SetupResult,
   TurnEvent,
+  WhatsAppChange,
 } from '../shapes';
 import type {
   ApprovalCounts,
@@ -54,6 +56,12 @@ export interface FakeHostBridge extends HostBridge {
   loops: LoopsState;
   /** Every loops call made, in order: `set gmail on`, `forget id`, `wipe`. */
   readonly loopCalls: readonly string[];
+  /** Home's Bodies state; setWhatsApp edits it, a test may swap it. */
+  bodies: BodiesState;
+  /** Every WhatsApp change handed to setWhatsApp, in order. */
+  readonly whatsappChanges: readonly WhatsAppChange[];
+  /** When set, setWhatsApp rejects with this sentence. */
+  whatsappFails?: string;
   /** The brain's reading_status answer (JSON text); a test may swap it. */
   reading: string;
   /** Every reading and ask call made, in order: `recheck`, `settings`, `ask <text>`. */
@@ -107,6 +115,27 @@ export interface FakeHostBridge extends HostBridge {
   readonly setupCalls: readonly { kind: 'expert' | 'app'; id: string; approved: boolean }[];
 }
 
+const NO_BODIES: BodiesState = {
+  bodies: [
+    { kind: 'desktop', name: 'Desktop', connected: true },
+    { kind: 'browser', name: 'Browser', connected: false },
+    { kind: 'whatsapp', name: 'WhatsApp', connected: false },
+  ],
+  whatsapp: {
+    enabled: false,
+    set: {
+      accessToken: false,
+      appSecret: false,
+      verifyToken: false,
+      phoneNumberId: false,
+      allowedNumber: false,
+    },
+    complete: false,
+    state: 'off',
+    port: 47322,
+  },
+};
+
 /**
  * Shipped from the package rather than kept in test files: the extension's side-panel tests
  * use the same bridge double without booting a brain.
@@ -128,6 +157,8 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's loops state. */
     loops?: LoopsState;
+    /** Home's Bodies state. */
+    bodies?: BodiesState;
     /** The brain's reading_status answer (JSON text). */
     reading?: string;
     /** Home's Jobs rows. */
@@ -166,6 +197,7 @@ export function createFakeHostBridge(
   const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
   const loopCalls: string[] = [];
+  const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
   const jobStops: string[] = [];
   const activityCalls: [string, number][] = [];
@@ -286,6 +318,8 @@ export function createFakeHostBridge(
     },
     loops: options.loops ?? { apps: [], loops: [] },
     loopCalls,
+    bodies: options.bodies ?? NO_BODIES,
+    whatsappChanges,
     reading: options.reading ?? '{"rows":[]}',
     readingCalls,
     readingStatus() {
@@ -322,6 +356,25 @@ export function createFakeHostBridge(
     wipeLoops() {
       loopCalls.push('wipe');
       fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };
+      return Promise.resolve();
+    },
+    bodiesState() {
+      return Promise.resolve(structuredClone(fake.bodies));
+    },
+    setWhatsApp(change) {
+      whatsappChanges.push(change);
+      if (fake.whatsappFails !== undefined) return Promise.reject(new Error(fake.whatsappFails));
+      const w = fake.bodies.whatsapp;
+      const set = { ...w.set };
+      for (const field of Object.keys(set) as (keyof typeof set)[]) {
+        if (change[field] !== undefined) set[field] = true;
+      }
+      const complete = Object.values(set).every(Boolean);
+      const enabled = change.enabled ?? w.enabled;
+      fake.bodies = {
+        ...fake.bodies,
+        whatsapp: { ...w, set, complete, enabled, port: change.port ?? w.port },
+      };
       return Promise.resolve();
     },
     permissions: (options.permissions ?? []).map((row) => ({ ...row })),

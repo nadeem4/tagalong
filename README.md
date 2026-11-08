@@ -58,7 +58,7 @@ The desktop never stops the brain, whoever started it. Its output goes to `~/.ta
 (or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
 The brain can also run the WhatsApp bridge (it starts only when `TAGALONG_WHATSAPP_*` are set; see
-`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)).
+`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)). Home > Connections > Bodies shows which bodies are connected and sets WhatsApp up ([docs/whatsapp.md](docs/whatsapp.md)).
 
 To let Scout hand work to an expert (Claude Code, Codex or Gemini, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the

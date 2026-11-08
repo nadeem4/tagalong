@@ -259,23 +259,32 @@ def load_env_file(data_dir: Path, env: MutableMapping[str, str]) -> None:
 def upsert_env_value(
     data_dir: Path, name: str, value: str, env: MutableMapping[str, str] = os.environ
 ) -> None:
-    """Set one NAME=value line in data_dir/.env, keeping every other line, comment and line
-    ending. Written to a temp file and renamed over, so a crash never leaves half a file. The
-    running environment changes only after the file is saved."""
+    """Set one NAME=value line; see upsert_env_values."""
+    upsert_env_values(data_dir, {name: value}, env)
+
+
+def upsert_env_values(
+    data_dir: Path, values: dict[str, str], env: MutableMapping[str, str] = os.environ
+) -> None:
+    """Set NAME=value lines in data_dir/.env in one read and one write, keeping every other
+    line, comment and line ending. Written to a temp file and renamed over, so a crash never
+    leaves half a file and several values land together or not at all. The running
+    environment changes only after the file is saved."""
     data_dir.mkdir(parents=True, exist_ok=True)
     path = data_dir / ".env"
     text = path.read_bytes().decode("utf-8") if path.exists() else ""
     eol = "\r\n" if "\r\n" in text else "\n"
     lines = text.splitlines(keepends=True)
-    new = f"{name}={value}"
-    for i, line in enumerate(lines):
-        if "=" in line and line.partition("=")[0].strip() == name:
-            lines[i] = new + line[len(line.rstrip("\r\n")) :]
-            break
-    else:
-        if lines and not lines[-1].endswith(("\n", "\r")):
-            lines[-1] += eol
-        lines.append(new + eol)
+    for name, value in values.items():
+        new = f"{name}={value}"
+        for i, line in enumerate(lines):
+            if "=" in line and line.partition("=")[0].strip() == name:
+                lines[i] = new + line[len(line.rstrip("\r\n")) :]
+                break
+        else:
+            if lines and not lines[-1].endswith(("\n", "\r")):
+                lines[-1] += eol
+            lines.append(new + eol)
     tmp = data_dir / ".env.tmp"
     try:
         # Owner-only from creation, so the key is never briefly world-readable.
@@ -288,7 +297,7 @@ def upsert_env_value(
     except OSError:
         tmp.unlink(missing_ok=True)
         raise
-    env[name] = value
+    env.update(values)
 
 
 def session_id(data_dir: Path) -> str:

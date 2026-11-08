@@ -17,6 +17,7 @@ from anthropic import AsyncAnthropic
 
 from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
+from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
@@ -208,6 +209,9 @@ async def _run() -> None:
         + login
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + loop_tools(loops)
+        + bodies_tools(
+            bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
+        )
         + home_setup_tools(
             registry,
             inspect_machine,

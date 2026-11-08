@@ -18,13 +18,13 @@ source of truth; each doc cites the files it describes. How to build and run fro
 
 ### Hosts
 
-| Doc                                | Covers                                                                                                                       |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| [desktop.md](desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file |
-| [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, drops                                                                     |
-| [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, the system voice                                  |
-| [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                    |
-| [whatsapp.md](whatsapp.md)         | WhatsApp body: webhook rules, Graph send, 24-hour window, build and test                                                     |
+| Doc                                | Covers                                                                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [desktop.md](desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file   |
+| [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, drops                                                                       |
+| [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, barge-in, the system voice                                    |
+| [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                      |
+| [whatsapp.md](whatsapp.md)         | The WhatsApp body: one-time Meta setup, Home > Connections > Bodies, webhook rules, Graph send, 24-hour window, build and test |
 
 ### Perception, memory and apps
 

@@ -101,6 +101,8 @@ including the bridge's own output, and in saved text); the numbers are the perso
 not. See
 [the brain](brain.md#whatsapp-bridge).
 
+Home sets them: Connections > Bodies sends each value once to the Home tool `whatsapp_set`, which writes it to `<TAGALONG_HOME>/.env`. It is never returned (`whatsapp_status` says only which values are set), kept in the renderer after Save, or put in an IPC error. See [WhatsApp](whatsapp.md).
+
 ### Secrets on the way out
 
 `hideSecrets(text)` (`bodies/desktop/src/main/hide-secrets.ts`) replaces each match with
