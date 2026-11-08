@@ -283,8 +283,9 @@ pnpm dev:desktop
 ```
 
 The desktop dials the brain at `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and retries every 2 s. It spawns `uv run brain` (cwd `brain/`) only when the address is local and
-nothing answers there, and on quit stops only the brain it started; a brain you started yourself
-(`cd brain && uv run brain`) is used as is and left running. Set `TAGALONG_START_BRAIN=0` to stop
+nothing answers there, detached, with its output in `<TAGALONG_HOME>/brain.log`. The desktop never stops a brain, so it
+keeps running after quit; end it with `cd brain && uv run tagalong stop`. A brain you started
+yourself (`cd brain && uv run brain`) is used as is. Set `TAGALONG_START_BRAIN=0` to stop
 the desktop starting one.
 
 To see what a new user sees, run `pnpm --filter @tagalong/desktop
