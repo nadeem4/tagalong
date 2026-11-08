@@ -557,14 +557,17 @@ An `ask` row in `work` is a permission ask, from the moment it is opened until i
 has none, or the job is gone). The row id is the ask id the bodies see, so an open ask and its
 log entry are one row. Home's log is the ask rows that were decided.
 
-| Work state  | Meaning                                                                    |
-| ----------- | -------------------------------------------------------------------------- |
-| `active`    | Open: a body can answer it                                                 |
-| `done`      | Approved                                                                   |
-| `cancelled` | Refused (a refused ask does not block its job)                             |
-| `expired`   | Timed out, nobody online, cancelled, or ended with its job or by a restart |
+| Work state  | Meaning                                                            |
+| ----------- | ------------------------------------------------------------------ |
+| `active`    | Open: a body can answer it                                         |
+| `done`      | Approved                                                           |
+| `cancelled` | Refused (a refused ask does not block its job)                     |
+| `expired`   | Ended unanswered: its job ended, a restart, or its deadline passed |
 
-`end_reason` is the outcome word (`approved`, `refused`, `timed_out`, `no_one`) once decided.
+`end_reason` is the outcome word (`approved`, `refused`, `expired`, `timed_out`, `no_one`) once decided.
+A Scout ask (no job above it) also saves its call: `input` is `{name, input, text}` masked by the
+log's guards, `due_at` the deadline from `ask_wait_hours`, and `safe_to_retry` is true when the
+masking changed nothing. An `expired` ask's `decided` event keeps a plain reason.
 An ask that ended before it was decided (answered, timed out) first ends with its own reason
 and is re-ended with the outcome when `Approvals.record` decides it.
 

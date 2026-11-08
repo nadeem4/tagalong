@@ -79,6 +79,7 @@ the total can run a little low.
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/asks.py`              | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                   |
+| `brain/src/brain/waiting.py`           | `WaitingAsks`: Scout asks parked past their turn; finds a repeated call, carries a saved call out on a late yes and emits `ask_ended`                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                          |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/offers.py`            | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                                                                                                                                                                        |
@@ -404,7 +405,7 @@ The always-hold rules the engine enforces:
 5. A cancelled ask is not a final outcome and writes no row.
 
 One approvals row is written per outcome: `approved` (decided by `rule`, `scout` with the
-preference, or `person`), `refused`, `timed_out` or `no_one`. A person's once-allow may be
+preference, or `person`), `refused`, `expired` (it ended unanswered; the `decided` event keeps the reason) or `no_one` (a turn-bound card, such as the hand-off mode card, found nobody). A person's once-allow may be
 followed by an offer (not after a rule, Scout, an "always", a `person_only` tool or `offer=False`).
 
 ```mermaid
@@ -523,7 +524,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   never for a `person_only` tool); on a
   wake turn it runs the normal decision (the side-check, the Allow card, with offers
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
-  nobody online the nudge is refused ("Nobody was there to ask...") and Scout is told. `hand_off`
+  nobody online the nudge waits like any Scout ask (see [Asks that wait](#asks-that-wait)). `hand_off`
   with an explicit `continue_job` on an owner turn skips the engine and shows the mode card as
   always; on a wake turn `Jobs._hand_off_mode` asks the engine first (kind `hand_off_followup`, source `claude_code`,
   tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
@@ -539,7 +540,8 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   to the engine. A standing rule or Scout's grant answers with the expert's allow-once option (an
   expert that offers none is only ever answered by the person, so Scout and rules never pick
   allow-always); the person's own pick, allow or reject, goes back as chosen. With nobody online
-  the row is `no_one` and Scout is told the job is waiting.
+  the ask stays open with its job and is shown when a body joins; it ends `expired` if the job
+  ends first (the reason says "job ended: ...").
 - **Standing rules.** A tool the owner set to Auto on Home that would otherwise ask (a `change`
   tool, or a `locked` one) is a standing rule: the engine grants it, the call runs and the log
   row says `approved`, `decided_by: "rule"`. A read, and a tool that asks for itself (tier
@@ -553,7 +555,7 @@ flowchart TD
   B -- no --> F{preference covers it?}
   F -- yes --> G[runs once, row by scout; hand_off reuses the earlier mode]
   F -- no or error --> D{anyone online?}
-  D -- no --> E[refused, row no_one]
+  D -- no --> E[ask stays open and parks]
   D -- yes --> H[ask the owner: Allow card or mode card]
 ```
 
@@ -562,11 +564,11 @@ flowchart TD
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
   `TAGALONG_KEEP_ASKING_DAYS`.
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
-- **No answer.** After 5 minutes the ask closes with `reason: "timeout"` and the call fails with a
-  timeout error.
-- **Nobody online.** No ask is opened. The tool does not run and Scout is told "Nobody was there
-  to ask, so <tool> was not run." Only bodies that display count: with just a `display: false`
-  body (the browser) online, an ask is refused the same way.
+- **No answer.** A Scout ask has no timeout of its own: it waits in its turn for five minutes, then
+  parks (see [Asks that wait](#asks-that-wait)). A job's ask waits with its job.
+- **Nobody online.** The ask is still opened and saved. Only bodies that display count: with
+  just a `display: false` body (the browser) online, a Scout ask parks at once, and the card
+  is replayed to the first displaying body that joins.
 - **Turn cancelled.** An open ask closes with `reason: "cancelled"` and nothing is left behind.
 - **Reconnect.** The waiting lives in memory; each open ask is also an `active` `ask` work row, which a restart expires ("brain restarted"), so the body never sees it again. A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
@@ -575,12 +577,52 @@ flowchart TD
   is for work with no Scout turn (expert jobs). It sends a plain ask: no `turn`, no `confirm`, any
   option names (for example `allow-once`, `reject`). It waits until closed; there is no default
   timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
-  returns `Answer(None, None)` at once and opens nothing. With `free_text=True` an answer whose
+  returns `Answer(None, None)` at once and opens nothing, unless the caller passes
+  `stay_open=True` (a job's permission ask does), which waits for somebody to join. With `free_text=True` an answer whose
   option is not listed is accepted when it carries non-empty `text` (the user typed their own
   answer). `cancel_all(ask_ids)` closes the named asks with `reason: "cancelled"` and their waiters
   get a `cancelled` error. `answer {ask, option, text}` now passes `text` through to the ask; the
   closed frame is unchanged. An open ask now sends `free_text: true` (when set) and `recommended`
   (one of the options, else `ValueError`), so a body shows a text box and marks the recommendation.
+
+### Asks that wait
+
+A tool in `ask` mode takes one extra argument, `ask_wait_hours` (1 to 168, default 72; shown in
+the tool's schema and named in the capability picture). The toolbox strips it from every call, so
+no tool, card or log line sees it, and keeps `now + hours` as the ask's `due_at`. It applies to
+Scout's own calls only; a job's ask waits with its job.
+
+The ask row saves the call: `input` is `{name, input, text}` masked through the log's guards, and
+`safe_to_retry` says the masking changed nothing. The Scout ask waits in its turn for five
+minutes (`PARK_AFTER_S`), or not at all when no body displays. Then the decision keeps running
+under `WaitingAsks` (`waiting.py`), the card loses its `turn`, and the call returns a fact line:
+"<tool> is waiting for the person's answer (ask <id>). It runs by itself if they allow it; do not
+call it again." The same call again (same tool, same masked input) while one is parked gets the
+same ask, never a second card. Stopping the turn withdraws only the ask it is still waiting on.
+
+When the person answers later, `Toolbox.carry_out` runs the saved call once (it checks the mode
+again: a tool turned off since then refuses), and `WaitingAsks` emits a waking `ask_ended` event
+`{ask, tool, summary, outcome, result | reason}` keyed `ask:<id>`. `outcome` is `approved`,
+`refused`, `expired` or `failed` (yes, but it could not run). A cancelled ask emits nothing. A
+second answer to a closed ask gets `not_found`. A restart expires parked asks ("brain
+restarted").
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+sequenceDiagram
+    participant S as Scout turn
+    participant T as Toolbox
+    participant W as WaitingAsks
+    participant P as Person
+    S->>T: call (tool in ask mode)
+    T->>P: ask card, row saved with the call
+    Note over T,P: waits up to five minutes in the turn
+    T->>W: adopt the decision, park the card
+    T-->>S: waiting for the person's answer
+    P->>W: answers later
+    W->>T: carry_out(saved call)
+    W->>S: ask_ended wake (outcome and result)
+```
 
 ### Choices and preferences
 
@@ -1158,6 +1200,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 
 | Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
 | ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ask_ended`       | 30 s         | 10           | A parked Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                     |
 | `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
 | `work_failed`     | 0 s          | 10           | A goal's step gave up after its retries or was not retryable (facts: goal, step, title, reason); Scout says which step failed and offers `resolve_step`                                      |
