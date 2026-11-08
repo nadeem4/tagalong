@@ -72,14 +72,14 @@ the total can run a little low.
 | `brain/src/brain/guardrails.py`        | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/masking.py`           | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                                                                                                                                                                               |
 | `brain/src/brain/guards.py`            | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                                                                                                                                                                               |
-| `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call), `wake_caps` (emit), and the ask chain `anyone_online`, `side_check`, `person_ask` (only `Jobs` still uses the chain)|
+| `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call) and `wake_caps` (emit)|
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                                                                                                                                                                             |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                       |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/asks.py`              | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                   |
-| `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `scout_approved` (logs a Scout approval and reports it)                                                                                                                                               |
+| `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                                               |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/offers.py`            | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/mind/approvals.md`    | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                                                                                                                                                                                       |
@@ -467,8 +467,8 @@ its mode is `auto` unless Off; `Toolbox.set_mode` refuses Auto for it ("<name> a
 ### Off
 
 Off is the third per-tool state, stored in the same `mode` rows of `rules`, so it holds for every body, survives a restart and survives
-a body reconnecting. `resolve_mode` returns `off` before any other rule, so it also beats `locked`,
-`self_asks` and `person_only`: those tools may be set Off or Ask (never Auto). Off does three things:
+a body reconnecting. `resolve_mode` returns `off` before any other rule, so it beats every tier (`locked`,
+`person_only` and `auto`): those tools may be set Off or Ask (never Auto). Off does three things:
 
 - `Toolbox.active_specs()` skips the tool, and `model_tools()` and the capability picture
   read only that list, so Scout never sees it and routes around it.
@@ -508,7 +508,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
   `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
 - **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
-  (Scout's tools through the engine's side-check decider, Claude Code in `Jobs._permission`). When it approves, no ask
+  (Scout's tools, Claude Code's permission asks and hand-off follow-ups all go through the engine's side-check decider). When it approves, no ask
   opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
   `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
   approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
@@ -523,26 +523,37 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   wake turn it runs the normal decision (the side-check, the Allow card, with offers
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
   nobody online the nudge is refused ("Nobody was there to ask...") and Scout is told. `hand_off`
-  with an explicit `continue_job` on an owner turn skips the chain and shows the mode card as
-  always; on a wake turn it asks the same way first (source `claude_code`,
+  with an explicit `continue_job` on an owner turn skips the engine and shows the mode card as
+  always; on a wake turn `Jobs._hand_off_mode` asks the engine first (kind `hand_off_followup`, source `claude_code`,
   tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
   and skips the mode card (Scout's row says `decided_by: "scout"`, no offer follows). Otherwise the mode card is the
-  owner's question: the chain's own person step answers at once so nothing is asked twice, and the
-  card pick is logged as a person row and offered like any approval. A mode the new session does not
-  offer shows the card without running the chain. A card that times out is logged `timed_out`; a
-  cancel leaves no row. A new job (no `continue_job`, including an implicit continue of the folder's
-  last session) always shows the card.
+  engine's person step, so nothing is asked twice: the card pick is logged as a person row and
+  offered like any approval. A mode the new session does not offer, or apps riding along, show
+  the card without a preference ever answering (apps are the person's to approve). The card has
+  no timeout; it ends with its job or turn. A cancel leaves no row. A new job (no
+  `continue_job`, including an implicit continue of the folder's last session) always shows the
+  card, and the owner's own hand-off without apps never reaches the engine.
+- **Claude Code's permission asks.** `Jobs._permission` builds an `expert_request` ask (tier
+  `ask`, group `<expert>:<folder>`) with the expert's own option names on the card and gives it
+  to the engine. A standing rule or Scout's grant answers with the expert's allow-once option (an
+  expert that offers none is only ever answered by the person, so Scout and rules never pick
+  allow-always); the person's own pick, allow or reject, goes back as chosen. With nobody online
+  the row is `no_one` and Scout is told the job is waiting.
+- **Standing rules.** A tool the owner set to Auto on Home that would otherwise ask (a `change`
+  tool, or a `locked` one) is a standing rule: the engine grants it, the call runs and the log
+  row says `approved`, `decided_by: "rule"`. A read, and a tool that asks for itself (tier
+  `auto`), runs with no engine and no row.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
   A[Scout calls tell_expert or hand_off continue_job] --> B{owner turn?}
   B -- yes --> C[tell_expert runs now, no ask, no row; hand_off shows the mode card]
-  B -- no --> D{anyone online?}
-  D -- no --> E[refused, row no_one]
-  D -- yes --> F{preference covers it?}
+  B -- no --> F{preference covers it?}
   F -- yes --> G[runs once, row by scout; hand_off reuses the earlier mode]
-  F -- no or error --> H[ask the owner: Allow card or mode card]
+  F -- no or error --> D{anyone online?}
+  D -- no --> E[refused, row no_one]
+  D -- yes --> H[ask the owner: Allow card or mode card]
 ```
 
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
@@ -645,7 +656,7 @@ page (the tour asks once per job's app), and `setup_app` takes the same `query` 
 the entry again), where `state` is `ready`, `needs_login` or
 `needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
-(`{id, approved?}`, `self_asks`). With `approved` false they open the same Allow card Scout's
+(`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
 from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
 on Allow. A card that refuses with an `{error: token}` (such as `already_logged_in`, when the
@@ -1225,7 +1236,7 @@ flowchart TD
 
 | Tool             | Audience    | Effect | Gate                         | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | ----------- | ------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`       | scout       | change | asks itself (`self_asks`)    | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                                                                                                                                  |
+| `hand_off`       | scout       | change | tier `auto` (asks for itself) | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                                                                                                                                  |
 | `list_experts`   | scout, home | read   | `auto`                       | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                                                                                                                                                                                 |
 | `tell_expert`    | scout       | change | `ask`, free on an owner turn | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                                                                                                                                                                                            |
 | `close_job`      | scout       | change | `auto`                       | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                                                                                                                                                                                     |
@@ -1721,13 +1732,11 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model_call` | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
 | `emit`       | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
-| `ask`        | Before a permission ask reaches you           | `anyone_online`, `side_check`, `person_ask`, in that order                                                                                                                          |
 | `save`       | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
-The ask chain is the `ask` hook's three guards in order. `anyone_online` blocks (`denied`) when no
-body that displays is connected (a `display: false` body does not count). `side_check` lets Scout approve once under a preference (an allow-once, so the
-rest are skipped). `person_ask` opens the ask and turns the answer into a verdict. Only Claude Code's permission asks (`Jobs._permission`) use this chain now; Scout's tools use the
-engine (P3 moves Jobs over and deletes the chain). A side-check that raises or times out falls through to `person_ask`.
+There is no `ask` hook: every permission ask, Scout's and Claude Code's, goes through the
+permission engine (`permission.py`), which owns the floor, the deciders and the one
+approvals-log write.
 
 The `save` hook runs through `mask_message` over the new chat messages (`Session._persist`, which
 saves a masked copy while `history` keeps the real values for the live turn), an approval's
@@ -1751,7 +1760,7 @@ offer. `step_cap` only counts turns. The budget guard is listed first so a spent
 
 | Verdict   | Meaning                                                     |
 | --------- | ----------------------------------------------------------- |
-| `allow`   | Carry on (`allow_once` is for one call only, used on `ask`) |
+| `allow`   | Carry on                                                    |
 | `ask`     | Put it to the person                                        |
 | `block`   | Refuse this one action, with a reason                       |
 | `stop`    | End the whole turn, with a reason and a code                |
@@ -1774,9 +1783,7 @@ flowchart TD
     F -->|yes| G[log one line, return it]
     F -->|no| J{ask?}
     J -->|yes| K[log one line, remember it]
-    J -->|no| L{allow_once on the ask hook?}
-    L -->|yes| M[return allow early]
-    L -->|no| H
+    J -->|no| H
     K --> H{more guards?}
     H -->|yes| B
     H -->|no| I[return ask, else rewrite, else allow]

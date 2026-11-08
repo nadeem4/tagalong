@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 from ask_log import approvals_on, list_approvals
 from fake_clock import FakeClock
+from fake_engine import FakeEngine
 from job_rows import add_timer, end_job
 
 from brain.asks import Answer
@@ -24,6 +25,7 @@ from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
+from brain.permission import Decision, Engine, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
@@ -131,6 +133,14 @@ class FakeConnectedApps:
         return SimpleNamespace(state=self.states[app_id])
 
 
+class FakeOffers:
+    def __init__(self):
+        self.considered = []
+
+    def consider(self, group_key, source, tool):
+        self.considered.append((group_key, source, tool))
+
+
 class Rig:
     def __init__(
         self,
@@ -143,6 +153,7 @@ class Rig:
         approvals=False,
         side_check=None,
         guards=None,
+        engine=None,
         experts=None,
         setup_facts=None,
         shared: bool = False,
@@ -177,6 +188,9 @@ class Rig:
             if approvals
             else None
         )
+        self.offers = FakeOffers()
+        deciders = [*([SideCheckDecider(side_check)] if side_check else []), Person()]
+        self.engine = engine or Engine(deciders, self.approvals, self.offers, lambda name: None)
         # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
         self.gate = asyncio.Event()
         self.hosts = ExpertHosts(300, sleep=lambda s: self.gate.wait())
@@ -193,8 +207,7 @@ class Rig:
             on_finished=self.finished.append,
             clock=lambda: self.now,
             scout_questions=scout,
-            approvals=self.approvals,
-            side_check=side_check,
+            engine=self.engine,
             guards=guards,
             setup_facts=setup_facts,
             emit=self.emitted.append,
@@ -946,10 +959,10 @@ async def test_claude_code_pass_falls_through_to_the_person(make_rig):
     assert (row.outcome, row.decided_by, row.rule_id) == ("approved", "person", None)
 
 
-async def test_claude_code_no_one_online_skips_side_check(make_rig):
+async def test_nobody_online_still_logs_no_one_after_scout_looks(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
     asks = FakeAsks(Answer("Plan"), Answer(None))
-    rig, check = make_scouted(make_rig, asks, steps)
+    rig, check = make_scouted(make_rig, asks, steps, approve=False)
     real_open = asks.open
 
     async def open_then_go_offline(**kw):
@@ -960,20 +973,12 @@ async def test_claude_code_no_one_online_skips_side_check(make_rig):
     asks.open = open_then_go_offline
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    assert check.facts == []
+    assert len(check.facts) == 1  # Scout looks first; only a pass finds nobody there
     [row] = logged(rig)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
 
 
 # --- Scout offers to auto-approve after the person allows a Claude Code ask ---------------
-
-
-class FakeOffers:
-    def __init__(self):
-        self.considered = []
-
-    def consider(self, group_key, source, tool):
-        self.considered.append((group_key, source, tool))
 
 
 @pytest.mark.parametrize(
@@ -982,7 +987,7 @@ class FakeOffers:
 async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, expected):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
     rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     group = f"claude_code:{rig.folder}"
@@ -992,7 +997,7 @@ async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, 
 async def test_scout_approval_is_not_offered(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
     rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert offers.considered == []
@@ -1012,55 +1017,75 @@ async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig
     assert (row.outcome, row.decided_by) == ("approved", "person")
 
 
-async def test_claude_code_scout_approved_that_raises_still_asks_the_person(make_rig):
+async def test_claude_code_preference_use_that_raises_still_asks_the_person(make_rig, monkeypatch):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
     rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps)
 
     def boom(*args, **kwargs):
         raise RuntimeError("boom")
 
-    rig.jobs._approvals.scout_approved = boom
+    monkeypatch.setattr("brain.approvals.rules.use_preference", boom)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     [row] = logged(rig)
     assert (row.outcome, row.decided_by) == ("approved", "person")
 
 
-# --- The permission relay runs the shared ask chain ---------------------------------------
+# --- The permission relay goes through the engine ----------------------------------------
 
 
-def chain_of(*guards):
-    from brain.guards import Guards
-
-    chain = Guards()
-    for guard in guards:
-        chain.add(guard)
-    return chain
+def engine_rig(make_rig, decision, steps):
+    engine = FakeEngine(decision)
+    return make_rig(FakeAsks(Answer("Plan")), steps, engine=engine), engine
 
 
-def recorder(seen, verdict):
-    from brain.guards import Guard, Hook
-
-    def check(ctx):
-        seen.append(ctx)
-        return verdict
-
-    return Guard("recorder", Hook.ask, check)
-
-
-async def test_permission_runs_the_shared_ask_chain(make_rig):
-    from brain.guards import allow_once
-
+async def test_permission_goes_through_the_engine(make_rig):
     steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
-    seen: list = []
-    rig.jobs._guards = chain_of(recorder(seen, allow_once("test", value="allow")))
+    rig, engine = engine_rig(make_rig, Decision("allow_once", decided_by="rule"), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    [ctx] = seen
-    assert (ctx.source, ctx.tool, ctx.group_key, ctx.locked) == (
-        "claude_code", "claude_code:ls -la", f"claude_code:{rig.folder}", False,
+    [req] = engine.requests
+    assert (req.kind, req.source, req.tool, req.tier.value) == (
+        "expert_request", "claude_code", "claude_code:ls -la", "ask",
     )  # fmt: skip
+    assert req.group_key == f"claude_code:{rig.folder}" and req.job_id == rig.finished[0].id
+    assert req.input == {"command": "ls"} and req.can_allow_once
+
+
+async def test_no_allow_once_option_means_no_rule_or_scout(make_rig):
+    steps = [{"permission": {"title": "ls", "options": [OPTS[1], OPTS[2]]}}]
+    rig, engine = engine_rig(make_rig, Decision("deny", "no_decider"), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert engine.requests[0].can_allow_once is False
+
+
+async def test_scout_grant_returns_the_allow_once_id(make_rig):
+    steps = [{"permission": {"title": "ls", "options": [OPTS[1], OPTS[0], OPTS[2]]}}]
+    rig, _ = engine_rig(make_rig, Decision("allow_once", decided_by="scout"), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
+
+
+async def test_an_engine_refusal_picks_no_option(make_rig):
+    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
+    rig, _ = engine_rig(make_rig, Decision("deny", "no_decider"), steps)
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"]["outcome"] != "selected"
+
+
+async def test_nobody_online_tells_scout_the_job_is_waiting(make_rig):
+    steps = [{"permission": {"title": "rm x"}}]
+    rig, _ = engine_rig(make_rig, Decision("deny", "no_one"), steps)
+    away: list = []
+    rig.jobs._on_away = lambda job_id, what: away.append((job_id, what))
+    await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert [what for _, what in away] == ["asked permission: rm x"]
 
 
 async def test_permission_side_check_approval_picks_allow_once_option_never_allow_always(make_rig):
@@ -1070,36 +1095,6 @@ async def test_permission_side_check_approval_picks_allow_once_option_never_allo
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
     assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
-
-
-async def test_permission_chain_guard_error_refuses_without_hanging(make_rig):
-    from brain.guards import Guard, Hook
-
-    def boom(ctx):
-        raise RuntimeError("boom")
-
-    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
-    asks = FakeAsks(Answer("Plan"))
-    rig = with_approvals(make_rig, asks, steps)
-    rig.jobs._guards = chain_of(Guard("boom", Hook.ask, boom))
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.finished)
-    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
-    assert reply["result"]["outcome"]["outcome"] != "selected"
-    assert len(asks.opened) == 1  # only the hand-off ask: nothing ran, nobody was asked
-
-
-async def test_permission_unexpected_allow_is_not_approval(make_rig):
-    from brain.guards import ALLOW
-
-    steps = [{"permission": {"title": "rm x", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan")), steps)
-    rig.jobs._guards = chain_of(recorder([], ALLOW))
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: rig.finished)
-    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
-    assert reply["result"]["outcome"]["outcome"] != "selected"
-    assert logged(rig) == []
 
 
 @pytest.mark.parametrize("scenario", ["denied", "nobody_online"])
@@ -1116,10 +1111,9 @@ async def test_permission_refusal_logs_no_tool_text(make_rig, caplog, scenario):
             return await real_open(**kw)
 
         asks.open = open_then_go_offline
-    with caplog.at_level("INFO", logger="brain.guardrails"):
+    with caplog.at_level("INFO"):
         await rig.jobs.start("go", str(rig.folder))
         await until(lambda: rig.finished)
-    assert "guard=" in caplog.text  # the refusal was logged
     assert "rm secret-file" not in caplog.text
 
 
@@ -2111,7 +2105,7 @@ async def test_brain_started_continue_without_a_preference_shows_the_card(make_r
     check = FakeSideCheck(None)
     asks = FakeAsks(Answer("Plan"), Answer("Auto"))
     rig = continuing(make_rig, asks, check)
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     first = await first_job(rig)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
     assert len(asks.opened) == 2 and asks.opened[1]["tool"] == "hand_off"
@@ -2125,7 +2119,7 @@ async def test_brain_started_continue_without_a_preference_shows_the_card(make_r
 async def test_brain_started_continue_card_cancel_starts_nothing_and_records_no_row(make_rig):
     asks = FakeAsks(Answer("Plan"), Answer("cancel"))
     rig = continuing(make_rig, asks, FakeSideCheck(None))
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     first = await first_job(rig)
     with pytest.raises(JobError, match="not started"):
         await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
@@ -2134,15 +2128,14 @@ async def test_brain_started_continue_card_cancel_starts_nothing_and_records_no_
 
 
 async def test_brain_started_continue_with_nobody_online_is_not_started_and_logs_no_one(make_rig):
-    check = FakeSideCheck()
+    check = FakeSideCheck(None)
     asks = FakeAsks(Answer("Plan"))
     rig = continuing(make_rig, asks, check)
-    check.result = pref_in(rig)
     first = await first_job(rig)
     asks.online = False
     with pytest.raises(JobError, match="not started"):
         await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert check.facts == []  # nobody online skips the side-check
+    assert len(check.facts) == 1  # Scout looks first; only a pass finds nobody there
     [row] = hand_off_rows(rig)
     assert (row.outcome, row.decided_by) == ("no_one", "none")
     assert len(rig.records.list_jobs()) == 1
@@ -2153,7 +2146,7 @@ async def test_an_earlier_mode_missing_from_the_new_session_falls_back_to_the_ca
     asks = FakeAsks(Answer("Plan"), Answer("Auto"))
     rig = continuing(make_rig, asks, check)
     check.result = pref_in(rig)
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     first = await first_job(rig)
     rig.records.work.set_job_detail(first, mode="gone")
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
@@ -2169,7 +2162,7 @@ async def test_a_covered_follow_up_is_not_offered_as_a_preference(make_rig):
     check = FakeSideCheck()
     rig = continuing(make_rig, FakeAsks(Answer("Plan")), check)
     check.result = pref_in(rig)
-    rig.jobs._offers = offers = FakeOffers()
+    offers = rig.offers
     first = await first_job(rig)
     await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
     assert offers.considered == []
@@ -2184,7 +2177,15 @@ async def test_the_chain_sees_the_mode_being_reused(make_rig):
     assert check.facts[0].input == {"folder": str(rig.folder), "mode": "plan"}
 
 
-async def test_brain_started_continue_card_timeout_records_timed_out(make_rig):
+async def test_hand_off_card_has_no_timeout(make_rig):
+    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    rig = continuing(make_rig, asks, FakeSideCheck(None))
+    first = await first_job(rig)
+    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    assert "timeout" not in asks.opened[1]  # the card ends with its turn or its job, not a clock
+
+
+async def test_follow_up_card_that_times_out_anyway_records_timed_out(make_rig):
     timeout = RpcError(ErrorCode.timeout, "nobody answered the ask in time")
     rig = continuing(make_rig, FakeAsks(Answer("Plan"), timeout), FakeSideCheck(None))
     first = await first_job(rig)
@@ -2777,6 +2778,35 @@ async def test_the_approvals_row_names_the_kept_apps(make_rig):
     [row] = hand_off_rows(rig)
     assert (row.tool, row.outcome, row.decided_by) == ("hand_off", "approved", "person")
     assert row.input["apps"] == ["mail"]
+
+
+async def test_hand_off_follow_up_goes_through_the_engine(make_rig):
+    engine = FakeEngine(Decision("allow_once", decided_by="scout"))
+    rig = continuing(make_rig, FakeAsks(Answer("Plan")), engine=engine)
+    first = await first_job(rig)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    [req] = engine.requests
+    assert (req.kind, req.source, req.tool, req.tier.value) == (
+        "hand_off_followup", "claude_code", "hand_off", "ask",
+    )  # fmt: skip
+    assert req.group_key == f"claude_code:{rig.folder}" and req.offer and req.can_allow_once
+    assert req.input == {"folder": str(rig.folder), "mode": "plan"}
+    assert rig.records.get_job(second).mode == "plan"  # a Scout grant reuses the earlier mode
+
+
+async def test_owner_hand_off_with_apps_logs_the_kept_apps_and_makes_no_offer(make_rig):
+    rig = apps_rig(make_rig, Answer("Plan", apps=("mail",)), approvals=True)
+    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
+    [row] = hand_off_rows(rig)
+    assert row.input == {"folder": str(rig.folder), "apps": ["mail"]}
+    assert rig.offers.considered == []
+
+
+async def test_owner_hand_off_without_apps_asks_no_engine(make_rig):
+    engine = FakeEngine(Decision("deny", "no_decider"))
+    rig = make_rig(FakeAsks(Answer("Plan")), engine=engine)
+    await rig.jobs.start("task", str(rig.folder))
+    assert engine.requests == []
 
 
 async def test_a_scouts_follow_up_with_apps_shows_the_card_though_a_preference_covers(make_rig):

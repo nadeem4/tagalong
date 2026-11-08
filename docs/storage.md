@@ -577,7 +577,7 @@ and is re-ended with the outcome when `Approvals.record` decides it.
 | `summary`       | TEXT                | One-line description of the action                                           |
 | `input`         | TEXT                | The tool input as JSON                                                       |
 | `group_key`     | TEXT                | The kind of action, to group like asks                                       |
-| `decided_by`    | TEXT                | `person`, `scout` or `none`; NULL while undecided                            |
+| `decided_by`    | TEXT                | `person`, `scout`, `rule` or `none`; NULL while undecided                    |
 | `rule_id`       | INTEGER             | The `sentence` rule Scout approved under                                     |
 | `rule_sentence` | TEXT                | That rule's sentence as it was then, so editing it later rewrites no history |
 

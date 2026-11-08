@@ -486,8 +486,12 @@ next section.
    `job_id`. `list_approvals {filter: "refused"}` returns only the refused ones.
 4. **Action:** with nobody connected, a job asks for permission (close the desktop mid-job).
    **Expected:** a row with `outcome: "no_one"`.
-5. **Action:** press **Stop** on the turn while its ask is open, and run a tool that is set to `auto`.
+5. **Action:** press **Stop** on the turn while its ask is open, and run a read tool.
    **Expected:** no row for either.
+   5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
+   **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
+   `decided_by: "rule"` (`test_stored_auto_run_is_logged_as_rule`). A Claude Code permission ask
+   still shows Claude Code's own option names on the card.
    5b. **Action:** leave a permission ask open and quit the brain, then start it again.
    **Expected:** the ask is gone from the body, and it is not in `list_approvals` (it was never
    decided). The ask is an `ask` work row that now reads expired, "brain restarted". The

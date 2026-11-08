@@ -8,13 +8,11 @@ import logging
 
 from brain.guards import (
     ALLOW,
-    AskCtx,
     Guard,
     Guards,
     Hook,
     ModelCallCtx,
     SaveCtx,
-    allow_once,
     ask,
     block,
     rewrite,
@@ -96,30 +94,6 @@ async def test_rewrite_feeds_the_next_guard():
     g = make(Guard("u", Hook.save, upper), Guard("c", Hook.save, check))
     v = await g.run(Hook.save, SaveCtx(what="chat", text="hi"))
     assert seen == ["HI"] and v.kind == "rewrite" and v.value == "HI"
-
-
-async def test_allow_once_short_circuits_on_ask_hook():
-    seen = []
-
-    def later(ctx):
-        seen.append(1)
-        return ask("x")
-
-    g = make(Guard("a", Hook.ask, lambda c: allow_once("fine")), Guard("b", Hook.ask, later))
-    v = await g.run(Hook.ask, None)
-    assert v.kind == "allow" and v.once and not seen
-
-
-async def test_allow_once_counts_as_allow_elsewhere():
-    seen = []
-
-    def later(ctx):
-        seen.append(1)
-        return ALLOW
-
-    g = make(Guard("a", Hook.emit, lambda c: allow_once("fine")), Guard("b", Hook.emit, later))
-    v = await g.run(Hook.emit, None)
-    assert v.kind == "allow" and seen == [1]
 
 
 async def test_raising_guard_is_block_with_code_error():
@@ -218,8 +192,8 @@ async def test_log_line_omits_turn_when_unknown(caplog):
     ]
 
 
-async def test_log_never_contains_tool_input(caplog):
+async def test_log_never_contains_the_guarded_text(caplog):
     caplog.set_level(logging.INFO, logger="brain.guardrails")
-    ctx = AskCtx("user", "t", "Doing it.", {"secret": "hunter2"}, "t", False, "t1", lambda: None)
-    await make(Guard("b", Hook.ask, lambda c: block("not allowed"))).run(Hook.ask, ctx)
+    ctx = SaveCtx(what="chat", text="hunter2")
+    await make(Guard("b", Hook.save, lambda c: block("not allowed"))).run(Hook.save, ctx)
     assert "hunter2" not in caplog.text and caplog.records

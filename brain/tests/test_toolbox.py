@@ -919,13 +919,30 @@ async def test_removed_preference_sends_next_ask_to_the_person(mem):
         await task
 
 
-async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem):
+async def test_stored_auto_run_is_logged_as_rule(mem):
+    box, source, bodies, stored, _ = scouted(mem, FakeSideCheck(None))
+    stored["t"] = "auto"  # the person's Home switch
+    assert await box.run(call_with_text("t")) == "ran t"
+    assert bodies.sent == []  # nobody was asked
+    [row] = list_approvals(mem, "all", 10, None)
+    assert (row.tool, row.outcome, row.decided_by) == ("t", "approved", "rule")
+
+
+async def test_plain_read_is_not_logged(mem):
+    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
+    source = FakeSource([ToolSpec("r", "read it", {"type": "object"}, effect="read")])
+    box = Toolbox([source], {}, Asks(AskBodies(("desktop",)), fresh_work()), approvals)
+    assert await box.run(call_with_text("r")) == "ran r"
+    assert list_approvals(mem, "all", 10, None) == []
+
+
+async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem, monkeypatch):
     box, source, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
 
     def boom(*a):
         raise RuntimeError("db")
 
-    box._engine._approvals.preference_used = boom
+    monkeypatch.setattr("brain.approvals.rules.use_preference", boom)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))  # Scout's grant was a pass: the person is asked
     box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")

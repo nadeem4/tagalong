@@ -1,34 +1,14 @@
-"""Built-in guards: the spend caps (daily budget, step cap), wake caps and the expert ask chain.
+"""Built-in guards: the spend caps (daily budget, step cap) and the wake caps.
 
 The budget also sits on emit so the scheduler drops wakes; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
-The ask hook runs anyone_online, side_check_guard and person_ask in that order; only Jobs still
-uses it (P3 moves it onto the permission engine, which already decides every tool call).
+Asks are not here: the permission engine decides every one of them.
 """
 
 import dataclasses
-import logging
-from typing import TYPE_CHECKING
 
-from brain.guards import (
-    ALLOW,
-    AskCtx,
-    EmitCtx,
-    Guard,
-    Guards,
-    Hook,
-    ModelCallCtx,
-    Verdict,
-    allow_once,
-    block,
-    stop,
-)
-from brain.protocol import ErrorCode, RpcError
+from brain.guards import ALLOW, EmitCtx, Guard, Guards, Hook, ModelCallCtx, Verdict, block, stop
 
-if TYPE_CHECKING:
-    pass
-
-log = logging.getLogger("brain")
 _WINDOW = 3600  # seconds in the rolling wake-cap window
 
 
@@ -81,55 +61,3 @@ def spend_guards(budget, cap: int) -> Guards:
     guards.add(daily_budget_on_emit(budget))
     guards.add(step_cap(cap))
     return guards
-
-
-def anyone_online(asks) -> Guard:
-    def check(ctx: AskCtx) -> Verdict:
-        if asks.anyone_online():
-            return ALLOW
-        return block("nobody online", "denied")
-
-    return Guard("anyone_online", Hook.ask, check)
-
-
-def side_check_guard(side_check, approvals) -> Guard:
-    async def check(ctx: AskCtx) -> Verdict:
-        if (
-            not ctx.can_approve or ctx.person_only or ctx.locked
-        ):  # the floor: Scout never sees these
-            return ALLOW
-        from brain.side_check import AskFacts  # side_check imports this module
-
-        facts = AskFacts(ctx.source, ctx.tool, ctx.summary, ctx.input, ctx.group_key)
-        try:
-            pref = await side_check.decide(facts)
-            if pref is None:
-                return ALLOW
-            # Allow-once only: the tool's ask mode stays as it is.
-            approvals.scout_approved(facts, pref, ctx.summary, ctx.job_id)
-            return allow_once("approved under a preference", value=pref)
-        except Exception:
-            log.exception("side-check failed; asking the person")
-            return ALLOW
-
-    return Guard("side_check", Hook.ask, check)
-
-
-_ASK_REASONS = {
-    ErrorCode.timeout: "nobody answered the ask in time",
-    ErrorCode.cancelled: "the ask was cancelled",
-}
-
-
-def person_ask() -> Guard:
-    async def check(ctx: AskCtx) -> Verdict:
-        try:
-            choice = await ctx.ask_person()
-        except RpcError as exc:
-            # Plain words only: logged guard reasons must never carry tool text.
-            return block(_ASK_REASONS.get(exc.code, exc.code.name), exc.code.name)
-        if choice == "deny":
-            return block("the person said no", "denied")
-        return allow_once("the person answered", value=choice)
-
-    return Guard("person_ask", Hook.ask, check)
