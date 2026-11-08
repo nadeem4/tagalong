@@ -6,7 +6,7 @@
 message Scout from your phone; the bridge says it to the brain over contract v1 and sends Scout's
 finished answer back to the same chat. It holds no brain of its own and adds no frame to the
 contract: it is an ordinary body whose `kind` is `whatsapp`. This page covers the bridge core
-(webhook, send, window). Asks as buttons and the Home setup come in later slices.
+(webhook, send, window) and asks answered from the phone. The Home setup comes in a later slice.
 
 ## Flow
 
@@ -47,7 +47,7 @@ you set up reaches it; the brain's own socket is never public.
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET`           | `hub.verify_token` must equal the verify token, then the challenge is echoed with 200; else 403                                                                                                                                          |
 | `POST`          | the raw body is read up to about 1 MB (over it: 413), then `X-Hub-Signature-256` is checked as `sha256=` plus the HMAC-SHA256 of the raw body with the app secret, in constant time, **before any JSON parsing** (missing or wrong: 401) |
-| after the check | 200 at once, then each text message from the allowed number whose id was not seen before is handed to the bridge; statuses, other senders, other message types and repeated ids are dropped                                              |
+| after the check | 200 at once, then each text message or button tap from the allowed number whose id was not seen before is handed to the bridge; statuses, other senders, other message types and repeated ids are dropped                                |
 
 The seen ids are kept in memory (the last 1000), so a restart forgets them; a Meta retry after a
 restart could in theory say the same text twice.
@@ -57,10 +57,53 @@ restart could in theory say the same text twice.
 - `graph.ts` posts to `https://graph.facebook.com/v21.0/<phone number id>/messages` (`GRAPH_VERSION`
   is the one constant to change) with the access token as a bearer token. One retry on a network
   error or a 5xx, then it logs a line without the token or the text and gives up. There is no queue.
+  It sends plain text and reply buttons (`type: interactive`).
 - `split.ts` cuts a reply at about 4000 characters (WhatsApp allows 4096), at a blank line, else a
-  line, else a space, else hard. The four-message cap and the cut note arrive with asks.
+  line, else a space, else hard. A reply that needs more than four messages is cut: the fourth
+  ends with `(cut: ask me for the rest)` and stays within the limit.
 - `window.ts`: WhatsApp allows free text only for 24 hours after your last message. If a reply
   finishes after that, it is dropped with one log line; the desktop chat still shows it.
+
+## Asks from the phone
+
+A permission ask or question from Scout reaches the phone as a message, and the answer goes back
+through the same `answer` call as at the desk. A yes from WhatsApp counts exactly like a yes there; no
+rule is per body.
+
+- **Buttons or a list.** An ask is sent as reply buttons only when it has one to three options,
+  each at most 20 characters and different from the others, a text of 1 to 1024 characters, and
+  does not take a typed answer. Anything else is sent as numbered text (`1. allow`), split like a
+  reply if it is long; a question that takes a typed answer adds a line saying the typed reply is the
+  answer. An ask with no text says which tool it wants to use and with what input. The limits are
+  constants in `asks.ts` marked "verify at build" against Meta's docs, like the 24-hour window and
+  the Graph version.
+- **Typing answers only the latest ask.** A typed text can answer an open ask only while no reply
+  has been sent to the phone since the ask was shown. After a newer reply, a "yes" is about the
+  chat and goes to Scout as a normal message; only a tap answers that older ask. This holds for typed
+  questions too.
+- **One such ask.** A tap answers it. So does a typed number, an option word, or `yes` / `no` (the
+  options `allow` / `deny`); for a typed question any text is the answer. Text that matches nothing
+  (including a number outside the options) is a normal message to Scout, since you may be changing
+  the subject.
+- **Two or more such asks.** If the text would answer at least one of them, the bridge cannot say
+  which and replies `More than one question is open: please tap a button`, doing nothing else. Text
+  that answers none is a normal message.
+- **A send that fails.** If the ask could not be sent to the phone, the bridge forgets it, so it can
+  never be answered unseen.
+- **One send queue.** Asks, the two fixed lines and replies go out through one queue, so an ask that
+  arrives while a long reply is being sent waits until all its parts are out.
+- **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, replies
+  `That question is closed.` The same line follows an answer the brain refuses as not found.
+- **Late taps.** An ask that is still open on the brain (for example one parked past its turn) can
+  be answered however long after, as the tap itself reopens the 24-hour window.
+- **Outside the window.** An ask that arrives after the 24 hours is not sent and not remembered
+  here; it stays open on the other bodies.
+- **After a reconnect** the bridge forgets its asks and shows again the ones the brain re-sends,
+  once each.
+
+The two fixed lines and the cut note are the bridge's only words, besides the ask's own wording
+(options, the typed-reply line, and the tool and input of an ask with no text); everything else is
+Scout's.
 
 ## Settings the bridge reads
 
@@ -71,16 +114,17 @@ never shows a value.
 
 ## Files
 
-| File                            | Responsibility                                                      |
-| ------------------------------- | ------------------------------------------------------------------- |
-| `bodies/whatsapp/src/config.ts` | `readConfig`: the settings above                                    |
-| `src/webhook.ts`                | the signed webhook server                                           |
-| `src/graph.ts`                  | the Graph send                                                      |
-| `src/split.ts`                  | `splitReply`                                                        |
-| `src/window.ts`                 | the 24-hour window                                                  |
-| `src/bridge.ts`                 | `createBridge`: the contract v1 body                                |
-| `src/index.ts`                  | the entry: real websocket, stdin pipe, SIGTERM                      |
-| `vite.config.ts`                | bundles everything (contract and zod included) into `dist/index.js` |
+| File                            | Responsibility                                                            |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `bodies/whatsapp/src/config.ts` | `readConfig`: the settings above                                          |
+| `src/webhook.ts`                | the signed webhook server                                                 |
+| `src/graph.ts`                  | the Graph send: text and reply buttons                                    |
+| `src/asks.ts`                   | `AskDesk`: open asks, buttons or numbered text, which ask a reply answers |
+| `src/split.ts`                  | `splitReply`                                                              |
+| `src/window.ts`                 | the 24-hour window                                                        |
+| `src/bridge.ts`                 | `createBridge`: the contract v1 body                                      |
+| `src/index.ts`                  | the entry: real websocket, stdin pipe, SIGTERM                            |
+| `vite.config.ts`                | bundles everything (contract and zod included) into `dist/index.js`       |
 
 ## Build and test
 

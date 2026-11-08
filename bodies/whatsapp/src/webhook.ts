@@ -1,6 +1,7 @@
 /**
  * The one public door: Meta's signed webhook on /webhook. A request counts only if the HMAC
- * of its raw body checks out, and only text from the one allowed number reaches the bridge.
+ * of its raw body checks out, and only text and button taps from the one allowed number reach
+ * the bridge.
  * Everything else gets a quick, boring answer, so a stranger learns nothing and Meta never
  * retries a message we chose to ignore.
  */
@@ -8,7 +9,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { WhatsAppConfig } from './config';
 
-export type Inbound = { kind: 'text'; id: string; text: string };
+export type Inbound =
+  { kind: 'text'; id: string; text: string } | { kind: 'button'; id: string; buttonId: string };
 
 export interface WebhookOptions {
   config: Pick<WhatsAppConfig, 'appSecret' | 'verifyToken' | 'allowedNumber'>;
@@ -63,6 +65,7 @@ interface WebhookMessage {
   from?: unknown;
   type?: unknown;
   text?: { body?: unknown };
+  interactive?: { button_reply?: { id?: unknown } };
 }
 
 function textMessages(body: unknown): WebhookMessage[] {
@@ -122,11 +125,19 @@ export function createWebhook(options: WebhookOptions): Server {
       return log('webhook: signed body was not JSON');
     }
     for (const m of textMessages(parsed)) {
-      if (m.type !== 'text' || typeof m.id !== 'string') continue;
-      if (typeof m.from !== 'string' || digits(m.from) !== digits(config.allowedNumber)) continue;
-      const body = m.text?.body;
-      if (typeof body !== 'string' || !remember(m.id)) continue;
-      onInbound({ kind: 'text', id: m.id, text: body });
+      if (typeof m.id !== 'string' || typeof m.from !== 'string') continue;
+      if (digits(m.from) !== digits(config.allowedNumber)) continue;
+      if (m.type === 'text') {
+        const body = m.text?.body;
+        if (typeof body === 'string' && remember(m.id)) {
+          onInbound({ kind: 'text', id: m.id, text: body });
+        }
+      } else if (m.type === 'interactive') {
+        const buttonId = m.interactive?.button_reply?.id;
+        if (typeof buttonId === 'string' && remember(m.id)) {
+          onInbound({ kind: 'button', id: m.id, buttonId });
+        }
+      }
     }
   };
 

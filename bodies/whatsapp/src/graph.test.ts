@@ -42,7 +42,7 @@ describe('sendText', () => {
       fetch: fn,
       log: (l) => logs.push(l),
     });
-    await expect(graph.sendText('1', 'x')).resolves.toBeUndefined();
+    await expect(graph.sendText('1', 'x')).resolves.toBe(false);
     expect(calls).toHaveLength(2);
     expect(logs).toHaveLength(1);
   });
@@ -76,5 +76,53 @@ describe('sendText', () => {
       expect(line).not.toContain('tok-secret');
       expect(line).not.toContain('my private words');
     }
+  });
+});
+
+describe('sendButtons', () => {
+  test('test_send_buttons_posts_the_interactive_body', async () => {
+    const { fn, calls } = fakeFetch([200]);
+    const graph = createGraph({ phoneNumberId: '1234', accessToken: 'tok', fetch: fn });
+    await graph.sendButtons('15550001111', 'Run it?', [
+      { id: 'ask:a1:0', title: 'allow' },
+      { id: 'ask:a1:1', title: 'deny' },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      messaging_product: 'whatsapp',
+      to: '15550001111',
+      type: 'interactive',
+      interactive: {
+        type: 'button',
+        body: { text: 'Run it?' },
+        action: {
+          buttons: [
+            { type: 'reply', reply: { id: 'ask:a1:0', title: 'allow' } },
+            { type: 'reply', reply: { id: 'ask:a1:1', title: 'deny' } },
+          ],
+        },
+      },
+    });
+  });
+
+  test('test_send_buttons_retries_once_and_fails_quietly', async () => {
+    const { fn, calls } = fakeFetch([503, 500]);
+    const logs: string[] = [];
+    const graph = createGraph({
+      phoneNumberId: '1',
+      accessToken: 't',
+      fetch: fn,
+      log: (l) => logs.push(l),
+    });
+    await expect(graph.sendButtons('1', 'q', [{ id: 'a', title: 'b' }])).resolves.toBe(false);
+    expect(calls).toHaveLength(2);
+    expect(logs).toHaveLength(1);
+  });
+
+  test('test_a_send_says_whether_it_went', async () => {
+    const ok = createGraph({ phoneNumberId: '1', accessToken: 't', fetch: fakeFetch([200]).fn });
+    expect(await ok.sendText('1', 'x')).toBe(true);
+    const bad = createGraph({ phoneNumberId: '1', accessToken: 't', fetch: fakeFetch([400]).fn });
+    expect(await bad.sendText('1', 'x')).toBe(false);
   });
 });
