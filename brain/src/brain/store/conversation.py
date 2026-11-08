@@ -6,6 +6,8 @@ Image and document blocks are stored as text markers, so the file never holds sc
 import json
 import sqlite3
 
+from brain.protocol import BODY_DESKTOP
+
 _MARKERS = {"image": "[screenshot]", "document": "[document]"}
 
 
@@ -48,14 +50,16 @@ def _encode_message(m: dict) -> tuple[str, str]:
     return json.dumps(content), "\n".join(t for t in texts if t)
 
 
-def save_messages(db: sqlite3.Connection, msgs: list[dict], at: str) -> None:
+def save_messages(
+    db: sqlite3.Connection, msgs: list[dict], at: str, body: str = BODY_DESKTOP
+) -> None:
     db.execute("BEGIN IMMEDIATE")
     try:
         for m in msgs:
             content, text = _encode_message(m)
             db.execute(
-                "INSERT INTO messages(at, role, content_json, text) VALUES (?,?,?,?)",
-                (at, m["role"], content, text),
+                "INSERT INTO messages(at, role, content_json, text, body) VALUES (?,?,?,?,?)",
+                (at, m["role"], content, text, body),
             )
     except BaseException:
         db.execute("ROLLBACK")

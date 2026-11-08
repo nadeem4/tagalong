@@ -11,6 +11,7 @@ from pathlib import Path
 
 from brain.apps import AppRow
 from brain.masking import WITHHELD
+from brain.protocol import BODY_DESKTOP
 from brain.store import connections, conversation, outputs
 from brain.store import memory as memory_store
 from brain.store import search as search_store
@@ -83,8 +84,8 @@ class Memory:
     def add_summary(self, text: str) -> Item:
         return memory_store.add_summary(self._db, self.mask(text), self._now().isoformat())
 
-    def save_messages(self, messages: list[dict]) -> None:
-        conversation.save_messages(self._db, messages, self._now().isoformat())
+    def save_messages(self, messages: list[dict], body: str = BODY_DESKTOP) -> None:
+        conversation.save_messages(self._db, messages, self._now().isoformat(), body)
 
     def replace_last_message(self, message: dict) -> None:
         conversation.replace_last_message(self._db, message)

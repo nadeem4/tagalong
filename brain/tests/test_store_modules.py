@@ -53,3 +53,12 @@ def test_search_finds_memory_and_message(tmp_path):
     hits = search.search(db, "marmalade", None, 10)
     assert {h.kind for h in hits} == {"about_you", "chat"}
     assert sorted(h.ref for h in hits) == ["1", "chat:1"]
+
+
+def test_saved_messages_record_their_body(tmp_path):
+    db = _db(tmp_path)
+    msg = [{"role": "user", "content": "hi"}]
+    conversation.save_messages(db, msg, AT, "whatsapp")
+    conversation.save_messages(db, msg, AT)
+    rows = db.execute("SELECT body FROM messages ORDER BY id").fetchall()
+    assert rows == [("whatsapp",), ("desktop",)]
