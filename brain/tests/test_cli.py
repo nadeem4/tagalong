@@ -411,3 +411,25 @@ def test_the_cli_never_opens_a_socket(tmp_path, monkeypatch, no_node_download):
     rig = Rig(tmp_path)
     assert rig.go("doctor") == 0
     assert rig.go("install", "claude-acp", "--yes", run=Npm()) == 0
+
+
+# ---- stop ----
+
+
+def test_stop_says_stopped(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("stop", stop=lambda home: "stopped") == 0
+    assert rig.text == "Stopped the brain."
+
+
+def test_stop_when_not_running_exits_zero(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("stop", stop=lambda home: "not_running") == 0
+    assert rig.text == "The brain is not running."
+
+
+def test_stop_failure_exits_one(tmp_path):
+    (tmp_path / "brain.pid").write_text("777")
+    rig = Rig(tmp_path)
+    assert rig.go("stop", stop=lambda home: "failed") == 1
+    assert rig.text == "The brain did not stop (pid 777)."
