@@ -2320,6 +2320,15 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 4. By hand, read-only: start the desktop with a brain running and check the brain log receives a `reading` event.
    Do not run the install while testing.
 
+## Saved messages record their body (automated, brain)
+
+1. `cd brain && uv run pytest tests/test_migrate_message_body.py tests/test_store_modules.py tests/test_memory.py -q`:
+   old messages read `desktop` after migration 0026, and `save_messages` stores the body it is given.
+2. `uv run pytest tests/test_sessions.py -q -k "record_the_body or tagged_desktop or body_is_kept"`: a turn from a
+   `whatsapp` body saves `whatsapp`, a desktop turn or a wake with no body saves `desktop`, and the tag
+   survives the body leaving mid-turn.
+3. By hand, after a chat: open `tagalong.db` and run `SELECT DISTINCT body FROM messages;`. It shows `desktop`.
+
 ## Not supported
 
 Do not test these here.

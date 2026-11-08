@@ -359,7 +359,7 @@ def _layers(m, kind):
 def test_memory_layers_migrated(tmp_path):
     path = tmp_path / "old.db"
     db = sqlite3.connect(path, isolation_level=None)
-    migrate(db, upto=load_migrations()[-1].number - 1)  # the schema before the layers
+    migrate(db, upto=24)  # the schema before the layers (0025)
     at = "2026-01-02T03:04:05+00:00"
     for kind in ("instruction", "about_you", "project", "summary", "mystery"):
         db.execute(
@@ -541,3 +541,10 @@ def test_migration_is_one_step_after_timers(tmp_path):
     assert v == len(load_migrations())
     assert any(p.builtin for p in rules.list_preferences(m.db))
     m.close()
+
+
+def test_save_messages_records_the_body(mem):
+    mem.save_messages([{"role": "user", "content": "a"}], "whatsapp")
+    mem.save_messages([{"role": "user", "content": "b"}])
+    rows = mem._db.execute("SELECT body FROM messages ORDER BY id").fetchall()
+    assert rows == [("whatsapp",), ("desktop",)]

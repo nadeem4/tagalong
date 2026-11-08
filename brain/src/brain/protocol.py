@@ -19,6 +19,11 @@ from pydantic import (
 
 PROTOCOL = 1
 
+# The kinds of body a turn can be shown on (`Body.kind`), as saved with each message.
+BODY_DESKTOP = "desktop"
+BODY_BROWSER = "browser"
+BODY_WHATSAPP = "whatsapp"
+
 LIMITS = {
     "part_bytes": 5_000_000,
     "message_bytes": 20_000_000,
