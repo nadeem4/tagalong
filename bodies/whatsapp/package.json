@@ -1,0 +1,15 @@
+{
+  "name": "@tagalong/whatsapp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "clean": "tsc -b --clean"
+  },
+  "devDependencies": {
+    "@tagalong/contract": "workspace:*",
+    "vite": "7.3.6",
+    "vitest": "5.0.0"
+  }
+}

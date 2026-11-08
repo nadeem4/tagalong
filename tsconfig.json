@@ -4,6 +4,7 @@
     { "path": "./protocol/ts" },
     { "path": "./bodies/ui" },
     { "path": "./bodies/desktop" },
-    { "path": "./bodies/browser" }
+    { "path": "./bodies/browser" },
+    { "path": "./bodies/whatsapp" }
   ]
 }
