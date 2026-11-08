@@ -29,6 +29,7 @@ from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
 from brain.offers import Offers
 from brain.outputs import OutputStore, preview
+from brain.permission import summarise
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
@@ -560,7 +561,7 @@ class Jobs:
         ctx = AskCtx(
             AGENT,
             "hand_off",
-            self._approvals.summarise(task, "hand_off", tool_input) if self._approvals else task,
+            summarise(task, "hand_off", tool_input) if self._approvals else task,
             tool_input,
             group,
             False,
@@ -598,7 +599,7 @@ class Jobs:
         self._approvals.record(
             source=AGENT,
             tool="hand_off",
-            summary=self._approvals.summarise(task, "hand_off", tool_input),
+            summary=summarise(task, "hand_off", tool_input),
             input=tool_input,
             group_key=f"{_prefix(chosen.id)}:{path}",
             outcome=outcome,
@@ -912,7 +913,7 @@ class Jobs:
         ctx = AskCtx(
             AGENT,
             tool,
-            approvals.summarise(request.title, tool, request.input) if approvals else "",
+            summarise(request.title, tool, request.input) if approvals else "",
             request.input,
             f"{agent}:{folder}",
             False,
@@ -964,7 +965,7 @@ class Jobs:
         self._approvals.record(
             source=AGENT,
             tool=tool,
-            summary=self._approvals.summarise(request.title, tool, request.input),
+            summary=summarise(request.title, tool, request.input),
             input=request.input,
             group_key=f"{agent}:{job.folder}",
             outcome=outcome,

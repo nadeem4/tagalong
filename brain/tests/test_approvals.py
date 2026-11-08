@@ -1,4 +1,4 @@
-"""Tests for the Approvals service: summaries and recording with a change notification."""
+"""Tests for the Approvals service: recording with a change notification."""
 
 from datetime import UTC, datetime
 
@@ -23,14 +23,6 @@ def make(mem, sent):
 
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
-
-
-def test_summarise_prefers_ask_text_and_cuts_at_200(mem):
-    a = make(mem, [])
-    assert a.summarise("Open the file", "t", {"x": 1}) == "Open the file"
-    assert a.summarise("", "t", {"x": 1}) == 't {"x":1}'
-    assert len(a.summarise("y" * 500, "t", {})) == 200
-    assert len(a.summarise("", "t", {"x": "z" * 500})) == 200
 
 
 def test_record_notifies_changed_approvals(mem):

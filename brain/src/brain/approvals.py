@@ -2,7 +2,6 @@
 
 The log is the decided `ask` work rows. The tool gate and expert jobs call `record`; it decides
 the ask's row (or makes one when no ask was ever opened) and tells open panels the log changed.
-`summarise` makes the one line shown in that log.
 """
 
 import json
@@ -24,8 +23,6 @@ if TYPE_CHECKING:
     from brain.side_check import AskFacts
     from brain.toolbox import Handler, ToolSpec
 
-SUMMARY_MAX = 200
-
 
 class Approvals:
     def __init__(
@@ -41,10 +38,6 @@ class Approvals:
         self._notify = notify
         self._now = now
         self._guards = guards  # None: rows are stored as given
-
-    def summarise(self, text: str, tool: str, input: dict) -> str:
-        line = text or f"{tool} {json.dumps(input, sort_keys=True, separators=(',', ':'))}"
-        return line[:SUMMARY_MAX]
 
     def record(
         self,
