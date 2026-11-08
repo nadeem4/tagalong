@@ -587,6 +587,8 @@ flowchart TD
 
 ### Asks that wait
 
+_Identical calls._ `WaitingAsks.claim` registers a call (tool plus masked input) before the card is awaited, so two identical parallel calls, or a re-call right after an immediate park, share one ask; the claim ends with the decision.
+
 A tool in `ask` mode takes one extra argument, `ask_wait_hours` (1 to 168, default 72; shown in
 the tool's schema and named in the capability picture). The toolbox strips it from every call, so
 no tool, card or log line sees it, and keeps `now + hours` as the ask's `due_at`. It applies to
