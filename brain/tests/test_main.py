@@ -331,3 +331,19 @@ def test_one_key_reaches_both_models():
     keyed = main._KeyedModels(scout, reader)
     keyed.set_key("sk-x")
     assert scout.ready and reader.ready and keyed.ready
+
+
+def test_main_writes_and_clears_the_pid_file(monkeypatch, tmp_path):
+    seen = {}
+
+    async def stop(*args):
+        seen["pid"] = (tmp_path / "brain.pid").read_text().strip()
+        raise RuntimeError("stop")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    assert seen["pid"] == str(os.getpid())
+    assert not (tmp_path / "brain.pid").exists()

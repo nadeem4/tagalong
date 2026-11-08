@@ -20,6 +20,7 @@ from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
+from brain.lifecycle import clear_pid, write_pid
 from brain.loops.home_tools import loop_home_tools
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
@@ -96,6 +97,7 @@ async def _run() -> None:
     except RuntimeError as err:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
+    write_pid(config.data_dir, os.getpid())  # so `tagalong stop` can end this brain
     bodies = Bodies()
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
@@ -238,6 +240,7 @@ async def _run() -> None:
         await session.jobs.shutdown()
         await apps.shutdown()
         memory.close()
+        clear_pid(config.data_dir, os.getpid())
 
 
 def main() -> None:
