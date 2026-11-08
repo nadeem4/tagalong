@@ -931,9 +931,23 @@ async def test_stored_auto_run_is_logged_as_rule(mem):
 async def test_plain_read_is_not_logged(mem):
     approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
     source = FakeSource([ToolSpec("r", "read it", {"type": "object"}, effect="read")])
-    box = Toolbox([source], {}, Asks(AskBodies(("desktop",)), fresh_work()), approvals)
+    asks = Asks(AskBodies(("desktop",)), fresh_work())
+    box = Toolbox([source], {}, asks, approvals)  # real engine: the skip is the auto tier's
     assert await box.run(call_with_text("r")) == "ran r"
     assert list_approvals(mem, "all", 10, None) == []
+
+
+async def test_a_read_set_to_ask_is_logged(mem):
+    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
+    source = FakeSource([ToolSpec("r", "read it", {"type": "object"}, effect="read")])
+    bodies = AskBodies(("desktop",))
+    box = Toolbox([source], {"r": "ask"}, Asks(bodies, fresh_work()), approvals)
+    task = asyncio.create_task(box.run(call_with_text("r")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran r"
+    [row] = list_approvals(mem, "all", 10, None)
+    assert (row.tool, row.outcome) == ("r", "approved")
 
 
 async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem, monkeypatch):

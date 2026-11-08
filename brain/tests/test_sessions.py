@@ -1511,6 +1511,7 @@ async def test_a_question_cannot_close_the_fence():
 def test_toolbox_and_jobs_share_one_engine():
     session, _ = make(Gate([]))
     assert session.jobs._engine is session.engine
+    assert session.toolbox._engine is session.engine
     assert session.engine is not None
 
 

@@ -468,7 +468,8 @@ its mode is `auto` unless Off; `Toolbox.set_mode` refuses Auto for it ("<name> a
 
 Off is the third per-tool state, stored in the same `mode` rows of `rules`, so it holds for every body, survives a restart and survives
 a body reconnecting. `resolve_mode` returns `off` before any other rule, so it beats every tier (`locked`,
-`person_only` and `auto`): those tools may be set Off or Ask (never Auto). Off does three things:
+`person_only` and `auto`). `person_only` and tier-`auto` tools can't be set Auto; a `locked` tool's Auto is its
+explicit unlock. Off does three things:
 
 - `Toolbox.active_specs()` skips the tool, and `model_tools()` and the capability picture
   read only that list, so Scout never sees it and routes around it.
