@@ -433,3 +433,12 @@ def test_stop_failure_exits_one(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("stop", stop=lambda home: "failed") == 1
     assert rig.text == "The brain did not stop (pid 777)."
+
+
+def test_stop_that_raises_oserror_prints_a_message_not_a_traceback(tmp_path):
+    def boom(home):
+        raise OSError("nope")
+
+    rig = Rig(tmp_path)
+    assert rig.go("stop", stop=boom) == 1
+    assert "did not stop" in rig.text

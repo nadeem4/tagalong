@@ -78,3 +78,23 @@ def test_stop_never_kills_a_live_process_that_is_not_the_brain(tmp_path):
     assert fakes.stop(tmp_path) == "not_running"
     assert fakes.killed == []
     assert not pid_path(tmp_path).exists()
+
+
+def test_kill_refused_by_the_os_is_failed(tmp_path):
+    write_pid(tmp_path, 123, "t1")
+    fakes = Fakes()
+
+    def refuse(pid):
+        raise PermissionError
+
+    assert (
+        stop_brain(tmp_path, alive=fakes.alive, kill=refuse, wait=fakes.wait, started=fakes.started)
+        == "failed"
+    )
+
+
+def test_a_pid_only_file_with_a_live_pid_is_killed(tmp_path):
+    write_pid(tmp_path, 123)  # an old file with no creation time: the pid alone decides
+    fakes = Fakes(started="t9")
+    assert fakes.stop(tmp_path) == "stopped"
+    assert fakes.killed == [123]
