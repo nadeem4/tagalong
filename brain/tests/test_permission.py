@@ -526,6 +526,9 @@ def test_gate_tier_turns_a_read_set_to_ask_into_ask():
     assert gate_tier(spec(tier=Tier.auto), "ask") is Tier.auto
     assert gate_tier(spec(tier=Tier.locked), "ask") is Tier.locked
     assert gate_tier(spec(tier=Tier.person_only), "auto") is Tier.person_only
+    # The owner's stored Auto opens a change tool and a locked one (the Home switch unlocks it).
+    assert gate_tier(spec(effect="change"), "auto") is Tier.auto
+    assert gate_tier(spec(tier=Tier.locked), "auto") is Tier.auto
 
 
 def test_body_confirm_maps_to_tier():
