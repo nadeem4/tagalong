@@ -92,6 +92,17 @@ describe('BodiesPanel', () => {
     expect(screen.getByLabelText(/Access token/)).toHaveAttribute('placeholder', 'Saved');
   });
 
+  it('marks the form busy while a save is in flight', async () => {
+    open();
+    await screen.findByLabelText(/Access token/);
+    const form = screen.getByLabelText(/Access token/).closest('form')!;
+    expect(form).toHaveAttribute('aria-busy', 'false');
+    type(/Access token/, 'EAAG-fake-token');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(form).toHaveAttribute('aria-busy', 'true');
+    await waitFor(() => expect(form).toHaveAttribute('aria-busy', 'false'));
+  });
+
   it('keeps the switch off, with the reason, until all five values are set', async () => {
     open();
     const toggle = await screen.findByRole('switch', { name: 'WhatsApp' });

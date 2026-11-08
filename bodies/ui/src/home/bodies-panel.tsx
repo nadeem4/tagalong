@@ -177,6 +177,7 @@ export function BodiesPanel() {
 
         <form
           className="bodies-form"
+          aria-busy={busy}
           onSubmit={(event) => {
             event.preventDefault();
             if (dirty && !busy) void save();
