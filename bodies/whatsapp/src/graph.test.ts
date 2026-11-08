@@ -42,7 +42,7 @@ describe('sendText', () => {
       fetch: fn,
       log: (l) => logs.push(l),
     });
-    await expect(graph.sendText('1', 'x')).resolves.toBeUndefined();
+    await expect(graph.sendText('1', 'x')).resolves.toBe(false);
     expect(calls).toHaveLength(2);
     expect(logs).toHaveLength(1);
   });
@@ -114,8 +114,15 @@ describe('sendButtons', () => {
       fetch: fn,
       log: (l) => logs.push(l),
     });
-    await expect(graph.sendButtons('1', 'q', [{ id: 'a', title: 'b' }])).resolves.toBeUndefined();
+    await expect(graph.sendButtons('1', 'q', [{ id: 'a', title: 'b' }])).resolves.toBe(false);
     expect(calls).toHaveLength(2);
     expect(logs).toHaveLength(1);
+  });
+
+  test('test_a_send_says_whether_it_went', async () => {
+    const ok = createGraph({ phoneNumberId: '1', accessToken: 't', fetch: fakeFetch([200]).fn });
+    expect(await ok.sendText('1', 'x')).toBe(true);
+    const bad = createGraph({ phoneNumberId: '1', accessToken: 't', fetch: fakeFetch([400]).fn });
+    expect(await bad.sendText('1', 'x')).toBe(false);
   });
 });

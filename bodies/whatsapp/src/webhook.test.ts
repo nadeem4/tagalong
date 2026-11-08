@@ -145,6 +145,12 @@ describe('button taps', () => {
     expect(inbound).toEqual([{ kind: 'button', id: 'm1', buttonId: 'ask:a1:0' }]);
   });
 
+  test('test_a_tap_matches_a_formatted_allowed_number', async () => {
+    const { base, inbound } = await start(undefined, '+1 (555) 000-1111');
+    await post(base, payload([tap('m1')]));
+    expect(inbound).toEqual([{ kind: 'button', id: 'm1', buttonId: 'ask:a1:0' }]);
+  });
+
   test('test_a_button_tap_from_another_sender_is_dropped', async () => {
     const { base, inbound } = await start();
     const res = await post(base, payload([tap('m1', '15559999999')]));

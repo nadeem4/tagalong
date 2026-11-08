@@ -36,6 +36,8 @@ export interface BridgeDeps {
   openSocket: BrainClientOptions['openSocket'];
   fetch?: typeof fetch;
   now?: () => number;
+  /** Wait before the brain socket is redialled; the tests use a few milliseconds. */
+  retryMs?: number;
   log?: (line: string) => void;
 }
 
@@ -59,6 +61,16 @@ export function createBridge(deps: BridgeDeps): {
   // One chain for all sends, so parts of two turns never interleave.
   let sending: Promise<void> = Promise.resolve();
 
+  // Replies sent to the phone so far. An ask remembers the count when it was shown; typed text
+  // may answer it only while no reply has come after (a later "yes" is about the chat).
+  let replies = 0;
+  // Every phone send goes through the one chain, so nothing lands between the parts of a reply.
+  const enqueue = (task: () => Promise<void>): void => {
+    sending = sending.then(task);
+  };
+  const line = (text: string): void =>
+    enqueue(() => graph.sendText(config.allowedNumber, text).then(() => undefined));
+
   const flush = async (turn: string): Promise<void> => {
     const text = (buffers.get(turn) ?? []).join('');
     buffers.delete(turn);
@@ -67,21 +79,36 @@ export function createBridge(deps: BridgeDeps): {
       log('whatsapp: reply dropped, the 24-hour window is closed');
       return;
     }
-    for (const part of splitReply(text)) await graph.sendText(config.allowedNumber, part);
+    const parts = splitReply(text);
+    if (parts.length > 0) replies += 1;
+    for (const part of parts) await graph.sendText(config.allowedNumber, part);
+  };
+
+  const showAsk = async (ask: Extract<AskParams, { state: 'open' }>): Promise<void> => {
+    // Outside the window nothing can be sent, so the desk must not hold an ask the person
+    // never saw (a typed yes would answer it unseen). It stays open on the other bodies.
+    if (!window.isOpen()) return;
+    const out = desk.open(ask, replies);
+    if (!out) return;
+    let sent = true;
+    if (out.kind === 'buttons') {
+      sent = await graph.sendButtons(config.allowedNumber, out.body, out.buttons);
+    } else {
+      for (const part of splitReply(out.body)) {
+        sent = (await graph.sendText(config.allowedNumber, part)) && sent;
+      }
+    }
+    // An ask the person may not have seen must never be answerable.
+    if (!sent) desk.close(ask.id);
   };
 
   const onAsk = (params: unknown): void => {
     const parsed = AskParams.safeParse(params);
     if (!parsed.success) return;
     const ask = parsed.data;
-    if (ask.state === 'closed') return desk.close(ask.id);
-    // Outside the window nothing can be sent, so the desk must not hold an ask the person
-    // never saw (a typed yes would answer it unseen). It stays open on the other bodies.
-    if (!window.isOpen()) return;
-    const out = desk.open(ask);
-    if (!out) return;
-    if (out.kind === 'buttons') void graph.sendButtons(config.allowedNumber, out.body, out.buttons);
-    else void graph.sendText(config.allowedNumber, out.body);
+    // Queued like every send, so an ask and a close keep their order with replies.
+    if (ask.state === 'closed') enqueue(async () => desk.close(ask.id));
+    else enqueue(() => showAsk(ask));
   };
 
   const onNotification = (method: string, params: unknown): void => {
@@ -106,6 +133,7 @@ export function createBridge(deps: BridgeDeps): {
     onNotification,
     onUse: () => Promise.reject(new Error('the WhatsApp body has no tools')),
     onStatus: (status) => log(`whatsapp: brain ${status}`),
+    ...(deps.retryMs === undefined ? {} : { retryMs: deps.retryMs }),
     onResync: () => {
       buffers.clear();
       // The brain re-sends the asks it still holds after a resync.
@@ -124,7 +152,7 @@ export function createBridge(deps: BridgeDeps): {
     client.answerWith(a.ask, a.option, a.text).catch((err: unknown) => {
       if (err instanceof RpcError && err.code === ErrorCode.not_found) {
         desk.close(a.ask);
-        void graph.sendText(config.allowedNumber, CLOSED_LINE);
+        line(CLOSED_LINE);
       } else log('whatsapp: the brain is not reachable, answer not delivered');
     });
   };
@@ -134,13 +162,13 @@ export function createBridge(deps: BridgeDeps): {
     window.touch();
     if (m.kind === 'button') {
       const tapped = desk.fromButton(m.buttonId);
-      if ('closed' in tapped) void graph.sendText(config.allowedNumber, CLOSED_LINE);
+      if ('closed' in tapped) line(CLOSED_LINE);
       else answer(tapped);
       return;
     }
-    const typed = desk.fromText(m.text);
+    const typed = desk.fromText(m.text, replies);
     if (typed === null) say(m.text);
-    else if ('ambiguous' in typed) void graph.sendText(config.allowedNumber, MANY_LINE);
+    else if ('ambiguous' in typed) line(MANY_LINE);
     else answer(typed);
   };
 

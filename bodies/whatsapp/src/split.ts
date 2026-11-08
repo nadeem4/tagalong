@@ -25,8 +25,9 @@ export function splitReply(text: string, maxLen = 4000, maxParts = 4): string[] 
   if (rest && parts.length <= maxParts) parts.push(rest);
   if (parts.length <= maxParts) return parts;
   const last = parts[maxParts - 1] as string;
-  return [
-    ...parts.slice(0, maxParts - 1),
-    `${last.slice(0, maxLen - CUT_NOTE.length).trimEnd()}${CUT_NOTE}`,
-  ];
+  let end = maxLen - CUT_NOTE.length;
+  // Same guard as the hard split: never leave half an emoji in front of the note.
+  const before = last.charCodeAt(end - 1);
+  if (before >= 0xd800 && before <= 0xdbff) end -= 1;
+  return [...parts.slice(0, maxParts - 1), `${last.slice(0, end).trimEnd()}${CUT_NOTE}`];
 }

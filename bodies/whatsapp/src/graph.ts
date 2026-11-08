@@ -1,7 +1,7 @@
 /**
- * Sends text and reply buttons through Meta's Graph API. One retry on a network error or a 5xx, then it logs a
- * line (never the token or the words) and gives up: no queue, and it never throws, so a dead
- * network cannot take the bridge down.
+ * Sends text and reply buttons through Meta's Graph API. One retry on a network error or a
+ * 5xx, then it logs a line (never the token or the words) and gives up: no queue, and it never
+ * throws, so a dead network cannot take the bridge down. Each send says whether it went.
  */
 
 export const GRAPH_VERSION = 'v21.0';
@@ -19,8 +19,8 @@ export interface ReplyButton {
 }
 
 export function createGraph(options: GraphOptions): {
-  sendText(to: string, text: string): Promise<void>;
-  sendButtons(to: string, body: string, buttons: ReplyButton[]): Promise<void>;
+  sendText(to: string, text: string): Promise<boolean>;
+  sendButtons(to: string, body: string, buttons: ReplyButton[]): Promise<boolean>;
 } {
   const { phoneNumberId, accessToken, fetch: doFetch = fetch, log = () => undefined } = options;
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`;
@@ -41,10 +41,11 @@ export function createGraph(options: GraphOptions): {
     }
   };
 
-  const send = async (payload: object): Promise<void> => {
+  const send = async (payload: object): Promise<boolean> => {
     let failed = await attempt(payload);
     if (failed?.retry) failed = await attempt(payload);
     if (failed) log(`whatsapp send failed: ${failed.why}`);
+    return failed === null;
   };
 
   return {

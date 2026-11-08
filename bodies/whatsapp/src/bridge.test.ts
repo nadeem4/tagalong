@@ -116,6 +116,7 @@ class FakeBrain {
 }
 
 function fakeFetch() {
+  const control = { status: 200 };
   const bodies: {
     to: string;
     type: string;
@@ -126,9 +127,9 @@ function fakeFetch() {
     // A slow first send would let a second turn's parts slip in between.
     await new Promise((r) => setTimeout(r, bodies.length === 0 ? 30 : 0));
     bodies.push(JSON.parse(String(init?.body)));
-    return new Response('{}', { status: 200 });
+    return new Response('{}', { status: control.status });
   }) as typeof fetch;
-  return { fn, bodies };
+  return { fn, bodies, control };
 }
 
 const closers: (() => Promise<void>)[] = [];
@@ -144,6 +145,7 @@ async function setup(options: { brain?: FakeBrain; now?: () => number } = {}) {
     config: CONFIG,
     openSocket: brain.socket,
     fetch: graph.fn,
+    retryMs: 10,
     ...(options.now ? { now: options.now } : {}),
     log: (l) => logs.push(l),
   });
@@ -458,5 +460,52 @@ describe('asks', () => {
     now = 30 * 3_600_000;
     await tap('ask:a1:0');
     await vi.waitFor(() => expect(brain.answers()).toEqual([{ ask: 'a1', option: 'allow' }]));
+  });
+
+  test('test_text_never_answers_an_ask_that_a_reply_has_come_after', async () => {
+    const { brain, graph, inbound, tap } = await ready();
+    brain.ask('a1');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    brain.reply('whatsapp', { delta: 'Sure, here you go.' });
+    brain.reply('whatsapp', { done: true });
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
+    await inbound('yes');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(2));
+    expect(brain.answers()).toEqual([]);
+    await tap('ask:a1:0');
+    await vi.waitFor(() => expect(brain.answers()).toEqual([{ ask: 'a1', option: 'allow' }]));
+  });
+
+  test('test_an_ask_that_could_not_be_sent_is_closed_in_the_desk', async () => {
+    const { brain, graph, inbound, tap } = await ready();
+    graph.control.status = 400;
+    brain.ask('a1');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    graph.control.status = 200;
+    await settle();
+    await inbound('yes');
+    await tap('ask:a1:0');
+    await vi.waitFor(() => expect(graph.bodies.at(-1)?.text.body).toBe(CLOSED));
+    expect(brain.answers()).toEqual([]);
+    expect(brain.says()).toHaveLength(2);
+  });
+
+  test('test_an_ask_mid_flush_waits_for_the_parts_of_the_reply', async () => {
+    const { brain, graph } = await ready();
+    const first = 'a'.repeat(3000);
+    const second = 'b'.repeat(3000);
+    brain.reply('whatsapp', { delta: `${first}\n\n${second}` });
+    brain.reply('whatsapp', { done: true });
+    brain.ask('a1');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(3));
+    expect(graph.bodies.map((b) => b.type)).toEqual(['text', 'text', 'interactive']);
+  });
+
+  test('test_an_empty_ask_text_names_the_tool', async () => {
+    const { brain, graph } = await ready();
+    brain.ask('a1', ['allow', 'deny'], { text: '', confirm: true, tool: 'shell', input: { c: 1 } });
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    expect(graph.bodies[0]?.type).toBe('text');
+    expect(graph.bodies[0]?.text.body).toContain('shell');
   });
 });

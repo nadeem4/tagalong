@@ -44,6 +44,26 @@ describe('AskDesk', () => {
     expect(out?.kind).toBe('text');
     expect(out?.body).toContain('1. reply');
     expect(out?.body).toContain('Type your reply');
+    expect(out?.body).not.toContain('number');
+  });
+
+  test('test_empty_text_falls_back_to_a_message_naming_the_tool_and_input', () => {
+    const out = new AskDesk().open(
+      ask({ text: '', confirm: true, tool: 'shell', input: { cmd: 'ls' } }),
+    );
+    expect(out?.kind).toBe('text');
+    expect(out?.body).toContain('shell');
+    expect(out?.body).toContain('ls');
+    expect(out?.body).toContain('1. allow');
+  });
+
+  test('test_text_over_the_button_body_limit_is_text', () => {
+    expect(new AskDesk().open(ask({ text: 'x'.repeat(1024) }))?.kind).toBe('buttons');
+    expect(new AskDesk().open(ask({ text: 'x'.repeat(1025) }))?.kind).toBe('text');
+  });
+
+  test('test_duplicate_titles_are_text', () => {
+    expect(new AskDesk().open(ask({ options: ['allow', 'Allow'] }))?.kind).toBe('text');
   });
 
   test('test_the_same_ask_is_not_shown_twice', () => {
@@ -86,6 +106,25 @@ describe('AskDesk', () => {
     desk.open(ask({ id: 'a1' }));
     desk.open(ask({ id: 'a2' }));
     expect(desk.fromText('yes')).toEqual({ ambiguous: true });
+  });
+
+  test('test_two_open_asks_are_ambiguous_only_if_the_text_would_answer_one', () => {
+    const desk = new AskDesk();
+    desk.open(ask({ id: 'a1' }));
+    desk.open(ask({ id: 'a2' }));
+    expect(desk.fromText('what time is it')).toBeNull();
+    expect(desk.fromText('yes')).toEqual({ ambiguous: true });
+  });
+
+  test('test_text_never_answers_an_ask_older_than_a_reply', () => {
+    const desk = new AskDesk();
+    desk.open(ask({ id: 'a1' }), 0);
+    expect(desk.fromText('yes', 1)).toBeNull();
+    expect(desk.fromButton('ask:a1:0')).toEqual({ ask: 'a1', option: 'allow' });
+    desk.open(ask({ id: 'a2', options: ['reply'], free_text: true }), 0);
+    expect(desk.fromText('hello', 1)).toBeNull();
+    desk.open(ask({ id: 'a3' }), 1);
+    expect(desk.fromText('yes', 1)).toEqual({ ask: 'a3', option: 'allow' });
   });
 
   test('test_a_button_answers_with_its_option', () => {

@@ -63,4 +63,12 @@ describe('splitReply', () => {
     const parts = splitReply('x'.repeat(200), 50, 4);
     expect(parts).toEqual(['x'.repeat(50), 'x'.repeat(50), 'x'.repeat(50), 'x'.repeat(50)]);
   });
+
+  test('test_the_cut_note_never_splits_a_surrogate_pair', () => {
+    // Room for 59 characters ends between the two halves of the emoji at 58-59.
+    const parts = splitReply(`${'x'.repeat(58)}\u{1F600}${'y'.repeat(400)}`, 86, 1);
+    const last = parts[0] ?? '';
+    expect(last.length).toBeLessThanOrEqual(86);
+    expect(last).not.toMatch(/[\ud800-\udbff]\n/);
+  });
 });

@@ -2363,7 +2363,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    `answer` call; two open asks make a typed text reply `More than one question is open: please tap a
 button`; a tap on a closed, unknown or refused ask replies `That question is closed.`; text with no
    ask open is a normal `say`; after a resync the re-sent ask is shown once; a reply needing more than
-   four messages ends with `(cut: ask me for the rest)`.
+   four messages ends with `(cut: ask me for the rest)`. A typed "yes" after a newer reply is a normal `say` (only a tap answers the older ask); an ask with empty text, text over 1024 characters or duplicate titles is sent as text; an ask that fails to send cannot be answered; an ask arriving mid-reply is sent after the reply's parts.
 4. By hand: start it with the five `TAGALONG_WHATSAPP_*` values set and its stdin closed
    (`node bodies/whatsapp/dist/index.js < /dev/null`): it prints that it is listening and exits at
    once. With a value missing it prints a message naming the variable and exits 1.

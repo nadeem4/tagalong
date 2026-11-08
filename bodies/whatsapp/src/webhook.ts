@@ -1,6 +1,7 @@
 /**
  * The one public door: Meta's signed webhook on /webhook. A request counts only if the HMAC
- * of its raw body checks out, and only text and button taps from the one allowed number reach the bridge.
+ * of its raw body checks out, and only text and button taps from the one allowed number reach
+ * the bridge.
  * Everything else gets a quick, boring answer, so a stranger learns nothing and Meta never
  * retries a message we chose to ignore.
  */
