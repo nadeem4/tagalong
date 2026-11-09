@@ -99,6 +99,7 @@ const bridge: PreloadBridge = {
   setPermission: (tool: string, mode: 'off' | 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
+  retryBrainSetup: () => ipcRenderer.invoke(IPC.brainSetupRetry) as Promise<void>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
   jobActivity: (job: string, afterRev: number) =>

@@ -1,8 +1,9 @@
 /**
  * Starts the brain for the desktop: when the brain address is local and nothing answers
- * there, runs `uv run brain` from the repo's brain/ folder, detached, its output going to
- * <TAGALONG_HOME>/brain.log. The desktop never stops it (`tagalong stop` does), so the brain
- * outlives the app. A failure only logs: the client retries.
+ * there, runs `uv run brain` from the brain/ folder, detached, its output going to
+ * <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
+ * reports installing/failed. The desktop never stops the brain (`tagalong stop` does).
+ * A start failure only logs: the client retries.
  */
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
@@ -13,10 +14,18 @@ import { dirname, join } from 'node:path';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
+export type SetupState = 'idle' | 'installing' | 'failed';
+
 export interface LaunchOptions {
   env: NodeJS.ProcessEnv;
-  /** The repo's brain/ folder; absent in a packaged app, where nothing is spawned. */
+  /** The brain/ folder: the repo's in dev, resources\brain when packaged. */
   brainDir: string;
+  /** The uv to run: 'uv' from PATH in dev, resources\uv\uv.exe when packaged. */
+  uv: string;
+  /** True when packaged: install the brain's dependencies (`uv sync`) before starting it. */
+  sync: boolean;
+  /** First-run progress for Home: installing while the sync runs, failed if it did not finish. */
+  onSetup: (state: SetupState) => void;
   /** Where the detached brain's output goes. */
   logPath: string;
   /** Opens the log for append and returns its fd. */
@@ -31,8 +40,24 @@ export interface LaunchOptions {
 }
 
 /** The brain's own data folder rule (config.py): TAGALONG_HOME, else ~/.tagalong. */
+function dataDir(env: NodeJS.ProcessEnv, home: string): string {
+  return env.TAGALONG_HOME || join(home, '.tagalong');
+}
+
 export function brainLogPath(env: NodeJS.ProcessEnv, home: string): string {
-  return join(env.TAGALONG_HOME || join(home, '.tagalong'), 'brain.log');
+  return join(dataDir(env, home), 'brain.log');
+}
+
+/** Packaged only: keeps uv's venv, Python and cache under the data folder, away from the installer's read-only folder. */
+export function packagedEnv(env: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {
+  const data = dataDir(env, home);
+  return {
+    ...env,
+    UV_PROJECT_ENVIRONMENT: join(data, 'runtime', 'venv'),
+    UV_PYTHON_INSTALL_DIR: join(data, 'runtime', 'python'),
+    UV_CACHE_DIR: join(data, 'cache', 'uv'),
+    UV_PYTHON_PREFERENCE: 'only-managed',
+  };
 }
 
 function hostOf(addr: string): string {
@@ -60,10 +85,27 @@ export function probeAddr(addr: string): Promise<boolean> {
   });
 }
 
-export function realLaunch(brainDir: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
+export interface RealLaunch {
+  brainDir: string;
+  /** Packaged: uv.exe at this path and a first-run sync. Dev: `uv` from PATH, no sync. */
+  packaged?: { uv: string } | undefined;
+  onSetup?: (state: SetupState) => void;
+  env?: NodeJS.ProcessEnv;
+}
+
+export function realLaunch({
+  brainDir,
+  packaged,
+  onSetup = () => undefined,
+  env: base = process.env,
+}: RealLaunch): Promise<void> {
+  const env = packaged ? packagedEnv(base, homedir()) : base;
   return launchBrain({
     env,
     brainDir,
+    uv: packaged?.uv ?? 'uv',
+    sync: packaged !== undefined,
+    onSetup,
     logPath: brainLogPath(env, homedir()),
     openLog: (path) => {
       mkdirSync(dirname(path), { recursive: true });
@@ -78,14 +120,25 @@ export function realLaunch(brainDir: string, env: NodeJS.ProcessEnv = process.en
 }
 
 export async function launchBrain(options: LaunchOptions): Promise<void> {
-  const { env, brainDir, logPath, openLog, closeLog, probe, exists, spawn, log } = options;
+  const { env, brainDir, uv, sync, onSetup, logPath, openLog, closeLog, probe, exists, spawn } =
+    options;
+  const { log } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
   if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return;
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
   if (await probe(addr)) return;
 
+  if (sync) {
+    onSetup('installing');
+    if (!(await runSync())) {
+      onSetup('failed');
+      return;
+    }
+    onSetup('idle');
+  }
+
   const fd = openLog(logPath);
-  const child = spawn('uv', ['run', 'brain'], {
+  const child = spawn(uv, sync ? ['run', '--frozen', '--no-dev', 'brain'] : ['run', 'brain'], {
     cwd: brainDir,
     env,
     detached: true,
@@ -105,4 +158,27 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   });
   // Detached and unreferenced: quitting the app leaves the brain running.
   child.unref();
+
+  /** `uv sync` with its output in brain.log and no timeout (the first download is slow). True when it finished cleanly. */
+  function runSync(): Promise<boolean> {
+    const syncFd = openLog(logPath);
+    return new Promise((resolve) => {
+      const child = spawn(uv, ['sync', '--frozen', '--no-dev'], {
+        cwd: brainDir,
+        env,
+        stdio: ['ignore', syncFd, syncFd],
+        windowsHide: true,
+      });
+      closeLog(syncFd);
+      let settled = false;
+      const done = (ok: boolean, why: string): void => {
+        if (settled) return;
+        settled = true;
+        if (!ok) log.warn(`could not install the brain (${why}); Home offers Retry`);
+        resolve(ok);
+      };
+      child.once('error', (error) => done(false, error.message));
+      child.once('exit', (code) => done(code === 0, `uv sync exited with code ${code}`));
+    });
+  }
 }

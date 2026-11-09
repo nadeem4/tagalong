@@ -16,8 +16,9 @@ The [user guide](#using-tagalong) follows.
 
 ## Download and run it
 
-There is no public download page yet. Until releases are published, build the installer yourself
-on Windows with Node.js 22 and pnpm 10:
+Download `Tagalong-Setup-<version>-x64.exe` from the
+[Releases page](https://github.com/nadeem4/tagalong/releases), or build it yourself on Windows
+with Node.js 22 and pnpm 10:
 
 ```powershell
 pnpm install
@@ -26,12 +27,22 @@ pnpm package:win     # writes bodies\desktop\release\Tagalong-Setup-<version>-x6
 
 Then run `Tagalong-Setup-<version>-x64.exe`.
 
+The first time Tagalong starts, it sets up Scout's brain: a one-time download of Python and the
+brain's libraries, which can take a few minutes and needs an internet connection. Home's "Where
+things run" card says "Setting up Scout's brain" while it works, and offers **Retry** if it did not
+finish. Later starts do not download again, though the "Setting up" line may show briefly on any
+start where the brain is not already running.
+
 - It installs for your user only, needs no administrator rights, and starts Tagalong when it
   finishes.
 - The installer is not code signed yet. If Windows SmartScreen says "Windows protected your PC",
   click **More info**, then **Run anyway**.
 - Your settings, conversations and stored keys live in `%APPDATA%\Tagalong`. Uninstalling from
   **Settings → Apps** keeps that folder; delete it too to remove everything.
+- The brain, its Python and its download cache live under `%USERPROFILE%\.tagalong` (`runtime\` and
+  `cache\`, next to `brain.log`), or under `TAGALONG_HOME` if you set it. The brain keeps running
+  after you quit Tagalong; to stop it, run
+  `%USERPROFILE%\.tagalong\runtime\venv\Scripts\tagalong.exe stop`.
 
 Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#first-run) says what to start.
 

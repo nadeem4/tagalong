@@ -1886,6 +1886,38 @@ prompt need a real browser.
    `%APPDATA%\Tagalong`. After reinstalling, keys and history are as
    before.
 
+### I.5. First start installs the brain
+
+1. **Setup:** the installed app on a machine with internet and no `<home>\runtime` folder
+   (`<home>` is `%USERPROFILE%\.tagalong`, or `TAGALONG_HOME`).
+2. **Action:** start Tagalong, then open Home and look at **Where things run**.
+3. **Expected:** the card says "Setting up Scout's brain — one-time download" while `uv sync` runs
+   (`<home>\brain.log` shows its output). When it finishes the line goes away, the brain starts and
+   shows Connected, and `<home>\runtime\venv`, `runtime\python` and `cache\uv` exist.
+
+### I.6. A failed install says so and Retry fixes it
+
+1. **Setup:** as I.5, but disconnect the network before starting Tagalong.
+2. **Action:** start Tagalong and open Home. Then reconnect the network and press **Retry**.
+3. **Expected:** the card says "Scout's brain did not finish setting up" with a **Retry** button,
+   and no brain process runs. After Retry the "Setting up" line shows again, then the brain
+   connects and the failure line is gone.
+
+### I.7. Later starts skip the download
+
+1. **Action:** quit Tagalong, run `<home>\runtime\venv\Scripts\tagalong.exe stop`, start Tagalong
+   again.
+2. **Expected:** the brain is up within seconds. The "Setting up" line may show briefly on
+   every start while the brain is not running (the check finds nothing to download), but no
+   download happens. Quit and start again
+   without stopping the brain: no second brain starts.
+
+### I.8. A home folder with a space or a non-ASCII letter
+
+1. **Setup:** a Windows user named like `Zoë Müller` (or set `TAGALONG_HOME` to such a folder).
+2. **Action:** repeat I.5.
+3. **Expected:** the install and the brain start as in I.5, with the folders under that path.
+
 ## Drop it on Scout _(real brain)_
 
 1. Drag a `.md` file from Explorer onto Scout. While you hold it over Scout, Scout shows its Seeing

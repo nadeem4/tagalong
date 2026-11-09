@@ -112,6 +112,8 @@ export const IPC = {
   brainChangedEvent: 'tagalong:brain:changed',
   // Home's "Where things run": the address the desktop dials and whether the link is up.
   brainLink: 'tagalong:brain:link',
+  // Retry the first-run install after it failed.
+  brainSetupRetry: 'tagalong:brain:setup-retry',
   // Home's Approvals page: the decision history and the preferences Scout follows.
   listApprovals: 'tagalong:approvals:list',
   listPreferences: 'tagalong:approvals:preferences:list',

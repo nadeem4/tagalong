@@ -298,6 +298,9 @@ keeps running after quit; end it with `cd brain && uv run tagalong stop`. A brai
 yourself (`cd brain && uv run brain`) is used as is. Set `TAGALONG_START_BRAIN=0` to stop
 the desktop starting one.
 
+The packaged app runs the same launch with `resources\uv\uv.exe` and `resources\brain`, syncing
+the brain's dependencies first; see [desktop.md](desktop.md).
+
 To see what a new user sees, run `pnpm --filter @tagalong/desktop
 start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
 running Tagalong first; the fresh copy has no saved keys. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.

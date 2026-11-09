@@ -35,7 +35,7 @@ const WIKI: AppInfo = {
   url: 'https://wiki.example.com/mcp',
 };
 
-const OFFLINE: BrainLink = { addr: 'ws://127.0.0.1:47321', status: 'offline' };
+const OFFLINE: BrainLink = { addr: 'ws://127.0.0.1:47321', status: 'offline', setup: 'idle' };
 
 function renderCard(bridge: FakeHostBridge) {
   render(
@@ -46,6 +46,33 @@ function renderCard(bridge: FakeHostBridge) {
 }
 
 const card = () => screen.findByRole('region', { name: 'Where things run' });
+
+describe('WhereThingsRun first-run setup', () => {
+  const setup = (state: BrainLink['setup']): BrainLink => ({ ...OFFLINE, setup: state });
+
+  it('says the brain is being set up while it installs, with no Retry', async () => {
+    renderCard(createFakeHostBridge({ brainLink: setup('installing') }));
+    const region = await card();
+    expect(region).toHaveTextContent("Setting up Scout's brain — one-time download");
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  it('says it did not finish when it failed, and Retry asks the host to run it again', async () => {
+    const bridge = createFakeHostBridge({ brainLink: setup('failed') });
+    renderCard(bridge);
+    const region = await card();
+    expect(region).toHaveTextContent("Scout's brain did not finish setting up");
+    screen.getByRole('button', { name: 'Retry' }).click();
+    expect(bridge.setupRetries()).toBe(1);
+  });
+
+  it('shows neither line when there is nothing to set up', async () => {
+    renderCard(createFakeHostBridge({ brainLink: setup('idle') }));
+    const region = await card();
+    expect(region).not.toHaveTextContent('Setting up');
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
 
 describe('WhereThingsRun', () => {
   it('shows the brain address and that it is connected', async () => {
@@ -161,7 +188,7 @@ describe('WhereThingsRun', () => {
   });
 
   it('hides the last app list while the brain is only connecting', async () => {
-    const link: BrainLink = { addr: 'ws://127.0.0.1:47321', status: 'connecting' };
+    const link: BrainLink = { ...OFFLINE, status: 'connecting' };
     renderCard(createFakeHostBridge({ brainLink: link, apps: [FILES] }));
     const region = await card();
     expect(region).toHaveTextContent(/apps show up when the brain is connected/i);

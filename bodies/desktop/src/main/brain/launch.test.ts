@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brainLogPath, isLocal, launchBrain, probeAddr } from './launch';
+import { brainLogPath, isLocal, launchBrain, packagedEnv, probeAddr } from './launch';
 import type { LaunchOptions } from './launch';
 
 class FakeChild extends EventEmitter {
@@ -23,6 +23,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
   const err: string[] = [];
   const opened: string[] = [];
   const closed: number[] = [];
+  const setups: string[] = [];
   const options: LaunchOptions = {
     env: {},
     brainDir: 'C:/repo/brain',
@@ -38,9 +39,12 @@ function setup(over: Partial<LaunchOptions> = {}) {
       return child as never;
     },
     log: { warn: (line) => err.push(line) },
+    uv: 'uv',
+    sync: false,
+    onSetup: (state) => void setups.push(state),
     ...over,
   };
-  return { options, spawned, children, err, opened, closed };
+  return { options, spawned, children, err, opened, closed, setups };
 }
 
 describe('isLocal', () => {
@@ -138,6 +142,126 @@ describe('launchBrain', () => {
     await launchBrain(options);
     children[0]?.emit('exit', 1);
     expect(err).toEqual(['brain exited with code 1; the desktop keeps retrying']);
+  });
+});
+
+/** A spawn that finishes the sync child with this exit code, then hands out ordinary children. */
+function syncing(code: number | null, error?: Error) {
+  const calls: { cmd: string; args: string[]; opts: SpawnOptions }[] = [];
+  const spawn: LaunchOptions['spawn'] = (cmd, args, opts) => {
+    calls.push({ cmd, args, opts });
+    const child = new FakeChild();
+    if (args[0] === 'sync') {
+      queueMicrotask(() => (error ? child.emit('error', error) : child.emit('exit', code)));
+    }
+    return child as never;
+  };
+  return { calls, spawn };
+}
+
+describe('launchBrain first run (sync)', () => {
+  it('runs uv sync before the brain, as argv without a shell, then starts the brain with --frozen', async () => {
+    const { calls, spawn } = syncing(0);
+    const { options, setups, opened } = setup({ sync: true, uv: 'C:/res/uv/uv.exe', spawn });
+    await launchBrain(options);
+    expect(calls.map((c) => [c.cmd, c.args])).toEqual([
+      ['C:/res/uv/uv.exe', ['sync', '--frozen', '--no-dev']],
+      ['C:/res/uv/uv.exe', ['run', '--frozen', '--no-dev', 'brain']],
+    ]);
+    expect(calls[0]?.opts).toMatchObject({ cwd: 'C:/repo/brain', windowsHide: true });
+    expect(calls[0]?.opts.shell).toBeUndefined();
+    expect(calls[0]?.opts.detached).toBeFalsy();
+    expect(calls[1]?.opts).toMatchObject({ detached: true, windowsHide: true });
+    expect(calls[1]?.opts.shell).toBeUndefined();
+    expect(setups).toEqual(['installing', 'idle']);
+    expect(opened).toHaveLength(2);
+  });
+
+  it('does not sync, or report installing, when the brain already answers', async () => {
+    const { calls, spawn } = syncing(0);
+    const { options, setups } = setup({ sync: true, spawn, probe: async () => true });
+    await launchBrain(options);
+    expect(calls).toEqual([]);
+    expect(setups).toEqual([]);
+  });
+
+  it('does not sync in dev, and runs plain uv run brain', async () => {
+    const { calls, spawn } = syncing(0);
+    await launchBrain(setup({ sync: false, spawn }).options);
+    expect(calls.map((c) => c.args)).toEqual([['run', 'brain']]);
+  });
+
+  it('a failed sync reports failed, logs one line and never starts the brain', async () => {
+    const { calls, spawn } = syncing(2);
+    const { options, setups, err } = setup({ sync: true, spawn });
+    await launchBrain(options);
+    expect(calls).toHaveLength(1);
+    expect(setups).toEqual(['installing', 'failed']);
+    expect(err).toHaveLength(1);
+  });
+
+  it('a sync that cannot start (no uv.exe) is a failure too', async () => {
+    const { calls, spawn } = syncing(0, new Error('spawn ENOENT'));
+    const { options, setups } = setup({ sync: true, spawn });
+    await launchBrain(options);
+    expect(calls).toHaveLength(1);
+    expect(setups).toEqual(['installing', 'failed']);
+  });
+
+  it('retrying after a failure syncs again and starts the brain', async () => {
+    let code = 1;
+    const calls: string[][] = [];
+    const spawn: LaunchOptions['spawn'] = (_cmd, args) => {
+      calls.push(args);
+      const child = new FakeChild();
+      if (args[0] === 'sync') queueMicrotask(() => child.emit('exit', code));
+      return child as never;
+    };
+    const { options, setups } = setup({ sync: true, spawn });
+    await launchBrain(options);
+    code = 0;
+    await launchBrain(options);
+    expect(setups).toEqual(['installing', 'failed', 'installing', 'idle']);
+    expect(calls.map((a) => a[0])).toEqual(['sync', 'sync', 'run']);
+  });
+
+  it('keeps a home path with a space and a non-ASCII letter as one argument and one env value', async () => {
+    const home = 'C:/Users/Zoë Müller/.tagalong';
+    const uv = 'C:/Program Files/Tagalong/uv.exe';
+    const env = packagedEnv({ TAGALONG_HOME: home }, 'C:/Users/x');
+    const { calls, spawn } = syncing(0);
+    await launchBrain(setup({ sync: true, spawn, env, uv }).options);
+    expect(calls[0]?.cmd).toBe(uv);
+    expect(calls[0]?.args).toEqual(['sync', '--frozen', '--no-dev']);
+    expect(calls[0]?.opts.env?.UV_PROJECT_ENVIRONMENT).toBe(join(home, 'runtime', 'venv'));
+  });
+});
+
+describe('packagedEnv', () => {
+  it('points uv at folders under the Tagalong home, managed Python only', () => {
+    const env = packagedEnv({ KEEP: '1' }, 'C:/Users/me');
+    const home = join('C:/Users/me', '.tagalong');
+    expect(env).toMatchObject({
+      KEEP: '1',
+      UV_PROJECT_ENVIRONMENT: join(home, 'runtime', 'venv'),
+      UV_PYTHON_INSTALL_DIR: join(home, 'runtime', 'python'),
+      UV_CACHE_DIR: join(home, 'cache', 'uv'),
+      UV_PYTHON_PREFERENCE: 'only-managed',
+    });
+  });
+
+  it('follows TAGALONG_HOME', () => {
+    expect(packagedEnv({ TAGALONG_HOME: 'D:/t' }, 'C:/Users/me').UV_CACHE_DIR).toBe(
+      join('D:/t', 'cache', 'uv'),
+    );
+  });
+});
+
+describe('launchBrain dev env', () => {
+  it('sets no UV_ variables when not packaged', async () => {
+    const { options, spawned } = setup({ env: { A: '1' } });
+    await launchBrain(options);
+    expect(Object.keys(spawned[0]?.opts.env ?? {}).filter((k) => k.startsWith('UV_'))).toEqual([]);
   });
 });
 
