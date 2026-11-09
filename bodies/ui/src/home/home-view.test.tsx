@@ -201,6 +201,25 @@ describe('HomeView', () => {
     expect(scout).toHaveTextContent('Brain: Offline');
   });
 
+  it('ignores a slow status from a previous host after the host changes', async () => {
+    let release: (v: { text: string; ok: boolean }) => void = () => undefined;
+    const first: HomeHost = { status: () => new Promise((resolve) => (release = resolve)) };
+    const second: HomeHost = { status: () => Promise.resolve({ text: 'Second host', ok: true }) };
+    const bridge = createFakeHostBridge({ pets: [SCOUT] });
+    const tree = (homeHost: HomeHost) => (
+      <HostBridgeProvider bridge={bridge}>
+        <HomeView host={homeHost} scout={IDLE} settings={<p>The settings form</p>} />
+      </HostBridgeProvider>
+    );
+    const { rerender } = render(tree(first));
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(release).not.toBe(undefined));
+    rerender(tree(second));
+    await waitFor(() => expect(scout).toHaveTextContent('Second host'));
+    await act(async () => release({ text: 'First host', ok: true }));
+    expect(scout).toHaveTextContent('Second host');
+  });
+
   it('moves between pages, and reports the page to the host', async () => {
     const pages: HomePage[] = [];
     renderHome(createFakeHostBridge({ pets: [SCOUT] }), {

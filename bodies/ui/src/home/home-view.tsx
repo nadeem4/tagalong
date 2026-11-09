@@ -167,9 +167,13 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
       );
     };
     read();
-    return bridge.onBrainChanged((what) => {
+    const stop = bridge.onBrainChanged((what) => {
       if (what === 'link') read();
     });
+    return () => {
+      latest = Infinity; // reads still in flight belong to a closed effect
+      stop();
+    };
   }, [bridge, host, companion]);
 
   const name = companion?.name ?? 'Scout';
