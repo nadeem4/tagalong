@@ -2,11 +2,12 @@
 
 Always cuts on whole turns so no tool_result is left without its tool_use, and answers a
 tool_use left hanging by a crash so the API accepts the next request. Also drops server-side
-tool blocks, so chats saved with orphaned results heal.
+tool blocks, so chats saved with orphaned results heal. Drops all thinking too: the API only
+accepts thinking blocks cut from the front of a history, so none at all is the safe rebuild.
 """
 
 from brain.masking import WITHHELD
-from brain.web_tools import without_server_blocks
+from brain.web_tools import without_server_blocks, without_thinking
 
 RESUME_MAX_MESSAGES = 50
 
@@ -15,6 +16,8 @@ def _without_server_blocks(message: dict) -> dict:
     """Heals saved chats that kept server blocks, by the same strip the save path uses. An
     assistant message left empty gets a placeholder so alternation and content stay valid."""
     out = without_server_blocks(message)
+    if out["role"] == "assistant" and isinstance(out["content"], list):
+        out = {**out, "content": without_thinking(out["content"])}
     if out["content"] == message["content"]:
         return message  # unchanged: callers tell a rebuilt tail from a loaded one by identity
     if out["role"] == "assistant" and isinstance(out["content"], list) and not out["content"]:

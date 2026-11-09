@@ -54,6 +54,39 @@ def a(text):
     return {"role": "assistant", "content": [{"type": "text", "text": text}]}
 
 
+def _think(text):
+    return {"type": "thinking", "thinking": text, "signature": "s"}
+
+
+def test_resume_keeps_no_thinking_anywhere_so_the_dropped_run_is_a_prefix():
+    messages = [
+        u("q1"),
+        {
+            "role": "assistant",
+            "content": [
+                _think("a"),
+                {"type": "redacted_thinking", "data": "x"},
+                {"type": "text", "text": "r1"},
+            ],
+        },
+        u("q2"),
+        {"role": "assistant", "content": [_think("b")]},
+        u("q3"),
+        {"role": "assistant", "content": [_think("c"), {"type": "text", "text": "r3"}]},
+    ]
+    history = rebuild_history(messages)
+    assert "thinking" not in str(history)
+    assert history[1]["content"] == [{"type": "text", "text": "r1"}]
+    assert history[3]["content"] == [{"type": "text", "text": WITHHELD}]
+    assert history[5]["content"] == [{"type": "text", "text": "r3"}]
+
+
+def test_resume_leaves_a_history_without_thinking_as_it_was():
+    messages = [u("q"), a("r")]
+    history = rebuild_history(messages)
+    assert history[0] is messages[0] and history[1] is messages[1]
+
+
 def call(id):
     return {
         "role": "assistant",
