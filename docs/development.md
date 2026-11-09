@@ -219,7 +219,7 @@ the browser body are not measured: the Playwright suites cover them.
   with `gh release create --generate-notes`. Bump `bodies/desktop/package.json` first, then tag.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
   is no macOS or Linux platform adapter.
-- CI does not build the installer.
+- CI builds the installer only on a `v*` tag (the Release workflow); pull requests never build it.
 
 ### CI
 
