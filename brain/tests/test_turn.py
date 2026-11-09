@@ -508,6 +508,63 @@ async def test_done_sent_once_after_deltas_on_cancel():
     assert len(dones(sent)) == 1
 
 
+async def _cancel_after(deltas, history):
+    started = asyncio.Event()
+
+    class Slow(FakeModel):
+        async def stream(self, system, messages, tools):
+            for d in deltas:
+                yield d
+            started.set()
+            await asyncio.sleep(10)
+
+    task = asyncio.create_task(start(Slow([]), history, []))
+    await started.wait()
+    task.cancel()
+    return await task
+
+
+async def test_cancel_after_deltas_keeps_what_was_shown_as_the_answer():
+    # Without it the cancelled request stays unanswered and the next turn answers both (F2).
+    history = [{"role": "user", "content": "story"}]
+    assert await _cancel_after(["Once ", "upon"], history) == "cancelled"
+    assert history[1:] == [
+        {"role": "assistant", "content": [{"type": "text", "text": "Once upon"}]}
+    ]
+
+
+async def test_cancel_after_whitespace_only_deltas_adds_no_answer():
+    history = [{"role": "user", "content": "go"}]
+    assert await _cancel_after([" ", "\t"], history) == "cancelled"
+    assert len(history) == 1
+
+
+async def test_cancel_in_a_later_step_keeps_alternation():
+    started = asyncio.Event()
+
+    class Two(FakeModel):
+        async def stream(self, system, messages, tools):
+            self.calls += 1
+            if self.calls == 1:
+                yield Final(
+                    [{"type": "tool_use", "id": "c1", "name": "x", "input": {}}],
+                    "tool_use",
+                    SimpleNamespace(),
+                )
+                return
+            yield "so far"
+            started.set()
+            await asyncio.sleep(10)
+
+    history = [{"role": "user", "content": "go"}]
+    task = asyncio.create_task(start(Two([]), history, []))
+    await started.wait()
+    task.cancel()
+    assert await task == "cancelled"
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[-1]["content"] == [{"type": "text", "text": "so far"}]
+
+
 async def test_max_tokens_with_tool_use_is_closed():
     step = tool_step(("c1", "x"), stop="max_tokens")
     reason, history, _, model = await go([step])

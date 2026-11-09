@@ -211,3 +211,25 @@ async def test_a_running_turn_is_cut_even_when_nothing_is_left_unsaid():
         {"type": "text", "text": f"One. Two. Three.\n\n{MARK}"}
     ]
     assert voice.hushed == ["desktop"]
+
+
+async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
+    # The cancel kept the streamed words as the reply; the cut must swap them, not add to them.
+    class Streaming(SnapGate):
+        async def stream(self, system, messages, tools):
+            if not self.seen:
+                self.seen.append([])
+                yield "One. Two. Three."
+                await asyncio.Event().wait()
+            async for item in super().stream(system, messages, tools):
+                yield item
+
+    session, _, voice = make_voiced(Streaming(["ok"]))
+    first = session.say("desktop", say("tell me"))
+    voice.logs[first.turn] = ["One.", "Two.", "Three."]
+    await asyncio.sleep(0)
+    session.say("desktop", over("wait", first.turn, 1))
+    await finish_quietly(session)
+    assert [m["role"] for m in session.history] == ["user", "assistant", "user", "assistant"]
+    assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]
+    assert "Two. Three." not in json.dumps(session.history)

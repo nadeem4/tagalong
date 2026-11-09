@@ -90,8 +90,11 @@ class Memory:
     def replace_last_message(self, message: dict) -> None:
         conversation.replace_last_message(self._db, message)
 
-    def load_messages(self) -> list[dict]:
-        return conversation.load_messages(self._db)
+    def set_last_cut(self, cut: bool) -> None:
+        conversation.set_last_cut(self._db, cut)
+
+    def load_messages(self, include_cut: bool = False) -> list[dict]:
+        return conversation.load_messages(self._db, include_cut)
 
     def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
         return search_store.search(self._db, query, kind, limit)

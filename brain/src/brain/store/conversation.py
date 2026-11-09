@@ -76,6 +76,15 @@ def replace_last_message(db: sqlite3.Connection, message: dict) -> None:
     )
 
 
-def load_messages(db: sqlite3.Connection) -> list[dict]:
-    rows = db.execute("SELECT role, content_json FROM messages ORDER BY id")
+def set_last_cut(db: sqlite3.Connection, cut: bool) -> None:
+    """Mark (or unmark) the newest saved message as a request cancelled before any reply."""
+    db.execute(
+        "UPDATE messages SET cut=? WHERE id=(SELECT MAX(id) FROM messages)", (1 if cut else 0,)
+    )
+
+
+def load_messages(db: sqlite3.Connection, include_cut: bool = False) -> list[dict]:
+    """The saved chat in order; cut requests are left out unless asked for."""
+    where = "" if include_cut else "WHERE cut=0 "
+    rows = db.execute(f"SELECT role, content_json FROM messages {where}ORDER BY id")
     return [{"role": r, "content": json.loads(c)} for r, c in rows]

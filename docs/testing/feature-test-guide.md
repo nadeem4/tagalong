@@ -215,7 +215,8 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
    **Expected:** the app opens normally with the offline mark and no error box. Start the brain:
    the mark clears and an ask works.
 8. **Action:** ask with an interrupt: ask for a long story, press the stop control.
-   **Expected:** the answer stops and the turn ends cancelled.
+   **Expected:** the answer stops and the turn ends cancelled. Then say "hi in 3 words": Scout
+   answers only that, and does not continue the story.
 9. **Action:** with the brain and app running, ask "What windows do I have open?"
    **Expected:** Scout lists them (it called `desktop__list_windows`).
 10. **Action:** ask the same, and quit the desktop app while Scout is working on it.
