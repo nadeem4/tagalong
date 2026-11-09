@@ -13,9 +13,16 @@ from brain.toolbox import ToolSpec
 # request, so the real limit per question is the step cap times this.
 MAX_USES = 5
 
-# What a saved turn must not keep: the results can be pages long, and their encrypted parts
-# only replay inside the live conversation.
-_SERVER_BLOCKS = frozenset({"server_tool_use", "web_search_tool_result", "web_fetch_tool_result"})
+
+def is_server_block(block: dict) -> bool:
+    """A block Anthropic ran, by shape so new tool versions need no list edit: server_tool_use
+    and every <name>_tool_result (web_search, web_fetch, code_execution, tool_search ...). Only
+    our own client results are exactly "tool_result". Results can be pages long and only replay
+    inside the live conversation; one left without its use makes the API reject every request."""
+    kind = block.get("type")
+    if not isinstance(kind, str):
+        return False
+    return kind.endswith(("_tool_use", "_tool_result")) and kind not in ("tool_use", "tool_result")
 
 
 def _spec(name: str, version: str, description: str) -> ToolSpec:
@@ -57,8 +64,6 @@ def without_server_blocks(message: dict) -> dict:
     if message["role"] != "assistant" or not isinstance(content, list):
         return message
     kept = [
-        {k: v for k, v in b.items() if k != "citations"}
-        for b in content
-        if b.get("type") not in _SERVER_BLOCKS
+        {k: v for k, v in b.items() if k != "citations"} for b in content if not is_server_block(b)
     ]
     return {**message, "content": kept}

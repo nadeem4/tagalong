@@ -1,10 +1,25 @@
 """Rebuilds a valid Anthropic message history from messages saved before a restart.
 
 Always cuts on whole turns so no tool_result is left without its tool_use, and answers a
-tool_use left hanging by a crash so the API accepts the next request.
+tool_use left hanging by a crash so the API accepts the next request. Also drops server-side
+tool blocks, so chats saved with orphaned results heal.
 """
 
+from brain.masking import WITHHELD
+from brain.web_tools import without_server_blocks
+
 RESUME_MAX_MESSAGES = 50
+
+
+def _without_server_blocks(message: dict) -> dict:
+    """Heals saved chats that kept server blocks, by the same strip the save path uses. An
+    assistant message left empty gets a placeholder so alternation and content stay valid."""
+    out = without_server_blocks(message)
+    if out["content"] == message["content"]:
+        return message  # unchanged: callers tell a rebuilt tail from a loaded one by identity
+    if out["role"] == "assistant" and isinstance(out["content"], list) and not out["content"]:
+        return {**out, "content": [{"type": "text", "text": WITHHELD}]}
+    return out
 
 
 def _is_turn_start(message: dict) -> bool:
@@ -33,7 +48,7 @@ def rebuild_history(messages: list[dict]) -> list[dict]:
         start = marks[-1]
         while start > 0 and not _is_turn_start(messages[start]):
             start -= 1
-    history = list(messages[start:])
+    history = [_without_server_blocks(m) for m in messages[start:]]
 
     if len(history) > RESUME_MAX_MESSAGES:
         cut = next(
