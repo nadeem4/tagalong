@@ -1,8 +1,9 @@
 """Moonshine (tiny, streaming) speech-to-text through the `moonshine-voice` package.
 
 Frames go in as they come; `text` is every line the stream has so far; `reset` stops and
-restarts the stream, which drops the words. The package downloads its own model into
-`<voice folder>/moonshine`. Not unit tested (needs the real model); covered by the hand run.
+restarts the stream, which drops the words; `finish` is `reset` that returns the final words.
+The package downloads its own model into `<voice folder>/moonshine`. Not unit tested (needs
+the real model); covered by the hand run.
 """
 
 from collections.abc import Callable
@@ -31,6 +32,14 @@ def load(folder: Path, on_progress: Callable[[float], None] | None = None):
 
         def text(self) -> str:
             lines = stream.update_transcription(0).lines
+            return " ".join(line.text.strip() for line in lines if line.text.strip())
+
+        def finish(self) -> str:
+            # `stop` runs a last pass over everything fed. The live `text` trails it by a
+            # pass, which clipped the last word ("France") and mangled others ("moon").
+            final = stream.stop()
+            stream.start()
+            lines = final.lines if final else []
             return " ".join(line.text.strip() for line in lines if line.text.strip())
 
         def reset(self) -> None:

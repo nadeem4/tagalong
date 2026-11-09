@@ -163,7 +163,7 @@ def test_pre_roll_keeps_only_the_last_frames():
     ears, _ = hear("always", p)
     feed(ears, soft(0.05), 20)
     feed(ears, LOUD, 1)
-    assert PRE_ROLL_FRAMES == 8
+    assert PRE_ROLL_FRAMES == 3  # more lead-in makes Moonshine invent a first word
     assert next(i for i, x in enumerate(p.stt.fed) if x >= 0.1) == PRE_ROLL_FRAMES
 
 
@@ -210,3 +210,21 @@ def test_a_vad_error_propagates_so_the_service_can_end_the_session():
 
 def test_unused_word_stt_has_no_words():
     assert WordStt().text() == ""
+
+
+def test_a_stretch_takes_its_words_from_the_final_pass_not_the_lagging_live_read():
+    p = parts()
+    p.stt.lag = 1  # the live read misses the last word until the stream is finished
+    ears, events = hear("held", p)
+    feed(ears, LOUD, 3)
+    feed(ears, QUIET, PAUSE_FRAMES)
+    assert f"final:{words(3)}" in events
+
+
+def test_held_finish_takes_the_final_pass_too():
+    p = parts()
+    p.stt.lag = 1
+    ears, events = hear("held", p)
+    feed(ears, LOUD, 2)
+    ears.finish()
+    assert events[-2:] == [f"final:{words(2)}", f"turn_end:{words(2)}"]
