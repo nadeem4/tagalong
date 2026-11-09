@@ -10,6 +10,7 @@ import io
 import json
 import os
 import sys
+import time
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -37,6 +38,7 @@ from brain.setup.install import (
     Unsupported,
     install_card,
     install_expert,
+    sweep_staging,
 )
 from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
@@ -665,3 +667,31 @@ async def test_install_refuses_when_the_registry_version_changed_after_the_card(
     assert out == {"error": "version_changed", "detail": "0.99.1 -> 1.0.0"}
     assert not [e for e in emitted if e.kind == "setup_done"]
     await stop()
+
+
+async def test_a_second_install_is_refused_before_any_card_is_shown(tmp_path, ensure):
+    hang = Hang()
+    tools, _, _, stop = make_tools(tmp_path, hang)
+    spec, handler = tools["install_expert"]
+    await handler({"id": "claude-acp"})
+    await asyncio.wait_for(hang.started.wait(), 5)
+    with pytest.raises(RpcError) as err:
+        await spec.card({"id": "claude-acp"})  # the card is built before the person is asked
+    assert json.loads(err.value.message)["error"] == "already_installing"
+    await stop()
+
+
+def test_a_start_sweeps_staging_folders_a_killed_brain_left_behind(tmp_path):
+    long_ago = time.time() - 3600
+    for name in ("claude-acp.part", "claude-acp.dl"):
+        tools_dir(tmp_path, name).mkdir(parents=True)
+        os.utime(tools_dir(tmp_path, name), (long_ago, long_ago))
+    fresh = tools_dir(tmp_path, "other.part")  # a CLI install may be staging this right now
+    fresh.mkdir()
+    kept = tools_dir(tmp_path, "claude-acp")
+    kept.mkdir()
+    sweep_staging(tmp_path)
+    assert not tools_dir(tmp_path, "claude-acp.part").exists()
+    assert not tools_dir(tmp_path, "claude-acp.dl").exists()
+    assert fresh.exists() and kept.exists()
+    sweep_staging(tmp_path / "nowhere")  # no tools folder yet: nothing to do

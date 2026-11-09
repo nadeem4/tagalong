@@ -14,7 +14,7 @@ from brain.guardrails import WEB_SEARCH_USD, Budget
 from brain.mind.turn import Call, Final, run_turn
 from brain.protocol import RpcError
 from brain.toolbox import Toolbox
-from brain.web_tools import WebSource, without_server_blocks
+from brain.web_tools import WebSource, is_server_block, without_server_blocks
 
 DAY = datetime.date(2026, 11, 3)
 MODEL = "claude-sonnet-5-5"
@@ -179,7 +179,9 @@ def test_server_blocks_and_citations_are_dropped_from_a_saved_message():
     cited = {"type": "text", "text": "From X.", "citations": [{"url": "https://x.example"}]}
     message = {"role": "assistant", "content": [*SERVER_BLOCKS, cited]}
     out = without_server_blocks(message)
-    assert out["content"] == [SERVER_BLOCKS[0], {"type": "text", "text": "From X."}]
+    assert out["content"][0] == SERVER_BLOCKS[0]
+    assert out["content"][-1] == {"type": "text", "text": "From X."}
+    assert not any(is_server_block(b) for b in out["content"])
     assert message["content"][-1] is cited  # the live history is not touched
 
 
@@ -200,7 +202,7 @@ DYNAMIC_BLOCKS = [
 
 def test_any_server_result_block_is_dropped_by_its_shape_not_a_list():
     out = without_server_blocks({"role": "assistant", "content": DYNAMIC_BLOCKS})
-    assert out["content"] == [DYNAMIC_BLOCKS[0]]
+    assert out["content"] == [DYNAMIC_BLOCKS[0]]  # nothing searched, so no note
     mine = {"type": "tool_result", "tool_use_id": "toolu_1", "content": "ok"}
     kept = without_server_blocks({"role": "assistant", "content": [mine]})
     assert kept["content"] == [mine]  # the brain's own results are not server blocks
@@ -213,9 +215,14 @@ def test_mcp_tool_use_is_a_server_block_but_client_tool_use_is_not():
     assert out["content"] == [mine]
 
 
-def test_a_message_of_only_server_blocks_is_left_for_the_caller_to_fill():
+def test_a_message_of_only_server_blocks_becomes_the_note_or_is_left_to_fill():
     only = {"role": "assistant", "content": SERVER_BLOCKS[1:]}
-    assert without_server_blocks(only)["content"] == []
+    only_out = without_server_blocks(only)["content"]
+    assert len(only_out) == 1 and only_out[0]["text"].startswith("[Searched")
+    bare = {"role": "assistant", "content": [SERVER_BLOCKS[1]]}  # no result: still a note
+    assert len(without_server_blocks(bare)["content"]) == 1
+    empty = {"role": "assistant", "content": DYNAMIC_BLOCKS[1:]}  # nothing searched
+    assert without_server_blocks(empty)["content"] == []
     user = {"role": "user", "content": "hi"}
     assert without_server_blocks(user) is user
 
@@ -241,3 +248,82 @@ def test_a_message_with_no_server_blocks_keeps_its_thinking_as_the_same_object()
         "content": [THINKING_AROUND_SEARCH[0], {"type": "text", "text": "Plain."}],
     }
     assert without_server_blocks(message) is message
+
+
+def _note(out):
+    notes = [b["text"] for b in out["content"] if b["text"].startswith("[")]
+    assert len(notes) == 1
+    return notes[0]
+
+
+def test_a_dropped_search_leaves_one_note_naming_the_query_and_sources():
+    out = without_server_blocks({"role": "assistant", "content": SERVER_BLOCKS})
+    assert [b["type"] for b in out["content"]] == ["text", "text"]
+    note = _note(out)
+    assert '"q"' in note and "X (https://x.example)" in note
+
+
+def test_the_note_caps_sources_and_length():
+    results = [
+        {"type": "web_search_result", "url": f"https://x.example/{i}", "title": "T" * 500}
+        for i in range(20)
+    ]
+    blocks = [
+        {
+            "type": "server_tool_use",
+            "id": "s1",
+            "name": "web_search",
+            "input": {"query": "q" * 900},
+        },
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": results},
+    ]
+    note = _note(without_server_blocks({"role": "assistant", "content": blocks}))
+    assert note.count("https://") == 5
+    assert len(note) < 1500
+
+
+def test_duplicate_sources_are_dropped_before_the_cap():
+    same = {"type": "web_search_result", "url": "https://same.example", "title": "S"}
+    others = [
+        {"type": "web_search_result", "url": f"https://o.example/{i}", "title": "O"}
+        for i in range(4)
+    ]
+    blocks = [
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "q"}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": [same] * 3 + others},
+    ]
+    note = _note(without_server_blocks({"role": "assistant", "content": blocks}))
+    assert note.count("https://same.example") == 1
+    assert note.count("https://") == 5
+
+
+def test_a_fetch_is_named_by_its_url_and_an_error_result_adds_no_sources():
+    blocks = [
+        {
+            "type": "server_tool_use",
+            "id": "s1",
+            "name": "web_fetch",
+            "input": {"url": "https://y.example/p"},
+        },
+        {
+            "type": "web_fetch_tool_result",
+            "tool_use_id": "s1",
+            "content": {"type": "web_fetch_result", "url": "https://y.example/p"},
+        },
+        {"type": "server_tool_use", "id": "s2", "name": "web_search", "input": {"query": "z"}},
+        {
+            "type": "web_search_tool_result",
+            "tool_use_id": "s2",
+            "content": {"type": "web_search_tool_result_error", "error_code": "unavailable"},
+        },
+    ]
+    note = _note(without_server_blocks({"role": "assistant", "content": blocks}))
+    assert "https://y.example/p" in note and '"z"' in note
+
+
+def test_thinking_is_still_dropped_with_server_blocks_and_plain_messages_are_the_same_object():
+    thinking = {"type": "thinking", "thinking": "hm", "signature": "s"}
+    out = without_server_blocks({"role": "assistant", "content": [thinking, *SERVER_BLOCKS]})
+    assert all(b["type"] != "thinking" for b in out["content"])
+    plain = {"role": "assistant", "content": [thinking, {"type": "text", "text": "hi"}]}
+    assert without_server_blocks(plain) is plain

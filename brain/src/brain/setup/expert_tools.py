@@ -65,6 +65,8 @@ def expert_setup_tools(
             entry = await entry_for(args)
             if entry is None:
                 raise InstallError("unknown_expert", str(args.get("id")))
+            if entry.id in running:  # refuse before asking the person to allow it
+                raise InstallError("already_installing", entry.id)
             card_facts = await install_card(entry, home, await inspect_fn(), get_json)
             shown[entry.id] = entry.version
             return card_facts

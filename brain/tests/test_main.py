@@ -190,6 +190,33 @@ def test_memory_closed_on_shutdown(monkeypatch, tmp_path):
     assert closed == [True]
 
 
+def test_start_sweeps_install_staging_once_the_port_is_ours(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    class Sock:
+        def getsockname(self):
+            return ("127.0.0.1", 1)
+
+    class Server:
+        sockets = [Sock()]
+
+        async def serve_forever(self):
+            raise Stop
+
+    async def listen(*args):
+        return Server()
+
+    swept = []
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", listen)
+    monkeypatch.setattr(main, "sweep_staging", swept.append)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    assert swept == [tmp_path]
+
+
 def _key_source(monkeypatch, tmp_path, env_key, file_key):
     class Stop(Exception):
         pass

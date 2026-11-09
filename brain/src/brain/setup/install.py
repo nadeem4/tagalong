@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
@@ -36,6 +37,7 @@ from brain.voice.models import Fetch
 
 NODE_FLOOR = 22  # the highest floor of the experts checked in the 20a spike; one for all
 NPM_TIMEOUT_S = 900.0
+STALE_STAGING_S = 600.0  # a staging folder newer than this may belong to a running install
 # What npm may see of our environment: enough to run and reach the network, never a key.
 _ENV_KEEP = frozenset(
     name.upper()
@@ -142,6 +144,23 @@ async def install_card(
 def _rm(folders: tuple[Path, ...]) -> None:
     for folder in folders:
         shutil.rmtree(folder, ignore_errors=True)
+
+
+def sweep_staging(home: Path) -> None:
+    """Remove `.part` and `.dl` staging folders left by a brain that was ended mid-install (on
+    Windows `tagalong stop` kills the process, so nothing can clean up first). Run at start,
+    when no install of ours is running. `.old` is kept: it may hold the last good install. A
+    folder touched in the last 10 minutes is kept too: `tagalong install` may be staging it."""
+    root = tools_dir(home, "")
+    if root.is_dir():
+        cutoff = time.time() - STALE_STAGING_S
+        _rm(
+            tuple(
+                p
+                for p in root.iterdir()
+                if p.suffix in (".part", ".dl") and p.stat().st_mtime < cutoff
+            )
+        )
 
 
 async def _clean(*folders: Path) -> None:

@@ -2998,7 +2998,12 @@ async def test_scouts_tool_steps_stay_out_of_the_summary_and_never_wake_for_a_fa
 def web_turn():
     blocks = [
         {"type": "text", "text": f"Found it, key {SECRET}.", "citations": [{"url": "https://x"}]},
-        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "q"}},
+        {
+            "type": "server_tool_use",
+            "id": "s1",
+            "name": "web_search",
+            "input": {"query": f"q {SECRET}"},
+        },
         {"type": "web_search_tool_result", "tool_use_id": "s1", "content": [{"url": "https://x"}]},
     ]
     return Final(blocks, "end_turn", SimpleNamespace())
@@ -3010,7 +3015,9 @@ async def test_saved_turn_with_web_blocks_keeps_masked_text_only(tmp_path):
     session.say("desktop", say("look it up"))
     await finish_quietly(session)
     saved = memory.load_messages()
-    assert saved[-1]["content"] == [{"type": "text", "text": "Found it, key [secret]."}]
+    first, note = saved[-1]["content"]
+    assert first == {"type": "text", "text": "Found it, key [secret]."}
+    assert note["text"].startswith('[Searched the web for "q [secret]"')  # masked like any text
     assert SECRET not in json.dumps(saved)
     assert "server_tool_use" in json.dumps(session.history)  # the live turn keeps them
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())

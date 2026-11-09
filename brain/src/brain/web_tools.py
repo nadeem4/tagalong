@@ -65,16 +65,58 @@ def without_thinking(content: list[dict]) -> list[dict]:
     return [b for b in content if b.get("type") not in ("thinking", "redacted_thinking")]
 
 
+NOTE_MAX_ITEMS = 5  # queries, fetched pages and sources each
+NOTE_MAX_TEXT = 120  # characters of one query, title or url
+
+
+def _clip(value: object) -> str:
+    return " ".join(str(value).split())[:NOTE_MAX_TEXT]
+
+
+def _search_note(blocks: list[dict]) -> str:
+    """One short line saying what Anthropic's search and fetch tools did in a message, so the
+    saved chat still shows it after the blocks themselves are dropped. Empty when none ran."""
+    queries: list[str] = []
+    fetched: list[str] = []
+    sources: list[str] = []
+    for b in blocks:
+        kind, body = b.get("type"), b.get("content")
+        if kind == "server_tool_use" and isinstance(b.get("input"), dict):
+            if b.get("name") == "web_search" and b["input"].get("query"):
+                queries.append(_clip(b["input"]["query"]))
+            elif b.get("name") == "web_fetch" and b["input"].get("url"):
+                fetched.append(_clip(b["input"]["url"]))
+        elif kind == "web_search_tool_result" and isinstance(body, list):
+            for r in body:  # an error result is a dict, not a list: no sources
+                if isinstance(r, dict) and r.get("url"):
+                    sources.append(f"{_clip(r.get('title') or 'page')} ({_clip(r['url'])})")
+    parts = []
+    if queries:
+        quoted = ", ".join(f'"{q}"' for q in queries[:NOTE_MAX_ITEMS])
+        parts.append(f"Searched the web for {quoted}")
+    if fetched:
+        parts.append("Read " + ", ".join(fetched[:NOTE_MAX_ITEMS]))
+    if sources:
+        parts.append("Sources: " + "; ".join(list(dict.fromkeys(sources))[:NOTE_MAX_ITEMS]))
+    return f"[{'. '.join(parts)}.]" if parts else ""
+
+
 def without_server_blocks(message: dict) -> dict:
-    """The copy of an assistant message that is saved: text only, no results, no citations.
-    Dropping server blocks leaves a hole between thinking blocks, so thinking goes too. A
-    message with nothing to drop comes back as the same object."""
+    """The copy of an assistant message that is saved: text only, no results, no citations, and
+    one short note in place of the dropped search blocks so a restarted Scout still knows it
+    searched. Dropping server blocks leaves a hole between thinking blocks, so thinking goes
+    too. A message with nothing to drop comes back as the same object."""
     content = message["content"]
     if message["role"] != "assistant" or not isinstance(content, list):
         return message
     if any(is_server_block(b) for b in content):
         content = without_thinking(content)
-    kept = [
-        {k: v for k, v in b.items() if k != "citations"} for b in content if not is_server_block(b)
-    ]
+    kept: list[dict] = []
+    noted = False
+    for b in content:
+        if not is_server_block(b):
+            kept.append({k: v for k, v in b.items() if k != "citations"})
+        elif not noted and (note := _search_note(content)):
+            kept.append({"type": "text", "text": note})  # where the first dropped block was
+            noted = True
     return message if kept == message["content"] else {**message, "content": kept}
