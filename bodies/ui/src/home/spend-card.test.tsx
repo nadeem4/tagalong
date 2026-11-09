@@ -62,6 +62,15 @@ describe('SpendCard', () => {
     await waitFor(() => expect(reads()).toBe(2));
   });
 
+  it('reads again when the brain connection comes back', async () => {
+    const { bridge, reads } = renderCard(() => ({ spentUsd: 0, limitUsd: 1 }));
+    await waitFor(() => expect(reads()).toBe(1));
+    act(() => bridge.emitChanged('apps'));
+    expect(reads()).toBe(1);
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(reads()).toBe(2));
+  });
+
   it('shows nothing on a host that cannot read spend, and survives a failed read', async () => {
     const bridge = Object.assign(createFakeHostBridge(), {
       usageSummary: () => Promise.reject(new Error('brain down')),

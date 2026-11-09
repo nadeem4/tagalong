@@ -139,14 +139,33 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
 function Overview({ companion, host }: { companion: Pet | undefined; host: HomeHost }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
 
-  useEffect(() => {
-    void host
-      .status?.()
-      .then(setStatus)
-      .catch(() => undefined);
-  }, [host, companion]);
-
   const bridge = useHostBridge();
+
+  useEffect(() => {
+    // The brain link comes first: with no brain, "Ready" would be a lie. Read again on
+    // every link change so the card follows an outage and the return.
+    const read = () => {
+      void bridge.brainLink().then(
+        (link) => {
+          if (link.status !== 'online') {
+            setStatus({
+              text: link.status === 'connecting' ? 'Connecting to the brain' : 'Brain offline',
+              ok: false,
+            });
+            return;
+          }
+          void host.status?.().then(setStatus, () => undefined);
+          if (host.status === undefined) setStatus({ text: 'Ready', ok: true });
+        },
+        () => undefined,
+      );
+    };
+    read();
+    return bridge.onBrainChanged((what) => {
+      if (what === 'link') read();
+    });
+  }, [bridge, host, companion]);
+
   const name = companion?.name ?? 'Scout';
   return (
     <>

@@ -23,6 +23,7 @@ import { STEPS, skipTour } from './steps';
 import { StepSaveContext } from './use-step-save';
 import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
+import { useKeyStatus } from '../key/use-key-status';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
 
@@ -79,6 +80,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [keyValid, setKeyValid] = useState(false);
+  const { status: keyFacts } = useKeyStatus(host);
   const [finishKeysShown, setFinishKeysShown] = useState<{ ask: string; talk: string } | null>(
     null,
   );
@@ -166,7 +168,13 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
     <div className="wt">
       <style>{CONTROLS_CSS}</style>
       <style>{WALKTHROUGH_CSS}</style>
-      <SidePanel scout={scout} current={current} reached={reached} onJump={go} />
+      <SidePanel
+        scout={scout}
+        current={current}
+        reached={reached}
+        onJump={go}
+        keySet={keyFacts !== null && keyFacts !== 'offline' && keyFacts.hasKey}
+      />
       <main className="wt-page">
         {finishKeysShown !== null ? (
           <FinishCard
