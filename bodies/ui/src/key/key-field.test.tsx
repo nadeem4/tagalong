@@ -293,6 +293,11 @@ describe('LimitField', () => {
 });
 
 describe('inside the Settings form', () => {
+  it('Set limit is the shared button, not plain text', () => {
+    render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
+    expect(screen.getByRole('button', { name: 'Set limit' })).toHaveClass('tg-button--secondary');
+  });
+
   // Settings is one form with one Save: Check key and Set limit must act alone, never submit it.
   it('Check key, Enter in the key field and Set limit do not submit the form', async () => {
     const onSubmit = vi.fn((event: { preventDefault(): void }) => event.preventDefault());

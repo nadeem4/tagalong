@@ -542,6 +542,12 @@ export function CompanionBubble({
       ))}
     </ul>
   );
+  // A permission card leads with Scout's own words; when they are the very text streaming
+  // above it, the card carries them and the stream says nothing twice.
+  const streamedInCard =
+    confirm?.options !== undefined &&
+    reply.state === 'running' &&
+    reply.text.trim() === confirm.summary.trim();
   const turnAnswer = (
     <>
       {reply.state === 'running' && (
@@ -549,7 +555,7 @@ export function CompanionBubble({
           className={reply.text === '' ? 'bubble-answer' : 'bubble-answer bubble-streaming'}
           aria-live="polite"
         >
-          {reply.text !== '' && <Answer text={reply.text} />}
+          {reply.text !== '' && !streamedInCard && <Answer text={reply.text} />}
           <div className="bubble-live">
             {reply.text === '' ? (
               <span className="bubble-thinking">

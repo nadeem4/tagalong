@@ -13,9 +13,11 @@ interface SidePanelProps {
   /** The furthest step visited; the list jumps to any step up to it. */
   reached: number;
   onJump: (step: number) => void;
+  /** Whether the brain already has the key, so the key step reads Key set, not Required. */
+  keySet: boolean;
 }
 
-export function SidePanel({ scout, current, reached, onJump }: SidePanelProps) {
+export function SidePanel({ scout, current, reached, onJump, keySet }: SidePanelProps) {
   return (
     <aside className="wt-side on-navy">
       <div className="wt-scout">
@@ -39,7 +41,7 @@ export function SidePanel({ scout, current, reached, onJump }: SidePanelProps) {
                 {step.id < current ? '✓' : ''}
               </span>
               {step.title}
-              {!step.skippable && <span className="wt-req">Required</span>}
+              {!step.skippable && <span className="wt-req">{keySet ? 'Key set' : 'Required'}</span>}
             </button>
           </li>
         ))}

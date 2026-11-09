@@ -1047,6 +1047,37 @@ describe('GreetingLine with a status mark', () => {
   });
 });
 
+describe('a permission ask whose words Scout was just streaming', () => {
+  it('shows those words once, in the card, and keeps Stop', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('remember teal'));
+    const said = 'Saving that your favourite colour is teal.';
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: said });
+      bridge.emit({
+        type: 'connector.confirm',
+        approvalId: '20000000-0000-4000-8000-000000000002',
+        turnId: 'turn-1',
+        petId: 'scout',
+        app: 'Scout',
+        tool: 'remember',
+        summary: said,
+        options: ['allow', 'always', 'deny'],
+      });
+    });
+    expect(screen.getAllByText(said)).toHaveLength(1);
+    expect(screen.getByRole('region', { name: 'Allow remember?' })).toHaveTextContent(said);
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  });
+});
+
 // The "Approved for you" card is hosted by the panel (ApprovedReport, approved-card.test.tsx).
 describe('the approval offer ask', () => {
   it('an approval_offer ask renders its text and exactly two buttons and answering sends the chosen option', async () => {

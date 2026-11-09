@@ -14,7 +14,7 @@ function cap(usd: number): string {
 }
 
 /**
- * Home's Spend card. Read again whenever a turn starts or ends.
+ * Home's Spend card. Read again whenever a turn starts or ends, and when the brain connection changes.
  */
 export function SpendCard() {
   const bridge = useHostBridge();
@@ -33,9 +33,17 @@ export function SpendCard() {
 
   useEffect(() => {
     refresh();
-    return bridge.onTurnEvent((event) => {
+    const stopTurn = bridge.onTurnEvent((event) => {
       if (changesSpend(event)) refresh();
     });
+    // A failed read while the brain was down must not outlive the outage.
+    const stopBrain = bridge.onBrainChanged((what) => {
+      if (what === 'link') refresh();
+    });
+    return () => {
+      stopTurn();
+      stopBrain();
+    };
   }, [bridge, refresh]);
 
   const limit = spend?.limitUsd ?? null;

@@ -1,6 +1,6 @@
 /** Tests for HomeView: the nav and the pages the Python brain feeds. */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
@@ -163,6 +163,20 @@ describe('HomeView', () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: paused });
     const scout = await screen.findByRole('region', { name: 'Scout' });
     await waitFor(() => expect(scout).toHaveTextContent('Ready, sight paused'));
+  });
+
+  it('says the brain is offline on the Scout card, and Ready again when it returns', async () => {
+    let status: 'offline' | 'online' = 'offline';
+    const bridge = Object.assign(createFakeHostBridge({ pets: [SCOUT] }), {
+      brainLink: () => Promise.resolve({ addr: 'ws://127.0.0.1:47321', status }),
+    });
+    renderHome(bridge);
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(scout).toHaveTextContent('Brain offline'));
+    expect(scout).not.toHaveTextContent('Ready');
+    status = 'online';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Ready'));
   });
 
   it('moves between pages, and reports the page to the host', async () => {
