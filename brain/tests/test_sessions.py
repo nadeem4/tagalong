@@ -471,6 +471,33 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
     assert rows[-1]["content"][0]["content"] == "cancelled"
 
 
+async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
+    # F2: the next say after a cancel must not carry the cut-off request unanswered.
+    memory = file_memory(tmp_path)
+
+    class Halting(Gate):
+        async def stream(self, system, messages, tools):
+            self.seen.append(list(messages))
+            if len(self.seen) == 1:
+                yield "Once upon"
+                await asyncio.Event().wait()
+            yield "hi"
+            yield Final([{"type": "text", "text": "hi"}], "end_turn", SimpleNamespace())
+
+    model = Halting([])
+    session, _ = make(model, memory)
+    first = session.say("desktop", say("long story"))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
+    assert rebuild_history(memory.load_messages())[-1]["content"][0]["text"] == "Once upon"
+    session.say("desktop", say("hi in 3 words"))
+    await finish_quietly(session)
+    assert [m["role"] for m in model.seen[1]] == ["user", "assistant", "user"]
+
+
 SECRET = "fake-bearer-token-0123456789"
 
 

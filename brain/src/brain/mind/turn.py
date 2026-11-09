@@ -1,8 +1,9 @@
 """The thinking loop: ask the model, stream its words, run its tools, repeat until it is done.
 
 History is append-only and always valid: a half-streamed message is never stored and a
-tool_use never goes unanswered, even when the turn is cancelled. The loop writes no words of
-its own; it only reports why it stopped.
+tool_use never goes unanswered, even when the turn is cancelled. A cancelled step keeps the
+words the person already saw as its reply, so the cut-off request counts as answered and the
+next turn does not resume it. The loop writes no words of its own; it only reports why it stopped.
 The one exception is the turn timeout: a stalled model gets one plain message so it is never silent.
 """
 
@@ -110,6 +111,7 @@ async def run_turn(
     guards = guards or spend_guards(budget, step_cap)
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
     steps = 0
+    shown: list[str] = []  # deltas of the step being streamed, kept if a cancel cuts it off
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
     try:
         try:
@@ -126,6 +128,7 @@ async def run_turn(
                     stream = model.stream(system(), history, tools()).__aiter__()
                     final = None
                     failed = False
+                    shown.clear()
                     while True:
                         try:
                             item = await anext(stream)
@@ -139,6 +142,7 @@ async def run_turn(
                             final = item
                         else:
                             spoke = True
+                            shown.append(item)
                             notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
                     if failed or final is None:
                         if not failed:
@@ -147,6 +151,7 @@ async def run_turn(
                         break
 
                     history.append({"role": "assistant", "content": final.content})
+                    shown.clear()  # now in history; only a cut-off step is kept
                     budget.spend(final.usage, final.model or model.model_id)
                     if final.stop_reason == "pause_turn":
                         continue
@@ -200,6 +205,9 @@ async def run_turn(
         else:
             log.exception("turn failed")
         _close_dangling_tool_use(history)
+        seen = "".join(shown)
+        if cancelled and seen.strip() and history and history[-1]["role"] == "user":
+            history.append({"role": "assistant", "content": [{"type": "text", "text": seen}]})
         for call, name in running.items():
             notify(
                 "tool",

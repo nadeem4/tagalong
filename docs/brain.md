@@ -203,7 +203,10 @@ flowchart TD
   again?") and the turn ends with `error`. History stays valid: an open `tool_use` is closed.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
 - History is append-only and always valid: a half-streamed message is never kept, and a
-  `tool_use` always gets a `tool_result`, even on cancel.
+  `tool_use` always gets a `tool_result`, even on cancel. A cancel is the one case where a
+  half-streamed step is kept: the words already sent become its assistant reply (nothing if none
+  were), so the cut-off request counts as answered and the next `say` is not merged with it. This
+  holds in the saved chat and after a restart.
 - Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
   turn's unsaved messages.
 - On start the history is rebuilt from the saved chat. It begins at the turn of the latest
