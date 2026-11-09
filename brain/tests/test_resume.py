@@ -54,6 +54,46 @@ def a(text):
     return {"role": "assistant", "content": [{"type": "text", "text": text}]}
 
 
+def _think(text):
+    return {"type": "thinking", "thinking": text, "signature": "s"}
+
+
+def test_resume_keeps_no_thinking_anywhere_so_the_dropped_run_is_a_prefix():
+    messages = [
+        u("q1"),
+        {
+            "role": "assistant",
+            "content": [
+                _think("a"),
+                {"type": "redacted_thinking", "data": "x"},
+                {"type": "text", "text": "r1"},
+            ],
+        },
+        u("q2"),
+        {"role": "assistant", "content": [_think("b")]},
+        u("q3"),
+        {"role": "assistant", "content": [_think("c"), {"type": "text", "text": "r3"}]},
+    ]
+    history = rebuild_history(messages)
+    assert "thinking" not in str(history)
+    assert history[1]["content"] == [{"type": "text", "text": "r1"}]
+    assert history[3]["content"] == [{"type": "text", "text": WITHHELD}]
+    assert history[5]["content"] == [{"type": "text", "text": "r3"}]
+
+
+def test_resume_leaves_a_history_without_thinking_as_it_was():
+    messages = [u("q"), a("r")]
+    history = rebuild_history(messages)
+    assert history[0] is messages[0] and history[1] is messages[1]
+
+
+def test_resume_adds_no_message_when_the_last_reply_only_lost_its_thinking():
+    messages = [u("q"), {"role": "assistant", "content": [_think("a"), a("r")["content"][0]]}]
+    history = rebuild_history(messages)
+    assert len(history) == len(messages)
+    assert history[-1]["role"] == "assistant"
+
+
 def call(id):
     return {
         "role": "assistant",
@@ -196,3 +236,29 @@ def test_every_tool_use_has_its_result():
     ]
     for msgs in cases:
         assert_valid(rebuild_history(msgs))
+
+
+def test_resume_heals_a_saved_reply_whose_thinking_lost_its_search_blocks():
+    saved = {
+        "role": "assistant",
+        "content": [
+            {"type": "thinking", "thinking": "a", "signature": "s1"},
+            {"type": "thinking", "thinking": "b", "signature": "s2"},
+            {"type": "text", "text": "Found."},
+        ],
+    }
+    old = [{"role": "user", "content": "look"}, saved]
+    # a row saved before the fix has thinking and no server blocks left, so it cannot be told
+    # from a clean one; only rows that still hold server blocks are healed
+    with_search = {
+        "role": "assistant",
+        "content": [
+            saved["content"][0],
+            {"type": "server_tool_use", "id": "srvtoolu_1", "name": "web_search", "input": {}},
+            {"type": "web_search_tool_result", "tool_use_id": "srvtoolu_1", "content": []},
+            saved["content"][1],
+            saved["content"][2],
+        ],
+    }
+    history = rebuild_history([old[0], with_search])
+    assert history[-1]["content"] == [{"type": "text", "text": "Found."}]

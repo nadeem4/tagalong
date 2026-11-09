@@ -218,3 +218,26 @@ def test_a_message_of_only_server_blocks_is_left_for_the_caller_to_fill():
     assert without_server_blocks(only)["content"] == []
     user = {"role": "user", "content": "hi"}
     assert without_server_blocks(user) is user
+
+
+THINKING_AROUND_SEARCH = [
+    {"type": "thinking", "thinking": "plan", "signature": "s1"},
+    {"type": "server_tool_use", "id": "srvtoolu_1", "name": "web_search", "input": {}},
+    {"type": "web_search_tool_result", "tool_use_id": "srvtoolu_1", "content": []},
+    {"type": "thinking", "thinking": "read", "signature": "s2"},
+    {"type": "text", "text": "Found.", "citations": [{"url": "https://x.example"}]},
+]
+
+
+def test_a_message_that_loses_server_blocks_loses_all_its_thinking():
+    # the API rejects a thinking run with a hole in it, so a partial run is worse than none
+    out = without_server_blocks({"role": "assistant", "content": THINKING_AROUND_SEARCH})
+    assert out["content"] == [{"type": "text", "text": "Found."}]
+
+
+def test_a_message_with_no_server_blocks_keeps_its_thinking_as_the_same_object():
+    message = {
+        "role": "assistant",
+        "content": [THINKING_AROUND_SEARCH[0], {"type": "text", "text": "Plain."}],
+    }
+    assert without_server_blocks(message) is message

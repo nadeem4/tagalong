@@ -787,10 +787,10 @@ async def test_thinking_block_with_a_secret_is_dropped_from_the_saved_copy(tmp_p
     await finish_quietly(session)
     saved = memory.load_messages()
     types = [b["type"] for b in saved[-1]["content"]]
-    assert types == ["redacted_thinking", "text"]
-    assert saved[-1]["content"][1]["text"] == "I will use [secret]"
+    # one changed block would leave a hole in the run, so all thinking goes
+    assert types == ["text"]
+    assert saved[-1]["content"][0]["text"] == "I will use [secret]"
     assert SECRET not in json.dumps(saved)
-    assert saved[-1]["content"][0] == {"type": "redacted_thinking", "data": "opaque"}
     assert [b["type"] for b in session.history[-1]["content"]][0] == "thinking"
     assert SECRET in json.dumps(session.history)
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
@@ -842,6 +842,20 @@ async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
     assert saved[-1]["content"] == [{"type": "text", "text": "[withheld]"}]
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
     assert resumed.history[-1]["content"]
+
+
+async def test_restarts_after_a_thinking_reply_do_not_save_it_twice(tmp_path):
+    # resume rebuilds a thinking reply as a new object; that must not look like an added message
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn("plain thought")]), memory)
+    session.say("desktop", say("one"))
+    await finish_quietly(session)
+    for text in ("two", "three"):
+        session, _ = make(Gate([thinking_turn("more thought")]), memory)
+        session.say("desktop", say(text))
+        await finish_quietly(session)
+    roles = [m["role"] for m in memory.load_messages()]
+    assert roles == ["user", "assistant"] * 3
 
 
 async def test_saved_chat_stays_valid_after_a_masker_failure(tmp_path):

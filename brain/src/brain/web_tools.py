@@ -58,12 +58,23 @@ class WebSource:
         return None
 
 
+def without_thinking(content: list[dict]) -> list[dict]:
+    """The blocks minus every thinking and redacted_thinking block. The API accepts a reply
+    with no thinking, but rejects a run with a hole in it (one block edited or dropped), so a
+    message that loses any block must lose all of them."""
+    return [b for b in content if b.get("type") not in ("thinking", "redacted_thinking")]
+
+
 def without_server_blocks(message: dict) -> dict:
-    """The copy of an assistant message that is saved: text only, no results, no citations."""
+    """The copy of an assistant message that is saved: text only, no results, no citations.
+    Dropping server blocks leaves a hole between thinking blocks, so thinking goes too. A
+    message with nothing to drop comes back as the same object."""
     content = message["content"]
     if message["role"] != "assistant" or not isinstance(content, list):
         return message
+    if any(is_server_block(b) for b in content):
+        content = without_thinking(content)
     kept = [
         {k: v for k, v in b.items() if k != "citations"} for b in content if not is_server_block(b)
     ]
-    return {**message, "content": kept}
+    return message if kept == message["content"] else {**message, "content": kept}
