@@ -183,6 +183,29 @@ def test_server_blocks_and_citations_are_dropped_from_a_saved_message():
     assert message["content"][-1] is cited  # the live history is not touched
 
 
+DYNAMIC_BLOCKS = [
+    {"type": "text", "text": "Checked."},
+    {
+        "type": "code_execution_tool_result",
+        "tool_use_id": "srvtoolu_01",
+        "content": {"type": "code_execution_result", "stdout": "", "return_code": 0},
+    },
+    {
+        "type": "tool_search_tool_result",
+        "tool_use_id": "srvtoolu_02",
+        "content": {"type": "tool_search_tool_search_result", "tool_references": []},
+    },
+]
+
+
+def test_any_server_result_block_is_dropped_by_its_shape_not_a_list():
+    out = without_server_blocks({"role": "assistant", "content": DYNAMIC_BLOCKS})
+    assert out["content"] == [DYNAMIC_BLOCKS[0]]
+    mine = {"type": "tool_result", "tool_use_id": "toolu_1", "content": "ok"}
+    kept = without_server_blocks({"role": "assistant", "content": [mine]})
+    assert kept["content"] == [mine]  # the brain's own results are not server blocks
+
+
 def test_a_message_of_only_server_blocks_is_left_for_the_caller_to_fill():
     only = {"role": "assistant", "content": SERVER_BLOCKS[1:]}
     assert without_server_blocks(only)["content"] == []

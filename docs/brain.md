@@ -1897,7 +1897,11 @@ sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` 
 plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
 server blocks and text citations from the copy written to disk (the live history keeps them), so
 a resumed chat holds the answer text only, masked like any other message. A paused message with
-only server blocks is saved as the withheld placeholder.
+only server blocks is saved as the withheld placeholder. A server block is `server_tool_use` or any
+`*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),
+so new tool versions need no list edit. `rebuild_history` drops them too, which heals chats saved
+before this rule (an orphaned result makes the API reject every request); an assistant message left
+empty becomes the withheld placeholder so the roles still alternate.
 
 Ask is meaningless for them (they never reach the gate): `Toolbox.set_mode` refuses `ask` for a
 spec with `server_tool`, `list_permissions` rows carry `server_tool`, and Home shows only Off and

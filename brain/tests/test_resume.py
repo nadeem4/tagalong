@@ -7,6 +7,33 @@ turn, so the trimming rules must always cut on whole turns.
 from brain.mind.resume import RESUME_MAX_MESSAGES, rebuild_history
 
 
+def test_orphaned_server_result_blocks_are_dropped_on_resume():
+    poisoned = {
+        "role": "assistant",
+        "content": [
+            {"type": "text", "text": "Found it."},
+            {
+                "type": "code_execution_tool_result",
+                "tool_use_id": "srvtoolu_01",
+                "content": {"type": "code_execution_result", "stdout": "", "return_code": 0},
+            },
+            {"type": "tool_search_tool_result", "tool_use_id": "srvtoolu_02", "content": {}},
+        ],
+    }
+    history = rebuild_history([u("q"), poisoned, u("next")])
+    assert history[1]["content"] == [{"type": "text", "text": "Found it."}]
+
+
+def test_an_assistant_message_emptied_by_stripping_keeps_alternation_valid():
+    only = {
+        "role": "assistant",
+        "content": [{"type": "code_execution_tool_result", "tool_use_id": "s", "content": {}}],
+    }
+    history = rebuild_history([u("q"), only, u("next")])
+    assert [m["role"] for m in history] == ["user", "assistant", "user"]
+    assert history[1]["content"] == [{"type": "text", "text": "[withheld]"}]
+
+
 def u(text):
     return {"role": "user", "content": text}
 
