@@ -21,7 +21,7 @@ interface BuilderConfig {
   asar: boolean;
   asarUnpack: string[];
   npmRebuild: boolean;
-  extraResources: { from: string; to: string }[];
+  extraResources: { from: string; to: string; filter?: string[] }[];
   win: { target: { target: string; arch: string[] }[] };
   nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean };
   mac: { target: string[] };
@@ -73,6 +73,22 @@ describe('electron-builder config', () => {
     });
   });
 
+  it('ships the pinned uv.exe next to app.asar, so first start can build the brain', () => {
+    expect(config.extraResources).toContainEqual({ from: 'build/uv', to: 'uv' });
+  });
+
+  it('ships only the brain source and its lockfile, never caches or bytecode', () => {
+    const brain = config.extraResources.find((r) => r.to === 'brain');
+    expect(brain?.from).toBe('../../brain');
+    expect(brain?.filter).toEqual([
+      'pyproject.toml',
+      'uv.lock',
+      'src/**/*',
+      '!**/__pycache__/**',
+      '!**/*.pyc',
+    ]);
+  });
+
   it('marks the macOS and Linux targets as configured, not verified', () => {
     expect(config.mac.target).toEqual(['dmg']);
     expect(config.linux.target).toEqual(['AppImage', 'deb']);
@@ -109,6 +125,35 @@ describe('desktop runtime dependencies', () => {
     expect(manifest.scripts['package:win']).toContain('--win nsis');
     // The active-window binding is downloaded, never compiled, before the build.
     expect(manifest.scripts['package:win']).toContain('fetch-native.mjs win32 x64');
+  });
+
+  it('fetches uv after the native binding and before the build', () => {
+    const steps = (manifest.scripts['package:win'] ?? '').split(' && ');
+    const at = (needle: string): number => steps.findIndex((s) => s.includes(needle));
+    expect(at('fetch-native.mjs')).toBeLessThan(at('fetch-uv.mjs'));
+    expect(at('fetch-uv.mjs')).toBeLessThan(at('electron-vite build'));
+    expect(at('electron-vite build')).toBeLessThan(at('electron-builder'));
+  });
+
+  it('pins uv by version and sha256 in the fetch script', () => {
+    const script = readFileSync(
+      fileURLToPath(new URL('../../scripts/fetch-uv.mjs', import.meta.url)),
+      'utf8',
+    );
+    expect(script).toMatch(/UV_VERSION = '\d+\.\d+\.\d+'/);
+    expect(script).toMatch(/UV_SHA256 = '[0-9a-f]{64}'/);
+  });
+
+  it('has a release workflow that publishes the installer on a v tag', () => {
+    const wf = readFileSync(
+      fileURLToPath(new URL('../../../../.github/workflows/release.yml', import.meta.url)),
+      'utf8',
+    );
+    expect(wf).toMatch(/tags:\s+- 'v\*'/);
+    expect(wf).toContain('windows-latest');
+    expect(wf).toContain('contents: write');
+    expect(wf).toContain('pnpm package:win');
+    expect(wf).toContain('gh release create');
   });
 });
 

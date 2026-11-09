@@ -14,6 +14,15 @@
     {
       "from": "../browser/dist",
       "to": "extension"
+    },
+    {
+      "from": "build/uv",
+      "to": "uv"
+    },
+    {
+      "from": "../../brain",
+      "to": "brain",
+      "filter": ["pyproject.toml", "uv.lock", "src/**/*", "!**/__pycache__/**", "!**/*.pyc"]
     }
   ],
   "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",

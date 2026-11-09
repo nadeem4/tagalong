@@ -1601,3 +1601,8 @@ async def test_list_permissions_names_each_body_by_what_it_declared(home):
     drop(home.bodies, "chrome")
     rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
     assert rows["chrome__open_tab"]["source_name"] == "Chrome on work PC"
+
+
+def test_list_timers_description_asks_for_ids_to_be_shown(trun):
+    text = trun.specs["list_timers"].description.lower()
+    assert "id" in text and "cancel" in text

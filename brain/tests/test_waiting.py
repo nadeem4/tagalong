@@ -616,9 +616,10 @@ async def test_return_runs_an_ask_a_new_auto_now_allows():
     rig.waiting.rejoined("desktop")
     await rig.settle()
     assert rig.source.ran == [("t", {"n": 1})]
+    # No card to show (asks_waiting stays quiet), but Scout is woken with ask_ended, as for Off.
     assert rig.opened() == [] and wakes(rig) == []
     [event] = ended(rig)
-    assert event.facts["outcome"] == "approved"
+    assert event.facts["outcome"] == "approved" and event.facts["tool"] == "t"
     assert rig.work.ask_detail(ask_id)["decided_by"] == "rule"
 
 

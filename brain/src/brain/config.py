@@ -77,6 +77,13 @@ def split_command(cmd: str, posix: bool | None = None) -> list[str]:
     return [p[1:-1] if len(p) > 1 and p[0] == p[-1] and p[0] in "\"'" else p for p in parts]
 
 
+def _expert_cmd(text: str) -> list[str]:
+    try:
+        return split_command(text)
+    except ValueError as err:  # shlex's own message names no variable
+        raise ValueError(f"bad TAGALONG_EXPERT_CMD: {err}: {text!r}") from None
+
+
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
     host, port = DEFAULT_HOST, DEFAULT_PORT
     addr = env.get("TAGALONG_BRAIN_ADDR")
@@ -105,7 +112,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         outputs_keep=_positive_int(env, "TAGALONG_OUTPUTS_KEEP", DEFAULT_OUTPUTS_KEEP),
         retry_max=_positive_int(env, "TAGALONG_RETRY_MAX", DEFAULT_RETRY_MAX),
         retry_backoff_s=_backoff(env.get("TAGALONG_RETRY_BACKOFF_S")),
-        expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or ""),
+        expert_cmd=_expert_cmd(env.get("TAGALONG_EXPERT_CMD") or ""),
         job_quiet_min=_job_quiet_min(env.get("TAGALONG_JOB_QUIET_MIN")),
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
         turn_timeout=_turn_timeout(env.get("TAGALONG_TURN_TIMEOUT_S")),
@@ -244,7 +251,11 @@ def load_env_file(data_dir: Path, env: MutableMapping[str, str]) -> None:
     path = data_dir / ".env"
     if not path.exists():
         return
-    for line in path.read_text(encoding="utf-8").splitlines():
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        raise ValueError(f"cannot read {path}: the file is not UTF-8 text") from None
+    for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

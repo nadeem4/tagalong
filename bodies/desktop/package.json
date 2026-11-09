@@ -13,7 +13,7 @@
     "start": "node scripts/ensure-electron.mjs && electron-vite preview",
     "start:fresh": "node scripts/ensure-electron.mjs && node scripts/start-fresh.mjs",
     "test:e2e": "node scripts/ensure-electron.mjs && electron-vite build && playwright test",
-    "package:win": "node scripts/ensure-electron.mjs && node scripts/fetch-native.mjs win32 x64 && electron-vite build && electron-builder --win nsis --x64 --publish never",
+    "package:win": "node scripts/ensure-electron.mjs && node scripts/fetch-native.mjs win32 x64 && node scripts/fetch-uv.mjs && electron-vite build && electron-builder --win nsis --x64 --publish never",
     "package:mac": "node scripts/ensure-electron.mjs && electron-vite build && electron-builder --mac dmg --publish never",
     "package:linux": "node scripts/ensure-electron.mjs && electron-vite build && electron-builder --linux AppImage deb --publish never",
     "package:dir": "node scripts/ensure-electron.mjs && electron-vite build && electron-builder --dir --publish never"
