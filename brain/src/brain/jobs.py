@@ -285,7 +285,6 @@ class Jobs:
         expert: str | None = None,
         continue_job: str | None = None,
         *,
-        owner_asked: bool = True,
         fresh: bool = False,
         job: str | None = None,
         title: str | None = None,
@@ -294,9 +293,8 @@ class Jobs:
         """Hand the task to an expert once the user picks a mode. Returns the job id.
 
         continue_job reopens that finished job's session (same expert, same folder); when the
-        expert cannot, a fresh session starts and the result says why. owner_asked is False when
-        Scout chose the follow-up on a wake: it then goes through the ask chain, and a covering
-        preference lets it reuse the earlier mode without a card. Without continue_job the
+        expert cannot, a fresh session starts and the result says why. The caller
+        has already checked that a person's message started this. Without continue_job the
         expert's last finished session in this folder is continued (its mode is not carried over,
         the card is shown as for any new job); fresh=True skips that. job adds a part to that open
         job (title is then ignored); otherwise a new job opens with Scout's title, if any.
@@ -329,7 +327,6 @@ class Jobs:
             path,
             earlier=earlier,
             earlier_part=earlier_part,
-            scout_follow_up=continue_job is not None and not owner_asked,
             new_job=job is None,
             apps=offered,
         )
@@ -378,7 +375,6 @@ class Jobs:
         *,
         earlier: Job | None = None,
         earlier_part: JobPart | None = None,
-        scout_follow_up: bool = False,
         new_job: bool = True,
         apps: tuple[str, ...] = (),
         redo: WorkRow | None = None,
@@ -429,9 +425,7 @@ class Jobs:
                 mode_id = self._redo_mode(job_id, by_name.values())
             kept = apps
             if mode_id is None:
-                mode_id, kept = await self._hand_off_mode(
-                    chosen, earlier, task, path, by_name, apps, scout_follow_up
-                )
+                mode_id, kept = await self._hand_off_mode(chosen, task, path, by_name, apps)
                 await run.keep_apps(kept)
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
@@ -524,16 +518,13 @@ class Jobs:
     async def _hand_off_mode(
         self,
         chosen: InstalledExpert,
-        earlier: Job | None,
         task: str,
         path: Path,
         by_name: dict[str, str],
         apps: tuple[str, ...],
-        scout_follow_up: bool,
     ) -> tuple[str, tuple[str, ...]]:
         """The mode to start in, and the apps kept. The card is the owner's own question; the
-        engine is asked only when Scout started the follow-up or apps ride along, so a covering
-        preference can skip the card and the person's pick is logged and offered. Apps on the
+        engine is asked only when apps ride along, so the person's pick is logged. Apps on the
         card are the person's to approve, so nothing but the person answers for them."""
         kept = apps
 
@@ -556,13 +547,10 @@ class Jobs:
                 facts["apps"] = list(kept)
             return PersonAnswer("allow", option_id=mode)
 
-        reusable = scout_follow_up and not apps and earlier.mode in by_name.values()
         facts: dict = {"folder": str(path)}
-        if reusable:
-            facts["mode"] = earlier.mode  # the mode being reused
-        elif apps:
+        if apps:
             facts["apps"] = list(apps)
-        if self._engine is None or not (scout_follow_up or apps):
+        if self._engine is None or not apps:
             try:
                 return (await card()).option_id, kept
             except NoOneThere as err:
@@ -581,15 +569,13 @@ class Jobs:
                 input=facts,
                 tier=Tier.ask,
                 how_to_ask=card,
-                can_allow_once=reusable,
-                offer=scout_follow_up,
+                can_allow_once=False,  # only the person answers for apps
+                offer=False,
             )
         )
-        if not decision.allowed:
+        if not decision.allowed or decision.option_id is None:
             raise JobError(f"not started: {decision.reason or 'the person declined'}")
-        if decision.decided_by == "person" and decision.option_id is not None:
-            return decision.option_id, kept
-        return earlier.mode, kept  # a preference covered it: same mode as before, no card
+        return decision.option_id, kept
 
     @staticmethod
     def _started(job_id: str, part: str, earlier: JobPart | None, run: ExpertRun) -> JobId:
@@ -647,9 +633,12 @@ class Jobs:
         # The exiting brain would drop any turn a report starts, so leave the report for the
         # next start (unreported jobs are re-queued then).
         self._on_finished = lambda job: None
-        for run in [r for runs in self._runs.values() for r in runs.values()]:
-            with suppress(Exception):
-                await run.stop()
+        for job_id, runs in list(self._runs.items()):
+            for part, run in list(runs.items()):
+                if activity := self._activity.get(job_id, {}).get(part):
+                    activity.stopping()
+                with suppress(Exception):
+                    await run.stop()
         for job_id in list(self._activity_trailing):
             self._stop_activity_notes(job_id)
         if self._hosts is not None:  # warm adapters waiting for a follow-up go too
@@ -1075,10 +1064,10 @@ def job_note(
         f"Folder: {job.folder}",
         f"State: {home_state(job.state)}",
     ]
-    if job.state == "cancelled":  # only a person's stop reaches here; a restart reads blocked
+    if job.state == "cancelled":  # a stop by the person, Scout or a clean shutdown; not a crash
         lines.append(
-            "The person stopped this job. Do not start it again or start a replacement "
-            "unless they ask."
+            "This job was stopped. Do not start it again or start a replacement "
+            "unless the person asks."
         )
     many = len(job.parts) > 1
     ended = [p for p in job.parts if p.ended_at]

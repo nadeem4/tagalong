@@ -238,7 +238,6 @@ class FakeJobs:
 
     def __init__(self):
         self.calls = []
-        self.owner_asked = None
         self.fresh = None
         self.error = None
         self.rows = []
@@ -264,7 +263,6 @@ class FakeJobs:
         expert=None,
         continue_job=None,
         *,
-        owner_asked=True,
         fresh=False,
         job=None,
         title=None,
@@ -272,7 +270,6 @@ class FakeJobs:
     ):
         self.apps = apps
         self.calls.append(("start", task, folder, expert, continue_job))
-        self.owner_asked = owner_asked
         self.fresh = fresh
         self.job, self.title = job, title
         if self.error:
@@ -415,19 +412,13 @@ async def test_home_permission_list_shows_tell_expert_as_ask(home):
     assert rows["tell_expert"]["mode"] == "ask"
 
 
-async def test_hand_off_tool_passes_the_turn_origin(home):
-    await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
-    assert home.jobs.owner_asked is True
-    assert home.jobs.owner_asked is True
-
-
 async def test_a_wake_turn_cannot_start_a_hand_off(home):
     # No person started this turn (a job ended, a timer fired): Scout may not start work.
     home.owner["turn"] = False
     for args in ({}, {"continue_job": "old1"}):
         out = await home.run("hand_off", {"task": "t", "folder": "C:/p", **args})
-        assert "did not ask for this" in out and "do not start" in out
-    assert home.jobs.calls == [] and home.jobs.owner_asked is None
+        assert out == "hand_off refused: only a message from the person can start a job."
+    assert home.jobs.calls == []
 
 
 async def test_hand_off_continue_job_reports_the_session_facts(home):

@@ -452,4 +452,4 @@ def test_install_without_a_tty_or_yes_says_to_pass_yes(tmp_path):
 
     rig.ask = no_tty
     assert rig.go("install", "claude-acp") == 1
-    assert rig.lines[-1] == "Run with --yes to install without a prompt."
+    assert rig.lines[-1] == "Run again with --yes to go ahead without a prompt."

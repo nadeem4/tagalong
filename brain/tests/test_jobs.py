@@ -566,6 +566,35 @@ async def test_tell_queues_a_note_for_a_running_job_only(make_rig):
         rig.jobs.tell("nope", "x")
 
 
+async def test_a_stop_during_an_open_permission_ask_reads_stopped_not_failed(make_rig):
+    # The cancelled ask makes the adapter report the tool call failed; the stop must win.
+    steps = [
+        {"tool": {"id": "c1", "title": "ls", "kind": "execute", "input": {"command": "ls"}}},
+        {"permission": {"title": "ls", "kind": "execute", "input": {"command": "ls"}}},
+        {"tool_update": {"id": "c1", "status": "failed", "text": "The user doesn't want to"}},
+    ]
+    rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: len(rig.asks.opened) == 2 and rig.asks.open_ids)
+    await rig.jobs.stop(job_id)
+    line = rig.jobs.activity_line(job_id)
+    assert "0 failed" in line and "stopped" in line
+    assert "failed: 0" in rig.jobs.wake_facts(job_id)["activity"]
+
+
+async def test_shutdown_marks_steps_stopped_not_failed(make_rig):
+    steps = [
+        {"tool": {"id": "c1", "title": "ls", "kind": "execute", "input": {"command": "ls"}}},
+        {"permission": {"title": "ls", "kind": "execute", "input": {"command": "ls"}}},
+        {"tool_update": {"id": "c1", "status": "failed", "text": "The user doesn't want to"}},
+    ]
+    rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: len(rig.asks.opened) == 2 and rig.asks.open_ids)
+    await rig.jobs.shutdown()
+    assert "0 failed" in rig.jobs.activity_line(job_id)
+
+
 async def test_stop_closes_open_asks_and_marks_stopped(make_rig):
     steps = [{"question": {"message": "?", "options": ["A"]}}]
     rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
@@ -755,8 +784,8 @@ def test_job_note_without_a_result_or_reason():
 
 def test_a_stopped_jobs_note_says_the_person_stopped_it_and_not_to_restart():
     note = job_note(a_job("j4", "t", "cancelled"))
-    assert "The person stopped this job" in note and "unless they ask" in note
-    assert "person stopped" not in job_note(a_job("j5", "t", "done"))
+    assert "This job was stopped" in note and "unless the person asks" in note
+    assert "was stopped" not in job_note(a_job("j5", "t", "done"))
 
 
 # --- expert questions go to Scout first (10d) ---
@@ -2061,110 +2090,16 @@ async def test_owner_asked_continue_shows_the_card_and_never_runs_the_chain(make
     check = FakeSideCheck(None)
     rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
     first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=True)
+    second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
     assert check.facts == [] and hand_off_rows(rig) == []
     assert rig.records.get_job(second).mode == "auto"
-
-
-async def test_brain_started_continue_with_a_covering_preference_skips_the_card(make_rig):
-    asks = FakeAsks(Answer("Plan"))  # no second answer: the owner is never asked
-    check = FakeSideCheck()
-    rig = continuing(make_rig, asks, check)
-    check.result = pref_in(rig, "Nudging my jobs is fine")
-    first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert len(asks.opened) == 1  # only the first card
-    assert rig.records.get_job(second).mode == "plan" == rig.records.get_job(first).mode
-    [row] = hand_off_rows(rig)
-    assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
-    assert row.group_key == f"claude_code:{rig.folder}"
-    [facts] = check.facts
-    assert (facts.source, facts.tool, facts.group_key) == (
-        "claude_code", "hand_off", f"claude_code:{rig.folder}",
-    )  # fmt: skip
-
-
-async def test_brain_started_continue_without_a_preference_shows_the_card(make_rig):
-    check = FakeSideCheck(None)
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
-    rig = continuing(make_rig, asks, check)
-    offers = rig.offers
-    first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert len(asks.opened) == 2 and asks.opened[1]["tool"] == "hand_off"
-    assert rig.records.get_job(second).mode == "auto"  # the owner's pick, not the earlier mode
-    [row] = hand_off_rows(rig)
-    assert (row.outcome, row.decided_by) == ("approved", "person")
-    group = f"claude_code:{rig.folder}"
-    assert offers.considered == [(group, "claude_code", "hand_off")]
-
-
-async def test_brain_started_continue_card_cancel_starts_nothing_and_records_no_row(make_rig):
-    asks = FakeAsks(Answer("Plan"), Answer("cancel"))
-    rig = continuing(make_rig, asks, FakeSideCheck(None))
-    offers = rig.offers
-    first = await first_job(rig)
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert hand_off_rows(rig) == [] and offers.considered == []
-    assert len(rig.records.list_jobs()) == 1
-
-
-async def test_brain_started_continue_with_nobody_online_is_not_started_and_logs_no_one(make_rig):
-    check = FakeSideCheck(None)
-    asks = FakeAsks(Answer("Plan"), Answer(None))  # the card finds nobody, as the real Asks does
-    rig = continuing(make_rig, asks, check)
-    first = await first_job(rig)
-    asks.online = False
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert len(check.facts) == 1  # Scout looks first; only a pass finds nobody there
-    [row] = hand_off_rows(rig)
-    assert (row.outcome, row.decided_by) == ("no_one", "none")
-    assert len(rig.records.list_jobs()) == 1
-
-
-async def test_an_earlier_mode_missing_from_the_new_session_falls_back_to_the_card(make_rig):
-    check = FakeSideCheck()
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
-    rig = continuing(make_rig, asks, check)
-    check.result = pref_in(rig)
-    offers = rig.offers
-    first = await first_job(rig)
-    rig.records.work.set_job_detail(first, mode="gone")
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert len(asks.opened) == 2  # the card was shown instead of crashing
-    assert rig.records.get_job(second).mode == "auto"
-    assert check.facts == []  # no chain, so no orphan scout row
-    [row] = hand_off_rows(rig)
-    assert (row.outcome, row.decided_by) == ("approved", "person")
-    assert len(offers.considered) == 1
-
-
-async def test_a_covered_follow_up_is_not_offered_as_a_preference(make_rig):
-    check = FakeSideCheck()
-    rig = continuing(make_rig, FakeAsks(Answer("Plan")), check)
-    check.result = pref_in(rig)
-    offers = rig.offers
-    first = await first_job(rig)
-    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert offers.considered == []
-
-
-async def test_the_chain_sees_the_mode_being_reused(make_rig):
-    check = FakeSideCheck()
-    rig = continuing(make_rig, FakeAsks(Answer("Plan")), check)
-    check.result = pref_in(rig)
-    first = await first_job(rig)
-    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert check.facts[0].input == {"folder": str(rig.folder), "mode": "plan"}
 
 
 async def test_hand_off_card_has_no_timeout(make_rig):
     asks = FakeAsks(Answer("Plan"), Answer("Auto"))
     rig = continuing(make_rig, asks, FakeSideCheck(None))
     first = await first_job(rig)
-    await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
+    await rig.jobs.start("two", str(rig.folder), continue_job=first)
     assert "timeout" not in asks.opened[1]  # the card ends with its turn or its job, not a clock
 
 
@@ -2174,25 +2109,9 @@ async def test_a_new_job_without_continue_always_shows_the_card_even_on_a_brain_
     rig = continuing(make_rig, asks, check)
     check.result = pref_in(rig)
     await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    second = await rig.jobs.start("two", str(rig.folder))
     assert check.facts == [] and hand_off_rows(rig) == []
     assert len(asks.opened) == 2 and rig.records.get_job(second).mode == "auto"
-
-
-async def test_a_side_check_error_on_a_follow_up_falls_back_to_the_card(make_rig):
-    check = FakeSideCheck()
-
-    async def boom(facts):
-        raise RuntimeError("boom")
-
-    check.decide = boom
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
-    rig = continuing(make_rig, asks, check)
-    first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    assert len(asks.opened) == 2 and rig.records.get_job(second).mode == "auto"
-    [row] = hand_off_rows(rig)
-    assert row.decided_by == "person"
 
 
 async def test_a_second_hand_off_in_the_same_folder_resumes_the_earlier_session(make_rig):
@@ -2291,7 +2210,7 @@ async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
     check = FakeSideCheck(None)
     rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
     first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), owner_asked=False)
+    second = await rig.jobs.start("two", str(rig.folder))
     assert rig.records.get_job(second).parent_job == first
     assert check.facts == [] and hand_off_rows(rig) == []
 
@@ -2753,20 +2672,6 @@ async def test_the_approvals_row_names_the_kept_apps(make_rig):
     assert row.input["apps"] == ["mail"]
 
 
-async def test_hand_off_follow_up_goes_through_the_engine(make_rig):
-    engine = FakeEngine(Decision("allow_once", decided_by="scout"))
-    rig = continuing(make_rig, FakeAsks(Answer("Plan")), engine=engine)
-    first = await first_job(rig)
-    second = await rig.jobs.start("two", str(rig.folder), continue_job=first, owner_asked=False)
-    [req] = engine.requests
-    assert (req.kind, req.source, req.tool, req.tier.value) == (
-        "hand_off_followup", "claude_code", "hand_off", "ask",
-    )  # fmt: skip
-    assert req.group_key == f"claude_code:{rig.folder}" and req.offer and req.can_allow_once
-    assert req.input == {"folder": str(rig.folder), "mode": "plan"}
-    assert rig.records.get_job(second).mode == "plan"  # a Scout grant reuses the earlier mode
-
-
 async def test_owner_hand_off_with_apps_logs_the_kept_apps_and_makes_no_offer(make_rig):
     rig = apps_rig(make_rig, Answer("Plan", apps=("mail",)), approvals=True)
     await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
@@ -2780,21 +2685,6 @@ async def test_owner_hand_off_without_apps_asks_no_engine(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), engine=engine)
     await rig.jobs.start("task", str(rig.folder))
     assert engine.requests == []
-
-
-async def test_a_scouts_follow_up_with_apps_shows_the_card_though_a_preference_covers(make_rig):
-    asks = FakeAsks(Answer("Plan"), Answer("Plan"))
-    check = FakeSideCheck()
-    rig = continuing(make_rig, asks, check, apps=FakeConnectedApps(lin="connected"))
-    check.result = pref_in(rig, "Nudging my jobs is fine")
-    first = await first_job(rig)
-    await rig.jobs.start(
-        "two", str(rig.folder), continue_job=first, owner_asked=False, apps=["lin"]
-    )
-    assert len(asks.opened) == 2 and check.facts == []
-    assert asks.opened[1]["input"]["apps"] == [{"id": "lin", "name": "Lin"}]
-    [row] = hand_off_rows(rig)
-    assert row.decided_by == "person" and row.input["apps"] == ["lin"]
 
 
 async def test_an_expert_that_cannot_take_apps_refuses_before_the_card(make_rig, monkeypatch):

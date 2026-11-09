@@ -544,7 +544,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
   `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
 - **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
-  (Scout's tools, Claude Code's permission asks and hand-off follow-ups all go through the engine's side-check decider). When it approves, no ask
+  (Scout's tools and Claude Code's permission asks go through the engine's side-check decider). When it approves, no ask
   opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
   `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
   approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
@@ -559,20 +559,15 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   wake turn it runs the normal decision (the side-check, the Allow card, with offers
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
   nobody online the nudge waits like any Scout ask (see [Asks that wait](#asks-that-wait)). `hand_off`
-  with an explicit `continue_job` on an owner turn skips the engine and shows the mode card as
-  always. A wake turn (a job ended, a timer: no message from the person started it) cannot call
-  `hand_off` at all: the tool answers "hand_off refused: the person did not ask for this in a
-  message" and Scout tells the person what it would run (LT1-4: a stopped job was restarted by
-  wakes, each costing money). `Jobs._hand_off_mode`'s engine ask (kind `hand_off_followup`, source
-  `claude_code`, tool `hand_off`, group `<expert>:<folder>`) and a covering preference's reuse of
-  the earlier job's mode (Scout's row says `decided_by: "scout"`, no offer follows) now apply
-  only below that guard. Otherwise the mode card is the
-  engine's person step, so nothing is asked twice: the card pick is logged as a person row and
-  offered like any approval. A mode the new session does not offer, or apps riding along, show
-  the card without a preference ever answering (apps are the person's to approve). The card has
-  no timeout; it ends with its job or turn. A cancel leaves no row. A new job (no
-  `continue_job`, including an implicit continue of the folder's last session) always shows the
-  card, and the owner's own hand-off without apps never reaches the engine.
+  is different: a wake turn (a job ended, a timer: no message from the person started it) can
+  never start a job. The tool answers "hand_off refused: only a message from the person can start
+  a job." and Scout tells the person what it would run; they ask in chat if they want it (LT1-4: a
+  stopped job was restarted by wakes, each costing money). On an owner turn `hand_off` shows the
+  mode card. With no apps the card never reaches the engine. When apps ride along the card goes
+  through the engine (kind `hand_off_followup`, source `claude_code`, tool `hand_off`, group
+  `<expert>:<folder>`) with no allow-once for Scout or a preference, so only the person answers:
+  the card pick is logged as a person row and offered like any approval. The card has no timeout;
+  it ends with its job or turn. A cancel leaves no row.
 - **Claude Code's permission asks.** `Jobs._permission` builds an `expert_request` ask (tier
   `ask`, group `<expert>:<folder>`) with the expert's own option names on the card and gives it
   to the engine. A standing rule or Scout's grant answers with the expert's allow-once option (an
@@ -588,13 +583,16 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
-  A[Scout calls tell_expert or hand_off continue_job] --> B{owner turn?}
-  B -- yes --> C[tell_expert runs now, no ask, no row; hand_off shows the mode card]
+  A[Scout calls tell_expert] --> B{owner turn?}
+  B -- yes --> C[runs now, no ask, no row]
   B -- no --> F{preference covers it?}
-  F -- yes --> G[runs once, row by scout; hand_off reuses the earlier mode]
+  F -- yes --> G[runs once, row by scout]
   F -- no or error --> D{anyone online?}
   D -- no --> E[ask stays open and parks]
-  D -- yes --> H[ask the owner: Allow card or mode card]
+  D -- yes --> H[ask the owner: Allow card]
+  X[Scout calls hand_off] --> Y{owner turn?}
+  Y -- yes --> Z[mode card]
+  Y -- no --> R[refused: only a message from the person can start a job]
 ```
 
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
@@ -1049,7 +1047,7 @@ words what the person reads (guidance in `mind/soul.md`).
   writes `ANTHROPIC_API_KEY` to `.env` with `upsert_env_value`. `install <expert>` and
   `apps add <app>` print what the Allow card shows (id, version, folder or host, the Node
   download), then ask `[y/N]`; `--yes` skips the question (with no terminal to answer on and no
-  `--yes` it prints "Run with --yes to install without a prompt." and exits 1). `login <expert>` runs the same
+  `--yes` it prints "Run again with --yes to go ahead without a prompt." and exits 1). `login <expert>` runs the same
   `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits
   for the result; where no window can open it prints the command to run yourself. A failure
   prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
@@ -1141,12 +1139,12 @@ builds its own host that stops with it, as above. `Jobs` gets its runs from `Exp
   the session id in its mode; a frame for an unknown session is dropped (cancelled for an ask).
   Two jobs of one expert share the process, and a stop ends only its own session. A stop that the
   adapter ignores (past the grace period) kills the process, and any session sharing it ends in
-  `error`. A finished job's session is forgotten at once, but the shared adapter (and the
-  `claude` process it started) stays for `TAGALONG_EXPERT_IDLE_S` after the last session so a
-  follow-up reuses it; each later job restarts that timer. This is by design (LT1-6), `tagalong
-stop` ends them, and a lower `TAGALONG_EXPERT_IDLE_S` frees the memory sooner.
+  `error`.
 - **Idle stop.** After the last session ends the process stays up for `TAGALONG_EXPERT_IDLE_S`
-  (default 300 s; 0 stops it at once), so a follow-up reuses a warm adapter. A new session cancels
+  (default 300 s; 0 stops it at once), so a follow-up reuses a warm adapter. A finished job's
+  session is forgotten at once, but the adapter and the `claude` process it started stay up for
+  that period, and each later job restarts the timer. This is by design (LT1-6): `tagalong stop`
+  ends them, and a lower value frees the memory sooner. A new session cancels
   the wait. The brain stops every host on exit. A session that ends in `error` stops the process
   at once if no other session uses it, so a crash is never kept warm; the next session starts a
   new process.
@@ -1178,8 +1176,8 @@ sets the grant to the kept apps, or revokes it when none are kept, all before th
 its task. Choosing a mode is Send, and Send is the approval for the kept apps: no per-app ask at
 start, while a risky tool call still asks through the bridge. An answer without `apps` keeps all.
 The Approvals row for the hand-off (written whenever apps were on the card) has
-`input.apps` set to the kept ids. A Scout follow-up on a wake never skips the card when it carries
-apps, even if a preference covers hand-offs. An expert that cannot take http MCP servers (or a
+`input.apps` set to the kept ids. A hand-off with apps always shows the card; only the person
+answers it, whatever preferences exist. An expert that cannot take http MCP servers (or a
 brain with no bridge) is refused before the card ("this expert can't take connected apps"). The
 grant's `sent` flag is set by `keep_apps`; until then the bridge lists tools but refuses calls.
 
@@ -1308,11 +1306,12 @@ or step still being updated survives), and keeps one marker. Messages without an
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
 `running`/`pending` are closed before the `end` entry: `stopped` when the person stopped the job
 (not a failure: the summary and `list_jobs` say "stopped: <step>"; a person's Stop, a restart and a clean shutdown all read the same), `failed` on an
-error. `Jobs.stop` first calls `JobActivity.stopping()` on each part: the adapter reports the tool
-call a cancelled permission ask left open as failed ("The user doesn't want to proceed"), and while
-stopping that status is written `stopped`, so the person's own stop never reads "1 failed"
-(LT1-2). A cancelled job's wake note adds "The person stopped this job. Do not start it again or
-start a replacement unless they ask."; a brain restart reads blocked, not that. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
+error. `Jobs.stop` and `Jobs.shutdown` first call `JobActivity.stopping()` on each part: the
+adapter reports the tool call a cancelled permission ask left open as failed ("The user doesn't
+want to proceed"), and while stopping that status is written `stopped`, so a stop never reads "1
+failed" (LT1-2). A cancelled job's wake note (a stop by the person or Scout, or a clean shutdown)
+adds "This job was stopped. Do not start it again or start a replacement unless the person
+asks."; a brain restart reads blocked, not that. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
 closed as `stopped`. Nothing unmasked is stored. The log lives as long as its job row.
 
 **Terminal output and exit codes.** `ExpertHost` sends `clientCapabilities._meta =

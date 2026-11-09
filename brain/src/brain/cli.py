@@ -159,7 +159,7 @@ def _confirm(ask: Callable[[str], str], yes: bool) -> bool:
     try:
         return ask("Go ahead? [y/N] ").strip().lower() in ("y", "yes")
     except EOFError:  # no terminal to answer on
-        raise _Fail("Run with --yes to install without a prompt.") from None
+        raise _Fail("Run again with --yes to go ahead without a prompt.") from None
 
 
 async def _doctor(home: Path, env, reg: Registry, machine, out) -> None:

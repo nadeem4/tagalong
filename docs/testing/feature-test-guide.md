@@ -451,9 +451,10 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 17. **Action:** with a job running, ask Scout in chat to nudge it ("tell it to use tabs"). Then let
     a check-back timer wake Scout and have it nudge or continue a job on its own.
     **Expected:** the chat request goes through with no card and no new row in Approvals. The nudge
-    Scout starts on a wake asks you first (an Allow card for `tell_expert`, or the mode card for a
-    `continue_job` follow-up). Save a preference that covers nudges and repeat: Scout proceeds, the
-    row says it was Scout's decision, and a follow-up reuses the earlier mode with no card. Type a
+    Scout starts on a wake asks you first (an Allow card for `tell_expert`). On a wake Scout never
+    starts a job (`hand_off` is refused): it tells you what it would run and waits for you to ask.
+    Save a preference that covers nudges and repeat: Scout proceeds and the row says it was
+    Scout's decision. Type a
     message into a wake turn that is already running: once it reaches Scout, the next nudge goes
     through with no ask (a nudge already waiting on its card still asks). With the bubble
     closed (nobody online) the nudge waits like any Scout ask and runs if you allow it later.
@@ -2345,8 +2346,9 @@ tagalong doctor` lists this machine, Node, npm and git, says there is no key and
 4. `uv run tagalong install claude-acp`: it prints the version, the folder and the Node download
    (or that the Node here is used), asks `[y/N]`; `n` installs nothing. Answer `y`: progress lines
    and `installed`. `experts.json` now lists it.
-   **F11 (LT1-3):** run `uv run tagalong install claude-acp < NUL` (no terminal, no `--yes`).
-   **Expected:** one line, "Run with --yes to install without a prompt.", exit code 1, no traceback.
+   **F11 (LT1-3):** with no terminal and no `--yes`, run `uv run tagalong install claude-acp < NUL` (cmd) or
+   `$null | uv run tagalong install claude-acp` (PowerShell).
+   **Expected:** one line, "Run again with --yes to go ahead without a prompt.", exit code 1, no traceback.
 5. Start the brain afterwards: the expert is available with no restart of anything else. (Start it
    first and install after: Scout sees the expert on its next use, without a restart.)
 6. `uv run tagalong login claude-acp` on a machine with a screen opens the terminal window and

@@ -706,17 +706,14 @@ def work_tools(
 def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolSpec, Handler]]:
     """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
     raises it as an RpcError so the body shows the same words. owner_turn says whether the
-    running turn is the owner's: a follow-up they asked for needs no ask."""
+    running turn is the owner's: only then may hand_off start a job."""
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
         if not owner_turn():
             # A wake (job ended, timer) never starts work: a stopped job restarted by itself
             # cost real money. Scout tells the person and waits for their say.
-            return (
-                "hand_off refused: the person did not ask for this in a message, so do not start "
-                "a job now. Tell them what you would run and let them ask."
-            )
+            return "hand_off refused: only a message from the person can start a job."
         apps = args.get("apps", [])
         if not isinstance(apps, list) or not all(isinstance(a, str) for a in apps):
             return "hand_off needs apps to be a list of connected app ids."
@@ -726,7 +723,6 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 args["folder"],
                 args.get("expert"),
                 args.get("continue_job"),
-                owner_asked=owner_turn(),
                 fresh=args.get("fresh") is True,
                 job=_text_arg(args, "job"),
                 title=_text_arg(args, "title"),
