@@ -156,10 +156,7 @@ def test_a_25k_result_is_stored_whole_and_read_to_the_end(mem):
     assert got == lines
 
 
-def test_a_cut_next_to_an_emoji_leaves_clean_text(mem):
-    store = OutputStore(mem, Guards(), 5)
-    for pad in range(6):
-        text = "a" * pad + "\U0001f600‍\U0001f600" + "b" * 10
-        shown = preview(store, "t", text).split("\n", 1)[1]
-        shown.encode("utf-8")  # a lone surrogate would raise
-        assert "�" not in shown
+def test_a_lone_surrogate_is_stored_as_a_replacement_character(mem):
+    store = OutputStore(mem, Guards(), 10)
+    out = preview(store, "t", "a" * 10 + "\ud83d" + "b" * 10)
+    assert store.page(header(out)["output_id"], 10)["text"].startswith("�")

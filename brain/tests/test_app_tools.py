@@ -273,6 +273,13 @@ async def test_source_run_is_error_result():
     assert e.value.message == "Linear could not do that: boom"
 
 
+async def test_source_run_caps_a_long_error_line():
+    apps = FakeApps([tool("t")], outcome=result(text("e" * 900), is_error=True))
+    with pytest.raises(RpcError) as e:
+        await AppSource(apps).run(a_call("lin__t"), "lin__t")
+    assert e.value.message == "Linear could not do that: " + "e" * 500
+
+
 async def test_source_run_timeout_and_protocol_lines():
     for exc in (AppError("Linear did not answer in time."), AppError("Linear said: bad")):
         src = AppSource(FakeApps([tool("t")], outcome=exc))

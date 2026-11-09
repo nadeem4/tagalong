@@ -309,7 +309,7 @@ the model gets a facts header plus the first cap characters:
 ```
 
 `read_output(id, offset)` is Scout's own auto tool: it returns one page (at most the cap) of the
-stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again.
+stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again; its text is fenced as `<data kind="output">` so stored app text cannot pass as instructions. A lone surrogate in a stored result becomes U+FFFD.
 An unknown id or a negative offset is a plain refusal line; an offset past the end is an empty last
 page. Cuts are on characters, never mid-character. Brain tools, connected-app tools and an expert's
 report on a job wake all use this one path. The stored job report stays whole in the database, so the

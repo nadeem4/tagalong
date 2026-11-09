@@ -28,6 +28,8 @@ class OutputStore:
         self.cap = cap
 
     def put(self, tool: str, text: str) -> StoredOutput:
+        # A lone surrogate (half an emoji from JSON) cannot be saved; it becomes U+FFFD.
+        text = text.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
         masked = mask_json(self._guards, "tool_output", text)
         output_id = uuid.uuid4().hex[:12]
         self._memory.put_output(output_id, tool, masked)

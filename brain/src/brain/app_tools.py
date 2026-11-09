@@ -119,14 +119,14 @@ def specs_for(app_id: str, tools: list[Tool]) -> list[ToolSpec]:
     return list(out.values())
 
 
-# Hard limit on one app answer, in characters (the body part limit). The model sees a preview
+# Hard limit on one app answer: about 5 MB (characters, not bytes). The model sees a preview
 # and reads the rest with read_output (toolbox._cap); cutting earlier hid the rest from it.
 RESULT_HARD_MAX = LIMITS["part_bytes"]
 
 
 def _first_line(text: str) -> str:
     lines = text.strip().splitlines()
-    return lines[0] if lines else "no reason given"
+    return lines[0][:500] if lines else "no reason given"
 
 
 def _block_text(block: object) -> str:
