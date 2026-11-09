@@ -23,7 +23,7 @@ import { BodiesPanel } from './bodies-panel';
 import { LoopsPanel } from './loops-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
-import { WhereThingsRun } from './where-things-run';
+import { LINK, WhereThingsRun } from './where-things-run';
 
 export type HomePage = 'overview' | 'jobs' | 'connections' | 'approvals' | 'memory' | 'settings';
 
@@ -139,14 +139,43 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
 function Overview({ companion, host }: { companion: Pet | undefined; host: HomeHost }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
 
-  useEffect(() => {
-    void host
-      .status?.()
-      .then(setStatus)
-      .catch(() => undefined);
-  }, [host, companion]);
-
   const bridge = useHostBridge();
+
+  useEffect(() => {
+    // The brain link comes first: with no brain, "Ready" would be a lie. Read again on
+    // every link change so the card follows an outage and the return.
+    // Only the newest read may write: a slow reply must not undo a later "Brain: Offline".
+    let latest = 0;
+    const read = () => {
+      const mine = ++latest;
+      void bridge.brainLink().then(
+        (link) => {
+          if (mine !== latest) return;
+          if (link.status !== 'online') {
+            setStatus({ text: `Brain: ${LINK[link.status].words}`, ok: false });
+            return;
+          }
+          void host.status?.().then(
+            (next) => {
+              if (mine === latest) setStatus(next);
+            },
+            () => undefined,
+          );
+          if (host.status === undefined) setStatus({ text: 'Ready', ok: true });
+        },
+        () => undefined,
+      );
+    };
+    read();
+    const stop = bridge.onBrainChanged((what) => {
+      if (what === 'link') read();
+    });
+    return () => {
+      latest = Infinity; // reads still in flight belong to a closed effect
+      stop();
+    };
+  }, [bridge, host, companion]);
+
   const name = companion?.name ?? 'Scout';
   return (
     <>

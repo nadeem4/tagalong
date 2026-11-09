@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ContextSnapshot } from './shapes';
+import type { ContextSnapshot, TurnEvent } from './shapes';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';
@@ -1044,6 +1044,130 @@ describe('GreetingLine with a status mark', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
     expect(onFix).toHaveBeenCalledWith('voice');
+  });
+});
+
+describe('a permission ask in the middle of a streaming turn', () => {
+  const said = 'Saving that your favourite colour is teal.';
+  const askId = '20000000-0000-4000-8000-000000000002';
+  const confirmEvent = (summary: string): TurnEvent => ({
+    type: 'connector.confirm',
+    approvalId: askId,
+    turnId: 'turn-1',
+    petId: 'scout',
+    app: 'Scout',
+    tool: 'remember',
+    summary,
+    options: ['allow', 'always', 'deny'],
+  });
+
+  /** A turn that said `lead`, read something, then said `said` and asked. */
+  async function twoStep(lead: string) {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('remember teal'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: lead });
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: 'toolu_01',
+        tool: 'read_screen',
+        input: {},
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: said });
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: 'toolu_02',
+        tool: 'remember',
+        input: {},
+      });
+      bridge.emit(confirmEvent(said));
+    });
+    return bridge;
+  }
+
+  it('shows the step words once, in the card, and keeps the earlier lead and Stop', async () => {
+    await twoStep('Let me check. ');
+    expect(screen.getAllByText(said)).toHaveLength(1);
+    expect(screen.getByRole('region', { name: 'Allow remember?' })).toHaveTextContent(said);
+    expect(screen.getByText('Let me check.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  });
+
+  it('still shows the step once when the card summary is cut short', async () => {
+    const long = `${said} ${'More words. '.repeat(30)}`;
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('remember teal'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: long });
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: 'toolu_02',
+        tool: 'remember',
+        input: {},
+      });
+      bridge.emit(confirmEvent(long.slice(0, 200)));
+    });
+    expect(screen.getAllByText(/Saving that your favourite/)).toHaveLength(1);
+  });
+
+  it('shows the full text again once the card is answered', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: askId } as never));
+    expect(screen.getByText(/Let me check\./)).toHaveTextContent(said);
+  });
+
+  const call = (id: string, tool = 'remember'): TurnEvent => ({
+    type: 'turn.toolRequest',
+    turnId: 'turn-1',
+    approvalId: id,
+    tool,
+    input: {},
+  });
+
+  it('cuts at the same step when parallel calls share it', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit(call('toolu_03', 'remember_more')));
+    expect(screen.getAllByText(said)).toHaveLength(1);
+    expect(screen.getByText('Let me check.')).toBeInTheDocument();
+  });
+
+  it('shows the whole text when the turn ends while the card is open', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() =>
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 'turn-1',
+        text: `Let me check. ${said} Done.`,
+        stopReason: 'end',
+      }),
+    );
+    expect(screen.queryByRole('region', { name: 'Allow remember?' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Done\./)).toHaveTextContent(said);
+  });
+
+  it('cuts text streamed after the ask while the card is open, and shows it after', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: ' Waiting on you.' }));
+    expect(screen.queryByText(/Waiting on you/)).not.toBeInTheDocument();
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: askId } as never));
+    expect(screen.getByText(/Waiting on you/)).toBeInTheDocument();
   });
 });
 

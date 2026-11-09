@@ -31,6 +31,15 @@ describe('Walkthrough', () => {
     expect(screen.getByText('Your companion')).toBeInTheDocument();
   });
 
+  it('labels the API key step Required without a key and Key set with one', async () => {
+    const { unmount } = render(<Walkthrough host={makeWalkthroughHost()} scout={SCOUT} />);
+    expect(sideButton('API key')).toHaveTextContent('Required');
+    unmount();
+    open(makeWalkthroughHost({ key: HAS_KEY }));
+    await waitFor(() => expect(sideButton('API key')).toHaveTextContent('Key set'));
+    expect(sideButton('API key')).not.toHaveTextContent('Required');
+  });
+
   it('marks the navy side panel on-navy so shared controls get the gold focus ring', () => {
     open();
     expect(screen.getByRole('list', { name: 'Steps' }).closest('aside')).toHaveClass('on-navy');

@@ -190,7 +190,7 @@ export function LimitField({
         onCommit={() => void save()}
       />
       <div className="tg-inline">
-        <Button variant="quiet" onClick={() => void save()}>
+        <Button variant="secondary" onClick={() => void save()}>
           Set limit
         </Button>
       </div>

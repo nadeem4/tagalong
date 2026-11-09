@@ -223,7 +223,7 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
 11. **Action:** ask Scout to do something that changes a window (for example "move the Notes
     window to the left").
     **Expected:** the bubble asks in Scout's own words, with **Allow once**, **Always allow** and
-    **Deny**. **Allow once** runs it; the next time the bubble asks again.
+    **Deny**. **Allow once** runs it; the next time the bubble asks again. Scout's words show once, in the card, never also as streaming text above it.
 12. **Action:** repeat and press **Always allow**.
     **Expected:** it runs, and later asks for the same tool no longer appear. Press **Deny** on
     another tool's ask: Scout tells you it was told no.
@@ -1916,7 +1916,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    match, Scout asks which one, in its own words.
 4. **Live update.** With Home open on **What Scout remembers**, ask Scout to remember something.
    **Expected:** the row appears without reopening Home.
-5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit.
+5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain: Offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 

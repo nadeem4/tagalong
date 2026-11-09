@@ -1,6 +1,6 @@
 /** Tests for HomeView: the nav and the pages the Python brain feeds. */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
@@ -163,6 +163,61 @@ describe('HomeView', () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: paused });
     const scout = await screen.findByRole('region', { name: 'Scout' });
     await waitFor(() => expect(scout).toHaveTextContent('Ready, sight paused'));
+  });
+
+  it('says the brain is offline on the Scout card, and Ready again when it returns', async () => {
+    let status: 'offline' | 'online' | 'outdated' = 'offline';
+    const bridge = Object.assign(createFakeHostBridge({ pets: [SCOUT] }), {
+      brainLink: () => Promise.resolve({ addr: 'ws://127.0.0.1:47321', status }),
+    });
+    renderHome(bridge);
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Offline'));
+    expect(scout).not.toHaveTextContent('Ready');
+    status = 'outdated';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Needs update'));
+    status = 'online';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Ready'));
+  });
+
+  it('ignores a slow host status that arrives after a newer link read', async () => {
+    let release: (v: { text: string; ok: boolean }) => void = () => undefined;
+    let status: 'online' | 'offline' = 'online';
+    const slow: HomeHost = {
+      status: () => new Promise((resolve) => (release = resolve)),
+    };
+    const bridge = Object.assign(createFakeHostBridge({ pets: [SCOUT] }), {
+      brainLink: () => Promise.resolve({ addr: 'ws://127.0.0.1:47321', status }),
+    });
+    renderHome(bridge, { homeHost: slow });
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(release).not.toBe(undefined));
+    status = 'offline';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Offline'));
+    await act(async () => release({ text: 'Ready', ok: true }));
+    expect(scout).toHaveTextContent('Brain: Offline');
+  });
+
+  it('ignores a slow status from a previous host after the host changes', async () => {
+    let release: (v: { text: string; ok: boolean }) => void = () => undefined;
+    const first: HomeHost = { status: () => new Promise((resolve) => (release = resolve)) };
+    const second: HomeHost = { status: () => Promise.resolve({ text: 'Second host', ok: true }) };
+    const bridge = createFakeHostBridge({ pets: [SCOUT] });
+    const tree = (homeHost: HomeHost) => (
+      <HostBridgeProvider bridge={bridge}>
+        <HomeView host={homeHost} scout={IDLE} settings={<p>The settings form</p>} />
+      </HostBridgeProvider>
+    );
+    const { rerender } = render(tree(first));
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(release).not.toBe(undefined));
+    rerender(tree(second));
+    await waitFor(() => expect(scout).toHaveTextContent('Second host'));
+    await act(async () => release({ text: 'First host', ok: true }));
+    expect(scout).toHaveTextContent('Second host');
   });
 
   it('moves between pages, and reports the page to the host', async () => {
