@@ -2098,6 +2098,16 @@ from a terminal.
    seconds of audio and the real-time factor; it writes `voice_smoke.wav`, which plays as the same
    British voice (`bm_george`) saying both sentences, clearly, with no clipping.
 
+### V.2. Brain ears keep the last word and invent no first word
+Needs a microphone and the voice models (the first listen downloads about 56 MB).
+1. **Action:** start the brain, listen in held mode and say "What is the capital of France?",
+then release. **Expected:** the final text ends with "France"; it does not start with an extra
+word such as "You" or "Okay". Repeat with "Please tell me a short fact about the moon.".
+2. **Action:** listen in always mode and say the same, then stay quiet. **Expected:** one turn,
+with the same words. A pause after a comma is judged by Smart Turn from how the voice sounds
+(a clean text-to-speech voice falls as if the sentence were over and may end the turn; a person
+trailing off does not).
+
 ## Anthropic key in the app
 
 Run on the desktop with a brain that has no key (a fresh data folder, no `ANTHROPIC_API_KEY` in
