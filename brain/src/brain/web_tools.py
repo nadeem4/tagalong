@@ -20,7 +20,9 @@ def is_server_block(block: dict) -> bool:
     our own client results are exactly "tool_result". Results can be pages long and only replay
     inside the live conversation; one left without its use makes the API reject every request."""
     kind = block.get("type")
-    return kind == "server_tool_use" or (isinstance(kind, str) and kind.endswith("_tool_result"))
+    if not isinstance(kind, str):
+        return False
+    return kind.endswith(("_tool_use", "_tool_result")) and kind not in ("tool_use", "tool_result")
 
 
 def _spec(name: str, version: str, description: str) -> ToolSpec:

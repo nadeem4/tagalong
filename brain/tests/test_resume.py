@@ -4,6 +4,7 @@ A broken history (orphan tool_result, unanswered tool_use) makes the API reject 
 turn, so the trimming rules must always cut on whole turns.
 """
 
+from brain.masking import WITHHELD
 from brain.mind.resume import RESUME_MAX_MESSAGES, rebuild_history
 
 
@@ -31,7 +32,18 @@ def test_an_assistant_message_emptied_by_stripping_keeps_alternation_valid():
     }
     history = rebuild_history([u("q"), only, u("next")])
     assert [m["role"] for m in history] == ["user", "assistant", "user"]
-    assert history[1]["content"] == [{"type": "text", "text": "[withheld]"}]
+    assert history[1]["content"] == [{"type": "text", "text": WITHHELD}]
+
+
+def test_resume_strips_citations_and_mcp_tool_use_like_the_save_path():
+    cited = {
+        "type": "text",
+        "text": "From X.",
+        "citations": [{"type": "web_search_result_location", "url": "https://x.example"}],
+    }
+    mcp = {"type": "mcp_tool_use", "id": "m1", "name": "n", "server_name": "s", "input": {}}
+    history = rebuild_history([u("q"), {"role": "assistant", "content": [cited, mcp]}, u("n")])
+    assert history[1]["content"] == [{"type": "text", "text": "From X."}]
 
 
 def u(text):

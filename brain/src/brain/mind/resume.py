@@ -6,21 +6,20 @@ tool blocks, so chats saved with orphaned results heal.
 """
 
 from brain.masking import WITHHELD
-from brain.web_tools import is_server_block
+from brain.web_tools import without_server_blocks
 
 RESUME_MAX_MESSAGES = 50
 
 
 def _without_server_blocks(message: dict) -> dict:
-    """Heals saved chats that kept server results without their server_tool_use. An assistant
-    message left empty gets a placeholder so alternation and non-empty content stay valid."""
-    content = message["content"]
-    if message["role"] != "assistant" or not isinstance(content, list):
-        return message
-    kept = [b for b in content if not is_server_block(b)]
-    if len(kept) == len(content):
-        return message
-    return {**message, "content": kept or [{"type": "text", "text": WITHHELD}]}
+    """Heals saved chats that kept server blocks, by the same strip the save path uses. An
+    assistant message left empty gets a placeholder so alternation and content stay valid."""
+    out = without_server_blocks(message)
+    if out["content"] == message["content"]:
+        return message  # unchanged: callers tell a rebuilt tail from a loaded one by identity
+    if out["role"] == "assistant" and isinstance(out["content"], list) and not out["content"]:
+        return {**out, "content": [{"type": "text", "text": WITHHELD}]}
+    return out
 
 
 def _is_turn_start(message: dict) -> bool:

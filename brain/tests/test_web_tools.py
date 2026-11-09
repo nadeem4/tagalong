@@ -206,6 +206,13 @@ def test_any_server_result_block_is_dropped_by_its_shape_not_a_list():
     assert kept["content"] == [mine]  # the brain's own results are not server blocks
 
 
+def test_mcp_tool_use_is_a_server_block_but_client_tool_use_is_not():
+    mcp = {"type": "mcp_tool_use", "id": "m1", "name": "n", "server_name": "s", "input": {}}
+    mine = {"type": "tool_use", "id": "toolu_1", "name": "n", "input": {}}
+    out = without_server_blocks({"role": "assistant", "content": [mcp, mine]})
+    assert out["content"] == [mine]
+
+
 def test_a_message_of_only_server_blocks_is_left_for_the_caller_to_fill():
     only = {"role": "assistant", "content": SERVER_BLOCKS[1:]}
     assert without_server_blocks(only)["content"] == []
