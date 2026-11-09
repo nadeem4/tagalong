@@ -947,8 +947,10 @@ words what the person reads (guidance in `mind/soul.md`).
   the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
   folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
   enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
-  background, outside the turn, one per expert id at a time (a second ask for the same id returns
-  `already_installing`). If the registry moved on after the card named a version, it returns
+  background, outside the turn, one per expert id at a time (a second ask for the same id is
+  refused with `already_installing` before the Allow card is shown). `tagalong stop` ends the
+  brain by killing it on Windows, so a start removes any `tools/*.part` and `tools/*.dl` staging
+  folder a killed brain left (`sweep_staging`). If the registry moved on after the card named a version, it returns
   `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
   `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. Brain
@@ -1906,8 +1908,12 @@ counts none). Fetch has no extra charge. The daily default is unchanged, so a re
 sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` has Scout say so
 plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
 server blocks and text citations from the copy written to disk (the live history keeps them). A message that loses any block also loses all its `thinking` and `redacted_thinking` blocks (`without_thinking`; masking a thinking block does the same), because the API rejects a thinking run with a hole in it. `rebuild_history` drops thinking from every message it rebuilds (the API only accepts thinking cut from the front of a history), so a resumed chat has none and thinking restarts with the next turn; the live history is untouched. So
-a resumed chat holds the answer text only, masked like any other message. A paused message with
-only server blocks is saved as the withheld placeholder. A server block is `server_tool_use` or any
+a resumed chat holds the answer text only, masked like any other message. In place of the dropped
+search blocks the save keeps one short text note (`[Searched the web for "q". Read <url>. Sources:
+Title (url); ...]`, from the `web_search` / `web_fetch` `server_tool_use` input and the
+`web_search_tool_result` content; at most 5 queries, pages and sources, 120 characters each), so a
+restarted Scout still knows it searched. The note is saved text, so it is masked too. A message
+with only server blocks and no search or fetch among them is saved as the withheld placeholder. A server block is `server_tool_use` or any
 `*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),
 so new tool versions need no list edit. `rebuild_history` drops them too, which heals chats saved
 before this rule (an orphaned result makes the API reject every request); an assistant message left

@@ -144,6 +144,15 @@ def _rm(folders: tuple[Path, ...]) -> None:
         shutil.rmtree(folder, ignore_errors=True)
 
 
+def sweep_staging(home: Path) -> None:
+    """Remove `.part` and `.dl` staging folders left by a brain that was ended mid-install (on
+    Windows `tagalong stop` kills the process, so nothing can clean up first). Run at start,
+    when no install of ours is running. `.old` is kept: it may hold the last good install."""
+    root = tools_dir(home, "")
+    if root.is_dir():
+        _rm(tuple(p for p in root.iterdir() if p.suffix in (".part", ".dl")))
+
+
 async def _clean(*folders: Path) -> None:
     await asyncio.to_thread(_rm, folders)  # a big tree must not stall the loop
 

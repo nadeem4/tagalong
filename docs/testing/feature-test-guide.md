@@ -191,7 +191,7 @@ desktop app. You need `uv` and an Anthropic key.
 16. **Action:** from `brain/`, run `uv run pytest tests/test_work_store.py tests/test_work_resume.py -q`.
     **Expected:** all pass. These cover the work table (not yet used by Scout): every allowed and
     refused state move, the goal rollup, the retry backoff, search, and the resume scan, which
-    changes nothing when run a second time. A fresh `tagalong.db` opens at schema version 18.
+    changes nothing when run a second time. A fresh `tagalong.db` opens at schema version 27.
 
 ## The desktop on the Python brain
 
