@@ -578,6 +578,17 @@ def test_stopping_a_job_does_not_report_its_open_steps_as_failures(frig):
     assert frig.failed == []
 
 
+def test_a_step_the_stop_rejected_reads_stopped_not_failed(frig):
+    # A stop answers the open permission ask as cancelled; the adapter then reports that tool
+    # call failed. The person's stop must win over that report.
+    frig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    frig.log.stopping()
+    frig.log.on_update(progress("t1", "failed", "The user doesn't want to proceed"))
+    assert frig.rows()[0].status == "stopped" and frig.failed == []
+    frig.log.end("stopped", "")
+    assert "0 failed" in job_activity.activity_line(frig.work, "j", NOW)
+
+
 # --- parts (SP2): one ordered log per job, each step tagged with its part
 
 

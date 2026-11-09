@@ -154,7 +154,12 @@ def _fact(err: Exception) -> str:
 
 def _confirm(ask: Callable[[str], str], yes: bool) -> bool:
     """The typed `y` (or --yes) is the OK, the same as the Allow card."""
-    return yes or ask("Go ahead? [y/N] ").strip().lower() in ("y", "yes")
+    if yes:
+        return True
+    try:
+        return ask("Go ahead? [y/N] ").strip().lower() in ("y", "yes")
+    except EOFError:  # no terminal to answer on
+        raise _Fail("Run again with --yes to go ahead without a prompt.") from None
 
 
 async def _doctor(home: Path, env, reg: Registry, machine, out) -> None:

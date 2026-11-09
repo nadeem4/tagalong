@@ -77,6 +77,10 @@ class JobActivity:
         self._last_say: object = None  # key of the message still being written, if any
         self._plan_seq: int | None = None
         self._wrote = False
+        self._stopping = False  # the person asked to stop: a rejected step is stopped, not failed
+
+    def stopping(self) -> None:
+        self._stopping = True
 
     def on_update(self, update: object) -> None:
         self._wrote = False
@@ -122,6 +126,8 @@ class JobActivity:
         step = u.tool_call_id
         old = self._steps.get(step)
         status = _STATUS.get(str(u.status)) if u.status else None
+        if self._stopping and status == "failed":
+            status = "stopped"
         if old is None:
             kind = _KIND.get(str(u.kind), "other") if u.kind else "other"
             entry = self._put(None, kind, _step_text(u, kind), status or "pending", step)
