@@ -25,7 +25,7 @@ function setup(opts: { held?: boolean; answer?: Answer | 'never'; heldAfter?: bo
     remove: async () => true,
   };
   const ask = vi.fn(
-    (_need: Need, _reason: string) =>
+    (_need: Need, _reason: string, _signal?: AbortSignal) =>
       new Promise<Answer>((resolve) => {
         if (opts.answer === 'never') return;
         held = opts.heldAfter ?? opts.answer === 'granted';
@@ -57,7 +57,7 @@ describe('PermissionBroker', () => {
   it('grant_then_resolves_after_a_recheck', async () => {
     const { broker, ask, api } = setup({ answer: 'granted' });
     await broker.ensure(tabsNeed, 'see tabs');
-    expect(ask).toHaveBeenCalledWith(tabsNeed, 'see tabs');
+    expect(ask).toHaveBeenCalledWith(tabsNeed, 'see tabs', expect.any(AbortSignal));
     expect(api.contains).toHaveBeenCalledTimes(2);
   });
 
@@ -92,6 +92,31 @@ describe('PermissionBroker', () => {
     await rejection(broker.ensure(tabsNeed, 'one'));
     await rejection(broker.ensure(tabsNeed, 'two'));
     expect(ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('silence_aborts_the_window_so_a_late_allow_grants_nothing', async () => {
+    const { broker, ask } = setup({ answer: 'never' });
+    const result = rejection(broker.ensure(tabsNeed, 'see tabs'));
+    await vi.advanceTimersByTimeAsync(0);
+    const signal = ask.mock.calls[0]?.[2] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(PERMISSION_WAIT_MS);
+    await result;
+    expect(signal.aborted).toBe(true);
+  });
+
+  it('the_window_stays_while_another_caller_still_waits', async () => {
+    const { broker, ask } = setup({ answer: 'never' });
+    const first = rejection(broker.ensure(tabsNeed, 'see tabs', 1_000));
+    const second = rejection(broker.ensure(tabsNeed, 'see tabs', 10_000));
+    await vi.advanceTimersByTimeAsync(0);
+    const signal = ask.mock.calls[0]?.[2] as AbortSignal;
+    await vi.advanceTimersByTimeAsync(1_000);
+    await first;
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(9_000);
+    await second;
+    expect(signal.aborted).toBe(true);
   });
 
   it('silence_fails_after_25s', async () => {

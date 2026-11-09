@@ -9,19 +9,31 @@ export type PartKind = 'links' | 'tables' | 'forms' | 'headings';
 
 const clean = (s: string | null | undefined): string => (s ?? '').replace(/\s+/g, ' ').trim();
 
+/** Text a reader sees: textContent also counts style, script and template bodies, which are code. */
+function withoutCode(el: Element): Element {
+  const copy = el.cloneNode(true) as Element;
+  copy.querySelectorAll('style, script, noscript, template').forEach((n) => n.remove());
+  return copy;
+}
+
+function visibleText(el: Element): string {
+  return clean(withoutCode(el).textContent);
+}
+
 function links(doc: Document): string[] {
   const out: string[] = [];
   for (const a of Array.from(doc.querySelectorAll('a'))) {
     const raw = a.getAttribute('href');
     if (raw === null || raw.trim() === '' || a.protocol === 'javascript:') continue;
-    out.push(`${clean(a.textContent) || a.href} -> ${a.href}`);
+    out.push(`${visibleText(a) || a.href} -> ${a.href}`);
   }
   return out;
 }
 
 function tables(doc: Document): string[] {
   return Array.from(doc.querySelectorAll('table')).map((table, i) => {
-    const rows = Array.from(table.querySelectorAll('tr')).map((tr) =>
+    const copy = withoutCode(table);
+    const rows = Array.from(copy.querySelectorAll('tr')).map((tr) =>
       Array.from(tr.querySelectorAll('th, td'))
         .map((cell) => clean(cell.textContent))
         .join('\t'),
@@ -32,7 +44,7 @@ function tables(doc: Document): string[] {
 
 function headings(doc: Document): string[] {
   return Array.from(doc.querySelectorAll('h1, h2, h3, h4, h5, h6')).map(
-    (h) => `${'#'.repeat(Number(h.tagName.slice(1)))} ${clean(h.textContent)}`,
+    (h) => `${'#'.repeat(Number(h.tagName.slice(1)))} ${visibleText(h)}`,
   );
 }
 

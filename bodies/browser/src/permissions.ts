@@ -32,7 +32,8 @@ export interface PermissionsApi {
 export type Answer = 'granted' | 'declined' | 'closed';
 
 export interface PermissionPrompt {
-  ask(need: Need, reason: string): Promise<Answer>;
+  /** An abort closes the window and settles as 'closed', so a late click cannot grant anything. */
+  ask(need: Need, reason: string, signal?: AbortSignal): Promise<Answer>;
 }
 
 /** A tool waits this long for the person to answer before giving up. */
@@ -69,7 +70,11 @@ export function denial(need: Need): string {
 
 export class PermissionBroker {
   // One open window per need; calls that arrive while it is open wait on the same answer.
-  private readonly open = new Map<string, Promise<Answer>>();
+  // The window closes when the last caller still waiting on it gives up.
+  private readonly open = new Map<
+    string,
+    { asking: Promise<Answer>; waiters: number; abort: AbortController }
+  >();
 
   constructor(
     private readonly api: PermissionsApi,
@@ -80,12 +85,23 @@ export class PermissionBroker {
   async ensure(need: Need, reason: string, waitMs: number = this.waitMs): Promise<void> {
     if (await this.api.contains(need)) return;
     const key = JSON.stringify(need);
-    let asking = this.open.get(key);
-    if (asking === undefined) {
-      asking = this.prompt.ask(need, reason).finally(() => this.open.delete(key));
-      this.open.set(key, asking);
+    let entry = this.open.get(key);
+    if (entry === undefined) {
+      const abort = new AbortController();
+      const asking = this.prompt
+        .ask(need, reason, abort.signal)
+        .finally(() => this.open.delete(key));
+      entry = { asking, waiters: 0, abort };
+      this.open.set(key, entry);
     }
-    const answer = await this.withinWait(asking, waitMs);
+    entry.waiters += 1;
+    const answer = await this.withinWait(entry.asking, waitMs);
+    entry.waiters -= 1;
+    // Silence ends the window; otherwise a late Allow would grant with no tool waiting.
+    if (answer === 'silent' && entry.waiters === 0) {
+      entry.abort.abort();
+      this.open.delete(key);
+    }
     // "closed" is rechecked too: the window closes itself right after a real grant, so the close
     // can be seen before the answer. Only a plain "no" or silence skips the check.
     const maybeHeld = answer === 'granted' || answer === 'closed';
