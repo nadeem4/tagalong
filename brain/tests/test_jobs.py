@@ -534,6 +534,13 @@ async def test_job_result_masks_key_shapes(make_rig, shape):
     )
 
 
+async def test_the_started_job_names_the_mode_the_person_chose(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"end": "end_turn"}])
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert job_id.mode == "Plan"
+
+
 async def test_a_crashed_run_ends_as_error(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"crash": 3}])
     job_id = await rig.jobs.start("go", str(rig.folder))
@@ -744,6 +751,12 @@ def test_job_note_without_a_result_or_reason():
     job = a_job("j2", "t", "cancelled")
     note = job_note(job)
     assert "stopped" in note and "[trimmed]" not in note
+
+
+def test_a_stopped_jobs_note_says_the_person_stopped_it_and_not_to_restart():
+    note = job_note(a_job("j4", "t", "cancelled"))
+    assert "The person stopped this job" in note and "unless they ask" in note
+    assert "person stopped" not in job_note(a_job("j5", "t", "done"))
 
 
 # --- expert questions go to Scout first (10d) ---

@@ -100,6 +100,7 @@ class JobId(str):
         self.session = session  # "continued" or "fresh"
         self.why_fresh = why_fresh
         self.title = title  # the saved, masked title of a job this start opened
+        self.mode: str | None = None  # the mode the person chose on the card, by its name
         return self
 
 
@@ -473,7 +474,9 @@ class Jobs:
                     raise JobError(message) from exc
                 raise
             self._records.update_part(job_id, part, session_id=run.session_id)
-            return self._started(job_id, part, earlier_part, run)
+            started = self._started(job_id, part, earlier_part, run)
+            started.mode = next((n for n, i in by_name.items() if i == mode_id), None)
+            return started
         finally:
             if not new_job:
                 self._reserved.get(job_id, set()).discard(part)
@@ -634,7 +637,9 @@ class Jobs:
     async def stop(self, job_id: str, part: str | None = None) -> None:
         """Stop the named part, or every running part of the job."""
         runs = self._running_parts(job_id, part)
-        for run in list(runs.values()):
+        for stopped_part, run in list(runs.items()):
+            if activity := self._activity.get(job_id, {}).get(stopped_part):
+                activity.stopping()  # the cancelled ask's rejection must not read as a failure
             await run.stop()
 
     async def shutdown(self) -> None:
@@ -1070,6 +1075,11 @@ def job_note(
         f"Folder: {job.folder}",
         f"State: {home_state(job.state)}",
     ]
+    if job.state == "cancelled":  # only a person's stop reaches here; a restart reads blocked
+        lines.append(
+            "The person stopped this job. Do not start it again or start a replacement "
+            "unless they ask."
+        )
     many = len(job.parts) > 1
     ended = [p for p in job.parts if p.ended_at]
     last = max(reversed(ended), key=lambda p: p.ended_at) if ended else None  # ties: later part

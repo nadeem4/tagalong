@@ -710,6 +710,13 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
+        if not owner_turn():
+            # A wake (job ended, timer) never starts work: a stopped job restarted by itself
+            # cost real money. Scout tells the person and waits for their say.
+            return (
+                "hand_off refused: the person did not ask for this in a message, so do not start "
+                "a job now. Tell them what you would run and let them ask."
+            )
         apps = args.get("apps", [])
         if not isinstance(apps, list) or not all(isinstance(a, str) for a in apps):
             return "hand_off needs apps to be a list of connected app ids."
@@ -729,16 +736,17 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
             # Setup facts (ids and numbers) are facts only; Scout words them. Else the plain line.
             return json.dumps(err.facts) if err.facts else str(err)
         # Facts only; Scout words them. Without a continue, the session is simply fresh.
-        return json.dumps(
-            {
-                "job": str(job_id),
-                "session": getattr(job_id, "session", "fresh"),
-                "why_fresh": getattr(job_id, "why_fresh", None),
-                "parent_job": getattr(job_id, "parent_job", None),
-                "part": getattr(job_id, "part", "p1"),
-                "title": getattr(job_id, "title", None),
-            }
-        )
+        result = {
+            "job": str(job_id),
+            "session": getattr(job_id, "session", "fresh"),
+            "why_fresh": getattr(job_id, "why_fresh", None),
+            "parent_job": getattr(job_id, "parent_job", None),
+            "part": getattr(job_id, "part", "p1"),
+            "title": getattr(job_id, "title", None),
+        }
+        if mode := getattr(job_id, "mode", None):  # the person's pick; Scout does not set it
+            result["mode"] = mode
+        return json.dumps(result)
 
     async def close_job(args: dict) -> str:
         _need_text("close_job", args, "job")

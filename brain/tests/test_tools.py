@@ -395,6 +395,14 @@ async def test_hand_off_reaches_jobs_start(home):
     }
 
 
+async def test_hand_off_result_states_the_chosen_mode(home):
+    started = JobId("m1")
+    started.mode = "Manual"
+    home.jobs.started = started
+    out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p"}))
+    assert out["mode"] == "Manual"
+
+
 async def test_hand_off_passes_the_apps_and_refuses_a_malformed_list(home):
     await home.run("hand_off", {"task": "t", "folder": "C:/p", "apps": ["lin", "mail"]})
     assert home.jobs.apps == ["lin", "mail"]
@@ -410,9 +418,16 @@ async def test_home_permission_list_shows_tell_expert_as_ask(home):
 async def test_hand_off_tool_passes_the_turn_origin(home):
     await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
     assert home.jobs.owner_asked is True
-    home.owner["turn"] = False  # a wake turn
-    await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
-    assert home.jobs.owner_asked is False
+    assert home.jobs.owner_asked is True
+
+
+async def test_a_wake_turn_cannot_start_a_hand_off(home):
+    # No person started this turn (a job ended, a timer fired): Scout may not start work.
+    home.owner["turn"] = False
+    for args in ({}, {"continue_job": "old1"}):
+        out = await home.run("hand_off", {"task": "t", "folder": "C:/p", **args})
+        assert "did not ask for this" in out and "do not start" in out
+    assert home.jobs.calls == [] and home.jobs.owner_asked is None
 
 
 async def test_hand_off_continue_job_reports_the_session_facts(home):

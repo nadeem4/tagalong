@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunsplit
 
+import httpx2
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
@@ -296,7 +297,9 @@ def _connect_error(name: str, exc: BaseException) -> str:
         cause = cause.__cause__ or cause.__context__
     if any(isinstance(c, socket.gaierror) for c in chain):
         return f"{name} could not be reached (address not found)."
-    if any(isinstance(c, ConnectionError) for c in chain):
+    if any(
+        isinstance(c, ConnectionError | httpx2.ConnectError | httpx2.ConnectTimeout) for c in chain
+    ):
         return f"{name} could not be reached."
     return _plain(exc)
 

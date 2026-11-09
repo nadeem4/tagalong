@@ -560,9 +560,13 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
   nobody online the nudge waits like any Scout ask (see [Asks that wait](#asks-that-wait)). `hand_off`
   with an explicit `continue_job` on an owner turn skips the engine and shows the mode card as
-  always; on a wake turn `Jobs._hand_off_mode` asks the engine first (kind `hand_off_followup`, source `claude_code`,
-  tool `hand_off`, group `<expert>:<folder>`); a covering preference reuses the earlier job's mode
-  and skips the mode card (Scout's row says `decided_by: "scout"`, no offer follows). Otherwise the mode card is the
+  always. A wake turn (a job ended, a timer: no message from the person started it) cannot call
+  `hand_off` at all: the tool answers "hand_off refused: the person did not ask for this in a
+  message" and Scout tells the person what it would run (LT1-4: a stopped job was restarted by
+  wakes, each costing money). `Jobs._hand_off_mode`'s engine ask (kind `hand_off_followup`, source
+  `claude_code`, tool `hand_off`, group `<expert>:<folder>`) and a covering preference's reuse of
+  the earlier job's mode (Scout's row says `decided_by: "scout"`, no offer follows) now apply
+  only below that guard. Otherwise the mode card is the
   engine's person step, so nothing is asked twice: the card pick is logged as a person row and
   offered like any approval. A mode the new session does not offer, or apps riding along, show
   the card without a preference ever answering (apps are the person's to approve). The card has
@@ -885,7 +889,8 @@ url shows empty. Home shows these rows in its "Where things run" card.
 
 `tools` is empty unless the app is `connected`: an Off or failed app offers Scout nothing to call.
 A failed app's `error` is one plain sentence naming the app: `<app> did not answer in time.`,
-`<app> could not be reached (address not found).` or `<app> could not be reached.`, never raw OS
+`<app> could not be reached (address not found).` or `<app> could not be reached.` (also for an
+http connect error or connect timeout anywhere in the cause chain), never raw OS
 text such as `[Errno 11001] getaddrinfo failed`.
 
 ## Connected apps
@@ -1043,7 +1048,8 @@ words what the person reads (guidance in `mind/soul.md`).
   `key set` reads the key from a hidden prompt or `--stdin`, never from the command line, and
   writes `ANTHROPIC_API_KEY` to `.env` with `upsert_env_value`. `install <expert>` and
   `apps add <app>` print what the Allow card shows (id, version, folder or host, the Node
-  download), then ask `[y/N]`; `--yes` skips the question. `login <expert>` runs the same
+  download), then ask `[y/N]`; `--yes` skips the question (with no terminal to answer on and no
+  `--yes` it prints "Run with --yes to install without a prompt." and exits 1). `login <expert>` runs the same
   `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits
   for the result; where no window can open it prints the command to run yourself. A failure
   prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
@@ -1135,7 +1141,10 @@ builds its own host that stops with it, as above. `Jobs` gets its runs from `Exp
   the session id in its mode; a frame for an unknown session is dropped (cancelled for an ask).
   Two jobs of one expert share the process, and a stop ends only its own session. A stop that the
   adapter ignores (past the grace period) kills the process, and any session sharing it ends in
-  `error`.
+  `error`. A finished job's session is forgotten at once, but the shared adapter (and the
+  `claude` process it started) stays for `TAGALONG_EXPERT_IDLE_S` after the last session so a
+  follow-up reuses it; each later job restarts that timer. This is by design (LT1-6), `tagalong
+stop` ends them, and a lower `TAGALONG_EXPERT_IDLE_S` frees the memory sooner.
 - **Idle stop.** After the last session ends the process stays up for `TAGALONG_EXPERT_IDLE_S`
   (default 300 s; 0 stops it at once), so a follow-up reuses a warm adapter. A new session cancels
   the wait. The brain stops every host on exit. A session that ends in `error` stops the process
@@ -1250,7 +1259,7 @@ description.
 job must use the same expert and the same folder as that job, which must not be running; each
 mismatch is a `JobError` with a plain reason. It reopens the earlier job's saved session id when
 the expert can, and records the earlier job in `parent_job` so `list_jobs` shows the chain. The
-hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh", "parent_job"}` (`parent_job` is the job
+hand-off result is JSON, facts only: `{"job", "session": "continued" | "fresh", "why_fresh", "parent_job", "mode"}` (`mode` is the name the person picked on the mode card, so Scout does not guess it; LT1-5. `parent_job` is the job
 whose session this one continues, `null` for none),
 with `why_fresh` one of `expert cannot reopen sessions`, `session could not be loaded`,
 `session is in use by another job` (a second follow-up of one session runs fresh, so asks never
@@ -1299,7 +1308,11 @@ or step still being updated survives), and keeps one marker. Messages without an
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
 `running`/`pending` are closed before the `end` entry: `stopped` when the person stopped the job
 (not a failure: the summary and `list_jobs` say "stopped: <step>"; a person's Stop, a restart and a clean shutdown all read the same), `failed` on an
-error. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
+error. `Jobs.stop` first calls `JobActivity.stopping()` on each part: the adapter reports the tool
+call a cancelled permission ask left open as failed ("The user doesn't want to proceed"), and while
+stopping that status is written `stopped`, so the person's own stop never reads "1 failed"
+(LT1-2). A cancelled job's wake note adds "The person stopped this job. Do not start it again or
+start a replacement unless they ask."; a brain restart reads blocked, not that. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
 closed as `stopped`. Nothing unmasked is stored. The log lives as long as its job row.
 
 **Terminal output and exit codes.** `ExpertHost` sends `clientCapabilities._meta =

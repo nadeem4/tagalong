@@ -194,6 +194,8 @@ desktop app. You need `uv` and an Anthropic key.
       **Expected:** its status is `off` or `error` and its `tools` list is empty.
     - **Action (F9, bug 3):** add an https app at `https://example.invalid/mcp` with a token, then `list_apps`.
       **Expected:** `error` is one plain line naming the app, such as `<app> could not be reached (address not found).`, with no `[Errno ...]` text.
+    - **Action (F11, LT1-1):** add an http app at `https://10.255.255.1/mcp` (a blackholed address) with a token, wait about 30 s, then `list_apps`.
+      **Expected:** `error` is `<app> could not be reached.`, never `All connection attempts failed`.
     - **Action (F9, bug 4):** ask Scout for something that needs a tool, after it has said a lead-in sentence.
       **Expected:** the lead-in and the answer are separate paragraphs, not run together (`...approve them.1) ...`).
     - **Automated (F9):** from `brain/`, run `uv run pytest tests/test_say_limits.py tests/test_app_status_lines.py tests/test_turn_text_break.py -q`.
@@ -296,6 +298,14 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 6. **Action:** start a long job and say "stop that job".
    **Expected:** the job ends as stopped, its open asks close, and no `claude` or `node` process
    stays behind. Asking Scout to stop it again gets a plain "not running" answer.
+   **F11 (LT1-2, LT1-4):** in Manual mode, hand off a task that runs several shell commands and leave
+   the permission ask unanswered, then say "stop that job". **Expected:** the step and the summary
+   say stopped (`0 failed`), not "1 failed"; Scout reports it stopped and does **not** start the task
+   again by itself on any later wake. Only when you ask "do it again" does it offer a new job.
+   **F11 (LT1-5):** answer the mode card with Manual. **Expected:** Scout then says the job runs in
+   Manual mode; it never says it cannot set the mode.
+   **F11 (LT1-6, by design):** after a job ends, its `claude` process stays up until
+   `TAGALONG_EXPERT_IDLE_S` (300 s) after the last job, or `tagalong stop`; nothing to fix.
 7. **Action:** start two long jobs, then ask for a third.
    **Expected:** Scout says 2 jobs are already running and names them.
 8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
@@ -2335,6 +2345,8 @@ tagalong doctor` lists this machine, Node, npm and git, says there is no key and
 4. `uv run tagalong install claude-acp`: it prints the version, the folder and the Node download
    (or that the Node here is used), asks `[y/N]`; `n` installs nothing. Answer `y`: progress lines
    and `installed`. `experts.json` now lists it.
+   **F11 (LT1-3):** run `uv run tagalong install claude-acp < NUL` (no terminal, no `--yes`).
+   **Expected:** one line, "Run with --yes to install without a prompt.", exit code 1, no traceback.
 5. Start the brain afterwards: the expert is available with no restart of anything else. (Start it
    first and install after: Scout sees the expert on its next use, without a restart.)
 6. `uv run tagalong login claude-acp` on a machine with a screen opens the terminal window and

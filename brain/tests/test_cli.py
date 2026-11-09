@@ -442,3 +442,14 @@ def test_stop_that_raises_oserror_prints_a_message_not_a_traceback(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("stop", stop=boom) == 1
     assert "did not stop" in rig.text
+
+
+def test_install_without_a_tty_or_yes_says_to_pass_yes(tmp_path):
+    rig = Rig(tmp_path)
+
+    def no_tty(prompt: str) -> str:
+        raise EOFError
+
+    rig.ask = no_tty
+    assert rig.go("install", "claude-acp") == 1
+    assert rig.lines[-1] == "Run with --yes to install without a prompt."

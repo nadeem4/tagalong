@@ -6,6 +6,7 @@ Fakes only: a fake stdio MCP server, and hand-built exceptions for the error wor
 
 import socket
 
+import httpx2
 from test_app_home_tools import rig, stdio, until  # noqa: F401  (rig is a fixture)
 
 from brain.apps import _connect_error
@@ -58,3 +59,11 @@ async def test_a_failed_connection_lists_a_plain_error_and_no_tools(rig):  # noq
     assert app["tools"] == []
     assert app["error"].startswith("Wiki could not be reached")
     assert "Errno" not in app["error"]
+
+
+def test_an_unreachable_http_address_names_the_app():
+    # A blackholed route raises httpx's own connect errors, not an OS ConnectionError.
+    for err in (httpx2.ConnectError("All connection attempts failed"), httpx2.ConnectTimeout("")):
+        wrapped = RuntimeError("wrapped")
+        wrapped.__cause__ = err
+        assert _connect_error("Hang", wrapped) == "Hang could not be reached."
