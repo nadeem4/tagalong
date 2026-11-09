@@ -43,10 +43,8 @@ def test_env_file_settings_are_read(monkeypatch, tmp_path, caplog):
         with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit):
             asyncio.run(_run())
         assert "TAGALONG_STEP_CAP" in caplog.text  # the .env value reached load_config
-    finally:
+    finally:  # _run put it in os.environ; monkeypatch.delenv would restore it at teardown
         os.environ.pop("TAGALONG_STEP_CAP", None)
-    # _run put it in os.environ; monkeypatch.delenv would restore it at teardown
-    os.environ.pop("TAGALONG_STEP_CAP", None)
 
 
 def test_main_opens_db_under_data_dir(monkeypatch, tmp_path):
@@ -510,3 +508,19 @@ def test_bad_numeric_setting_is_one_plain_line_and_exit_1(bad, monkeypatch, tmp_
         r.getMessage() for r in caplog.records if "TAGALONG_READER_DAILY_USD" in r.getMessage()
     ]
     assert len(lines) == 1 and repr(bad) in lines[0]
+
+
+def test_bad_expert_command_names_its_variable(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("TAGALONG_EXPERT_CMD", 'run "unclosed')
+    with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit):
+        asyncio.run(_run())
+    assert "TAGALONG_EXPERT_CMD" in caplog.text
+
+
+def test_non_utf8_env_file_names_the_file(monkeypatch, tmp_path, caplog):
+    (tmp_path / ".env").write_bytes(b"TAGALONG_MODEL=\xff\xfe\n")
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit):
+        asyncio.run(_run())
+    assert ".env" in caplog.text and "UTF-8" in caplog.text
