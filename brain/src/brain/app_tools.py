@@ -249,6 +249,8 @@ def app_home_tools(
                 }
                 for s in specs_for(row.id, apps.tools(row.id))
             ]
+            if status.state != "connected":
+                tools = []  # Off or failed: Scout cannot call them, so they are not offered
             rows.append(
                 {
                     "id": row.id,

@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import shutil
+import socket
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
@@ -283,6 +284,21 @@ def _plain(exc: BaseException) -> str:
     return lines[0] if lines else type(exc).__name__
 
 
+def _connect_error(name: str, exc: BaseException) -> str:
+    """The app's error line: one plain sentence naming the app, never raw OS text."""
+    root = _root(exc)
+    if isinstance(root, TimeoutError):
+        return f"{name} did not answer in time."
+    cause: BaseException | None = root
+    while cause is not None:  # httpx wraps the resolver's error as its cause
+        if isinstance(cause, socket.gaierror):
+            return f"{name} could not be reached (address not found)."
+        cause = cause.__cause__ or cause.__context__
+    if isinstance(root, ConnectionError):
+        return f"{name} could not be reached."
+    return _plain(exc)
+
+
 class Apps:
     def __init__(
         self,
@@ -501,7 +517,7 @@ class Apps:
                 known = isinstance(root, OAuthError | TimeoutError)
                 self._set(slot, "needs-sign-in", _plain(exc) if known else "The sign-in failed.")
             else:
-                self._set(slot, "error", _plain(exc))
+                self._set(slot, "error", _connect_error(slot.row.name, exc))
         finally:
             slot.session = None
 

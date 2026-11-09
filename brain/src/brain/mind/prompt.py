@@ -14,7 +14,17 @@ from functools import cache
 from importlib.resources import files
 from typing import Any
 
-from brain.protocol import Body, FilePart, ImagePart, Part, SayParams, TextPart
+from brain.protocol import (
+    LIMITS,
+    Body,
+    ErrorCode,
+    FilePart,
+    ImagePart,
+    Part,
+    RpcError,
+    SayParams,
+    TextPart,
+)
 from brain.store.memory import Item
 from brain.store.rules import Preference
 
@@ -182,6 +192,20 @@ def is_interruption_block(block: Any) -> bool:
         and block.get("type") == "text"
         and str(block.get("text", "")).startswith('<data kind="interruption">')
     )
+
+
+def check_part_sizes(parts: list[Part]) -> None:
+    """Contract limits for a say: one part's decoded data, and all parts together. Checked on
+    the base64 length so nothing is decoded; a bad part must never reach history, where the API
+    would reject it on every later turn."""
+    total = 0
+    for part in parts:
+        if isinstance(part, TextPart):
+            continue
+        size = len(part.data) * 3 // 4
+        total += size
+        if size > LIMITS["part_bytes"] or total > LIMITS["message_bytes"]:
+            raise RpcError(ErrorCode.over_limit, "That attachment is too big to send.")
 
 
 def user_content(params: SayParams) -> list[dict[str, Any]]:

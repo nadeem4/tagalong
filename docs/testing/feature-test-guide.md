@@ -188,6 +188,16 @@ desktop app. You need `uv` and an Anthropic key.
     large page).
     **Expected:** the call ends as an error result `<tool> sent more data than allowed.`
     (`over_limit`); Scout does not receive the text.
+    - **Action (F9, bug 1):** with a scripted body, `say` with a 6 MB image part, then `say` "Reply with just: ok".
+      **Expected:** the first `say` returns the `over_limit` error and no turn starts; the second answers normally.
+    - **Action (F9, bug 2):** add an app, then switch it off (or kill its process) and ask Scout or Home to `list_apps`.
+      **Expected:** its status is `off` or `error` and its `tools` list is empty.
+    - **Action (F9, bug 3):** add an https app at `https://example.invalid/mcp` with a token, then `list_apps`.
+      **Expected:** `error` is one plain line naming the app, such as `<app> could not be reached (address not found).`, with no `[Errno ...]` text.
+    - **Action (F9, bug 4):** ask Scout for something that needs a tool, after it has said a lead-in sentence.
+      **Expected:** the lead-in and the answer are separate paragraphs, not run together (`...approve them.1) ...`).
+    - **Automated (F9):** from `brain/`, run `uv run pytest tests/test_say_limits.py tests/test_app_status_lines.py tests/test_turn_text_break.py -q`.
+      **Expected:** all pass; a 400 from the API drops only the newest request so the next turn works.
 16. **Action:** from `brain/`, run `uv run pytest tests/test_work_store.py tests/test_work_resume.py -q`.
     **Expected:** all pass. These cover the work table (not yet used by Scout): every allowed and
     refused state move, the goal rollup, the retry backoff, search, and the resume scan, which

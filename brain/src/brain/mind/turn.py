@@ -107,12 +107,14 @@ async def run_turn(
     guards: Guards | None = None,
     turn_timeout: float | None = None,
     on_owner_input: Callable[[], None] | None = None,
+    on_rejected: Callable[[], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
     steps = 0
     shown: list[str] = []  # deltas of the step being streamed, kept if a cancel cuts it off
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
+    tail = ""  # the last words sent, so a new step's text can be set apart from them
     try:
         try:
             async with asyncio.timeout(turn_timeout) as limit:
@@ -134,14 +136,23 @@ async def run_turn(
                             item = await anext(stream)
                         except StopAsyncIteration:
                             break
-                        except Exception:
+                        except Exception as err:
                             log.exception("model call failed")
                             failed = True
+                            # A 400 on the person's newest message (a bad image, say) would fail
+                            # every later turn too; the session drops that message.
+                            if on_rejected and getattr(err, "status_code", None) == 400:
+                                on_rejected()
                             break
                         if isinstance(item, Final):
                             final = item
                         else:
+                            if not shown and tail and not tail[-1].isspace():
+                                # A new step after a tool round: without a break its words run
+                                # on from the lead-in ("...approve them.1) Moved...").
+                                notify("reply", {"turn": turn_id, "body": body_id, "delta": "\n\n"})
                             spoke = True
+                            tail = item or tail
                             shown.append(item)
                             notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
                     if failed or final is None:

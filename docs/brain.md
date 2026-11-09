@@ -191,7 +191,9 @@ flowchart TD
   prompt from Scout's soul, that "What you know" block, the capability picture, the bodies online
   and the local time (with its UTC offset), in that order.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
-  `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
+  `tool` `started` then `ended`. When a step's text follows a tool round and the words already sent
+  do not end in whitespace, a `"\n\n"` delta goes first, so a lead-in and the answer never run
+  together. The model is offered the memory tools (`remember`, `recall`,
   `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`, `watch`) and every online body's
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
@@ -212,7 +214,11 @@ flowchart TD
   holds in the saved chat and after a restart. A cancel before any word leaves nothing to keep: the request stays in the saved chat, marked
   `cut` (migration `0027_message_cut`), and leaves the model's history when the next turn starts;
   `load_messages` skips cut rows, so a restart does the same. Only a cancel does this: a turn that
-  ends in an error, a guard stop or a timeout keeps its request, so "try again" works. Says that
+  ends in an error, a guard stop or a timeout keeps its request, so "try again" works. The one
+  exception is a request the API rejects with a 400 (an image it cannot read, say): it is dropped
+  and marked `cut` the same way, since sending it again would fail every later turn. A `say` whose
+  part is over 5 MB (decoded), or whose parts total over 20 MB, is refused with `over_limit`
+  before anything is saved or sent. Says that
   joined a turn being cancelled get a turn of their own. A cancel during a tool step ends on the
   cancelled `tool_result`, which is valid as is.
 - Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
@@ -874,6 +880,11 @@ An unknown id is refused with `There is no app called <id>.`
 `list_apps` never returns a secret. Env values, headers and tokens do not leave the brain. A url
 is cut to scheme, host, port and path: userinfo, query and fragment are stripped, and a malformed
 url shows empty. Home shows these rows in its "Where things run" card.
+
+`tools` is empty unless the app is `connected`: an Off or failed app offers Scout nothing to call.
+A failed app's `error` is one plain sentence naming the app: `<app> did not answer in time.`,
+`<app> could not be reached (address not found).` or `<app> could not be reached.`, never raw OS
+text such as `[Errno 11001] getaddrinfo failed`.
 
 ## Connected apps
 

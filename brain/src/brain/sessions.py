@@ -49,6 +49,7 @@ from brain.memory import Memory
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
+    check_part_sizes,
     interruption_block,
     render_know,
     render_preferences,
@@ -302,6 +303,7 @@ class Session:
         # True when the last turn was cancelled before any word and its request is still last in
         # history: the next turn drops it (see _drop_unanswered).
         self._wordless_cancel = False
+        self._rejected = False  # the API answered the running turn's request with a 400
         self._joined: tuple[str | None, SayParams] | None = None
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
@@ -353,6 +355,7 @@ class Session:
             work.mark_reported(w.id)
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
+        check_part_sizes(params.parts or [])  # over_limit, before anything changes
         content = user_content(params)  # may raise ValueError before anything changes
         sender = self._bodies.body(body_id)
         shown_on: str | None = body_id
@@ -432,6 +435,9 @@ class Session:
         if last is not None and last["role"] == "user" and self._saved == len(self.history):
             self.history.pop()
             self._saved = len(self.history)
+
+    def _reject(self) -> None:
+        self._rejected = True
 
     def _set_last_cut(self, cut: bool) -> None:
         try:
@@ -791,6 +797,7 @@ class Session:
                 guards=self.guards,
                 turn_timeout=self._turn_timeout,
                 on_owner_input=self._owner_joined,
+                on_rejected=self._reject,
             )
 
         task = asyncio.create_task(run())
@@ -904,9 +911,12 @@ class Session:
         pending: list = []
         owns = self._task is task  # a newer turn may already own the session
         last = self.history[-1] if self.history else None
+        rejected, self._rejected = self._rejected, False
+        # A request the API rejects is dropped like a wordless cancel: kept in the saved chat
+        # (marked cut) but out of the history that every later turn would send again.
         unanswered = (
             owns
-            and reason == "cancelled"
+            and (reason == "cancelled" or rejected)
             and last is not None
             and last["role"] == "user"
             and not (
