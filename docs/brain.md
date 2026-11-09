@@ -2080,8 +2080,11 @@ listen first loads the ears.
 
 - **`Ears`** (`voice/ears.py`) is synchronous and holds no asyncio, so tests drive it frame by
   frame with fakes (`tests/fake_voice.py`). Silence is ignored. The first speech frame emits
-  `speech_start` (the 256 ms before it are fed in too). Every 10 speech frames, if the words
-  changed, `partial`. 256 ms of quiet closes the stretch and emits `final`. Held mode ends the
+  `speech_start` (the 96 ms before it are fed in too: more makes Moonshine invent a first word
+  like "You"). Every 10 speech frames, if the words changed, `partial`. 256 ms of quiet closes the
+  stretch and emits `final`, with the words from Moonshine's final pass (`finish`: the live read
+  trails the audio and clipped the last word; a failed final pass raises, so the service's error
+  path logs it). Held mode ends the
   turn only on `finish` (the key was released), with the last words kept and exactly one
   `turn_end`, even if nothing was said. Always mode asks Smart Turn at each pause and ends the
   turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as

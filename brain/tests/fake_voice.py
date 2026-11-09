@@ -44,6 +44,7 @@ class WordStt:
         self.words = 0
         self.fail = False
         self.sleep = 0.0
+        self.lag = 0  # words the live `text` has not caught up on yet; `finish` has them
 
     def accept(self, frame: np.ndarray) -> None:
         self.fed.append(float(frame[0]))
@@ -57,7 +58,14 @@ class WordStt:
             time.sleep(self.sleep)
         if self.fail:
             raise RuntimeError("stt broke")
-        return " ".join(["word"] * self.words)
+        return " ".join(["word"] * max(self.words - self.lag, 0))
+
+    def finish(self) -> str:
+        if self.fail:
+            raise RuntimeError("stt broke")
+        words = " ".join(["word"] * self.words)
+        self.words = 0
+        return words
 
     def reset(self) -> None:
         self.words = 0

@@ -23,8 +23,10 @@ PARTIAL_EVERY_FRAMES = 10  # live words about three times a second
 TURN_THRESHOLD = 0.5
 # Speech that never goes quiet (noise) is closed as a stretch after about 30 s.
 MAX_STRETCH_FRAMES = 938
-# Silero hears speech a frame or three late: the 256 ms before it is fed in too.
-PRE_ROLL_FRAMES = 8
+# Silero hears speech a frame or three late: the 96 ms before it is fed in too. More than that
+# feeds Moonshine the lead-in noise, which it turns into a spurious first word ("You", "Okay"):
+# 8 frames gave a bad first word in 20 of 25 runs, 3 frames in none (measured on the F13 test WAVs).
+PRE_ROLL_FRAMES = 3
 TURN_SAMPLES = 8 * SAMPLE_RATE  # Smart Turn reads the last 8 s
 
 
@@ -37,9 +39,11 @@ class Vad(Protocol):
 class StreamingStt(Protocol):
     def accept(self, frame: np.ndarray) -> None: ...
 
-    def text(self) -> str: ...
+    def text(self) -> str: ...  # words so far; can trail the audio by a pass, fine for partials
 
-    def reset(self) -> None: ...
+    def finish(self) -> str: ...  # the final pass over what was fed; restarts the stream
+
+    def reset(self) -> None: ...  # drop the words
 
 
 class EndOfTurn(Protocol):
@@ -134,8 +138,8 @@ class Ears:
     def _close_stretch(self, *, stopping: bool) -> None:
         self._in_speech = False
         self._stretch = 0
-        words = self._parts.stt.text().strip()
-        self._parts.stt.reset()
+        # `text` can trail the last word or two; only the final pass is the whole stretch.
+        words = self._parts.stt.finish().strip()
         if words != "":
             self._heard.append(words)
             self._emit("final", words)
