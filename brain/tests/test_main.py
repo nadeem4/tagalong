@@ -460,3 +460,22 @@ def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
     assert (
         "wa-token-0123456789" not in out and "leak [secret] to 15551234567" in out
     )  # the person's own number stays
+
+
+def test_busy_port_is_one_plain_line_and_exit_1(monkeypatch, tmp_path, caplog):
+    (tmp_path / "brain.pid").write_text("12345 first-brain")  # the running brain's file
+
+    async def busy(*args):
+        raise OSError(10048, "address already in use")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("TAGALONG_BRAIN_ADDR", "127.0.0.1:47399")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(main, "start_server", busy)
+    with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit) as exc:
+        asyncio.run(_run())
+    assert exc.value.code == 1
+    lines = [r.getMessage() for r in caplog.records if "47399" in r.getMessage()]
+    assert len(lines) == 1
+    assert "another brain" in lines[0] and "tagalong stop" in lines[0]
+    assert (tmp_path / "brain.pid").read_text() == "12345 first-brain"
