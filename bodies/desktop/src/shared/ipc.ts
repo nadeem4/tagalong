@@ -25,6 +25,7 @@ export const IPC = {
   ask: 'tagalong:ask',
   interrupt: 'tagalong:interrupt',
   listPets: 'tagalong:pets:list',
+  openConfirms: 'tagalong:confirms:open',
   // Home.
   browserFolder: 'tagalong:browser:folder',
   showBrowserFolder: 'tagalong:browser:show-folder',

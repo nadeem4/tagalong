@@ -170,6 +170,8 @@ export function CompanionBubble({
   // shows the head; answering or dismissing it brings up the next.
   const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
   const confirm = confirms[0] ?? null;
+  // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
+  const dismissed = useRef(new Set<string>());
   const dropConfirms = (gone: (c: ConnectorConfirmParams) => boolean): void =>
     setConfirms((current) => {
       const next = current.filter((c) => !gone(c));
@@ -243,6 +245,7 @@ export function CompanionBubble({
       }
       case 'connector.dismiss':
         // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
+        dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
         return;
       case 'turn.started':
@@ -301,6 +304,25 @@ export function CompanionBubble({
     }
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
+  // Cards whose ask arrived before this bubble mounted (a relaunch) are shown again.
+  useEffect(() => {
+    let live = true;
+    dismissed.current.clear();
+    void bridge
+      .openConfirms?.()
+      .then((open) => {
+        // An ask that closed while the reply was on its way stays closed.
+        for (const event of open) {
+          const gone =
+            event.type === 'connector.confirm' && dismissed.current.has(event.approvalId);
+          if (live && !gone) onTurnEvent(event);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [bridge]);
 
   const speakingIndicator = speaking && onStopSpeaking !== undefined && (
     <button
@@ -1024,7 +1046,7 @@ const BUBBLE_CSS = `
   .bubble-speaking span, .bubble-speaking span:nth-child(2),
   .bubble-bars span, .bubble-bars span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
-.bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
 .bubble-jobline {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

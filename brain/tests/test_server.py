@@ -635,6 +635,21 @@ async def test_new_body_sees_the_open_ask(ask_env):
             assert seen["params"]["id"] == ask["id"] and seen["params"]["state"] == "open"
 
 
+async def test_relaunched_body_with_no_last_seq_is_shown_the_open_ask_again(ask_env):
+    # The desktop restarts as a new process: no last_seq, same body id. The ask it left open
+    # (the turn is still waiting on it) must come again, after the hello result.
+    url, _ = ask_env
+    async with connect(url) as first:
+        ask = (await open_ask(first))["params"]
+    async with connect(url) as second:
+        reply = await call(second, hello_with_click())
+        assert reply["result"]["resync"] is False
+        seen = json.loads(await second.recv())
+        assert seen["params"]["id"] == ask["id"] and seen["params"]["state"] == "open"
+        frames = await answer(second, ask["id"], "allow")
+        assert frames[-1]["result"] == {}  # still answerable: the waiting turn goes on
+
+
 async def test_reconnect_without_resync_gets_the_ask_once_from_the_backlog(ask_env):
     url, _ = ask_env
     async with connect(url) as ws:

@@ -1,8 +1,10 @@
 /** Tests for the bubble's onAsk: text Home sends "as the person" is asked like typed text. */
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { TurnEvent } from './shapes';
 import { CompanionBubble } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
+import { ruleOf } from './test-support/css-rules';
 import { createFakeHostBridge } from './test-support/fake-host-bridge';
 
 function sender() {
@@ -30,6 +32,85 @@ function setup() {
   );
   return { bridge, host, view };
 }
+
+describe('CompanionBubble mounted while an ask is open', () => {
+  it('shows the open ask the body kept, though its live event came before the bubble existed', async () => {
+    const bridge = createFakeHostBridge({
+      openConfirms: [
+        {
+          type: 'connector.confirm',
+          approvalId: 'a1',
+          turnId: '',
+          petId: 'scout',
+          app: 'Claude Code',
+          tool: 'hand_off',
+          summary: 'Write ten poems',
+          options: ['Manual', 'Plan', 'cancel'],
+        },
+      ],
+    });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    expect(await screen.findByText(/Write ten poems/)).toBeInTheDocument();
+  });
+
+  it('does not bring back a card that was dismissed while the pull was in flight', async () => {
+    const card = {
+      type: 'connector.confirm' as const,
+      approvalId: 'a1',
+      turnId: '',
+      petId: 'scout',
+      app: 'Claude Code',
+      tool: 'hand_off',
+      summary: 'Write ten poems',
+      options: ['Manual', 'cancel'],
+    };
+    let release: (events: TurnEvent[]) => void = () => undefined;
+    const bridge = {
+      ...createFakeHostBridge(),
+      openConfirms: () => new Promise<TurnEvent[]>((resolve) => (release = resolve)),
+    };
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    // The ask closes after the reply was sent but before it arrives.
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+    await act(async () => release([card]));
+    expect(screen.queryByText(/Write ten poems/)).toBeNull();
+  });
+
+  // A folder path has no spaces to break at; without this it ran past the card's edge.
+  it('wraps a long unbroken path in the card text instead of clipping it', async () => {
+    const bridge = createFakeHostBridge({
+      openConfirms: [
+        {
+          type: 'connector.confirm',
+          approvalId: 'a1',
+          turnId: '',
+          petId: 'scout',
+          app: 'Claude Code',
+          tool: 'hand_off',
+          summary:
+            'folder: C:/Users/someone/AppData/Local/Temp/a-very-long-folder-name-with-no-spaces',
+          options: ['Manual', 'cancel'],
+        },
+      ],
+    });
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    await screen.findByText(/folder:/);
+    const css = [...container.querySelectorAll('style')].map((s) => s.textContent).join(' ');
+    expect(ruleOf(css, '.bubble-text')).toContain('overflow-wrap: anywhere');
+  });
+});
 
 describe('CompanionBubble asked from Home', () => {
   it('submits text delivered through onAsk as the person, visibly', async () => {

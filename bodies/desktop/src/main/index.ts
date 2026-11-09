@@ -155,6 +155,8 @@ const brainSetup = createBrainSetup(
 );
 /** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
 let claimTurn: (turnId: string) => void = () => undefined;
+/** The confirm cards still open, for a window that opened after their ask arrived. */
+let openConfirms: () => TurnEvent[] = () => [];
 
 /** Scout's spot goes to the settings file and the live settings: the brain has no settings. */
 function rememberAvatarSpot(position: { x: number | null; y: number | null }): void {
@@ -251,6 +253,7 @@ async function start(): Promise<void> {
     forwardToRenderers({ method: type, params });
   };
   claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
+  openConfirms = () => turnEvents.openConfirms();
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   // The Add key mark follows the brain's own answer; an unreadable answer leaves it as it is.
@@ -860,7 +863,7 @@ function registerIpc(): void {
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
   });
-  registerScoutIpc(handle);
+  registerScoutIpc(handle, () => openConfirms());
   registerSpendIpc(handle, { brain: required().brain });
   registerKeyIpc(handle, {
     brain: required().brain,

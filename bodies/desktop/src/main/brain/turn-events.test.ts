@@ -471,6 +471,22 @@ describe('createTurnEvents: asks', () => {
     expect(m.map('ask', closed('a2'))).toEqual([{ type: 'connector.dismiss', approvalId: 'a2' }]);
   });
 
+  // A window that opens after the ask arrived (a relaunch, a panel not yet created) missed the
+  // card; it pulls the ones still open instead.
+  it('openConfirms lists the cards still open, and drops one when its ask closes', () => {
+    const m = make();
+    const [first] = m.map('ask', open());
+    m.map('ask', open({ id: 'a2' }));
+    expect(
+      m.openConfirms().map((e) => (e.type === 'connector.confirm' ? e.approvalId : '')),
+    ).toEqual(['a1', 'a2']);
+    expect(m.openConfirms()[0]).toEqual(first);
+    m.map('ask', closed('a1'));
+    expect(m.openConfirms()).toHaveLength(1);
+    m.resync();
+    expect(m.openConfirms()).toEqual([]);
+  });
+
   it('a closed ask it never showed maps to nothing', () => {
     expect(make().map('ask', closed('zz'))).toEqual([]);
   });

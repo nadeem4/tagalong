@@ -5,6 +5,7 @@
  * Contains registerJobsIpc.
  */
 
+import { BrainOffline } from '@tagalong/contract';
 import type { JobActivityPage, JobPartRow, JobRow, RunningStep } from '@tagalong/ui';
 import { IPC } from '../../shared/ipc';
 import { callJson } from '../brain/call-json';
@@ -100,5 +101,14 @@ export function registerJobsIpc(handle: IpcHandle, deps: { brain: BrainCall }): 
     if (text !== null && typeof text !== 'string') throw new Error('brain sent bad report');
     return text;
   });
-  handle(IPC.runningSteps, async () => parseRunning(await callJson(brain, 'job_activity')));
+  // Polled by the bubble, also while the brain is still starting: offline means no steps yet,
+  // not an error (a throwing handler is logged by Electron as an ERROR on every launch).
+  handle(IPC.runningSteps, async () => {
+    try {
+      return parseRunning(await callJson(brain, 'job_activity'));
+    } catch (err) {
+      if (err instanceof BrainOffline) return [];
+      throw err;
+    }
+  });
 }

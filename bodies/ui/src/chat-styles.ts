@@ -70,7 +70,7 @@ export const CHAT_CSS = `
 .bubble-exchange { display: flex; flex-direction: column; gap: 12px; }
 .bubble-mine {
   align-self: flex-end; max-width: 82%; margin: 0; padding: 12px 16px; border-radius: 12px 12px 4px 12px;
-  background: #222845; font-size: 14px; line-height: 21px; white-space: pre-wrap;
+  background: #222845; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 
