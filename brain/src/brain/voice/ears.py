@@ -25,7 +25,7 @@ TURN_THRESHOLD = 0.5
 MAX_STRETCH_FRAMES = 938
 # Silero hears speech a frame or three late: the 96 ms before it is fed in too. More than that
 # feeds Moonshine the lead-in noise, which it turns into a spurious first word ("You", "Okay"):
-# 8 frames gave one in 20 of 25 clean runs, 3 frames none (measured on the F13 test WAVs).
+# 8 frames gave a bad first word in 20 of 25 runs, 3 frames in none (measured on the F13 test WAVs).
 PRE_ROLL_FRAMES = 3
 TURN_SAMPLES = 8 * SAMPLE_RATE  # Smart Turn reads the last 8 s
 
