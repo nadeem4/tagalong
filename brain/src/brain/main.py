@@ -241,8 +241,8 @@ async def _run() -> None:
             server = await start_server(
                 config.host, config.port, bodies, session_id(config.data_dir), session
             )
-        except OSError as err:  # a port in use: 10048 on Windows, EADDRINUSE elsewhere
-            if err.errno not in (10048, errno.EADDRINUSE):
+        except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
+            if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
                 raise
             log.error(
                 "cannot listen on %s:%d: another brain is probably running there. "

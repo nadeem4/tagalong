@@ -1,6 +1,7 @@
 """Checks main refuses to start without an API key, and opens the memory db under the data dir."""
 
 import asyncio
+import errno
 import io
 import json
 import logging
@@ -462,11 +463,12 @@ def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
     )  # the person's own number stays
 
 
-def test_busy_port_is_one_plain_line_and_exit_1(monkeypatch, tmp_path, caplog):
+@pytest.mark.parametrize("code", [10048, errno.EADDRINUSE])
+def test_busy_port_is_one_plain_line_and_exit_1(code, monkeypatch, tmp_path, caplog):
     (tmp_path / "brain.pid").write_text("12345 first-brain")  # the running brain's file
 
     async def busy(*args):
-        raise OSError(10048, "address already in use")
+        raise OSError(code, "address already in use")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
     monkeypatch.setenv("TAGALONG_BRAIN_ADDR", "127.0.0.1:47399")
@@ -479,3 +481,15 @@ def test_busy_port_is_one_plain_line_and_exit_1(monkeypatch, tmp_path, caplog):
     assert len(lines) == 1
     assert "another brain" in lines[0] and "tagalong stop" in lines[0]
     assert (tmp_path / "brain.pid").read_text() == "12345 first-brain"
+
+
+def test_other_bind_errors_are_not_called_a_busy_port(monkeypatch, tmp_path, caplog):
+    async def denied(*args):
+        raise OSError(errno.EACCES, "permission denied")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(main, "start_server", denied)
+    with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(OSError):
+        asyncio.run(_run())
+    assert not [r for r in caplog.records if "another brain" in r.getMessage()]
