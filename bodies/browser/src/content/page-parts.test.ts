@@ -125,3 +125,21 @@ describe('readParts limits', () => {
     expect(readParts(document, 'forms')).toBe('There are no forms on this page.');
   });
 });
+
+describe('readParts hides code text', () => {
+  it('tables_skip_style_and_script_inside_cells', () => {
+    body(
+      '<table><tr><td><style>.x{color:red}</style>One</td><td>Two<script>var a=1</script></td></tr></table>',
+    );
+    const out = readParts(document, 'tables');
+    expect(out).toContain('One	Two');
+    expect(out).not.toContain('color');
+    expect(out).not.toContain('var a');
+  });
+
+  it('headings_and_links_skip_style_text', () => {
+    body('<h2>Title<style>.h{x:y}</style></h2><a href="/a">Go<style>.l{x:y}</style></a>');
+    expect(readParts(document, 'headings')).toBe('## Title');
+    expect(readParts(document, 'links')).not.toContain('{');
+  });
+});

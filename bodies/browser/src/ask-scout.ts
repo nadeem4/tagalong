@@ -4,7 +4,7 @@
  * same as the tab fact. Text a page wrote (the selection) is fenced as data so it never carries
  * the person's authority, and nothing is asked from a private window.
  */
-import { stripUrl } from './events';
+import { stripTitle, stripUrl } from './events';
 import type { PermissionsApi } from './permissions';
 
 export const MENU_ID = 'ask-scout';
@@ -26,7 +26,7 @@ type PageTab =
 
 function ask(text: string, url: string | undefined, title: string | undefined): Ask | null {
   if (text === '') return null;
-  const page = { url: stripUrl(url ?? ''), title: title ?? '' };
+  const page = { url: stripUrl(url ?? ''), title: stripTitle(title ?? '', url ?? '') };
   if (page.url === '' && page.title === '') return { text };
   return { text, context: page };
 }

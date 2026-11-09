@@ -116,3 +116,18 @@ describe('chromeSearch', () => {
     expect(hits.map((h) => h.title)).toEqual(['Recent']);
   });
 });
+
+describe('sessionWhen', () => {
+  it('reads seconds as seconds and milliseconds as milliseconds', async () => {
+    const { sessionWhen } = await import('./chromium');
+    expect(sessionWhen(1_700_000_000, undefined)).toBe('2023-11-14T22:13:20.000Z');
+    expect(sessionWhen(1_700_000_000_000, undefined)).toBe('2023-11-14T22:13:20.000Z');
+  });
+
+  it('never shows 1970: zero or missing falls back to lastAccessed, then to no date', async () => {
+    const { sessionWhen } = await import('./chromium');
+    expect(sessionWhen(0, 1_700_000_000_000)).toBe('2023-11-14T22:13:20.000Z');
+    expect(sessionWhen(undefined, undefined)).toBeUndefined();
+    expect(sessionWhen(0, 0)).toBeUndefined();
+  });
+});

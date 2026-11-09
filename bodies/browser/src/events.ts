@@ -17,6 +17,26 @@ export function stripUrl(url: string): string {
   }
 }
 
+/**
+ * A tab title safe to send. While a page loads Chrome uses its address as the title, query and
+ * fragment included, so a token the url loses would leave through the title. A title that is
+ * one unbroken address-like word is cut at its first ? or #, and the tab's own query and
+ * fragment text is removed wherever it appears.
+ */
+export function stripTitle(title: string, rawUrl: string): string {
+  let out = title;
+  try {
+    const u = new URL(rawUrl);
+    for (const secret of [u.search, u.hash]) {
+      if (secret.length > 1) out = out.split(secret).join('');
+    }
+  } catch {
+    // an unparsable address has nothing to subtract; the shape check below still runs
+  }
+  if (!/\s/.test(out) && out.includes('/') && /[?#]/.test(out)) out = out.split(/[?#]/)[0] ?? '';
+  return out;
+}
+
 interface TabReporterOptions {
   /** Returns false when the fact could not go out (offline), so the next change tries again. */
   send: (name: string, data: unknown) => boolean;
@@ -50,7 +70,7 @@ export function createTabReporter(
   return (tab) => {
     const url = stripUrl(tab.url);
     if (!url) return;
-    const item = { title: tab.title, url };
+    const item = { title: stripTitle(tab.title, tab.url), url };
     const wait = lastAt + TAB_THROTTLE_MS - options.now();
     if (wait <= 0 && !timer) {
       trySend(item);

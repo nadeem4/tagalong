@@ -3,7 +3,7 @@
  * The reporter runs on a fake clock and a fake send, so throttling is exact and repeatable.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTabReporter, downloadEvent, stripUrl, TAB_THROTTLE_MS } from './events';
+import { createTabReporter, downloadEvent, stripTitle, stripUrl, TAB_THROTTLE_MS } from './events';
 
 describe('stripUrl', () => {
   it('stripUrl_drops_query_and_fragment', () => {
@@ -16,6 +16,26 @@ describe('stripUrl', () => {
     expect(stripUrl('javascript:alert(1)')).toBe('');
     expect(stripUrl('not a url')).toBe('');
     expect(stripUrl('')).toBe('');
+  });
+});
+
+describe('stripTitle', () => {
+  const raw = 'http://localhost:8080/login.html?token=SECRET123#frag';
+
+  it('stripTitle_cuts_a_loading_title_that_is_the_address', () => {
+    expect(stripTitle('localhost:8080/login.html?token=SECRET123#frag', raw)).toBe(
+      'localhost:8080/login.html',
+    );
+    expect(stripTitle(raw, raw)).toBe('http://localhost:8080/login.html');
+  });
+
+  it('stripTitle_removes_the_tabs_own_query_from_a_longer_title', () => {
+    expect(stripTitle('Login ?token=SECRET123 now', raw)).not.toContain('SECRET123');
+  });
+
+  it('stripTitle_keeps_ordinary_titles', () => {
+    expect(stripTitle('Is this a real? Yes # one', raw)).toBe('Is this a real? Yes # one');
+    expect(stripTitle('', raw)).toBe('');
   });
 });
 
@@ -98,5 +118,20 @@ describe('downloadEvent', () => {
   it('downloadEvent_sends_nothing_when_the_name_is_empty', () => {
     expect(downloadEvent({ filename: '', state: 'interrupted' })).toBeNull();
     expect(downloadEvent({ filename: 'C:\\dl\\', state: 'interrupted' })).toBeNull();
+  });
+});
+
+describe('createTabReporter title', () => {
+  it('tab_event_title_never_carries_the_query_or_fragment', () => {
+    const sent: unknown[] = [];
+    const report = createTabReporter({
+      send: (_n, data) => (sent.push(data), true),
+      now: () => 0,
+    });
+    report({
+      title: 'localhost:8080/login.html?token=SECRET123#frag',
+      url: 'http://localhost:8080/login.html?token=SECRET123#frag',
+    });
+    expect(JSON.stringify(sent)).not.toContain('SECRET123');
   });
 });

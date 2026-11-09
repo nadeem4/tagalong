@@ -125,6 +125,21 @@ export const chromePicture: PictureApi = {
 const iso = (ms: number | undefined): string | undefined =>
   ms === undefined ? undefined : new Date(ms).toISOString();
 
+/**
+ * When a closed tab or window was last touched. Chrome documents lastModified in seconds in some
+ * versions and milliseconds in others, and a closed window can report 0: anything below 1e11 is
+ * read as seconds, and 0 or missing falls back to the tab's own lastAccessed (ms) or no date.
+ */
+export function sessionWhen(
+  lastModified: number | undefined,
+  lastAccessed: number | undefined,
+): string | undefined {
+  if (lastModified !== undefined && lastModified > 0) {
+    return iso(lastModified < 1e11 ? lastModified * 1000 : lastModified);
+  }
+  return lastAccessed !== undefined && lastAccessed > 0 ? iso(lastAccessed) : undefined;
+}
+
 function flattenBookmarks(nodes: chrome.bookmarks.BookmarkTreeNode[]): SearchHit[] {
   return nodes.flatMap((n) =>
     n.url === undefined
@@ -188,7 +203,7 @@ export const chromeSearch: SearchApi = {
         (s.tab ? [s.tab] : (s.window?.tabs ?? [])).map((tab) => ({
           title: tab.title ?? '',
           url: tab.url ?? '',
-          when: iso(s.lastModified * 1000),
+          when: sessionWhen(s.lastModified, tab.lastAccessed),
         })),
       )
       .slice(0, limit);
@@ -263,15 +278,22 @@ export const chromePermissions: PermissionsApi = {
  * window first counts as "closed".
  */
 export const chromePrompt: PermissionPrompt = {
-  ask(need, reason) {
+  ask(need, reason, signal) {
     const id = crypto.randomUUID();
     return new Promise<Answer>((resolve) => {
       let windowId: number | undefined;
       const finish = (answer: Answer): void => {
         chrome.runtime.onMessage.removeListener(onMessage);
         chrome.windows.onRemoved.removeListener(onRemoved);
+        signal?.removeEventListener('abort', onAbort);
         resolve(answer);
       };
+      // The broker gave up waiting: close the window so no late click grants into the void.
+      const onAbort = (): void => {
+        if (windowId !== undefined) void chrome.windows.remove(windowId).catch(() => undefined);
+        finish('closed');
+      };
+      signal?.addEventListener('abort', onAbort);
       const onMessage = (msg: unknown): void => {
         const m = msg as { type?: string; id?: string; granted?: boolean } | null;
         if (m?.type === 'permission-answer' && m.id === id) {
@@ -292,7 +314,8 @@ export const chromePrompt: PermissionPrompt = {
       void chrome.windows.create({ url, type: 'popup', width: 420, height: 280 }).then(
         (w) => {
           windowId = w?.id;
-          if (windowId !== undefined && removedEarly.has(windowId)) finish('closed');
+          if (signal?.aborted === true) onAbort();
+          else if (windowId !== undefined && removedEarly.has(windowId)) finish('closed');
         },
         () => finish('closed'),
       );
