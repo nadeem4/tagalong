@@ -515,7 +515,8 @@ next section.
    **Expected:** the card is back, and Scout says how old the ask is
    (`test_return_shows_two_parked_asks_oldest_first_with_one_wake`,
    `test_restart_keeps_a_waiting_scout_ask_with_its_deadline`). Set the tool to Auto before
-   opening the desktop: it runs by itself and Scout says so (`test_return_runs_an_ask_a_new_auto_now_allows`).
+   opening the desktop: it runs by itself and Scout says so through an `ask_ended` wake, which can take up to 30 s because
+   wakes of that kind are batched (`test_return_runs_an_ask_a_new_auto_now_allows`).
    Set it Off instead: the ask expires with reason "turned off" (`test_return_refuses_an_ask_whose_tool_was_turned_off`).
    With a secret in the call the ask expires at start instead and Scout says it held a secret
    (`test_restart_expires_a_waiting_ask_that_held_a_secret`).

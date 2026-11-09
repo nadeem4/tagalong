@@ -466,7 +466,8 @@ def timer_tools(
         (
             ToolSpec(
                 "list_timers",
-                "Your timers, soonest first, with next time in UTC.",
+                "Your timers, soonest first, with next time in UTC. Each has an id: show it when "
+                "you list them, so the owner can ask to cancel one by id.",
                 {"type": "object", "properties": {}},
                 scout,
                 effect="read",

@@ -88,8 +88,12 @@ async def _run() -> None:
     # A key in the real environment wins over .env; remember that before .env is read.
     from_environment = bool(os.environ.get("ANTHROPIC_API_KEY"))
     # The data dir says where .env is, and .env may hold the other TAGALONG_* settings.
-    load_env_file(load_config().data_dir, os.environ)
-    config = load_config()
+    try:
+        load_env_file(load_config().data_dir, os.environ)
+        config = load_config()
+    except ValueError as err:  # a bad setting: say which, once, instead of a traceback
+        log.error("%s", err)
+        sys.exit(1)
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:  # not fatal: the app asks for the key and sends it over a Home tool
         log.warning(
