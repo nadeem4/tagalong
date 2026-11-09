@@ -1890,7 +1890,9 @@ prompt need a real browser.
 
 1. **Action:** quit Tagalong, run `<home>\runtime\venv\Scripts\tagalong.exe stop`, start Tagalong
    again.
-2. **Expected:** the brain is up within seconds and no "Setting up" line shows. Quit and start again
+2. **Expected:** the brain is up within seconds. The "Setting up" line may show briefly on
+   every start while the brain is not running (the check finds nothing to download), but no
+   download happens. Quit and start again
    without stopping the brain: no second brain starts.
 
 ### I.8. A home folder with a space or a non-ASCII letter

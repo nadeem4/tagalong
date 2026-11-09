@@ -30,7 +30,8 @@ Then run `Tagalong-Setup-<version>-x64.exe`.
 The first time Tagalong starts, it sets up Scout's brain: a one-time download of Python and the
 brain's libraries, which can take a few minutes and needs an internet connection. Home's "Where
 things run" card says "Setting up Scout's brain" while it works, and offers **Retry** if it did not
-finish. Later starts skip the download.
+finish. Later starts do not download again, though the "Setting up" line may show briefly on any
+start where the brain is not already running.
 
 - It installs for your user only, needs no administrator rights, and starts Tagalong when it
   finishes.

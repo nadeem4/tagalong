@@ -36,8 +36,9 @@ export function createBrainSetup(
       running = true;
       try {
         await launch(set);
-      } catch {
+      } catch (error) {
         // launchBrain logs its own failures; a surprise must not leave Retry stuck.
+        console.warn(`could not start the brain (${String(error)})`);
         set('failed');
       } finally {
         running = false;
@@ -56,5 +57,6 @@ export function registerBrainLinkIpc(
     status: brain.link,
     setup: setup.state,
   }));
-  handle(IPC.brainSetupRetry, () => setup.retry());
+  // Only after a failure: any other time a brain is starting or already running.
+  handle(IPC.brainSetupRetry, () => (setup.state === 'failed' ? setup.retry() : undefined));
 }

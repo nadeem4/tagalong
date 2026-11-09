@@ -1,6 +1,6 @@
 /** Tests for the brain link IPC: the address, the link status, the setup state and Retry. */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import type { SetupState } from '../brain/launch';
 import { createBrainSetup, registerBrainLinkIpc } from './brain-link';
@@ -29,12 +29,35 @@ describe('registerBrainLinkIpc', () => {
       setup: 'idle',
     });
     link = 'offline';
-    await ipc.invoke(IPC.brainSetupRetry);
+    await setup.retry();
     expect(await ipc.invoke(IPC.brainLink)).toEqual({
       addr: 'ws://127.0.0.1:47321',
       status: 'offline',
       setup: 'installing',
     });
+  });
+
+  it('the Retry call only runs the launch after a failure, so a second brain never starts', async () => {
+    const ipc = fakeIpc();
+    let launches = 0;
+    let outcome: SetupState = 'idle';
+    const setup = createBrainSetup(
+      async (on) => {
+        launches++;
+        on(outcome);
+      },
+      () => undefined,
+    );
+    registerBrainLinkIpc(ipc.handle, { brain: { addr: 'x:1', link: 'online' }, setup });
+    await ipc.invoke(IPC.brainSetupRetry);
+    expect(launches).toBe(0);
+    outcome = 'failed';
+    await setup.retry();
+    outcome = 'idle';
+    await ipc.invoke(IPC.brainSetupRetry);
+    expect(launches).toBe(2);
+    await ipc.invoke(IPC.brainSetupRetry);
+    expect(launches).toBe(2);
   });
 });
 
@@ -86,12 +109,16 @@ describe('createBrainSetup', () => {
     expect(seen).toEqual(['installing', 'failed', 'installing', 'idle']);
   });
 
-  it('shows failed, not stuck, if the launch throws', async () => {
+  it('shows failed, not stuck, if the launch throws, and logs why', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const setup = createBrainSetup(
       () => Promise.reject(new Error('boom')),
       () => undefined,
     );
     await setup.retry();
     expect(setup.state).toBe('failed');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('could not start the brain'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('boom'));
+    warn.mockRestore();
   });
 });
