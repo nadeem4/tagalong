@@ -1905,7 +1905,7 @@ per `usage.server_tool_use.web_search_requests`, added in `Budget.spend` (a miss
 counts none). Fetch has no extra charge. The daily default is unchanged, so a research-heavy day can reach it
 sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` has Scout say so
 plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
-server blocks and text citations from the copy written to disk (the live history keeps them), so
+server blocks and text citations from the copy written to disk (the live history keeps them). A message that loses any block also loses all its `thinking` and `redacted_thinking` blocks (`without_thinking`; masking a thinking block does the same), because the API rejects a thinking run with a hole in it. So
 a resumed chat holds the answer text only, masked like any other message. A paused message with
 only server blocks is saved as the withheld placeholder. A server block is `server_tool_use` or any
 `*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),

@@ -88,7 +88,7 @@ from brain.tools import (
 )
 from brain.voice import VoiceHooks
 from brain.waiting import WaitingAsks
-from brain.web_tools import WebSource, without_server_blocks
+from brain.web_tools import WebSource, without_server_blocks, without_thinking
 
 log = logging.getLogger("brain")
 
@@ -945,12 +945,14 @@ class Session:
             self._speak(self._start_turn(shown, pending), shown, params)
 
     def _masked(self, message: dict[str, Any]) -> dict[str, Any]:
-        """The copy saved to disk. A thinking block that masking would change is dropped: its
-        signature covers the original text, so a rewritten block could never be replayed."""
+        """The copy saved to disk. A thinking block that masking would change cannot be replayed
+        (its signature covers the original text) and a partial run is rejected too, so all the
+        message's thinking is dropped."""
         message = without_server_blocks(message)
         content = message["content"]
         if message["role"] == "assistant" and isinstance(content, list):
-            content = [b for b in content if not self._thinking_changes(b)]
+            if any(self._thinking_changes(b) for b in content):
+                content = without_thinking(content)
             # an empty content list would not rebuild into valid history
             message = {**message, "content": content or [{"type": "text", "text": WITHHELD}]}
         return mask_message(self.guards, "chat", message)

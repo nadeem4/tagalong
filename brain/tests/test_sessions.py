@@ -787,10 +787,10 @@ async def test_thinking_block_with_a_secret_is_dropped_from_the_saved_copy(tmp_p
     await finish_quietly(session)
     saved = memory.load_messages()
     types = [b["type"] for b in saved[-1]["content"]]
-    assert types == ["redacted_thinking", "text"]
-    assert saved[-1]["content"][1]["text"] == "I will use [secret]"
+    # one changed block would leave a hole in the run, so all thinking goes
+    assert types == ["text"]
+    assert saved[-1]["content"][0]["text"] == "I will use [secret]"
     assert SECRET not in json.dumps(saved)
-    assert saved[-1]["content"][0] == {"type": "redacted_thinking", "data": "opaque"}
     assert [b["type"] for b in session.history[-1]["content"]][0] == "thinking"
     assert SECRET in json.dumps(session.history)
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
