@@ -170,6 +170,8 @@ export function CompanionBubble({
   // shows the head; answering or dismissing it brings up the next.
   const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
   const confirm = confirms[0] ?? null;
+  // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
+  const dismissed = useRef(new Set<string>());
   const dropConfirms = (gone: (c: ConnectorConfirmParams) => boolean): void =>
     setConfirms((current) => {
       const next = current.filter((c) => !gone(c));
@@ -243,6 +245,7 @@ export function CompanionBubble({
       }
       case 'connector.dismiss':
         // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
+        dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
         return;
       case 'turn.started':
@@ -304,10 +307,16 @@ export function CompanionBubble({
   // Cards whose ask arrived before this bubble mounted (a relaunch) are shown again.
   useEffect(() => {
     let live = true;
+    dismissed.current.clear();
     void bridge
       .openConfirms?.()
       .then((open) => {
-        if (live) for (const event of open) onTurnEvent(event);
+        // An ask that closed while the reply was on its way stays closed.
+        for (const event of open) {
+          const gone =
+            event.type === 'connector.confirm' && dismissed.current.has(event.approvalId);
+          if (live && !gone) onTurnEvent(event);
+        }
       })
       .catch(() => undefined);
     return () => {

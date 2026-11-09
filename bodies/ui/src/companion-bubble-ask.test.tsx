@@ -1,6 +1,7 @@
 /** Tests for the bubble's onAsk: text Home sends "as the person" is asked like typed text. */
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { TurnEvent } from './shapes';
 import { CompanionBubble } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { ruleOf } from './test-support/css-rules';
@@ -54,6 +55,33 @@ describe('CompanionBubble mounted while an ask is open', () => {
       </HostBridgeProvider>,
     );
     expect(await screen.findByText(/Write ten poems/)).toBeInTheDocument();
+  });
+
+  it('does not bring back a card that was dismissed while the pull was in flight', async () => {
+    const card = {
+      type: 'connector.confirm' as const,
+      approvalId: 'a1',
+      turnId: '',
+      petId: 'scout',
+      app: 'Claude Code',
+      tool: 'hand_off',
+      summary: 'Write ten poems',
+      options: ['Manual', 'cancel'],
+    };
+    let release: (events: TurnEvent[]) => void = () => undefined;
+    const bridge = {
+      ...createFakeHostBridge(),
+      openConfirms: () => new Promise<TurnEvent[]>((resolve) => (release = resolve)),
+    };
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    // The ask closes after the reply was sent but before it arrives.
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+    await act(async () => release([card]));
+    expect(screen.queryByText(/Write ten poems/)).toBeNull();
   });
 
   // A folder path has no spaces to break at; without this it ran past the card's edge.

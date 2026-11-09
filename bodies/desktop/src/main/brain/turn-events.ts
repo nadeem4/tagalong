@@ -78,7 +78,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     ];
   }
 
-  // Ids of the confirm cards shown, so a closed frame only dismisses a card that was shown.
+  // The confirm cards shown, by ask id: a closed frame only dismisses a card that was shown,
+  // and openConfirms() serves the cards still open to a window that opened late.
   // The dismissal is its own event, not asks.changed: Home lists asks from the brain itself.
   const asks = new Map<string, TurnEvent>();
 
