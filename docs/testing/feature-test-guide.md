@@ -2438,6 +2438,16 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 5. Answer a permission ask by its button on the phone; ask for something long and check it arrives in a few messages; quit the desktop and message again: the brain is still running and answers.
 6. Switch it off: the line reads `WhatsApp is off.` and the bridge process is gone. Stop the brain with `cd brain && uv run tagalong stop`: no `node` bridge is left.
 
+## Stop, restart and decline wording (F10)
+
+1. Automated: `cd brain && uv run pytest tests/test_job_activity.py tests/test_jobs.py tests/test_lifecycle.py tests/test_tools.py tests/test_prompt.py -q`.
+2. Stopped is not failed: hand a long task (for example `sleep 600`) to an expert, then stop the job. Ask Scout for the job: its step reads `stopped by the person`, the count shows `0 failed`, and Scout does not call the job failed.
+3. Restart: with that job running, restart the brain (`uv run tagalong stop`, then start it). Ask for the job: the step reads stopped, never `running`.
+4. `uv run tagalong stop` with an expert job running: afterwards no expert process (for example `claude` or the fake agent) is left in Task Manager.
+5. Decline the mode card of a hand-off: Scout says the person declined it (not a guess).
+6. Ask Scout to stop a job with a blank job id: the refusal reads `stop_job needs job as non-empty text.` in every blank or missing case.
+7. Clear the focus after Scout answered from it and ask again: Scout says it can no longer see it, not that its earlier answer was made up.
+
 ## Not supported
 
 Do not test these here.

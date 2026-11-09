@@ -38,6 +38,11 @@ def test_soul_ships_as_package_data_and_has_no_scripted_lines():
     assert "silence" in soul.lower() or "nothing useful" in soul.lower()
 
 
+def test_soul_says_earlier_context_was_real_when_given():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
+    assert "was real when you were given it" in soul and "never that you made it up" in soul
+
+
 def test_system_prompt_sections_in_order():
     bodies = [
         Body(id="ext", kind="extension", name="Chrome"),

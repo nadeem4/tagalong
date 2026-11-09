@@ -238,8 +238,8 @@ def test_latest_plan_survives_trim_after_an_in_place_update(tmp_path):
     rig.memory.close()
 
 
-def test_end_marks_open_steps_failed_when_stopped_or_errored(tmp_path):
-    for state, failed in [("stopped", True), ("error", True), ("done", False)]:
+def test_end_closes_open_steps_as_stopped_or_failed(tmp_path):
+    for state, closed in [("stopped", "stopped"), ("error", "failed"), ("done", "running")]:
         r = Rig(tmp_path / state)
         r.log.on_update(start("t1", raw_input={"command": "ls"}))
         r.log.on_update(start("t2", raw_input={"command": "pwd"}))
@@ -247,11 +247,21 @@ def test_end_marks_open_steps_failed_when_stopped_or_errored(tmp_path):
         r.log.end(state, "why")
         rows = r.rows()
         assert [e.status for e in rows if e.kind == "command"] == [
-            "failed" if failed else "running",
+            closed,
             "done",
         ]
         assert rows[-1].kind == "end"
         r.memory.close()
+
+
+def test_a_stopped_step_is_not_a_failure_and_the_person_is_named(rig):
+    seed(rig.work, [cmd("sleep 600", "1", None, "stopped")])
+    assert "failed: 0" in job_activity.activity_summary(rig.work, rig.records, "j", NOW)
+    assert "stopped by the person: sleep 600" in job_activity.activity_summary(
+        rig.work, rig.records, "j", NOW
+    )
+    line = job_activity.activity_line(rig.work, "j", NOW)
+    assert "0 failed" in line and "stopped by the person: sleep 600" in line
 
 
 def meta_update(id, **meta):

@@ -13,7 +13,7 @@ from brain.job_records import JobRecords
 from brain.store.work import ActivityEntry, WorkStore
 
 KINDS = ("command", "output", "edit", "read", "search", "other", "say", "plan", "end", "tool")
-STATUSES = ("pending", "running", "done", "failed", "refused")
+STATUSES = ("pending", "running", "done", "failed", "refused", "stopped")
 TOOL_CAP = 300  # characters of one Scout tool or app step: what was tried, never the result
 
 OUTPUT_CAP = 65536  # bytes of one command's output kept (the tail)
@@ -103,10 +103,12 @@ class JobActivity:
     def end(self, state: str, reason: str) -> None:
         text = {"done": "# done", "stopped": "# stopped"}.get(state, f"# error: {reason}")
         if state != "done":
+            # The person's Stop is not a failure: the step reads "stopped", not "failed".
+            closed = "stopped" if state == "stopped" else "failed"
             for step, old in list(self._steps.items()):
                 if old.status in ("running", "pending"):
                     self._steps[step] = self._put(
-                        old.seq, old.kind, old.text, "failed", step, exit=old.exit
+                        old.seq, old.kind, old.text, closed, step, exit=old.exit
                     )
         self._put(None, "end", text)
         self._on_change()
@@ -344,6 +346,8 @@ def activity_summary(
         lines.extend(
             f"  {_tag(who, e)}{_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:]
         )
+    for entry in [e for e in steps if e.status == "stopped"][-FAILED_SHOWN:]:
+        lines.append(f"stopped by the person: {_tag(who, entry)}{_clip(entry.text)}")
     for entry in failed[-FAILED_SHOWN:]:
         lines.append(f"failed: {_tag(who, entry)}{_clip(entry.text)} ({_exit(entry)})")
         out = outputs.get((entry.part, entry.step or ""), "")
@@ -378,6 +382,8 @@ def activity_line(work: WorkStore, job_id: str, now: datetime) -> str:
     live = [e for e in steps if e.status in ("running", "pending")]
     if live:
         line += f"; running: {_clip(live[-1].text, 80)}"
+    elif stopped := [e for e in steps if e.status == "stopped"]:
+        line += f"; stopped by the person: {_clip(stopped[-1].text, 80)}"
     elif failed:
         line += f"; last failure: {_clip(failed[-1].text, 80)} ({_exit(failed[-1])})"
     return _clip(line, LINE_CAP)

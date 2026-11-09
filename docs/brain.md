@@ -21,7 +21,7 @@ Once it holds the port, the brain writes its process id and creation time to `<T
 clean exit. The desktop starts the brain detached and never stops it, so `uv run tagalong stop`
 ends it: it reads the pid file, checks the live process at that pid has the same creation time (a reused pid is never killed), ends it, and says `Stopped the brain.`, `The brain is
 not running.` (a stale file is removed) or `The brain did not stop (pid N).` (exit 1). On Windows
-the process is ended hard, so the brain's shutdown code does not run.
+the process is ended hard (`taskkill /T /F`, so its whole tree, including expert child processes, goes with it) and the brain's shutdown code does not run.
 
 It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl+C.
 
@@ -1297,8 +1297,10 @@ caps `WorkStore.trim_activity` blanks the oldest `output` text first (bumping it
 deletes rows by entry count and by bytes, least recently written first (lowest `rev`, so a plan
 or step still being updated survives), and keeps one marker. Messages without an id join into one
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
-`running`/`pending` are marked `failed` before the `end` entry; a job stopped by a brain restart
-gets its `# stopped` entry too. Nothing unmasked is stored. The log lives as long as its job row.
+`running`/`pending` are closed before the `end` entry: `stopped` when the person stopped the job
+(not a failure: the summary and `list_jobs` say "stopped by the person: <step>"), `failed` on an
+error. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
+closed as `stopped`. Nothing unmasked is stored. The log lives as long as its job row.
 
 **Terminal output and exit codes.** `ExpertHost` sends `clientCapabilities._meta =
 {"terminal_output": true}` (`CLIENT_META` in `experts.py`). Claude Code's adapter then sends a
