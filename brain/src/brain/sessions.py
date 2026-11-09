@@ -406,8 +406,21 @@ class Session:
                 except Exception:
                     log.exception("could not rewrite the cut-off reply")
         else:
-            # Cancelled before the reply was whole, so none was kept; keep the heard words.
+            # Cancelled before any word was streamed, so no reply was kept; keep the heard words.
             self.history.append({"role": "assistant", "content": [block]})
+
+    def _drop_unanswered(self) -> None:
+        """A turn cancelled before any word leaves its request saved but unanswered. Out of the
+        model's history it goes (the next request must not be answered together with it); the
+        saved chat keeps it, and `rebuild_history` skips it the same way after a restart."""
+        last = self.history[-1] if self.history else None
+        if last is None or last["role"] != "user" or self._saved != len(self.history):
+            return
+        content = last["content"]
+        if isinstance(content, list) and any(b.get("type") == "tool_result" for b in content):
+            return  # its tool_use is before it and it is valid; the loop closes those itself
+        self.history.pop()
+        self._saved = len(self.history)
 
     def _owner_joined(self) -> None:
         # The owner's words reached the model, so a nudge from here on is theirs; one already
@@ -708,6 +721,8 @@ class Session:
         def prepare() -> None:
             if cut is not None:
                 self._record_cut(cut)
+            else:
+                self._drop_unanswered()
             if self._inbox:  # says from the finished turn come before this newer one
                 self._append_user([b for s in self._inbox for b in s])
                 self._inbox.clear()

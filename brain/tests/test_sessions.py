@@ -498,6 +498,81 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
     assert [m["role"] for m in model.seen[1]] == ["user", "assistant", "user"]
 
 
+async def _cancel_before_any_word(memory):
+    stuck = asyncio.Event()  # the model never gets going, so no delta is ever sent
+    model = Gate([stuck, "hi there"])
+    session, _ = make(model, memory)
+    first = session.say("desktop", say("long story"))
+    await asyncio.sleep(0)
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    return model, session
+
+
+async def test_cancel_before_any_word_leaves_no_unanswered_request(tmp_path):
+    # F2: with no delta there is no reply to keep, so the cut-off request leaves the model's
+    # history (the next say must not become a second user message) but stays in the saved chat.
+    memory = file_memory(tmp_path)
+    model, session = await _cancel_before_any_word(memory)
+    session.say("desktop", say("hi in 3 words"))
+    await finish_quietly(session)
+    assert [m["role"] for m in model.seen[1]] == ["user"]
+    assert model.seen[1][0]["content"][0]["text"] == "hi in 3 words"
+    assert [m["role"] for m in memory.load_messages()] == ["user", "user", "assistant"]
+    assert [m["role"] for m in session.history] == ["user", "assistant"]
+
+
+async def test_cancel_before_any_word_holds_after_restart(tmp_path):
+    memory = file_memory(tmp_path)
+    _, session = await _cancel_before_any_word(memory)
+    session.say("desktop", say("hi in 3 words"))
+    await finish_quietly(session)
+    restarted = Gate(["again"])
+    again, _ = make(restarted, memory)
+    assert [m["role"] for m in again.history] == ["user", "assistant"]
+    again.say("desktop", say("one more"))
+    await finish_quietly(again)
+    assert [m["role"] for m in restarted.seen[0]] == ["user", "assistant", "user"]
+
+
+async def test_restart_right_after_a_wordless_cancel_does_not_stack_requests(tmp_path):
+    memory = file_memory(tmp_path)
+    await _cancel_before_any_word(memory)
+    restarted = Gate(["ok"])
+    again, _ = make(restarted, memory)
+    again.say("desktop", say("hi in 3 words"))
+    await finish_quietly(again)
+    assert [m["role"] for m in restarted.seen[0]] == ["user"]
+
+
+async def test_cancel_during_a_tool_step_keeps_the_tool_result_last(tmp_path):
+    # Valid as is: the request already has its tool_use and a cancelled tool_result after it.
+    memory = file_memory(tmp_path)
+    call = Final(
+        [{"type": "tool_use", "id": "t1", "name": "recall", "input": {"query": "x"}}],
+        "tool_use",
+        SimpleNamespace(),
+    )
+    running = asyncio.Event()
+
+    async def blocked(args):
+        running.set()
+        await asyncio.Event().wait()
+
+    model = Gate([call, "next"])
+    session, _ = make(model, memory)
+    stuck = ToolSpec("recall", "blocks", {"type": "object"}, effect="read")
+    session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
+    first = session.say("desktop", say("a"))
+    await running.wait()
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    assert [m["role"] for m in model.seen[1]][:3] == ["user", "assistant", "user"]
+    assert model.seen[1][2]["content"][0]["content"] == "cancelled"
+
+
 SECRET = "fake-bearer-token-0123456789"
 
 
@@ -799,15 +874,17 @@ async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
     assert stored[2]["content"][0]["tool_use_id"] == "t1"
 
 
-async def test_no_merge_into_saved_message(tmp_path):
+async def test_unanswered_saved_request_is_not_merged_or_kept(tmp_path):
     memory = file_memory(tmp_path)
     memory.save_messages([{"role": "user", "content": [{"type": "text", "text": "old"}]}])
     session, _ = make(Gate(["one"]), memory)
     assert len(session.history) == 1
     session.say("desktop", say("new"))
-    assert [m["role"] for m in session.history] == ["user", "user"]
-    assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
+    # The old request was never answered: the model sees only the new one, the chat keeps both.
+    assert [m["role"] for m in session.history] == ["user"]
+    assert session.history[0]["content"] == [{"type": "text", "text": "new"}]
     await finish_quietly(session)
+    assert [m["role"] for m in memory.load_messages()] == ["user", "user", "assistant"]
 
 
 async def test_body_tools_offered_then_gone_after_disconnect():

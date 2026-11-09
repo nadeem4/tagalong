@@ -206,7 +206,10 @@ flowchart TD
   `tool_use` always gets a `tool_result`, even on cancel. A cancel is the one case where a
   half-streamed step is kept: the words already sent become its assistant reply (nothing if none
   were), so the cut-off request counts as answered and the next `say` is not merged with it. This
-  holds in the saved chat and after a restart.
+  holds in the saved chat and after a restart. A cancel before any word leaves nothing to keep:
+  the request stays in the saved chat but leaves the model's history when the next turn starts
+  (and `rebuild_history` skips a request followed by another request), so only the new say is
+  answered. A cancel during a tool step ends on the cancelled `tool_result`, which is valid as is.
 - Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
   turn's unsaved messages.
 - On start the history is rebuilt from the saved chat. It begins at the turn of the latest

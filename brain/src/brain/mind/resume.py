@@ -42,6 +42,13 @@ def _has_compaction(message: dict) -> bool:
 
 
 def rebuild_history(messages: list[dict]) -> list[dict]:
+    # A request cut off before any reply sits saved but unanswered; the next turn's request
+    # follows it, and the live session keeps only that one, so the rebuilt history does too.
+    messages = [
+        m
+        for i, m in enumerate(messages)
+        if not (_is_turn_start(m) and i + 1 < len(messages) and _is_turn_start(messages[i + 1]))
+    ]
     start = 0
     marks = [i for i, m in enumerate(messages) if _has_compaction(m)]
     if marks:
