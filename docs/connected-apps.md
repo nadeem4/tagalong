@@ -141,8 +141,8 @@ dropped is offline ("<app> is not connected right now."), and a disabled app's t
   A name that clashes is dropped and logged.
 - **Audience**: Scout only. Home never calls an app's tool.
 - **Result**: text blocks, resource text or links, `[image: type]` for images, or the structured
-  content as JSON, capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`. A
-  `</data` inside is defused so the app cannot close the fence.
+  content as JSON, fenced as `<data kind="app" app="<id>">`. A
+  `</data` inside is defused so the app cannot close the fence. A long answer is previewed like any tool result: stored whole (up to 5,000,000 characters), the rest read with `read_output`.
 - **Failures**: an app's own error reads `<app> could not do that: <first line>`; a timeout (60
   seconds) reads `<app> did not answer in time.`; a closed connection turns the app into `error`.
   Never any env value or token.

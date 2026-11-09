@@ -35,7 +35,7 @@ from brain.apps import (
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.permission import Tier, tier
-from brain.protocol import ErrorCode, RpcError
+from brain.protocol import LIMITS, ErrorCode, RpcError
 from brain.toolbox import NAME_MAX, SEP, Handler, ToolSpec
 from brain.tools import Notify, _fence_safe
 
@@ -119,7 +119,9 @@ def specs_for(app_id: str, tools: list[Tool]) -> list[ToolSpec]:
     return list(out.values())
 
 
-RESULT_MAX = 8000  # characters of an app's answer that reach the model
+# Hard limit on one app answer, in characters (the body part limit). The model sees a preview
+# and reads the rest with read_output (toolbox._cap); cutting earlier hid the rest from it.
+RESULT_HARD_MAX = LIMITS["part_bytes"]
 
 
 def _first_line(text: str) -> str:
@@ -150,10 +152,10 @@ def result_text(result: CallToolResult) -> str:
 
 
 def format_result(app_id: str, result: CallToolResult) -> str:
-    """An app's answer as capped, fenced data the model reads but never obeys."""
+    """An app's answer as fenced data (the toolbox previews it) the model reads but never obeys."""
     body = result_text(result)
-    if len(body) > RESULT_MAX:
-        body = body[: RESULT_MAX - 1] + "\u2026"
+    if len(body) > RESULT_HARD_MAX:
+        body = body[: RESULT_HARD_MAX - 1] + "\u2026"
     return f'<data kind="app" app="{app_id}">\n{_fence_safe(body)}\n</data>'
 
 

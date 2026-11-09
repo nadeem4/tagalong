@@ -876,7 +876,7 @@ url shows empty. Home shows these rows in its "Where things run" card.
   (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time
   until you set it to `auto` on Home) when its hints say destructive or its name has a risky word (`send`, `delete`,
   `remove`, `destroy`, `trash`, `pay`, `charge`). An app that is not connected is offline.
-  Answers are capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`.
+  Answers are fenced as `<data kind="app" app="<id>">`. A long answer is kept whole (up to 5,000,000 characters) and reaches Scout as the usual preview, so `read_output` can page through all of it.
 - **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
   `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
 - **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where

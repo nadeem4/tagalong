@@ -152,7 +152,7 @@ from mcp.types import (  # noqa: E402
     TextResourceContents,
 )
 
-from brain.app_tools import AppSource, format_result  # noqa: E402
+from brain.app_tools import RESULT_HARD_MAX, AppSource, format_result  # noqa: E402
 from brain.apps import AppError  # noqa: E402
 from brain.mind.turn import Call  # noqa: E402
 from brain.protocol import ErrorCode, RpcError  # noqa: E402
@@ -194,9 +194,16 @@ def test_format_structured_only_when_no_content():
     assert body_of(format_result("lin", result(text("t"), structured={"a": 1}))) == "t"
 
 
-def test_format_cut_at_8000():
-    body = body_of(format_result("lin", result(text("x" * 9000))))
-    assert len(body) <= 8000 and body.endswith("\u2026")
+def test_format_keeps_a_long_answer_whole_for_the_output_store():
+    # The preview cap lives in outputs.preview; an early cut here made read_output unable to
+    # reach the rest of a long file.
+    long = "line\n" * 5000
+    assert body_of(format_result("lin", result(text(long)))) == long
+
+
+def test_format_cuts_only_at_the_hard_limit():
+    body = body_of(format_result("lin", result(text("x" * (RESULT_HARD_MAX + 5)))))
+    assert len(body) == RESULT_HARD_MAX and body.endswith("\u2026")
 
 
 def test_format_cannot_close_the_fence():
