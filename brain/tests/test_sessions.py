@@ -125,14 +125,27 @@ async def test_second_say_joins_running_turn():
     assert states(sent) == ["started", "ended"]
 
 
-async def test_leftover_inbox_kept_in_history():
-    session, sent = make(Gate([asyncio.Event(), "x"]))
+async def turns_done(session):
+    """Wait until no turn is running, including one started when the last ended."""
+    for _ in range(100):
+        if session._task is None:
+            return
+        await asyncio.wait({session._task})
+        await asyncio.sleep(0)
+
+
+async def test_leftover_inbox_gets_its_own_turn():
+    # A say that joined a turn cancelled before it could drain the inbox is answered, not lost.
+    model = Gate([asyncio.Event(), "x"])
+    session, sent = make(model)
     result = session.say("desktop", say("a"))
     await asyncio.sleep(0)
     session.say("desktop", say("late"))
     session.cancel(result.turn)  # stops the turn before it can drain the inbox
     await finish(session)
-    assert session.history[-1]["content"][-1] == {"type": "text", "text": "late"}
+    await turns_done(session)
+    assert [m["role"] for m in model.seen[1]] == ["user"]
+    assert model.seen[1][0]["content"] == [{"type": "text", "text": "late"}]
     assert session.say("desktop", say("next")).joined is False
 
 
@@ -193,20 +206,6 @@ async def test_say_after_task_finished_but_before_callback_starts_new_turn():
     assert second.joined is False and second.turn != first.turn
     await finish(session)
     assert states(sent).count("ended") == 2
-
-
-async def test_leftover_inbox_merges_into_last_user_message():
-    session, _ = make(Gate([asyncio.Event(), "x"]))
-    result = session.say("desktop", say("a"))
-    await asyncio.sleep(0)
-    session.say("desktop", say("late"))
-    session.cancel(result.turn)
-    await finish(session)
-    assert [m["role"] for m in session.history] == ["user"]
-    assert session.history[0]["content"] == [
-        {"type": "text", "text": "a"},
-        {"type": "text", "text": "late"},
-    ]
 
 
 async def test_cancel_right_after_say():
@@ -518,7 +517,12 @@ async def test_cancel_before_any_word_leaves_no_unanswered_request(tmp_path):
     await finish_quietly(session)
     assert [m["role"] for m in model.seen[1]] == ["user"]
     assert model.seen[1][0]["content"][0]["text"] == "hi in 3 words"
-    assert [m["role"] for m in memory.load_messages()] == ["user", "user", "assistant"]
+    assert [m["role"] for m in memory.load_messages(include_cut=True)] == [
+        "user",
+        "user",
+        "assistant",
+    ]
+    assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
     assert [m["role"] for m in session.history] == ["user", "assistant"]
 
 
@@ -543,6 +547,64 @@ async def test_restart_right_after_a_wordless_cancel_does_not_stack_requests(tmp
     again.say("desktop", say("hi in 3 words"))
     await finish_quietly(again)
     assert [m["role"] for m in restarted.seen[0]] == ["user"]
+
+
+class Failing(Gate):
+    """A model whose first call breaks, so the turn ends in error with its request unanswered."""
+
+    async def stream(self, system, messages, tools):
+        self.seen.append(list(messages))
+        if len(self.seen) == 1:
+            raise RuntimeError("down")
+            yield
+        yield "ok"
+        yield Final([{"type": "text", "text": "ok"}], "end_turn", SimpleNamespace())
+
+
+async def test_an_error_turn_keeps_its_request_for_try_again(tmp_path):
+    memory = file_memory(tmp_path)
+    model = Failing([])
+    session, sent = make(model, memory)
+    session.say("desktop", say("long story"))
+    await finish_quietly(session)
+    assert sent[-1][1]["reason"] == "error"
+    session.say("desktop", say("try again"))
+    await finish_quietly(session)
+    assert "long story" in json.dumps(model.seen[1])
+    again = make(Gate(["x"]), memory)[0]
+    assert "long story" in json.dumps(again.history)
+
+
+async def test_a_timed_out_turn_keeps_its_request_for_try_again(tmp_path):
+    memory = file_memory(tmp_path)
+    model = Gate([asyncio.Event(), "ok"])
+    session, sent = make(model, memory)
+    session._turn_timeout = 0.01
+    session.say("desktop", say("long story"))
+    await finish_quietly(session)
+    session._turn_timeout = None
+    session.say("desktop", say("try again"))
+    await finish_quietly(session)
+    assert "long story" in json.dumps(model.seen[1])
+
+
+async def test_a_say_joining_a_cancelled_turn_gets_its_own_answer(tmp_path):
+    # "stop ... actually do X": X joined the turn being cancelled and must still be answered.
+    memory = file_memory(tmp_path)
+    model = Gate([asyncio.Event(), "done X"])
+    session, _ = make(model, memory)
+    first = session.say("desktop", say("long story"))
+    await asyncio.sleep(0)
+    session.cancel(first.turn)
+    joined = session.say("desktop", say("actually do X"))
+    assert joined.joined is True
+    await finish_quietly(session)
+    await turns_done(session)
+    assert len(model.seen) == 2
+    assert [m["role"] for m in model.seen[1]] == ["user"]
+    assert "actually do X" in json.dumps(model.seen[1])
+    assert "long story" not in json.dumps(model.seen[1])
+    assert [m["role"] for m in session.history] == ["user", "assistant"]
 
 
 async def test_cancel_during_a_tool_step_keeps_the_tool_result_last(tmp_path):
@@ -779,8 +841,9 @@ async def test_late_says_are_saved(tmp_path):
     session.say("desktop", say("late"))
     session.cancel(result.turn)
     await finish_quietly(session)
-    saved = memory.load_messages()
-    assert saved[-1]["content"][-1] == {"type": "text", "text": "late"}
+    await turns_done(session)
+    saved = memory.load_messages(include_cut=True)
+    assert saved[1]["content"] == [{"type": "text", "text": "late"}]
 
 
 async def test_resume_after_restart(tmp_path):
@@ -874,17 +937,16 @@ async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
     assert stored[2]["content"][0]["tool_use_id"] == "t1"
 
 
-async def test_unanswered_saved_request_is_not_merged_or_kept(tmp_path):
+async def test_no_merge_into_saved_message(tmp_path):
     memory = file_memory(tmp_path)
     memory.save_messages([{"role": "user", "content": [{"type": "text", "text": "old"}]}])
     session, _ = make(Gate(["one"]), memory)
     assert len(session.history) == 1
     session.say("desktop", say("new"))
-    # The old request was never answered: the model sees only the new one, the chat keeps both.
-    assert [m["role"] for m in session.history] == ["user"]
-    assert session.history[0]["content"] == [{"type": "text", "text": "new"}]
+    assert [m["role"] for m in session.history] == ["user", "user"]
+    assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
     await finish_quietly(session)
-    assert [m["role"] for m in memory.load_messages()] == ["user", "user", "assistant"]
+    assert memory.load_messages()[0]["content"] == [{"type": "text", "text": "old"}]
 
 
 async def test_body_tools_offered_then_gone_after_disconnect():

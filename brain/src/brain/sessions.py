@@ -298,6 +298,9 @@ class Session:
             # the stored chat stays valid.
             self._saved -= 1
         self._inbox: list = []
+        # True when the last turn was cancelled before any word and its request is still last in
+        # history: the next turn drops it (see _drop_unanswered).
+        self._wordless_cancel = False
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
@@ -394,6 +397,9 @@ class Session:
 
     def _record_cut(self, cut: Interruption) -> None:
         """History keeps what the owner heard, marked as cut off, never the unsaid rest."""
+        if self._wordless_cancel:  # the request gets its (heard) answer below, so it is kept
+            self._wordless_cancel = False
+            self._set_last_cut(False)
         text = (cut.spoken + "\n\n" if cut.spoken else "") + INTERRUPTED_MARK
         block = {"type": "text", "text": text}
         last = self.history[-1] if self.history else None
@@ -410,17 +416,21 @@ class Session:
             self.history.append({"role": "assistant", "content": [block]})
 
     def _drop_unanswered(self) -> None:
-        """A turn cancelled before any word leaves its request saved but unanswered. Out of the
-        model's history it goes (the next request must not be answered together with it); the
-        saved chat keeps it, and `rebuild_history` skips it the same way after a restart."""
-        last = self.history[-1] if self.history else None
-        if last is None or last["role"] != "user" or self._saved != len(self.history):
+        """A turn cancelled before any word leaves its request unanswered (see `_ended`). Out of
+        the model's history it goes, so the next request is not answered together with it. An
+        error or a timeout keeps its request: the person may say "try again"."""
+        if not self._wordless_cancel:
             return
-        content = last["content"]
-        if isinstance(content, list) and any(b.get("type") == "tool_result" for b in content):
-            return  # its tool_use is before it and it is valid; the loop closes those itself
-        self.history.pop()
-        self._saved = len(self.history)
+        self._wordless_cancel = False
+        if self.history and self._saved == len(self.history):
+            self.history.pop()
+            self._saved = len(self.history)
+
+    def _set_last_cut(self, cut: bool) -> None:
+        try:
+            self._memory.set_last_cut(cut)
+        except Exception:
+            log.exception("could not mark the cut-off request")
 
     def _owner_joined(self) -> None:
         # The owner's words reached the model, so a nudge from here on is theirs; one already
@@ -884,8 +894,24 @@ class Session:
             reason = "error"
         else:
             reason = task.result()
+        last = self.history[-1] if self.history else None
+        unanswered = (
+            reason == "cancelled"
+            and last is not None
+            and last["role"] == "user"
+            and not (
+                isinstance(last["content"], list)
+                and any(b.get("type") == "tool_result" for b in last["content"])
+            )
+        )
+        pending: list = []
         if self._task is task:  # a newer turn may already own the session
-            if self._inbox:  # says that arrived too late for the loop must not be lost
+            if self._inbox and reason == "cancelled":
+                # Joined the turn that was cancelled: they get a turn of their own, not a
+                # silent place in an unanswered one.
+                pending = [b for s in self._inbox for b in s]
+                self._inbox.clear()
+            elif self._inbox:  # says that arrived too late for the loop must not be lost
                 self._append_user([b for s in self._inbox for b in s])
                 self._inbox.clear()
             self._turn_id = None
@@ -894,6 +920,9 @@ class Session:
             self._task = None
         self._last_turn = turn_id
         self._persist(body_kind)
+        if unanswered and self._saved == len(self.history):
+            self._wordless_cancel = True
+            self._set_last_cut(True)  # the saved chat keeps it; a restart skips it
         if turn_id in self._spoken:
             self._spoken.discard(turn_id)
             if self.voice is not None:
@@ -902,6 +931,8 @@ class Session:
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )
         self.scheduler.turn_ended(turn_id)  # after ended, so the next turn's started comes second
+        if pending:
+            self._start_turn(body_id, pending)
 
     def _masked(self, message: dict[str, Any]) -> dict[str, Any]:
         """The copy saved to disk. A thinking block that masking would change is dropped: its

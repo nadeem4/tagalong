@@ -196,9 +196,3 @@ def test_every_tool_use_has_its_result():
     ]
     for msgs in cases:
         assert_valid(rebuild_history(msgs))
-
-
-def test_a_request_followed_by_another_request_is_skipped():
-    # The first was cut off before any reply; only the one that got an answer is kept.
-    rows = [u("story"), u("hi"), a("hello")]
-    assert rebuild_history(rows) == [u("hi"), a("hello")]
