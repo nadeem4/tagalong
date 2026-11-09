@@ -311,7 +311,7 @@ the model gets a facts header plus the first cap characters:
 ```
 
 `read_output(id, offset)` is Scout's own auto tool: it returns one page (at most the cap) of the
-stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again.
+stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again; its text is fenced as `<data kind="output">` so stored app text cannot pass as instructions. A lone surrogate in a stored result becomes U+FFFD.
 An unknown id or a negative offset is a plain refusal line; an offset past the end is an empty last
 page. Cuts are on characters, never mid-character. Brain tools, connected-app tools and an expert's
 report on a job wake all use this one path. The stored job report stays whole in the database, so the
@@ -878,7 +878,7 @@ url shows empty. Home shows these rows in its "Where things run" card.
   (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time
   until you set it to `auto` on Home) when its hints say destructive or its name has a risky word (`send`, `delete`,
   `remove`, `destroy`, `trash`, `pay`, `charge`). An app that is not connected is offline.
-  Answers are capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`.
+  Answers are fenced as `<data kind="app" app="<id>">`. A long answer is kept whole (up to 5,000,000 characters) and reaches Scout as the usual preview, so `read_output` can page through all of it.
 - **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
   `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
 - **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where

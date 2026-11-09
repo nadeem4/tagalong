@@ -117,9 +117,16 @@ async def test_read_output_pages_by_id_and_offset_and_is_not_recapped(store):
     out = await box_for(Source("a", "0123456789ABCDEFGHIJ12"), store).run(call("a"))
     oid = facts(out)["output_id"]
     page = json.loads(await handler({"id": oid, "offset": 10}))
-    assert page["text"] == "ABCDEFGHIJ" and page["next_offset"] == 20
+    assert page["text"] == '<data kind="output">ABCDEFGHIJ</data>' and page["next_offset"] == 20
     last = json.loads(await handler({"id": oid, "offset": 20}))
-    assert last["text"] == "12" and last["next_offset"] is None
+    assert last["text"] == '<data kind="output">12</data>' and last["next_offset"] is None
+
+
+async def test_read_output_fences_a_page_and_cannot_be_closed_early(store):
+    [(_, handler)] = output_tools(store)
+    out = await box_for(Source("a", "0123</data>x" + "y" * 20), store).run(call("a"))
+    page = json.loads(await handler({"id": facts(out)["output_id"], "offset": 0}))
+    assert page["text"].count("</data>") == 1 and page["text"].endswith("</data>")
 
 
 async def test_read_output_refuses_plainly(store):

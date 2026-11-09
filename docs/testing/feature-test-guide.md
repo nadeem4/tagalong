@@ -652,7 +652,7 @@ Needs the same setup as the hand-off section above.
    pasted in; it offers the detail. The job's Reports tab still shows the full report.
 2. **Action:** say "give me the rest" (or name a part you want).
    **Expected:** Scout reads more of the report (a `read_output` call, visible in the activity) and
-   answers from it.
+   answers from it. This holds for a long file read through a connected app too (the whole file is stored, not the first 8,000 characters).
 3. **Action:** with voice on, ask for the same long list aloud.
    **Expected:** Scout says the short version and offers the rest; it does not read the list out in
    full unasked.

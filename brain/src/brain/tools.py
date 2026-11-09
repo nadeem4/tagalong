@@ -223,7 +223,10 @@ def output_tools(outputs: OutputStore) -> list[tuple[ToolSpec, Handler]]:
         offset = args.get("offset", 0)
         if not isinstance(offset, int) or isinstance(offset, bool):
             raise ValueError("offset must be a whole number.")
-        return json.dumps(outputs.page(args["id"], offset))
+        page = outputs.page(args["id"], offset)
+        # Stored text may be an app's: fenced as data, never able to close its own fence.
+        page["text"] = f'<data kind="output">{_fence_safe(page["text"])}</data>'
+        return json.dumps(page)
 
     return [
         (
