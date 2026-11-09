@@ -282,6 +282,21 @@ def test_the_note_caps_sources_and_length():
     assert len(note) < 1500
 
 
+def test_duplicate_sources_are_dropped_before_the_cap():
+    same = {"type": "web_search_result", "url": "https://same.example", "title": "S"}
+    others = [
+        {"type": "web_search_result", "url": f"https://o.example/{i}", "title": "O"}
+        for i in range(4)
+    ]
+    blocks = [
+        {"type": "server_tool_use", "id": "s1", "name": "web_search", "input": {"query": "q"}},
+        {"type": "web_search_tool_result", "tool_use_id": "s1", "content": [same] * 3 + others},
+    ]
+    note = _note(without_server_blocks({"role": "assistant", "content": blocks}))
+    assert note.count("https://same.example") == 1
+    assert note.count("https://") == 5
+
+
 def test_a_fetch_is_named_by_its_url_and_an_error_result_adds_no_sources():
     blocks = [
         {

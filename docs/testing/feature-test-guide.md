@@ -192,6 +192,15 @@ desktop app. You need `uv` and an Anthropic key.
     **Expected:** all pass. These cover the work table (not yet used by Scout): every allowed and
     refused state move, the goal rollup, the retry backoff, search, and the resume scan, which
     changes nothing when run a second time. A fresh `tagalong.db` opens at schema version 27.
+17. **Action:** with a key set, ask Scout to search the web for something (for example the weather
+    in Lisbon in May), stop the brain, start it, then ask `Did you search the web earlier?`
+    **Expected:** Scout says yes and can name what it searched; it does not claim it answered from
+    its own knowledge. The saved chat holds a short `[Searched the web for ...]` note, not the
+    search blocks.
+18. **Action:** ask Scout to set up an expert, press Allow, and end the brain a second later
+    (`tagalong stop`). Wait ten minutes, start the brain again and look in `<TAGALONG_HOME>/tools`.
+    **Expected:** no `*.part` or `*.dl` folder is left (a folder touched in the last ten minutes is
+    kept, in case `tagalong install` is staging it).
 
 ## The desktop on the Python brain
 

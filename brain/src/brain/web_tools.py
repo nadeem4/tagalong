@@ -97,7 +97,7 @@ def _search_note(blocks: list[dict]) -> str:
     if fetched:
         parts.append("Read " + ", ".join(fetched[:NOTE_MAX_ITEMS]))
     if sources:
-        parts.append("Sources: " + "; ".join(dict.fromkeys(sources[:NOTE_MAX_ITEMS])))
+        parts.append("Sources: " + "; ".join(list(dict.fromkeys(sources))[:NOTE_MAX_ITEMS]))
     return f"[{'. '.join(parts)}.]" if parts else ""
 
 

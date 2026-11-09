@@ -253,7 +253,9 @@ async def _run() -> None:
             sys.exit(1)
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
-        sweep_staging(config.data_dir)  # an install a killed brain left half-staged
+        await asyncio.to_thread(
+            sweep_staging, config.data_dir
+        )  # an install a killed brain left half-staged
         await apps.start()  # connects in the background, so a slow app never delays boot
         port = server.sockets[0].getsockname()[1]
         bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when on and set up

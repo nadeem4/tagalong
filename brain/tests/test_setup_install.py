@@ -10,6 +10,7 @@ import io
 import json
 import os
 import sys
+import time
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -681,12 +682,16 @@ async def test_a_second_install_is_refused_before_any_card_is_shown(tmp_path, en
 
 
 def test_a_start_sweeps_staging_folders_a_killed_brain_left_behind(tmp_path):
+    long_ago = time.time() - 3600
     for name in ("claude-acp.part", "claude-acp.dl"):
         tools_dir(tmp_path, name).mkdir(parents=True)
+        os.utime(tools_dir(tmp_path, name), (long_ago, long_ago))
+    fresh = tools_dir(tmp_path, "other.part")  # a CLI install may be staging this right now
+    fresh.mkdir()
     kept = tools_dir(tmp_path, "claude-acp")
     kept.mkdir()
     sweep_staging(tmp_path)
     assert not tools_dir(tmp_path, "claude-acp.part").exists()
     assert not tools_dir(tmp_path, "claude-acp.dl").exists()
-    assert kept.exists()
+    assert fresh.exists() and kept.exists()
     sweep_staging(tmp_path / "nowhere")  # no tools folder yet: nothing to do
