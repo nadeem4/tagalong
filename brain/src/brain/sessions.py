@@ -925,7 +925,7 @@ class Session:
             )
         )
         if owns:
-            if self._inbox and reason == "cancelled":
+            if self._inbox and (reason == "cancelled" or rejected):
                 # Joined the turn that was cancelled: they get a turn of their own, not a
                 # silent place in an unanswered one.
                 pending = [b for s in self._inbox for b in s]

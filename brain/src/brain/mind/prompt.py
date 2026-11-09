@@ -202,7 +202,7 @@ def check_part_sizes(parts: list[Part]) -> None:
     for part in parts:
         if isinstance(part, TextPart):
             continue
-        size = len(part.data) * 3 // 4
+        size = len(part.data) * 3 // 4 - part.data.count("=", -2)  # minus base64 padding
         total += size
         if size > LIMITS["part_bytes"] or total > LIMITS["message_bytes"]:
             raise RpcError(ErrorCode.over_limit, "That attachment is too big to send.")

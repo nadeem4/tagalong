@@ -91,6 +91,21 @@ class AnthropicModel:
         yield Final([b.to_dict() for b in msg.content], msg.stop_reason, msg.usage, msg.model)
 
 
+def _blames_newest(err: Exception, history: list) -> bool:
+    """True for a 400 that the newest request caused: it holds an image or document, or the
+    error names one. A 400 about money, length or older history would hit any request, and
+    dropping it would only cut the person's messages one after another."""
+    last = history[-1] if history else None
+    if getattr(err, "status_code", None) != 400 or last is None or last["role"] != "user":
+        return False
+    content = last["content"]
+    if not isinstance(content, list) or any(b.get("type") == "tool_result" for b in content):
+        return False  # after a tool round the newest message is the tools' answer, not theirs
+    if any(b.get("type") in ("image", "document") for b in content):
+        return True
+    return any(word in str(err).lower() for word in ("image", "document"))
+
+
 async def run_turn(
     *,
     turn_id: str,
@@ -141,7 +156,7 @@ async def run_turn(
                             failed = True
                             # A 400 on the person's newest message (a bad image, say) would fail
                             # every later turn too; the session drops that message.
-                            if on_rejected and getattr(err, "status_code", None) == 400:
+                            if on_rejected and _blames_newest(err, history):
                                 on_rejected()
                             break
                         if isinstance(item, Final):

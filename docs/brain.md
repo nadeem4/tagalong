@@ -215,8 +215,10 @@ flowchart TD
   `cut` (migration `0027_message_cut`), and leaves the model's history when the next turn starts;
   `load_messages` skips cut rows, so a restart does the same. Only a cancel does this: a turn that
   ends in an error, a guard stop or a timeout keeps its request, so "try again" works. The one
-  exception is a request the API rejects with a 400 (an image it cannot read, say): it is dropped
-  and marked `cut` the same way, since sending it again would fail every later turn. A `say` whose
+  exception is a request the API rejects with a 400 that it caused (it holds an image or document,
+  or the error names one): it is dropped and marked `cut` the same way, since sending it again
+  would fail every later turn, and says that joined it get a turn of their own. Any other 400
+  (credit, length, older history) and a 400 after a tool round keep the request. A `say` whose
   part is over 5 MB (decoded), or whose parts total over 20 MB, is refused with `over_limit`
   before anything is saved or sent. Says that
   joined a turn being cancelled get a turn of their own. A cancel during a tool step ends on the

@@ -39,3 +39,22 @@ def test_a_timeout_names_the_app():
 
 def test_other_errors_keep_their_own_line():
     assert _connect_error("Fake", RuntimeError("bad thing\nmore")) == "bad thing"
+
+
+def test_a_connection_error_wrapped_by_another_is_still_plain():
+    err = RuntimeError("all connection attempts failed")
+    err.__cause__ = ConnectionRefusedError(10061, "refused")
+    assert _connect_error("Wiki", err) == "Wiki could not be reached."
+
+
+async def test_a_failed_connection_lists_a_plain_error_and_no_tools(rig):  # noqa: F811
+    # Nothing listens on port 1, so the real connect fails: this covers the call site.
+    await rig.call(
+        "add_app",
+        {"name": "Wiki", "transport": "http", "url": "https://127.0.0.1:1/mcp", "auth": "none"},
+    )
+    await until(lambda: rig.apps.status("wiki").state == "error")
+    app = (await rig.call("list_apps"))["apps"][0]
+    assert app["tools"] == []
+    assert app["error"].startswith("Wiki could not be reached")
+    assert "Errno" not in app["error"]
