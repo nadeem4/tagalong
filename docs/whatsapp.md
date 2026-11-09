@@ -128,6 +128,8 @@ never shows a value.
 
 ## Build and test
 
+On a fresh checkout run `pnpm install` first: the build fails until the package's dependencies are installed.
+
 ```bash
 pnpm --filter @tagalong/whatsapp build   # writes bodies/whatsapp/dist/index.js, one file
 pnpm --filter @tagalong/whatsapp test

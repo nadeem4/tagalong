@@ -14,6 +14,8 @@ uv sync
 uv run brain
 ```
 
+If the port is already in use (another brain is running), the brain logs one plain line naming the address, pointing to `tagalong stop`, and exits with code 1; it never touches the running brain's pid file.
+
 Once it holds the port, the brain writes its process id and creation time to `<TAGALONG_HOME>/brain.pid` while it runs and removes it on a
 clean exit. The desktop starts the brain detached and never stops it, so `uv run tagalong stop`
 ends it: it reads the pid file, checks the live process at that pid has the same creation time (a reused pid is never killed), ends it, and says `Stopped the brain.`, `The brain is
@@ -251,7 +253,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 
 - `pnpm dev:desktop` starts the brain if none is running, detached, with its output in
   `<TAGALONG_HOME>/brain.log`; quitting the app leaves it running (`uv run tagalong stop` ends it).
-  Or run `cd brain && uv run brain` yourself first. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
+  Or run `cd brain && uv run brain` yourself first: run by hand, the brain logs to the terminal (stdout) and writes no `brain.log`; that file exists only when the desktop starts the brain. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
   variable the brain listens on) and retries every 2 s, so either order works.
 - It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
   `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.

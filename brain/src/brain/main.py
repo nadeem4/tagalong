@@ -5,6 +5,7 @@ so the library's own connection chatter stays quiet and only the brain's lines p
 """
 
 import asyncio
+import errno
 import logging
 import os
 import sys
@@ -236,9 +237,20 @@ async def _run() -> None:
     session.loops = loops  # focus and tab events also surface loops
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
-        server = await start_server(
-            config.host, config.port, bodies, session_id(config.data_dir), session
-        )
+        try:
+            server = await start_server(
+                config.host, config.port, bodies, session_id(config.data_dir), session
+            )
+        except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
+            if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
+                raise
+            log.error(
+                "cannot listen on %s:%d: another brain is probably running there. "
+                "End it with `tagalong stop`.",
+                config.host,
+                config.port,
+            )
+            sys.exit(1)
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         await apps.start()  # connects in the background, so a slow app never delays boot
