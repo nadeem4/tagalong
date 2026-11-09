@@ -182,6 +182,25 @@ describe('HomeView', () => {
     await waitFor(() => expect(scout).toHaveTextContent('Ready'));
   });
 
+  it('ignores a slow host status that arrives after a newer link read', async () => {
+    let release: (v: { text: string; ok: boolean }) => void = () => undefined;
+    let status: 'online' | 'offline' = 'online';
+    const slow: HomeHost = {
+      status: () => new Promise((resolve) => (release = resolve)),
+    };
+    const bridge = Object.assign(createFakeHostBridge({ pets: [SCOUT] }), {
+      brainLink: () => Promise.resolve({ addr: 'ws://127.0.0.1:47321', status }),
+    });
+    renderHome(bridge, { homeHost: slow });
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(release).not.toBe(undefined));
+    status = 'offline';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Offline'));
+    await act(async () => release({ text: 'Ready', ok: true }));
+    expect(scout).toHaveTextContent('Brain: Offline');
+  });
+
   it('moves between pages, and reports the page to the host', async () => {
     const pages: HomePage[] = [];
     renderHome(createFakeHostBridge({ pets: [SCOUT] }), {

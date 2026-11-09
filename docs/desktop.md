@@ -497,7 +497,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   the single JSON text part the Home tools return. Home's What Scout remembers uses `list_memories`
   and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
-  rejects, so the page says it could not read). The Overview's Scout card shows Brain: Offline (or Connecting, Needs update) while the link is down; the Spend card reads again when the link changes. Spend card uses `spend_today` (`ipc/spend.ts`,
+  rejects, so the page says it could not read). The Overview's Scout card shows Brain: Offline (or Connecting, Needs update) while the link is down; the Spend card reads again when the link changes. The spend card uses `spend_today` (`ipc/spend.ts`,
   answering `{ spentUsd, limitUsd }`). Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
   (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows

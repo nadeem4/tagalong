@@ -144,14 +144,23 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
   useEffect(() => {
     // The brain link comes first: with no brain, "Ready" would be a lie. Read again on
     // every link change so the card follows an outage and the return.
+    // Only the newest read may write: a slow reply must not undo a later "Brain: Offline".
+    let latest = 0;
     const read = () => {
+      const mine = ++latest;
       void bridge.brainLink().then(
         (link) => {
+          if (mine !== latest) return;
           if (link.status !== 'online') {
             setStatus({ text: `Brain: ${LINK[link.status].words}`, ok: false });
             return;
           }
-          void host.status?.().then(setStatus, () => undefined);
+          void host.status?.().then(
+            (next) => {
+              if (mine === latest) setStatus(next);
+            },
+            () => undefined,
+          );
           if (host.status === undefined) setStatus({ text: 'Ready', ok: true });
         },
         () => undefined,

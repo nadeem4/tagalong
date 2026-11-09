@@ -1077,7 +1077,7 @@ describe('a permission ask in the middle of a streaming turn', () => {
       bridge.emit({
         type: 'turn.toolRequest',
         turnId: 'turn-1',
-        approvalId: 'read-1',
+        approvalId: 'toolu_01',
         tool: 'read_screen',
         input: {},
       });
@@ -1085,7 +1085,7 @@ describe('a permission ask in the middle of a streaming turn', () => {
       bridge.emit({
         type: 'turn.toolRequest',
         turnId: 'turn-1',
-        approvalId: askId,
+        approvalId: 'toolu_02',
         tool: 'remember',
         input: {},
       });
@@ -1118,7 +1118,7 @@ describe('a permission ask in the middle of a streaming turn', () => {
       bridge.emit({
         type: 'turn.toolRequest',
         turnId: 'turn-1',
-        approvalId: askId,
+        approvalId: 'toolu_02',
         tool: 'remember',
         input: {},
       });
@@ -1131,6 +1131,43 @@ describe('a permission ask in the middle of a streaming turn', () => {
     const bridge = await twoStep('Let me check. ');
     act(() => bridge.emit({ type: 'connector.dismiss', approvalId: askId } as never));
     expect(screen.getByText(/Let me check\./)).toHaveTextContent(said);
+  });
+
+  const call = (id: string, tool = 'remember'): TurnEvent => ({
+    type: 'turn.toolRequest',
+    turnId: 'turn-1',
+    approvalId: id,
+    tool,
+    input: {},
+  });
+
+  it('cuts at the same step when parallel calls share it', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit(call('toolu_03', 'remember_more')));
+    expect(screen.getAllByText(said)).toHaveLength(1);
+    expect(screen.getByText('Let me check.')).toBeInTheDocument();
+  });
+
+  it('shows the whole text when the turn ends while the card is open', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() =>
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 'turn-1',
+        text: `Let me check. ${said} Done.`,
+        stopReason: 'end',
+      }),
+    );
+    expect(screen.queryByRole('region', { name: 'Allow remember?' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Done\./)).toHaveTextContent(said);
+  });
+
+  it('cuts text streamed after the ask while the card is open, and shows it after', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: ' Waiting on you.' }));
+    expect(screen.queryByText(/Waiting on you/)).not.toBeInTheDocument();
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: askId } as never));
+    expect(screen.getByText(/Waiting on you/)).toBeInTheDocument();
   });
 });
 

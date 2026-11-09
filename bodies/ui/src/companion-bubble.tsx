@@ -131,7 +131,7 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 type Reply =
   | { state: 'idle' }
   // `steps`: where the text stood when each tool call began, to find where an ask's step starts.
-  | { state: 'running'; turnId: string | null; text: string; steps?: { id: string; at: number }[] }
+  | { state: 'running'; turnId: string | null; text: string; steps?: number[] }
   | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
 
@@ -258,10 +258,7 @@ export function CompanionBubble({
           current.state === 'running'
             ? {
                 ...current,
-                steps: [
-                  ...(current.steps ?? []),
-                  { id: event.approvalId, at: current.text.length },
-                ],
+                steps: [...(current.steps ?? []), current.text.length],
               }
             : current,
         );
@@ -560,9 +557,11 @@ export function CompanionBubble({
   // A permission card leads with Scout's words for its own step, and the brain cuts them short.
   // So while it is open the stream stops where that step begins (the last tool call before the
   // ask's own); the card carries the rest, and the full text returns when the card closes.
+  // The ask is the newest tool call (parallel calls share one position), so its step starts
+  // at the last position before that; none before it means the whole text is its step.
   const askStep =
     confirm?.options !== undefined && reply.state === 'running' && confirm.turnId === reply.turnId
-      ? ([...(reply.steps ?? [])].reverse().find((s) => s.id !== confirm.approvalId)?.at ?? 0)
+      ? Math.max(0, ...(reply.steps ?? []).filter((at) => at < Math.max(...(reply.steps ?? [0]))))
       : null;
   const shownText =
     reply.state !== 'running' ? '' : askStep === null ? reply.text : reply.text.slice(0, askStep);
