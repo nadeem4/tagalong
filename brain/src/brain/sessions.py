@@ -301,6 +301,7 @@ class Session:
         # True when the last turn was cancelled before any word and its request is still last in
         # history: the next turn drops it (see _drop_unanswered).
         self._wordless_cancel = False
+        self._joined: tuple[str | None, SayParams] | None = None
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
@@ -368,6 +369,7 @@ class Session:
         # A finished task whose callback has not run yet is a dead turn: start a new one.
         if self._busy():
             self._inbox.append(content)
+            self._joined = (shown_on, params)  # the newest joined say, if its turn is cancelled
             self._speak(self._turn_id, self._turn_body, params)
             return SayResult(turn=self._turn_id, joined=True)
         if not self._ready():
@@ -422,7 +424,11 @@ class Session:
         if not self._wordless_cancel:
             return
         self._wordless_cancel = False
-        if self.history and self._saved == len(self.history):
+        # The flag is set right after the save, so history still ends on that saved request:
+        # nothing appends to history between the end of a turn and the next prepare(). The
+        # checks guard the pop anyway; the row's `cut` mark then still matches what was dropped.
+        last = self.history[-1] if self.history else None
+        if last is not None and last["role"] == "user" and self._saved == len(self.history):
             self.history.pop()
             self._saved = len(self.history)
 
@@ -894,9 +900,12 @@ class Session:
             reason = "error"
         else:
             reason = task.result()
+        pending: list = []
+        owns = self._task is task  # a newer turn may already own the session
         last = self.history[-1] if self.history else None
         unanswered = (
-            reason == "cancelled"
+            owns
+            and reason == "cancelled"
             and last is not None
             and last["role"] == "user"
             and not (
@@ -904,8 +913,7 @@ class Session:
                 and any(b.get("type") == "tool_result" for b in last["content"])
             )
         )
-        pending: list = []
-        if self._task is task:  # a newer turn may already own the session
+        if owns:
             if self._inbox and reason == "cancelled":
                 # Joined the turn that was cancelled: they get a turn of their own, not a
                 # silent place in an unanswered one.
@@ -919,6 +927,7 @@ class Session:
             self._owner_turn = False
             self._task = None
         self._last_turn = turn_id
+        joined, self._joined = self._joined, None
         self._persist(body_kind)
         if unanswered and self._saved == len(self.history):
             self._wordless_cancel = True
@@ -932,7 +941,8 @@ class Session:
         )
         self.scheduler.turn_ended(turn_id)  # after ended, so the next turn's started comes second
         if pending:
-            self._start_turn(body_id, pending)
+            shown, params = joined if joined is not None else (body_id, None)
+            self._speak(self._start_turn(shown, pending), shown, params)
 
     def _masked(self, message: dict[str, Any]) -> dict[str, Any]:
         """The copy saved to disk. A thinking block that masking would change is dropped: its

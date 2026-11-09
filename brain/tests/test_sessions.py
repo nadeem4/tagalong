@@ -208,6 +208,85 @@ async def test_say_after_task_finished_but_before_callback_starts_new_turn():
     assert states(sent).count("ended") == 2
 
 
+async def test_say_between_a_cancelled_task_ending_and_its_callback(tmp_path):
+    # The cancelled turn is over but its _ended has not run: the new say joins the unsaved
+    # request and starts the turn that answers both. That request must not be marked cut.
+    memory = file_memory(tmp_path)
+    model = Gate([asyncio.Event(), "ok b", "ok c"])
+    session, _ = make(model, memory)
+    held = []
+    ended = session._ended
+    session._ended = lambda *args: held.append(args)
+    first = session.say("desktop", say("a"))
+    await asyncio.sleep(0)
+    session.cancel(first.turn)
+    await asyncio.wait({session._task})
+    assert held
+    session._ended = ended  # only the first callback is held
+    second = session.say("desktop", say("b"))
+    assert second.joined is False
+    ended(*held[0])  # the old callback runs now, while the merged request is still last
+    await asyncio.wait({session._task})
+    await asyncio.sleep(0)
+    session.say("desktop", say("c"))
+    await finish_quietly(session)
+    assert [m["role"] for m in model.seen[2]] == ["user", "assistant", "user"]
+    assert [m["role"] for m in memory.load_messages()][0] == "user"
+    assert [m["role"] for m in make(Gate(["x"]), memory)[0].history] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+
+
+class FailsLater(Gate):
+    """Waits, then breaks: the turn ends in error after a say joined it."""
+
+    async def stream(self, system, messages, tools):
+        self.seen.append(list(messages))
+        await self.steps[0].wait()
+        raise RuntimeError("down")
+        yield
+
+
+async def test_late_says_after_an_error_turn_join_its_request(tmp_path):
+    memory = file_memory(tmp_path)
+    release = asyncio.Event()
+    session, sent = make(FailsLater([release]), memory)
+    session.say("desktop", say("a"))
+    await asyncio.sleep(0)
+    assert session.say("desktop", say("late")).joined is True
+    release.set()
+    await finish_quietly(session)
+    assert sent[-1][1]["reason"] == "error"
+    assert session._task is None  # no new turn: only a cancel gives joined says one
+    assert session.history[-1]["content"] == [
+        {"type": "text", "text": "a"},
+        {"type": "text", "text": "late"},
+    ]
+    assert memory.load_messages()[-1]["content"][-1] == {"type": "text", "text": "late"}
+
+
+async def test_joined_say_after_a_cancel_is_read_aloud_on_its_own_body():
+    gate = asyncio.Event()
+    model = Gate([gate, "done"])
+    session, sent = make(model)
+    session.voice = voice = RecordingVoice()
+    join(session, "desktop")
+    first = session.say("desktop", say("tell me"))
+    await asyncio.sleep(0)
+    session.cancel(first.turn)
+    joined = session.say("desktop", SayParams(text="actually X", spoken=True))
+    assert joined.joined is True
+    await finish_quietly(session)
+    await asyncio.sleep(0)
+    started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert len(started) == 2 and started[1]["body"] == "desktop"
+    spoken_turns = [c[1] for c in voice.calls if c[0] == "spoken"]
+    assert started[1]["turn"] in spoken_turns
+
+
 async def test_cancel_right_after_say():
     session, sent = make(Gate(["never"]))
     result = session.say("desktop", say("a"))
