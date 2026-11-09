@@ -135,7 +135,7 @@ pnpm start            # ensure-electron, then electron-vite preview against the 
 pnpm start:fresh      # the same, on a new temp data folder, so you start from a clean profile
 pnpm --filter @tagalong/desktop test:e2e  # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
-pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
+pnpm package:win      # fetch-native, fetch-uv, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
 ```
 
@@ -208,6 +208,15 @@ the browser body are not measured: the Playwright suites cover them.
 - **The browser body ships inside.** `bodies/browser/dist` is copied to `resources/extension`, so
   someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
   it first.
+- **The brain ships as source plus uv.** `scripts/fetch-uv.mjs` downloads a pinned uv release
+  (version and sha256 are constants in the script; a mismatch fails the build, one retry on a flaky
+  network) into the gitignored `bodies/desktop/build/uv`, and `extraResources` copies it to
+  `resources/uv` and the brain's `pyproject.toml`, `uv.lock` and `src/` (no bytecode) to
+  `resources/brain`. To bump uv, change both constants from the new release's `.sha256` file. The
+  brain reads no `mode.txt`, so none is shipped. First-run use of these files is a later slice.
+- **Release.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on Windows: it checks the
+  tag equals `v` plus the desktop `version`, runs `pnpm package:win`, and publishes the installer
+  with `gh release create --generate-notes`. Bump `bodies/desktop/package.json` first, then tag.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
   is no macOS or Linux platform adapter.
 - CI does not build the installer.

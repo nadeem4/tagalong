@@ -11,6 +11,7 @@ out/
 release/
 bodies/desktop/dist/
 bodies/desktop/out/
+bodies/desktop/build/
 
 # env & secrets
 .env

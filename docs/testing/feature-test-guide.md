@@ -1843,8 +1843,12 @@ prompt need a real browser.
 2. **Action:** `pnpm package:win` from the repository root.
 3. **Expected:** it ends without errors and `bodies\desktop\release\Tagalong-Setup-0.1.0-x64.exe`
    exists. In `bodies\desktop\release\win-unpacked\resources` there are `app.asar`,
-   `app.asar.unpacked` (holding `get-windows`' and the other native modules' Windows binaries) and
-   `extension`.
+   `app.asar.unpacked` (holding `get-windows`' and the other native modules' Windows binaries),
+   `extension`, `uv\uv.exe` (`uv.exe --version` prints the version pinned in
+   `bodies\desktop\scripts\fetch-uv.mjs`) and `brain` (holding `pyproject.toml`, `uv.lock` and
+   `src`, with no `__pycache__`). Automated: `pnpm --filter @tagalong/desktop exec vitest run
+scripts/fetch-uv.test.mjs src/main/packaging.test.ts`. A pushed `v0.1.0` tag (matching the
+   desktop version) makes the Release workflow attach the installer to a GitHub release.
 
 ### I.2. Install on a fresh Windows machine
 
