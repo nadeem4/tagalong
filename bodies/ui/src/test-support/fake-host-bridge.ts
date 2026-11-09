@@ -70,6 +70,8 @@ export interface FakeHostBridge extends HostBridge {
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
   readonly jobStops: readonly string[];
+  /** How many times Retry was pressed on the brain setup line. */
+  readonly setupRetries: () => number;
   /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
   activity: Record<string, JobActivityEntry[]>;
   /** Scout's watch list by job id; a test may swap them. */
@@ -200,6 +202,7 @@ export function createFakeHostBridge(
   const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
   const jobStops: string[] = [];
+  let setupRetries = 0;
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
@@ -391,6 +394,7 @@ export function createFakeHostBridge(
     },
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
+    setupRetries: () => setupRetries,
     usageSummary() {
       return Promise.resolve({ spentUsd: 0, limitUsd: null });
     },
@@ -428,8 +432,12 @@ export function createFakeHostBridge(
     },
     brainLink() {
       return Promise.resolve(
-        options.brainLink ?? { addr: 'ws://127.0.0.1:47321', status: 'online' },
+        options.brainLink ?? { addr: 'ws://127.0.0.1:47321', status: 'online', setup: 'idle' },
       );
+    },
+    retryBrainSetup() {
+      setupRetries++;
+      return Promise.resolve();
     },
     listJobs() {
       return Promise.resolve(fake.jobs.map((row) => ({ ...row })));

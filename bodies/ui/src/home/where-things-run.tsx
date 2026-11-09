@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { readingRowsOf, type AppInfo, type ReadingRowView } from '../shapes';
 import { useHostBridge, type BrainLink } from '../host-bridge';
 import { STATUS_CHIP, STATUS_DOT, STATUS_WORDS } from './connection-row';
+import { Button } from '../controls/button';
 import { ReadingRows } from './reading-rows';
 
 // Link states reuse the apps' dots; words say it too, so colour never carries it alone.
@@ -90,6 +91,21 @@ export function WhereThingsRun() {
           <span className={state.dot} aria-hidden="true" /> {state.words}
         </span>
       </p>
+      {link.setup === 'installing' && (
+        <p>Setting up Scout's brain — one-time download. This can take a few minutes.</p>
+      )}
+      {link.setup === 'failed' && (
+        <div className="home-reading__fix">
+          <p>
+            Scout's brain did not finish setting up. Check your internet connection, then retry.
+          </p>
+          <div className="home-reading__actions">
+            <Button variant="primary" onClick={() => void bridge.retryBrainSetup()}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
       {link.status !== 'online' ? (
         <p>Connected apps show up when the brain is connected.</p>
       ) : (

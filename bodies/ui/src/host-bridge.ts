@@ -189,6 +189,8 @@ export interface PreferenceRow {
 export interface BrainLink {
   addr: string;
   status: 'connecting' | 'online' | 'offline' | 'outdated';
+  /** The first-run install of the brain (packaged app only): idle when there is nothing to show. */
+  setup: 'idle' | 'installing' | 'failed';
 }
 
 export interface AskInput {
@@ -339,6 +341,8 @@ export interface HostBridge {
   ): () => void;
   /** Home's "Where things run": the brain's address and link status. */
   brainLink(): Promise<BrainLink>;
+  /** Runs the first-run install again after it failed. */
+  retryBrainSetup(): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection
    * to the brain goes up or down): read it again. Returns an

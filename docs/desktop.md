@@ -100,14 +100,24 @@ declares four body tools in `hello` (`brain/body-tools.ts`) and answers the brai
 If the socket is down the client retries every 2 s, so the app opens whether or not the brain is
 running.
 
-Before dialing, an unpackaged desktop runs `launchBrain` (`brain/launch.ts`). If the address is
-local (`127.0.0.1`, `localhost` or `::1`), the repo's `brain/` folder has a `pyproject.toml`, and a
+Before dialing, the desktop runs `launchBrain` (`brain/launch.ts`), packaged or not. If the address is
+local (`127.0.0.1`, `localhost` or `::1`), the `brain/` folder (the repo's, or `resources\brain` when
+packaged) has a `pyproject.toml`, and a
 TCP connect to the address is refused, it spawns `uv run brain` there with the environment passed
 through, detached and unreferenced, with its output appended to `<TAGALONG_HOME>/brain.log`
 (default `~/.tagalong/brain.log`), not `tagalong.log`. If something already answers, or the address
 is remote, it spawns nothing. The desktop never stops the brain, so it keeps running after quit;
 `uv run tagalong stop` ends it. If `uv` is missing or the child exits, it logs one line and does not respawn; the
 client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
+
+Packaged, the first run installs the brain: `resources\uv\uv.exe sync --frozen --no-dev` runs
+first (argv, no shell, output in `brain.log`, no timeout), then
+`uv run --frozen --no-dev brain`. Only the packaged app sets
+`UV_PROJECT_ENVIRONMENT=<home>\runtime\venv`, `UV_PYTHON_INSTALL_DIR=<home>\runtime\python`,
+`UV_CACHE_DIR=<home>\cache\uv` and `UV_PYTHON_PREFERENCE=only-managed` (`<home>` is
+`TAGALONG_HOME`, else `~/.tagalong`). While the sync runs, `ipc/brain-link.ts` reports
+`setup: 'installing'`; if it fails, `'failed'` and no brain is spawned. Home's "Where things run"
+card shows a plain line for each, and **Retry** (`IPC.brainSetupRetry`) runs the launch again.
 
 - **Body tools.** `list_windows` returns visible and minimized windows as JSON text.
   `read_window_text(windowId)` works on minimized windows, and a read from pixels (OCR) raises the

@@ -79,7 +79,7 @@ import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
-import { registerBrainLinkIpc } from './ipc/brain-link';
+import { createBrainSetup, registerBrainLinkIpc } from './ipc/brain-link';
 import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerPermissionsIpc } from './ipc/permissions';
@@ -137,6 +137,22 @@ interface Desktop {
 let desktop: Desktop | null = null;
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
+/** Starts the brain (installing it first when packaged) and holds the setup state Home shows. */
+const brainSetup = createBrainSetup(
+  (onSetup) =>
+    realLaunch({
+      brainDir: app.isPackaged
+        ? join(process.resourcesPath, 'brain')
+        : resolve(app.getAppPath(), '..', '..', 'brain'),
+      packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
+      onSetup,
+    }),
+  () => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
+    }
+  },
+);
 /** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
 let claimTurn: (turnId: string) => void = () => undefined;
 
@@ -223,13 +239,9 @@ async function start(): Promise<void> {
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
 
-  // In dev, start the brain if none is running; the client below dials it and retries.
-  if (!app.isPackaged) {
-    // A failure to start the brain only logs: the client below keeps retrying.
-    realLaunch(resolve(app.getAppPath(), '..', '..', 'brain')).catch((error: unknown) =>
-      console.warn(`could not start the brain (${String(error)}); the desktop keeps retrying`),
-    );
-  }
+  // Start the brain if none is running; the client below dials it and retries. Packaged, the
+  // first start installs it first (uv sync) and Home shows that as it goes.
+  void brainSetup.retry();
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,
     () => brain.session,
@@ -908,7 +920,7 @@ function registerIpc(): void {
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
-  registerBrainLinkIpc(handle, { brain: required().brain });
+  registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,
     problem: () => {
