@@ -566,34 +566,6 @@ async def test_tell_queues_a_note_for_a_running_job_only(make_rig):
         rig.jobs.tell("nope", "x")
 
 
-async def test_a_note_to_a_second_running_job_right_after_the_first_is_refused(make_rig):
-    # LT5 B1R-2: "tell it to hurry" with two jobs running went to both. The refusal lists the
-    # running jobs so Scout asks which; `also` is for when the person said both.
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
-    one = await rig.jobs.start("one", str(rig.folder), title="Docs pass")
-    two = await rig.jobs.start("two", str(rig.folder), title="Test pass")
-    rig.jobs.tell(one, "hurry")
-    with pytest.raises(JobError) as err:
-        rig.jobs.tell(two, "hurry")
-    text = str(err.value)
-    assert one in text and two in text and "Docs pass" in text and "Test pass" in text
-    rig.jobs.tell(one, "and then stop")  # the same job again is no ambiguity
-    rig.jobs.tell(two, "hurry", also=True)
-    await rig.jobs.shutdown()
-
-
-async def test_a_note_to_another_job_later_is_not_ambiguous(make_rig):
-    clock = [datetime(2026, 1, 1, tzinfo=UTC)]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
-    one = await rig.jobs.start("one", str(rig.folder))
-    two = await rig.jobs.start("two", str(rig.folder))
-    rig.jobs._now = lambda: clock[0]
-    rig.jobs.tell(one, "hurry")
-    clock[0] += timedelta(minutes=5)
-    rig.jobs.tell(two, "go on")
-    await rig.jobs.shutdown()
-
-
 async def test_a_stop_during_an_open_permission_ask_reads_stopped_not_failed(make_rig):
     # The cancelled ask makes the adapter report the tool call failed; the stop must win.
     steps = [
@@ -1420,6 +1392,18 @@ async def test_carrying_on_from_a_part_that_failed_on_restart_closes_the_old_job
     await rig.jobs.start("two", str(rig.folder), continue_job="old")
     assert "old" not in [r.id for r in rig.records.work.open_roots()]
     assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
+
+
+async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(make_rig):
+    # Only an explicit continue_job closes a failed or stopped job; a new task in the same folder
+    # must not hide a failure the person may not have seen.
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.records.update_part("old", "p1", state="failed", reason="it broke")
+    await rig.jobs.start("two", str(rig.folder))
+    assert "old" in [r.id for r in rig.records.work.open_roots()]
+    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == ["old"]
 
 
 async def test_carrying_on_from_a_job_a_shutdown_stopped_closes_the_old_job(make_rig):

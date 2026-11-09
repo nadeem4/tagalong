@@ -67,7 +67,6 @@ CANCEL = "cancel"
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
-TELL_WINDOW_S = 120  # a note to a second job this soon after one to the first may be a fan-out
 TITLE_FALLBACK_CHARS = 80
 
 
@@ -159,7 +158,6 @@ class Jobs:
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
-        self._told: dict[str, datetime] = {}  # job -> when it last got a note from Scout
 
     def startup(self) -> list[tuple[str, str]]:
         """Settle what a dead brain left running (the resume scan): a call that saved a session is
@@ -329,8 +327,13 @@ class Jobs:
             new_job=job is None,
             apps=offered,
         )
-        if earlier and earlier_part and earlier_part.state in ("blocked", "failed", "cancelled"):
-            self._supersede(earlier, earlier_part, job)
+        if earlier and earlier_part:
+            # An explicit carry-on closes whatever a restart, shutdown or stop left behind. The
+            # implicit same-folder path only settles a part the restart held, so a genuine
+            # failure is not hidden by an unrelated new task.
+            held = earlier_part.state == "blocked"
+            if held or (continue_job and earlier_part.state in ("failed", "cancelled")):
+                self._supersede(earlier, earlier_part, job)
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
             self._records.set_title(str(started), clean.strip())
@@ -342,7 +345,9 @@ class Jobs:
     def _supersede(self, earlier: Job, part: JobPart, into: str | None) -> None:
         """Carried on: a part a restart, a shutdown or a stop left behind is done with once its
         continuation runs, so its job stops showing as open instead of lingering beside the new
-        one. A part added to the same job, or another part still open, keeps the job open."""
+        one. A part added to the same job, or another part still open, keeps the job open.
+        Marking a failed or stopped part reported is safe only because the caller passed an
+        explicit continue_job: the person asked to carry on, so nothing is hidden from them."""
         if part.state == "blocked":
             self._records.update_part(
                 earlier.id, part.id, state="cancelled", reason="carried on", reported=True
@@ -623,31 +628,10 @@ class Jobs:
             self._timers_changed()
         self._changed()
 
-    def tell(self, job_id: str, note: str, part: str | None = None, also: bool = False) -> None:
-        """Queue a note for a running part. With several jobs running, a note to a second one
-        right after one to the first is refused with the running jobs listed, so Scout asks which
-        the person meant (one "tell it to hurry" went to both); `also` says they meant several."""
+    def tell(self, job_id: str, note: str, part: str | None = None) -> None:
         run = self._running(job_id, part, "name one")
-        now = self._now()
-        if not also:
-            alive = {j.id for j in self._records.running_jobs()}
-            recent = [
-                j
-                for j, at in self._told.items()
-                if j != job_id and j in alive and (now - at).total_seconds() < TELL_WINDOW_S
-            ]
-            if recent:
-                raise JobError(
-                    f"not sent: job {recent[0]} was just told something and several jobs are "
-                    f"running ({self._running_list()}). Ask the person which job they meant; "
-                    "pass also only if they said to tell several."
-                )
         if not run.note(note):
             raise JobError(f"job {job_id} is not running")
-        self._told[job_id] = now
-
-    def _running_list(self) -> str:
-        return "; ".join(f"{j.id} '{job_title(j)}'" for j in self._records.running_jobs())
 
     async def stop(self, job_id: str, part: str | None = None) -> None:
         """Stop the named part, or every running part of the job."""
