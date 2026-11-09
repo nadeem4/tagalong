@@ -168,7 +168,8 @@ class JobActivity:
     def _finish_command(self, step: str, code: object) -> None:
         old = self._steps[step]
         code = code if isinstance(code, int) and not isinstance(code, bool) else None
-        status = "done" if code == 0 else "failed"
+        # A command the stop killed exits with no code or a signal's: stopped, not failed.
+        status = "done" if code == 0 else ("stopped" if self._stopping else "failed")
         self._exited.add(step)
         self._touched.add(step)
         self._raw.pop(step, None)
@@ -298,7 +299,10 @@ def _cut_trimmed(text: str) -> str:
 
 
 def is_failed(entry: ActivityEntry) -> bool:
-    """A step failed by its status, or a command that exited non-zero whatever its status says."""
+    """A step failed by its status, or a command that exited non-zero whatever its status says;
+    a step the stop ended is never a failure, whatever exit code the kill left."""
+    if entry.status == "stopped":
+        return False
     return entry.status == "failed" or (entry.kind == "command" and entry.exit not in (None, 0))
 
 

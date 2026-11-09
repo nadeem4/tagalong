@@ -302,6 +302,12 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
    the permission ask unanswered, then say "stop that job". **Expected:** the step and the summary
    say stopped (`0 failed`), not "1 failed"; Scout reports it stopped and does **not** start the task
    again by itself on any later wake. Only when you ask "do it again" does it offer a new job.
+   **F15 (LT5 B1R-1):** in Bypass mode hand off `ping -n 60 127.0.0.1` (a long Terminal step), then say "stop that job".
+   **Expected:** the Terminal step reads stopped (never "Terminal (failed)"), `list_jobs` says `0 failed`, and Scout reports the job stopped, not turned down or failed. Repeat with Manual and the permission ask left open: same result.
+   **F15 (LT5 B1R-2):** with two jobs running say "tell it to hurry".
+   **Expected:** Scout asks which job (by title); only after you answer does one note go out. A second note to the other job within two minutes is refused unless you said to tell both.
+   **F15 (LT5 B1R-3):** start a job, stop the brain (`tagalong stop`), start it, then say "carry on".
+   **Expected:** the new job continues the old session (`parent_job` names the old one) and the old job no longer shows as open or running; it is closed as "carried on". The same holds when the session could not reload (a fresh job starts, the old one still closes).
    **F11 (LT1-5):** answer the mode card with Manual. **Expected:** Scout then says the job runs in
    Manual mode; it never says it cannot set the mode.
    **F11 (LT1-6, by design):** after a job ends, its `claude` process stays up until

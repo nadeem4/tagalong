@@ -589,6 +589,36 @@ def test_a_step_the_stop_rejected_reads_stopped_not_failed(frig):
     assert "0 failed" in job_activity.activity_line(frig.work, "j", NOW)
 
 
+@pytest.mark.parametrize("code", [None, 137, 1])
+def test_a_command_killed_by_the_stop_reads_stopped_whatever_its_exit(frig, code):
+    # A Bypass terminal step killed by Stop exits with no code or a signal's code (LT5 B1R-1).
+    frig.log.on_update(start("t1", raw_input={"command": "sleep 99"}))
+    frig.log.stopping()
+    frig.log.on_update(exited("t1", code))
+    assert frig.rows()[0].status == "stopped" and frig.failed == []
+    frig.log.end("stopped", "")
+    line = job_activity.activity_line(frig.work, "j", NOW)
+    assert "0 failed" in line and "last failure" not in line
+    summary = job_activity.activity_summary(frig.work, frig.records, "j", NOW)
+    assert "failed: 0" in summary and "\nfailed: " not in summary
+
+
+def test_a_command_that_finished_cleanly_while_stopping_stays_done(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "ls"}))
+    frig.log.stopping()
+    frig.log.on_update(exited("t1", 0))
+    assert frig.rows()[0].status == "done"
+
+
+def test_a_stopped_step_with_a_nonzero_exit_is_not_a_failure(frig):
+    frig.log.on_update(start("t1", raw_input={"command": "sleep 99"}))
+    frig.log.stopping()
+    frig.log.on_update(exited("t1", 143))
+    [entry] = frig.rows()
+    assert (entry.status, entry.exit) == ("stopped", 143)
+    assert not job_activity.is_failed(entry)
+
+
 # --- parts (SP2): one ordered log per job, each step tagged with its part
 
 

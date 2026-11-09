@@ -769,7 +769,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
     async def tell_expert(args: dict) -> str:
         _need_text("tell_expert", args, "job", "note")
         try:
-            jobs.tell(args["job"], args["note"], **_part_arg(args))
+            also = {"also": True} if args.get("also") is True else {}
+            jobs.tell(args["job"], args["note"], **_part_arg(args), **also)
         except JobError as err:
             return str(err)
         return f"note queued for job {args['job']}"
@@ -958,10 +959,17 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "tell_expert",
                 "Send a follow-up note to a running Claude Code job. It is read after the "
                 "current step finishes. When the job has several running parts, name one "
-                "with part (p1, p2, ...).",
+                "with part (p1, p2, ...). With several jobs running, ask the person which one "
+                "they mean before you send; a note to a second job right after the first is "
+                "refused unless you pass also: true because the person said to tell several.",
                 {
                     "type": "object",
-                    "properties": {"job": job_id, "note": {"type": "string"}, "part": part_id},
+                    "properties": {
+                        "job": job_id,
+                        "note": {"type": "string"},
+                        "part": part_id,
+                        "also": {"type": "boolean"},
+                    },
                     "required": ["job", "note"],
                 },
                 scout,

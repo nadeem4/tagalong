@@ -281,8 +281,10 @@ class FakeJobs:
         if self.error:
             raise self.error
 
-    def tell(self, job_id, note, part=None):
-        self.calls.append(("tell", job_id, note) + ((part,) if part else ()))
+    def tell(self, job_id, note, part=None, also=False):
+        self.calls.append(
+            ("tell", job_id, note) + ((part,) if part else ()) + (("also",) if also else ())
+        )
         if self.error:
             raise self.error
 
@@ -506,6 +508,14 @@ async def test_tell_expert_queues_a_note(home):
     out = await home.run("tell_expert", {"job": "j1", "note": "use tabs"})
     assert home.jobs.calls == [("tell", "j1", "use tabs")]
     assert "j1" in out
+
+
+async def test_tell_expert_passes_also_only_when_true_and_shows_a_refusal(home):
+    await home.run("tell_expert", {"job": "j1", "note": "n", "also": True})
+    await home.run("tell_expert", {"job": "j1", "note": "n", "also": "yes"})
+    assert home.jobs.calls == [("tell", "j1", "n", "also"), ("tell", "j1", "n")]
+    home.jobs.error = JobError("not sent: ask which job")
+    assert await home.run("tell_expert", {"job": "j2", "note": "n"}) == "not sent: ask which job"
 
 
 async def test_tell_expert_and_stop_job_can_name_a_part(home):
