@@ -522,6 +522,8 @@ The offscreen page holds the microphone stream only while listening and stores n
 
 ## Privacy notes
 
+- Tool results (`tabs` list and read, `browser_search`) carry the full address, query included, because the person's own tab is what they ask about. The brain masks token-like query values before they are saved (`masking.py`).
+
 - Nothing is read until Scout asks and you have allowed it. No script runs in a page before that.
   The two facts under Events are the only thing sent on the body's own. A right-click or
   address-bar ask is sent because you made it: it carries the text you selected (fenced as page
@@ -552,9 +554,8 @@ offline, a fact is dropped, not queued.
 
 - **URLs are stripped.** The `url` is the origin plus the path, with no query string and no
   fragment, because tokens live there. An address that is not http or https gives nothing. The `title` is cleaned too:
-  while a page loads Chrome uses its address as the title, so a title that is one address-like word
-  is cut at its first `?` or `#`, and the tab's own query and fragment text is removed from any
-  title. The `say` context title gets the same cleaning.
+  while a page loads Chrome uses its address as the title, so a title that starts with the tab's own
+  host and path is cut at its first `?` or `#`; any other title is left alone. The `say` context title gets the same cleaning.
 - **Throttled.** At most one `tab` every 2 seconds. A burst sends the first at once and the last
   value when the 2 seconds end. The same title and URL twice in a row is sent once. If the send
   fails (offline), the next change tries again.
@@ -576,7 +577,7 @@ offline, a fact is dropped, not queued.
 | `service-worker.test.ts`                | The omnibox and right-click listeners exist at load; another menu item says nothing; a click on ours says the gated ask                                                                                       |
 | `tools/tab-actions.test.ts`             | Each action and its permission, web addresses only, defaults to the tab in front, plain failures                                                                                                              |
 | `tab-facts.test.ts`                     | The worker's tab wiring: sent only with the `tabs` allow held, never from a private window                                                                                                                    |
-| `layer/chromium.test.ts`                | The layers over `chrome.*`: search (closed tabs, history, bookmarks, limits) and tab actions                                                                                                                  |
+| `layer/chromium.test.ts`                | The layers over `chrome.*`: search (closed tabs and their dates, history, bookmarks, limits), tab actions and the permission window closing on abort                                                          |
 | `reconnect.test.ts`                     | The alarm redials unless the body is online or outdated                                                                                                                                                       |
 | `identity.test.ts`                      | The id shape and the browser kind                                                                                                                                                                             |
 | `settings.test.ts`                      | Address and name validation                                                                                                                                                                                   |
@@ -585,16 +586,16 @@ offline, a fact is dropped, not queued.
 | `voice/popup-port.test.ts`              | A closed popup port ends the listen; other ports are ignored                                                                                                                                                  |
 | `voice/mic-control.test.ts`             | The offscreen page exists only while listening; a stale one is remade                                                                                                                                         |
 | `voice/pcm.test.ts`                     | Float to int16: scaling, rounding, clamping                                                                                                                                                                   |
-| `permissions.test.ts`                   | One window per need, the 25 s wait, decline and silence                                                                                                                                                       |
+| `permissions.test.ts`                   | One window per need, the 25 s wait, decline, silence (the window is aborted)                                                                                                                                  |
 | `permission/model.test.ts`              | The window's wording and buttons                                                                                                                                                                              |
 | `popup/model.test.ts`                   | The popup's status lines, allowed list, when the right-click button shows, the mic button's label and click, and its line                                                                                     |
-| `events.test.ts`                        | Stripped URLs, the 2 s throttle, no repeats, download names and states                                                                                                                                        |
+| `events.test.ts`                        | Stripped URLs and loading titles, the 2 s throttle, no repeats, download names and states                                                                                                                     |
 | `tools/tabs.test.ts`                    | List, read, picture (front tab only, same tab after the allow), asleep, locked, truncation                                                                                                                    |
 | `tools/page-parts.test.ts`              | Same needs as read, asleep and locked tabs, unknown part                                                                                                                                                      |
 | `tools/browser-search.test.ts`          | Each source and its permission, limits, local-day dates, impossible dates, unsupported reading list                                                                                                           |
 | `tools/registry.test.ts`                | The tool catalog the hello sends                                                                                                                                                                              |
 | `content/read-page.test.ts`             | The page text, selection and the cut at 40,000 characters                                                                                                                                                     |
-| `content/page-parts.test.ts`            | Links, tables, headings, forms by label and type only, the cut at 40,000 characters                                                                                                                           |
+| `content/page-parts.test.ts`            | Links, tables, headings (no style or script text), forms by label and type only, the cut at 40,000 characters                                                                                                 |
 | `content/injected-weight.test.ts`       | The injected reader stays small                                                                                                                                                                               |
 | `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them and asks for `contextMenus`); no ui import                                                                                       |
 

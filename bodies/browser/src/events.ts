@@ -1,6 +1,6 @@
 /**
  * The two facts the browser volunteers to the brain: the tab in front and finished downloads.
- * URLs lose their query and fragment (tokens live there) and the tab fact is throttled so
+ * URLs (and a title that is only the loading address) lose their query and fragment (tokens live there) and the tab fact is throttled so
  * flicking through tabs does not flood the brain.
  */
 
@@ -18,23 +18,31 @@ export function stripUrl(url: string): string {
 }
 
 /**
- * A tab title safe to send. While a page loads Chrome uses its address as the title, query and
- * fragment included, so a token the url loses would leave through the title. A title that is
- * one unbroken address-like word is cut at its first ? or #, and the tab's own query and
- * fragment text is removed wherever it appears.
+ * A tab title safe to send. While a page loads Chrome uses its address as the title, in display
+ * form (percent-escapes decoded), so a token the url loses would leave through the title. Only a
+ * title that starts with the tab's own host and path, with or without the scheme, is cut at its
+ * first ? or #; any other title is left alone, because real titles may hold either character.
  */
 export function stripTitle(title: string, rawUrl: string): string {
-  let out = title;
+  let u: URL;
   try {
-    const u = new URL(rawUrl);
-    for (const secret of [u.search, u.hash]) {
-      if (secret.length > 1) out = out.split(secret).join('');
-    }
+    u = new URL(rawUrl);
   } catch {
-    // an unparsable address has nothing to subtract; the shape check below still runs
+    return title;
   }
-  if (!/\s/.test(out) && out.includes('/') && /[?#]/.test(out)) out = out.split(/[?#]/)[0] ?? '';
-  return out;
+  const paths = [u.pathname];
+  try {
+    paths.push(decodeURI(u.pathname));
+  } catch {
+    // an undecodable path has only its raw form to compare
+  }
+  const lower = title.toLowerCase();
+  for (const path of paths) {
+    for (const head of [u.origin + path, u.host + path]) {
+      if (lower.startsWith(head.toLowerCase())) return title.split(/[?#]/)[0] ?? '';
+    }
+  }
+  return title;
 }
 
 interface TabReporterOptions {

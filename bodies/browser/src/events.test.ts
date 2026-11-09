@@ -29,12 +29,15 @@ describe('stripTitle', () => {
     expect(stripTitle(raw, raw)).toBe('http://localhost:8080/login.html');
   });
 
-  it('stripTitle_removes_the_tabs_own_query_from_a_longer_title', () => {
-    expect(stripTitle('Login ?token=SECRET123 now', raw)).not.toContain('SECRET123');
+  it('stripTitle_cuts_a_decoded_loading_title', () => {
+    const url = 'http://localhost:8080/p?token=S&m=a%20b';
+    expect(stripTitle('localhost:8080/p?token=S&m=a b', url)).toBe('localhost:8080/p');
   });
 
-  it('stripTitle_keeps_ordinary_titles', () => {
-    expect(stripTitle('Is this a real? Yes # one', raw)).toBe('Is this a real? Yes # one');
+  it('stripTitle_leaves_real_titles_untouched', () => {
+    expect(stripTitle('Issue #12', 'https://a.test/i#1')).toBe('Issue #12');
+    expect(stripTitle('What is C#?', 'https://a.test/c?x=1')).toBe('What is C#?');
+    expect(stripTitle('Q&A?', 'https://a.test/q?t=SECRET')).toBe('Q&A?');
     expect(stripTitle('', raw)).toBe('');
   });
 });

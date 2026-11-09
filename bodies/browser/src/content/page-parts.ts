@@ -10,10 +10,14 @@ export type PartKind = 'links' | 'tables' | 'forms' | 'headings';
 const clean = (s: string | null | undefined): string => (s ?? '').replace(/\s+/g, ' ').trim();
 
 /** Text a reader sees: textContent also counts style, script and template bodies, which are code. */
-function visibleText(el: Element): string {
+function withoutCode(el: Element): Element {
   const copy = el.cloneNode(true) as Element;
   copy.querySelectorAll('style, script, noscript, template').forEach((n) => n.remove());
-  return clean(copy.textContent);
+  return copy;
+}
+
+function visibleText(el: Element): string {
+  return clean(withoutCode(el).textContent);
 }
 
 function links(doc: Document): string[] {
@@ -28,8 +32,7 @@ function links(doc: Document): string[] {
 
 function tables(doc: Document): string[] {
   return Array.from(doc.querySelectorAll('table')).map((table, i) => {
-    const copy = table.cloneNode(true) as Element;
-    copy.querySelectorAll('style, script, noscript, template').forEach((n) => n.remove());
+    const copy = withoutCode(table);
     const rows = Array.from(copy.querySelectorAll('tr')).map((tr) =>
       Array.from(tr.querySelectorAll('th, td'))
         .map((cell) => clean(cell.textContent))

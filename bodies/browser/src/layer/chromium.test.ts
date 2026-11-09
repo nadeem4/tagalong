@@ -9,6 +9,7 @@
 import type {} from '../content/page-reader';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ActionsApi, SearchApi } from './api';
+import type { PermissionPrompt } from '../permissions';
 
 const fake = {
   storage: { local: {}, session: {} },
@@ -42,14 +43,24 @@ const fake = {
   },
   search: { query: vi.fn(async (_q: unknown) => undefined) },
   tabGroups: { update: vi.fn(async (_id: number, _p: unknown) => undefined) },
+  runtime: {
+    getURL: (p: string) => `chrome-extension://x/${p}`,
+    onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+  },
+  windows: {
+    create: vi.fn(async (_p: unknown) => ({ id: 7 }) as { id: number } | undefined),
+    remove: vi.fn(async (_id: number) => undefined),
+    onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+  },
 };
 
 let chromeSearch: SearchApi;
 let chromeActions: ActionsApi;
+let chromePrompt: PermissionPrompt;
 
 beforeAll(async () => {
   vi.stubGlobal('chrome', fake);
-  ({ chromeSearch, chromeActions } = await import('./chromium'));
+  ({ chromeSearch, chromeActions, chromePrompt } = await import('./chromium'));
 });
 
 describe('chromeActions', () => {
@@ -129,5 +140,34 @@ describe('sessionWhen', () => {
     expect(sessionWhen(0, 1_700_000_000_000)).toBe('2023-11-14T22:13:20.000Z');
     expect(sessionWhen(undefined, undefined)).toBeUndefined();
     expect(sessionWhen(0, 0)).toBeUndefined();
+  });
+});
+
+describe('chromePrompt abort', () => {
+  const need = { kind: 'permission', name: 'tabs' } as const;
+
+  it('closes the open window and settles closed when the broker gives up', async () => {
+    fake.windows.remove.mockClear();
+    const abort = new AbortController();
+    const answer = chromePrompt.ask(need, 'why', abort.signal);
+    await new Promise((r) => setTimeout(r, 0));
+    abort.abort();
+    expect(await answer).toBe('closed');
+    expect(fake.windows.remove).toHaveBeenCalledWith(7);
+  });
+
+  it('closes the window that opens after an abort that came first', async () => {
+    fake.windows.remove.mockClear();
+    let open: (w: { id: number }) => void = () => undefined;
+    fake.windows.create.mockImplementationOnce(
+      () => new Promise((resolve) => (open = resolve)) as Promise<{ id: number }>,
+    );
+    const abort = new AbortController();
+    const answer = chromePrompt.ask(need, 'why', abort.signal);
+    abort.abort();
+    expect(await answer).toBe('closed');
+    open({ id: 8 });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fake.windows.remove).toHaveBeenCalledWith(8);
   });
 });

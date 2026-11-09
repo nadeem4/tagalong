@@ -127,7 +127,7 @@ const iso = (ms: number | undefined): string | undefined =>
 
 /**
  * When a closed tab or window was last touched. Chrome documents lastModified in seconds in some
- * versions and milliseconds in others, and a closed window can report 0: anything below 1e11 is
+ * versions and milliseconds in others, and a closed window can report 0: anything below 1e11 (year 5138 as seconds) is
  * read as seconds, and 0 or missing falls back to the tab's own lastAccessed (ms) or no date.
  */
 export function sessionWhen(

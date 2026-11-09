@@ -98,7 +98,10 @@ export class PermissionBroker {
     const answer = await this.withinWait(entry.asking, waitMs);
     entry.waiters -= 1;
     // Silence ends the window; otherwise a late Allow would grant with no tool waiting.
-    if (answer === 'silent' && entry.waiters === 0) entry.abort.abort();
+    if (answer === 'silent' && entry.waiters === 0) {
+      entry.abort.abort();
+      this.open.delete(key);
+    }
     // "closed" is rechecked too: the window closes itself right after a real grant, so the close
     // can be seen before the answer. Only a plain "no" or silence skips the check.
     const maybeHeld = answer === 'granted' || answer === 'closed';
