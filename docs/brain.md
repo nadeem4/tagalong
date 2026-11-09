@@ -15,6 +15,7 @@ uv run brain
 ```
 
 If the port is already in use (another brain is running), the brain logs one plain line naming the address, pointing to `tagalong stop`, and exits with code 1; it never touches the running brain's pid file.
+A bad numeric setting (for example `TAGALONG_READER_DAILY_USD=abc`, or a value that is not positive) likewise logs one plain line naming the variable and the value, and exits with code 1, with no traceback.
 
 Once it holds the port, the brain writes its process id and creation time to `<TAGALONG_HOME>/brain.pid` while it runs and removes it on a
 clean exit. The desktop starts the brain detached and never stops it, so `uv run tagalong stop`
@@ -1679,7 +1680,7 @@ ISO time.
 | Tool           | Effect | Mode   | Does                                                                                                                                                             |
 | -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                    |
-| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout |
+| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout; the description tells Scout to show each id when it lists timers, so the owner can cancel by id |
 | `cancel_timer` | change | `auto` | `{id}` as text. Returns `timer <id> cancelled`                                                                                                                   |
 | `watch`        | change | `auto` | `{action: add, list, pause, switch_on or cancel, note?, every_minutes?, id?}`; Scout and Home. See Watches below                                                 |
 
