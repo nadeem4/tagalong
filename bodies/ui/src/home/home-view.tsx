@@ -23,7 +23,7 @@ import { BodiesPanel } from './bodies-panel';
 import { LoopsPanel } from './loops-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
-import { WhereThingsRun } from './where-things-run';
+import { LINK, WhereThingsRun } from './where-things-run';
 
 export type HomePage = 'overview' | 'jobs' | 'connections' | 'approvals' | 'memory' | 'settings';
 
@@ -148,10 +148,7 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
       void bridge.brainLink().then(
         (link) => {
           if (link.status !== 'online') {
-            setStatus({
-              text: link.status === 'connecting' ? 'Connecting to the brain' : 'Brain offline',
-              ok: false,
-            });
+            setStatus({ text: `Brain: ${LINK[link.status].words}`, ok: false });
             return;
           }
           void host.status?.().then(setStatus, () => undefined);

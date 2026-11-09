@@ -12,7 +12,7 @@ import { STATUS_CHIP, STATUS_DOT, STATUS_WORDS } from './connection-row';
 import { ReadingRows } from './reading-rows';
 
 // Link states reuse the apps' dots; words say it too, so colour never carries it alone.
-const LINK: Record<BrainLink['status'], { words: string; dot: string; chip: string }> = {
+export const LINK: Record<BrainLink['status'], { words: string; dot: string; chip: string }> = {
   online: { words: 'Connected', dot: STATUS_DOT.connected, chip: STATUS_CHIP.connected },
   connecting: { words: 'Connecting', dot: STATUS_DOT.connecting, chip: STATUS_CHIP.connecting },
   offline: { words: 'Offline', dot: STATUS_DOT.off, chip: STATUS_CHIP.off },

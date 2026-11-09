@@ -166,14 +166,17 @@ describe('HomeView', () => {
   });
 
   it('says the brain is offline on the Scout card, and Ready again when it returns', async () => {
-    let status: 'offline' | 'online' = 'offline';
+    let status: 'offline' | 'online' | 'outdated' = 'offline';
     const bridge = Object.assign(createFakeHostBridge({ pets: [SCOUT] }), {
       brainLink: () => Promise.resolve({ addr: 'ws://127.0.0.1:47321', status }),
     });
     renderHome(bridge);
     const scout = await screen.findByRole('region', { name: 'Scout' });
-    await waitFor(() => expect(scout).toHaveTextContent('Brain offline'));
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Offline'));
     expect(scout).not.toHaveTextContent('Ready');
+    status = 'outdated';
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(scout).toHaveTextContent('Brain: Needs update'));
     status = 'online';
     act(() => bridge.emitChanged('link'));
     await waitFor(() => expect(scout).toHaveTextContent('Ready'));

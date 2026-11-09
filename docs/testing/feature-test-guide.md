@@ -1915,7 +1915,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    match, Scout asks which one, in its own words.
 4. **Live update.** With Home open on **What Scout remembers**, ask Scout to remember something.
    **Expected:** the row appears without reopening Home.
-5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
+5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain: Offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 

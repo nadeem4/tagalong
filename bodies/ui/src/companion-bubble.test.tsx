@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ContextSnapshot } from './shapes';
+import type { ContextSnapshot, TurnEvent } from './shapes';
 import { CompanionBubble, GreetingLine } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';
@@ -1047,12 +1047,25 @@ describe('GreetingLine with a status mark', () => {
   });
 });
 
-describe('a permission ask whose words Scout was just streaming', () => {
-  it('shows those words once, in the card, and keeps Stop', async () => {
+describe('a permission ask in the middle of a streaming turn', () => {
+  const said = 'Saving that your favourite colour is teal.';
+  const askId = '20000000-0000-4000-8000-000000000002';
+  const confirmEvent = (summary: string): TurnEvent => ({
+    type: 'connector.confirm',
+    approvalId: askId,
+    turnId: 'turn-1',
+    petId: 'scout',
+    app: 'Scout',
+    tool: 'remember',
+    summary,
+    options: ['allow', 'always', 'deny'],
+  });
+
+  /** A turn that said `lead`, read something, then said `said` and asked. */
+  async function twoStep(lead: string) {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);
     await act(async () => ask('remember teal'));
-    const said = 'Saving that your favourite colour is teal.';
     act(() => {
       bridge.emit({
         type: 'turn.started',
@@ -1060,21 +1073,64 @@ describe('a permission ask whose words Scout was just streaming', () => {
         petId: 'scout',
         conversationId: CONVERSATION,
       });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: lead });
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: 'read-1',
+        tool: 'read_screen',
+        input: {},
+      });
       bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: said });
       bridge.emit({
-        type: 'connector.confirm',
-        approvalId: '20000000-0000-4000-8000-000000000002',
+        type: 'turn.toolRequest',
         turnId: 'turn-1',
-        petId: 'scout',
-        app: 'Scout',
+        approvalId: askId,
         tool: 'remember',
-        summary: said,
-        options: ['allow', 'always', 'deny'],
+        input: {},
       });
+      bridge.emit(confirmEvent(said));
     });
+    return bridge;
+  }
+
+  it('shows the step words once, in the card, and keeps the earlier lead and Stop', async () => {
+    await twoStep('Let me check. ');
     expect(screen.getAllByText(said)).toHaveLength(1);
     expect(screen.getByRole('region', { name: 'Allow remember?' })).toHaveTextContent(said);
+    expect(screen.getByText('Let me check.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  });
+
+  it('still shows the step once when the card summary is cut short', async () => {
+    const long = `${said} ${'More words. '.repeat(30)}`;
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('remember teal'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: long });
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: askId,
+        tool: 'remember',
+        input: {},
+      });
+      bridge.emit(confirmEvent(long.slice(0, 200)));
+    });
+    expect(screen.getAllByText(/Saving that your favourite/)).toHaveLength(1);
+  });
+
+  it('shows the full text again once the card is answered', async () => {
+    const bridge = await twoStep('Let me check. ');
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: askId } as never));
+    expect(screen.getByText(/Let me check\./)).toHaveTextContent(said);
   });
 });
 

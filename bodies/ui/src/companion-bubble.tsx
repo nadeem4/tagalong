@@ -130,7 +130,8 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 
 type Reply =
   | { state: 'idle' }
-  | { state: 'running'; turnId: string | null; text: string }
+  // `steps`: where the text stood when each tool call began, to find where an ask's step starts.
+  | { state: 'running'; turnId: string | null; text: string; steps?: { id: string; at: number }[] }
   | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
 
@@ -250,6 +251,20 @@ export function CompanionBubble({
         mine.current = event.turnId;
         conversation.current = event.conversationId;
         setReply({ state: 'running', turnId: event.turnId, text: '' });
+        return;
+      case 'turn.toolRequest':
+        if (event.turnId !== mine.current) return;
+        setReply((current) =>
+          current.state === 'running'
+            ? {
+                ...current,
+                steps: [
+                  ...(current.steps ?? []),
+                  { id: event.approvalId, at: current.text.length },
+                ],
+              }
+            : current,
+        );
         return;
       case 'turn.delta':
         if (event.turnId !== mine.current) return;
@@ -542,12 +557,15 @@ export function CompanionBubble({
       ))}
     </ul>
   );
-  // A permission card leads with Scout's own words; when they are the very text streaming
-  // above it, the card carries them and the stream says nothing twice.
-  const streamedInCard =
-    confirm?.options !== undefined &&
-    reply.state === 'running' &&
-    reply.text.trim() === confirm.summary.trim();
+  // A permission card leads with Scout's words for its own step, and the brain cuts them short.
+  // So while it is open the stream stops where that step begins (the last tool call before the
+  // ask's own); the card carries the rest, and the full text returns when the card closes.
+  const askStep =
+    confirm?.options !== undefined && reply.state === 'running' && confirm.turnId === reply.turnId
+      ? ([...(reply.steps ?? [])].reverse().find((s) => s.id !== confirm.approvalId)?.at ?? 0)
+      : null;
+  const shownText =
+    reply.state !== 'running' ? '' : askStep === null ? reply.text : reply.text.slice(0, askStep);
   const turnAnswer = (
     <>
       {reply.state === 'running' && (
@@ -555,7 +573,7 @@ export function CompanionBubble({
           className={reply.text === '' ? 'bubble-answer' : 'bubble-answer bubble-streaming'}
           aria-live="polite"
         >
-          {reply.text !== '' && !streamedInCard && <Answer text={reply.text} />}
+          {shownText.trim() !== '' && <Answer text={shownText} />}
           <div className="bubble-live">
             {reply.text === '' ? (
               <span className="bubble-thinking">
