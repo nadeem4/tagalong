@@ -103,7 +103,7 @@ class JobActivity:
     def end(self, state: str, reason: str) -> None:
         text = {"done": "# done", "stopped": "# stopped"}.get(state, f"# error: {reason}")
         if state != "done":
-            # The person's Stop is not a failure: the step reads "stopped", not "failed".
+            # A stop is not a failure: the step reads "stopped", not "failed".
             closed = "stopped" if state == "stopped" else "failed"
             for step, old in list(self._steps.items()):
                 if old.status in ("running", "pending"):
@@ -347,7 +347,7 @@ def activity_summary(
             f"  {_tag(who, e)}{_clip(e.text)} ({_exit(e)})" for e in commands[-RECENT_COMMANDS:]
         )
     for entry in [e for e in steps if e.status == "stopped"][-FAILED_SHOWN:]:
-        lines.append(f"stopped by the person: {_tag(who, entry)}{_clip(entry.text)}")
+        lines.append(f"stopped: {_tag(who, entry)}{_clip(entry.text)}")
     for entry in failed[-FAILED_SHOWN:]:
         lines.append(f"failed: {_tag(who, entry)}{_clip(entry.text)} ({_exit(entry)})")
         out = outputs.get((entry.part, entry.step or ""), "")
@@ -383,7 +383,7 @@ def activity_line(work: WorkStore, job_id: str, now: datetime) -> str:
     if live:
         line += f"; running: {_clip(live[-1].text, 80)}"
     elif stopped := [e for e in steps if e.status == "stopped"]:
-        line += f"; stopped by the person: {_clip(stopped[-1].text, 80)}"
+        line += f"; stopped: {_clip(stopped[-1].text, 80)}"
     elif failed:
         line += f"; last failure: {_clip(failed[-1].text, 80)} ({_exit(failed[-1])})"
     return _clip(line, LINE_CAP)

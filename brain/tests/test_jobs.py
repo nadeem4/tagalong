@@ -690,7 +690,7 @@ async def test_restart_closes_a_stopped_parts_open_step_as_stopped(make_rig):
     rig.jobs.startup()
     rig.jobs.startup()
     steps = [e for e in work.activity_after("old", 0, 10) if e.kind == "command"]
-    assert [(e.text, e.status) for e in steps] == [("sleep 600", "stopped")]
+    assert [(e.text, e.status, e.at) for e in steps] == [("sleep 600", "stopped", at)]
 
 
 @pytest.mark.parametrize(

@@ -254,14 +254,13 @@ def test_end_closes_open_steps_as_stopped_or_failed(tmp_path):
         r.memory.close()
 
 
-def test_a_stopped_step_is_not_a_failure_and_the_person_is_named(rig):
+def test_a_stopped_step_is_not_a_failure_and_is_not_blamed_on_the_person(rig):
     seed(rig.work, [cmd("sleep 600", "1", None, "stopped")])
     assert "failed: 0" in job_activity.activity_summary(rig.work, rig.records, "j", NOW)
-    assert "stopped by the person: sleep 600" in job_activity.activity_summary(
-        rig.work, rig.records, "j", NOW
-    )
+    assert "stopped: sleep 600" in job_activity.activity_summary(rig.work, rig.records, "j", NOW)
     line = job_activity.activity_line(rig.work, "j", NOW)
-    assert "0 failed" in line and "stopped by the person: sleep 600" in line
+    assert "by the person" not in line  # a restart or shutdown also stops steps
+    assert "0 failed" in line and "stopped: sleep 600" in line
 
 
 def meta_update(id, **meta):

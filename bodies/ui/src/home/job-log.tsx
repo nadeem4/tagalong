@@ -11,7 +11,14 @@ import { collapseCarriageReturns, parseAnsi } from './ansi';
 import type { PartView } from './job-activity-state';
 import { localTime } from './job-time';
 
-const GLYPH: Record<string, string> = { done: '✓', failed: '✗', pending: '·', running: '◐' };
+const GLYPH: Record<string, string> = {
+  done: '✓',
+  failed: '✗',
+  pending: '·',
+  running: '◐',
+  stopped: '■',
+  refused: '⊘',
+};
 const GLYPH_NAME: Record<string, string> = { pending: 'waiting' };
 
 /** Read at render: the spinner stays still when the person asked for reduced motion. */

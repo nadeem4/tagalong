@@ -1298,7 +1298,7 @@ deletes rows by entry count and by bytes, least recently written first (lowest `
 or step still being updated survives), and keeps one marker. Messages without an id join into one
 entry only until a tool call or plan intervenes. When a job ends stopped or errored, steps still
 `running`/`pending` are closed before the `end` entry: `stopped` when the person stopped the job
-(not a failure: the summary and `list_jobs` say "stopped by the person: <step>"), `failed` on an
+(not a failure: the summary and `list_jobs` say "stopped: <step>"; a person's Stop, a restart and a clean shutdown all read the same), `failed` on an
 error. A job stopped by a brain restart gets its `# stopped` entry too and its open steps are
 closed as `stopped`. Nothing unmasked is stored. The log lives as long as its job row.
 

@@ -2441,7 +2441,7 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 ## Stop, restart and decline wording (F10)
 
 1. Automated: `cd brain && uv run pytest tests/test_job_activity.py tests/test_jobs.py tests/test_lifecycle.py tests/test_tools.py tests/test_prompt.py -q`.
-2. Stopped is not failed: hand a long task (for example `sleep 600`) to an expert, then stop the job. Ask Scout for the job: its step reads `stopped by the person`, the count shows `0 failed`, and Scout does not call the job failed.
+2. Stopped is not failed: hand a long task (for example `sleep 600`) to an expert, then stop the job. Ask Scout for the job: its step reads `stopped`, the count shows `0 failed`, and Scout does not call the job failed.
 3. Restart: with that job running, restart the brain (`uv run tagalong stop`, then start it). Ask for the job: the step reads stopped, never `running`.
 4. `uv run tagalong stop` with an expert job running: afterwards no expert process (for example `claude` or the fake agent) is left in Task Manager.
 5. Decline the mode card of a hand-off: Scout says the person declined it (not a guess).

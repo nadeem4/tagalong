@@ -46,6 +46,20 @@ describe('JobLog', () => {
     expect(screen.getByText('all green')).toBeInTheDocument();
   });
 
+  it('gives stopped and refused steps their own glyphs, not the waiting dot', () => {
+    render(
+      <JobLog
+        entries={[
+          entry(1, { text: 'sleep 600', status: 'stopped', step: 's1' }),
+          entry(2, { text: 'rm x', status: 'refused', step: 's2' }),
+        ]}
+        now={NOW}
+      />,
+    );
+    expect(screen.getByLabelText('stopped')).toHaveTextContent('■');
+    expect(screen.getByLabelText('refused')).toHaveTextContent('⊘');
+  });
+
   it('shows the elapsed time and a note for a running command with no output', () => {
     render(
       <JobLog

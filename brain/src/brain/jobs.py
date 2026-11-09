@@ -200,12 +200,7 @@ class Jobs:
             if e.part == part and e.status in ("running", "pending"):
                 work.save_activity(
                     job_id,
-                    replace(
-                        e,
-                        rev=work.last_rev(job_id) + 1,
-                        status="stopped",
-                        at=self._now().isoformat(),
-                    ),
+                    replace(e, rev=work.last_rev(job_id) + 1, status="stopped"),
                 )
 
     def can_resume_row(self, row: WorkRow) -> bool | None:

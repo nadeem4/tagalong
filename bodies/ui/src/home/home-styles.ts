@@ -309,6 +309,8 @@ export const HOME_CSS = `
 .job-log__glyph--done { color: ${t.ansi.green}; }
 .job-log__glyph--failed { color: ${t.ansi.red}; }
 .job-log__glyph--pending { color: ${t.color.textMuted}; }
+.job-log__glyph--stopped { color: ${t.color.textMuted}; }
+.job-log__glyph--refused { color: ${t.ansi.red}; }
 .job-log__glyph--running { color: ${t.color.gold}; }
 .job-log__glyph--running[data-motion='on'] { display: inline-block; animation: job-log-spin 1s linear infinite; }
 @keyframes job-log-spin { to { transform: rotate(360deg); } }

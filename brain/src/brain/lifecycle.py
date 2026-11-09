@@ -143,7 +143,10 @@ def kill_command(pid: int, platform: str) -> list[str] | None:
 def real_kill(pid: int) -> None:
     command = kill_command(pid, sys.platform)
     if command is not None:
-        subprocess.run(command, capture_output=True, check=False)  # argv list, no shell
+        try:  # argv list, no shell; if it fails, `wait` still decides the outcome
+            subprocess.run(command, capture_output=True, check=False, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
         return
     try:
         os.kill(pid, signal.SIGTERM)
