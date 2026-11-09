@@ -1677,12 +1677,12 @@ the repeat is `work_timer.repeat_s` (see [storage.md](storage.md)). Times are st
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
-| Tool           | Effect | Mode   | Does                                                                                                                                                             |
-| -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                    |
+| Tool           | Effect | Mode   | Does                                                                                                                                                                                                                                                              |
+| -------------- | ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?, job?}`. Returns `timer <id> set for <local time>`, plus `, repeats every N minutes` when repeating                                                                                                                     |
 | `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes, pending, job}]}`, soonest first; `pending` is true for a one-off that has fired but not yet reached Scout; the description tells Scout to show each id when it lists timers, so the owner can cancel by id |
-| `cancel_timer` | change | `auto` | `{id}` as text. Returns `timer <id> cancelled`                                                                                                                   |
-| `watch`        | change | `auto` | `{action: add, list, pause, switch_on or cancel, note?, every_minutes?, id?}`; Scout and Home. See Watches below                                                 |
+| `cancel_timer` | change | `auto` | `{id}` as text. Returns `timer <id> cancelled`                                                                                                                                                                                                                    |
+| `watch`        | change | `auto` | `{action: add, list, pause, switch_on or cancel, note?, every_minutes?, id?}`; Scout and Home. See Watches below                                                                                                                                                  |
 
 `set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
 one of `in_minutes` (a number above 0, at most 525600, one year) or `at` (ISO 8601 with a UTC
