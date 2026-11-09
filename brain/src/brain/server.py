@@ -289,6 +289,8 @@ def _dispatch(
             return _result(req_id, session.say(body_id, say))
         except ValueError as exc:  # ValidationError is a ValueError
             return _error(req_id, ErrorCode.invalid_params, str(exc))
+        except RpcError as exc:  # over_limit
+            return _error(req_id, exc.code, str(exc))
     if method == "answer":
         try:
             reply = AnswerParams.model_validate(message.get("params"))
