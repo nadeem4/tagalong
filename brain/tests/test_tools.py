@@ -632,6 +632,15 @@ async def test_list_jobs_rows_carry_a_one_line_summary(home, mem, records):
     assert rows["j2"]["summary"] == ""
 
 
+async def test_stop_job_argument_problems_share_one_wording(home):
+    messages = set()
+    for args in ({}, {"job": ""}, {"job": 5}):
+        with pytest.raises(MemoryRefused) as err:
+            await home.run("stop_job", args)
+        messages.add(str(err.value))
+    assert messages == {"stop_job needs job as non-empty text."}
+
+
 async def test_stop_job_stops_and_refusal_is_rpc_error(home):
     out = json.loads(await home.run("stop_job", {"job": "j1"}))
     assert out == {"job": "j1", "stopping": True}

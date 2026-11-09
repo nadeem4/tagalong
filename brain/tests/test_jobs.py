@@ -681,6 +681,32 @@ async def test_restart_ends_each_stopped_parts_log_once(make_rig):
     assert [(e.part, e.text) for e in ends] == [("p1", "# stopped")]
 
 
+async def test_restart_closes_a_stopped_parts_open_step_as_stopped(make_rig):
+    rig = make_rig(FakeAsks())
+    work = rig.records.work
+    rig.records.add_job("old", "claude_code", "t", str(rig.folder), "plan")
+    at = "2026-01-01T00:00:00+00:00"
+    work.save_activity("old", ActivityEntry(1, 1, at, "command", "sleep 600", "running", "t1"))
+    rig.jobs.startup()
+    rig.jobs.startup()
+    steps = [e for e in work.activity_after("old", 0, 10) if e.kind == "command"]
+    assert [(e.text, e.status, e.at) for e in steps] == [("sleep 600", "stopped", at)]
+
+
+@pytest.mark.parametrize(
+    ("answer", "why"),
+    [
+        (Answer("cancel"), "the person declined"),
+        (Answer(None), "nobody was there to answer"),
+        (RpcError(ErrorCode.timeout, "nobody answered"), "nobody was there to answer"),
+    ],
+)
+async def test_mode_card_refusal_tells_scout_why(make_rig, answer, why):
+    rig = make_rig(FakeAsks(answer))
+    with pytest.raises(JobError, match=f"not started: {why}"):
+        await rig.jobs.start("task", str(rig.folder))
+
+
 def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
     """A stored one-part job, built by hand."""
     part = JobPart(

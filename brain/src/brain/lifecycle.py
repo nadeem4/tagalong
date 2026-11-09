@@ -8,6 +8,7 @@ parameters so tests never signal a real process.
 
 import os
 import signal
+import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -132,9 +133,23 @@ def real_started(pid: int) -> str | None:
         return None
 
 
+def kill_command(pid: int, platform: str) -> list[str] | None:
+    """The command that ends the brain with its children (the experts it started), or None
+    where a plain signal does it. Windows has no process groups to signal, so taskkill walks
+    the tree."""
+    return ["taskkill", "/PID", str(pid), "/T", "/F"] if platform == "win32" else None
+
+
 def real_kill(pid: int) -> None:
+    command = kill_command(pid, sys.platform)
+    if command is not None:
+        try:  # argv list, no shell; if it fails, `wait` still decides the outcome
+            subprocess.run(command, capture_output=True, check=False, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return
     try:
-        os.kill(pid, signal.SIGTERM)  # TerminateProcess on Windows
+        os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         pass  # already gone; `wait` decides the outcome
 

@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -190,7 +190,18 @@ class Jobs:
                     part=work_id.split(".", 1)[1],
                 ),
             )
+            self._close_open_steps(job_id, work_id.split(".", 1)[1])
         return settled
+
+    def _close_open_steps(self, job_id: str, part: str) -> None:
+        """A part that ended with the brain keeps no step "running": close each as stopped."""
+        work = self._records.work
+        for e in work.activity_after(job_id, 0, 100_000):
+            if e.part == part and e.status in ("running", "pending"):
+                work.save_activity(
+                    job_id,
+                    replace(e, rev=work.last_rev(job_id) + 1, status="stopped"),
+                )
 
     def can_resume_row(self, row: WorkRow) -> bool | None:
         """Whether the expert that ran this call reopens sessions; None when not known yet."""
@@ -551,8 +562,12 @@ class Jobs:
         if self._engine is None or not (scout_follow_up or apps):
             try:
                 return (await card()).option_id, kept
-            except (NoOneThere, RpcError) as err:
-                raise JobError("not started") from err
+            except NoOneThere as err:
+                raise JobError("not started: nobody was there to answer") from err
+            except RpcError as err:
+                declined = err.code == ErrorCode.cancelled
+                why = "the person declined" if declined else "nobody was there to answer"
+                raise JobError(f"not started: {why}") from err
         decision = await self._engine.decide(
             AskRequest(
                 kind="hand_off_followup",
@@ -568,7 +583,7 @@ class Jobs:
             )
         )
         if not decision.allowed:
-            raise JobError("not started")
+            raise JobError(f"not started: {decision.reason or 'the person declined'}")
         if decision.decided_by == "person" and decision.option_id is not None:
             return decision.option_id, kept
         return earlier.mode, kept  # a preference covered it: same mode as before, no card

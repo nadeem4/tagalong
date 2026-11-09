@@ -1,6 +1,6 @@
 """Checks the brain's pid file and the stop logic on fakes: no real process is ever signalled."""
 
-from brain.lifecycle import clear_pid, pid_path, stop_brain, write_pid
+from brain.lifecycle import clear_pid, kill_command, pid_path, stop_brain, write_pid
 
 
 class Fakes:
@@ -98,3 +98,11 @@ def test_a_pid_only_file_with_a_live_pid_is_killed(tmp_path):
     fakes = Fakes(started="t9")
     assert fakes.stop(tmp_path) == "stopped"
     assert fakes.killed == [123]
+
+
+def test_windows_kill_takes_the_whole_tree_without_a_shell():
+    assert kill_command(42, "win32") == ["taskkill", "/PID", "42", "/T", "/F"]
+
+
+def test_posix_kill_is_a_plain_term_signal():
+    assert kill_command(42, "linux") is None
