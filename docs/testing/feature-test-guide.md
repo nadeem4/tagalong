@@ -2462,6 +2462,15 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 6. Ask Scout to stop a job with a blank job id: the refusal reads `stop_job needs job as non-empty text.` in every blank or missing case.
 7. Clear the focus after Scout answered from it and ask again: Scout says it can no longer see it, not that its earlier answer was made up.
 
+## Live-test fixes (F12)
+
+1. Automated: `cd brain && uv run pytest tests/test_server.py -k relaunched -q`; `pnpm --filter @tagalong/desktop exec vitest run src/main/brain/turn-events.test.ts src/main/ipc/scout.test.ts src/main/ipc/jobs.test.ts src/renderer/csp.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/companion-bubble-ask.test.tsx`.
+2. Open ask survives a relaunch: ask Scout to hand a task to Claude Code and leave the permission-mode card unanswered. Quit the desktop and start it again, then open the bubble. The mode card is shown again, and choosing a mode starts the job. No "Scout is thinking" with nothing to answer.
+3. Same for Claude Code's own Yes / No ask: while a job waits on it, quit and relaunch the desktop. The ask card is shown again in the bubble.
+4. Long path: the mode card for a folder with a long unbroken path (about 120 characters, no spaces) wraps inside the card; nothing is clipped on the right. The same for a long path in your own message.
+5. Log: start the desktop with the brain not yet running. `tagalong.log` has no `script-src` line and no `jobs:running-steps` `BrainOffline` ERROR.
+6. Stop job: the bubble offers Stop (this answer) only. Stopping a job is on Home > Jobs (Stop on a running job).
+
 ## Not supported
 
 Do not test these here.

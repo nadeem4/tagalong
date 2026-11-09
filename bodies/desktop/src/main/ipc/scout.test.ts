@@ -8,7 +8,7 @@ import { SCOUT_ID, localScout, registerScoutIpc } from './scout';
 
 function setup() {
   const ipc = fakeIpc();
-  registerScoutIpc(ipc.handle);
+  registerScoutIpc(ipc.handle, () => [{ type: 'connector.dismiss', approvalId: 'x' }]);
   return ipc;
 }
 
@@ -17,6 +17,13 @@ describe('registerScoutIpc', () => {
     const { invoke } = setup();
     expect(await invoke(IPC.listPets)).toEqual([localScout()]);
     expect(localScout()).toMatchObject({ id: SCOUT_ID, name: 'Scout', avatar: '🦊' });
+  });
+
+  it('hands the renderer the confirm cards still open', async () => {
+    const { invoke } = setup();
+    expect(await invoke(IPC.openConfirms)).toEqual([
+      { type: 'connector.dismiss', approvalId: 'x' },
+    ]);
   });
 
   it('hands out a copy, so a caller cannot change the one Scout', () => {

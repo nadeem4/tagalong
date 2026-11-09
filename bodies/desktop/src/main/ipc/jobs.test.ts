@@ -213,6 +213,13 @@ describe('registerJobsIpc', () => {
     expect(calls).toEqual([['job_activity', {}]]);
   });
 
+  // The bubble polls this while the brain is still starting; Electron logs a throwing handler
+  // as an ERROR, and "no steps yet" is the true answer then.
+  it('has no running steps while the brain is offline, and does not throw', async () => {
+    const { invoke } = setup(() => Promise.reject(new BrainOffline()));
+    expect(await invoke(IPC.runningSteps)).toEqual([]);
+  });
+
   it('rejects running steps the brain did not send as a list', async () => {
     const { invoke } = setup(() => text({ running: 3 }));
     await expect(invoke(IPC.runningSteps)).rejects.toThrow('brain sent bad running steps');

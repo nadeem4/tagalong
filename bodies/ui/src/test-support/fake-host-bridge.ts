@@ -145,6 +145,8 @@ const NO_BODIES: BodiesState = {
 export function createFakeHostBridge(
   options: {
     pets?: Pet[];
+    /** Confirm cards the body still holds open when the bubble mounts (a relaunch). */
+    openConfirms?: TurnEvent[];
     /** The brain's apps to start with. */
     apps?: AppInfo[];
     /** What setupOverview answers; defaults to nothing set up and nothing to add. */
@@ -226,6 +228,9 @@ export function createFakeHostBridge(
       return () => {
         handlers.delete(handler);
       };
+    },
+    openConfirms() {
+      return Promise.resolve([...(options.openConfirms ?? [])]);
     },
     listPets() {
       return Promise.resolve(options.pets ?? []);

@@ -301,6 +301,19 @@ export function CompanionBubble({
     }
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
+  // Cards whose ask arrived before this bubble mounted (a relaunch) are shown again.
+  useEffect(() => {
+    let live = true;
+    void bridge
+      .openConfirms?.()
+      .then((open) => {
+        if (live) for (const event of open) onTurnEvent(event);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [bridge]);
 
   const speakingIndicator = speaking && onStopSpeaking !== undefined && (
     <button
@@ -1024,7 +1037,7 @@ const BUBBLE_CSS = `
   .bubble-speaking span, .bubble-speaking span:nth-child(2),
   .bubble-bars span, .bubble-bars span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
-.bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
 .bubble-jobline {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

@@ -220,6 +220,11 @@ export interface HostBridge {
   interrupt(turnId: string): Promise<void>;
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
+  /**
+   * The confirm cards the body still holds open. A bubble that mounted after its ask arrived
+   * (a relaunch) never saw the live event, so it asks for these once when it mounts.
+   */
+  openConfirms?(): Promise<TurnEvent[]>;
   listPets(): Promise<Pet[]>;
   /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
   approveTool(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;

@@ -80,7 +80,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
 
   // Ids of the confirm cards shown, so a closed frame only dismisses a card that was shown.
   // The dismissal is its own event, not asks.changed: Home lists asks from the brain itself.
-  const asks = new Set<string>();
+  const asks = new Map<string, TurnEvent>();
 
   const dismiss = (approvalId: string): TurnEvent => ({ type: 'connector.dismiss', approvalId });
 
@@ -118,23 +118,22 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
           : body === ''
             ? 'Scout'
             : label(body);
-    asks.add(p.id);
-    return [
-      {
-        type: 'connector.confirm',
-        approvalId: p.id,
-        turnId: p.turn ?? '',
-        petId: petId(),
-        app,
-        tool,
-        summary,
-        options: p.options,
-        ...(question ? { question: true } : {}),
-        ...(p.free_text ? { freeText: true } : {}),
-        ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
-        ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
-      },
-    ];
+    const card: TurnEvent = {
+      type: 'connector.confirm',
+      approvalId: p.id,
+      turnId: p.turn ?? '',
+      petId: petId(),
+      app,
+      tool,
+      summary,
+      options: p.options,
+      ...(question ? { question: true } : {}),
+      ...(p.free_text ? { freeText: true } : {}),
+      ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
+      ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
+    };
+    asks.set(p.id, card);
+    return [card];
   }
 
   return {
@@ -180,6 +179,14 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ];
     },
 
+    /**
+     * The confirm cards still open. A window that opened after the ask arrived (a relaunch, the
+     * panel created later) never saw the frame, so it pulls these when it mounts.
+     */
+    openConfirms(): TurnEvent[] {
+      return [...asks.values()];
+    },
+
     /** The brain lost what these turns were doing; tell the UI instead of leaving them open. */
     resync(): TurnEvent[] {
       const events = [...open.keys()]
@@ -187,7 +194,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         .map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
       quiet.clear();
-      for (const id of asks) events.push(dismiss(id));
+      for (const id of asks.keys()) events.push(dismiss(id));
       asks.clear();
       return events;
     },

@@ -3,7 +3,7 @@
  * Contains registerScoutIpc and localScout.
  */
 
-import type { Pet } from '@tagalong/ui/shapes';
+import type { Pet, TurnEvent } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 
@@ -18,6 +18,8 @@ export function localScout(): Pet {
   return { ...SCOUT };
 }
 
-export function registerScoutIpc(handle: IpcHandle): void {
+export function registerScoutIpc(handle: IpcHandle, openConfirms: () => TurnEvent[]): void {
   handle(IPC.listPets, (): Pet[] => [localScout()]);
+  // Cards a window missed because it opened after their ask arrived.
+  handle(IPC.openConfirms, (): TurnEvent[] => openConfirms());
 }
