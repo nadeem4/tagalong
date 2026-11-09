@@ -238,7 +238,7 @@ run it on its own for those.
 
 1. **Setup:** make sure nothing listens on `127.0.0.1:47321`, then run `pnpm dev:desktop` alone.
    **Expected:** a `uv` process (and its `python` child) appears, Scout appears, and no "Scout's
-   brain is not running." mark stays. An ask works. The brain's output goes to `brain.log` in your Tagalong home folder (`~/.tagalong` by default).
+   brain is not running." mark stays. An ask works. The brain's output goes to `brain.log` in your Tagalong home folder (`~/.tagalong` by default). That file exists only when the desktop starts the brain; a brain you run by hand (`uv run brain`) prints to its terminal instead.
 2. **Action:** quit the app from the tray.
    **Expected:** the `uv` and `python` processes stay up, and `brain.pid` is in the Tagalong home folder.
    Starting the app again connects to that brain and spawns no second one.
@@ -864,7 +864,7 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
    **Expected:** `{"id": "files"}`; the app shows `connecting`, then `connected` with its tools,
    each with an effect (`read` or `change`) and `locked`.
 2. **Action:** ask Scout "what files are in the test folder?"
-   **Expected:** a read tool runs at once with no ask, and Scout answers from the folder.
+   **Expected:** a connected app's read tool asks first by default (`ask`, see Permissions in docs/brain.md); allow it and Scout answers from the folder. Set the tool to Auto in Home to skip the ask.
 3. **Action:** ask Scout to write a new file in the folder.
    **Expected:** an ask card (allow, always, deny). Allow runs it; deny leaves the folder alone.
 4. **Action:** ask Scout to move or delete a file (a tool whose name has a risky word such as
@@ -1376,12 +1376,13 @@ the apps in C1 to C7 use a command or a pasted key.
 
 ### C2. Read with an app
 
-- [ ] Ask Scout "what files are in my Documents folder?". Scout answers from the app with no card.
+- [ ] Ask Scout "what files are in my Documents folder?". A card asks first (an app's tools default to Ask); press **Allow once** and Scout answers from the app. Set the tool to Auto in Home and it runs with no card.
 
 ### C3. A change asks first
 
 - [ ] Ask Scout to write a new file called `tagalong-test.txt`. The bubble comes up with a card: the
-      app, what will change. Nothing has changed yet.
+      app, what will change (the card's text is Scout's own words from that step; if Scout wrote
+      none it is empty and the card shows the tool and its input). Nothing has changed yet.
 - [ ] Press **Cancel**. Scout says nothing was changed.
 - [ ] Ask again and press **Allow once**. The file appears.
 - [ ] Ask again and leave the card for 5 minutes. Scout says it is waiting; nothing was changed
