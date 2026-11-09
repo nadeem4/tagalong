@@ -140,3 +140,26 @@ def test_page_length_is_clamped_between_one_and_the_cap(store):
     assert len(store.page(oid, 0, -5)["text"]) == 1
     assert len(store.page(oid, 0, CAP + 20)["text"]) == CAP
     assert len(store.page(oid, 0, 4)["text"]) == 4
+
+
+def test_a_25k_result_is_stored_whole_and_read_to_the_end(mem):
+    store = OutputStore(mem, Guards(), 8000)
+    lines = "".join(f"line {i:03d} " + "y" * 55 + "\n" for i in range(400))
+    assert len(lines) > 25_000
+    facts = header(preview(store, "t", lines))
+    assert facts["chars"] == len(lines)
+    offset, got = 0, ""
+    while offset is not None:
+        page = store.page(facts["output_id"], offset)
+        got += page["text"]
+        offset = page["next_offset"]
+    assert got == lines
+
+
+def test_a_cut_next_to_an_emoji_leaves_clean_text(mem):
+    store = OutputStore(mem, Guards(), 5)
+    for pad in range(6):
+        text = "a" * pad + "\U0001f600‍\U0001f600" + "b" * 10
+        shown = preview(store, "t", text).split("\n", 1)[1]
+        shown.encode("utf-8")  # a lone surrogate would raise
+        assert "�" not in shown
