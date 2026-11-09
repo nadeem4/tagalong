@@ -196,6 +196,8 @@ page." (or tables, forms, headings).
 | `headings` | `h1` to `h6`, one per line, indented with `#` marks to the level.                                |
 | `forms`    | `Form N: <action>`, then one line per field: its label and its type, for example `Email (text)`. |
 
+`links`, `tables` and `headings` leave out the text of `style`, `script`, `noscript` and `template` elements (code, not words the person sees), even when one sits inside a cell.
+
 `forms` reports the shape of a form and never what is in it. It lists labels and types only: no
 value the person typed or picked, no checked state, no option text and no textarea text. A label that
 wraps a field is cut down to its own words, so the field's contents cannot ride along. A field with
@@ -234,6 +236,9 @@ Looks through the browser's own records.
   `invalid_params`.
 - `limit` defaults to 20 and is capped at 50. `closed` is capped at 25 (the most Chrome returns),
   and a closed window counts as its tabs.
+  The `<when>` is the session's `lastModified` (Chrome gives seconds in some versions and
+  milliseconds in others, so a value under 1e11 is read as seconds); when that is 0 or missing the
+  tab's own `lastAccessed` is used, else the date is left out. It never shows 1970.
 - An unknown `source` fails with `invalid_params`.
 - The answer is one text part with one line per hit, `<when> | <title> | <url>`, each line cut at
   300 characters. A download shows its file name and its state in place of the title and URL. No
@@ -327,7 +332,9 @@ popup's button (below).
 
 A `file:` page uses the origin `file://`. **Allow on all sites** grants `<all_urls>`.
 
-The window: one is open at a time for each need, and it waits 25 seconds. A click on **Not now**, or
+The window: one is open at a time for each need, and it waits 25 seconds. When the wait ends with no
+answer (and no other call is still waiting on that window) the body closes the window, so a late
+**Allow** is not possible and nothing is granted with no tool waiting. A click on **Not now**, or
 no answer, fails the tool with `tool_failed` and a plain sentence the brain can pass on, for example
 "the person has not allowed Scout to see open tabs", "the person has not allowed Scout to search
 browsing history" or "the person has not allowed reading example.com". The title reads "Scout wants
@@ -544,7 +551,10 @@ offline, a fact is dropped, not queued.
 | `download` | `{name, state}` (`complete`, `interrupted`) | A download finishes or fails; other states send nothing   |
 
 - **URLs are stripped.** The `url` is the origin plus the path, with no query string and no
-  fragment, because tokens live there. An address that is not http or https gives nothing.
+  fragment, because tokens live there. An address that is not http or https gives nothing. The `title` is cleaned too:
+  while a page loads Chrome uses its address as the title, so a title that is one address-like word
+  is cut at its first `?` or `#`, and the tab's own query and fragment text is removed from any
+  title. The `say` context title gets the same cleaning.
 - **Throttled.** At most one `tab` every 2 seconds. A burst sends the first at once and the last
   value when the 2 seconds end. The same title and URL twice in a row is sent once. If the send
   fails (offline), the next change tries again.

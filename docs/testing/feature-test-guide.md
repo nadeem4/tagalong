@@ -2471,6 +2471,14 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 5. Log: start the desktop with the brain not yet running. `tagalong.log` has no `script-src` line and no `jobs:running-steps` `BrainOffline` ERROR.
 6. Stop job: the bubble offers Stop (this answer) only. Stopping a job is on Home > Jobs (Stop on a running job).
 
+## Browser body live-test fixes (F14)
+
+1. Automated: `pnpm --filter @tagalong/browser exec vitest run src/events.test.ts src/content/page-parts.test.ts src/permissions.test.ts src/layer/chromium.test.ts`.
+2. Loading title: with the `tabs` permission allowed, open a slow page at `http://localhost:8080/login.html?token=SECRET123#frag` and, while Chrome still shows the address as the tab title, ask Scout which tab you are on. Neither title nor url contains `SECRET123` or `#frag`.
+3. Tables: on a Wikipedia article with a table or infobox holding a `<style>` element, ask "Show me the tables". The cells read as words and numbers, with no CSS text.
+4. Permission window: remove `history` in the popup's Allowed list, ask Scout to search history and leave the window alone for over 25 seconds. Scout says you have not allowed it and the window closes by itself; asking again opens a fresh one.
+5. Closed tabs: allow `sessions`, close a whole window of two tabs, ask for recently closed tabs. They show today's date and time, never 1970-01-01.
+
 ## Not supported
 
 Do not test these here.
