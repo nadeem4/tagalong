@@ -87,6 +87,13 @@ def test_resume_leaves_a_history_without_thinking_as_it_was():
     assert history[0] is messages[0] and history[1] is messages[1]
 
 
+def test_resume_adds_no_message_when_the_last_reply_only_lost_its_thinking():
+    messages = [u("q"), {"role": "assistant", "content": [_think("a"), a("r")["content"][0]]}]
+    history = rebuild_history(messages)
+    assert len(history) == len(messages)
+    assert history[-1]["role"] == "assistant"
+
+
 def call(id):
     return {
         "role": "assistant",

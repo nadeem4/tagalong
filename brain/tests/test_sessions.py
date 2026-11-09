@@ -844,6 +844,20 @@ async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
     assert resumed.history[-1]["content"]
 
 
+async def test_restarts_after_a_thinking_reply_do_not_save_it_twice(tmp_path):
+    # resume rebuilds a thinking reply as a new object; that must not look like an added message
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([thinking_turn("plain thought")]), memory)
+    session.say("desktop", say("one"))
+    await finish_quietly(session)
+    for text in ("two", "three"):
+        session, _ = make(Gate([thinking_turn("more thought")]), memory)
+        session.say("desktop", say(text))
+        await finish_quietly(session)
+    roles = [m["role"] for m in memory.load_messages()]
+    assert roles == ["user", "assistant"] * 3
+
+
 async def test_saved_chat_stays_valid_after_a_masker_failure(tmp_path):
     def broken():
         raise RuntimeError("no values")

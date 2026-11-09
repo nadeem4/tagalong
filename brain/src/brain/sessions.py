@@ -293,9 +293,10 @@ class Session:
         loaded = memory.load_messages()
         self.history: list = rebuild_history(loaded)
         self._saved = len(self.history)  # history[:_saved] is already in the database
-        if self.history and (not loaded or self.history[-1] is not loaded[-1]):
-            # rebuild_history added a cancelled tool_result; store it with the next save so
-            # the stored chat stays valid.
+        if self.history and self.history[-1]["role"] != loaded[-1]["role"]:
+            # rebuild_history added a cancelled tool_result after a dangling tool_use; store it
+            # with the next save so the stored chat stays valid. By role, not identity: resume
+            # rebuilds a reply that only lost its thinking as a new object.
             self._saved -= 1
         self._inbox: list = []
         # True when the last turn was cancelled before any word and its request is still last in
