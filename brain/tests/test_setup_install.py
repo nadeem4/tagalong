@@ -31,6 +31,7 @@ from brain.permission import (
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.expert_tools import expert_setup_tools
+from brain.setup.home_tools import SetupProgress, home_setup_tools
 from brain.setup.facts import CmdResult, Machine, NodePaths, ToolVersion
 from brain.setup.install import (
     InstallError,
@@ -43,6 +44,7 @@ from brain.setup.install import (
 from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
+from brain.setup.tools import setup_tools
 from brain.toolbox import BrainSource
 from brain.toolbox import Toolbox as RealToolbox
 
@@ -393,9 +395,12 @@ async def test_bad_sha256_raises_and_records_nothing(tmp_path):
 
 
 async def test_a_binary_with_no_listed_checksum_is_refused(tmp_path):
-    data = make_zip()
+    # `build_for` never offers one, so this is the last guard, reached only directly.
+    dist = binary_entry(None).distributions[0]
     with pytest.raises(InstallError) as err:
-        await go(tmp_path, binary_entry(None), machine(), Npm(), fetch=fetch_of(data))
+        await install_mod._binary_install(
+            dist, tmp_path / "s", tmp_path / "f", tmp_path / "d", no_fetch, lambda d: None
+        )
     assert err.value.kind == "integrity"
 
 
@@ -695,3 +700,63 @@ def test_a_start_sweeps_staging_folders_a_killed_brain_left_behind(tmp_path):
     assert not tools_dir(tmp_path, "claude-acp.dl").exists()
     assert fresh.exists() and kept.exists()
     sweep_staging(tmp_path / "nowhere")  # no tools folder yet: nothing to do
+
+
+# ---- a binary with no checksum is never offered (it could only fail at install) ----
+
+NO_SUM_ACP = json.dumps(
+    {
+        "agents": [
+            {
+                "id": "bin-agent",
+                "name": "Bin Agent",
+                "version": "1.0.0",
+                "description": "d",
+                "license": "MIT",
+                "distribution": {
+                    "binary": {
+                        "windows-x86_64": {"archive": "https://x.invalid/a.zip", "cmd": "./a.exe"}
+                    }
+                },
+            }
+        ]
+    }
+).encode()
+
+
+class _NoWhy:
+    async def line(self, entry):
+        return ""
+
+
+@pytest.mark.parametrize("where", ["home_list", "find_experts", "install"])
+async def test_binary_without_checksum_is_never_offered(tmp_path, where):
+    async def get(url: str) -> bytes:
+        return NO_SUM_ACP if "agentclientprotocol" in url else b'{"servers": []}'
+
+    async def inspect():
+        return machine()
+
+    reg = Registry(tmp_path, get)
+    if where == "home_list":
+        tools = {
+            s.name: h
+            for s, h in home_setup_tools(
+                reg,
+                inspect,
+                lambda: [],
+                lambda: [],
+                None,
+                None,
+                [],
+                SetupProgress(lambda e: None),
+                _NoWhy(),
+            )
+        }
+        assert json.loads(await tools["setup_overview"]({}))["browse_experts"] == []
+    elif where == "find_experts":
+        tools = {s.name: h for s, h in setup_tools(tmp_path, reg, inspect)}
+        assert json.loads(await tools["find_experts"]({}))["experts"] == []
+    else:
+        with pytest.raises(NoBuild):
+            await go(tmp_path, binary_entry(None), machine(), Npm())
