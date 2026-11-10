@@ -316,3 +316,39 @@ async def test_a_card_that_times_out_is_recorded_and_raised(tmp_path):
     with pytest.raises(RpcError):
         await handler({"id": "x", "approved": False})
     assert [r["outcome"] for r in rig.recorded] == ["timed_out"]
+
+
+async def official_card(args):
+    return {"id": args["id"], "official": True, "community": False}
+
+
+async def community_card(args):
+    return {"id": args["id"], "official": False, "community": True, "publisher": "bob"}
+
+
+async def test_home_official_connect_skips_the_card(tmp_path):
+    rig = Rig(tmp_path, card=official_card)
+    await rig.call("setup_app", {"id": "com.acme/x", "approved": True})
+    assert rig.asked == [] and rig.ran == [("install_app", {"id": "com.acme/x"})]
+
+
+async def test_home_community_connect_without_confirm_still_asks(tmp_path):
+    rig = Rig(tmp_path, card=community_card)
+    await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
+    assert len(rig.asked) == 1 and rig.asked[0]["input"]["community"] is True
+    assert rig.ran == [("install_app", {"id": "io.github.bob/x"})]  # the answer was allow
+
+
+async def test_home_community_denied_check_card_installs_nothing(tmp_path):
+    rig = Rig(tmp_path, card=community_card, answer="deny")
+    out = await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
+    assert out["error"] == "denied" and rig.ran == []
+
+
+async def test_home_community_connect_anyway_installs_without_second_card(tmp_path):
+    rig = Rig(tmp_path, card=community_card)
+    args = {"id": "io.github.bob/x", "approved": True, "community_ok": True}
+    await rig.call("setup_app", args)
+    assert rig.asked == [] and rig.ran == [("install_app", {"id": "io.github.bob/x"})]
+    (row,) = rig.recorded
+    assert (row["outcome"], row["decided_by"], row["tool"]) == ("approved", "person", "install_app")

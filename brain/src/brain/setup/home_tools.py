@@ -138,9 +138,13 @@ def home_setup_tools(
             }
         )
 
-    async def run_with_card(tool: str, args: dict, approved: bool) -> str:
+    async def run_with_card(
+        tool: str, args: dict, approved: bool, community_ok: bool = False
+    ) -> str:
         spec, handler = by_name[tool]
-        if not approved:
+        # An app always has its facts built: they say whether it is Official, which decides if
+        # a press is enough. An expert's card is only built when the press is not the OK.
+        if not approved or tool == "install_app":
             # The card's facts come from the same code Scout's own install uses; a failing card
             # raises its tool error and nothing is asked or installed. A `{error: token}` one is
             # answered instead, so Home words it like the tool's own refusals.
@@ -165,6 +169,14 @@ def home_setup_tools(
                     decided_by=decided,
                 )
 
+            # A press is the OK for an Official app, and "Connect anyway" on the check card is
+            # the OK for a community one; a bare `approved` never installs community code.
+            if tool == "install_app" and approved:
+                if facts.get("official") is True:
+                    return await handler(args)
+                if community_ok:
+                    log("approved")
+                    return await handler(args)
             try:
                 answer = await ask(
                     text="",
@@ -184,7 +196,8 @@ def home_setup_tools(
         return await handler(args)
 
     def parts(args: dict) -> tuple[dict, bool]:
-        return {k: v for k, v in args.items() if k != "approved"}, args.get("approved") is True
+        inner_args = {k: v for k, v in args.items() if k not in ("approved", "community_ok")}
+        return inner_args, args.get("approved") is True
 
     async def setup_expert(args: dict) -> str:
         inner_args, approved = parts(args)
@@ -202,13 +215,14 @@ def home_setup_tools(
         return await run_with_card(tool, inner_args, approved)
 
     async def setup_app(args: dict) -> str:
-        # Only the tour presses OK for an expert; an app always shows its card.
-        inner_args, _ = parts(args)
-        return await run_with_card("install_app", inner_args, False)
+        inner_args, approved = parts(args)
+        community_ok = args.get("community_ok") is True
+        return await run_with_card("install_app", inner_args, approved, community_ok)
 
-    def schema(*extra: str) -> dict[str, Any]:
+    def schema(*extra: str, flags: tuple[str, ...] = ()) -> dict[str, Any]:
         props: dict[str, Any] = {"id": {"type": "string"}, "approved": {"type": "boolean"}}
         props.update({name: {"type": "string"} for name in extra})
+        props.update({name: {"type": "boolean"} for name in flags})
         return {"type": "object", "properties": props, "required": ["id", "approved"]}
 
     home = frozenset({"home"})
@@ -239,8 +253,10 @@ def home_setup_tools(
         (
             ToolSpec(
                 "setup_app",
-                "Add an app from the registry by id. Always opens the Allow card.",
-                schema("query"),
+                "Add an app from the registry by id. approved true connects an Official app "
+                "at once; a community one still opens the check card until community_ok "
+                "(Connect anyway) is true.",
+                schema("query", flags=("community_ok",)),
                 home,
                 effect="change",
                 tier=Tier.auto,  # asks for itself, so the gate adds none

@@ -8,9 +8,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from pathlib import Path
 
+from brain.setup.apps import app_facts
 from brain.setup.facts import Machine
-from brain.setup.registry import Listing, Registry, RegistryUnavailable, build_for
+from brain.setup.registry import Listing, Registry, RegistryEntry, RegistryUnavailable, build_for
 from brain.setup.store import ExpertStore
+from brain.setup.trust import is_official_expert
 from brain.toolbox import Handler, ToolSpec
 
 InspectFn = Callable[[], Awaitable[Machine]]
@@ -55,6 +57,12 @@ def setup_tools(
         experts = [asdict(e) for e in ExpertStore(home).list()]
         return json.dumps({"machine": asdict(await inspect_fn()), "experts": experts})
 
+    def _facts(key: str, e: RegistryEntry, machine: Machine) -> dict:
+        if key == "experts":
+            return {"official": is_official_expert(e.id)}
+        facts = app_facts(e, build_for(e, machine))
+        return {k: facts[k] for k in ("official", "publisher", "runs", "sign_in", "licence")}
+
     async def listing(key: str, fetch: Callable[[], Awaitable[Listing]]) -> str:
         try:
             found, machine = await fetch(), await inspect_fn()
@@ -69,6 +77,7 @@ def setup_tools(
                 "license": e.license,
                 "kinds": [d.kind for d in e.distributions],
                 "buildable": build_for(e, machine) is not None,
+                **_facts(key, e, machine),
             }
             for e in found.entries
         ]

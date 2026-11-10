@@ -353,3 +353,17 @@ async def test_mcp_stale_cursor_page_serves_cache_when_offline(tmp_path):
     net.offline = True
     clock.now += 2 * 86400
     assert (await reg.mcp_servers("notion", cursor="abc")).stale is True
+
+
+async def test_find_apps_rows_carry_the_facts(tmp_path):
+    async def inspect_fn():
+        return machine()
+
+    tools = {s.name: h for s, h in setup_tools(tmp_path, registry(tmp_path), inspect_fn)}
+    rows = {r["id"]: r for r in json.loads(await tools["find_apps"]({}))["apps"]}
+    remote = rows["academy.apexai/apex-ai-academy"]
+    assert remote["official"] is True and remote["runs"] == "hosted"
+    assert remote["publisher"] == "academy.apexai" and remote["sign_in"] == "browser"
+    assert remote["licence"] == "Unknown"
+    package = rows["ai.2kw/mcp-server"]
+    assert package["runs"] == "pc" and package["sign_in"] == "key"

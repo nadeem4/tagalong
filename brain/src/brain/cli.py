@@ -252,8 +252,13 @@ async def _app_add(args, home, env, reg, machine, fetch, get_json, ask, out) -> 
     if card["transport"] == "http":
         what = f"talks to {card['host']}"
     else:
-        what = f"runs {card['package']}@{card['version']} ({card['runs']})"
+        what = f"runs {card['package']}@{card['version']} ({card['runner']})"
     out(f"add app {entry.id}: {what}")
+    out(
+        "  official"
+        if card["official"]
+        else f"  community, made by {card['publisher']} (not the service itself)"
+    )
     node = card["node_download"]
     out(
         f"  downloads Tagalong's own Node {node['version']} into {node['into']}"
