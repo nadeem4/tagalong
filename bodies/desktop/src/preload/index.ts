@@ -36,7 +36,7 @@ import type {
   KeyStatus,
   KeyResult,
 } from '@tagalong/ui';
-import type { BodiesState, LoopsState, WhatsAppChange } from '@tagalong/ui/shapes';
+import type { BodiesState, LoopsState, TimerRow, WhatsAppChange } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
 import type { PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
@@ -92,6 +92,8 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,
   forgetLoop: (id: string) => ipcRenderer.invoke(IPC.loopForget, id) as Promise<void>,
   wipeLoops: () => ipcRenderer.invoke(IPC.loopsWipe) as Promise<void>,
+  timersState: () => ipcRenderer.invoke(IPC.timersState) as Promise<TimerRow[]>,
+  cancelTimer: (id: string) => ipcRenderer.invoke(IPC.timersCancel, id) as Promise<void>,
   bodiesState: () => ipcRenderer.invoke(IPC.bodiesState) as Promise<BodiesState>,
   setWhatsApp: (change: WhatsAppChange) =>
     ipcRenderer.invoke(IPC.whatsappSet, change) as Promise<void>,
