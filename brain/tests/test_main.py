@@ -551,3 +551,33 @@ def test_non_utf8_env_file_names_the_file(monkeypatch, tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit):
         asyncio.run(_run())
     assert ".env" in caplog.text and "UTF-8" in caplog.text
+
+
+def test_status_marks_work_running_while_a_job_runs(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    seen = {}
+
+    async def stop(host, port, bodies, session_id, session, build):
+        seen["idle"] = json.loads(await session.call_home("brain_status", {}))
+        session.records.add_job("j1", "claude-code", "fix it", str(tmp_path), "ask")
+        seen["busy"] = json.loads(await session.call_home("brain_status", {}))
+        seen["build"] = build
+        raise Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setenv("TAGALONG_STARTED_BY", "desktop")
+    monkeypatch.setenv("TAGALONG_BUILD", "9.9.9")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    assert seen["idle"]["work_running"] is False
+    status = seen["busy"]
+    assert status["work_running"] is True
+    assert status["build"] == "9.9.9" and status["started_by"] == "desktop"
+    assert status["pid"] == os.getpid() and status["data_dir"] == str(tmp_path)
+    assert status["log_path"] == str(tmp_path / "brain.log")
+    assert status["addr"] == "127.0.0.1:47321" and status["places"] == []
+    assert seen["build"][1] == "9.9.9"

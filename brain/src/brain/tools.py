@@ -1122,6 +1122,28 @@ def clean_key(raw: object) -> str | None:
     return key
 
 
+def brain_status_tools(status: Callable[[], dict]) -> list[tuple[ToolSpec, Handler]]:
+    """Home's brain_status: the facts on the Scout's brain card (version, build, process,
+    folders, places, whether a job runs). main builds `status`; this only serves it."""
+
+    async def brain_status(args: dict) -> str:
+        return json.dumps(status())
+
+    return [
+        (
+            ToolSpec(
+                "brain_status",
+                "The brain's version, build, process, folders, connected places and whether a job "
+                "is running.",
+                {"type": "object", "properties": {}},
+                frozenset({"home"}),
+                effect="read",
+            ),
+            brain_status,
+        )
+    ]
+
+
 def home_tools(
     budget: Budget, toolbox: Callable[[], Toolbox], keys: KeySettings | None = None
 ) -> list[tuple[ToolSpec, Handler]]:

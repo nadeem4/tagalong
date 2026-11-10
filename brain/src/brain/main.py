@@ -50,7 +50,7 @@ from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
 from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
-from brain.tools import KeySettings, anthropic_check
+from brain.tools import KeySettings, anthropic_check, brain_status_tools
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
 
@@ -194,6 +194,22 @@ async def _run() -> None:
         config.loop_stale_days,
         bodies.notify,
     )
+    started_at = datetime.now(UTC).isoformat()
+
+    def brain_status() -> dict:  # the facts Home's brain card shows; session exists by the call
+        return {
+            "version": app_version(),
+            "build": build,
+            "pid": os.getpid(),
+            "started_at": started_at,
+            "started_by": config.started_by,
+            "addr": f"{config.host}:{config.port}",
+            "data_dir": str(config.data_dir),
+            "log_path": str(config.data_dir / "brain.log"),
+            "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
+            "work_running": bool(session.records.running_jobs()),
+        }
+
     session = Session(
         model,
         budget,
@@ -220,6 +236,7 @@ async def _run() -> None:
         + login
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + loop_tools(loops)
+        + brain_status_tools(brain_status)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )
