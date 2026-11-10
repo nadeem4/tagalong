@@ -30,7 +30,15 @@ from brain.setup.registry import (
     build_for,
 )
 from brain.setup.store import InstalledExpert
-from brain.setup.trust import POPULAR_APPS, is_official_app, is_official_expert, service_key
+from brain.setup.trust import (
+    MORE_APPS,
+    POPULAR_APPS,
+    POPULAR_EXPERTS,
+    RECOMMENDED_EXPERT,
+    is_official_app,
+    is_official_expert,
+    service_key,
+)
 from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
@@ -140,9 +148,13 @@ def home_setup_tools(
             return "needs_update"
         return "ready" if expert.logged_in is True else "needs_login"
 
-    async def popular(machine: Machine, skip: set[str]) -> list[dict]:
-        """The Popular row: seeded Official ids that resolve in the registry and connect in one
-        click here (a hosted app, or a package that needs no key)."""
+    async def curated(
+        ids: tuple[str, ...], machine: Machine, skip: set[str]
+    ) -> tuple[list[dict], bool]:
+        """One curated row: listed Official ids that resolve in the registry and connect in one
+        click here (a hosted app, or a package that needs no key). An id that is missing or cannot
+        be looked up is dropped on its own; the rest stay. Also says whether any lookup was stale
+        or failed."""
 
         async def look(entry_id: str):
             try:
@@ -151,11 +163,12 @@ def home_setup_tools(
                 return None
 
         out: list[dict] = []
-        for entry_id, found in zip(
-            POPULAR_APPS, await asyncio.gather(*(look(i) for i in POPULAR_APPS)), strict=True
-        ):
+        stale = False
+        for entry_id, found in zip(ids, await asyncio.gather(*(look(i) for i in ids)), strict=True):
             if found is None:
-                return out
+                stale = True
+                continue
+            stale = stale or found.stale
             entry = next((e for e in found.entries if e.id == entry_id), None)
             dist = build_for(entry, machine) if entry else None
             if entry is None or dist is None or entry.name in skip or entry.id in skip:
@@ -163,7 +176,17 @@ def home_setup_tools(
             if not is_official_app(entry.id) or dist.headers or dist.env:
                 continue
             out.append(app_row(entry, dist))
-        return out
+        return out, stale
+
+    def ordered_experts(found: list[dict]) -> tuple[list[dict], int]:
+        """The curated experts first, in their listed order, then the rest as the registry gave
+        them; also where "Show more" starts."""
+        first = [r for i in POPULAR_EXPERTS for r in found if r["id"] == i]
+        rest = [r for r in found if r["id"] not in POPULAR_EXPERTS]
+        return [
+            {**r, "recommended": r["id"] == RECOMMENDED_EXPERT, "tested": is_tested(r["id"])}
+            for r in first + rest
+        ], len(first)
 
     async def overview(args: dict) -> str:
         machine = await inspect_fn()
@@ -172,7 +195,12 @@ def home_setup_tools(
         query = query.strip() if isinstance(query, str) and query.strip() else None
         cursor = args.get("cursor")
         cursor = cursor if isinstance(cursor, str) and cursor else None
-        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query, cursor=cursor))
+        # With no search only the curated lists show; the registry's raw first page is never read.
+        searching = query is not None or cursor is not None
+        if searching:
+            mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query, cursor=cursor))
+        else:
+            mcp, stale_mcp = None, False
         latest = {e.id: e.version for e in acp.entries} if acp else {}
         installed = experts()
         added = {a["name"] for a in apps()}
@@ -211,6 +239,16 @@ def home_setup_tools(
             {"service": g.service, "official": h, "others": list(o)}
             for g, h, o in zip(grouped, heads, rest, strict=True)
         ]
+        popular, popular_more = [], []
+        if not searching:
+            (popular, stale_a), (popular_more, stale_b) = (
+                await curated(POPULAR_APPS, machine, added),
+                await curated(MORE_APPS, machine, added),
+            )
+            stale_mcp = stale_a or stale_b
+        browse, show_more_from = ordered_experts(
+            rows(acp, machine, {e.id for e in installed}, _INSTALLABLE)
+        )
         return json.dumps(
             {
                 "experts": [
@@ -225,9 +263,11 @@ def home_setup_tools(
                     for e in installed
                 ],
                 "apps": apps(),
-                "browse_experts": rows(acp, machine, {e.id for e in installed}, _INSTALLABLE),
+                "browse_experts": browse,
+                "show_more_from": show_more_from,
                 "browse_apps": rows(mcp, machine, added),
-                "popular": [] if query or cursor else await popular(machine, added),
+                "popular": popular,
+                "popular_more": popular_more,
                 "app_groups": groups,
                 "next_cursor": mcp.next_cursor if mcp else None,
                 "sources": {
