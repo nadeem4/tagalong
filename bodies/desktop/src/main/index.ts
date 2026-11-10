@@ -146,6 +146,7 @@ const brainSetup = createBrainSetup(
         ? join(process.resourcesPath, 'brain')
         : resolve(app.getAppPath(), '..', '..', 'brain'),
       packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
+      appVersion: app.getVersion(),
       onSetup,
     }),
   () => {

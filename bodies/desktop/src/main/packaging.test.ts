@@ -30,6 +30,7 @@ interface BuilderConfig {
 
 const config = read('../../electron-builder.json') as BuilderConfig;
 const manifest = read('../../package.json') as {
+  version: string;
   productName: string;
   main: string;
   dependencies: Record<string, string>;
@@ -133,6 +134,14 @@ describe('desktop runtime dependencies', () => {
     expect(at('fetch-native.mjs')).toBeLessThan(at('fetch-uv.mjs'));
     expect(at('fetch-uv.mjs')).toBeLessThan(at('electron-vite build'));
     expect(at('electron-vite build')).toBeLessThan(at('electron-builder'));
+  });
+
+  it('brain version follows the app version', () => {
+    const pyproject = readFileSync(
+      fileURLToPath(new URL('../../../../brain/pyproject.toml', import.meta.url)),
+      'utf8',
+    );
+    expect(/^version = "([^"]+)"/m.exec(pyproject)?.[1]).toBe(manifest.version);
   });
 
   it('pins uv by version and sha256 in the fetch script', () => {

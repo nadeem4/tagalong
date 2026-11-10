@@ -2,7 +2,8 @@
  * Starts the brain for the desktop: when the brain address is local and nothing answers
  * there, runs `uv run brain` from the brain/ folder, detached, its output going to
  * <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
- * reports installing/failed. The desktop never stops the brain (`tagalong stop` does).
+ * reports installing/failed. Quitting the app never stops the brain; only a restart for a
+ * version update does (`stopBrain`, never for a brain the person started themselves).
  * A start failure only logs: the client retries.
  */
 import { spawn as nodeSpawn } from 'node:child_process';
@@ -49,10 +50,15 @@ export function brainLogPath(env: NodeJS.ProcessEnv, home: string): string {
 }
 
 /** Packaged only: keeps uv's venv, Python and cache under the data folder, away from the installer's read-only folder. */
-export function packagedEnv(env: NodeJS.ProcessEnv, home: string): NodeJS.ProcessEnv {
+export function packagedEnv(
+  env: NodeJS.ProcessEnv,
+  home: string,
+  appVersion: string,
+): NodeJS.ProcessEnv {
   const data = dataDir(env, home);
   return {
     ...env,
+    TAGALONG_BUILD: appVersion, // the brain's build id; hello carries it for the version check
     UV_PROJECT_ENVIRONMENT: join(data, 'runtime', 'venv'),
     UV_PYTHON_INSTALL_DIR: join(data, 'runtime', 'python'),
     UV_CACHE_DIR: join(data, 'cache', 'uv'),
@@ -89,6 +95,8 @@ export interface RealLaunch {
   brainDir: string;
   /** Packaged: uv.exe at this path and a first-run sync. Dev: `uv` from PATH, no sync. */
   packaged?: { uv: string } | undefined;
+  /** The app's version; packaged, it is the brain's build id. */
+  appVersion: string;
   onSetup?: (state: SetupState) => void;
   env?: NodeJS.ProcessEnv;
 }
@@ -96,10 +104,11 @@ export interface RealLaunch {
 export function realLaunch({
   brainDir,
   packaged,
+  appVersion,
   onSetup = () => undefined,
   env: base = process.env,
 }: RealLaunch): Promise<void> {
-  const env = packaged ? packagedEnv(base, homedir()) : base;
+  const env = packaged ? packagedEnv(base, homedir(), appVersion) : base;
   return launchBrain({
     env,
     brainDir,
@@ -116,6 +125,22 @@ export function realLaunch({
     exists: existsSync,
     spawn: nodeSpawn,
     log: { warn: (line) => console.warn(line) },
+  });
+}
+
+/**
+ * Ends the brain the desktop started (`tagalong stop`, by its pid file) for a restart. True when
+ * the command exited cleanly. Callers check who started the brain first: never a person's.
+ */
+export function stopBrain(
+  options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'sync' | 'spawn'>,
+): Promise<boolean> {
+  const { env, brainDir, uv, sync, spawn } = options;
+  const args = sync ? ['run', '--frozen', '--no-dev', 'tagalong', 'stop'] : ['run', 'tagalong', 'stop'];
+  return new Promise((resolve) => {
+    const child = spawn(uv, args, { cwd: brainDir, env, stdio: 'ignore', windowsHide: true });
+    child.once('error', () => resolve(false));
+    child.once('exit', (code) => resolve(code === 0));
   });
 }
 
@@ -140,7 +165,8 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   const fd = openLog(logPath);
   const child = spawn(uv, sync ? ['run', '--frozen', '--no-dev', 'brain'] : ['run', 'brain'], {
     cwd: brainDir,
-    env,
+    // Tells the brain the desktop owns it, so the version check may restart it.
+    env: { ...env, TAGALONG_STARTED_BY: 'desktop' },
     detached: true,
     stdio: ['ignore', fd, fd],
     windowsHide: true,

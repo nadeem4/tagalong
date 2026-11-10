@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brainLogPath, isLocal, launchBrain, packagedEnv, probeAddr } from './launch';
+import { brainLogPath, isLocal, launchBrain, packagedEnv, probeAddr, stopBrain } from './launch';
 import type { LaunchOptions } from './launch';
 
 class FakeChild extends EventEmitter {
@@ -228,7 +228,7 @@ describe('launchBrain first run (sync)', () => {
   it('keeps a home path with a space and a non-ASCII letter as one argument and one env value', async () => {
     const home = 'C:/Users/Zoë Müller/.tagalong';
     const uv = 'C:/Program Files/Tagalong/uv.exe';
-    const env = packagedEnv({ TAGALONG_HOME: home }, 'C:/Users/x');
+    const env = packagedEnv({ TAGALONG_HOME: home }, 'C:/Users/x', '0.9.2');
     const { calls, spawn } = syncing(0);
     await launchBrain(setup({ sync: true, spawn, env, uv }).options);
     expect(calls[0]?.cmd).toBe(uv);
@@ -237,9 +237,54 @@ describe('launchBrain first run (sync)', () => {
   });
 });
 
+describe('started by and stop', () => {
+  it('spawned brain is told the desktop started it', async () => {
+    const { options, spawned } = setup({ env: { KEEP: '1' } });
+    await launchBrain(options);
+    expect(spawned[0]?.opts.env).toMatchObject({ KEEP: '1', TAGALONG_STARTED_BY: 'desktop' });
+  });
+
+  it('packaged env carries TAGALONG_BUILD', () => {
+    expect(packagedEnv({}, 'C:/Users/me', '0.9.2').TAGALONG_BUILD).toBe('0.9.2');
+  });
+
+  it('stopBrain runs tagalong stop with the brain env', async () => {
+    const { options, spawned } = setup({ env: { KEEP: '1' }, uv: 'C:/uv.exe', sync: true });
+    const spawn: LaunchOptions['spawn'] = (cmd, args, opts) => {
+      const child = options.spawn(cmd, args, opts);
+      queueMicrotask(() => child.emit('exit', 0));
+      return child;
+    };
+    expect(await stopBrain({ ...options, spawn })).toBe(true);
+    expect(spawned[0]).toMatchObject({
+      cmd: 'C:/uv.exe',
+      args: ['run', '--frozen', '--no-dev', 'tagalong', 'stop'],
+    });
+    expect(spawned[0]?.opts).toMatchObject({ cwd: 'C:/repo/brain', env: { KEEP: '1' } });
+  });
+
+  it('stopBrain is false when the command fails or cannot start', async () => {
+    const { options } = setup();
+    const exits =
+      (code: number): LaunchOptions['spawn'] =>
+      (cmd, args, opts) => {
+        const child = options.spawn(cmd, args, opts);
+        queueMicrotask(() => child.emit('exit', code));
+        return child;
+      };
+    expect(await stopBrain({ ...options, spawn: exits(1) })).toBe(false);
+    const broken: LaunchOptions['spawn'] = (cmd, args, opts) => {
+      const child = options.spawn(cmd, args, opts);
+      queueMicrotask(() => child.emit('error', new Error('spawn ENOENT')));
+      return child;
+    };
+    expect(await stopBrain({ ...options, spawn: broken })).toBe(false);
+  });
+});
+
 describe('packagedEnv', () => {
   it('points uv at folders under the Tagalong home, managed Python only', () => {
-    const env = packagedEnv({ KEEP: '1' }, 'C:/Users/me');
+    const env = packagedEnv({ KEEP: '1' }, 'C:/Users/me', '0.9.2');
     const home = join('C:/Users/me', '.tagalong');
     expect(env).toMatchObject({
       KEEP: '1',
@@ -251,7 +296,7 @@ describe('packagedEnv', () => {
   });
 
   it('follows TAGALONG_HOME', () => {
-    expect(packagedEnv({ TAGALONG_HOME: 'D:/t' }, 'C:/Users/me').UV_CACHE_DIR).toBe(
+    expect(packagedEnv({ TAGALONG_HOME: 'D:/t' }, 'C:/Users/me', '0.9.2').UV_CACHE_DIR).toBe(
       join('D:/t', 'cache', 'uv'),
     );
   });
