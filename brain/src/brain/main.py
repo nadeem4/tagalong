@@ -46,6 +46,7 @@ from brain.setup.registry import Registry
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
+from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
 from brain.tools import KeySettings, anthropic_check
 from brain.voice.load import ears_loader, tts_loader
@@ -110,9 +111,11 @@ async def _run() -> None:
     reader_model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.reader_model, key)
     # Its own ledger, so a heavy mail day never silences Scout and a spent Scout budget never
     # stops the reader.
-    reader = HaikuReader(
-        reader_model, Budget(config.data_dir / "reader-budget.json", config.reader_daily_usd)
-    )
+    reader_budget = Budget(config.data_dir / "reader-budget.json", config.reader_daily_usd)
+    reader = HaikuReader(reader_model, reader_budget)
+    # The one-line "why pick it" shares the reader's model and allowance: one ledger on the file,
+    # a second Budget on it would race.
+    why_pick = WhyPick(reader_model, reader_budget, config.data_dir)
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
@@ -229,6 +232,7 @@ async def _run() -> None:
             lambda **kw: session.approvals.record(**kw),
             expert_tools + app_tools + login,
             progress,
+            why_pick,
         ),
         offers=OfferSettings(
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
