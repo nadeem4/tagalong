@@ -8,6 +8,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@fontsource/onest": "5.3.1",
     "@mozilla/readability": "0.6.0",
     "@tagalong/contract": "workspace:*"
   },
