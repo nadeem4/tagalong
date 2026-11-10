@@ -23,6 +23,7 @@ from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
 from brain.store.memory import MemoryRefused
 from brain.store.search import Hit
+from brain.store.work import TransitionRefused
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
 from brain.tools import (
     RECALL_MAX_CHARS,
@@ -897,11 +898,21 @@ _T0 = datetime.datetime(2026, 10, 28, 9, 0, tzinfo=datetime.timezone(datetime.ti
 
 
 class _FakeTimers:
-    def __init__(self):
+    def __init__(self, work=None):
         self.changes = 0
+        self._work = work
 
     def changed(self):
         self.changes += 1
+
+    def cancel(self, tid, reason):  # what Timers.cancel does, without the wake
+        try:
+            self._work.transition(tid, "cancelled", reason=reason)
+        except (TransitionRefused, KeyError):
+            return False
+        self._work.mark_reported(tid)
+        self.changed()
+        return True
 
 
 @pytest.fixture
@@ -911,8 +922,8 @@ def records(mem):
 
 @pytest.fixture
 def trun(mem):
-    fake = _FakeTimers()
     records = records_for(mem, lambda: _T0)
+    fake = _FakeTimers(records.work)
     pairs = timer_tools(records, fake, lambda: _T0)
     handlers = {spec.name: handler for spec, handler in pairs}
 

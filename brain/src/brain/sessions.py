@@ -73,6 +73,7 @@ from brain.store import rules
 from brain.store.conversation import compaction_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.timers import Timers
+from brain.timers_home import timer_home_tools
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
 from brain.tools import (
     KeySettings,
@@ -237,6 +238,7 @@ class Session:
             now,
             job_facts=self.jobs.wake_facts,
             rerun=self._rerun_step,
+            notify=notify,
         )
         choices = Choices(self._asks, self.scheduler.emit)
         tools = (
@@ -246,6 +248,7 @@ class Session:
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now)
+            + timer_home_tools(self.records.work, timers)
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)

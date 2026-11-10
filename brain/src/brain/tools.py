@@ -369,11 +369,8 @@ def timer_tools(
         row = of_kind("timer", tid)
         if row is None:
             raise MemoryRefused(f"no timer with id {tid}.")
-        try:
-            end(row, "cancelled by Scout")
-        except TransitionRefused:
-            raise MemoryRefused(f"no timer with id {tid}.") from None
-        timers.changed()
+        if not timers.cancel(tid, "cancelled by Scout"):
+            raise MemoryRefused(f"no timer with id {tid}.")
         return f"timer {tid} cancelled"
 
     async def watch(args: dict) -> str:

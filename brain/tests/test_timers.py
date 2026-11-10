@@ -262,3 +262,21 @@ def test_transition_refused_is_the_race_signal():
     except TransitionRefused:
         return
     raise AssertionError("expected TransitionRefused")
+
+
+def test_changed_notifies_the_bodies():
+    work = WorkStore(Memory(":memory:").db, Clock())
+    notes = []
+    timers = Timers(work, lambda *a, **k: None, Clock(), notify=lambda k, d: notes.append((k, d)))
+    timers.changed()
+    assert notes == [("changed", {"what": "timers"})]
+
+
+def test_cancel_ends_the_row_and_marks_reported():
+    timers, work, _c, events, _s = make()
+    t = add_timer(work, "x", T0 + timedelta(hours=1))
+    assert timers.cancel(t.id, "cancelled by the person") is True
+    row = work.get(t.id)
+    assert (row.state, row.end_reason) == ("cancelled", "cancelled by the person")
+    assert row.reported_at is not None and events == []
+    assert timers.cancel(t.id, "again") is False
