@@ -68,12 +68,12 @@ const bridge: PreloadBridge = {
   answerJobAsk: (approvalId: string, answer: { option: string; text?: string; apps?: string[] }) =>
     ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
-  setupOverview: (query?: string) =>
-    ipcRenderer.invoke(IPC.setupOverview, query) as Promise<SetupOverview>,
-  setupExpert: (id: string, approved: boolean) =>
-    ipcRenderer.invoke(IPC.setupExpert, id, approved) as Promise<SetupResult>,
-  setupApp: (id: string, approved: boolean, query?: string) =>
-    ipcRenderer.invoke(IPC.setupApp, id, approved, query) as Promise<SetupResult>,
+  setupOverview: (query?: string, cursor?: string) =>
+    ipcRenderer.invoke(IPC.setupOverview, query, cursor) as Promise<SetupOverview>,
+  setupExpert: (id: string, approved: boolean, communityOk?: boolean) =>
+    ipcRenderer.invoke(IPC.setupExpert, id, approved, communityOk) as Promise<SetupResult>,
+  setupApp: (id: string, approved: boolean, query?: string, communityOk?: boolean) =>
+    ipcRenderer.invoke(IPC.setupApp, id, approved, query, communityOk) as Promise<SetupResult>,
   addConnection: (params: AppAddParams) =>
     ipcRenderer.invoke(IPC.addConnection, params) as Promise<{ id: string }>,
   setConnectionEnabled: (id: string, enabled: boolean) =>

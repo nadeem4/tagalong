@@ -208,6 +208,21 @@ ${'z'.repeat(5000)}END`;
     expect(await screen.findByRole('list', { name: 'Jobs' })).toBeInTheDocument();
   });
 
+  it('shows its footer on the list only, not on a job page', async () => {
+    const watched: JobRow = { ...DONE, id: 'j9', task: 'Watched job', activity: true };
+    const bridge = createFakeHostBridge({ jobs: [watched], activity: { j9: [] } });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <JobsPanel footer={<p>the footer</p>} />
+      </HostBridgeProvider>,
+    );
+    await rows();
+    expect(screen.getByText('the footer')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Watch Watched job' }));
+    await screen.findByRole('tablist');
+    expect(screen.queryByText('the footer')).toBeNull();
+  });
+
   it('moves focus to the job heading on Watch and back to its Watch button on return', async () => {
     const watched: JobRow = { ...DONE, id: 'j9', task: 'Watched job', activity: true };
     const bridge = createFakeHostBridge({ jobs: [watched], activity: { j9: [] } });

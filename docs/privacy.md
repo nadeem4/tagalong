@@ -425,7 +425,7 @@ day, for Home's **Spend** card and the daily budget.
 
 ## Your mail: the loops switch
 
-- **Off until you turn it on.** Home, Connections, "Read my mail for loops", one switch per Gmail
+- **Off until you turn it on.** Home, Jobs, "Read my mail for loops", one switch per Gmail
   account you connected. While it is off Scout reads no mail. Turning it on reads the last 14 days
   of mail you have not answered, then new and sent mail every few minutes. The switch stays as you
   left it across restarts: on stays on until you turn it off. If the mail app is not connected yet

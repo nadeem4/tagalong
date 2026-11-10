@@ -1,21 +1,26 @@
 /**
- * Home's Connections page, two groups. Apps: the ones the brain keeps over MCP, one row each
- * (status, tool count, on/off, Restart, Remove) and one Add form. Experts: the installed coding
- * agents and their state. Each group has a Browse and add list from the registries. The brain
- * owns every list and the keys; this page only asks and reads again. Contains ConnectionsPanel
- * and splitCommand; rows are connection-row.tsx, experts-group.tsx and browse-list.tsx.
+ * Home's Connections page, two tabs. Apps: the ones the brain keeps over MCP, then a registry
+ * search (Official first, a check card before community) and Add one by hand. Experts: the
+ * installed coding agents and the registry's. The brain owns every list and the keys; this page
+ * only asks and reads again. Contains ConnectionsPanel; the tabs are apps-tab.tsx and
+ * experts-tab.tsx, the add form add-form.tsx.
  */
 
-import { useCallback, useEffect, useId, useState } from 'react';
-import type { AppAddParams, AppInfo, SetupOverview, SetupResult } from '../shapes';
+import { useCallback, useEffect, useState } from 'react';
+import type { AppAddParams, AppInfo, AppRow, SetupOverview, SetupResult } from '../shapes';
 import { failure } from '../failure';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
-import { BrowseList } from './browse-list';
-import { ConnectionRow, SAME_MACHINE } from './connection-row';
-import { ExpertsGroup } from './experts-group';
+import { AppsTab } from './apps-tab';
+import { ExpertsTab } from './experts-tab';
+import { JobTabs, panelId, tabId } from './job-tabs';
 
 type Status = { text: string; error: boolean } | null;
+type Tab = 'apps' | 'experts';
+const TABS = [
+  { id: 'apps', label: 'Apps' },
+  { id: 'experts', label: 'Experts' },
+];
 
 const BRAIN_OFFLINE = 'brain offline';
 
@@ -39,24 +44,6 @@ const SETUP_REFUSALS: Record<string, Status & object> = {
 const LOGIN_WAITING = 'Finish logging in in the window that opened.';
 const SETUP_FAILED: Status & object = { text: 'Setting that up didn’t work.', error: true };
 
-/** `npx -y "my server" C:/x` as a command and its arguments; quotes keep spaces. */
-function splitCommand(line: string): string[] {
-  return [...line.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3] ?? '');
-}
-
-/** `NAME=value` lines; blank lines skipped. */
-function envLines(text: string): Record<string, string> | string {
-  const env: Record<string, string> = {};
-  for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (line === '') continue;
-    const at = line.indexOf('=');
-    if (at <= 0) return `"${line}" is not NAME=value.`;
-    env[line.slice(0, at).trim()] = line.slice(at + 1).trim();
-  }
-  return env;
-}
-
 /**
  * Home's Connections page. Scout reads with an app on its own and asks before every change;
  * which tools ask is set in Permissions, not here.
@@ -68,10 +55,23 @@ export function ConnectionsPanel() {
   const [offline, setOffline] = useState(false);
   const [setup, setSetup] = useState<SetupOverview | null>(null);
   const [asking, setAsking] = useState<ReadonlySet<string>>(new Set());
+  const [tab, setTab] = useState<Tab>('apps');
+  // Counts finished changes so the app search reads again; not bumped on first load.
+  const [refresh, setRefresh] = useState(0);
+  const [setupFailed, setSetupFailed] = useState(false);
 
   const reloadSetup = useCallback(() => {
-    // Quiet on failure: the apps list already says when the brain is away.
-    bridge.setupOverview().then(setSetup, () => setSetup(null));
+    // A failure is shown on the Experts tab as one plain line; the apps list says when the brain is away.
+    bridge.setupOverview().then(
+      (latest) => {
+        setSetupFailed(false);
+        setSetup(latest);
+      },
+      () => {
+        setSetup(null);
+        setSetupFailed(true);
+      },
+    );
   }, [bridge]);
 
   const reload = useCallback(() => {
@@ -92,7 +92,10 @@ export function ConnectionsPanel() {
   useEffect(
     () =>
       bridge.onTurnEvent((event) => {
-        if (event.type === 'connections.changed') reload();
+        if (event.type === 'connections.changed') {
+          setRefresh((n) => n + 1);
+          reload();
+        }
       }),
     [bridge, reload],
   );
@@ -117,12 +120,13 @@ export function ConnectionsPanel() {
       else setStatus({ text: failure(error), error: true });
       return false;
     } finally {
+      setRefresh((n) => n + 1);
       reload();
     }
   };
 
   // The call returns once the person has answered the Allow card; until then the row waits.
-  const setUp = (id: string, call: () => Promise<SetupResult>): void => {
+  const setUp = (id: string, call: () => Promise<SetupResult>, added?: string): void => {
     setAsking((now) => new Set(now).add(id));
     void act(async () => {
       try {
@@ -130,6 +134,7 @@ export function ConnectionsPanel() {
         if (error !== undefined) setStatus(SETUP_REFUSALS[error] ?? SETUP_FAILED);
         else if (state === 'waiting') setStatus({ text: LOGIN_WAITING, error: false });
         else if (state === 'logged_in') setStatus({ text: 'Already logged in.', error: false });
+        else if (added !== undefined) setStatus({ text: added, error: false });
       } finally {
         setAsking((now) => {
           const next = new Set(now);
@@ -171,225 +176,58 @@ export function ConnectionsPanel() {
           {status.text}
         </p>
       )}
-      <section className="home-card" aria-label="Connected apps">
-        <h2 className="home-card__label">CONNECTED APPS</h2>
-        {apps.length > 0 && (
-          <ul aria-label="Apps" className="home-list home-conns__list">
-            {apps.map((app) => (
-              <ConnectionRow
-                key={app.id}
-                app={app}
-                onSwitch={() => void act(() => bridge.setConnectionEnabled(app.id, !app.enabled))}
-                onRestart={() => void act(() => bridge.restartConnection(app.id))}
-                onSignIn={() => void act(() => bridge.signInConnection(app.id))}
-                onRemove={() =>
-                  void act(() => bridge.removeConnection(app.id), `${app.name} removed.`)
-                }
-              />
-            ))}
-          </ul>
+      <JobTabs
+        tabs={TABS}
+        selected={tab}
+        onSelect={(id) => setTab(id as Tab)}
+        label="Connections sections"
+      />
+      <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
+        {tab === 'apps' && (
+          <AppsTab
+            apps={apps}
+            offline={offline}
+            busy={asking}
+            refresh={refresh}
+            onSwitch={(app) => void act(() => bridge.setConnectionEnabled(app.id, !app.enabled))}
+            onRestart={(app) => void act(() => bridge.restartConnection(app.id))}
+            onSignIn={(app) => void act(() => bridge.signInConnection(app.id))}
+            onRemove={(app) =>
+              void act(() => bridge.removeConnection(app.id), `${app.name} removed.`)
+            }
+            onConnect={(row: AppRow, query) =>
+              setUp(
+                row.id,
+                () => bridge.setupApp(row.id, true, query || undefined),
+                `${row.name} added.`,
+              )
+            }
+            onConnectAnyway={(row: AppRow, query) =>
+              setUp(
+                row.id,
+                () => bridge.setupApp(row.id, true, query || undefined, true),
+                `${row.name} added.`,
+              )
+            }
+            onAdd={add}
+          />
         )}
-        {apps.length === 0 && !offline && <p className="tg-note">No apps yet. Add one below.</p>}
-      </section>
-      <BrowseList
-        label="Browse apps"
-        items={setup?.browseApps ?? []}
-        progress={setup?.progress ?? null}
-        asking={asking}
-        onAdd={(id) => setUp(id, () => bridge.setupApp(id, false))}
-      />
-      {setup !== null && (
-        <>
-          {setup.failed !== null && (
-            <p className="tg-error" role="alert">
-              Setting up {nameOf(setup.failed.expert)} didn’t finish. Try again.
-            </p>
-          )}
-          <ExpertsGroup
-            experts={setup.experts}
-            progress={setup.progress}
+        {tab === 'experts' && setup === null && setupFailed && !offline && (
+          <p className="tg-note" role="status">
+            {SETUP_REFUSALS['registry_unavailable']?.text}
+          </p>
+        )}
+        {tab === 'experts' && setup !== null && (
+          <ExpertsTab
+            setup={setup}
             asking={asking}
+            failedName={setup.failed === null ? null : nameOf(setup.failed.expert)}
             onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}
-          />
-          <BrowseList
-            label="Browse experts"
-            items={setup.browseExperts}
-            progress={setup.progress}
-            asking={asking}
             onAdd={(id) => setUp(id, () => bridge.setupExpert(id, false))}
+            onAddAnyway={(id) => setUp(id, () => bridge.setupExpert(id, true, true))}
           />
-        </>
-      )}
-      <section className="home-card home-conns" aria-label="Add an app">
-        <h2 className="home-card__label">ADD AN APP</h2>
-        <details>
-          <summary className="tg-note">Add an app</summary>
-          <div className="tg-panel home-conns__form-host">
-            <AddForm onAdd={add} />
-          </div>
-        </details>
-      </section>
+        )}
+      </div>
     </>
-  );
-}
-
-/** A key field, kept as a password field so it never shows on screen. */
-function SecretField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label>
-      <span>{label}</span>
-      <input
-        type="password"
-        autoComplete="off"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  );
-}
-
-type SignIn = 'oauth' | 'token' | 'none';
-
-function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<boolean> }) {
-  const [kind, setKind] = useState<'remote' | 'local'>('remote');
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [signIn, setSignIn] = useState<SignIn>('none');
-  const [key, setKey] = useState('');
-  const [command, setCommand] = useState('');
-  const [env, setEnv] = useState('');
-  const [problem, setProblem] = useState<string | null>(null);
-  const group = useId();
-
-  // The key is sent once: it is gone from the form as soon as the brain has it.
-  const clear = (): void => {
-    setName('');
-    setUrl('');
-    setKey('');
-    setCommand('');
-    setEnv('');
-  };
-
-  const submit = async (): Promise<void> => {
-    setProblem(null);
-    if (name.trim() === '') return setProblem('Give the app a name.');
-    if (kind === 'remote') {
-      if (!/^https:\/\/\S+$/.test(url.trim())) {
-        return setProblem('Use an address that starts with https://');
-      }
-      if (signIn === 'token' && key.trim() === '') return setProblem('Paste the key.');
-      const added = await onAdd({
-        name: name.trim(),
-        transport: 'http',
-        url: url.trim(),
-        auth: signIn,
-        ...(signIn === 'token' ? { token: key.trim() } : {}),
-      });
-      if (added) clear();
-      return;
-    }
-    const [program, ...args] = splitCommand(command.trim());
-    if (program === undefined) return setProblem('Type the command that starts the app.');
-    const vars = envLines(env);
-    if (typeof vars === 'string') return setProblem(vars);
-    const added = await onAdd({
-      name: name.trim(),
-      transport: 'stdio',
-      command: program,
-      args,
-      env: vars,
-      auth: 'none',
-    });
-    if (added) clear();
-  };
-
-  return (
-    <div className="home-conn__form">
-      <p className="tg-note">
-        Any MCP server: an address on the web, or a command that runs on this PC.
-      </p>
-      <div className="tg-choices" role="radiogroup" aria-label="Kind of app">
-        <label className="tg-choice">
-          <input
-            type="radio"
-            name={group}
-            checked={kind === 'remote'}
-            onChange={() => setKind('remote')}
-          />
-          <span>An address on the web</span>
-        </label>
-        <label className="tg-choice">
-          <input
-            type="radio"
-            name={group}
-            checked={kind === 'local'}
-            onChange={() => setKind('local')}
-          />
-          <span>A command on this PC</span>
-        </label>
-      </div>
-      <label>
-        <span>Name</span>
-        <input value={name} onChange={(event) => setName(event.target.value)} />
-      </label>
-      {kind === 'remote' ? (
-        <>
-          <label>
-            <span>Address</span>
-            <input
-              value={url}
-              placeholder="https://example.com/mcp"
-              onChange={(event) => setUrl(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>Signs in with</span>
-            <select value={signIn} onChange={(event) => setSignIn(event.target.value as SignIn)}>
-              <option value="none">Nothing</option>
-              <option value="oauth">The app’s own sign-in page</option>
-              <option value="token">A key you paste</option>
-            </select>
-          </label>
-          {signIn === 'token' && <SecretField label="Key" value={key} onChange={setKey} />}
-          {signIn === 'oauth' && <p className="tg-note">{SAME_MACHINE}</p>}
-        </>
-      ) : (
-        <>
-          <label>
-            <span>Command</span>
-            <input
-              value={command}
-              placeholder="npx -y some-mcp-server"
-              onChange={(event) => setCommand(event.target.value)}
-            />
-          </label>
-          <label>
-            <span>
-              Environment (NAME=value, one per line; {'${NAME}'} takes the value from your own
-              environment)
-            </span>
-            <textarea rows={2} value={env} onChange={(event) => setEnv(event.target.value)} />
-          </label>
-        </>
-      )}
-      {problem !== null && (
-        <p className="tg-error" role="alert">
-          {problem}
-        </p>
-      )}
-      <div className="home-conn__actions">
-        <Button variant="primary" onClick={() => void submit()}>
-          Add
-        </Button>
-      </div>
-    </div>
   );
 }

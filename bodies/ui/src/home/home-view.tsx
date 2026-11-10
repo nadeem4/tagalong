@@ -114,11 +114,10 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
       <main className="home-main">
         <div className="home-page">
           {page === 'overview' && <Overview companion={companion} host={host} />}
-          {page === 'jobs' && <JobsPanel />}
+          {page === 'jobs' && <JobsPanel footer={<LoopsPanel />} />}
           {page === 'connections' && (
             <>
               <ConnectionsPanel />
-              <LoopsPanel />
               <BodiesPanel />
             </>
           )}

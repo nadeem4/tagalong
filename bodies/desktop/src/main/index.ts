@@ -916,6 +916,11 @@ function registerIpc(): void {
   registerSetupIpc(handle, {
     brain: required().brain,
     fromTour: (event) => required().walkthroughGate?.fromTour(event) ?? false,
+    fromHome: (event) => {
+      const id = (event as { sender?: { id?: number } }).sender?.id;
+      const home = required().homeWindow;
+      return id !== undefined && home !== null && !home.isDestroyed() && home.webContents.id === id;
+    },
   });
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });

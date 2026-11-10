@@ -4,7 +4,7 @@
  * lists them and reads again when the brain says they changed. Watch opens a job's page in
  * place of the list. Contains JobsPanel.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -32,7 +32,8 @@ function when(job: JobRow): string {
   return minutes > 0 ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
 }
 
-export function JobsPanel() {
+/** `footer` shows under the list only, never on a job's own page (which has its own scroll). */
+export function JobsPanel({ footer }: { footer?: ReactNode }) {
   const bridge = useHostBridge();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -201,6 +202,7 @@ export function JobsPanel() {
           </ul>
         )}
       </section>
+      {footer}
     </>
   );
 }

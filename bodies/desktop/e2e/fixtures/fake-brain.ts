@@ -60,6 +60,8 @@ export interface FakeBrain {
   expertApprovals: unknown[];
   /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
   appSetups: string[];
+  /** The `approved` and `community_ok` flags of each setup_app call, in order. */
+  appFlags: { approved: unknown; communityOk: unknown }[];
   /** Every preference id Home sent to `remove_preference`, in order. */
   removedPreferences: number[];
   /** What the desktop asked of the brain's ears and mouth, in order. */
@@ -193,6 +195,30 @@ const TWO_PART_STEPS = [
 const LONG_FACT = `Remembers ${'supercalifragilistic'.repeat(8)} and a long story about the launch.`;
 
 // One connected app, as the brain's list_apps row.
+/** A registry search for "notion": the Official head and two community versions of one service. */
+const notionRow = (id: string, official: boolean, publisher: string) => ({
+  id,
+  name: 'Notion',
+  version: '1',
+  description: 'Notion pages',
+  official,
+  publisher,
+  runs: official ? 'hosted' : 'pc',
+  host: official ? 'mcp.notion.com' : null,
+  sign_in: official ? 'browser' : 'key',
+  licence: official ? 'Proprietary' : 'MIT',
+  repo: official ? '' : `https://example.test/${id}`,
+  why: official ? '' : 'Matches the name',
+});
+const NOTION_GROUP = {
+  service: 'Notion',
+  official: notionRow('com.notion/mcp', true, 'Notion'),
+  others: [
+    notionRow('io.example/notion-a', false, 'Ada'),
+    notionRow('io.example/notion-b', false, 'Bo'),
+  ],
+};
+
 const APPS = [
   {
     id: 'files',
@@ -288,6 +314,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
   const appSetups: string[] = [];
+  const appFlags: { approved: unknown; communityOk: unknown }[] = [];
   let expertInstalled = false;
   let gmailConnected = false;
   const limits: number[] = [];
@@ -592,6 +619,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             filter?: string;
             usd?: number;
             approved?: boolean;
+            community_ok?: boolean;
             query?: string;
             app?: string;
             on?: boolean;
@@ -691,12 +719,21 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               gmailConnected || !String(params.input?.query ?? '').includes('gmail')
                 ? []
                 : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
+            // C1 facts: a search for notion is one service, an Official head and two community.
+            popular: [],
+            app_groups: String(params.input?.query ?? '').includes('notion') ? [NOTION_GROUP] : [],
+            next_cursor: null,
+            sources: null,
             stale: false,
             progress: null,
             failed: null,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
+          appFlags.push({
+            approved: params.input?.approved,
+            communityOk: params.input?.community_ok,
+          });
           gmailConnected = true;
           notify('changed', { what: 'setup' });
         } else if (params.tool === 'setup_expert') {
@@ -828,6 +865,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     expertSetups,
     expertApprovals,
     appSetups,
+    appFlags,
     removedPreferences,
     voice,
     pushActivity: (job, entry) => {
