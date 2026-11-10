@@ -703,6 +703,24 @@ Needs the same setup as the hand-off section above.
    a held loop and a goal with a running part stay; stored outputs a job points at survive
    the `TAGALONG_OUTPUTS_KEEP` cut; and no module outside `store/` runs SQL.
 
+## The Tasks page (fake brain, then real)
+
+Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-tab` tests),
+`cd brain && uv run pytest tests/test_timers_home.py tests/test_timers.py -q`, and the e2e
+`e2e/tasks.spec.ts` on the fake brain. By hand, with a real brain:
+
+1. **Action:** open Home and press Tasks.
+   **Expected:** a Now card, then tabs Jobs, Held and Timers, each with a count once loaded.
+2. **Action:** ask Scout to "remind me in 10 minutes to stretch", then look at Now and the Timers tab.
+   **Expected:** Now lists the note with "in N min"; the Timers tab lists it with its local time.
+3. **Action:** press Cancel on it.
+   **Expected:** it goes from the tab and from Now, and the Timers count drops.
+4. **Action:** hand a job to Claude Code, then look at Now.
+   **Expected:** the job shows its live step and a clock that ticks; Open shows the job page and Back
+   returns to the tab; Stop ends it.
+5. **Action:** trigger a permission ask (for example ask Scout to move a window).
+   **Expected:** the ask shows at the top of Now; Allow, Always or Deny answers it and it goes.
+
 ## The mail switch and the Held list (fake brain, then real)
 
 Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the desktop ipc test

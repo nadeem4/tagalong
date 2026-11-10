@@ -59,7 +59,7 @@ test('Home lists the job and Stop reaches the brain', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
 
   const jobs = home.getByRole('region', { name: 'Jobs' });
   await expect(jobs).toContainText('Fix the build', { timeout: 30_000 });
@@ -125,7 +125,7 @@ test('a job page pulls its steps by cursor', async () => {
 
 test('watching a job shows its log, follows new steps and shows exit codes', async () => {
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
 
   // An earlier test stopped job1, so the page may open on Overview: pick Activity.
@@ -159,7 +159,7 @@ test('watching a job shows its log, follows new steps and shows exit codes', asy
 
 test('the job page shows what Scout is watching, read-only', async () => {
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
 
   const list = home.getByRole('list', { name: 'Scout is checking' });
@@ -189,7 +189,7 @@ test('the job page shows what Scout is watching, read-only', async () => {
 
 test('a long watch list never pushes the log or its pill off the screen', async () => {
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Fix the build' }).click();
   await home.getByRole('tab', { name: 'Activity' }).click();
   const items = Array.from({ length: 10 }, (_, i) => ({
@@ -243,7 +243,7 @@ test("the bubble shows a running job's latest step", async () => {
 
 test('Show result reads the whole long result and draws its table', async () => {
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   const row = home.getByRole('listitem').filter({ hasText: 'Ship the release notes' });
   await row.getByRole('button', { name: 'Show result' }).click();
   await expect(row.getByRole('cell', { name: 'a.md' })).toBeVisible({ timeout: 15_000 });
@@ -253,7 +253,7 @@ test('Show result reads the whole long result and draws its table', async () => 
 
 test('a two-expert job shows its parts in Reports and a labelled Activity', async () => {
   const home = await windowFor('home');
-  await home.getByRole('button', { name: 'Jobs', exact: true }).click();
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   await home.getByRole('button', { name: 'Watch Ship the release notes' }).click();
 
   await expect(home.getByRole('heading', { level: 1 })).toHaveText('Release notes for 1.2', {
