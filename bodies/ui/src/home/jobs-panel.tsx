@@ -4,7 +4,7 @@
  * lists them and reads again when the brain says they changed. Watch opens a job's page in
  * place of the list. Contains JobsPanel.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { JobRow } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -32,13 +32,25 @@ function when(job: JobRow): string {
   return minutes > 0 ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
 }
 
-/** `footer` shows under the list only, never on a job's own page (which has its own scroll). */
-export function JobsPanel({ footer }: { footer?: ReactNode }) {
+interface JobsPanelProps {
+  /** Under the Tasks page, which owns the heading: no `h1` of its own. */
+  embedded?: boolean;
+  /**
+   * The open job page, when the host keeps it (the Tasks page opens one from the Now card too).
+   * Without `onOpenJob` the panel keeps it itself.
+   */
+  openJob?: string | null;
+  onOpenJob?: (id: string | null) => void;
+}
+
+export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsPanelProps = {}) {
   const bridge = useHostBridge();
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const [watching, setWatching] = useState<string | null>(null);
+  const [ownWatching, setOwnWatching] = useState<string | null>(null);
+  const watching = onOpenJob === undefined ? ownWatching : openJob;
+  const setWatching = onOpenJob ?? setOwnWatching;
   // The whole result by job id. The list rows are Scout's compact copy (cut at 1000 characters);
   // Home reads the full text when a row opens, and shows the row's copy until it arrives.
   const [full, setFull] = useState<Readonly<Record<string, string>>>({});
@@ -117,10 +129,12 @@ export function JobsPanel({ footer }: { footer?: ReactNode }) {
 
   return (
     <>
-      <div className="home-head">
-        <h1 className="home-title">Jobs</h1>
-        <p>Work Scout has handed to Claude Code.</p>
-      </div>
+      {!embedded && (
+        <div className="home-head">
+          <h1 className="home-title">Jobs</h1>
+          <p>Work Scout has handed to Claude Code.</p>
+        </div>
+      )}
       <section className="home-card" aria-label="Jobs">
         <h2 className="home-card__label">JOBS</h2>
         {failed && jobs === null && (
@@ -202,7 +216,6 @@ export function JobsPanel({ footer }: { footer?: ReactNode }) {
           </ul>
         )}
       </section>
-      {footer}
     </>
   );
 }

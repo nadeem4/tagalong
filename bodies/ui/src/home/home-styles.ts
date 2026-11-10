@@ -31,6 +31,10 @@ export const HOME_CSS = `
   background: transparent; color: ${t.color.textMuted}; text-align: left; cursor: pointer;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
+.home-nav__badge {
+  margin-left: ${t.space.md}px; padding: 1px ${t.space.md}px; border-radius: 999px;
+  background: ${t.color.gold}; color: ${t.color.goldInk}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
+}
 .home-nav__item:hover { color: ${t.color.text}; }
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
@@ -246,6 +250,8 @@ export const HOME_CSS = `
   min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
   background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
 }
+/* The tab panel adds no box: a job page or a card stays a direct child of .home-page. */
+.tasks-panel { display: contents; }
 .job-tabs { display: flex; gap: ${t.space.xs}px; border-bottom: 1px solid ${t.color.panelLine}; }
 .job-tabs__tab {
   margin: 0 0 -1px; padding: ${t.space.md}px ${t.space.xl}px; border: 0; border-bottom: 2px solid transparent; background: none;

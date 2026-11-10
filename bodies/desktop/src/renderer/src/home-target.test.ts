@@ -4,7 +4,7 @@ import { homeTarget, scrollToSection } from './home-target';
 
 describe('homeTarget', () => {
   it('reads a plain page', () => {
-    expect(homeTarget('jobs')).toEqual({ page: 'jobs' });
+    expect(homeTarget('tasks')).toEqual({ page: 'tasks' });
     expect(homeTarget('settings')).toEqual({ page: 'settings' });
   });
 
@@ -13,7 +13,7 @@ describe('homeTarget', () => {
   });
 
   it('ignores a section on any page but Settings', () => {
-    expect(homeTarget('jobs#voice')).toEqual({ page: 'jobs' });
+    expect(homeTarget('tasks#voice')).toEqual({ page: 'tasks' });
   });
 });
 

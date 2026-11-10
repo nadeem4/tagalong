@@ -1,6 +1,6 @@
 /**
  * Home: the one window for the companion and the app. Scout in the corner and six pages
- * (overview, jobs, connections, approvals, what Scout remembers, settings), each fed by the
+ * (overview, tasks, connections, approvals, what Scout remembers, settings), each fed by the
  * Python brain. Contains HomeView, HomeHost and HomePage. Rendered by the
  * desktop `home` page.
  */
@@ -18,18 +18,17 @@ import { ApprovalsView } from './approvals-view';
 import { ConnectionsPanel } from './connections-panel';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
-import { JobsPanel } from './jobs-panel';
+import { TasksView } from './tasks-view';
 import { BodiesPanel } from './bodies-panel';
-import { LoopsPanel } from './loops-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
 import { LINK, WhereThingsRun } from './where-things-run';
 
-export type HomePage = 'overview' | 'jobs' | 'connections' | 'approvals' | 'memory' | 'settings';
+export type HomePage = 'overview' | 'tasks' | 'connections' | 'approvals' | 'memory' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
-  { id: 'jobs', label: () => 'Jobs' },
+  { id: 'tasks', label: () => 'Tasks' },
   { id: 'connections', label: () => 'Connections' },
   { id: 'approvals', label: () => 'Approvals' },
   { id: 'memory', label: (name) => `What ${name} remembers` },
@@ -58,7 +57,7 @@ export interface HomeViewProps {
 
 /**
  * Home: the one window for everything. The companion in the corner, and six pages: an
- * overview, the jobs it handed to Claude Code, the apps it can use, what it may do alone and
+ * overview, its tasks (jobs, held mail, timers), the apps it can use, what it may do alone and
  * what you approved, what it remembers, and the app's settings.
  */
 export function HomeView({ host, scout, settings, page: asked, onPage }: HomeViewProps) {
@@ -108,13 +107,18 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
             onClick={() => go(item.id)}
           >
             {item.label(name)}
+            {item.id === 'tasks' && (
+              <span className="home-nav__badge" aria-hidden="true">
+                New
+              </span>
+            )}
           </button>
         ))}
       </nav>
       <main className="home-main">
         <div className="home-page">
           {page === 'overview' && <Overview companion={companion} host={host} />}
-          {page === 'jobs' && <JobsPanel footer={<LoopsPanel />} />}
+          {page === 'tasks' && <TasksView />}
           {page === 'connections' && (
             <>
               <ConnectionsPanel />
