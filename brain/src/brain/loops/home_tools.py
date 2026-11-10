@@ -7,6 +7,7 @@ people, status) and never the mail it came from: the brain does not keep the bod
 
 import json
 from collections.abc import Callable
+from datetime import datetime
 
 from brain.loops.service import LoopService
 from brain.protocol import ErrorCode, RpcError
@@ -71,6 +72,30 @@ def loop_home_tools(
             raise refuse(f"There is no loop {loop_id}.")
         return json.dumps({"id": loop_id})
 
+    async def done(args: dict) -> str:
+        loop_id = args.get("id")
+        try:
+            service.done(loop_id)  # type: ignore[arg-type]
+        except ValueError as err:
+            raise refuse(str(err)) from err
+        return json.dumps({"id": loop_id})
+
+    async def later(args: dict) -> str:
+        loop_id, raw = args.get("id"), args.get("until")
+        try:
+            until = datetime.fromisoformat(raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            raise refuse("until must be an ISO 8601 time with a UTC offset.") from None
+        if until.tzinfo is None:
+            raise refuse("until needs a UTC offset, e.g. 2026-11-05T09:00:00+01:00.")
+        if until <= service.now():
+            raise refuse("until is not in the future.")
+        try:
+            service.later(loop_id, until)  # type: ignore[arg-type]
+        except ValueError as err:
+            raise refuse(str(err)) from err
+        return json.dumps({"id": loop_id, "until": until.isoformat()})
+
     async def wipe(_args: dict) -> str:
         service.wipe()
         return json.dumps({"wiped": True})
@@ -102,6 +127,19 @@ def loop_home_tools(
         (
             spec("loop_forget", "Delete one held loop.", {"id": {"type": "string"}}, "change"),
             forget,
+        ),
+        (
+            spec("loop_done", "Mark one held loop finished.", {"id": {"type": "string"}}, "change"),
+            done,
+        ),
+        (
+            spec(
+                "loop_later",
+                "Put one held loop off until a time (ISO 8601 with a UTC offset).",
+                {"id": {"type": "string"}, "until": {"type": "string"}},
+                "change",
+            ),
+            later,
         ),
         (
             spec(

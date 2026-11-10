@@ -56,4 +56,17 @@ describe('registerLoopsIpc', () => {
     ]);
     await expect(invoke(IPC.loopForget, 7)).rejects.toThrow();
   });
+  it('checks the id and the time of a Done and a Later before the brain hears of them', async () => {
+    const { invoke, calls } = setup();
+    await invoke(IPC.loopDone, 'a1');
+    await invoke(IPC.loopLater, 'a1', '2026-11-11T09:00:00+01:00');
+    expect(calls).toEqual([
+      ['loop_done', { id: 'a1' }],
+      ['loop_later', { id: 'a1', until: '2026-11-11T09:00:00+01:00' }],
+    ]);
+    await expect(invoke(IPC.loopDone, '')).rejects.toThrow();
+    await expect(invoke(IPC.loopLater, 'a1', '')).rejects.toThrow();
+    await expect(invoke(IPC.loopLater, 7, 'x')).rejects.toThrow();
+    expect(calls).toHaveLength(2);
+  });
 });

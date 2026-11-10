@@ -705,6 +705,8 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "speak_sample",
         "spend_today",
         "stop_job",
+        "timer_cancel",
+        "timers_state",
         "watch",
     ]
     for t in tools:

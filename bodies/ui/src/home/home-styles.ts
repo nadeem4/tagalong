@@ -31,6 +31,10 @@ export const HOME_CSS = `
   background: transparent; color: ${t.color.textMuted}; text-align: left; cursor: pointer;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
+.home-nav__badge {
+  margin-left: ${t.space.md}px; padding: 1px ${t.space.md}px; border-radius: 999px;
+  background: ${t.color.gold}; color: ${t.color.goldInk}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
+}
 .home-nav__item:hover { color: ${t.color.text}; }
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
@@ -246,6 +250,16 @@ export const HOME_CSS = `
   min-height: 32px; padding: 0 ${t.space.xl}px; border: 0; border-radius: 999px; cursor: pointer;
   background: ${t.color.gold}; color: ${t.color.goldInk}; font: inherit; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
 }
+/* The Now card: one row per live thing; a waiting ask is picked out with the warm fill. */
+.now__row { display: flex; align-items: center; gap: ${t.space.xl}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine}; }
+.now__row:first-of-type { border-top: 0; }
+.now__ask { padding: ${t.space.lg}px ${t.space.xl}px; border-radius: ${t.radius.field}px; background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
+.now__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.now__title { flex: 1; min-width: 0; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; overflow-wrap: anywhere; }
+.now__meta { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; overflow-wrap: anywhere; }
+.now__actions { display: flex; align-items: center; gap: ${t.space.lg}px; flex: none; }
+/* The tab panel adds no box: a job page or a card stays a direct child of .home-page. */
+.tasks-panel { display: contents; }
 .job-tabs { display: flex; gap: ${t.space.xs}px; border-bottom: 1px solid ${t.color.panelLine}; }
 .job-tabs__tab {
   margin: 0 0 -1px; padding: ${t.space.md}px ${t.space.xl}px; border: 0; border-bottom: 2px solid transparent; background: none;

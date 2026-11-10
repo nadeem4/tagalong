@@ -17,6 +17,7 @@ import type {
   Pet,
   SetupOverview,
   SetupResult,
+  TimerRow,
   TurnEvent,
   WhatsAppChange,
 } from './shapes';
@@ -297,8 +298,19 @@ export interface HostBridge {
   setLoopsOn(app: string, on: boolean): Promise<void>;
   /** Deletes one held loop. */
   forgetLoop(id: string): Promise<void>;
+  /** Closes one held loop: the person dealt with it. */
+  loopDone(id: string): Promise<void>;
+  /** Snoozes one held loop until an ISO time with offset; Scout may raise it again then. */
+  loopLater(id: string, until: string): Promise<void>;
   /** Stop and wipe: every switch off, every loop and mail cursor deleted. */
   wipeLoops(): Promise<void>;
+  /**
+   * Home's Timers tab: every timer waiting to fire, soonest first. Changes arrive as `changed
+   * timers`. Rejects while the brain is away.
+   */
+  timersState(): Promise<TimerRow[]>;
+  /** Cancels one timer. */
+  cancelTimer(id: string): Promise<void>;
   /**
    * Home's Bodies section: which bodies are connected and how WhatsApp is set up (which values
    * are saved, never the values). Changes arrive as `changed bodies`. Rejects while the brain is

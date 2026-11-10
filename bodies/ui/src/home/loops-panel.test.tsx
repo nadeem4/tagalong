@@ -5,7 +5,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LoopRow, LoopsState } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
@@ -42,6 +42,10 @@ function open(state: Partial<LoopsState> = {}): FakeHostBridge {
   );
   return bridge;
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('LoopsPanel', () => {
   it('has the switch off by default and says where mail goes before it is turned on', async () => {
@@ -166,5 +170,52 @@ describe('LoopsPanel', () => {
     open({ apps: [] });
     expect(await screen.findByText(/Connect Gmail/)).toBeInTheDocument();
     expect(screen.queryByRole('switch')).toBeNull();
+  });
+  it('gives an open row Done and Later, and a closed row neither', async () => {
+    open({ loops: [LOOP, { ...WAITING, status: 'done' }] });
+    const open1 = (await screen.findByText('Send Priya the Q4 deck')).closest('li') as HTMLElement;
+    expect(
+      within(open1).getByRole('button', { name: 'Done Send Priya the Q4 deck' }),
+    ).toBeVisible();
+    expect(
+      within(open1).getByRole('button', { name: 'Later Send Priya the Q4 deck' }),
+    ).toBeVisible();
+    const closed = screen.getByText('Contract from Omar').closest('li') as HTMLElement;
+    expect(within(closed).queryByRole('button', { name: /^Done / })).toBeNull();
+    expect(within(closed).queryByRole('button', { name: /^Later / })).toBeNull();
+  });
+
+  it('Done closes the loop and the list reads again', async () => {
+    const bridge = open({ loops: [LOOP] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Done Send Priya the Q4 deck' }));
+    await waitFor(() => expect(bridge.loopCalls).toEqual(['done a1']));
+  });
+
+  it('points to the Connections page when no mail app is connected', async () => {
+    open({ apps: [] });
+    expect(await screen.findByText(/on the Connections page/)).toBeInTheDocument();
+  });
+
+  it('Done and Later wait for the call to finish, so a second press cannot repeat it', async () => {
+    const bridge = open({ loops: [LOOP] });
+    let finish: () => void = () => undefined;
+    vi.spyOn(bridge, 'loopDone').mockReturnValue(new Promise<void>((r) => (finish = r)));
+    const done = await screen.findByRole('button', { name: 'Done Send Priya the Q4 deck' });
+    fireEvent.click(done);
+    expect(done).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Later Send Priya the Q4 deck' })).toBeDisabled();
+    finish();
+    await waitFor(() => expect(done).not.toBeDisabled());
+  });
+
+  it('Later sends tomorrow at nine, local, with the offset', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 10, 10, 15, 0) });
+    const bridge = open({ loops: [LOOP] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Later Send Priya the Q4 deck' }));
+    await waitFor(() => expect(bridge.loopCalls).toHaveLength(1));
+    const [call] = bridge.loopCalls;
+    const until = (call as string).replace('later a1 ', '');
+    expect(until).toMatch(/[+-]\d\d:\d\d$|Z$/);
+    expect(new Date(until).getTime()).toBe(new Date(2026, 10, 11, 9, 0).getTime());
   });
 });

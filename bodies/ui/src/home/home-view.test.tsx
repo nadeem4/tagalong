@@ -46,13 +46,28 @@ describe('HomeView', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers', 'Settings']);
+    ).toEqual([
+      'Overview',
+      'TasksNew',
+      'Connections',
+      'Approvals',
+      'What Scout remembers',
+      'Settings',
+    ]);
+  });
+
+  it('nav says Tasks with a New badge and has no Jobs item', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    const tasks = within(nav).getByRole('button', { name: 'Tasks' });
+    expect(tasks.querySelector('.home-nav__badge')).toHaveTextContent('New');
+    expect(within(nav).queryByRole('button', { name: 'Jobs' })).toBeNull();
   });
 
   it('every page renders inside one .home-page wrapper', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     await screen.findByRole('navigation', { name: 'Tagalong' });
-    for (const label of ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers']) {
+    for (const label of ['Overview', 'Tasks', 'Connections', 'Approvals', 'What Scout remembers']) {
       fireEvent.click(screen.getByRole('button', { name: label }));
       const main = document.querySelector('.home-main') as HTMLElement;
       expect(main.children).toHaveLength(1);
@@ -68,8 +83,8 @@ describe('HomeView', () => {
       'aria-current',
       'page',
     );
-    fireEvent.click(within(nav).getByRole('button', { name: 'Jobs' }));
-    expect(within(nav).getByRole('button', { name: 'Jobs' })).toHaveAttribute(
+    fireEvent.click(within(nav).getByRole('button', { name: 'Tasks' }));
+    expect(within(nav).getByRole('button', { name: 'Tasks' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -231,15 +246,17 @@ describe('HomeView', () => {
     expect(pages).toEqual(['connections', 'settings']);
   });
 
-  it('keeps the mail loops card off Connections and on the Jobs page for now', async () => {
+  it('keeps the mail loops card off Connections and under Held on Tasks', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Connections' }));
     expect(screen.queryByText(/read my mail for loops/i)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Jobs' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tasks' }));
+    expect(screen.queryByText(/read my mail for loops/i)).toBeNull(); // Jobs is the first tab
+    fireEvent.click(await screen.findByRole('tab', { name: /^Held/ }));
     expect(await screen.findByText(/read my mail for loops/i)).toBeInTheDocument();
   });
 
-  it('shows Jobs on its own page only', async () => {
+  it('page tasks shows the Tasks view, and only on its own page', async () => {
     const jobs = [
       {
         id: 'j1',
@@ -256,7 +273,8 @@ describe('HomeView', () => {
         activity: false,
       },
     ];
-    renderHome(createFakeHostBridge({ pets: [SCOUT], jobs }), { page: 'jobs' });
+    renderHome(createFakeHostBridge({ pets: [SCOUT], jobs }), { page: 'tasks' });
+    expect(await screen.findByRole('heading', { name: 'Tasks', level: 1 })).toBeVisible();
     const panel = await screen.findByRole('region', { name: 'Jobs' });
     expect(within(panel).getByText('Fix the login bug')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));

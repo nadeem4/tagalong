@@ -1,6 +1,6 @@
 /**
  * IPC for Home's "Read my mail for loops" card: read the state (switches and the Held list),
- * switch an app on or off, forget one loop, stop and wipe. All go through the brain's Home tools
+ * switch an app on or off, forget one loop, close or snooze one, stop and wipe. All go through the brain's Home tools
  * (loops_state, loops_set, loop_forget, loops_wipe); the brain owns the loops and the consent,
  * the page is not trusted, so arguments are checked before the brain hears of them.
  * Contains registerLoopsIpc.
@@ -23,6 +23,12 @@ export function registerLoopsIpc(handle: IpcHandle, deps: { brain: BrainCall }):
   });
   handle(IPC.loopForget, async (_event, id: unknown) => {
     await callJson(brain, 'loop_forget', { id: Id.parse(id) });
+  });
+  handle(IPC.loopDone, async (_event, id: unknown) => {
+    await callJson(brain, 'loop_done', { id: Id.parse(id) });
+  });
+  handle(IPC.loopLater, async (_event, id: unknown, until: unknown) => {
+    await callJson(brain, 'loop_later', { id: Id.parse(id), until: Id.parse(until) });
   });
   handle(IPC.loopsWipe, async () => {
     await callJson(brain, 'loops_wipe');

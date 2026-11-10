@@ -40,7 +40,9 @@ class Timers:
         now: Callable[[], datetime],
         job_facts: Callable[[str], dict] = lambda job_id: {},
         rerun: Callable[[WorkRow], Awaitable[None]] | None = None,
+        notify: Callable[[str, dict], None] | None = None,
     ) -> None:
+        self._notify = notify  # tells the bodies the list changed, so Home reads it again
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._work = work
         self._emit = emit
@@ -57,6 +59,7 @@ class Timers:
 
     def fire_due(self) -> None:
         now = self._now()
+        fired = False
         for row in self._work.due(KINDS):
             if is_return_wake(row):
                 continue
@@ -73,8 +76,11 @@ class Timers:
             except TransitionRefused:
                 continue  # cancelled or paused as it came due: already handled
             self._emit_one(row, repeat_s)
+            fired = True
         self._rerun_due()
         self._arm()
+        if fired:
+            self._tell()  # a one-off is now pending, a repeating one moved: the page is stale
 
     def _rerun_due(self) -> None:
         if self._rerun is None:
@@ -103,6 +109,21 @@ class Timers:
 
     def changed(self) -> None:
         self._arm()
+        self._tell()
+
+    def _tell(self) -> None:
+        if self._notify is not None:
+            self._notify("changed", {"what": "timers"})
+
+    def cancel(self, tid: str, reason: str) -> bool:
+        """End a timer or watch row; False when it is gone or already ended."""
+        try:
+            self._work.transition(tid, "cancelled", reason=reason)
+        except (TransitionRefused, KeyError):
+            return False
+        self._work.mark_reported(tid)  # nobody needs telling about a cancel
+        self.changed()
+        return True
 
     def _emit_one(self, row: WorkRow, repeat_s: int | None) -> None:
         facts: dict = {"id": row.id, "note": note_of(row), "repeat_minutes": (repeat_s or 0) // 60}
@@ -127,6 +148,7 @@ class Timers:
         except TransitionRefused:
             return  # cancelled while the wake waited
         self._work.mark_reported(id)  # Scout is hearing it now
+        self._tell()
 
     def _arm(self) -> None:
         if self._handle is not None:

@@ -374,14 +374,14 @@ when sight is paused).
 
 The nav lists six pages (`HomePage`), the companion's name filling in where it appears:
 
-| Page (`HomePage`)               | Component                  | Reads and writes                                                                                                                                |
-| ------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview (`overview`)           | `Overview`                 | `host.status()`; `WhereThingsRun`; the Spend card (`usageSummary`)                                                                              |
-| Jobs (`jobs`)                   | `JobsPanel`                | `listJobs`, `stopJob`, and the hand-off questions; re-reads on `onBrainChanged('jobs')`                                                         |
-| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `setupOverview`, `setupExpert`, `setupApp` |
-| Approvals (`approvals`)         | `ApprovalsView`            | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')`                             |
-| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                                                          |
-| Settings (`settings`)           | the host's `settings` slot | the host's settings form, then `PermissionsPanel`                                                                                               |
+| Page (`HomePage`)               | Component                                            | Reads and writes                                                                                                                                 |
+| ------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview (`overview`)           | `Overview`                                           | `host.status()`; `WhereThingsRun`; the Spend card (`usageSummary`)                                                                               |
+| Tasks (`tasks`)                 | `TasksView` (Now card, then Jobs, Held, Timers tabs) | `listJobs`, `stopJob`, `loopsState`, `loopDone`, `loopLater`, `timersState`, `cancelTimer`, the open asks; re-reads on `jobs`, `loops`, `timers` |
+| Connections (`connections`)     | `ConnectionsPanel`                                   | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `setupOverview`, `setupExpert`, `setupApp`  |
+| Approvals (`approvals`)         | `ApprovalsView`                                      | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')`                              |
+| What Scout remembers (`memory`) | `MemoryView`                                         | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                                                           |
+| Settings (`settings`)           | the host's `settings` slot                           | the host's settings form, then `PermissionsPanel`                                                                                                |
 
 - **Navigation.** The `page` prop selects a page when the host names one (main's
   `homePageEvent`, through `homeTarget`, which also splits `settings#<section>` for a Fix it and

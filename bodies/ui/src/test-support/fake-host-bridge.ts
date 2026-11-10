@@ -8,6 +8,7 @@ import type {
   AppInfo,
   BodiesState,
   LoopsState,
+  TimerRow,
   Pet,
   MemoryEntry,
   SetupOverview,
@@ -56,6 +57,10 @@ export interface FakeHostBridge extends HostBridge {
   loops: LoopsState;
   /** Every loops call made, in order: `set gmail on`, `forget id`, `wipe`. */
   readonly loopCalls: readonly string[];
+  /** Home's timers; cancelTimer edits it, a test may swap it. */
+  timers: TimerRow[];
+  /** The id of every cancelTimer call, in order. */
+  readonly cancelledTimers: readonly string[];
   /** Home's Bodies state; setWhatsApp edits it, a test may swap it. */
   bodies: BodiesState;
   /** Every WhatsApp change handed to setWhatsApp, in order. */
@@ -174,6 +179,8 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's loops state. */
     loops?: LoopsState;
+    /** Home's timers. */
+    timers?: TimerRow[];
     /** Home's Bodies state. */
     bodies?: BodiesState;
     /** The brain's reading_status answer (JSON text). */
@@ -214,6 +221,7 @@ export function createFakeHostBridge(
   const setupCalls: SetupCall[] = [];
   const setupOverviewCalls: { query?: string; cursor?: string }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
+  const cancelledTimers: string[] = [];
   const loopCalls: string[] = [];
   const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
@@ -355,6 +363,8 @@ export function createFakeHostBridge(
       return Promise.resolve(fake.memories.length < before);
     },
     loops: options.loops ?? { apps: [], loops: [] },
+    timers: options.timers ?? [],
+    cancelledTimers,
     loopCalls,
     bodies: options.bodies ?? NO_BODIES,
     whatsappChanges,
@@ -391,9 +401,33 @@ export function createFakeHostBridge(
       fake.loops = { ...fake.loops, loops: fake.loops.loops.filter((l) => l.id !== id) };
       return Promise.resolve();
     },
+    loopDone(id) {
+      loopCalls.push(`done ${id}`);
+      fake.loops = {
+        ...fake.loops,
+        loops: fake.loops.loops.map((l) => (l.id === id ? { ...l, status: 'done' } : l)),
+      };
+      return Promise.resolve();
+    },
+    loopLater(id, until) {
+      loopCalls.push(`later ${id} ${until}`);
+      fake.loops = {
+        ...fake.loops,
+        loops: fake.loops.loops.map((l) => (l.id === id ? { ...l, status: 'snoozed' } : l)),
+      };
+      return Promise.resolve();
+    },
     wipeLoops() {
       loopCalls.push('wipe');
       fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };
+      return Promise.resolve();
+    },
+    timersState() {
+      return Promise.resolve(structuredClone(fake.timers));
+    },
+    cancelTimer(id) {
+      cancelledTimers.push(id);
+      fake.timers = fake.timers.filter((t) => t.id !== id);
       return Promise.resolve();
     },
     bodiesState() {

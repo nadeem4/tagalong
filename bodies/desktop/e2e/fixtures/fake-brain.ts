@@ -44,6 +44,10 @@ export interface FakeBrain {
   permissionSets: { tool: string; mode: string }[];
   /** Every loops call the page made, in order: `set gmail on`, `forget l1`, `wipe`. */
   loopCalls: string[];
+  /** Replace the timers `timers_state` answers (snake_case rows) and tell the bodies `changed: timers`. */
+  setTimers(rows: Record<string, unknown>[]): void;
+  /** Every timer id Home sent to `timer_cancel`, in order. */
+  timerCancels: string[];
   /** The data of every `reading` event the desktop sent (how this PC reads the screen). */
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
@@ -308,6 +312,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // Home's loops: one mail app, off at first. Turning it on "reads" one mail into a held loop,
   // as the brain's first poll would; forget and wipe edit the list.
   const loopCalls: string[] = [];
+  let timers: Record<string, unknown>[] = [];
+  const timerCancels: string[] = [];
   const loopApps = [{ id: 'gmail', name: 'Gmail', on: false }];
   let heldLoops: Record<string, unknown>[] = [];
   const stops: string[] = [];
@@ -623,6 +629,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             query?: string;
             app?: string;
             on?: boolean;
+            until?: string;
           };
         };
         let value: unknown = {};
@@ -771,7 +778,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           if (at >= 0) preferences.splice(at, 1);
           notify('changed', { what: 'approvals' });
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
-        else if (params.tool === 'loops_state') value = { apps: loopApps, loops: heldLoops };
+        else if (params.tool === 'timers_state') value = { timers };
+        else if (params.tool === 'timer_cancel') {
+          timerCancels.push(String(params.input?.id));
+          timers = timers.filter((t) => t.id !== params.input?.id);
+          notify('changed', { what: 'timers' });
+        } else if (params.tool === 'loops_state') value = { apps: loopApps, loops: heldLoops };
         else if (params.tool === 'loops_set') {
           const on = params.input?.on === true;
           loopCalls.push(`set ${String(params.input?.app)} ${on ? 'on' : 'off'}`);
@@ -794,6 +806,17 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'loop_forget') {
           loopCalls.push(`forget ${String(params.input?.id)}`);
           heldLoops = heldLoops.filter((l) => l.id !== params.input?.id);
+          notify('changed', { what: 'loops' });
+        } else if (params.tool === 'loop_done' || params.tool === 'loop_later') {
+          const id = String(params.input?.id);
+          loopCalls.push(
+            params.tool === 'loop_done'
+              ? `done ${id}`
+              : `later ${id} ${String(params.input?.until)}`,
+          );
+          heldLoops = heldLoops.map((l) =>
+            l.id === id ? { ...l, status: params.tool === 'loop_done' ? 'done' : 'snoozed' } : l,
+          );
           notify('changed', { what: 'loops' });
         } else if (params.tool === 'loops_wipe') {
           loopCalls.push('wipe');
@@ -844,6 +867,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     answers,
     permissionSets,
     loopCalls,
+    timerCancels,
+    setTimers: (rows) => {
+      timers = rows;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'timers' },
+          }),
+        );
+      }
+    },
     readingEvents,
     setReading: (rows) => {
       readingRows = rows;
