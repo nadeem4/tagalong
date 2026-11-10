@@ -261,7 +261,7 @@ describe('HomeView', () => {
       {
         id: 'j1',
         task: 'Fix the login bug',
-        folder: 'C:\code\app',
+        folder: 'C:\\code\\app',
         mode: 'edit',
         state: 'running',
         title: null,

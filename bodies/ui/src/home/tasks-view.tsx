@@ -84,7 +84,14 @@ export function TasksView() {
         </div>
       )}
       {viewing && <NowCard onOpenJob={setOpenJob} />}
-      {viewing && <JobTabs tabs={tabs} selected={tab} onSelect={(id) => setTab(id as Tab)} />}
+      {viewing && (
+        <JobTabs
+          label="Tasks sections"
+          tabs={tabs}
+          selected={tab}
+          onSelect={(id) => setTab(id as Tab)}
+        />
+      )}
       {/* Always one panel in this spot, so the Jobs list keeps its state while a job page is open. */}
       <div
         {...(viewing ? { role: 'tabpanel', id: panelId(tab), 'aria-labelledby': tabId(tab) } : {})}
