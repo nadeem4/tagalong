@@ -1,5 +1,5 @@
 /**
- * Home's Tasks page: the work Scout has on its plate. A title, then three tabs with counts read
+ * Home's Tasks page: the work Scout has on its plate. A title, the Now card (what is live), then three tabs with counts read
  * from the brain (Jobs, Held mail loops, Timers). Opening a job (Watch on a row) shows its page
  * in place of everything, and Back returns to the tab. The brain owns all of it; this reads the
  * counts and timers and reads again when it says `jobs`, `loops` or `timers` changed.
@@ -10,6 +10,7 @@ import { useHostBridge } from '../host-bridge';
 import { HeldTab } from './held-tab';
 import { JobsPanel } from './jobs-panel';
 import { JobTabs, panelId, tabId } from './job-tabs';
+import { NowCard } from './now-card';
 import { TimersTab } from './timers-tab';
 import type { TimerRow } from '../shapes';
 
@@ -82,6 +83,7 @@ export function TasksView() {
           <p>What Scout is working on, holding and waiting for.</p>
         </div>
       )}
+      {viewing && <NowCard onOpenJob={setOpenJob} />}
       {viewing && <JobTabs tabs={tabs} selected={tab} onSelect={(id) => setTab(id as Tab)} />}
       {/* Always one panel in this spot, so the Jobs list keeps its state while a job page is open. */}
       <div

@@ -38,7 +38,7 @@ const loop = (id: string, status: LoopRow['status'] = 'held'): LoopRow => ({
 const timer = (id: string, extra: Partial<TimerRow> = {}): TimerRow => ({
   id,
   note: `note ${id}`,
-  nextAt: '2026-11-10T20:00:00+00:00',
+  nextAt: '2027-01-01T20:00:00+00:00',
   repeatMinutes: null,
   pending: false,
   ...extra,
