@@ -913,7 +913,8 @@ text such as `[Errno 11001] getaddrinfo failed`.
   runs the MCP SDK's `OAuthClientProvider` (client name "Tagalong", PKCE, dynamic registration) with
   a one-request listener on `127.0.0.1` (port picked by the system, 300 s wait) as the redirect.
   The provider asks a body's `open_url` to show the page. Only https is followed, or http to
-  loopback. With no saved tokens the app starts `needs-sign-in` and opens no browser; `sign_in_app`
+  loopback. The listener hands the SDK the redirect's `code`, `state` and `iss` (RFC 9207); servers like
+  Notion advertise `iss` support and the SDK refuses a sign-in whose `iss` was dropped. With no saved tokens the app starts `needs-sign-in` and opens no browser; `sign_in_app`
   starts it. A 401 mid-session returns the app to `needs-sign-in`.
 - **`app-oauth/<app id>.json`** in the data directory (`FileTokenStorage`) holds that app's tokens
   and client registration, with `saved_at` and `expires_in` so tokens refresh before they expire.

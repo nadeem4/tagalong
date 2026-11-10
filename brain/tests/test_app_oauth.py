@@ -126,9 +126,17 @@ async def test_listener_serves_one_request_then_closes():
     assert uri.startswith("http://127.0.0.1:") and uri.endswith("/callback")
     waiter = asyncio.create_task(cb.wait(5))
     await asyncio.to_thread(_get, f"{uri}?code=abc&state=xyz")
-    assert await waiter == ("abc", "xyz")
+    assert await waiter == ("abc", "xyz", None)
     with pytest.raises(OSError):  # the port is closed after the one request
         socket.create_connection(("127.0.0.1", urlparse(uri).port), timeout=1).close()
+
+
+async def test_listener_passes_iss_back():
+    cb = LoopbackCallback()
+    uri = await cb.start()
+    waiter = asyncio.create_task(cb.wait(5))
+    await asyncio.to_thread(_get, f"{uri}?code=abc&state=xyz&iss=https%3A%2F%2Fas.example")
+    assert await waiter == ("abc", "xyz", "https://as.example")
 
 
 async def test_listener_ignores_other_paths():
@@ -139,7 +147,7 @@ async def test_listener_ignores_other_paths():
     with pytest.raises(urllib.error.HTTPError):
         await asyncio.to_thread(_get, f"{base}/favicon.ico")
     await asyncio.to_thread(_get, f"{uri}?code=abc&state=s")
-    assert await waiter == ("abc", "s")
+    assert await waiter == ("abc", "s", None)
 
 
 async def test_listener_timeout_closes_the_port():
@@ -175,7 +183,7 @@ async def test_listener_survives_a_malformed_request_line():
     # answered like any unknown path, not dropped with an unhandled error in the loop
     assert (await asyncio.to_thread(bad)).startswith(b"HTTP/1.1 404")
     await asyncio.to_thread(_get, f"{uri}?code=abc&state=s")  # still serving afterwards
-    assert await waiter == ("abc", "s")
+    assert await waiter == ("abc", "s", None)
 
 
 async def test_token_file_is_never_written_world_readable_first(tmp_path, monkeypatch):
@@ -203,7 +211,7 @@ def _provider(opened):
         opened.append(url)
 
     async def wait():
-        return ("c", "s")
+        return ("c", "s", None)
 
     storage = FileTokenStorage(Path("."), "notes")
     return make_provider(row, storage, "http://127.0.0.1:1/callback", open_url, wait)
@@ -253,16 +261,28 @@ async def _wait_port(port: int) -> None:
             await asyncio.sleep(0.1)
 
 
-@pytest.fixture
-async def oauth_server():
+async def _serve(*extra: str):
     port = _free_port()
-    proc = subprocess.Popen([sys.executable, FAKE_OAUTH, str(port)])
+    proc = subprocess.Popen([sys.executable, FAKE_OAUTH, str(port), *extra])
     try:
         await _wait_port(port)
         yield f"http://127.0.0.1:{port}/mcp"
     finally:
         proc.kill()
         proc.wait()
+
+
+@pytest.fixture
+async def oauth_server():
+    async for url in _serve():
+        yield url
+
+
+@pytest.fixture
+async def iss_oauth_server():
+    """Like Notion: advertises RFC 9207 iss support and sends iss on the redirect."""
+    async for url in _serve("iss"):
+        yield url
 
 
 class Rig:
@@ -321,6 +341,15 @@ async def test_sign_in_saves_tokens_and_connects(rig):
     saved = await FileTokenStorage(rig.data, "notes").get_tokens()
     assert saved and saved.access_token == "good-token"
     assert len(rig.apps.tools("notes")) == 6
+
+
+async def test_sign_in_works_when_the_server_sends_iss(tmp_path, iss_oauth_server):
+    r = Rig(tmp_path, iss_oauth_server)
+    try:
+        await r.apps.sign_in("notes", _browser)
+        await r.state("connected")
+    finally:
+        await r.apps.shutdown()
 
 
 async def test_saved_tokens_connect_after_restart_without_a_browser(rig):
