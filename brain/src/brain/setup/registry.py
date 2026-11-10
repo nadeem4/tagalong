@@ -21,9 +21,9 @@ from brain.setup.net import GetJson, real_get_json
 from brain.setup.paths import cache_file
 
 ACP_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
-# A search page of 30 keeps the reply small. /v0/ is kept: the free v0.1 check could not be
-# run from the build sandbox, and the entry shape read below is the one this repo has a sample of.
-MCP_BASE = "https://registry.modelcontextprotocol.io/v0/servers"
+# A search page of 30 keeps the reply small. Without version=latest the registry returns
+# every version of a server, so it is always sent (and isLatest is still checked below).
+MCP_BASE = "https://registry.modelcontextprotocol.io/v0.1/servers"
 MCP_URL = f"{MCP_BASE}?limit=30&version=latest"
 TTL_S = 86400
 _LATEST = "io.modelcontextprotocol.registry/official"

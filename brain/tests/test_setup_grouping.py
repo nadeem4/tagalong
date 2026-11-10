@@ -65,3 +65,18 @@ def test_no_query_groups_each_service_once():
     )
     assert [g.service for g in groups] == ["notion", "linear", "Thing"]
     assert groups[2].official is None
+
+
+def test_third_party_notion_wrappers_never_head_the_notion_group():
+    groups = group_entries(
+        [
+            entry("com.mcparmory/notion", "Notion"),
+            entry("com.foreverworks/notion", "Notion"),
+            entry("com.notion/mcp", "Notion"),
+        ],
+        "notion",
+    )
+    assert groups[0].official.id == "com.notion/mcp"
+    assert {e.id for e in groups[0].others} == {"com.mcparmory/notion", "com.foreverworks/notion"}
+    lone = group_entries([entry("com.mcparmory/atlassian-jira", "Jira")], "atlassian")
+    assert all(g.official is None for g in lone)

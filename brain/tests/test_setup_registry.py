@@ -362,8 +362,20 @@ async def test_find_apps_rows_carry_the_facts(tmp_path):
     tools = {s.name: h for s, h in setup_tools(tmp_path, registry(tmp_path), inspect_fn)}
     rows = {r["id"]: r for r in json.loads(await tools["find_apps"]({}))["apps"]}
     remote = rows["academy.apexai/apex-ai-academy"]
-    assert remote["official"] is True and remote["runs"] == "hosted"
+    assert remote["official"] is False and remote["runs"] == "hosted"
     assert remote["publisher"] == "academy.apexai" and remote["sign_in"] == "browser"
     assert remote["licence"] == "Unknown"
     package = rows["ai.2kw/mcp-server"]
     assert package["runs"] == "pc" and package["sign_in"] == "key"
+
+
+V01 = (FIX / "mcp-registry-v01.sample.json").read_bytes()
+
+
+async def test_v01_shape_is_read_and_old_versions_dropped(tmp_path):
+    net = Net(mcp=V01)
+    listing = await registry(tmp_path, net).mcp_servers("notion")
+    assert "/v0.1/servers" in net.urls[0] and "version=latest" in net.urls[0]
+    assert [e.id for e in listing.entries] == ["com.notion/mcp", "com.mcparmory/notion"]
+    assert listing.entries[0].repo == "https://github.com/makenotion/notion-mcp-server"
+    assert listing.next_cursor == "com.mcparmory/notion:1.0.0"

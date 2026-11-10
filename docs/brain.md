@@ -852,8 +852,11 @@ community rows only. Offline with no cache, `app_groups` and `popular` are empty
 and the installed lists stay.
 
 Who is Official is decided by code only (`setup/trust.py`): an app whose registry namespace is the
-service's own reversed domain (exactly two labels: `com.notion`, `app.linear`) or whose id is in
-the seeded `OFFICIAL_APPS`; `io.github.*` and deeper namespaces (`com.notion.evil`) never are. An
+service's own reversed domain (exactly two labels: `com.notion`, `app.linear`) and whose name
+after the slash is only that label plus generic words (`com.notion/mcp`,
+`com.atlassian/atlassian-mcp-server`), or whose id is in the seeded `OFFICIAL_APPS`. A third party
+on its own domain for another service (`com.mcparmory/notion`, `ai.smithery/smithery-notion`),
+`io.github.*` and deeper namespaces (`com.notion.evil`) never are. An
 expert is Official when its id is one of eight vendors (claude-acp, codex-acp, gemini,
 github-copilot-cli, cursor, junie, goose, kimi). Grouping never marks anything Official: a
 community entry joins a service's group by name but never heads it.
@@ -1252,7 +1255,7 @@ machine was not clean, so clean-machine login was read from `authMethods` and so
 | Gemini (`gemini`)     | `npx @google/gemini-cli@0.66.0 --acp`              | It is the agent                   | 20            | yes          | browser (`oauth-personal`) via ACP `authenticate`; or `gemini-api-key`, `vertex-ai`                                                                                                                                                                                             | `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` |
 
 The registries: ACP `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`, MCP
-`https://registry.modelcontextprotocol.io/v0/servers?limit=30&version=latest` (plus `&search=`
+`https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` (plus `&search=`
 and `&cursor=` when set, URL-encoded; a blank search is no search). Samples of both are in
 `brain/tests/fixtures/`.
 

@@ -5,6 +5,8 @@ The registry proves a namespace by DNS or HTTP, so `com.notion` is Notion's; a G
 the vendor is on a short allowlist. Everything else is Community.
 """
 
+import re
+
 # Full registry ids whose namespace breaks the pattern but that the service itself publishes.
 # Empty until one is confirmed against the live registry.
 OFFICIAL_APPS: frozenset[str] = frozenset()
@@ -27,7 +29,7 @@ EXPERT_VENDORS: frozenset[str] = frozenset(
 POPULAR: tuple[str, ...] = (
     "com.notion/mcp",
     "app.linear/mcp",
-    "com.atlassian/mcp",
+    "com.atlassian/atlassian-mcp-server",
     "com.asana/mcp",
 )
 
@@ -46,13 +48,24 @@ def service_key(entry_id: str) -> str:
     return labels[-1] if len(labels) == 2 else labels[min(2, len(labels) - 1)]
 
 
+# Words in an entry's own name that do not name another service.
+_GENERIC = frozenset({"mcp", "server", "remote", "official", "hosted"})
+
+
 def is_official_app(entry_id: str) -> bool:
+    """Official: the allowlist, or a two-label namespace (a reversed registrable domain) whose
+    entry is about that domain's own service. A third party publishes under its own domain for
+    someone else's service (`com.mcparmory/notion`), so the name after the slash may hold only
+    the domain's label and generic words (`com.notion/mcp`,
+    `com.atlassian/atlassian-mcp-server`)."""
     if entry_id in OFFICIAL_APPS:
         return True
-    # Exactly two non-empty labels: a reversed registrable domain. A third label
-    # (`com.notion.evil`) is a subdomain anyone with that host could claim, so it is Community.
     labels = _labels(entry_id)
-    return "/" in entry_id and len(labels) == 2 and all(labels)
+    if "/" not in entry_id or len(labels) != 2 or not all(labels):
+        # A third label (`com.notion.evil`) is a subdomain anyone with that host can claim.
+        return False
+    words = set(re.split(r"[^a-z0-9]+", entry_id.partition("/")[2].lower())) - {""}
+    return not words - _GENERIC - {labels[1].lower()}
 
 
 def is_official_expert(expert_id: str) -> bool:

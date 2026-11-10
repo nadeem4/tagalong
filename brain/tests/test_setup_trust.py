@@ -58,3 +58,20 @@ def test_expert_vendors():
     ):
         assert trust.is_official_expert(expert)
     assert not trust.is_official_expert("some-other-acp")
+
+
+def test_third_party_namespaces_for_another_service_are_community():
+    for lookalike in (
+        "com.mcparmory/notion",
+        "com.foreverworks/notion",
+        "com.insightfulpipe/notion",
+        "com.mcparmory/atlassian-jira",
+        "ai.smithery/smithery-notion",
+    ):
+        assert not trust.is_official_app(lookalike), lookalike
+
+
+def test_the_service_itself_is_official():
+    assert trust.is_official_app("com.notion/mcp")
+    assert trust.is_official_app("com.atlassian/atlassian-mcp-server")
+    assert trust.is_official_app("app.linear/linear")
