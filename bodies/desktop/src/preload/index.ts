@@ -91,6 +91,9 @@ const bridge: PreloadBridge = {
   setLoopsOn: (app: string, on: boolean) =>
     ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,
   forgetLoop: (id: string) => ipcRenderer.invoke(IPC.loopForget, id) as Promise<void>,
+  loopDone: (id: string) => ipcRenderer.invoke(IPC.loopDone, id) as Promise<void>,
+  loopLater: (id: string, until: string) =>
+    ipcRenderer.invoke(IPC.loopLater, id, until) as Promise<void>,
   wipeLoops: () => ipcRenderer.invoke(IPC.loopsWipe) as Promise<void>,
   timersState: () => ipcRenderer.invoke(IPC.timersState) as Promise<TimerRow[]>,
   cancelTimer: (id: string) => ipcRenderer.invoke(IPC.timersCancel, id) as Promise<void>,

@@ -298,6 +298,10 @@ export interface HostBridge {
   setLoopsOn(app: string, on: boolean): Promise<void>;
   /** Deletes one held loop. */
   forgetLoop(id: string): Promise<void>;
+  /** Closes one held loop: the person dealt with it. */
+  loopDone(id: string): Promise<void>;
+  /** Snoozes one held loop until an ISO time with offset; Scout may raise it again then. */
+  loopLater(id: string, until: string): Promise<void>;
   /** Stop and wipe: every switch off, every loop and mail cursor deleted. */
   wipeLoops(): Promise<void>;
   /**

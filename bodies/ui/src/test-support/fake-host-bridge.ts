@@ -401,6 +401,22 @@ export function createFakeHostBridge(
       fake.loops = { ...fake.loops, loops: fake.loops.loops.filter((l) => l.id !== id) };
       return Promise.resolve();
     },
+    loopDone(id) {
+      loopCalls.push(`done ${id}`);
+      fake.loops = {
+        ...fake.loops,
+        loops: fake.loops.loops.map((l) => (l.id === id ? { ...l, status: 'done' } : l)),
+      };
+      return Promise.resolve();
+    },
+    loopLater(id, until) {
+      loopCalls.push(`later ${id} ${until}`);
+      fake.loops = {
+        ...fake.loops,
+        loops: fake.loops.loops.map((l) => (l.id === id ? { ...l, status: 'snoozed' } : l)),
+      };
+      return Promise.resolve();
+    },
     wipeLoops() {
       loopCalls.push('wipe');
       fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };

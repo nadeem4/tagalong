@@ -1921,7 +1921,7 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
   the store holds (any status) with id, app, title, asks, direction, due, people and status, and
   never the mail text (the brain does not keep it). `loops_set {app, on}` starts (the 14-day
   backfill) or stops that app's poll; an app that is not a mail app is refused with `invalid_params`,
-  and off keeps the loops. `loop_forget {id}` deletes one loop. `loops_wipe` is Stop and wipe: every
+  and off keeps the loops. `loop_forget {id}` deletes one loop. `loop_done {id}` closes one (the person dealt with it) and `loop_later {id, until}` snoozes one until an ISO time that carries an offset (a naive, past or unparsable time, or an unknown id, is refused with `invalid_params`); Home's Later button sends tomorrow 09:00 local. `loops_wipe` is Stop and wipe: every
   switch off, every loop, surface log and cursor deleted. Each emits `changed { what: "loops" }`, as
   does a poll that changed something, a surfacing and a stale sweep, so an open Home reads again.
   The switch is saved: a restarted brain keeps reading where it was on; a fresh one has every

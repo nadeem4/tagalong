@@ -209,3 +209,32 @@ async def test_a_stale_sweep_tells_home(rig):
     later.fire_due()
     assert rig.store.list()[0].status == "stale"
     assert ("changed", {"what": "loops"}) in notes
+
+
+async def test_home_loop_done_closes_it(rig):
+    lp = rig.add()
+    assert await rig.call("loop_done", id=lp.id) == {"id": lp.id}
+    assert rig.store.get(lp.id).status == "done"
+
+
+async def test_home_loop_later_snoozes_until(rig):
+    lp = rig.add()
+    until = (T0 + timedelta(days=1)).isoformat()
+    assert await rig.call("loop_later", id=lp.id, until=until) == {"id": lp.id, "until": until}
+    assert rig.store.get(lp.id).snoozed_until is not None
+
+
+@pytest.mark.parametrize("until", ["2026-11-04T08:00:00+00:00", "2026-11-05T09:00:00", "soon"])
+async def test_home_loop_later_refuses_past_or_naive_time(rig, until):
+    lp = rig.add()
+    with pytest.raises(RpcError) as err:
+        await rig.call("loop_later", id=lp.id, until=until)
+    assert err.value.code == ErrorCode.invalid_params
+
+
+async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
+    later = {"until": "2026-11-05T09:00:00+00:00"}
+    for name, extra in [("loop_done", {}), ("loop_later", later)]:
+        with pytest.raises(RpcError) as err:
+            await rig.call(name, id="nope", **extra)
+        assert err.value.code == ErrorCode.invalid_params

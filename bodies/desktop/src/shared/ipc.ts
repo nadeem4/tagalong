@@ -47,6 +47,8 @@ export const IPC = {
   loopsState: 'tagalong:loops:state',
   loopsSet: 'tagalong:loops:set',
   loopForget: 'tagalong:loops:forget',
+  loopDone: 'tagalong:loops:done',
+  loopLater: 'tagalong:loops:later',
   loopsWipe: 'tagalong:loops:wipe',
   timersState: 'tagalong:timers:state',
   timersCancel: 'tagalong:timers:cancel',

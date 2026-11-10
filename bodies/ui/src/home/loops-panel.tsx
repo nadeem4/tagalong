@@ -35,6 +35,17 @@ function meta(loop: LoopRow): string[] {
   return parts;
 }
 
+/** Tomorrow 09:00 on the person's clock, as ISO with the local offset (the brain refuses naive times). */
+function tomorrowNine(): string {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  at.setHours(9, 0, 0, 0);
+  const offset = -at.getTimezoneOffset();
+  const pad = (n: number): string => String(Math.floor(Math.abs(n))).padStart(2, '0');
+  const zone = `${offset >= 0 ? '+' : '-'}${pad(offset / 60)}:${pad(offset % 60)}`;
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T09:00:00${zone}`;
+}
+
 export function LoopsPanel() {
   const bridge = useHostBridge();
   const headingId = useId();
@@ -139,6 +150,24 @@ export function LoopsPanel() {
                     ))}
                   </span>
                 </span>
+                {loop.status !== 'done' && loop.status !== 'dropped' && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      aria-label={`Done ${loop.title}`}
+                      onClick={() => run(bridge.loopDone(loop.id))}
+                    >
+                      Done
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      aria-label={`Later ${loop.title}`}
+                      onClick={() => run(bridge.loopLater(loop.id, tomorrowNine()))}
+                    >
+                      Later
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="quiet"
                   aria-label={`Forget ${loop.title}`}
