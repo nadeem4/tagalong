@@ -21,7 +21,7 @@ GOOD_TOKENS = {"good-token", "refreshed-token"}
 CODE = "fake-code"
 
 
-def build(port: int, with_iss: bool = False) -> object:
+def build(port: int, mode: str = "none") -> object:
     base = f"http://127.0.0.1:{port}"
     mcp_app = server.streamable_http_app()
 
@@ -39,7 +39,11 @@ def build(port: int, with_iss: bool = False) -> object:
                 "grant_types_supported": ["authorization_code", "refresh_token"],
                 "code_challenge_methods_supported": ["S256"],
                 "token_endpoint_auth_methods_supported": ["none"],
-                **({"authorization_response_iss_parameter_supported": True} if with_iss else {}),
+                **(
+                    {"authorization_response_iss_parameter_supported": True}
+                    if mode != "none"
+                    else {}
+                ),
             }
         )
 
@@ -49,7 +53,8 @@ def build(port: int, with_iss: bool = False) -> object:
 
     async def authorize(request: Request) -> Response:
         q = request.query_params
-        back = urlencode({"code": CODE, "state": q["state"], **({"iss": base} if with_iss else {})})
+        extra = {"iss": base if mode == "iss" else "http://evil.example"} if mode != "none" else {}
+        back = urlencode({"code": CODE, "state": q["state"], **extra})
         return RedirectResponse(f"{q['redirect_uri']}?{back}", status_code=302)
 
     async def token(request: Request) -> Response:
@@ -106,5 +111,8 @@ def build(port: int, with_iss: bool = False) -> object:
 if __name__ == "__main__":
     port = int(sys.argv[1])
     uvicorn.run(
-        build(port, "iss" in sys.argv[2:]), host="127.0.0.1", port=port, log_level="warning"
+        build(port, sys.argv[2] if len(sys.argv) > 2 else "none"),
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
     )

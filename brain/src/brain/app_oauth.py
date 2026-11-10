@@ -167,7 +167,9 @@ class LoopbackCallback:
         if self._done.done():
             return
         code, state = query.get("code", [""])[0], query.get("state", [""])[0]
-        iss = query.get("iss", [None])[0]  # RFC 9207: the SDK rejects a server that sends none
+        # RFC 9207: the SDK checks it, and refuses its absence when the server advertises
+        # iss support
+        iss = query.get("iss", [None])[0]
         if "error" in query:
             self._done.set_exception(OAuthError("The sign-in was declined."))
         elif not code:

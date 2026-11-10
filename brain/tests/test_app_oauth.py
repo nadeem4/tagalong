@@ -279,6 +279,13 @@ async def oauth_server():
 
 
 @pytest.fixture
+async def bad_iss_oauth_server():
+    """Advertises iss support but names another issuer on the redirect."""
+    async for url in _serve("bad-iss"):
+        yield url
+
+
+@pytest.fixture
 async def iss_oauth_server():
     """Like Notion: advertises RFC 9207 iss support and sends iss on the redirect."""
     async for url in _serve("iss"):
@@ -348,6 +355,16 @@ async def test_sign_in_works_when_the_server_sends_iss(tmp_path, iss_oauth_serve
     try:
         await r.apps.sign_in("notes", _browser)
         await r.state("connected")
+    finally:
+        await r.apps.shutdown()
+
+
+async def test_sign_in_is_refused_when_the_iss_is_wrong(tmp_path, bad_iss_oauth_server):
+    r = Rig(tmp_path, bad_iss_oauth_server)
+    try:
+        await r.apps.sign_in("notes", _browser)
+        await r.state("needs-sign-in")
+        assert await FileTokenStorage(tmp_path, "notes").get_tokens() is None
     finally:
         await r.apps.shutdown()
 
