@@ -35,7 +35,7 @@ export function TimersTab({
   };
   return (
     <section className="home-card" aria-label="Timers">
-      <h2 className="home-card__label">TIMERS</h2>
+      <h2 className="home-card__label">Timers</h2>
       {timers.length === 0 ? (
         <p>No timers.</p>
       ) : (

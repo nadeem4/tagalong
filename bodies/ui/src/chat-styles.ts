@@ -57,7 +57,7 @@ export const CHAT_CSS = `
 }
 .bubble-head strong {
   margin-right: auto; font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark};
-  font-size: 16px; line-height: 20px; letter-spacing: -0.01em;
+  font-size: 16px; line-height: 20px;
 }
 .bubble-head .bubble-toggle { min-height: 26px; }
 .bubble-head .bubble-row { gap: 8px; }

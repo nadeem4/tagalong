@@ -39,7 +39,7 @@ export function AppsTab({
   return (
     <>
       <section className="home-card" aria-label="Connected apps">
-        <h2 className="home-card__label">CONNECTED</h2>
+        <h2 className="home-card__label">Connected</h2>
         {apps.length > 0 && (
           <ul aria-label="Apps" className="home-list home-conns__list">
             {apps.map((app) => (
@@ -60,7 +60,7 @@ export function AppsTab({
       </section>
 
       <section className="home-card home-conns" aria-label="Add an app">
-        <h2 className="home-card__label">ADD AN APP</h2>
+        <h2 className="home-card__label">Add an app</h2>
         <AppSearch
           busy={busy}
           refresh={refresh}

@@ -50,7 +50,7 @@ export function SpendCard() {
   const spentOut = spend !== null && limit !== null && spend.spentUsd >= limit;
   return (
     <section className="home-card" aria-label="Spend">
-      <h2 className="home-card__label">SPEND</h2>
+      <h2 className="home-card__label">Spend</h2>
       {failed && spend === null && <p>Tagalong could not read what was spent.</p>}
       {spend !== null && (
         <>
@@ -59,7 +59,7 @@ export function SpendCard() {
               Today’s {cap(limit)} is spent; Scout pauses until midnight.
             </p>
           )}
-          <h3 className="home-card__label">TODAY</h3>
+          <h3 className="home-card__label">Today</h3>
           {spend.spentUsd === 0 ? (
             <p>Nothing spent yet today.</p>
           ) : (

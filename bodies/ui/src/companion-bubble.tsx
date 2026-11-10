@@ -994,7 +994,7 @@ const BUBBLE_CSS = `
 .bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
   flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
-  color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
+  color: ${t.color.textMuted}; font-size: 16px; line-height: 1; cursor: pointer;
 }
 .bubble-close:hover { background: #222845; color: ${t.color.text}; }
 .bubble-speaking {

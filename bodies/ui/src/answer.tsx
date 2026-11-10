@@ -43,10 +43,10 @@ export const ANSWER_CSS = `
 .answer ul, .answer ol { padding-left: 20px; }
 .answer li + li { margin-top: 2px; }
 .answer h1, .answer h2, .answer h3, .answer h4 { margin: 12px 0 6px; font-size: 14px; font-weight: 600; }
-.answer h1, .answer h2 { font-size: 15px; }
+.answer h1, .answer h2 { font-size: 16px; }
 .answer code {
   padding: 1px 5px; border-radius: 4px; background: #222845;
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12.5px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 12px;
 }
 .answer pre {
   padding: 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 8px; background: ${t.color.field};

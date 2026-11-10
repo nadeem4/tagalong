@@ -48,7 +48,7 @@ export function Section({
   return (
     <section id={id} className="tg-panel home-card" aria-labelledby={`${id}-heading`}>
       <div className="tg-titlerow">
-        <h2 id={`${id}-heading`} className="tg-px tg-panel__heading">
+        <h2 id={`${id}-heading`} className="tg-panel__heading">
           {title}
         </h2>
         {info !== undefined && <Info tip={info.tip} label={info.label} />}

@@ -22,7 +22,7 @@ export const CARD_CSS = `
 .bubble-choices .bubble-choice.bubble-quiet { align-self: stretch; }
 .bubble-choices .bubble-choice.bubble-quiet:hover { background: rgba(255, 255, 255, 0.06); }
 .bubble-choices .bubble-choice.bubble-primary:hover { filter: brightness(1.06); }
-.bubble-tag { flex: none; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; opacity: 0.7; }
+.bubble-tag { flex: none; font-size: 11px; font-weight: 400; opacity: 0.7; }
 .card-brief { font-size: 12px; line-height: 1.5; color: #C9CEE0; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 `;

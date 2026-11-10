@@ -143,7 +143,7 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
 
   return (
     <section className="home-card now" aria-label="Now">
-      <h2 className="home-card__label">NOW</h2>
+      <h2 className="home-card__label">Now</h2>
       {waiting.map((ask) => (
         <div key={ask.approvalId} className="now__row now__ask">
           <span className="now__body">

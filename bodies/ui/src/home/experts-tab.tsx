@@ -99,7 +99,7 @@ export function ExpertsTab({
       <ExpertsGroup experts={setup.experts} progress={progress} asking={asking} onAct={onAct} />
       {items.length > 0 && (
         <section className="home-card home-conns" aria-label="Add an expert">
-          <h2 className="home-card__label">ADD AN EXPERT</h2>
+          <h2 className="home-card__label">Add an expert</h2>
           {items.some((item) => progress?.expert === item.id) && progress !== null && (
             <p className="tg-note" role="status">
               {stageWords(progress)}
