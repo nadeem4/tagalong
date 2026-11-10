@@ -335,6 +335,12 @@ def test_apps_add_lists_only_env_names_not_already_set(tmp_path, no_node_downloa
     assert "ACME_KEY" not in rig.text
 
 
+def test_apps_add_says_community_and_who_made_it(tmp_path):
+    rig = Rig(tmp_path, answers=["n"])
+    assert rig.go("apps", "add", "acme/cloud") == 0
+    assert "community, made by acme (not the service itself)" in rig.text
+
+
 # ---- login ----
 
 

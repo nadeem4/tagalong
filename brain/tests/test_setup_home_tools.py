@@ -12,8 +12,9 @@ from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
+from brain.setup import registry as registry_module
 from brain.setup.facts import Machine
-from brain.setup.home_tools import SetupProgress, home_setup_tools
+from brain.setup.home_tools import WHY_PER_REPLY, SetupProgress, home_setup_tools
 from brain.setup.registry import Registry
 from brain.setup.store import InstalledExpert
 from brain.toolbox import ToolSpec
@@ -62,13 +63,21 @@ def expert(id="claude-acp", version="1.0.0", logged_in=True, source="registry"):
 
 class Rig:
     def __init__(
-        self, tmp_path: Path, installed=(), apps=(), offline=False, answer="allow", card=None
+        self,
+        tmp_path: Path,
+        installed=(),
+        apps=(),
+        offline=False,
+        answer="allow",
+        card=None,
+        mcp=None,
+        why=None,
     ):  # answer None: nobody online
         async def get(url: str) -> bytes:
             self.urls.append(url)
             if offline:
                 raise OSError("down")
-            return MCP if "modelcontext" in url else ACP
+            return (mcp or MCP) if "modelcontext" in url else ACP
 
         self.urls: list[str] = []
         self.progress = SetupProgress(lambda event: None)
@@ -102,6 +111,7 @@ class Rig:
             lambda **kw: self.recorded.append(kw),
             [inner("install_expert"), inner("login_expert"), inner("install_app")],
             self.progress,
+            why or FakeWhy(),
         )
         self.tools = {spec.name: (spec, handler) for spec, handler in tools}
 
@@ -126,7 +136,8 @@ async def test_overview_searches_the_app_registry_by_the_query(tmp_path):
     assert any("modelcontext" in u and u.endswith("&search=gmail") for u in rig.urls)
     rig = Rig(tmp_path / "plain")
     await rig.call("setup_overview")
-    assert not any("search=" in u for u in rig.urls)
+    # The page itself is not a search; only the Popular lookups after it are.
+    assert "search=" not in next(u for u in rig.urls if "modelcontext" in u)
 
 
 async def test_an_expert_not_logged_in_needs_login(tmp_path):
@@ -311,8 +322,166 @@ async def test_a_card_that_times_out_is_recorded_and_raised(tmp_path):
         lambda **kw: rig.recorded.append(kw),
         [(ToolSpec("install_expert", "d", {}, effect="change"), lambda a: None)],
         rig.progress,
+        FakeWhy(),
     )
     handler = {spec.name: h for spec, h in tools}["setup_expert"]
     with pytest.raises(RpcError):
         await handler({"id": "x", "approved": False})
     assert [r["outcome"] for r in rig.recorded] == ["timed_out"]
+
+
+async def official_card(args):
+    return {"id": args["id"], "official": True, "community": False}
+
+
+async def community_card(args):
+    return {"id": args["id"], "official": False, "community": True, "publisher": "bob"}
+
+
+async def test_home_official_connect_skips_the_card(tmp_path):
+    rig = Rig(tmp_path, card=official_card)
+    await rig.call("setup_app", {"id": "com.acme/x", "approved": True})
+    assert rig.asked == [] and rig.ran == [("install_app", {"id": "com.acme/x"})]
+
+
+async def test_home_community_connect_without_confirm_still_asks(tmp_path):
+    rig = Rig(tmp_path, card=community_card)
+    await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
+    assert len(rig.asked) == 1 and rig.asked[0]["input"]["community"] is True
+    assert rig.ran == [("install_app", {"id": "io.github.bob/x"})]  # the answer was allow
+
+
+async def test_home_community_denied_check_card_installs_nothing(tmp_path):
+    rig = Rig(tmp_path, card=community_card, answer="deny")
+    out = await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
+    assert out["error"] == "denied" and rig.ran == []
+
+
+async def test_home_community_connect_anyway_installs_without_second_card(tmp_path):
+    rig = Rig(tmp_path, card=community_card)
+    args = {"id": "io.github.bob/x", "approved": True, "community_ok": True}
+    await rig.call("setup_app", args)
+    assert rig.asked == [] and rig.ran == [("install_app", {"id": "io.github.bob/x"})]
+    (row,) = rig.recorded
+    assert (row["outcome"], row["decided_by"], row["tool"]) == ("approved", "person", "install_app")
+
+
+def server(name, title="", description="", **body):
+    return {
+        "server": {
+            "name": name,
+            "title": title or name,
+            "version": "1",
+            "description": description,
+            **body,
+        }
+    }
+
+
+def remote(host="c.test", **extra):
+    return {"remotes": [{"type": "streamable-http", "url": f"https://{host}/mcp", **extra}]}
+
+
+SEARCH = json.dumps(
+    {
+        "servers": [
+            server("io.github.amy/podcast-editor", "Podcast editor", "Edits audio.", **remote()),
+            server("io.github.bob/notion-tools", "Notion tools", "Fast notes. More.", **remote()),
+            server("com.notion/mcp", "Notion", "Official.", **remote("mcp.notion.test")),
+            server("io.github.notion/mcp", "Notion", "Lookalike.", **remote()),
+            server(
+                "app.linear/mcp",
+                "Linear",
+                "Issues.",
+                **remote(headers=[{"name": "Authorization", "isRequired": True}]),
+            ),
+        ],
+        "metadata": {"nextCursor": "page2"},
+    }
+).encode()
+
+
+class FakeWhy:
+    def __init__(self):
+        self.asked: list[str] = []
+
+    async def line(self, entry):
+        self.asked.append(entry.id)
+        return "why:" + entry.id
+
+
+async def test_overview_groups_search_results_with_official_head(tmp_path):
+    rig = Rig(tmp_path, mcp=SEARCH)
+    out = await rig.call("setup_overview", {"query": "notion"})
+    first = out["app_groups"][0]
+    assert first["service"] == "notion" and first["official"]["id"] == "com.notion/mcp"
+    assert first["official"]["official"] is True and "why" not in first["official"]
+    others = {r["id"]: r for r in first["others"]}
+    assert set(others) == {"io.github.bob/notion-tools", "io.github.notion/mcp"}
+    assert others["io.github.bob/notion-tools"]["official"] is False
+    assert others["io.github.bob/notion-tools"]["why"] == "why:io.github.bob/notion-tools"
+    assert first["official"]["runs"] == "hosted" and first["official"]["host"] == "mcp.notion.test"
+    flat = [r["id"] for g in out["app_groups"][:1] for r in g["others"]]
+    assert "io.github.amy/podcast-editor" not in flat
+
+
+async def test_overview_popular_only_without_query(tmp_path):
+    rig = Rig(tmp_path, mcp=SEARCH)
+    out = await rig.call("setup_overview")
+    assert [r["id"] for r in out["popular"]] == ["com.notion/mcp"]
+    assert all(r["official"] is True for r in out["popular"])
+    assert (await rig.call("setup_overview", {"query": "notion"}))["popular"] == []
+
+
+async def test_popular_drops_what_one_click_cannot_connect(tmp_path):
+    # app.linear/mcp is in the list but needs a header token, so it is not one click.
+    out = await Rig(tmp_path, mcp=SEARCH).call("setup_overview")
+    assert "app.linear/mcp" not in [r["id"] for r in out["popular"]]
+
+
+async def test_overview_passes_cursor_and_returns_next_cursor(tmp_path):
+    rig = Rig(tmp_path, mcp=SEARCH)
+    out = await rig.call("setup_overview", {"query": "notion", "cursor": "page2"})
+    assert out["next_cursor"] == "page2"
+    assert any("cursor=page2" in u for u in rig.urls)
+
+
+async def test_overview_caps_why_calls_per_reply(tmp_path):
+    many = json.dumps(
+        {
+            "servers": [
+                server(f"io.github.u{i}/notion-{i}", f"Notion {i}", f"Does {i}. More.", **remote())
+                for i in range(20)
+            ]
+        }
+    ).encode()
+    why = FakeWhy()
+    rig = Rig(tmp_path, mcp=many, why=why)
+    out = await rig.call("setup_overview", {"query": "notion"})
+    rows = [r for g in out["app_groups"] for r in g["others"]]
+    assert len(rows) == 20 and len(why.asked) == WHY_PER_REPLY
+    late = next(r for r in rows if r["id"] not in why.asked)
+    assert late["why"].startswith("Does ") and not late["why"].startswith("why:")
+
+
+async def test_overview_experts_are_tagged(tmp_path):
+    rig = Rig(tmp_path, [expert(version="2.0.0"), expert("mine", "1", None, "custom")])
+    out = await rig.call("setup_overview")
+    assert [e["official"] for e in out["experts"]] == [True, False]
+    assert [e["official"] for e in out["browse_experts"]] == [True]
+
+
+async def test_overview_reports_registry_sources(tmp_path):
+    out = await Rig(tmp_path).call("setup_overview")
+    assert out["sources"] == {
+        "apps": {"name": "MCP registry", "url": registry_module.MCP_BASE},
+        "experts": {"name": "ACP registry", "url": registry_module.ACP_URL},
+    }
+
+
+async def test_overview_registry_unavailable_keeps_installed_lists(tmp_path):
+    rig = Rig(tmp_path, apps=[{"id": "a1", "name": "N", "state": "off"}], offline=True)
+    out = await rig.call("setup_overview", {"query": "notion"})
+    assert out["app_groups"] == [] and out["popular"] == [] and out["stale"] is True
+    assert out["apps"] == [{"id": "a1", "name": "N", "state": "off"}]
+    assert out["next_cursor"] is None

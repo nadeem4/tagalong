@@ -215,13 +215,17 @@ than the brain's; TLS, pairing and multi-user.
 `find_apps(query)` (Scout, read-only) searches the MCP Registry
 (`registry.modelcontextprotocol.io`, latest versions only) and lists each server with whether it
 can run on this computer. Packages map to `npx` (npm) or `uvx` (pypi); hosted servers are
-`remote`. Results are cached for 24 h under `<TAGALONG_HOME>/cache/`. Nothing is installed or
-connected by searching.
+`remote`. Each row also says whether it is Official (the service's own reversed domain, see
+[docs/brain.md](brain.md)), who published it, where it runs, how it signs in and its licence. A
+search page is 30 entries and may carry a cursor for the next. Results are cached for 24 h under
+`<TAGALONG_HOME>/cache/`, one file per query and cursor. Nothing is installed or connected by
+searching.
 
 ## Adding an app from the registry
 
 `install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `person_only`: the Allow card names the transport, the package and version (or the host), the
-environment variable names it needs and any Node download, and neither a saved preference nor a
+environment variable names it needs and any Node download, and for a community app the check
+card facts (who made it, where it runs, sign-in, licence, "not yet audited by anyone"), and neither a saved preference nor a
 stored Auto skips it. After Allow it saves the app through the same code as `add_app`. A connected
 app is reported with its tool names in the result; a sign-in or slow start that ends later sends
 a `setup_done` event (app, name, ok, state, tools, tools_total; `tools` lists at most 30 names, `tools_total` is the full count), so Scout can carry on with the request that led

@@ -85,7 +85,10 @@ download. Once the app is connected (even after a sign-in in your browser), Scou
 what you first asked, in the same conversation; restart the brain and it forgets the request. Apps
 from the MCP registry (local `npx` or `uvx` packages, or hosted ones that sign in through your
 browser) are added the same way as apps you add by hand; required keys are never
-stored, only their names.
+stored, only their names. Searching the registry from Home lists an Official app first (the
+service's own, by its own domain) and a community app only behind a check card that says who made
+it, where it runs, how it signs in and that nobody has audited it; Scout still asks before each
+use.
 
 On a brain machine with no screen, `uv run tagalong doctor` shows what is set up and what is
 missing, and `tagalong key set`, `install <expert>`, `login <expert>` and `apps add <app>` do the

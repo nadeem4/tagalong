@@ -70,6 +70,22 @@ MCP = json.dumps(
                 "acme/cloud", remotes=[{"type": "streamable-http", "url": "https://c.test/mcp"}]
             ),
             server(
+                "com.acme/hosted",
+                remotes=[{"type": "streamable-http", "url": "https://h.acme.test/mcp"}],
+            ),
+            server(
+                "io.github.bob/pkg",
+                repository={"url": "https://github.com/bob/pkg", "source": "github"},
+                packages=[
+                    {
+                        "registryType": "npm",
+                        "identifier": "@bob/pkg",
+                        "version": "2.0.0",
+                        "environmentVariables": [{"name": "BOB_KEY", "isRequired": True}],
+                    }
+                ],
+            ),
+            server(
                 "acme/keyed",
                 remotes=[
                     {
@@ -551,3 +567,45 @@ def test_the_watch_outlasts_the_longest_connect_and_sign_in():
     params = inspect.signature(Apps.__init__).parameters
     longest = params["signin_timeout"].default + params["connect_timeout"].default
     assert SIGN_IN_WAIT_S > longest  # the watch must not give up before Apps does
+
+
+# ---- official and community facts ----
+
+
+async def test_app_card_carries_official_facts(rig):
+    card = await rig().spec.card({"id": "com.acme/hosted"})
+    assert card["official"] is True and card["community"] is False
+    assert card["runs"] == "hosted" and card["host"] == "h.acme.test"
+    assert card["publisher"] == "com.acme" and card["sign_in"] == "browser"
+    assert card["reviewed"] is None and card["licence"] == "Unknown"
+
+
+async def test_app_card_community_package_facts(rig):
+    card = await rig().spec.card({"id": "io.github.bob/pkg"})
+    assert card["official"] is False and card["community"] is True
+    assert card["runs"] == "pc" and card["host"] is None
+    assert card["licence"] == "Unknown" and card["sign_in"] == "key"
+    assert card["publisher"] == "https://github.com/bob/pkg" == card["repo"]
+    assert card["package"] == "@bob/pkg"  # the existing facts stay
+
+
+async def test_install_app_result_names_official(rig):
+    out = await rig().run("com.acme/hosted")
+    assert out["official"] is True
+
+
+async def test_install_app_for_community_stays_person_only_and_asks_with_the_card(rig):
+    r = rig(env={"BOB_KEY": "k"})
+    assert r.spec.tier is Tier.person_only
+    asks = StubAsks("deny")
+    box = RealToolbox(
+        [BrainSource([(r.spec, r.handler)])],
+        lambda: {},
+        lambda n, m: None,
+        asks,
+        engine=person_engine(),
+    )
+    with pytest.raises(RpcError):
+        await box.run(Call("c1", "install_app", {"id": "io.github.bob/pkg"}, "t1", ""))
+    assert asks.asked[0]["community"] is True and asks.locked
+    assert r.memory.list_apps() == []

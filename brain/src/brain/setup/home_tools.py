@@ -5,6 +5,7 @@
 the OK itself, so it passes `approved: true`. Progress is the latest `setup_progress` facts.
 """
 
+import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
@@ -14,16 +15,30 @@ from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
+from brain.setup.apps import app_facts
 from brain.setup.env import is_tested
 from brain.setup.facts import Machine
-from brain.setup.registry import Listing, Registry, RegistryUnavailable, build_for
+from brain.setup.grouping import group_entries
+from brain.setup.registry import (
+    ACP_URL,
+    MCP_BASE,
+    Distribution,
+    Listing,
+    Registry,
+    RegistryEntry,
+    RegistryUnavailable,
+    build_for,
+)
 from brain.setup.store import InstalledExpert
+from brain.setup.trust import POPULAR, is_official_app, is_official_expert, service_key
+from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
 InspectFn = Callable[[], Awaitable[Machine]]
 AskFn = Callable[..., Awaitable[Answer]]
 RecordFn = Callable[..., None]
 _INSTALLABLE = ("npx", "binary")
+WHY_PER_REPLY = 12  # model-written lines per search reply; bounds what one search costs
 
 
 class SetupProgress:
@@ -81,6 +96,7 @@ def home_setup_tools(
     record: RecordFn,
     inner: list[tuple[ToolSpec, Handler]],
     progress: SetupProgress,
+    why: WhyPick,
 ) -> list[tuple[ToolSpec, Handler]]:
     by_name = {spec.name: (spec, handler) for spec, handler in inner}
 
@@ -97,10 +113,25 @@ def home_setup_tools(
             dist = build_for(e, machine)
             if dist is None or e.id in skip or e.name in skip or (kinds and dist.kind not in kinds):
                 continue
-            out.append(
-                {"id": e.id, "name": e.name, "version": e.version, "description": e.description}
-            )
+            row = {"id": e.id, "name": e.name, "version": e.version, "description": e.description}
+            out.append({**row, "official": _official(e, kinds)})
         return out
+
+    def _official(e: RegistryEntry, kinds) -> bool:
+        # `kinds` is only passed for the expert list, whose ids are vendors, not namespaces.
+        return is_official_expert(e.id) if kinds else is_official_app(e.id)
+
+    def app_row(e: RegistryEntry, dist: Distribution | None) -> dict:
+        facts = app_facts(e, dist)
+        return {
+            "id": e.id,
+            "name": e.name,
+            "version": e.version,
+            "description": e.description,
+            **{k: facts[k] for k in ("official", "publisher", "runs", "host", "sign_in")},
+            "licence": facts["licence"],
+            "repo": facts["repo"],
+        }
 
     def state(expert: InstalledExpert, latest: dict[str, str]) -> str:
         if expert.source == "custom":
@@ -109,14 +140,77 @@ def home_setup_tools(
             return "needs_update"
         return "ready" if expert.logged_in is True else "needs_login"
 
+    async def popular(machine: Machine, skip: set[str]) -> list[dict]:
+        """The Popular row: seeded Official ids that resolve in the registry and connect in one
+        click here (a hosted app, or a package that needs no key)."""
+
+        async def look(entry_id: str):
+            try:
+                return await registry.mcp_servers(service_key(entry_id))
+            except RegistryUnavailable:
+                return None
+
+        out: list[dict] = []
+        for entry_id, found in zip(
+            POPULAR, await asyncio.gather(*(look(i) for i in POPULAR)), strict=True
+        ):
+            if found is None:
+                return out
+            entry = next((e for e in found.entries if e.id == entry_id), None)
+            dist = build_for(entry, machine) if entry else None
+            if entry is None or dist is None or entry.name in skip or entry.id in skip:
+                continue
+            if not is_official_app(entry.id) or dist.headers or dist.env:
+                continue
+            out.append(app_row(entry, dist))
+        return out
+
     async def overview(args: dict) -> str:
         machine = await inspect_fn()
         acp, stale_acp = await listing(registry.acp_agents)
         query = args.get("query")
         query = query.strip() if isinstance(query, str) and query.strip() else None
-        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query))
+        cursor = args.get("cursor")
+        cursor = cursor if isinstance(cursor, str) and cursor else None
+        mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query, cursor=cursor))
         latest = {e.id: e.version for e in acp.entries} if acp else {}
         installed = experts()
+        added = {a["name"] for a in apps()}
+        # Only what can be added here and is not already added; the model writes at most
+        # WHY_PER_REPLY lines per reply, the rest use the shortened registry description.
+        fresh = [
+            e
+            for e in (mcp.entries if mcp else [])
+            if build_for(e, machine) is not None and e.id not in added and e.name not in added
+        ]
+        budget = WHY_PER_REPLY
+
+        async def none() -> None:
+            return None
+
+        async def row_with_why(e) -> dict:
+            nonlocal budget
+            row = app_row(e, build_for(e, machine))
+            if not row["official"]:
+                if budget > 0:
+                    budget -= 1
+                    row["why"] = await why.line(e)
+                else:
+                    row["why"] = shorten(e.description)
+            return row
+
+        # All the lines are asked at once; each takes its turn at the cap before its first await.
+        grouped = group_entries(fresh, query)
+        heads = await asyncio.gather(
+            *(row_with_why(g.official) if g.official else none() for g in grouped)
+        )
+        rest = await asyncio.gather(
+            *(asyncio.gather(*(row_with_why(e) for e in g.others)) for g in grouped)
+        )
+        groups = [
+            {"service": g.service, "official": h, "others": list(o)}
+            for g, h, o in zip(grouped, heads, rest, strict=True)
+        ]
         return json.dumps(
             {
                 "experts": [
@@ -126,21 +220,33 @@ def home_setup_tools(
                         "version": e.version,
                         "state": state(e, latest),
                         "tested": is_tested(e.id),
+                        "official": is_official_expert(e.id),
                     }
                     for e in installed
                 ],
                 "apps": apps(),
                 "browse_experts": rows(acp, machine, {e.id for e in installed}, _INSTALLABLE),
-                "browse_apps": rows(mcp, machine, {a["name"] for a in apps()}),
+                "browse_apps": rows(mcp, machine, added),
+                "popular": [] if query or cursor else await popular(machine, added),
+                "app_groups": groups,
+                "next_cursor": mcp.next_cursor if mcp else None,
+                "sources": {
+                    "apps": {"name": "MCP registry", "url": MCP_BASE},
+                    "experts": {"name": "ACP registry", "url": ACP_URL},
+                },
                 "stale": stale_acp or stale_mcp,
                 "progress": progress.current(),
                 "failed": progress.failed(),
             }
         )
 
-    async def run_with_card(tool: str, args: dict, approved: bool) -> str:
+    async def run_with_card(
+        tool: str, args: dict, approved: bool, community_ok: bool = False
+    ) -> str:
         spec, handler = by_name[tool]
-        if not approved:
+        # An app always has its facts built: they say whether it is Official, which decides if
+        # a press is enough. An expert's card is only built when the press is not the OK.
+        if not approved or tool == "install_app":
             # The card's facts come from the same code Scout's own install uses; a failing card
             # raises its tool error and nothing is asked or installed. A `{error: token}` one is
             # answered instead, so Home words it like the tool's own refusals.
@@ -165,6 +271,14 @@ def home_setup_tools(
                     decided_by=decided,
                 )
 
+            # A press is the OK for an Official app, and "Connect anyway" on the check card is
+            # the OK for a community one; a bare `approved` never installs community code.
+            if tool == "install_app" and approved:
+                if facts.get("official") is True:
+                    return await handler(args)
+                if community_ok:
+                    log("approved")
+                    return await handler(args)
             try:
                 answer = await ask(
                     text="",
@@ -184,7 +298,8 @@ def home_setup_tools(
         return await handler(args)
 
     def parts(args: dict) -> tuple[dict, bool]:
-        return {k: v for k, v in args.items() if k != "approved"}, args.get("approved") is True
+        inner_args = {k: v for k, v in args.items() if k not in ("approved", "community_ok")}
+        return inner_args, args.get("approved") is True
 
     async def setup_expert(args: dict) -> str:
         inner_args, approved = parts(args)
@@ -202,13 +317,14 @@ def home_setup_tools(
         return await run_with_card(tool, inner_args, approved)
 
     async def setup_app(args: dict) -> str:
-        # Only the tour presses OK for an expert; an app always shows its card.
-        inner_args, _ = parts(args)
-        return await run_with_card("install_app", inner_args, False)
+        inner_args, approved = parts(args)
+        community_ok = args.get("community_ok") is True
+        return await run_with_card("install_app", inner_args, approved, community_ok)
 
-    def schema(*extra: str) -> dict[str, Any]:
+    def schema(*extra: str, flags: tuple[str, ...] = ()) -> dict[str, Any]:
         props: dict[str, Any] = {"id": {"type": "string"}, "approved": {"type": "boolean"}}
         props.update({name: {"type": "string"} for name in extra})
+        props.update({name: {"type": "boolean"} for name in flags})
         return {"type": "object", "properties": props, "required": ["id", "approved"]}
 
     home = frozenset({"home"})
@@ -219,7 +335,10 @@ def home_setup_tools(
                 "What is set up: installed experts and apps with their state, what could be "
                 "added (an optional query searches the app registry), and the running install's "
                 "progress.",
-                {"type": "object", "properties": {"query": {"type": "string"}}},
+                {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}, "cursor": {"type": "string"}},
+                },
                 home,
                 effect="read",
             ),
@@ -239,8 +358,10 @@ def home_setup_tools(
         (
             ToolSpec(
                 "setup_app",
-                "Add an app from the registry by id. Always opens the Allow card.",
-                schema("query"),
+                "Add an app from the registry by id. approved true connects an Official app "
+                "at once; a community one still opens the check card until community_ok "
+                "(Connect anyway) is true.",
+                schema("query", flags=("community_ok",)),
                 home,
                 effect="change",
                 tier=Tier.auto,  # asks for itself, so the gate adds none

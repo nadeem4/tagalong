@@ -41,6 +41,7 @@ from brain.setup.registry import (
     RegistryUnavailable,
     build_for,
 )
+from brain.setup.trust import is_official_app, publisher
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
 
@@ -102,6 +103,29 @@ def app_params(
     }
 
 
+def app_facts(entry: RegistryEntry, dist: Distribution | None) -> dict:
+    """The check-card facts for an entry: who made it, where it runs, how it signs in. Facts
+    only; Home lays them out and Scout words them."""
+    remote = dist is not None and dist.kind == "remote"
+    if dist is None:
+        sign_in = "none"
+    elif remote:
+        sign_in = "key" if dist.headers else "browser"
+    else:
+        sign_in = "key" if dist.env else "none"
+    official = is_official_app(entry.id)
+    return {
+        "official": official,
+        "publisher": publisher(entry.id, entry.repo),
+        "runs": None if dist is None else ("hosted" if remote else "pc"),
+        "host": (urlsplit(dist.url or "").hostname or None) if remote and dist else None,
+        "sign_in": sign_in,
+        "licence": entry.license or "Unknown",
+        "reviewed": None,  # nobody audits registry apps yet; Home says so
+        "repo": entry.repo,
+    }
+
+
 async def app_card(entry: RegistryEntry, home: Path, machine: Machine, get_json: GetJson) -> dict:
     """What adding this entry would do, as facts for the Allow card (and the CLI's question):
     host for a remote app; package, version and env names for a stdio one; any Node download.
@@ -109,7 +133,8 @@ async def app_card(entry: RegistryEntry, home: Path, machine: Machine, get_json:
     dist = build_for(entry, machine)
     if dist is None:
         raise NoBuild(f"{machine.os}-{machine.arch}")
-    facts: dict = {"app": entry.id, "node_download": None}
+    facts: dict = {"app": entry.id, "node_download": None, **app_facts(entry, dist)}
+    facts["community"] = not facts["official"]
     if dist.kind == "remote":
         if dist.headers:
             raise InstallError("needs_token", ",".join(dist.headers))
@@ -122,7 +147,7 @@ async def app_card(entry: RegistryEntry, home: Path, machine: Machine, get_json:
         raise InstallError("uv_missing", "uvx")
     facts.update(
         transport="stdio",
-        runs=dist.kind,
+        runner=dist.kind,
         package=dist.package,
         version=dist.version or entry.version,
         env=list(dist.env),
@@ -250,7 +275,12 @@ def app_setup_tools(
             return fail(err.kind, err.detail, **({"id": err.id} if err.id else {}))
         except AppError as err:
             return fail("refused", str(err))
-        out: dict = {"id": row.id, "transport": row.transport, "auth": row.auth}
+        out: dict = {
+            "id": row.id,
+            "transport": row.transport,
+            "auth": row.auth,
+            "official": is_official_app(entry.id),
+        }
         if row.auth == "oauth":
             open_url = (opener or partial(browser_opener, bodies))(row.id)
             if open_url is not None:
@@ -274,7 +304,8 @@ def app_setup_tools(
     spec = ToolSpec(
         "install_app",
         "Add an app from the MCP registry, by its id from find_apps (pass the same query too). "
-        "The owner sees an Allow card naming what it runs and any Node download. It reports "
+        "The owner sees an Allow card naming who made it (official or community), what it runs "
+        "and any Node download. It reports "
         "connected (with its tool names), signing_in, needs_sign_in or needs_env (names of "
         "variables to set). When it ends later (sign-in finished, slow start) a setup_done "
         "event says how.",

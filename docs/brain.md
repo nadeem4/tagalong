@@ -819,7 +819,7 @@ to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested
 browse_experts, browse_apps, stale, progress, failed}`; an optional `query` searches the app
 registry, so `browse_apps` holds that search's entries instead of the registry's unfiltered first
 page (the tour asks once per job's app), and `setup_app` takes the same `query` so install_app can find
-the entry again), where `state` is `ready`, `needs_login` or
+the entry again; an optional `cursor` asks for that search's next page), where `state` is `ready`, `needs_login` or
 `needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
 (`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
@@ -828,14 +828,49 @@ from the tool and its input; it waits as long as the gate's ask) and run that to
 on Allow. A card that refuses with an `{error: token}` (such as `already_logged_in`, when the
 check finds the login done; it saves that and sends `changed setup` first) is answered as that
 token, so Home words it; any other card failure stays a tool error. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
-`setup_app` ignores `approved` and always opens it, and the desktop only forwards `true` from the
-tour window. Each answered card is written to the approvals history like the gate does (source
+`setup_app` with `approved` true connects an Official app at once, while a community app still
+opens the check card (the Allow card with the trust facts) until `community_ok` (the Connect
+anyway press) is also true; a bare `approved` never installs community code. The desktop only
+forwards `true` from the tour window or Home's own buttons. Each answered card is written to the approvals history like the gate does (source
 `scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
 records nothing. An installed expert that needs login is logged in instead of reinstalled (a
 second press after the install: the install and the login are two presses, not one chained
 call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
 by name, as `install_app` does). Progress rides `changed {what:
 "setup"}`.
+
+`setup_overview` also answers the registry search for Home (all facts, no wording):
+`browse_experts`, `browse_apps` and the installed `experts` rows carry `official`; `popular` (only
+with no query or cursor) is the seeded Official apps (`trust.POPULAR`) that resolve in the registry
+and connect in one click here (hosted, or a package with no key); `app_groups` is
+`[{service, official: Row | null, others: [Row]}]` for the query, one group per service, Official
+head first (`setup/grouping.py`); `next_cursor` is the registry's cursor for the next page;
+`sources` names the two registries and their base URLs (`MCP_BASE`, `ACP_URL`) so Settings cannot
+drift from the code. A `Row` is `{id, name, version, description, official, publisher, runs
+("pc" or "hosted"), host, sign_in ("browser", "key" or "none"), licence, repo, why}`; `why` is on
+community rows only. Offline with no cache, `app_groups` and `popular` are empty, `stale` is true
+and the installed lists stay.
+
+Who is Official is decided by code only (`setup/trust.py`): an app whose registry namespace is the
+service's own reversed domain (exactly two labels: `com.notion`, `app.linear`) and whose name
+after the slash is only that label plus generic words (`com.notion/mcp`,
+`com.atlassian/atlassian-mcp-server`), or whose id is in the seeded `OFFICIAL_APPS`. A third party
+on its own domain for another service (`com.mcparmory/notion`, `ai.smithery/smithery-notion`),
+`io.github.*` and deeper namespaces (`com.notion.evil`) never are. A same-label
+domain on another TLD (`io.notion/mcp`) can still read Official under this rule, but groups are
+keyed by the whole namespace, so it never joins or heads `com.notion`. Community entries join a
+group by whole word (`ai` does not pull in `openai-tools`). An
+expert is Official when its id is one of eight vendors (claude-acp, codex-acp, gemini,
+github-copilot-cli, cursor, junie, goose, kimi). Grouping never marks anything Official: a
+community entry joins a service's group by name but never heads it.
+
+The "why pick it" line for a community row comes from the reader's Haiku model
+(`setup/why.py`, prompt `mind/why_pick.md`, the registry description fenced as untrusted), at most
+`WHY_PER_REPLY` (12) model calls per reply, on the reader's own daily allowance, cached per
+`<id>@<version>` in `<TAGALONG_HOME>/cache/why-registry.json`. A model that is not ready, over its
+allowance or failing falls back to the shortened description, as does a line that repeats 30 or
+more characters of the description; the line never carries markup or link targets and is at most
+100 characters. The calls and the Popular lookups run concurrently.
 
 - **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
   newline, one pair of quotes); a missing, non-string, empty, over-256-character or
@@ -1224,8 +1259,9 @@ machine was not clean, so clean-machine login was read from `authMethods` and so
 | Gemini (`gemini`)     | `npx @google/gemini-cli@0.66.0 --acp`              | It is the agent                   | 20            | yes          | browser (`oauth-personal`) via ACP `authenticate`; or `gemini-api-key`, `vertex-ai`                                                                                                                                                                                             | `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` |
 
 The registries: ACP `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`, MCP
-`https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest`. Samples of both
-are in `brain/tests/fixtures/`.
+`https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` (plus `&search=`
+and `&cursor=` when set, URL-encoded; a blank search is no search). Samples of both are in
+`brain/tests/fixtures/`.
 
 The Claude row also reads the opt-in `clientCapabilities._meta.terminal_output` (see Terminal
 output and exit codes under Jobs and tools).

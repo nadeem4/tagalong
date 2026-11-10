@@ -308,3 +308,74 @@ async def test_a_package_identifier_that_reads_as_an_option_is_dropped(tmp_path)
     listing = await registry(tmp_path, Net(mcp=body)).mcp_servers(None)
     assert [e.id for e in listing.entries] == ["x/ok"]
     assert [d.package for d in listing.entries[0].distributions] == ["@s/p-k.g", "my_pkg-2"]
+
+
+async def test_mcp_search_url_encodes_the_query(tmp_path):
+    net = Net()
+    await registry(tmp_path, net).mcp_servers("a b&c#é")
+    assert "search=a%20b%26c%23%C3%A9" in net.urls[-1] and " " not in net.urls[-1]
+
+
+async def test_mcp_blank_query_is_no_search(tmp_path):
+    net = Net()
+    reg = registry(tmp_path, net)
+    await reg.mcp_servers("   ")
+    assert "search=" not in net.urls[0]
+    await reg.mcp_servers(None)
+    assert len(net.urls) == 1  # the same request, so the cache answered
+
+
+async def test_mcp_cursor_is_sent_and_next_cursor_read(tmp_path):
+    body = json.loads(MCP)
+    body["metadata"] = {"nextCursor": "abc"}
+    net = Net(mcp=json.dumps(body).encode())
+    reg = registry(tmp_path, net)
+    first = await reg.mcp_servers(None)
+    assert first.next_cursor == "abc" and first.more is True
+    await reg.mcp_servers(None, cursor="abc")
+    assert "cursor=abc" in net.urls[-1]
+    assert len(list((tmp_path / "cache").iterdir())) == 2
+
+
+async def test_mcp_entry_reads_repo(tmp_path):
+    listing = await registry(tmp_path).mcp_servers(None)
+    by_id = {e.id: e for e in listing.entries}
+    assert by_id["academy.apexai/apex-ai-academy"].repo == (
+        "https://github.com/ApexAI-Academy/sample-agents"
+    )
+    assert by_id["ai.2kw/mcp-server"].repo == "https://2kw.ai"  # no repository: the website
+
+
+async def test_mcp_stale_cursor_page_serves_cache_when_offline(tmp_path):
+    net, clock = Net(), Clock()
+    reg = registry(tmp_path, net, clock)
+    await reg.mcp_servers("notion", cursor="abc")
+    net.offline = True
+    clock.now += 2 * 86400
+    assert (await reg.mcp_servers("notion", cursor="abc")).stale is True
+
+
+async def test_find_apps_rows_carry_the_facts(tmp_path):
+    async def inspect_fn():
+        return machine()
+
+    tools = {s.name: h for s, h in setup_tools(tmp_path, registry(tmp_path), inspect_fn)}
+    rows = {r["id"]: r for r in json.loads(await tools["find_apps"]({}))["apps"]}
+    remote = rows["academy.apexai/apex-ai-academy"]
+    assert remote["official"] is False and remote["runs"] == "hosted"
+    assert remote["publisher"] == "academy.apexai" and remote["sign_in"] == "browser"
+    assert remote["licence"] == "Unknown"
+    package = rows["ai.2kw/mcp-server"]
+    assert package["runs"] == "pc" and package["sign_in"] == "key"
+
+
+V01 = (FIX / "mcp-registry-v01.sample.json").read_bytes()
+
+
+async def test_v01_shape_is_read_and_old_versions_dropped(tmp_path):
+    net = Net(mcp=V01)
+    listing = await registry(tmp_path, net).mcp_servers("notion")
+    assert "/v0.1/servers" in net.urls[0] and "version=latest" in net.urls[0]
+    assert [e.id for e in listing.entries] == ["com.notion/mcp", "com.mcparmory/notion"]
+    assert listing.entries[0].repo == "https://github.com/makenotion/notion-mcp-server"
+    assert listing.next_cursor == "com.mcparmory/notion:1.0.0"

@@ -1452,6 +1452,21 @@ the apps in C1 to C7 use a command or a pasted key.
 - [ ] An app that does not use browser sign-in (a command, a pasted key) never shows a **Sign in**
       button.
 
+### C6a. Search the registry
+
+- [ ] Home → **Connections** → search `notion`. The Official Notion app is first with an
+      **Official** tag; community apps with Notion in their name sit under it, each with a one-line
+      reason to pick it, and an unrelated app is not in that group.
+- [ ] Search `a b&c#é`. The page answers (results or none) and does not error; a blank search shows
+      the Popular row.
+- [ ] Press **Connect** on a community app. A check card names who made it ("not the service
+      itself"), where it runs, how it signs in, the licence and "Not yet audited by anyone". Nothing
+      is added until **Connect anyway**; **Back** adds nothing.
+- [ ] Ask Scout in chat to install a community app. The same card appears and nothing is added
+      until you press Allow; no saved preference skips it.
+- [ ] Turn the network off and search. The page keeps the Connected list and says it could not
+      reach the registry (or shows the cached results marked stale).
+
 ### C7. Where things run
 
 - [ ] With the brain running, Home → **Overview** → **Where things run** shows
@@ -2254,13 +2269,13 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 Fixtures only; nothing in the app reads these yet. The samples in `brain/tests/fixtures/` are
 trimmed copies of the live responses.
 
-| Registry       | URL                                                                            | Status                           |
-| -------------- | ------------------------------------------------------------------------------ | -------------------------------- |
-| ACP Registry   | `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`         | tested (fetched, shape recorded) |
-| MCP Registry   | `https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest` | tested (fetched, shape recorded) |
-| Claude adapter | `initialize`                                                                   | tested; login untested           |
-| Codex adapter  | `initialize`                                                                   | tested; login untested           |
-| Gemini adapter | `initialize`                                                                   | tested; login untested           |
+| Registry       | URL                                                                             | Status                           |
+| -------------- | ------------------------------------------------------------------------------- | -------------------------------- |
+| ACP Registry   | `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`          | tested (fetched, shape recorded) |
+| MCP Registry   | `https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` | tested (fetched, shape recorded) |
+| Claude adapter | `initialize`                                                                    | tested; login untested           |
+| Codex adapter  | `initialize`                                                                    | tested; login untested           |
+| Gemini adapter | `initialize`                                                                    | tested; login untested           |
 
 ## Scout looks for an expert or app (setup facts and registries)
 

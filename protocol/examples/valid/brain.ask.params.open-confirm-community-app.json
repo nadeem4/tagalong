@@ -1,0 +1,30 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 8,
+    "id": "a3",
+    "state": "open",
+    "text": "",
+    "options": ["allow", "deny"],
+    "confirm": true,
+    "tool": "install_app",
+    "input": {
+      "app": "io.github.bob/notion-tools",
+      "official": false,
+      "community": true,
+      "publisher": "https://github.com/bob/notion-tools",
+      "runs": "pc",
+      "host": null,
+      "sign_in": "key",
+      "licence": "Unknown",
+      "reviewed": null,
+      "repo": "https://github.com/bob/notion-tools",
+      "transport": "stdio",
+      "package": "@bob/notion-tools",
+      "version": "1.0.0",
+      "env": ["NOTION_TOKEN"],
+      "node_download": null
+    }
+  }
+}
