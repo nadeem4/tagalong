@@ -58,7 +58,7 @@ describe('SettingsFormView', () => {
 
   it('draws every section as a home card', () => {
     const html = render();
-    expect(html.match(/<section [^>]*class="[^"]*home-card/g)).toHaveLength(6);
+    expect(html.match(/<section [^>]*class="[^"]*home-card/g)).toHaveLength(7);
   });
 
   it('shows the ask shortcut as keycaps, never CommandOrControl as text', () => {

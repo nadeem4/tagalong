@@ -336,7 +336,13 @@ describe('ConnectionsPanel', () => {
   });
 });
 
-const CLAUDE = { id: 'claude-acp', name: 'Claude Code', version: '2.0', tested: true };
+const CLAUDE = {
+  id: 'claude-acp',
+  name: 'Claude Code',
+  version: '2.0',
+  tested: true,
+  official: true,
+};
 const CODEX = {
   id: 'codex-acp',
   name: 'Codex',

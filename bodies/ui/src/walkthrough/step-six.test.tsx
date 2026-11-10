@@ -13,20 +13,41 @@ import { makeWalkthroughHost } from './test-host';
 const EMPTY: SetupOverview = {
   experts: [],
   apps: [],
-  browseExperts: [{ id: 'claude-acp', name: 'Claude Code', version: '2', description: 'd' }],
+  browseExperts: [
+    { id: 'claude-acp', name: 'Claude Code', version: '2', description: 'd', official: false },
+  ],
   browseApps: [],
+  popular: [],
+  appGroups: [],
+  nextCursor: null,
+  sources: null,
   stale: false,
   progress: null,
   failed: null,
 };
 const READY: SetupOverview = {
   ...EMPTY,
-  experts: [{ id: 'claude-acp', name: 'Claude Code', version: '2', state: 'ready', tested: true }],
+  experts: [
+    {
+      id: 'claude-acp',
+      name: 'Claude Code',
+      version: '2',
+      state: 'ready',
+      tested: true,
+      official: false,
+    },
+  ],
   browseExperts: [],
 };
 
 const EXPERT_LINE = 'For long jobs, Scout can also use an expert';
-const GMAIL = { id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'd' };
+const GMAIL = {
+  id: 'io.example/gmail',
+  name: 'Gmail',
+  version: '1',
+  description: 'd',
+  official: false,
+};
 
 /** Renders the step and opens the optional expert line, where Claude Code's setup lives. */
 async function renderOpen(host: ReturnType<typeof hostWith>) {
@@ -256,7 +277,13 @@ describe('StepSix', () => {
 
   it('asks the registry once per job app, by name, and names the button after the match', async () => {
     const host = hostWith(EMPTY, [
-      { id: 'io.example/cal', name: 'Fancy Calendar', version: '1', description: 'd' },
+      {
+        id: 'io.example/cal',
+        name: 'Fancy Calendar',
+        version: '1',
+        description: 'd',
+        official: false,
+      },
     ]);
     render(<StepSix host={host} />);
     expect(await screen.findByRole('button', { name: 'Connect Fancy Calendar' })).toBeVisible();

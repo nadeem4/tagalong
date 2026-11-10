@@ -2220,7 +2220,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
    offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **FOR LONG JOBS** card lists Claude Code with its
-   state; **Browse and add** offers more, and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+   state; the **Experts** tab's **BROWSE EXPERTS** offers more (an Official one has **Add**, a community one shows the check card first), and each button opens an Allow card first (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
@@ -2490,6 +2490,14 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 4. Switch WhatsApp on. The line reads `WhatsApp is starting.` then `WhatsApp is running.` (`The WhatsApp bridge is not built yet.` if the bridge was not built). Send `hello` from the phone: Scout answers there.
 5. Answer a permission ask by its button on the phone; ask for something long and check it arrives in a few messages; quit the desktop and message again: the brain is still running and answers.
 6. Switch it off: the line reads `WhatsApp is off.` and the bridge process is gone. Stop the brain with `cd brain && uv run tagalong stop`: no `node` bridge is left.
+
+## Home app search and the check card (C2)
+
+1. Automated: `pnpm --filter @tagalong/ui exec vitest run src/home/app-search.test.tsx src/home/app-group-row.test.tsx src/home/check-card.test.tsx src/home/experts-tab.test.tsx src/home/connections-panel.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/setup.test.ts src/renderer/src/settings`; `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (after `pnpm --filter @tagalong/desktop build`).
+2. By hand, Home > Connections > Apps: type `notion` in **Search apps**. **Expected:** after a moment one Notion group, the **Official** version first with **Connect Notion**; "Show N other versions" lists community ones, each tagged **Community**.
+3. Press **Connect** on a community version. **Expected:** the check card opens (maker, where it runs, sign-in, licence, "Not yet audited by anyone", **See its code**); **Back** closes it and connects nothing. **Connect anyway** connects it.
+4. Clear the box. **Expected:** a **Popular** row. Disconnect from the network and search: one plain line says Scout could not reach the registry.
+5. Settings > **Where Scout looks for apps** lists the two registries, read only. Home > Jobs now holds the **Read my mail for loops** card.
 
 ## Stop, restart and decline wording (F10)
 

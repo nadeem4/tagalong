@@ -13,6 +13,7 @@ const SECTIONS = [
   { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Add Scout to your browser' },
+  { id: 'registries', title: 'Where Scout looks for apps' },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];

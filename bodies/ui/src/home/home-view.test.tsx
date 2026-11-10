@@ -231,6 +231,14 @@ describe('HomeView', () => {
     expect(pages).toEqual(['connections', 'settings']);
   });
 
+  it('keeps the mail loops card off Connections and on the Jobs page for now', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Connections' }));
+    expect(screen.queryByText(/read my mail for loops/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Jobs' }));
+    expect(await screen.findByText(/read my mail for loops/i)).toBeInTheDocument();
+  });
+
   it('shows Jobs on its own page only', async () => {
     const jobs = [
       {

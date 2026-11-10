@@ -159,8 +159,9 @@ its token.`.
 
 ### Home's Connections page
 
-`bodies/ui/src/home/connections-panel.tsx` shows the brain's `list_apps` and nothing else; the brain
-owns the list and the keys.
+`bodies/ui/src/home/connections-panel.tsx` is the page shell: the header, the offline note and two
+tabs, **Apps** (`apps-tab.tsx`) and **Experts** (`experts-tab.tsx`). The brain owns the list, the
+keys and every fact shown; the page only asks and renders.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -176,14 +177,29 @@ flowchart LR
   `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
   there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
   (**Yes, remove** or **Keep**) before `remove_app`.
-- **Cards**: the list sits in a "Connected apps" card, the form in an "Add an app" card. Above
-  them a **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led by the kind
-  of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip (Ready,
-  Needs login, Update available) and a **Log in** or **Update** button; **Browse and add**
-  (`browse-list.tsx`) lists what the registries offer, for experts and for apps, with an **Add**
-  button. These go through `setup_overview`, `setup_expert` and `setup_app` (see
-  [brain.md](brain.md#home-tools)): the button opens the same Allow card Scout's install opens, and
-  progress ("Installing 40%") rides `changed setup`.
+- **Apps tab**: a **CONNECTED** card (the rows above), then **ADD AN APP** (`app-search.tsx`): a
+  search box (read 300 ms after typing stops; only the newest request writes results), a **Popular**
+  row while it is empty, results grouped per service with **Load more**, and **Add one by hand**
+  (`add-form.tsx`, the form below). In a group (`app-group-row.tsx`) the **Official** version leads
+  with its tag and a **Connect** that goes to the brain approved at once (`setup_app` with
+  `approved` true, then its own Allow card). Community versions sit behind "Show N other versions",
+  each with a **Community** tag, why it matched, its publisher and where it runs. Its **Connect**
+  opens the **check card** (`check-card.tsx`) first: who made it ("not the service itself"), runs on
+  your PC or hosted by whom, how you sign in, licence, "Not yet audited by anyone", **See its code**,
+  **Back** and **Connect anyway** (`setup_app` with `approved` and `community_ok` true). The brain
+  decides what is Official; a registry that cannot be reached shows one plain line.
+- **Experts tab**: the **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led
+  by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
+  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **BROWSE EXPERTS**
+  lists the registry's experts. An Official one has **Add**; a community one opens the same check
+  card, and **Connect anyway** sends `setup_expert` with `approved` and `community_ok`. These go
+  through `setup_overview`, `setup_expert` and `setup_app` (see [brain.md](brain.md#home-tools)): the
+  button opens the same Allow card Scout's install opens, and progress ("Installing 40%") rides
+  `changed setup`.
+- **Trust at the door**: the desktop's `ipc/setup.ts` honours `approved` for an app only from the Home
+  window, and for an expert only from the tour or from Home with `community_ok`; anything else opens
+  the Allow card.
+- **Mail loops** sit on the Jobs page for now, not here.
 - **Add an app** (one form): a command on this PC (command, args, `NAME=value` env lines, which may
   be `${NAME}`) or a web address (https only; auth none, the app's own sign-in page, or a pasted
   key in a password field). The key is sent once, as `token`, and the field is cleared as soon as

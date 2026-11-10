@@ -10,6 +10,7 @@ import { BrowserSection } from './browser-section';
 import { FilesSection } from './files-section';
 import { KeySection } from './key-section';
 import { PrivacySection } from './privacy-section';
+import { RegistriesSection } from './registries-section';
 import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
@@ -217,6 +218,7 @@ export function SettingsFormView({
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
+          <RegistriesSection />
         </main>
       </form>
     </SettingsUiContext.Provider>

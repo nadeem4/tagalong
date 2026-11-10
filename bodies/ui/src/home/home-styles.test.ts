@@ -52,6 +52,6 @@ describe('HOME_CSS', () => {
       expect(HOME_CSS).toContain(`${name} {`);
     }
     expect(HOME_CSS).toContain('.conn-tag {');
-    expect(HOME_CSS).toMatch(new RegExp(`\.conn-check \{[^}]*${t.color.warnFill}`));
+    expect(HOME_CSS).toMatch(new RegExp(`\\.conn-check \\{[^}]*${t.color.warnFill}`));
   });
 });
