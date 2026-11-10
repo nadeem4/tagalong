@@ -25,10 +25,13 @@ export function JobTabs({
   tabs,
   selected,
   onSelect,
+  label = 'Job sections',
 }: {
   tabs: TabDef[];
   selected: string;
   onSelect: (id: string) => void;
+  /** The tablist's accessible name. */
+  label?: string;
 }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const move = (event: KeyboardEvent, at: number): void => {
@@ -39,7 +42,7 @@ export function JobTabs({
     refs.current[next.id]?.focus();
   };
   return (
-    <div className="job-tabs" role="tablist" aria-label="Job sections">
+    <div className="job-tabs" role="tablist" aria-label={label}>
       {tabs.map((tab, at) => (
         <button
           key={tab.id}

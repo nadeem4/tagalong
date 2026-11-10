@@ -185,12 +185,12 @@ flowchart LR
   `approved` true, then its own Allow card). Community versions sit behind "Show N other versions",
   each with a **Community** tag, why it matched, its publisher and where it runs. Its **Connect**
   opens the **check card** (`check-card.tsx`) first: who made it ("not the service itself"), runs on
-  your PC or hosted by whom, how you sign in, licence, "Not yet audited by anyone", **See its code**,
+  your PC or hosted by whom, how you sign in, licence, "Reviewed: Not yet audited by anyone", **See its code** (only for an http(s) address, opened in your own browser),
   **Back** and **Connect anyway** (`setup_app` with `approved` and `community_ok` true). The brain
   decides what is Official; a registry that cannot be reached shows one plain line.
 - **Experts tab**: the **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led
   by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
-  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **BROWSE EXPERTS**
+  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **ADD AN EXPERT**
   lists the registry's experts. An Official one has **Add**; a community one opens the same check
   card, and **Connect anyway** sends `setup_expert` with `approved` and `community_ok`. These go
   through `setup_overview`, `setup_expert` and `setup_app` (see [brain.md](brain.md#home-tools)): the

@@ -115,6 +115,40 @@ describe('AppSearch', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/couldn’t reach the registry/i);
   });
 
+  it('a failing search keeps the earlier results and shows the plain line', async () => {
+    const bridge = createFakeHostBridge({ setupFor: () => ({ appGroups: [GROUP] }) });
+    await renderSearch(bridge);
+    await type('notion');
+    bridge.setupOverview = () => Promise.reject(new Error('boom'));
+    await type('notion2');
+    expect(screen.getByRole('button', { name: 'Connect Notion' })).toBeTruthy();
+    expect(screen.getByRole('status')).toHaveTextContent(/couldn’t reach the registry/i);
+  });
+
+  it('a failing Load more keeps the earlier results and shows the plain line', async () => {
+    const bridge = createFakeHostBridge({
+      setupFor: () => ({ appGroups: [GROUP], nextCursor: 'c2' }),
+    });
+    await renderSearch(bridge);
+    await type('app');
+    bridge.setupOverview = () => Promise.reject(new Error('boom'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Connect Notion' })).toBeTruthy();
+    expect(screen.getByRole('status')).toHaveTextContent(/couldn’t reach the registry/i);
+  });
+
+  it('a Popular community app is not shown as Official', async () => {
+    const community = row('io.github.a/notion', 'Notion', false);
+    const bridge = createFakeHostBridge({ setupFor: () => ({ popular: [community] }) });
+    await renderSearch(bridge);
+    const popular = screen.getByRole('region', { name: 'Popular' });
+    expect(popular.textContent).not.toContain('Official');
+    expect(popular.textContent).toContain('Community');
+  });
+
   it('only the newest search writes its results', async () => {
     const bridge = createFakeHostBridge();
     const fast = structuredClone(bridge.setup);

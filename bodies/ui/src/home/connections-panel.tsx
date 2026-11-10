@@ -58,10 +58,20 @@ export function ConnectionsPanel() {
   const [tab, setTab] = useState<Tab>('apps');
   // Counts finished changes so the app search reads again; not bumped on first load.
   const [refresh, setRefresh] = useState(0);
+  const [setupFailed, setSetupFailed] = useState(false);
 
   const reloadSetup = useCallback(() => {
-    // Quiet on failure: the apps list already says when the brain is away.
-    bridge.setupOverview().then(setSetup, () => setSetup(null));
+    // A failure is shown on the Experts tab as one plain line; the apps list says when the brain is away.
+    bridge.setupOverview().then(
+      (latest) => {
+        setSetupFailed(false);
+        setSetup(latest);
+      },
+      () => {
+        setSetup(null);
+        setSetupFailed(true);
+      },
+    );
   }, [bridge]);
 
   const reload = useCallback(() => {
@@ -116,7 +126,7 @@ export function ConnectionsPanel() {
   };
 
   // The call returns once the person has answered the Allow card; until then the row waits.
-  const setUp = (id: string, call: () => Promise<SetupResult>): void => {
+  const setUp = (id: string, call: () => Promise<SetupResult>, added?: string): void => {
     setAsking((now) => new Set(now).add(id));
     void act(async () => {
       try {
@@ -124,6 +134,7 @@ export function ConnectionsPanel() {
         if (error !== undefined) setStatus(SETUP_REFUSALS[error] ?? SETUP_FAILED);
         else if (state === 'waiting') setStatus({ text: LOGIN_WAITING, error: false });
         else if (state === 'logged_in') setStatus({ text: 'Already logged in.', error: false });
+        else if (added !== undefined) setStatus({ text: added, error: false });
       } finally {
         setAsking((now) => {
           const next = new Set(now);
@@ -165,7 +176,12 @@ export function ConnectionsPanel() {
           {status.text}
         </p>
       )}
-      <JobTabs tabs={TABS} selected={tab} onSelect={(id) => setTab(id as Tab)} />
+      <JobTabs
+        tabs={TABS}
+        selected={tab}
+        onSelect={(id) => setTab(id as Tab)}
+        label="Connections sections"
+      />
       <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
         {tab === 'apps' && (
           <AppsTab
@@ -180,13 +196,26 @@ export function ConnectionsPanel() {
               void act(() => bridge.removeConnection(app.id), `${app.name} removed.`)
             }
             onConnect={(row: AppRow, query) =>
-              setUp(row.id, () => bridge.setupApp(row.id, true, query || undefined))
+              setUp(
+                row.id,
+                () => bridge.setupApp(row.id, true, query || undefined),
+                `${row.name} added.`,
+              )
             }
             onConnectAnyway={(row: AppRow, query) =>
-              setUp(row.id, () => bridge.setupApp(row.id, true, query || undefined, true))
+              setUp(
+                row.id,
+                () => bridge.setupApp(row.id, true, query || undefined, true),
+                `${row.name} added.`,
+              )
             }
             onAdd={add}
           />
+        )}
+        {tab === 'experts' && setup === null && setupFailed && !offline && (
+          <p className="tg-note" role="status">
+            {SETUP_REFUSALS['registry_unavailable']?.text}
+          </p>
         )}
         {tab === 'experts' && setup !== null && (
           <ExpertsTab

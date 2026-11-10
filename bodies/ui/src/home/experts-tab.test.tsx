@@ -52,7 +52,7 @@ describe('ExpertsTab', () => {
     expect(screen.getByText('Community')).toBeTruthy();
     await click(screen.getByRole('button', { name: 'Connect Someone' }));
     expect(screen.getByRole('group', { name: 'Check before connecting' })).toBeTruthy();
-    expect(screen.getByText('Not yet audited by anyone')).toBeTruthy();
+    expect(screen.getByText('Reviewed: Not yet audited by anyone')).toBeTruthy();
     expect(bridge.setupCalls).toEqual([]);
     await click(screen.getByRole('button', { name: 'Connect anyway' }));
     expect(bridge.setupCalls).toEqual([

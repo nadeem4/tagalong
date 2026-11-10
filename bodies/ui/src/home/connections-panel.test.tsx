@@ -638,6 +638,25 @@ describe('ConnectionsPanel app search', () => {
     expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
   });
 
+  it('the Experts tab says the same plain line when the overview fails, not blank', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES], overviewFails: 'no route' });
+    await renderPanel(bridge, 'Experts');
+    expect(await screen.findByText(/couldn’t reach the registry/i)).toBeInTheDocument();
+  });
+
+  it('a successful Official connect says it was added', async () => {
+    const bridge = found();
+    await renderPanel(bridge);
+    await search('notion');
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    expect(await screen.findByText('Notion added.')).toBeInTheDocument();
+  });
+
+  it('names the tab strip for Connections', async () => {
+    await renderPanel(createFakeHostBridge({ apps: [FILES] }));
+    expect(screen.getByRole('tablist', { name: 'Connections sections' })).toBeInTheDocument();
+  });
+
   it('searches the registry again after a connect (the list moves on)', async () => {
     const bridge = found();
     await renderPanel(bridge);

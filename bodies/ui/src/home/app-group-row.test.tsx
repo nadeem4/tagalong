@@ -46,6 +46,16 @@ describe('AppGroupRow', () => {
     expect(onConnect).toHaveBeenCalledWith(HEAD);
   });
 
+  it('the Official head says who made it, where it runs and how you sign in', () => {
+    setup({
+      service: 'notion',
+      official: { ...HEAD, runs: 'hosted', host: 'mcp.notion.com', signIn: 'browser' },
+      others: [],
+    });
+    expect(screen.getByText(/Where it runs: hosted by mcp.notion.com/)).toBeTruthy();
+    expect(screen.getByText(/Sign-in: your browser/)).toBeTruthy();
+  });
+
   it('hides community versions behind a toggle and lists them with tags and why', () => {
     setup({ service: 'notion', official: HEAD, others: [A, B] });
     expect(screen.queryByText('io.github.a/notion')).toBeNull();
@@ -53,7 +63,8 @@ describe('AppGroupRow', () => {
     expect(screen.getByText('io.github.a/notion')).toBeTruthy();
     expect(screen.getAllByText('Community')).toHaveLength(2);
     expect(screen.getByText('Reads pages')).toBeTruthy();
-    expect(screen.getAllByText(/Runs on your PC/)).toHaveLength(2);
+    expect(screen.getAllByText(/Where it runs: your PC/)).toHaveLength(2);
+    expect(screen.getAllByText(/Sign-in: /).length).toBeGreaterThanOrEqual(2);
   });
 
   it('Connect on a community version opens the card, Connect anyway confirms, Back closes', () => {

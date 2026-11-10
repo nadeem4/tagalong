@@ -29,21 +29,21 @@ describe('CheckCard', () => {
   it('shows who made it, where it runs, the licence and that nobody audited it', () => {
     setup();
     expect(screen.getByText('Made by io.github.bob/x (not the service itself)')).toBeTruthy();
-    expect(screen.getByText('Runs on your PC')).toBeTruthy();
-    expect(screen.getByText('Licence MIT')).toBeTruthy();
-    expect(screen.getByText('Not yet audited by anyone')).toBeTruthy();
+    expect(screen.getByText('Where it runs: your PC')).toBeTruthy();
+    expect(screen.getByText('Licence: MIT')).toBeTruthy();
+    expect(screen.getByText('Reviewed: Not yet audited by anyone')).toBeTruthy();
     expect(screen.getByText('Scout still asks you before each use.')).toBeTruthy();
   });
 
   it('says where a hosted app runs and what the sign-in is', () => {
     setup({ ...ROW, runs: 'hosted', host: 'mcp.example.com', signIn: 'browser' });
-    expect(screen.getByText('Hosted by mcp.example.com')).toBeTruthy();
+    expect(screen.getByText('Where it runs: hosted by mcp.example.com')).toBeTruthy();
     expect(screen.getByText('Sign-in: your browser')).toBeTruthy();
   });
 
   it('shows an unknown licence as Unknown', () => {
     setup({ ...ROW, licence: '' });
-    expect(screen.getByText('Licence Unknown')).toBeTruthy();
+    expect(screen.getByText('Licence: Unknown')).toBeTruthy();
   });
 
   it('Connect anyway and Back call their handlers', () => {
@@ -66,6 +66,14 @@ describe('CheckCard', () => {
     setup({ ...ROW, repo: '' });
     expect(screen.queryByRole('link', { name: 'See its code' })).toBeNull();
   });
+
+  it.each(['javascript:alert(1)', 'file:///c:/secret', 'ftp://x.example/y', 'not a url'])(
+    'shows no code link for a repo that is not http(s): %s',
+    (repo) => {
+      setup({ ...ROW, repo });
+      expect(screen.queryByRole('link', { name: 'See its code' })).toBeNull();
+    },
+  );
 
   it('disables Connect anyway while busy', () => {
     setup(ROW, true);

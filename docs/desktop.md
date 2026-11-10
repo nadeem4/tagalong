@@ -213,7 +213,7 @@ Every window draws its toggles, selects, sliders, money field, keycaps, buttons 
 
 Every window has `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` and the one
 preload `PRELOAD_PATH` (`dist/preload/index.cjs`). `loadPage` (`windows/page.ts`) loads
-`${ELECTRON_RENDERER_URL}/<page>.html` in development and `dist/renderer/<page>.html` otherwise.
+`${ELECTRON_RENDERER_URL}/<page>.html` in development and `dist/renderer/<page>.html` otherwise. It also stops every window opening another: an http(s) link goes to the person's own browser, anything else is dropped (`windows/external-links.ts`).
 Every page sets the CSP `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'`. `script-src` is named on purpose: left to fall back on `default-src`, Chromium prints a note the log recorded as an ERROR on every launch (`renderer/csp.test.ts`).
 
 | Window | Module              | Shape                                                                                                               | Created                              | Shown                                   |

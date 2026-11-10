@@ -1,10 +1,11 @@
 /**
- * Loading a renderer page into a window, from the dev server or off disk. Contains RendererPage,
- * PRELOAD_PATH and loadPage.
+ * Loading a renderer page into a window, from the dev server or off disk, with no window
+ * opening another. Contains RendererPage, PRELOAD_PATH and loadPage.
  */
 
 import { fileURLToPath } from 'node:url';
 import type { BrowserWindow } from 'electron';
+import { denyNewWindows } from './external-links';
 
 /** One HTML entry per window, all built by the renderer half of electron-vite. */
 type RendererPage = 'avatar' | 'panel' | 'home' | 'walkthrough';
@@ -21,6 +22,7 @@ export function loadPage(
   page: RendererPage,
   query: Record<string, string> = {},
 ): void {
+  denyNewWindows(window);
   const devServer = process.env['ELECTRON_RENDERER_URL'];
   if (devServer !== undefined && devServer !== '') {
     const search = new URLSearchParams(query).toString();

@@ -100,7 +100,11 @@ export function AppSearch({
             {popular.map((app) => (
               <AppGroupRow
                 key={app.id}
-                group={{ service: app.name, official: app, others: [] }}
+                group={{
+                  service: app.name,
+                  official: app.official ? app : null,
+                  others: app.official ? [] : [app],
+                }}
                 busy={busy}
                 onConnect={(chosen) => onConnect(chosen, term)}
                 onConnectAnyway={(chosen) => onConnectAnyway(chosen, term)}

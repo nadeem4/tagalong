@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import type { AppGroup, AppRow } from '../shapes';
 import { Button } from '../controls/button';
-import { CheckCard } from './check-card';
+import { CheckCard, signInText, whereText } from './check-card';
 
 function Tile({ name }: { name: string }) {
   return (
@@ -15,6 +15,14 @@ function Tile({ name }: { name: string }) {
     </span>
   );
 }
+
+/** One line of facts for a row, worded as the check card words them. */
+const preview = (row: AppRow): string =>
+  [
+    `Made by ${row.publisher}`,
+    `Where it runs: ${whereText(row)}`,
+    `Sign-in: ${signInText(row) ?? 'none needed'}`,
+  ].join(' · ');
 
 export function AppGroupRow({
   group,
@@ -44,6 +52,7 @@ export function AppGroupRow({
             <span className="home-entry__preview" title={official.description}>
               {official.description}
             </span>
+            <span className="home-entry__preview">{preview(official)}</span>
           </span>
           <Button
             variant="primary"
@@ -80,12 +89,7 @@ export function AppGroupRow({
                     {row.id} <span className="tg-chip conn-tag">Community</span>
                   </span>
                   {row.why !== undefined && <span className="home-entry__preview">{row.why}</span>}
-                  <span className="home-entry__preview">
-                    {row.publisher} ·{' '}
-                    {row.runs === 'hosted'
-                      ? `Hosted by ${row.host ?? 'a remote server'}`
-                      : 'Runs on your PC'}
-                  </span>
+                  <span className="home-entry__preview">{preview(row)}</span>
                 </span>
                 <Button
                   variant="secondary"

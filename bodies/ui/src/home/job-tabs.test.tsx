@@ -15,7 +15,7 @@ const TABS = [
 
 function Harness() {
   const [selected, setSelected] = useState('a');
-  return <JobTabs tabs={TABS} selected={selected} onSelect={setSelected} />;
+  return <JobTabs tabs={TABS} selected={selected} onSelect={setSelected} label="Job sections" />;
 }
 
 describe('JobTabs', () => {
@@ -25,6 +25,13 @@ describe('JobTabs', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
     expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1]);
+  });
+
+  it('names the tablist from its label prop', () => {
+    render(
+      <JobTabs tabs={TABS} selected="a" onSelect={() => undefined} label="Connections sections" />,
+    );
+    expect(screen.getByRole('tablist', { name: 'Connections sections' })).toBeInTheDocument();
   });
 
   it('arrow keys move between tabs, wrapping, and Home and End jump', () => {
