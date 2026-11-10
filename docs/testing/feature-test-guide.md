@@ -1482,6 +1482,8 @@ address, which is https). The brain and the desktop run on this PC.
 - [ ] Press **Sign in**. Your browser opens the app's page and the chip reads **Waiting for the
       browser**. Approve it. The browser shows the brain's "you can close this tab" page, and the row
       becomes **Connected** with a tool count (no need to press anything).
+- [ ] Connect Notion's hosted MCP (its server sends `iss` on the redirect). The sign-in completes and
+      the row becomes **Connected**; the brain log shows no `missing iss parameter` error.
 - [ ] Ask Scout something that reads with that app: it answers from it.
 - [ ] Abandon it: press **Sign in** on another needs-sign-in app, close the browser tab without
       approving, and wait five minutes. The row goes back to **Needs sign-in** and **Sign in** works

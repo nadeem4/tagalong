@@ -608,7 +608,7 @@ class Apps:
                 raise lost()
             await slot.open_url(url)
 
-        async def wait() -> tuple[str, str]:
+        async def wait() -> tuple[str, str, str | None]:
             if slot.open_url is None or listener is None:
                 raise lost()
             return await listener.wait(self._signin_timeout)

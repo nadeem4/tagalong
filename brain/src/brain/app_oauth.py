@@ -117,7 +117,7 @@ class LoopbackCallback:
 
     def __init__(self) -> None:
         self._server: asyncio.Server | None = None
-        self._done: asyncio.Future[tuple[str, str]] | None = None
+        self._done: asyncio.Future[tuple[str, str, str | None]] | None = None
 
     async def start(self) -> str:
         self._done = asyncio.get_running_loop().create_future()
@@ -125,7 +125,7 @@ class LoopbackCallback:
         port = self._server.sockets[0].getsockname()[1]
         return f"http://127.0.0.1:{port}/callback"
 
-    async def wait(self, timeout: float = 300) -> tuple[str, str]:
+    async def wait(self, timeout: float = 300) -> tuple[str, str, str | None]:
         assert self._done is not None, "start() first"
         try:
             async with asyncio.timeout(timeout):
@@ -167,12 +167,15 @@ class LoopbackCallback:
         if self._done.done():
             return
         code, state = query.get("code", [""])[0], query.get("state", [""])[0]
+        # RFC 9207: the SDK checks it, and refuses its absence when the server advertises
+        # iss support
+        iss = query.get("iss", [None])[0]
         if "error" in query:
             self._done.set_exception(OAuthError("The sign-in was declined."))
         elif not code:
             self._done.set_exception(OAuthError("The sign-in sent back no code."))
         else:
-            self._done.set_result((code, state))
+            self._done.set_result((code, state, iss))
 
 
 def _may_open(url: str) -> bool:
@@ -201,7 +204,7 @@ def make_provider(
     storage: FileTokenStorage,
     redirect_uri: str,
     open_url: Callable[[str], Awaitable[None]],
-    wait: Callable[[], Awaitable[tuple[str, str]]],
+    wait: Callable[[], Awaitable[tuple[str, str, str | None]]],
 ) -> OAuthClientProvider:
     """The SDK's OAuth provider (PKCE, dynamic registration) with our guarded browser opener."""
 
@@ -211,8 +214,8 @@ def make_provider(
         await open_url(url)
 
     async def callback_handler() -> AuthorizationCodeResult:
-        code, state = await wait()
-        return AuthorizationCodeResult(code=code, state=state)
+        code, state, iss = await wait()
+        return AuthorizationCodeResult(code=code, state=state, iss=iss)
 
     meta = OAuthClientMetadata(
         client_name="Tagalong",
