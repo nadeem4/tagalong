@@ -30,7 +30,7 @@ from brain.setup.registry import (
     build_for,
 )
 from brain.setup.store import InstalledExpert
-from brain.setup.trust import POPULAR, is_official_app, is_official_expert, service_key
+from brain.setup.trust import POPULAR_APPS, is_official_app, is_official_expert, service_key
 from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
@@ -152,7 +152,7 @@ def home_setup_tools(
 
         out: list[dict] = []
         for entry_id, found in zip(
-            POPULAR, await asyncio.gather(*(look(i) for i in POPULAR)), strict=True
+            POPULAR_APPS, await asyncio.gather(*(look(i) for i in POPULAR_APPS)), strict=True
         ):
             if found is None:
                 return out
