@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import io
 import json
+import logging
 import os
 import sys
 import time
@@ -31,8 +32,8 @@ from brain.permission import (
 from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.expert_tools import expert_setup_tools
-from brain.setup.home_tools import SetupProgress, home_setup_tools
 from brain.setup.facts import CmdResult, Machine, NodePaths, ToolVersion
+from brain.setup.home_tools import SetupProgress, home_setup_tools
 from brain.setup.install import (
     InstallError,
     NoBuild,
@@ -538,6 +539,16 @@ async def test_install_failure_arrives_as_setup_done_facts(tmp_path, ensure):
     assert done.facts["ok"] is False and done.facts["error"] == "npm_failed"
     assert "detail" in done.facts
     assert ExpertStore(tmp_path).list() == []
+    await stop()
+
+
+async def test_install_failure_is_logged(tmp_path, ensure, caplog):
+    tools, emitted, _, stop = make_tools(tmp_path, Npm(code=1))
+    with caplog.at_level(logging.WARNING, logger="brain.setup.expert_tools"):
+        await tools["install_expert"][1]({"id": "claude-acp"})
+        await settled(emitted)
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1 and all(t in warned[0] for t in ("claude-acp", "npm_failed", "npm ERR"))
     await stop()
 
 

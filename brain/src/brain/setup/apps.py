@@ -11,6 +11,7 @@ the person's earlier request back up in the same conversation.
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 from collections.abc import Awaitable, Callable, Mapping
@@ -45,6 +46,7 @@ from brain.setup.trust import is_official_app, publisher
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
 
+log = logging.getLogger(__name__)
 InspectFn = Callable[[], Awaitable[Machine]]
 CONNECT_WAIT_S = 20.0  # how long install_app waits to report connected; a slow app stays connecting
 # How long to watch for a person finishing sign-in. Apps itself gives up after its signin_timeout
@@ -272,6 +274,7 @@ def app_setup_tools(
                 entry, home, inspect_fn, fetch, get_json, apps, memory, tokens, notify
             )
         except InstallError as err:
+            log.warning("install of app %s failed: %s: %s", entry.id, err.kind, err.detail)
             return fail(err.kind, err.detail, **({"id": err.id} if err.id else {}))
         except AppError as err:
             return fail("refused", str(err))

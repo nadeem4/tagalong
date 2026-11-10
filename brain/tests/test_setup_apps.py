@@ -6,6 +6,7 @@ real MCP server. The Allow card goes through the real Toolbox so the gate itself
 
 import asyncio
 import json
+import logging
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -441,6 +442,14 @@ async def test_remote_entry_without_a_browser_connects_and_says_so(rig):
     out = await r.run("acme/cloud")
     assert r.apps.signed_in == [] and out["status"] == "needs-sign-in"
     assert out["browser"] is False
+
+
+async def test_install_failure_is_logged(rig, monkeypatch, caplog):
+    monkeypatch.setattr("brain.setup.apps.shutil.which", lambda n: None)
+    with caplog.at_level(logging.WARNING, logger="brain.setup.apps"):
+        await rig().run("acme/pytool")
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1 and all(t in warned[0] for t in ("acme/pytool", "uv_missing", "uvx"))
 
 
 async def test_uv_missing_adds_nothing(rig, monkeypatch):
