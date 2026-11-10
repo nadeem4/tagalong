@@ -70,9 +70,6 @@ LIST_LIMIT = 20
 TITLE_FALLBACK_CHARS = 80
 
 
-RESTARTED = "brain restarted"  # the reason a restart gives a part it holds for a carry-on
-
-
 class JobError(Exception):
     """A plain message for the model or the user; never a crash. `facts` (JSON-able ids and
     numbers, no sentences) lets Scout reason about a setup problem and word it himself."""
@@ -330,17 +327,13 @@ class Jobs:
             new_job=job is None,
             apps=offered,
         )
-        if earlier_part and earlier_part.state == "blocked" and earlier_part.reason == RESTARTED:
-            # Carried on: the held part is done with, so its goal stops showing as open.
-            self._records.update_part(
-                earlier.id, earlier_part.id, state="cancelled", reason="carried on", reported=True
-            )
-            # A part added to the same job, or another part still open, keeps the job open.
-            if job != earlier.id and not any(
-                c.state in OPEN for c in self._records.work.children(earlier.id)
-            ):
-                self._records.work.transition(earlier.id, "cancelled", reason="carried on")
-                self._records.mark_reported(earlier.id)
+        if earlier and earlier_part:
+            # An explicit carry-on closes whatever a restart, shutdown or stop left behind. The
+            # implicit same-folder path only settles a part the restart held, so a genuine
+            # failure is not hidden by an unrelated new task.
+            held = earlier_part.state == "blocked"
+            if held or (continue_job and earlier_part.state in ("failed", "cancelled")):
+                self._supersede(earlier, earlier_part, job)
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         if job is None and clean.strip():
             self._records.set_title(str(started), clean.strip())
@@ -348,6 +341,26 @@ class Jobs:
             saved = self._records.get_job(str(started))
             started.title = job_title(saved) if saved else None
         return started
+
+    def _supersede(self, earlier: Job, part: JobPart, into: str | None) -> None:
+        """Carried on: a part a restart, a shutdown or a stop left behind is done with once its
+        continuation runs, so its job stops showing as open instead of lingering beside the new
+        one. A part added to the same job, or another part still open, keeps the job open.
+        Marking a failed or stopped part reported is safe only because the caller passed an
+        explicit continue_job: the person asked to carry on, so nothing is hidden from them."""
+        if part.state == "blocked":
+            self._records.update_part(
+                earlier.id, part.id, state="cancelled", reason="carried on", reported=True
+            )
+        else:
+            self._records.update_part(earlier.id, part.id, reported=True)
+        if into != earlier.id and not any(
+            c.state in OPEN for c in self._records.work.children(earlier.id)
+        ):
+            goal = self._records.work.get(earlier.id)
+            if goal is not None and goal.state in OPEN:
+                self._records.work.transition(earlier.id, "cancelled", reason="carried on")
+            self._records.mark_reported(earlier.id)
 
     def _check_apps(self, wanted: Sequence[str]) -> tuple[str, ...]:
         """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable."""

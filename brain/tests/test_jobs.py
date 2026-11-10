@@ -1378,6 +1378,43 @@ async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_
     assert "old" not in [r.id for r in rig.records.work.open_roots()]
 
 
+async def test_carrying_on_from_a_part_that_failed_on_restart_closes_the_old_job(
+    make_rig, monkeypatch
+):
+    # LT5 B1R-3: the session could not reload, so the carry-on is a fresh job; the old one must
+    # not stay open beside it.
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    monkeypatch.setattr(rig.jobs, "can_resume", lambda expert_id: False)
+    rig.jobs.startup()
+    assert rig.records.get_job("old").parts[-1].state == "failed"
+    await rig.jobs.start("two", str(rig.folder), continue_job="old")
+    assert "old" not in [r.id for r in rig.records.work.open_roots()]
+    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
+
+
+async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(make_rig):
+    # Only an explicit continue_job closes a failed or stopped job; a new task in the same folder
+    # must not hide a failure the person may not have seen.
+    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.records.update_part("old", "p1", state="failed", reason="it broke")
+    await rig.jobs.start("two", str(rig.folder))
+    assert "old" in [r.id for r in rig.records.work.open_roots()]
+    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == ["old"]
+
+
+async def test_carrying_on_from_a_job_a_shutdown_stopped_closes_the_old_job(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    first = await rig.jobs.start("one", str(rig.folder))
+    await until(lambda: rig.records.get_job(first).parts[-1].session_id)
+    await rig.jobs.shutdown()
+    await rig.jobs.start("two", str(rig.folder), continue_job=first)
+    assert first not in [r.id for r in rig.records.work.open_roots()]
+
+
 async def test_carrying_on_from_one_of_two_blocked_parts_leaves_the_other_and_the_job(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")

@@ -958,7 +958,8 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "tell_expert",
                 "Send a follow-up note to a running Claude Code job. It is read after the "
                 "current step finishes. When the job has several running parts, name one "
-                "with part (p1, p2, ...).",
+                "with part (p1, p2, ...). With several jobs running and the person not naming one, "
+                "ask which before you send.",
                 {
                     "type": "object",
                     "properties": {"job": job_id, "note": {"type": "string"}, "part": part_id},
