@@ -21,7 +21,10 @@ from brain.setup.net import GetJson, real_get_json
 from brain.setup.paths import cache_file
 
 ACP_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
-MCP_URL = "https://registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest"
+# A search page of 30 keeps the reply small. /v0/ is kept: the free v0.1 check could not be
+# run from the build sandbox, and the entry shape read below is the one this repo has a sample of.
+MCP_BASE = "https://registry.modelcontextprotocol.io/v0/servers"
+MCP_URL = f"{MCP_BASE}?limit=30&version=latest"
 TTL_S = 86400
 _LATEST = "io.modelcontextprotocol.registry/official"
 
@@ -57,6 +60,7 @@ class RegistryEntry:
     license: str
     distributions: list[Distribution]
     requires: dict[str, str] = field(default_factory=dict)
+    repo: str = ""  # where the code lives (an MCP entry); Home links it from the check card
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,8 @@ class Listing:
     entries: list[RegistryEntry]
     stale: bool
     fetched_at: str
-    more: bool = False  # the registry has further pages; only the first is read
+    more: bool = False  # the registry has further pages
+    next_cursor: str | None = None  # pass back to `mcp_servers` for the next page
 
 
 def _split(package: str, sep: str) -> tuple[str, str | None]:
@@ -126,6 +131,12 @@ def _required(items: object, safe: str) -> tuple[str, ...]:
 _PACKAGE = re.compile(r"(@[\w.~-]+/)?[A-Za-z0-9][\w.~-]*")
 
 
+def _repo(server: dict) -> str:
+    repository = server.get("repository")
+    url = repository.get("url") if isinstance(repository, dict) else None
+    return str(url or server.get("websiteUrl") or "")
+
+
 def _mcp_entry(raw: dict) -> RegistryEntry:
     server = raw["server"]
     if not (raw.get("_meta") or {}).get(_LATEST, {}).get("isLatest", True):
@@ -153,6 +164,7 @@ def _mcp_entry(raw: dict) -> RegistryEntry:
         server.get("description", ""),
         "",
         out,
+        repo=_repo(server),
     )
 
 
@@ -200,14 +212,25 @@ class Registry:
         data, stale, at = await self._load("acp", ACP_URL, refresh)
         return Listing(_parse(data.get("agents"), _acp_entry), stale, _iso(at))
 
-    async def mcp_servers(self, query: str | None, refresh: bool = False) -> Listing:
-        query = query.strip().lower() if query else None
-        url = MCP_URL + (f"&search={quote(query)}" if query else "")
-        name = f"mcp-{hashlib.sha1(query.encode()).hexdigest()[:12]}" if query else "mcp"
+    async def mcp_servers(
+        self, query: str | None, refresh: bool = False, cursor: str | None = None
+    ) -> Listing:
+        query = query.strip().lower() if query and query.strip() else None
+        url = MCP_URL
+        if query:
+            url += f"&search={quote(query, safe='')}"
+        if cursor:
+            url += f"&cursor={quote(cursor, safe='')}"
+        # Query and cursor together name the page, so each page has its own cache file.
+        key = f"{query}|{cursor}"
+        name = f"mcp-{hashlib.sha1(key.encode()).hexdigest()[:12]}" if query or cursor else "mcp"
         data, stale, at = await self._load(name, url, refresh)
         meta = data.get("metadata")
-        more = isinstance(meta, dict) and bool(meta.get("nextCursor"))
-        return Listing(_parse(data.get("servers"), _mcp_entry), stale, _iso(at), more)
+        nxt = meta.get("nextCursor") if isinstance(meta, dict) else None
+        nxt = nxt if isinstance(nxt, str) and nxt else None
+        return Listing(
+            _parse(data.get("servers"), _mcp_entry), stale, _iso(at), nxt is not None, nxt
+        )
 
     async def _load(self, name: str, url: str, refresh: bool) -> tuple[dict, bool, float]:
         path = cache_file(self._home, name)
