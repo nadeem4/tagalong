@@ -81,7 +81,7 @@ describe('NowCard', () => {
     const ask = await screen.findByText('Send the reply a1');
     const rows = document.querySelectorAll('.now__row');
     expect(rows[0]).toContainElement(ask);
-    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Allow Send the reply a1' }));
     expect(bridge.approvals).toEqual([{ approvalId: 'a1', decision: 'once' }]);
     await waitFor(() => expect(screen.queryByText('Send the reply a1')).toBeNull());
   });
@@ -92,11 +92,11 @@ describe('NowCard', () => {
     const first = (await screen.findByText('Send the reply a1')).closest(
       '.now__row',
     ) as HTMLElement;
-    fireEvent.click(within(first).getByRole('button', { name: 'Always' }));
+    fireEvent.click(within(first).getByRole('button', { name: 'Always Send the reply a1' }));
     const second = (await screen.findByText('Send the reply a2')).closest(
       '.now__row',
     ) as HTMLElement;
-    fireEvent.click(within(second).getByRole('button', { name: 'Deny' }));
+    fireEvent.click(within(second).getByRole('button', { name: 'Deny Send the reply a2' }));
     expect(bridge.approvals).toEqual([
       { approvalId: 'a1', decision: 'always' },
       { approvalId: 'a2', decision: 'deny' },
@@ -106,7 +106,7 @@ describe('NowCard', () => {
   it('has no Always when the ask does not offer it', async () => {
     open(createFakeHostBridge({ openConfirms: [confirm('a1', { options: ['allow', 'deny'] })] }));
     await screen.findByText('Send the reply a1');
-    expect(screen.queryByRole('button', { name: 'Always' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Always/ })).toBeNull();
   });
 
   it('a live ask arrives, and a dismiss removes it without an error', async () => {
@@ -145,10 +145,10 @@ describe('NowCard', () => {
       vi.advanceTimersByTime(65_000);
     });
     expect(screen.getByText('3m 10s')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Fix the login bug' }));
     expect(onOpenJob).toHaveBeenCalledWith('j1');
     const reads = vi.spyOn(bridge, 'listJobs');
-    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop Fix the login bug' }));
     expect(bridge.jobStops).toEqual(['j1']);
     await act(async () => undefined); // flush the read that follows the stop
     expect(reads).toHaveBeenCalled();
@@ -188,6 +188,56 @@ describe('NowCard', () => {
     expect(await screen.findByText('note soon')).toBeVisible();
     expect(screen.getByText('in 20 min')).toBeVisible();
     expect(screen.queryByText('note later')).toBeNull();
+  });
+
+  it('leaves out a timer whose time has passed', async () => {
+    open(createFakeHostBridge({ timers: [timer('past', -2), timer('soon', 10)] }));
+    expect(await screen.findByText('note soon')).toBeVisible();
+    expect(screen.queryByText('note past')).toBeNull();
+  });
+
+  it('names what each button acts on', async () => {
+    open(
+      createFakeHostBridge({ openConfirms: [confirm('a1')], jobs: [job({ title: 'Login fix' })] }),
+    );
+    await screen.findByText('Send the reply a1');
+    for (const verb of ['Deny', 'Always', 'Allow']) {
+      expect(screen.getByRole('button', { name: `${verb} Send the reply a1` })).toBeVisible();
+    }
+    expect(screen.getByRole('button', { name: 'Open Login fix' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Stop Login fix' })).toBeVisible();
+  });
+
+  it('says a high-risk ask cannot be undone, and a lower one does not', async () => {
+    open(
+      createFakeHostBridge({
+        openConfirms: [confirm('a1', { risk: 'high' }), confirm('a2', { risk: 'change' })],
+      }),
+    );
+    await screen.findByText('Send the reply a1');
+    expect(screen.getAllByText('Can’t be undone')).toHaveLength(1);
+  });
+
+  it('puts the ask back when the brain could not take the answer', async () => {
+    const bridge = createFakeHostBridge({ openConfirms: [confirm('a1')] });
+    vi.spyOn(bridge, 'approveTool').mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    open(bridge);
+    await screen.findByText('Send the reply a1');
+    fireEvent.click(screen.getByRole('button', { name: 'Allow Send the reply a1' }));
+    expect(await screen.findByText('Send the reply a1')).toBeVisible();
+  });
+
+  it('disables Stop while the stop is in flight', async () => {
+    const bridge = createFakeHostBridge({ jobs: [job()] });
+    let finish: () => void = () => undefined;
+    vi.spyOn(bridge, 'stopJob').mockReturnValue(new Promise<void>((r) => (finish = r)));
+    open(bridge);
+    const stop = await screen.findByRole('button', { name: 'Stop Fix the login bug' });
+    fireEvent.click(stop);
+    expect(stop).toBeDisabled();
+    finish();
+    await waitFor(() => expect(stop).not.toBeDisabled());
   });
 
   it('says nothing is running when nothing is live', async () => {

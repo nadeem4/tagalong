@@ -280,3 +280,39 @@ def test_cancel_ends_the_row_and_marks_reported():
     assert (row.state, row.end_reason) == ("cancelled", "cancelled by the person")
     assert row.reported_at is not None and events == []
     assert timers.cancel(t.id, "again") is False
+
+
+def _noting():
+    notes, starts = [], []
+    clock = Clock()
+    work = WorkStore(Memory(":memory:").db, clock)
+    timers = Timers(
+        work,
+        lambda event, *, on_start=None: starts.append(on_start),
+        clock,
+        notify=lambda k, d: notes.append((k, d)),
+    )
+    return timers, work, notes, starts
+
+
+def test_firing_a_one_off_tells_home_and_so_does_its_wake_starting():
+    timers, work, notes, starts = _noting()
+    add_timer(work, "x", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    assert notes == [("changed", {"what": "timers"})]  # now pending
+    starts[0]()  # Scout's turn starts: the row is done
+    assert notes == [("changed", {"what": "timers"})] * 2
+
+
+def test_a_repeating_timer_advancing_tells_home():
+    timers, work, notes, _starts = _noting()
+    add_timer(work, "x", T0 - timedelta(seconds=1), repeat_s=600)
+    timers.fire_due()
+    assert notes == [("changed", {"what": "timers"})]
+
+
+def test_nothing_due_tells_nobody():
+    timers, work, notes, _starts = _noting()
+    add_timer(work, "x", T0 + timedelta(hours=1))
+    timers.fire_due()
+    assert notes == []

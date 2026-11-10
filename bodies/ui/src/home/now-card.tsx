@@ -31,6 +31,7 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
   const [timers, setTimers] = useState<TimerRow[]>([]);
   const [settled, setSettled] = useState<ReadonlySet<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
+  const [stopping, setStopping] = useState<ReadonlySet<string>>(new Set());
   // An ask answered elsewhere before the first read came back must not appear from it.
   const dismissed = useRef(new Set<string>());
 
@@ -108,20 +109,36 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
   const answer = (ask: ConnectorConfirmParams, decision: 'once' | 'always' | 'deny'): void => {
     dismissed.current.add(ask.approvalId);
     setAsks((current) => current.filter((a) => a.approvalId !== ask.approvalId));
-    void bridge
-      .approveTool(ask.approvalId, decision)
-      .catch((error: unknown) => console.error('could not answer the ask', error));
+    void bridge.approveTool(ask.approvalId, decision).catch((error: unknown) => {
+      console.error('could not answer the ask', error);
+      // The brain never heard the answer: the ask is still open there, so show it again.
+      dismissed.current.delete(ask.approvalId);
+      setAsks((current) =>
+        current.some((a) => a.approvalId === ask.approvalId) ? current : [ask, ...current],
+      );
+    });
   };
   const stop = (id: string): void => {
+    setStopping((current) => new Set(current).add(id));
     void bridge
       .stopJob(id)
       .catch((error: unknown) => console.error('could not stop the job', error))
-      .then(readJobs); // either way: a refusal usually means it had just ended
+      .then(readJobs) // either way: a refusal usually means it had just ended
+      .finally(() =>
+        setStopping((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        }),
+      );
   };
 
   const waiting = asks.filter(isGate);
   const reading = apps.filter((app) => app.on && app.unreadSince === undefined);
-  const soon = timers.filter((t) => new Date(t.nextAt).getTime() - now <= SOON_S * 1000);
+  const soon = timers.filter((t) => {
+    const left = new Date(t.nextAt).getTime() - now;
+    return left > 0 && left <= SOON_S * 1000; // one that has passed is firing, not "in 0 min"
+  });
   const empty = waiting.length + jobs.length + reading.length + soon.length === 0;
 
   return (
@@ -131,17 +148,30 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
         <div key={ask.approvalId} className="now__row now__ask">
           <span className="now__body">
             <span className="now__title">{ask.summary}</span>
+            {ask.risk === 'high' && <span className="now__meta">Can’t be undone</span>}
           </span>
           <span className="now__actions">
-            <Button variant="quiet" onClick={() => answer(ask, 'deny')}>
+            <Button
+              variant="quiet"
+              aria-label={`Deny ${ask.summary}`}
+              onClick={() => answer(ask, 'deny')}
+            >
               Deny
             </Button>
             {ask.options?.includes('always') === true && (
-              <Button variant="secondary" onClick={() => answer(ask, 'always')}>
+              <Button
+                variant="secondary"
+                aria-label={`Always ${ask.summary}`}
+                onClick={() => answer(ask, 'always')}
+              >
                 Always
               </Button>
             )}
-            <Button variant="primary" onClick={() => answer(ask, 'once')}>
+            <Button
+              variant="primary"
+              aria-label={`Allow ${ask.summary}`}
+              onClick={() => answer(ask, 'once')}
+            >
               Allow
             </Button>
           </span>
@@ -157,10 +187,19 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
             </span>
             <span className="now__actions">
               <span className="home-time">{elapsed(job.startedAt, now)}</span>
-              <Button variant="secondary" onClick={() => onOpenJob(job.id)}>
+              <Button
+                variant="secondary"
+                aria-label={`Open ${job.title ?? job.task}`}
+                onClick={() => onOpenJob(job.id)}
+              >
                 Open
               </Button>
-              <Button variant="secondary" onClick={() => stop(job.id)}>
+              <Button
+                variant="secondary"
+                aria-label={`Stop ${job.title ?? job.task}`}
+                disabled={stopping.has(job.id)}
+                onClick={() => stop(job.id)}
+              >
                 Stop
               </Button>
             </span>

@@ -86,8 +86,19 @@ export function LoopsPanel() {
   }, [bridge, refresh]);
 
   // Read again either way: on a refusal the card then shows what the brain really holds.
-  const run = (call: Promise<void>): void => {
-    void call.catch((error: unknown) => console.error('loops call failed', error)).then(refresh);
+  const run = (call: Promise<void>): Promise<void> =>
+    call.catch((error: unknown) => console.error('loops call failed', error)).then(refresh);
+  // Done and Later wait for their call, so a second press cannot repeat it on the same loop.
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const runRow = (id: string, call: Promise<void>): void => {
+    setBusy((current) => new Set(current).add(id));
+    void run(call).finally(() =>
+      setBusy((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      }),
+    );
   };
 
   if (state === null) {
@@ -113,7 +124,9 @@ export function LoopsPanel() {
         only reads, never sends or changes your mail. Off until you turn it on.
       </p>
       <p>Your mail goes to Anthropic to be read. The loops it finds stay on this computer.</p>
-      {state.apps.length === 0 && <p>Connect Gmail above and the switch appears here.</p>}
+      {state.apps.length === 0 && (
+        <p>Connect Gmail on the Connections page and the switch appears here.</p>
+      )}
       {state.apps.map((app) => (
         <div key={app.id} className="loops-app">
           <div className="loops-app__row">
@@ -155,14 +168,16 @@ export function LoopsPanel() {
                     <Button
                       variant="secondary"
                       aria-label={`Done ${loop.title}`}
-                      onClick={() => run(bridge.loopDone(loop.id))}
+                      disabled={busy.has(loop.id)}
+                      onClick={() => runRow(loop.id, bridge.loopDone(loop.id))}
                     >
                       Done
                     </Button>
                     <Button
                       variant="secondary"
                       aria-label={`Later ${loop.title}`}
-                      onClick={() => run(bridge.loopLater(loop.id, tomorrowNine()))}
+                      disabled={busy.has(loop.id)}
+                      onClick={() => runRow(loop.id, bridge.loopLater(loop.id, tomorrowNine()))}
                     >
                       Later
                     </Button>

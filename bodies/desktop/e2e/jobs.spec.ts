@@ -1,5 +1,5 @@
 /**
- * Claude Code jobs on the fake brain: Home's Jobs page lists a job and Stop reaches
+ * Claude Code jobs on the fake brain: Home's Tasks page lists a job and Stop reaches
  * `stop_job`; a hand-off opens a mode ask, a relayed permission ask and a question with no turn
  * running, each answered from its card; and a `changed: jobs` from the brain refreshes the list.
  */

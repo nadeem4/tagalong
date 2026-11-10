@@ -3,6 +3,7 @@
  * in local time, "every N min" when it repeats) and a Cancel. The brain owns the timers; the
  * page above reads them and passes them in. Contains TimersTab.
  */
+import { useState } from 'react';
 import type { TimerRow } from '../shapes';
 import { Button } from '../controls/button';
 
@@ -19,8 +20,19 @@ export function TimersTab({
   onCancel,
 }: {
   timers: TimerRow[];
-  onCancel: (id: string) => void;
+  onCancel: (id: string) => void | Promise<void>;
 }) {
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  const cancel = (id: string): void => {
+    setBusy((current) => new Set(current).add(id));
+    void Promise.resolve(onCancel(id)).finally(() =>
+      setBusy((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      }),
+    );
+  };
   return (
     <section className="home-card" aria-label="Timers">
       <h2 className="home-card__label">TIMERS</h2>
@@ -39,13 +51,17 @@ export function TimersTab({
                   {timer.repeatMinutes !== null && <span>every {timer.repeatMinutes} min</span>}
                 </span>
               </span>
-              <Button
-                variant="quiet"
-                aria-label={`Cancel ${timer.note}`}
-                onClick={() => onCancel(timer.id)}
-              >
-                Cancel
-              </Button>
+              {/* A fired timer Scout has not heard yet cannot be cancelled: it is already on its way. */}
+              {!timer.pending && (
+                <Button
+                  variant="quiet"
+                  aria-label={`Cancel ${timer.note}`}
+                  disabled={busy.has(timer.id)}
+                  onClick={() => cancel(timer.id)}
+                >
+                  Cancel
+                </Button>
+              )}
             </li>
           ))}
         </ul>

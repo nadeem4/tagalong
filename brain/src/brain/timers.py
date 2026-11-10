@@ -59,6 +59,7 @@ class Timers:
 
     def fire_due(self) -> None:
         now = self._now()
+        fired = False
         for row in self._work.due(KINDS):
             if is_return_wake(row):
                 continue
@@ -75,8 +76,11 @@ class Timers:
             except TransitionRefused:
                 continue  # cancelled or paused as it came due: already handled
             self._emit_one(row, repeat_s)
+            fired = True
         self._rerun_due()
         self._arm()
+        if fired:
+            self._tell()  # a one-off is now pending, a repeating one moved: the page is stale
 
     def _rerun_due(self) -> None:
         if self._rerun is None:
@@ -105,6 +109,9 @@ class Timers:
 
     def changed(self) -> None:
         self._arm()
+        self._tell()
+
+    def _tell(self) -> None:
         if self._notify is not None:
             self._notify("changed", {"what": "timers"})
 
@@ -141,6 +148,7 @@ class Timers:
         except TransitionRefused:
             return  # cancelled while the wake waited
         self._work.mark_reported(id)  # Scout is hearing it now
+        self._tell()
 
     def _arm(self) -> None:
         if self._handle is not None:

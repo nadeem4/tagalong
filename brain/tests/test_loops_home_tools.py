@@ -232,6 +232,16 @@ async def test_home_loop_later_refuses_past_or_naive_time(rig, until):
     assert err.value.code == ErrorCode.invalid_params
 
 
+async def test_home_loop_done_and_later_on_a_closed_loop_are_invalid_params(rig):
+    lp = rig.add()
+    await rig.call("loop_done", id=lp.id)
+    later = {"until": (T0 + timedelta(days=1)).isoformat()}
+    for name, extra in [("loop_done", {}), ("loop_later", later)]:
+        with pytest.raises(RpcError) as err:
+            await rig.call(name, id=lp.id, **extra)
+        assert err.value.code == ErrorCode.invalid_params
+
+
 async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
     later = {"until": "2026-11-05T09:00:00+00:00"}
     for name, extra in [("loop_done", {}), ("loop_later", later)]:

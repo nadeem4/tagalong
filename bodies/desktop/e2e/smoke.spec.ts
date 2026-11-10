@@ -338,7 +338,7 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   // One companion and six pages, all fed by the brain.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers', 'Settings'],
+    ['Overview', 'TasksNew', 'Connections', 'Approvals', 'What Scout remembers', 'Settings'],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
@@ -411,11 +411,11 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   const edges: number[] = [];
   // Each tab waits for its seeded long content, then must not scroll sideways.
   const seeded: Record<string, string> = {
-    Jobs: 'Fix the build and then keep going',
+    Tasks: 'Fix the build and then keep going',
     Connections: 'Wiki of everything',
     'What Scout remembers': 'supercalifragilistic',
   };
-  for (const tab of ['Overview', 'Jobs', 'Connections', 'Approvals', 'What Scout remembers']) {
+  for (const tab of ['Overview', 'Tasks', 'Connections', 'Approvals', 'What Scout remembers']) {
     await nav.getByRole('button', { name: tab, exact: true }).click();
     if (seeded[tab] !== undefined) {
       await expect(home.getByText(seeded[tab]).first()).toBeVisible({ timeout: 15_000 });

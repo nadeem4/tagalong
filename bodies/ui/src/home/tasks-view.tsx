@@ -59,12 +59,11 @@ export function TasksView() {
     });
   }, [bridge, readJobs, readHeld, readTimers]);
 
-  const cancelTimer = (id: string): void => {
-    void bridge
+  const cancelTimer = (id: string): Promise<void> =>
+    bridge
       .cancelTimer(id)
       .catch((error: unknown) => console.error('could not cancel the timer', error))
       .then(readTimers); // either way: on a refusal the tab shows what the brain holds
-  };
 
   const label = (name: string, count: number | null): string =>
     count === null ? name : `${name} (${count})`;

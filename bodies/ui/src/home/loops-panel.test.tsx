@@ -191,6 +191,23 @@ describe('LoopsPanel', () => {
     await waitFor(() => expect(bridge.loopCalls).toEqual(['done a1']));
   });
 
+  it('points to the Connections page when no mail app is connected', async () => {
+    open({ apps: [] });
+    expect(await screen.findByText(/on the Connections page/)).toBeInTheDocument();
+  });
+
+  it('Done and Later wait for the call to finish, so a second press cannot repeat it', async () => {
+    const bridge = open({ loops: [LOOP] });
+    let finish: () => void = () => undefined;
+    vi.spyOn(bridge, 'loopDone').mockReturnValue(new Promise<void>((r) => (finish = r)));
+    const done = await screen.findByRole('button', { name: 'Done Send Priya the Q4 deck' });
+    fireEvent.click(done);
+    expect(done).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Later Send Priya the Q4 deck' })).toBeDisabled();
+    finish();
+    await waitFor(() => expect(done).not.toBeDisabled());
+  });
+
   it('Later sends tomorrow at nine, local, with the offset', async () => {
     vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 10, 10, 15, 0) });
     const bridge = open({ loops: [LOOP] });

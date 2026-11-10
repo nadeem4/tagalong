@@ -325,7 +325,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
    does not follow for the same job. See "Scout speaks first" below.
 10. **Action:** start a job whose result needs no comment.
     **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
-11. **Action:** with a long job running, open Home → Jobs.
+11. **Action:** with a long job running, open Home → Tasks → Jobs.
     **Expected:** the page lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens Scout's result (the expert's report if Scout wrote none) as formatted text, in full (a result over 1,000 characters is not cut) and with Markdown tables drawn as tables (HTML in it shows as text; a result over 100,000 characters shows as plain text).
@@ -337,14 +337,14 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Parts (SP2):** a job holds one part per expert hand-off. Automated: `test_jobs.py` (one part
     per start, separate asks per part, `tell` needs a part when several run, `stop` stops all),
     `test_job_records.py` (parts as expert_call rows), `test_job_activity.py` (one ordered log,
-    expert tags in the wake summary). **Manual check:** open Home → Jobs on a database from before
+    expert tags in the wake summary). **Manual check:** open Home → Tasks → Jobs on a database from before
     this change: an old job opens as one part, with its steps, result and times intact.
     **Jobs as work rows (S2a):** jobs and parts are now `work` rows. Automated:
     `test_migrate_jobs.py` (a messy old database upgrades with every job, part, report, session
     and watch list kept), `test_job_records.py` (the `Job` and `JobPart` shapes, state words,
     long reports in `tool_outputs`, a part blocked by a restart is news), `test_tools.py` (`list_jobs` and `close_job`
     keep their shapes; `close_job` takes `outcome`). **Manual check:** upgrade a database that
-    has finished, failed and stopped jobs; Home → Jobs shows the same list, states and results,
+    has finished, failed and stopped jobs; Home → Tasks → Jobs shows the same list, states and results,
     and a follow-up on an old job still continues its session.
     **Job steps, resume and work_status (S2b):** a job's step log is now the `job_steps` table.
     Automated: `test_work_steps.py` (the log's paging and caps, unchanged), `test_job_activity.py`
@@ -352,7 +352,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     (a restart blocks a part that saved a session, fails one that cannot reload, ends its log once
     and wakes Scout once), `test_work_status.py` (the three ways to read `work_status`),
     `test_tools.py` (`list_jobs` is Home only; `recall` finds work by title).
-    **Manual check:** start a job, quit the brain, start it again. **Expected:** Home → Jobs still
+    **Manual check:** start a job, quit the brain, start it again. **Expected:** Home → Tasks → Jobs still
     pages the job's steps and the last one reads "stopped"; Scout says the step was stopped by the
     restart and offers to carry on; asking "what is going on?" gets an answer from `work_status`.
     **Retry and give-ups (S3b):** a Scout tool call made while working for a job is now a step
@@ -365,7 +365,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     up it is woken once (`work_failed`), says plainly which step failed and why, and offers retry,
     skip or stop the job; the job stays held until the person answers.
     **Watch a job (manual):** hand a job to Claude Code that runs a command (for example "run the
-    tests in this folder"), then in Home → Jobs press **Watch** on its row. **Expected:** a dark
+    tests in this folder"), then in Home → Tasks → Jobs press **Watch** on its row. **Expected:** a dark
     page titled with the task, a state chip, an elapsed time and **Stop**. Steps appear as it
     works: `$ command` lines with a spinner that turns into a check (or a cross if it failed),
     output beneath in muted text with colours kept, edits in blue, `# ` lines for what Claude Code
@@ -435,7 +435,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
     "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
     naming one.
-    **Expected:** each named expert runs the job and Home → Jobs shows its id as the agent; Scout
+    **Expected:** each named expert runs the job and Home → Tasks → Jobs shows its id as the agent; Scout
     lists the experts with login state and whether each is tested (Claude, Codex and Gemini are;
     any other registry expert is "untested"); an unnamed hand-off with two installed makes Scout
     ask which. With no expert installed, Scout says so and offers to set one up. Automated tests
@@ -443,7 +443,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 
 16. **Action:** after a job on an expert has finished, ask Scout for a follow-up ("now also add
     tests") in the same folder, within five minutes and again after more than five.
-    **Expected:** Scout continues the earlier job: Home → Jobs shows the new job under the same
+    **Expected:** Scout continues the earlier job: Home → Tasks → Jobs shows the new job under the same
     expert and folder, and Scout says whether the session was continued or started fresh (and
     why: the expert cannot reopen sessions, or the session could not be loaded). Within the idle
     period the same adapter process serves it. A plain second hand-off in that folder (no

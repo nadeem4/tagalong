@@ -67,7 +67,7 @@ its result.
   those need no name. The bubble offers the key to reply.
 - The bubble's header has Always listening (off by default) and Seeing (sight on or paused);
   Settings has both, plus who speaks and who listens.
-- Home, the control centre: Overview (everything Scout is doing for you), Jobs, Connections,
+- Home, the control centre: Overview (everything Scout is doing for you), Tasks, Connections,
   Approvals, what Scout remembers, Settings.
 - Settings: privacy, voice, shortcuts and the browser extension, each with a short line visible and the longer story behind ⓘ.
 - The Chrome extension is a tools-only body, with no display: Scout can see and manage your tabs when
@@ -91,7 +91,7 @@ its result.
   your mailbox. There is no inbox screen.
 - The first-run tour and Home speak of jobs, not products: the tour's step six lists everyday jobs with a one-click Connect for the app each needs, and "Claude Code" shows only behind the optional line "For long jobs, Scout can also use an expert". Home lists experts by the kind of job, the product underneath.
 - Experts: Claude Code is the first kind, reached over ACP on the user's own Claude login. Scout
-  hands it a task for a folder on this computer; Home's Jobs page shows each one. When the task
+  hands it a task for a folder on this computer; Home's Tasks page shows each one. When the task
   needs a connected app, the Send card lists the apps; you can remove any, and Send is your
   approval for the rest. The expert reaches only those, through Tagalong.
 - Built-in blind spots (password managers, sign-in prompts, secret files, private windows,

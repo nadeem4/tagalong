@@ -94,7 +94,7 @@ test('Now shows a waiting ask, a running job and a timer; the tabs count and Can
   await expect(home.getByRole('tab', { name: 'Jobs (2)' })).toBeVisible({ timeout: 15_000 });
   await expect(home.getByRole('tab', { name: 'Timers (2)' })).toBeVisible({ timeout: 15_000 });
 
-  await now.getByRole('button', { name: 'Allow', exact: true }).click();
+  await now.getByRole('button', { name: 'Allow I will move the Notes window.' }).click();
   await expect
     .poll(() => brain.answers, { timeout: 15_000 })
     .toEqual([{ ask: 'a1', option: 'allow' }]);
