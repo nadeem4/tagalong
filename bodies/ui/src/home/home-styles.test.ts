@@ -46,4 +46,12 @@ describe('HOME_CSS', () => {
       /prefers-reduced-motion: reduce\)\s*\{[^}]*\.job-log__glyph--running[^}]*animation: none/,
     );
   });
+
+  it('styles the app search group, tags and check card from tokens', () => {
+    for (const name of ['.conn-group', '.conn-tag--official', '.conn-check']) {
+      expect(HOME_CSS).toContain(`${name} {`);
+    }
+    expect(HOME_CSS).toContain('.conn-tag {');
+    expect(HOME_CSS).toMatch(new RegExp(`\.conn-check \{[^}]*${t.color.warnFill}`));
+  });
 });

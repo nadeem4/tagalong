@@ -124,6 +124,18 @@ export const HOME_CSS = `
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__form-host.tg-panel { padding: 0; background: transparent; }
+/* App search: a service group, its tags and the check card before a community app. */
+.conn-group { display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine}; }
+.conn-group__others { padding-left: ${t.space.xl}px; }
+.conn-tag { margin-left: ${t.space.sm}px; }
+.conn-tag--official { background: ${t.color.okFill}; color: ${t.color.okInk}; }
+.conn-check {
+  display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px;
+  border-radius: ${t.radius.row}px; background: ${t.color.warnFill}; color: ${t.color.warnInk};
+}
+.conn-check__facts { margin: 0; padding-left: ${t.space.xl}px; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.conn-check .tg-note { color: ${t.color.warnInk}; }
+.conn-check__link { color: ${t.color.warnInk}; margin-right: auto; text-decoration: underline; }
 .perm-group { margin-top: ${t.space.xl}px; }
 .perm-group__title { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; letter-spacing: ${t.letterSpacing.pixel}px; text-transform: uppercase; color: ${t.color.panelMuted}; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
