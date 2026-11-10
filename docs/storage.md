@@ -679,6 +679,14 @@ activity, tool outputs, loops and memories, and as a filter on every log handler
 turn is not masked, only what reaches disk or logs. Preference sentences and job `task` text are
 not covered.
 
+## Registry caches
+
+Not in `tagalong.db`: plain JSON files under `<TAGALONG_HOME>/cache/`, written atomically and safe
+to delete. `acp-registry.json` and `mcp-registry.json` hold the registry pages (24 h; served
+stale when offline); a search or a later page is `mcp-<hash>-registry.json`, the hash being of the
+query and cursor together, so each page has its own file. `why-registry.json` maps
+`<id>@<version>` to the one-line "why pick it" the model wrote for a community app.
+
 ## In memory only
 
 These are lost when the brain restarts.

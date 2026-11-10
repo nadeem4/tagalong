@@ -135,6 +135,7 @@ The brain hears and speaks; a body only handles sound. Audio rides in the same J
 ## Asks and confirm
 
 - A tool with `confirm: true` asks until the person unlocks it on Home or a preference names it: code guards, not the model. The brain pauses the call and sends an `ask` with `confirm: true`, `tool`, `input` and options `["allow", "deny"]`, or `["allow", "always", "deny"]` when the tool is not locked. Bodies show the options they get as their own buttons. `always` means allow this call, and the brain saves `auto` for that tool so later calls run without asking; it is never offered for a locked tool.
+- A tool's `input` may carry facts for a body to lay out as a card (for example an app's `official`, `community`, `publisher`, `runs`, `sign_in`, `licence` and `reviewed`; see `examples/valid/brain.ask.params.open-confirm-community-app.json`). No field is required and unknown ones are ignored, so this is not a schema change.
 - The ask's `text` is the model's own words from the step that made the call (for example "I'll delete these 3 old logs"), with no extra model call and no template. If the model wrote nothing, `text` is empty and the body shows the tool and its input.
 - `deny` fails the call with `denied`. A Scout ask with nobody to answer stays open (a body that joins is sent it again) and the call returns a waiting line; a job's ask waits with its job. The model is told either way.
 - Every other ask is the model's own: it words the question and chooses the options.
