@@ -1,8 +1,8 @@
 /** Tests for ConnectionsPanel: the brain's apps, Add an app, switch, Restart, Remove. */
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppInfo, SetupOverview, SetupResult } from '../shapes';
+import type { AppGroup, AppInfo, AppRow, SetupOverview, SetupResult } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
@@ -32,13 +32,14 @@ const WIKI: AppInfo = {
   tools: [],
 };
 
-async function renderPanel(bridge: FakeHostBridge) {
+async function renderPanel(bridge: FakeHostBridge, tab: 'Apps' | 'Experts' = 'Apps') {
   render(
     <HostBridgeProvider bridge={bridge}>
       <ConnectionsPanel />
     </HostBridgeProvider>,
   );
   await screen.findByRole('heading', { name: 'Connections' });
+  if (tab === 'Experts') fireEvent.click(screen.getByRole('tab', { name: 'Experts' }));
 }
 
 const click = async (element: HTMLElement) => {
@@ -96,19 +97,33 @@ describe('ConnectionsPanel', () => {
     expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
   });
 
-  it('groups the list and the add form in two labelled cards', async () => {
+  it('opens on the Apps tab: Connected, then Add an app', async () => {
     await renderPanel(createFakeHostBridge());
     expect(
       screen.getByText('The apps Scout can use for you. Turn one off to stop Scout using it.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'CONNECTED APPS' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'ADD AN APP' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Apps' })).toHaveAttribute('aria-selected', 'true');
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(['CONNECTED', 'ADD AN APP']);
+  });
+
+  it('Add one by hand opens the form, and the old summary is gone', async () => {
+    await renderPanel(createFakeHostBridge());
+    expect(screen.queryByLabelText('Address')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
+    expect(screen.getByLabelText('Address')).toBeInTheDocument();
+    expect(document.querySelector('summary')).toBeNull();
+  });
+
+  it('has no loops panel on Connections', async () => {
+    await renderPanel(createFakeHostBridge());
+    expect(screen.queryByText(/READ MY MAIL FOR LOOPS/i)).toBeNull();
   });
 
   it('offers sign-in at once after adding an app that signs in with its own page', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'https://wiki.example/mcp' },
@@ -129,7 +144,7 @@ describe('ConnectionsPanel', () => {
   it('adds a local command with its arguments and environment lines', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
     fireEvent.click(screen.getByLabelText('A command on this PC'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Files' } });
     fireEvent.change(screen.getByLabelText('Command'), {
@@ -156,7 +171,7 @@ describe('ConnectionsPanel', () => {
   it('refuses a web address that is not https', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'http://wiki.example' },
@@ -169,7 +184,7 @@ describe('ConnectionsPanel', () => {
   it('sends a pasted key once, then clears the field', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'https://wiki.example/mcp' },
@@ -302,7 +317,7 @@ describe('ConnectionsPanel', () => {
         ),
       );
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add one by hand' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'https://wiki.example/mcp' },
@@ -322,18 +337,26 @@ describe('ConnectionsPanel', () => {
 });
 
 const CLAUDE = { id: 'claude-acp', name: 'Claude Code', version: '2.0', tested: true };
-const CODEX = { id: 'codex-acp', name: 'Codex', version: '1.0', description: 'OpenAI’s agent' };
-const NOTES = { id: 'acme/notes', name: 'notes', version: '1', description: 'Take notes' };
+const CODEX = {
+  id: 'codex-acp',
+  name: 'Codex',
+  version: '1.0',
+  description: 'OpenAI’s agent',
+  official: true,
+};
 
 function withSetup(setup: Partial<SetupOverview>, setupResult?: SetupResult) {
   return createFakeHostBridge({ apps: [FILES], setup, ...(setupResult && { setupResult }) });
 }
 
 describe('ConnectionsPanel groups', () => {
-  it('shows the Apps and Experts groups', async () => {
+  it('shows the apps on the Apps tab and the experts on the Experts tab', async () => {
     await renderPanel(withSetup({ experts: [{ ...CLAUDE, state: 'ready' }] }));
     expect(screen.getByRole('region', { name: 'Connected apps' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'For long jobs' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Experts' }));
     expect(screen.getByRole('region', { name: 'For long jobs' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Connected apps' })).toBeNull();
   });
 
   it('an expert row leads with the kind of job and keeps the product underneath', async () => {
@@ -344,6 +367,7 @@ describe('ConnectionsPanel groups', () => {
           { ...CLAUDE, id: 'other', name: 'Beta', state: 'ready' },
         ],
       }),
+      'Experts',
     );
     const claude = screen.getByRole('region', { name: 'Claude Code' });
     expect(within(claude).getByText('Fix code and other long jobs')).toBeVisible();
@@ -363,6 +387,7 @@ describe('ConnectionsPanel groups', () => {
           { ...CLAUDE, id: 'c', name: 'Gamma', state: 'ready' },
         ],
       }),
+      'Experts',
     );
     const row = (name: string) => screen.getByRole('region', { name });
     expect(within(row('Claude Code')).getByText('Needs login')).toBeInTheDocument();
@@ -380,6 +405,7 @@ describe('ConnectionsPanel groups', () => {
           { ...CLAUDE, id: 'x', name: 'Xtra', tested: false, state: 'ready' },
         ],
       }),
+      'Experts',
     );
     expect(
       within(screen.getByRole('region', { name: 'Xtra' })).getByText('Untested'),
@@ -389,20 +415,16 @@ describe('ConnectionsPanel groups', () => {
     ).toBeNull();
   });
 
-  it('Add on a browse row calls setupExpert or setupApp with approved false', async () => {
-    const bridge = withSetup({ browseExperts: [CODEX], browseApps: [NOTES] });
-    await renderPanel(bridge);
+  it('Add on a browse expert calls setupExpert with approved false', async () => {
+    const bridge = withSetup({ browseExperts: [CODEX] });
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Add Codex' }));
-    await click(screen.getByRole('button', { name: 'Add notes' }));
-    expect(bridge.setupCalls).toEqual([
-      { kind: 'expert', id: 'codex-acp', approved: false },
-      { kind: 'app', id: 'acme/notes', approved: false },
-    ]);
+    expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'codex-acp', approved: false }]);
   });
 
   it('Set up on an expert row asks with approved false too', async () => {
     const bridge = withSetup({ experts: [{ ...CLAUDE, state: 'needs_login' }] });
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Log in' }));
     expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'claude-acp', approved: false }]);
   });
@@ -412,7 +434,7 @@ describe('ConnectionsPanel groups', () => {
       { experts: [{ ...CLAUDE, state: 'needs_login' }] },
       { state: 'waiting' },
     );
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Log in' }));
     expect(await screen.findByText(/Finish logging in in the window that opened/)).toBeVisible();
   });
@@ -422,7 +444,7 @@ describe('ConnectionsPanel groups', () => {
       { experts: [{ ...CLAUDE, state: 'needs_login' }] },
       { state: 'logged_in' },
     );
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Log in' }));
     expect(await screen.findByText('Already logged in.')).toBeVisible();
   });
@@ -432,7 +454,7 @@ describe('ConnectionsPanel groups', () => {
       { experts: [{ ...CLAUDE, state: 'needs_login' }] },
       { error: 'already_logged_in' },
     );
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Log in' }));
     expect(await screen.findByText('Already logged in.')).toBeVisible();
     expect(screen.queryByText('Setting that up didn’t work.')).toBeNull();
@@ -443,14 +465,14 @@ describe('ConnectionsPanel groups', () => {
       browseExperts: [CODEX],
       progress: { expert: 'codex-acp', stage: 'node', percent: 40 },
     });
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     expect(screen.getByRole('button', { name: 'Add Codex' })).toBeDisabled();
     expect(screen.getByText(/40%/)).toBeVisible();
   });
 
   it('reads the overview again when the brain says setup changed', async () => {
     const bridge = withSetup({});
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     expect(screen.queryByRole('button', { name: 'Add Codex' })).toBeNull();
     bridge.setup = { ...bridge.setup, browseExperts: [CODEX] };
     await act(async () => {
@@ -463,6 +485,7 @@ describe('ConnectionsPanel groups', () => {
   it('a failed install is shown on the page by the expert’s name', async () => {
     await renderPanel(
       withSetup({ browseExperts: [CODEX], failed: { expert: 'codex-acp', error: 'integrity' } }),
+      'Experts',
     );
     expect(screen.getByRole('alert')).toHaveTextContent(/Codex/);
     expect(screen.getByRole('alert')).not.toHaveTextContent('codex-acp');
@@ -482,7 +505,7 @@ describe('ConnectionsPanel groups', () => {
       setup: { browseExperts: [CODEX] },
       setupResult: { error },
     });
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Add Codex' }));
     const shown = await screen.findByText(line);
     expect(shown).toHaveAttribute('role', isError ? 'alert' : 'status');
@@ -490,14 +513,14 @@ describe('ConnectionsPanel groups', () => {
 
   it('a call that succeeds leaves no line behind', async () => {
     const bridge = withSetup({ browseExperts: [CODEX] });
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     await click(screen.getByRole('button', { name: 'Add Codex' }));
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('keeps the offline note when the brain is away', async () => {
     const bridge = createFakeHostBridge({ listFails: 'brain offline' });
-    await renderPanel(bridge);
+    await renderPanel(bridge, 'Experts');
     expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
     expect(screen.queryByRole('region', { name: 'For long jobs' })).toBeNull();
   });
@@ -509,8 +532,112 @@ describe('ConnectionsPanel groups', () => {
       name: `A very long expert name that keeps going and going ${i}`,
       description: 'long '.repeat(80),
     }));
-    await renderPanel(withSetup({ browseExperts: many }));
+    await renderPanel(withSetup({ browseExperts: many }), 'Experts');
     // The row holds its text to one line with an ellipsis (home-entry__title/preview rules).
     expect(screen.getAllByRole('button', { name: /^Add A very long/ })).toHaveLength(30);
+  });
+});
+
+const row = (id: string, name: string, official: boolean): AppRow => ({
+  id,
+  name,
+  version: '1',
+  description: `${name} app`,
+  official,
+  publisher: official ? 'notion.com' : id,
+  runs: official ? 'hosted' : 'pc',
+  host: official ? 'mcp.notion.com' : null,
+  signIn: 'none',
+  licence: 'MIT',
+  repo: '',
+});
+const NOTION = row('com.notion/mcp', 'Notion', true);
+const COMMUNITY = row('io.github.bob/notion', 'bobs', false);
+const GROUP: AppGroup = { service: 'notion', official: NOTION, others: [COMMUNITY] };
+
+const search = async (text: string) => {
+  fireEvent.change(screen.getByLabelText('Search apps'), { target: { value: text } });
+  await screen.findByRole('button', { name: 'Connect Notion' });
+};
+
+describe('ConnectionsPanel app search', () => {
+  const found = () =>
+    createFakeHostBridge({
+      apps: [FILES],
+      setupFor: (query) => (query === undefined ? { popular: [NOTION] } : { appGroups: [GROUP] }),
+    });
+
+  it('shows Popular before typing', async () => {
+    await renderPanel(found());
+    expect(await screen.findByRole('region', { name: 'Popular' })).toBeInTheDocument();
+  });
+
+  it('an official Connect sends one approved call without community ok', async () => {
+    const bridge = found();
+    await renderPanel(bridge);
+    await search('notion');
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    expect(bridge.setupCalls).toEqual([{ kind: 'app', id: 'com.notion/mcp', approved: true }]);
+  });
+
+  it('a community Connect anyway sends community ok; Back sends nothing', async () => {
+    const bridge = found();
+    await renderPanel(bridge);
+    await search('notion');
+    fireEvent.click(screen.getByRole('button', { name: 'Show 1 other versions' }));
+    await click(screen.getByRole('button', { name: 'Connect io.github.bob/notion' }));
+    await click(screen.getByRole('button', { name: 'Back' }));
+    expect(bridge.setupCalls).toEqual([]);
+    await click(screen.getByRole('button', { name: 'Connect io.github.bob/notion' }));
+    await click(screen.getByRole('button', { name: 'Connect anyway' }));
+    expect(bridge.setupCalls).toEqual([
+      { kind: 'app', id: 'io.github.bob/notion', approved: true, communityOk: true },
+    ]);
+  });
+
+  it('Connect disables while the call runs, so a double press makes one call', async () => {
+    let finish: (value: SetupResult) => void = () => undefined;
+    const bridge = createFakeHostBridge({
+      apps: [FILES],
+      setupFor: () => ({ appGroups: [GROUP] }),
+      setupResult: () => new Promise<SetupResult>((resolve) => (finish = resolve)),
+    });
+    await renderPanel(bridge);
+    await search('notion');
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    expect(screen.getByRole('button', { name: 'Connect Notion' })).toBeDisabled();
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    expect(bridge.setupCalls).toHaveLength(1);
+    await act(async () => finish({}));
+  });
+
+  it('already added is a plain line, not an error', async () => {
+    const bridge = createFakeHostBridge({
+      apps: [FILES],
+      setupFor: () => ({ appGroups: [GROUP] }),
+      setupResult: { error: 'already_added' },
+    });
+    await renderPanel(bridge);
+    await search('notion');
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    const line = await screen.findByText('That app is already added.');
+    expect(line).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the Connected list when the registry cannot be reached', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES], overviewFails: 'no route' });
+    await renderPanel(bridge);
+    expect(await screen.findByText(/couldn’t reach the registry/i)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
+  });
+
+  it('searches the registry again after a connect (the list moves on)', async () => {
+    const bridge = found();
+    await renderPanel(bridge);
+    await search('notion');
+    const before = bridge.setupOverviewCalls.length;
+    await click(screen.getByRole('button', { name: 'Connect Notion' }));
+    await waitFor(() => expect(bridge.setupOverviewCalls.length).toBeGreaterThan(before));
   });
 });
