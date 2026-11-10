@@ -2269,13 +2269,13 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 Fixtures only; nothing in the app reads these yet. The samples in `brain/tests/fixtures/` are
 trimmed copies of the live responses.
 
-| Registry       | URL                                                                            | Status                           |
-| -------------- | ------------------------------------------------------------------------------ | -------------------------------- |
-| ACP Registry   | `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`         | tested (fetched, shape recorded) |
+| Registry       | URL                                                                             | Status                           |
+| -------------- | ------------------------------------------------------------------------------- | -------------------------------- |
+| ACP Registry   | `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`          | tested (fetched, shape recorded) |
 | MCP Registry   | `https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` | tested (fetched, shape recorded) |
-| Claude adapter | `initialize`                                                                   | tested; login untested           |
-| Codex adapter  | `initialize`                                                                   | tested; login untested           |
-| Gemini adapter | `initialize`                                                                   | tested; login untested           |
+| Claude adapter | `initialize`                                                                    | tested; login untested           |
+| Codex adapter  | `initialize`                                                                    | tested; login untested           |
+| Gemini adapter | `initialize`                                                                    | tested; login untested           |
 
 ## Scout looks for an expert or app (setup facts and registries)
 
