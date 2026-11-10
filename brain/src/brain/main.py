@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import partial
+from pathlib import Path
 
 from anthropic import AsyncAnthropic
 
@@ -20,6 +21,7 @@ from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
+from brain.build_info import app_version, build_id
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
@@ -106,6 +108,7 @@ async def _run() -> None:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
     bodies = Bodies()
+    build = build_id(config.build, Path(__file__).parent)  # once: hashing reads every source file
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     reader_model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.reader_model, key)
@@ -247,7 +250,12 @@ async def _run() -> None:
     try:
         try:
             server = await start_server(
-                config.host, config.port, bodies, session_id(config.data_dir), session
+                config.host,
+                config.port,
+                bodies,
+                session_id(config.data_dir),
+                session,
+                (app_version(), build),
             )
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):

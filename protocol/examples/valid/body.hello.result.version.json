@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocol": 1,
+    "session": "s1",
+    "tools": [],
+    "seq": 0,
+    "resync": false,
+    "version": "0.1.0",
+    "build": "a1b2c3d4e5f6"
+  }
+}

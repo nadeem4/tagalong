@@ -68,7 +68,7 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["voice"] = session.voice
         raise Stop
 
@@ -223,7 +223,7 @@ def _key_source(monkeypatch, tmp_path, env_key, file_key):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["status"] = json.loads(await session.call_home("key_status", {}))
         seen["session"] = session
         raise Stop
@@ -250,7 +250,7 @@ def test_home_has_the_bodies_tools(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["bodies"] = json.loads(await session.call_home("bodies_status", {}))
         seen["wa"] = json.loads(await session.call_home("whatsapp_status", {}))
         raise Stop
@@ -316,7 +316,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
     class Stop(Exception):
         pass
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         await session.call_home("set_api_key", {"key": "sk-ant-example-new-key"})
         raise Stop
 
@@ -334,7 +334,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
 def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     seen = []
 
-    async def stop(host, port, bodies, sid, session):
+    async def stop(host, port, bodies, sid, session, build):
         seen.append(session)
         raise RuntimeError("stop")
 
