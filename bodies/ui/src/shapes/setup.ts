@@ -12,7 +12,30 @@ const Choice = z.object({
   name: z.string(),
   version: z.string(),
   description: z.string(),
+  // Old brains do not send it; an expert row is Official only when the brain says so.
+  official: z.boolean().default(false),
 });
+
+const AppRowWire = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  version: z.string(),
+  description: z.string(),
+  official: z.boolean(),
+  publisher: z.string(),
+  runs: z.enum(['pc', 'hosted']).nullable(),
+  host: z.string().nullable(),
+  sign_in: z.enum(['browser', 'key', 'none']),
+  licence: z.string(),
+  repo: z.string(),
+  why: z.string().optional(),
+});
+const toAppRow = ({ sign_in, ...rest }: z.infer<typeof AppRowWire>) => ({
+  ...rest,
+  signIn: sign_in,
+});
+const AppRow = AppRowWire.transform(toAppRow);
+const RegistrySource = z.object({ name: z.string(), url: z.string() });
 
 const Wire = z
   .object({
@@ -23,11 +46,24 @@ const Wire = z
         version: z.string(),
         state: ExpertState,
         tested: z.boolean(),
+        official: z.boolean().default(false),
       }),
     ),
     apps: z.array(z.object({ id: z.string().min(1), name: z.string(), state: z.string() })),
     browse_experts: z.array(Choice),
     browse_apps: z.array(Choice),
+    popular: z.array(AppRow).default([]),
+    app_groups: z
+      .array(
+        z.object({
+          service: z.string(),
+          official: AppRow.nullable(),
+          others: z.array(AppRow),
+        }),
+      )
+      .default([]),
+    next_cursor: z.string().nullable().default(null),
+    sources: z.object({ apps: RegistrySource, experts: RegistrySource }).nullable().default(null),
     stale: z.boolean(),
     progress: z
       .object({
@@ -38,14 +74,19 @@ const Wire = z
       .nullable(),
     failed: z.object({ expert: z.string(), error: z.string() }).nullable(),
   })
-  .transform(({ browse_experts, browse_apps, ...rest }) => ({
+  .transform(({ browse_experts, browse_apps, app_groups, next_cursor, ...rest }) => ({
     ...rest,
     browseExperts: browse_experts,
     browseApps: browse_apps,
+    appGroups: app_groups,
+    nextCursor: next_cursor,
   }));
 
 export type SetupOverview = z.infer<typeof Wire>;
 export type SetupExpert = SetupOverview['experts'][number];
+export type AppRow = z.infer<typeof AppRow>;
+export type AppGroup = { service: string; official: AppRow | null; others: AppRow[] };
+export type RegistrySourceInfo = z.infer<typeof RegistrySource>;
 export type SetupChoice = z.infer<typeof Choice>;
 
 export function parseSetupOverview(json: unknown): SetupOverview {

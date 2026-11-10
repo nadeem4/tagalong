@@ -33,6 +33,7 @@ function setup(answer: (tool: string, input?: object) => unknown) {
   registerSetupIpc(ipc.handle, {
     brain,
     fromTour: (event) => (event as { sender?: string }).sender === 'tour',
+    fromHome: (event) => (event as { sender?: string }).sender === 'home',
   });
   return { ...ipc, calls };
 }
@@ -86,10 +87,40 @@ describe('setup IPC', () => {
     ]);
   });
 
-  it('setupApp always opens the card, even from the tour', async () => {
+  it('the Home window may approve an app; no other window can', async () => {
     const { invokeWith, calls } = setup(() => text({}));
+    await invokeWith(HOME, IPC.setupApp, 'acme/cloud', true);
     await invokeWith(TOUR, IPC.setupApp, 'acme/cloud', true);
-    expect(calls).toEqual([['setup_app', { id: 'acme/cloud', approved: false }]]);
+    expect(calls).toEqual([
+      ['setup_app', { id: 'acme/cloud', approved: true }],
+      ['setup_app', { id: 'acme/cloud', approved: false }],
+    ]);
+  });
+
+  it('communityOk is forwarded as community_ok only from Home', async () => {
+    const { invokeWith, calls } = setup(() => text({}));
+    await invokeWith(HOME, IPC.setupApp, 'a/b', true, 'q', true);
+    await invokeWith(TOUR, IPC.setupApp, 'a/b', true, 'q', true);
+    expect(calls).toEqual([
+      ['setup_app', { id: 'a/b', approved: true, query: 'q', community_ok: true }],
+      ['setup_app', { id: 'a/b', approved: false, query: 'q' }],
+    ]);
+  });
+
+  it('setupOverview forwards the cursor', async () => {
+    const { invoke, calls } = setup(() => text(OVERVIEW));
+    await invoke(IPC.setupOverview, 'gmail', 'c2');
+    expect(calls).toEqual([['setup_overview', { query: 'gmail', cursor: 'c2' }]]);
+  });
+
+  it('an expert approval is the tour alone, unless Home sends communityOk', async () => {
+    const { invokeWith, calls } = setup(() => text({}));
+    await invokeWith(HOME, IPC.setupExpert, 'x', true);
+    await invokeWith(HOME, IPC.setupExpert, 'x', true, true);
+    expect(calls).toEqual([
+      ['setup_expert', { id: 'x', approved: false }],
+      ['setup_expert', { id: 'x', approved: true, community_ok: true }],
+    ]);
   });
 
   it('the channels validate their arguments', async () => {

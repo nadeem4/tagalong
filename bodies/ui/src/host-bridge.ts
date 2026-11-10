@@ -248,14 +248,23 @@ export interface HostBridge {
    * Experts and apps with their state, what could be added, and a running install's progress.
    * A `query` searches the app registry; without one `browseApps` is its first page.
    */
-  setupOverview(query?: string): Promise<SetupOverview>;
+  setupOverview(query?: string, cursor?: string): Promise<SetupOverview>;
   /**
    * Installs, updates or logs in an expert. `approved` false opens the Allow card (Connections);
-   * true means the person's press was the OK (the tour). Progress arrives as `changed setup`.
+   * true means the person's press was the OK (the tour), or with `communityOk` the Connections
+   * page's "Connect anyway" on a community expert. Progress arrives as `changed setup`.
    */
-  setupExpert(id: string, approved: boolean): Promise<SetupResult>;
-  /** `query` is the registry search the app was found with; the card needs it to find it again. */
-  setupApp(id: string, approved: boolean, query?: string): Promise<SetupResult>;
+  setupExpert(id: string, approved: boolean, communityOk?: boolean): Promise<SetupResult>;
+  /**
+   * `query` is the registry search the app was found with; the card needs it to find it again.
+   * `approved` from Home connects an Official app at once; a community one also needs `communityOk`.
+   */
+  setupApp(
+    id: string,
+    approved: boolean,
+    query?: string,
+    communityOk?: boolean,
+  ): Promise<SetupResult>;
   addConnection(params: AppAddParams): Promise<{ id: string }>;
   setConnectionEnabled(id: string, enabled: boolean): Promise<unknown>;
   restartConnection(id: string): Promise<unknown>;

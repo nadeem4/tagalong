@@ -114,7 +114,16 @@ export interface FakeHostBridge extends HostBridge {
   readonly removedConnections: readonly string[];
   /** The brain's setup overview and every setupExpert / setupApp call, in order. */
   setup: SetupOverview;
-  readonly setupCalls: readonly { kind: 'expert' | 'app'; id: string; approved: boolean }[];
+  readonly setupCalls: readonly SetupCall[];
+  /** Every setupOverview call: the search query and cursor it was given. */
+  readonly setupOverviewCalls: readonly { query?: string; cursor?: string }[];
+}
+
+interface SetupCall {
+  kind: 'expert' | 'app';
+  id: string;
+  approved: boolean;
+  communityOk?: boolean;
 }
 
 const NO_BODIES: BodiesState = {
@@ -152,7 +161,11 @@ export function createFakeHostBridge(
     /** What setupOverview answers; defaults to nothing set up and nothing to add. */
     setup?: Partial<SetupOverview>;
     /** What setupExpert and setupApp answer; defaults to `{}`, which is success. */
-    setupResult?: SetupResult;
+    setupResult?: SetupResult | (() => Promise<SetupResult>);
+    /** Makes only setupOverview fail (listFails fails the connections list too). */
+    overviewFails?: string;
+    /** Per-search answer: fields laid over `setup` for this query and cursor. */
+    setupFor?: (query?: string, cursor?: string) => Partial<SetupOverview>;
     /** Listing apps rejects with this message, as "brain offline" does. */
     listFails?: string;
     /** What Scout remembers, newest first. */
@@ -198,7 +211,8 @@ export function createFakeHostBridge(
   const restarts: string[] = [];
   const signIns: string[] = [];
   const removedConnections: string[] = [];
-  const setupCalls: { kind: 'expert' | 'app'; id: string; approved: boolean }[] = [];
+  const setupCalls: SetupCall[] = [];
+  const setupOverviewCalls: { query?: string; cursor?: string }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
   const loopCalls: string[] = [];
   const whatsappChanges: WhatsAppChange[] = [];
@@ -256,23 +270,39 @@ export function createFakeHostBridge(
       apps: [],
       browseExperts: [],
       browseApps: [],
+      popular: [],
+      appGroups: [],
+      nextCursor: null,
+      sources: null,
       stale: false,
       progress: null,
       failed: null,
       ...options.setup,
     },
     setupCalls,
-    setupOverview() {
-      if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
-      return Promise.resolve(structuredClone(fake.setup));
+    setupOverviewCalls,
+    setupOverview(query, cursor) {
+      setupOverviewCalls.push({
+        ...(query === undefined ? {} : { query }),
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      const failure = options.overviewFails ?? options.listFails;
+      if (failure !== undefined) return Promise.reject(new Error(failure));
+      return Promise.resolve(
+        structuredClone({ ...fake.setup, ...options.setupFor?.(query, cursor) }),
+      );
     },
-    setupExpert(id, approved) {
-      setupCalls.push({ kind: 'expert', id, approved });
-      return Promise.resolve(options.setupResult ?? {});
+    setupExpert(id, approved, communityOk) {
+      setupCalls.push({ kind: 'expert', id, approved, ...(communityOk ? { communityOk } : {}) });
+      return typeof options.setupResult === 'function'
+        ? options.setupResult()
+        : Promise.resolve(options.setupResult ?? {});
     },
-    setupApp(id, approved) {
-      setupCalls.push({ kind: 'app', id, approved });
-      return Promise.resolve(options.setupResult ?? {});
+    setupApp(id, approved, _query, communityOk) {
+      setupCalls.push({ kind: 'app', id, approved, ...(communityOk ? { communityOk } : {}) });
+      return typeof options.setupResult === 'function'
+        ? options.setupResult()
+        : Promise.resolve(options.setupResult ?? {});
     },
     listConnections() {
       if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
