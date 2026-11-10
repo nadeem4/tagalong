@@ -4,10 +4,11 @@ Only `trust.is_official_app` decides who heads a group; matching a name never ma
 Official, so a lookalike title cannot take the top spot.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from brain.setup.registry import RegistryEntry
-from brain.setup.trust import is_official_app, service_key
+from brain.setup.trust import is_official_app, namespace, service_key
 
 
 @dataclass(frozen=True)
@@ -28,12 +29,9 @@ def group_entries(entries: list[RegistryEntry], query: str | None) -> list[Group
     for e in entries:
         if not is_official_app(e.id):
             continue
-        key = service_key(e.id)
-        head = heads.get(key)
-        if head is None:
-            heads[key] = e
-        elif len(e.id.partition("/")[0]) < len(head.id.partition("/")[0]):
-            others.setdefault(key, []).append(head)
+        # Keyed by the whole namespace: `io.notion` is another publisher than `com.notion`.
+        key = namespace(e.id)
+        if key not in heads:
             heads[key] = e
         else:
             others.setdefault(key, []).append(e)
@@ -44,7 +42,8 @@ def group_entries(entries: list[RegistryEntry], query: str | None) -> list[Group
         if is_official_app(e.id):
             continue
         text = _text(e)
-        key = next((k for k in heads if k in text), None)
+        words = set(re.split(r"[^a-z0-9]+", text))
+        key = next((k for k, h in heads.items() if service_key(h.id) in words), None)
         if key:
             others.setdefault(key, []).append(e)
         elif q and q in text:
@@ -53,7 +52,7 @@ def group_entries(entries: list[RegistryEntry], query: str | None) -> list[Group
             off_topic.append(Group(e.name, None, [e]))
         else:
             singles.append(Group(e.name, None, [e]))
-    groups = [Group(k, h, others.get(k, [])) for k, h in heads.items()]
+    groups = [Group(service_key(h.id), h, others.get(k, [])) for k, h in heads.items()]
     if q and query_group:
         groups.append(Group(q, None, query_group))
     matching = [g for g in groups if not q or _group_matches(g, q)]

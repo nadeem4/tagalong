@@ -51,11 +51,26 @@ def test_lookalike_does_not_take_the_official_head():
     assert [e.id for e in groups[0].others] == ["com.notion.labs/x"]
 
 
-def test_two_officials_same_key_shortest_namespace_heads():
-    # Two entries of one service: the first of equal length heads, the other is listed under it.
-    groups = group_entries([entry("com.notion/mcp"), entry("com.notion/legacy")], None)
+def test_two_officials_in_one_namespace_first_heads():
+    groups = group_entries([entry("com.notion/mcp"), entry("com.notion/notion-server")], None)
     assert groups[0].official.id == "com.notion/mcp"
-    assert [e.id for e in groups[0].others] == ["com.notion/legacy"]
+    assert [e.id for e in groups[0].others] == ["com.notion/notion-server"]
+
+
+def test_other_tld_never_takes_the_head():
+    groups = group_entries([entry("io.notion/mcp"), entry("com.notion/mcp")], None)
+    assert len(groups) == 2
+    by_head = {g.official.id: g for g in groups}
+    assert by_head["com.notion/mcp"].others == []
+    assert by_head["io.notion/mcp"].others == []
+
+
+def test_community_joins_by_whole_word_only():
+    groups = group_entries(
+        [entry("com.ai/mcp"), entry("io.github.z/openai-tools"), entry("io.github.y/ai-helper")],
+        None,
+    )
+    assert [e.id for e in groups[0].others] == ["io.github.y/ai-helper"]
 
 
 def test_no_query_groups_each_service_once():

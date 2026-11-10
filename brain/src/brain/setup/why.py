@@ -23,7 +23,17 @@ SHORT_MAX = 100
 
 
 def _clean(text: str) -> str:
+    text = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", text)  # a link keeps its text, not its URL
     return " ".join(re.sub(r"<[^>]*>|[<>`*_#]", "", text).split())
+
+
+COPY_SPAN = 30
+
+
+def _copies(line: str, description: str) -> bool:
+    """True when the line repeats a long stretch of the description: an instruction passed on."""
+    line, desc = line.lower(), _clean(description).lower()
+    return any(line[i : i + COPY_SPAN] in desc for i in range(len(line) - COPY_SPAN + 1))
 
 
 def _cut(text: str) -> str:
@@ -76,7 +86,7 @@ class WhyPick:
             return fallback
         self._budget.spend(final.usage, final.model or self._model.model_id)
         text = _cut(_clean("".join(b.get("text", "") for b in final.content)))
-        if not text:
+        if not text or _copies(text, entry.description):
             return fallback
         self._load()[key] = text
         self._save()

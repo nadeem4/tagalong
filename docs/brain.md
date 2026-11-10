@@ -856,7 +856,10 @@ service's own reversed domain (exactly two labels: `com.notion`, `app.linear`) a
 after the slash is only that label plus generic words (`com.notion/mcp`,
 `com.atlassian/atlassian-mcp-server`), or whose id is in the seeded `OFFICIAL_APPS`. A third party
 on its own domain for another service (`com.mcparmory/notion`, `ai.smithery/smithery-notion`),
-`io.github.*` and deeper namespaces (`com.notion.evil`) never are. An
+`io.github.*` and deeper namespaces (`com.notion.evil`) never are. A same-label
+domain on another TLD (`io.notion/mcp`) can still read Official under this rule, but groups are
+keyed by the whole namespace, so it never joins or heads `com.notion`. Community entries join a
+group by whole word (`ai` does not pull in `openai-tools`). An
 expert is Official when its id is one of eight vendors (claude-acp, codex-acp, gemini,
 github-copilot-cli, cursor, junie, goose, kimi). Grouping never marks anything Official: a
 community entry joins a service's group by name but never heads it.
@@ -865,8 +868,9 @@ The "why pick it" line for a community row comes from the reader's Haiku model
 (`setup/why.py`, prompt `mind/why_pick.md`, the registry description fenced as untrusted), at most
 `WHY_PER_REPLY` (12) model calls per reply, on the reader's own daily allowance, cached per
 `<id>@<version>` in `<TAGALONG_HOME>/cache/why-registry.json`. A model that is not ready, over its
-allowance or failing falls back to the shortened description; the line never carries markup and is
-at most 100 characters.
+allowance or failing falls back to the shortened description, as does a line that repeats 30 or
+more characters of the description; the line never carries markup or link targets and is at most
+100 characters. The calls and the Popular lookups run concurrently.
 
 - **`set_api_key`.** The handler checks the raw input by hand: the key is trimmed (spaces, a
   newline, one pair of quotes); a missing, non-string, empty, over-256-character or

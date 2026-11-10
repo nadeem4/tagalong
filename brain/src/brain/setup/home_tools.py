@@ -5,6 +5,7 @@
 the OK itself, so it passes `approved: true`. Progress is the latest `setup_progress` facts.
 """
 
+import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
@@ -142,11 +143,18 @@ def home_setup_tools(
     async def popular(machine: Machine, skip: set[str]) -> list[dict]:
         """The Popular row: seeded Official ids that resolve in the registry and connect in one
         click here (a hosted app, or a package that needs no key)."""
-        out: list[dict] = []
-        for entry_id in POPULAR:
+
+        async def look(entry_id: str):
             try:
-                found = await registry.mcp_servers(service_key(entry_id))
+                return await registry.mcp_servers(service_key(entry_id))
             except RegistryUnavailable:
+                return None
+
+        out: list[dict] = []
+        for entry_id, found in zip(
+            POPULAR, await asyncio.gather(*(look(i) for i in POPULAR)), strict=True
+        ):
+            if found is None:
                 return out
             entry = next((e for e in found.entries if e.id == entry_id), None)
             dist = build_for(entry, machine) if entry else None
@@ -177,6 +185,9 @@ def home_setup_tools(
         ]
         budget = WHY_PER_REPLY
 
+        async def none() -> None:
+            return None
+
         async def row_with_why(e) -> dict:
             nonlocal budget
             row = app_row(e, build_for(e, machine))
@@ -188,16 +199,18 @@ def home_setup_tools(
                     row["why"] = shorten(e.description)
             return row
 
-        groups = []
-        for g in group_entries(fresh, query):
-            head = await row_with_why(g.official) if g.official else None
-            groups.append(
-                {
-                    "service": g.service,
-                    "official": head,
-                    "others": [await row_with_why(e) for e in g.others],
-                }
-            )
+        # All the lines are asked at once; each takes its turn at the cap before its first await.
+        grouped = group_entries(fresh, query)
+        heads = await asyncio.gather(
+            *(row_with_why(g.official) if g.official else none() for g in grouped)
+        )
+        rest = await asyncio.gather(
+            *(asyncio.gather(*(row_with_why(e) for e in g.others)) for g in grouped)
+        )
+        groups = [
+            {"service": g.service, "official": h, "others": list(o)}
+            for g, h, o in zip(grouped, heads, rest, strict=True)
+        ]
         return json.dumps(
             {
                 "experts": [
@@ -322,7 +335,10 @@ def home_setup_tools(
                 "What is set up: installed experts and apps with their state, what could be "
                 "added (an optional query searches the app registry), and the running install's "
                 "progress.",
-                {"type": "object", "properties": {"query": {"type": "string"}}},
+                {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}, "cursor": {"type": "string"}},
+                },
                 home,
                 effect="read",
             ),
