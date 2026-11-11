@@ -262,7 +262,7 @@ const MODEL_CSS = `
   padding: 16px 0 2px; border-top: 1px solid ${t.color.panelLine};
 }
 .tg-model__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 8px; }
-.tg-model__labelrow { display: flex; align-items: center; gap: 10px; }
+.tg-model__labelrow { display: flex; align-items: center; gap: ${t.space.lg}px; }
 .tg-model__label { ${typeCss('body')};font-weight:600; color: ${t.color.panelText}; }
 .tg-model__note { ${typeCss('body')}; color: ${t.color.panelMuted}; max-width: 46ch; }
 .tg-model__msg { display: flex; align-items: center; gap: 6px; ${typeCss('small')};font-weight:600; }
@@ -272,8 +272,8 @@ const MODEL_CSS = `
 .tg-model__ctl { position: relative; }
 .tg-model__sel {
   position: relative; box-sizing: border-box; width: 100%; height: 36px; display: flex; align-items: center;
-  gap: 8px; padding: 0 10px 0 12px; border: 1px solid ${t.color.keycapLine}; border-radius: 8px;
-  background: #fff; box-shadow: 0 1px 1px rgba(18, 22, 43, 0.04); font-family: ${t.font.ui};
+  gap: 8px; padding: 0 ${t.space.lg}px 0 12px; border: 1px solid ${t.color.keycapLine}; border-radius: ${t.radius.sm}px;
+  background: ${t.color.card}; box-shadow: 0 1px 1px rgba(18, 22, 43, 0.04); font-family: ${t.font.ui};
   ${typeCss('bodyLead')}; color: ${t.color.panelText};
 }
 .tg-model__sel--live { cursor: pointer; }
@@ -281,9 +281,9 @@ const MODEL_CSS = `
 .tg-model__sel.is-open { border-color: ${t.color.panelText}; }
 .tg-model__sel.is-open .tg-model__chev { transform: rotate(180deg); color: ${t.color.panelText}; }
 .tg-model__sel[aria-disabled='true'] {
-  background: #eef0f5; border-color: ${t.color.panelLine}; box-shadow: none; color: #6e7590; cursor: default;
+  background: ${t.color.disabledFill}; border-color: ${t.color.panelLine}; box-shadow: none; color: ${t.color.dim}; cursor: default;
 }
-.tg-model__sel[aria-disabled='true'] .tg-model__chev { color: #b4b9c9; }
+.tg-model__sel[aria-disabled='true'] .tg-model__chev { color: ${t.color.disabledChev}; }
 .tg-model__value { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .tg-model__name { flex: none; }
 .tg-model__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${t.color.panelMuted}; ${typeCss('body')}; }
@@ -291,12 +291,12 @@ const MODEL_CSS = `
 .tg-model__chev { width: 16px; height: 16px; flex: none; color: ${t.color.panelMuted}; }
 .tg-model__list {
   position: absolute; z-index: 2; top: 42px; left: 0; right: 0; list-style: none; margin: 0; padding: 4px;
-  display: flex; flex-direction: column; gap: 2px; background: #fff; border: 1px solid ${t.color.panelLine};
-  border-radius: 10px; box-shadow: 0 1px 2px rgba(18, 22, 43, 0.08), 0 12px 32px -8px rgba(18, 22, 43, 0.24);
+  display: flex; flex-direction: column; gap: 2px; background: ${t.color.card}; border: 1px solid ${t.color.panelLine};
+  border-radius: ${t.radius.card}px; box-shadow: 0 1px 2px rgba(18, 22, 43, 0.08), 0 12px 32px -8px rgba(18, 22, 43, 0.24);
 }
 .tg-model__list li {
-  display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; gap: 10px;
-  min-height: 52px; padding: 8px 10px 8px 12px; border-radius: 7px; cursor: pointer;
+  display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; gap: ${t.space.lg}px;
+  min-height: 52px; padding: 8px ${t.space.lg}px 8px 12px; border-radius: ${t.radius.sm}px; cursor: pointer;
 }
 .tg-model__list li.is-active { background: ${t.color.panelTile}; }
 .tg-model__opt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -304,8 +304,8 @@ const MODEL_CSS = `
 .tg-model__optline { ${typeCss('small')}; color: ${t.color.panelMuted}; }
 .tg-model__tick { width: 16px; height: 16px; color: ${t.color.panelText}; }
 .tg-model__chip {
-  display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px; flex: none;
+  display: inline-flex; align-items: center; height: 18px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.pill}px; flex: none;
   background: ${t.color.panelTile}; color: ${t.color.chipFreeInk}; ${typeCss('caption')};
 }
-.tg-model__list li.is-active .tg-model__chip { background: #fff; }
+.tg-model__list li.is-active .tg-model__chip { background: ${t.color.card}; }
 `;

@@ -80,6 +80,9 @@ export const themeTokens = {
     /** The health card's dots on navy. */
     healthOk: '#7FD1A4',
     healthBad: '#FF8A9A',
+    okOnNavy: '#8FD19E',
+    disabledFill: '#EEF0F5',
+    disabledChev: '#B4B9C9',
     /** The shared renderer sheet (app.css) and its slate. */
     slateInk: '#0F172A',
     slateMuted: '#64748B',

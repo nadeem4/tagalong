@@ -29,9 +29,10 @@ export const SETTINGS_CSS = `
   white-space: nowrap;
 }
 .tg-main { overflow-y: auto; padding: ${t.space.xxl}px; display: flex; flex-direction: column; gap: ${t.space.xl}px; }
-.tg-panel {
-  background: ${t.color.panel}; color: ${t.color.panelText}; border-radius: ${t.radius.card}px;
-  padding: ${t.space.xxl}px; margin: 0; border: 0; min-width: 0;
+.tg-panel { color: ${t.color.panelText}; margin: 0; min-width: 0; }
+/* The box is .tg-card's when embedded in Home; the standalone window draws its own. */
+.tg-panel:not(.tg-card) {
+  background: ${t.color.panel}; border-radius: ${t.radius.card}px; padding: ${t.space.xxl}px; border: 0;
 }
 .tg-panel__heading {
   ${typeCss('title')};
