@@ -27,10 +27,6 @@ export const CONTEXT = {
   note: 'text chat on a phone; keep replies short and offer detail on request',
 } as const;
 
-// The bridge's only own words besides the cut note; everything else is Scout's.
-const CLOSED_LINE = 'That question is closed.';
-const MANY_LINE = 'More than one question is open: please tap a button';
-
 export interface BridgeDeps {
   config: WhatsAppConfig;
   openSocket: BrainClientOptions['openSocket'];
@@ -71,8 +67,10 @@ export function createBridge(deps: BridgeDeps): {
       log(`whatsapp: a send task failed (${e instanceof Error ? e.name : 'error'})`);
     });
   };
-  const line = (text: string): void =>
-    enqueue(() => graph.sendText(config.allowedNumber, text).then(() => undefined));
+  // The bridge only reports what happened; Scout words any reply, so it has no canned lines.
+  const tell = (name: string, data: Record<string, unknown>): void => {
+    if (!client.event(name, data)) log(`whatsapp: the brain is not reachable, ${name} not sent`);
+  };
 
   const flush = async (turn: string): Promise<void> => {
     const text = (buffers.get(turn) ?? []).join('');
@@ -155,7 +153,7 @@ export function createBridge(deps: BridgeDeps): {
     client.answerWith(a.ask, a.option, a.text).catch((err: unknown) => {
       if (err instanceof RpcError && err.code === ErrorCode.not_found) {
         desk.close(a.ask);
-        line(CLOSED_LINE);
+        tell('window_closed', { via: 'answer' });
       } else log('whatsapp: the brain is not reachable, answer not delivered');
     });
   };
@@ -165,13 +163,13 @@ export function createBridge(deps: BridgeDeps): {
     window.touch();
     if (m.kind === 'button') {
       const tapped = desk.fromButton(m.buttonId);
-      if ('closed' in tapped) line(CLOSED_LINE);
+      if ('closed' in tapped) tell('window_closed', { via: 'tap' });
       else answer(tapped);
       return;
     }
     const typed = desk.fromText(m.text, replies);
     if (typed === null) say(m.text);
-    else if ('ambiguous' in typed) line(MANY_LINE);
+    else if ('ambiguous' in typed) tell('many_pending', { asks: desk.ids().length });
     else answer(typed);
   };
 

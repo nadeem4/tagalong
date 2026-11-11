@@ -78,6 +78,14 @@ A body just came back after being away. A greeting is optional and usually nothi
 
 The owner returned after being idle for idle_seconds. Speak only if something truly waits for them, otherwise stay silent.
 
+## window_closed
+
+On WhatsApp the owner tapped a button, or sent an answer, for a question that is no longer open (body; via is tap or answer). Nothing was sent to their phone and nothing ran. Tell them in a few plain words of your own that it is closed and, if what they wanted still matters, offer to ask again. Keep it short; it is a phone chat.
+
+## many_pending
+
+On WhatsApp the owner typed a reply while several questions of yours were open (body; asks is how many), so it could not be told which one they meant and nothing was answered. Ask them in your own words to tap a button on the one they mean. Keep it short; it is a phone chat.
+
 ## focus
 
 Context only, not for speaking. It tells you which window the owner is in.

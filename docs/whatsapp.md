@@ -94,14 +94,18 @@ rule is per body.
   (including a number outside the options) is a normal message to Scout, since you may be changing
   the subject.
 - **Two or more such asks.** If the text would answer at least one of them, the bridge cannot say
-  which and replies `More than one question is open: please tap a button`, doing nothing else. Text
-  that answers none is a normal message.
+  which and sends the brain a `many_pending {asks}` event, doing nothing else (nothing goes to the
+  phone from the bridge; Scout words the ask to tap a button). Text that answers none is a normal
+  message.
 - **A send that fails.** If the ask could not be sent to the phone, the bridge forgets it, so it can
   never be answered unseen.
-- **One send queue.** Asks, the two fixed lines and replies go out through one queue, so an ask that
+- **One send queue.** Asks and replies go out through one queue, so an ask that
   arrives while a long reply is being sent waits until all its parts are out.
-- **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, replies
-  `That question is closed.` The same line follows an answer the brain refuses as not found.
+- **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, sends the
+  brain `window_closed {via: "tap"}`; an answer the brain refuses as not found sends
+  `window_closed {via: "answer"}`. The brain wakes Scout (urgency `next_pause`, see
+  [brain.md](brain.md#front-door-and-urgency)) and Scout says in its own words that the question is
+  closed. If the brain is down the event is dropped and logged.
 - **Late taps.** An ask that is still open on the brain (for example one whose turn is long over) can
   be answered however long after, as the tap itself reopens the 24-hour window.
 - **Outside the window.** An ask that arrives after the 24 hours is not sent and not remembered
@@ -109,9 +113,9 @@ rule is per body.
 - **After a reconnect** the bridge forgets its asks and shows again the ones the brain re-sends,
   once each.
 
-The two fixed lines and the cut note are the bridge's only words, besides the ask's own wording
-(options, the typed-reply line, and the tool and input of an ask with no text); everything else is
-Scout's.
+The cut note is the bridge's only own word, besides the ask's own wording (options, the typed-reply
+line, and the tool and input of an ask with no text); everything else is Scout's. The closed and
+many-questions moments are facts sent as events, never canned text.
 
 ## Settings the bridge reads
 

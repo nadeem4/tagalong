@@ -2368,6 +2368,11 @@ is logged as `dispatcher.gave_up` and dropped. `stop()` logs everything still wa
 callback. `Dispatcher` requires the
 `OpenItems` store so a `hold` can never be lost. The event notes in `mind/events.md` do not mention
 urgency: the model cannot act on delivery timing.
+
+The WhatsApp body's two moments are event kinds with urgency `next_pause`: `window_closed` (a tap or
+answer met a question the brain no longer holds; fact `via`) and `many_pending` (a typed reply with
+several questions open; fact `asks`). `from_body` in `events.py` validates them like any body event;
+the notes in `mind/events.md` leave the wording to Scout.
 Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
 
 ## Not built yet

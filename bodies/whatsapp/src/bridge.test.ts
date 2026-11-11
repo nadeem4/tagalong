@@ -99,6 +99,11 @@ class FakeBrain {
     return this.sent.filter((m) => m.method === 'answer').map((m) => m.params);
   }
 
+  /** The `event` frames the body sent, as name and data. */
+  events() {
+    return this.sent.filter((m) => m.method === 'event').map((m) => m.params);
+  }
+
   private seq = 1;
   reply(body: string | null, fields: { delta: string } | { done: true }, turn = 't1') {
     this.onMessage(
@@ -302,8 +307,6 @@ describe('bridge', () => {
   });
 });
 
-const CLOSED = 'That question is closed.';
-const MANY = 'More than one question is open: please tap a button';
 const settle = () => new Promise((r) => setTimeout(r, 30));
 
 /** A bridge whose window is open (the person has just said hi). */
@@ -371,43 +374,52 @@ describe('asks', () => {
     );
   });
 
-  test('test_text_with_two_open_asks_says_tap_a_button', async () => {
+  test('bridge sends many_pending event', async () => {
     const { brain, graph, inbound } = await ready();
     brain.ask('a1');
     brain.ask('a2');
     await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
     await inbound('yes');
-    await vi.waitFor(() => expect(graph.bodies).toHaveLength(3));
-    expect(graph.bodies[2]?.text.body).toBe(MANY);
+    await vi.waitFor(() =>
+      expect(brain.events()).toEqual([{ name: 'many_pending', data: { asks: 2 } }]),
+    );
+    expect(graph.bodies).toHaveLength(2);
     expect(brain.answers()).toEqual([]);
     expect(brain.says()).toHaveLength(1);
   });
 
-  test('test_tap_on_a_closed_ask_says_it_is_closed', async () => {
+  test('bridge sends window_closed event instead of canned text', async () => {
     const { brain, graph, tap } = await ready();
     brain.ask('a1');
     await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
     brain.closeAsk('a1');
     await tap('ask:a1:0');
-    await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
-    expect(graph.bodies[1]?.text.body).toBe(CLOSED);
+    await vi.waitFor(() =>
+      expect(brain.events()).toEqual([{ name: 'window_closed', data: { via: 'tap' } }]),
+    );
+    expect(graph.bodies).toHaveLength(1);
     expect(brain.answers()).toEqual([]);
   });
 
-  test('test_tap_on_an_unknown_ask_says_it_is_closed', async () => {
-    const { graph, tap } = await ready();
+  test('test_tap_on_an_unknown_ask_sends_window_closed', async () => {
+    const { brain, graph, tap } = await ready();
     await tap('ask:nope:0');
-    await vi.waitFor(() => expect(graph.bodies.map((b) => b.text.body)).toEqual([CLOSED]));
+    await vi.waitFor(() =>
+      expect(brain.events()).toEqual([{ name: 'window_closed', data: { via: 'tap' } }]),
+    );
+    expect(graph.bodies).toEqual([]);
   });
 
-  test('test_a_not_found_answer_says_it_is_closed', async () => {
+  test('test_a_not_found_answer_sends_window_closed', async () => {
     const { brain, graph, tap } = await ready();
     brain.ask('a1');
     await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
     brain.answerGone = true;
     await tap('ask:a1:0');
-    await vi.waitFor(() => expect(graph.bodies).toHaveLength(2));
-    expect(graph.bodies[1]?.text.body).toBe(CLOSED);
+    await vi.waitFor(() =>
+      expect(brain.events()).toEqual([{ name: 'window_closed', data: { via: 'answer' } }]),
+    );
+    expect(graph.bodies).toHaveLength(1);
   });
 
   test('test_text_with_no_ask_open_is_a_say', async () => {
@@ -485,7 +497,10 @@ describe('asks', () => {
     await settle();
     await inbound('yes');
     await tap('ask:a1:0');
-    await vi.waitFor(() => expect(graph.bodies.at(-1)?.text.body).toBe(CLOSED));
+    await vi.waitFor(() =>
+      expect(brain.events()).toEqual([{ name: 'window_closed', data: { via: 'tap' } }]),
+    );
+    expect(graph.bodies).toHaveLength(1);
     expect(brain.answers()).toEqual([]);
     expect(brain.says()).toHaveLength(2);
   });
