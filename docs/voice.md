@@ -517,7 +517,8 @@ flowchart LR
   without replaying it.
 - **Clear.** `clear(turn?)` aborts the sentence playing, empties the queue and drops late chunks
   of that turn, without telling the brain to hush (the brain asked, or `cutOff` did). With a
-  `turn` it only acts when that turn is the one speaking.
+  `turn` it drops only that turn's sentences (playing or queued) and other turns still speak. A
+  pause between sentences holds the next one too, and a pause with nothing to say sends nothing.
 - **Cut off.** `cutOff()` is the person's stop: it sends `hush` to the brain, then `clear()`s.
 - **Speech state.** `onSpeech` fires `started` and `ended` per sentence (with its `n`), `paused`
   on a pause, `started` again for the held sentence on a resume, and `idle` when the player runs

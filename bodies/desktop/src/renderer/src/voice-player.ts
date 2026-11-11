@@ -207,11 +207,14 @@ export class SpeechPlayer {
 
   /** The person spoke over Scout: the sound holds where it is, and nothing is lost. */
   pause(): void {
-    if (this.paused || !this.playing) return;
+    if (this.paused) return;
+    // Between sentences counts too: the next one waits at the pump's gate.
+    const turn = this.current?.turn ?? this.answeringTurn ?? this.queue[0]?.turn ?? null;
+    if (turn === null) return;
     this.paused = true;
     this.gate = new Promise<void>((resolve) => (this.release = resolve));
     (this.options.output ?? speakers).pause();
-    this.tell({ turn: this.current?.turn ?? this.record.turn ?? '', state: 'paused' });
+    this.tell({ turn, state: 'paused' });
   }
 
   /** It was noise or Scout's own echo: carry on from the same spot. */
@@ -222,6 +225,9 @@ export class SpeechPlayer {
     this.release?.();
     // The held sentence carries on from where it stopped, so the brain hears it sounding again.
     if (this.current !== null) this.sentence(this.current, 'started');
+    // Held between sentences with nothing left to say: the brain must not stay on "paused".
+    else if (!this.running && this.queue.length === 0)
+      this.tell({ turn: this.lastTurn, state: 'idle' });
   }
 
   /**
@@ -251,11 +257,15 @@ export class SpeechPlayer {
 
   /**
    * Drops this sentence and the rest, for the brain's `clear` or a cut-off. With a `turn`, only
-   * when that turn is the one speaking. The brain is not told to hush: it asked, or cutOff did.
+   * that turn's sentences go (playing or queued); other turns carry on. The brain is not told
+   * to hush: it asked, or cutOff did.
    */
   clear(turn?: string): void {
+    if (turn !== undefined) {
+      this.clearTurn(turn);
+      return;
+    }
     const active = this.current?.turn ?? this.queue[0]?.turn ?? this.answeringTurn;
-    if (turn !== undefined && turn !== active) return;
     if (this.paused) {
       // The sound is held: let it go, or the next sentence would start frozen.
       this.paused = false;
@@ -272,6 +282,30 @@ export class SpeechPlayer {
     this.abort = new AbortController();
     this.emit();
     if (active !== null) this.tell({ turn: active, state: 'idle' });
+  }
+
+  private clearTurn(turn: string): void {
+    const playing = this.current?.turn === turn;
+    const known = playing || this.answeringTurn === turn || this.queue.some((c) => c.turn === turn);
+    if (!known) return;
+    this.queue = this.queue.filter((c) => c.turn !== turn);
+    this.silenced = turn;
+    if (this.answeringTurn === turn) this.answeringTurn = null;
+    if (this.record.turn === turn) this.record = { turn: null, texts: [], played: 0 };
+    if (playing) {
+      if (this.paused) {
+        this.paused = false;
+        (this.options.output ?? speakers).resume();
+        this.release?.();
+      }
+      this.playing = false;
+      this.current = null;
+      this.abort.abort();
+      this.abort = new AbortController();
+    }
+    this.emit();
+    // A queued turn's removal is silent while another turn is still sounding.
+    if (playing || this.current === null) this.tell({ turn, state: 'idle' });
   }
 
   private async pump(): Promise<void> {
