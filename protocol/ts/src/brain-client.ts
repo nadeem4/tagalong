@@ -51,6 +51,8 @@ export interface BrainClientOptions {
   onStatus: (status: BrainStatus) => void;
   /** The brain could not replay what was missed; drop what open turns were showing. */
   onResync: () => void;
+  /** A valid hello result arrived; version and build are absent on a brain older than D1. */
+  onHello?: (result: HelloResult) => void;
   retryMs?: number;
 }
 
@@ -268,6 +270,7 @@ export class BrainClient {
           this.options.onResync();
         }
         this.setStatus('online');
+        this.options.onHello?.(parsed.data);
       },
       (e) => {
         if (e instanceof RpcError && e.code === ErrorCode.version_mismatch) {

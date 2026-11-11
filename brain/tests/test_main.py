@@ -68,7 +68,7 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["voice"] = session.voice
         raise Stop
 
@@ -223,7 +223,7 @@ def _key_source(monkeypatch, tmp_path, env_key, file_key):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["status"] = json.loads(await session.call_home("key_status", {}))
         seen["session"] = session
         raise Stop
@@ -250,7 +250,7 @@ def test_home_has_the_bodies_tools(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         seen["bodies"] = json.loads(await session.call_home("bodies_status", {}))
         seen["wa"] = json.loads(await session.call_home("whatsapp_status", {}))
         raise Stop
@@ -316,7 +316,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
     class Stop(Exception):
         pass
 
-    async def stop(host, port, bodies, session_id, session):
+    async def stop(host, port, bodies, session_id, session, build):
         await session.call_home("set_api_key", {"key": "sk-ant-example-new-key"})
         raise Stop
 
@@ -334,7 +334,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
 def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     seen = []
 
-    async def stop(host, port, bodies, sid, session):
+    async def stop(host, port, bodies, sid, session, build):
         seen.append(session)
         raise RuntimeError("stop")
 
@@ -551,3 +551,33 @@ def test_non_utf8_env_file_names_the_file(monkeypatch, tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="brain"), pytest.raises(SystemExit):
         asyncio.run(_run())
     assert ".env" in caplog.text and "UTF-8" in caplog.text
+
+
+def test_status_marks_work_running_while_a_job_runs(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    seen = {}
+
+    async def stop(host, port, bodies, session_id, session, build):
+        seen["idle"] = json.loads(await session.call_home("brain_status", {}))
+        session.records.add_job("j1", "claude-code", "fix it", str(tmp_path), "ask")
+        seen["busy"] = json.loads(await session.call_home("brain_status", {}))
+        seen["build"] = build
+        raise Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setenv("TAGALONG_STARTED_BY", "desktop")
+    monkeypatch.setenv("TAGALONG_BUILD", "9.9.9")
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    assert seen["idle"]["work_running"] is False
+    status = seen["busy"]
+    assert status["work_running"] is True
+    assert status["build"] == "9.9.9" and status["started_by"] == "desktop"
+    assert status["pid"] == os.getpid() and status["data_dir"] == str(tmp_path)
+    assert status["log_path"] == str(tmp_path / "brain.log")
+    assert status["addr"] == "127.0.0.1:47321" and status["places"] == []
+    assert seen["build"][1] == "9.9.9"

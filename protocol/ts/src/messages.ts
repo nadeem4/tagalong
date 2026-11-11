@@ -32,6 +32,9 @@ export const HelloResult = z.object({
   tools: z.array(Tool),
   seq: HandshakeSeq,
   resync: z.boolean(),
+  // The brain's own version and build; absent on a brain older than the version check.
+  version: z.string().optional(),
+  build: z.string().optional(),
 });
 export type HelloResult = z.infer<typeof HelloResult>;
 

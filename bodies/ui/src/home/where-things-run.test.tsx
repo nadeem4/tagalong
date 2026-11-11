@@ -1,6 +1,7 @@
 /**
- * Tests for WhereThingsRun: the brain's address with its link state, each connected app by
- * where it runs, Claude Code as a local process, and the refetch when the brain changes.
+ * Tests for WhereThingsRun: each connected app by where it runs, Claude Code as a local
+ * process, how Scout reads the screen, and the refetch when the brain changes. The brain
+ * itself has its own card (brain-card.test.tsx).
  */
 
 import { act, render, screen } from '@testing-library/react';
@@ -47,46 +48,14 @@ function renderCard(bridge: FakeHostBridge) {
 
 const card = () => screen.findByRole('region', { name: 'Where things run' });
 
-describe('WhereThingsRun first-run setup', () => {
-  const setup = (state: BrainLink['setup']): BrainLink => ({ ...OFFLINE, setup: state });
-
-  it('says the brain is being set up while it installs, with no Retry', async () => {
-    renderCard(createFakeHostBridge({ brainLink: setup('installing') }));
-    const region = await card();
-    expect(region).toHaveTextContent("Setting up Scout's brain — one-time download");
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-  });
-
-  it('says it did not finish when it failed, and Retry asks the host to run it again', async () => {
-    const bridge = createFakeHostBridge({ brainLink: setup('failed') });
-    renderCard(bridge);
-    const region = await card();
-    expect(region).toHaveTextContent("Scout's brain did not finish setting up");
-    screen.getByRole('button', { name: 'Retry' }).click();
-    expect(bridge.setupRetries()).toBe(1);
-  });
-
-  it('shows neither line when there is nothing to set up', async () => {
-    renderCard(createFakeHostBridge({ brainLink: setup('idle') }));
-    const region = await card();
-    expect(region).not.toHaveTextContent('Setting up');
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-  });
-});
-
 describe('WhereThingsRun', () => {
-  it('shows the brain address and that it is connected', async () => {
+  it('has no Brain row: the brain card owns the address, the link and the setup lines', async () => {
     renderCard(createFakeHostBridge());
     const region = await card();
-    expect(region).toHaveTextContent('ws://127.0.0.1:47321');
-    expect(region).toHaveTextContent('Connected');
-  });
-
-  it('says Offline in words when the brain is down, with the address kept', async () => {
-    renderCard(createFakeHostBridge({ brainLink: OFFLINE }));
-    const region = await card();
-    expect(region).toHaveTextContent('ws://127.0.0.1:47321');
-    expect(region).toHaveTextContent('Offline');
+    expect(screen.queryByText('Brain')).toBeNull();
+    expect(region).not.toHaveTextContent('ws://127.0.0.1:47321');
+    expect(region).not.toHaveTextContent('Setting up');
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 
   it('shows a local app as its command and arguments, and a web app by its address', async () => {
@@ -106,9 +75,7 @@ describe('WhereThingsRun', () => {
     expect(row.querySelector('.home-conn__initial')).toHaveTextContent('W');
     expect(row).toHaveTextContent('https://wiki.example.com/mcp');
     expect(screen.getByText('Not working').closest('.tg-chip')).toHaveClass('tg-chip--err');
-    expect(screen.getAllByText('Connected', { selector: '.tg-chip--ok' }).length).toBeGreaterThan(
-      1,
-    );
+    expect(screen.getAllByText('Connected', { selector: '.tg-chip--ok' })).toHaveLength(1);
   });
 
   it('names Claude Code as a local process the brain starts', async () => {
@@ -121,11 +88,12 @@ describe('WhereThingsRun', () => {
   it('reads again when the brain says its link changed', async () => {
     const bridge = createFakeHostBridge();
     renderCard(bridge);
-    const region = await card();
-    expect(region).toHaveTextContent('Connected');
+    await card();
+    const note = 'Connected apps show up when the brain is connected.';
+    expect(screen.queryByText(note)).toBeNull();
     bridge.brainLink = () => Promise.resolve(OFFLINE);
     act(() => bridge.emitChanged('link'));
-    await screen.findByText('Offline');
+    await screen.findByText(note);
   });
 
   it('reads again when the brain says its apps changed', async () => {

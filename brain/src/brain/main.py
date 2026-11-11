@@ -13,6 +13,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import partial
+from pathlib import Path
 
 from anthropic import AsyncAnthropic
 
@@ -20,6 +21,7 @@ from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
+from brain.build_info import app_version, build_id
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
@@ -48,7 +50,7 @@ from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
 from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
-from brain.tools import KeySettings, anthropic_check
+from brain.tools import KeySettings, anthropic_check, brain_status_tools
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
 
@@ -106,6 +108,7 @@ async def _run() -> None:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
     bodies = Bodies()
+    build = build_id(config.build, Path(__file__).parent)  # once: hashing reads every source file
     model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     reader_model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.reader_model, key)
@@ -191,6 +194,22 @@ async def _run() -> None:
         config.loop_stale_days,
         bodies.notify,
     )
+    started_at = datetime.now(UTC).isoformat()
+
+    def brain_status() -> dict:  # the facts Home's brain card shows; session exists by the call
+        return {
+            "version": app_version(),
+            "build": build,
+            "pid": os.getpid(),
+            "started_at": started_at,
+            "started_by": config.started_by,
+            "addr": f"{config.host}:{config.port}",
+            "data_dir": str(config.data_dir),
+            "log_path": str(config.data_dir / "brain.log"),
+            "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
+            "work_running": bool(session.records.running_jobs()),
+        }
+
     session = Session(
         model,
         budget,
@@ -217,6 +236,7 @@ async def _run() -> None:
         + login
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + loop_tools(loops)
+        + brain_status_tools(brain_status)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )
@@ -244,7 +264,12 @@ async def _run() -> None:
     try:
         try:
             server = await start_server(
-                config.host, config.port, bodies, session_id(config.data_dir), session
+                config.host,
+                config.port,
+                bodies,
+                session_id(config.data_dir),
+                session,
+                (app_version(), build),
             )
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):

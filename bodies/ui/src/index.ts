@@ -7,6 +7,7 @@
 export { HostBridgeProvider, useHostBridge } from './host-bridge';
 export type {
   AskInput,
+  BrainCard,
   BrainLink,
   HostBridge,
   JobActivityEntry,

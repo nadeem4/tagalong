@@ -202,6 +202,7 @@ export const CONTROLS_CSS = `
 .tg-limitfield .tg-error { color: ${t.color.errInk}; }
 .tg-limitfield .tg-saved { color: ${t.color.okInk}; }
 .tg-limitfield .tg-icon { width: 14px; height: 14px; flex: none; }
+.tg-money .tg-button .tg-icon { width: 14px; height: 14px; }
 .tg-spend { width: 100%; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-spend__top { display: flex; justify-content: space-between; gap: ${t.space.lg}px; ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 .tg-spend__top strong { color: var(--tg-ctl-ink); font-weight: ${t.fontWeight.semibold}; }

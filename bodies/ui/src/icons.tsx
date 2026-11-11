@@ -1,11 +1,13 @@
 /**
- * The small 16px line icons the design mockups use (chevrons, search, check, error). They draw in
+ * The small 16px line icons the design mockups use (chevrons, search, check, error, minus, plus). They draw in
  * the current text colour, so a parent's `color` tints them. Contains Icon and its names.
  */
 import type { ReactElement } from 'react';
 
 const PATHS = {
   'chev-r': <path d="M6 3.5 10.5 8 6 12.5" />,
+  minus: <path d="M4 8h8" />,
+  plus: <path d="M4 8h8M8 4v8" />,
   'chev-d': <path d="M3.5 6 8 10.5 12.5 6" />,
   search: (
     <>

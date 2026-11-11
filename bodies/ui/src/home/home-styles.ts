@@ -138,6 +138,45 @@ export const HOME_CSS = `
 .conn-check__facts { margin: 0; padding-left: ${t.space.xl}px; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .conn-check .tg-note { color: ${t.color.warnInk}; }
 .conn-check__link { color: ${t.color.warnInk}; margin-right: auto; text-decoration: underline; }
+/* Scout's brain card and the update prompt. */
+.brain-card__title { margin: 0; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
+.brain-facts { display: grid; grid-template-columns: 140px 1fr; margin: 0; border-top: 1px solid ${t.color.panelLine}; }
+.brain-facts dt, .brain-facts dd {
+  padding: ${t.space.md}px 0; border-bottom: 1px solid ${t.color.panelLine};
+  ${typeCss('body')};
+}
+.brain-facts dt { color: ${t.color.panelMuted}; }
+.brain-facts dd {
+  margin: 0; min-width: 0; display: flex; align-items: center; flex-wrap: wrap;
+  gap: ${t.space.xs}px ${t.space.lg}px; overflow-wrap: anywhere; color: ${t.color.panelText};
+}
+.brain-facts--dim dd { color: ${t.color.panelMuted}; }
+.brain-status { display: inline-flex; align-items: center; gap: ${t.space.md}px; }
+.brain-mono { font-family: ${t.font.mono}; ${typeCss('small')}; }
+.brain-chips { display: inline-flex; flex-wrap: wrap; gap: ${t.space.sm}px; }
+.brain-link {
+  border: 0; background: none; padding: 0; cursor: pointer; font: inherit;
+  color: ${t.color.panelText}; text-decoration: underline;
+}
+.brain-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
+.brain-foot__note { margin-right: auto; ${typeCss('small')}; }
+.brain-error {
+  display: flex; align-items: center; gap: ${t.space.lg}px; padding: ${t.space.lg}px;
+  border-radius: ${t.radius.row}px; background: ${t.color.errFill}; color: ${t.color.errInk};
+}
+.brain-error > span { flex: 1; }
+.brain-icon { width: 16px; height: 16px; flex: none; }
+.brain-update p.brain-update__title { display: flex; align-items: center; gap: ${t.space.md}px; }
+.brain-meta { color: ${t.color.panelMuted}; ${typeCss('small')}; }
+.brain-update {
+  display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px;
+  border-radius: ${t.radius.row}px; background: ${t.color.warnFill};
+}
+.home-card .brain-update p, .brain-update p { margin: 0; color: ${t.color.warnInk}; ${typeCss('body')}; }
+.brain-update p.brain-update__title { font-weight: ${t.fontWeight.semibold}; }
+.brain-update__foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
+.brain-update__foot .brain-update__note { margin-right: auto; ${typeCss('small')}; }
+.home-page > .brain-update { margin-bottom: ${t.space.xl}px; }
 .perm-group { margin-top: ${t.space.xl}px; }
 .perm-group__title { margin: 0 0 ${t.space.xs}px; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted}; }
 .perm-search {
@@ -147,6 +186,8 @@ export const HOME_CSS = `
 }
 .perm-search:focus-within { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
 .perm-search .tg-icon { flex: none; }
+.perm-search input:focus-visible { outline: none; }
+.perm-search input::-webkit-search-cancel-button { appearance: none; }
 .perm-search input {
   flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: transparent;
   color: ${t.color.panelText}; font-family: ${t.font.ui}; ${typeCss('bodyLead')};

@@ -16,36 +16,39 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 ## Where it lives
 
-| Path (under `bodies/desktop/`)             | What it holds                                                                                                                                                               |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/index.ts`                        | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
-| `src/main/brain/start.ts`                  | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
-| `src/main/brain/launch.ts`                 | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached, output to `brain.log`, never stopped                              |
-| `src/main/brain/body-tools.ts`             | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
-| `src/main/brain/body-events.ts`            | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
-| `src/main/hotkeys.ts`                      | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
-| `src/main/talk-key.ts`                     | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
-| `src/main/tray-menu.ts`, `tray-icon.ts`    | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
-| `src/main/windows/`                        | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
-| `src/main/ipc/`                            | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                     |
-| `src/main/drop.ts`, `drop-io.ts`           | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
-| `src/main/status-marks.ts`                 | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
-| `src/main/settings-store.ts`               | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
-| `src/main/hide-secrets.ts`                 | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
-| `src/main/front-window.ts`                 | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
-| `src/main/fix-target.ts`                   | `fixPage` (the Fix it allowlist)                                                                                                                                            |
-| `src/main/log-file.ts`, `log-text.ts`      | The log file                                                                                                                                                                |
-| `src/main/platform/`                       | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
-| `src/main/platform/exclusions.ts`          | `findCaptureBlock`, `secretFileRule`, `normalizeProcessName`: which window may not be read                                                                                  |
-| `src/main/platform/inventory.ts`           | `buildInventory`: applies the exclusions to the host's window list                                                                                                          |
-| `src/main/platform/text-layer-notes.ts`    | What a window's text does not say (editors, terminals and canvas apps publish little)                                                                                       |
-| `src/preload/index.ts`, `held.ts`          | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
-| `src/shared/ipc.ts`                        | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
-| `src/renderer/*.html`, `src/renderer/src/` | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
-| `electron.vite.config.ts`                  | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
-| `electron-builder.json`                    | The installer                                                                                                                                                               |
-| `scripts/`                                 | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                      |
-| `e2e/`                                     | Playwright suites run against the built app                                                                                                                                 |
+| Path (under `bodies/desktop/`)                   | What it holds                                                                                                                                                               |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/index.ts`                              | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
+| `src/main/brain/start.ts`                        | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
+| `src/main/brain/launch.ts`                       | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached, output to `brain.log`, never stopped                              |
+| `src/main/brain/build-id.ts`, `version-check.ts` | `ownBuild` (app version, or the dev source hash) and `decideUpdate`: current, restart, ask or terminal                                                                      |
+| `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts, quiet restart, restart after work; `registerBrainStatusIpc`                                                                    |
+| `build/installer.nsh`                            | NSIS hooks that stop a running brain before install and uninstall                                                                                                           |
+| `src/main/brain/body-tools.ts`                   | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
+| `src/main/brain/body-events.ts`                  | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
+| `src/main/hotkeys.ts`                            | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
+| `src/main/talk-key.ts`                           | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
+| `src/main/tray-menu.ts`, `tray-icon.ts`          | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
+| `src/main/windows/`                              | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
+| `src/main/ipc/`                                  | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                     |
+| `src/main/drop.ts`, `drop-io.ts`                 | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
+| `src/main/status-marks.ts`                       | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
+| `src/main/settings-store.ts`                     | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
+| `src/main/hide-secrets.ts`                       | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
+| `src/main/front-window.ts`                       | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
+| `src/main/fix-target.ts`                         | `fixPage` (the Fix it allowlist)                                                                                                                                            |
+| `src/main/log-file.ts`, `log-text.ts`            | The log file                                                                                                                                                                |
+| `src/main/platform/`                             | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
+| `src/main/platform/exclusions.ts`                | `findCaptureBlock`, `secretFileRule`, `normalizeProcessName`: which window may not be read                                                                                  |
+| `src/main/platform/inventory.ts`                 | `buildInventory`: applies the exclusions to the host's window list                                                                                                          |
+| `src/main/platform/text-layer-notes.ts`          | What a window's text does not say (editors, terminals and canvas apps publish little)                                                                                       |
+| `src/preload/index.ts`, `held.ts`                | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
+| `src/shared/ipc.ts`                              | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
+| `src/renderer/*.html`, `src/renderer/src/`       | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
+| `electron.vite.config.ts`                        | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
+| `electron-builder.json`                          | The installer                                                                                                                                                               |
+| `scripts/`                                       | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                      |
+| `e2e/`                                           | Playwright suites run against the built app                                                                                                                                 |
 
 ## How it works
 
@@ -116,8 +119,10 @@ first (argv, no shell, output in `brain.log`, no timeout), then
 `UV_PROJECT_ENVIRONMENT=<home>\runtime\venv`, `UV_PYTHON_INSTALL_DIR=<home>\runtime\python`,
 `UV_CACHE_DIR=<home>\cache\uv` and `UV_PYTHON_PREFERENCE=only-managed` (`<home>` is
 `TAGALONG_HOME`, else `~/.tagalong`). While the sync runs, `ipc/brain-link.ts` reports
-`setup: 'installing'`; if it fails, `'failed'` and no brain is spawned. Home's "Where things run"
+`setup: 'installing'`; if it fails, `'failed'` and no brain is spawned. Home's "Scout's brain"
 card shows a plain line for each, and **Retry** (`IPC.brainSetupRetry`) runs the launch again.
+The same call backs **Start brain** on the offline card, so it also runs when the link is
+`offline`. See [Brain version check and restart](#brain-version-check-and-restart).
 
 - **Body tools.** `list_windows` returns visible and minimized windows as JSON text.
   `read_window_text(windowId)` works on minimized windows, and a read from pixels (OCR) raises the
@@ -616,9 +621,15 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   `IPC.brainChangedEvent`; the preload exposes it as `onBrainChanged(handler)` on the HostBridge.
   Memory view reads again on `memory`, the Jobs panel on `jobs`. The brain link sends `link`
   (online, connecting, offline, outdated) when it changes, so the "Where things run" card reads again.
+- **Scout's brain:** a card above "Where things run" (`bodies/ui/src/home/brain-card.tsx`): status
+  and uptime, where it runs, version, who started it, process id, data folder, log file and the
+  places connected, with Restart brain and Copy details. States: normal, update ready, started by
+  you (no restart offered), offline (Start brain, facts dimmed). It reads `brainCard()` and
+  refreshes on `link` and `jobs`.
 - **Where things run:** a card on Home's Overview (`bodies/ui/src/home/where-things-run.tsx`). The
   `brainLink` IPC (`tagalong:brain:link`, `ipc/brain-link.ts`) returns `{ addr: "ws://<addr>", status }`;
-  the address is `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), exactly what the desktop dials.
+  the address is `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), exactly what the desktop dials
+  (the brain card shows it; this card keeps only the offline note).
   Apps come from `listConnections`. Each row is a letter tile, a name over its subline and the
   Connections page's status chip. Offline, the card says apps return with the brain.
   `e2e/where-things-run.spec.ts` covers it on the fake brain.
@@ -763,24 +774,66 @@ Bean's frames are WebP strips under `src/renderer/src/bean/`, loaded with
 each strip once as a file that the avatar and Home share; a `data:` URL would be blocked
 by the CSP. `scripts/bean/bean.py` (Blender, headless) and `pack.py` regenerate them.
 
+### Brain version check and restart
+
+The brain's `hello` result names its `version` and `build`; the desktop knows its own
+(`brain/build-id.ts`): packaged, both are the app version (the brain is launched with
+`TAGALONG_BUILD` set to it); in dev the build is the first 12 hex characters of a sha256 over the
+`.py` and `.md` files under `brain/src/brain`, the same hash the brain computes
+(`brain/src/brain/build_info.py`, pinned by `brain/tests/fixtures/build-hash` on both sides).
+
+`brain/version-check.ts` (`decideUpdate`) is pure and decides what to do on every connect:
+
+| Facts                                                              | Action                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Same version and build                                             | `current`                                                                  |
+| Brain started by the person (`TAGALONG_STARTED_BY` not `desktop`)  | `terminal`: tell the person to restart it in their terminal; never kill it |
+| Started by the desktop, no job running, not yet restarted this run | `restart`: stop it and start the new one, quietly, one log line            |
+| Started-by unknown, a job running, or already restarted this run   | `ask`: show the update prompt                                              |
+
+An old brain that says no version is never current and never loops: at most one quiet restart per
+app run. `ipc/brain-status.ts` (`createBrainStatus`) holds the state: the `brain_status` Home tool
+feeds Home's "Scout's brain" card (`brainStatus`, `brainRestart`, `brainRestartAfterWork`,
+`brainOpenFolder`, `brainOpenLog`, `brainCopyDetails`); `restart` is refused for a person-started
+brain; "When your job finishes" waits for the next `changed jobs` with no work running, and an old
+brain that cannot answer `brain_status` (unknown facts) never restarts behind a waiting job. The
+card's `BrainCard` carries `build` plus the app's own `appVersion` and `appBuild`: the Version row
+reads `Tagalong <version> · build <id>`, and an out-of-date brain reads `Brain <version> · build
+<id> (app is <version> · <build>)`; offline it shows the app's own version and "Tagalong" under
+Started by. The copy is the mockup's: the update prompt (an alert icon, "Update ready", "Scout's
+brain is from an older version. Restart to finish updating.") and, for a brain the person started,
+"You started it, so Tagalong leaves it alone. Restart it in your terminal."; the offline line has an
+error icon (`home/brain-icons.tsx`). A failed restart shows nothing extra. The
+desktop marks the brain it spawns with `TAGALONG_STARTED_BY=desktop` and stops it with
+`stopBrain` (`launch.ts`, through `brain.pid`). On Overview the update prompt sits inside the
+card; on every other page `UpdateBanner` shows it at the top. `e2e/where-things-run.spec.ts`
+covers a person-started old brain on the fake brain. The e2e fake brain's default `hello` is the
+app's own version and build (`e2e/fixtures/fake-brain.ts`), so ordinary specs see a current brain
+and no prompt; only the version specs pass an old `hello`.
+
+The Windows installer stops a running brain before it replaces or removes files:
+`build/installer.nsh` (`customInit`, `customUnInit`) reads `brain.pid` from `TAGALONG_HOME` (else
+`%USERPROFILE%\.tagalong`) and runs `taskkill` on that process id, only when it is a Python
+process, and ignores a missing file. This is checked by hand (see the feature test guide).
+
 ### Packaging
 
 `electron-builder.json`:
 
-| Key                    | Value                                                                                                                                                                                  |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `appId`, `productName` | `dev.tagalong.desktop`, `Tagalong` (`productName` also names the user data folder, `%APPDATA%\Tagalong`)                                                                               |
-| `files`                | `dist/**/*`, `package.json`                                                                                                                                                            |
-| `asar`                 | `true`                                                                                                                                                                                 |
-| `asarUnpack`           | `**/*.node`                                                                                                                                                                            |
-| `npmRebuild`           | `false`: every native module ships an N-API binary, which Electron loads as is                                                                                                         |
-| `publish`              | `null`: no update channel                                                                                                                                                              |
-| `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked)                                                                                                 |
-| `artifactName`         | `${productName}-Setup-${version}-${arch}.${ext}`                                                                                                                                       |
-| `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                  |
-| `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false` |
-| `mac`, `linux`         | `dmg`; `AppImage` and `deb`. Configured, not verified                                                                                                                                  |
-| `directories`          | output `release`                                                                                                                                                                       |
+| Key                    | Value                                                                                                                                                                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appId`, `productName` | `dev.tagalong.desktop`, `Tagalong` (`productName` also names the user data folder, `%APPDATA%\Tagalong`)                                                                                                                                             |
+| `files`                | `dist/**/*`, `package.json`                                                                                                                                                                                                                          |
+| `asar`                 | `true`                                                                                                                                                                                                                                               |
+| `asarUnpack`           | `**/*.node`                                                                                                                                                                                                                                          |
+| `npmRebuild`           | `false`: every native module ships an N-API binary, which Electron loads as is                                                                                                                                                                       |
+| `publish`              | `null`: no update channel                                                                                                                                                                                                                            |
+| `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked)                                                                                                                                                               |
+| `artifactName`         | `${productName}-Setup-${version}-${arch}.${ext}`                                                                                                                                                                                                     |
+| `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                                                                                |
+| `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false`, `include: build/installer.nsh` (stops a running brain first) |
+| `mac`, `linux`         | `dmg`; `AppImage` and `deb`. Configured, not verified                                                                                                                                                                                                |
+| `directories`          | output `release`                                                                                                                                                                                                                                     |
 
 Node cannot `dlopen` from inside an asar archive; files under `app.asar.unpacked` are loaded from
 there by Electron's `require` redirect, which is why every `.node` file and the ONNX runtime's DLLs

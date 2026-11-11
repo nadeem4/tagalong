@@ -61,6 +61,20 @@ describe('registerBrainLinkIpc', () => {
   });
 });
 
+describe('Start brain', () => {
+  it('runs the launch while the brain is offline, which probes before it spawns', async () => {
+    const ipc = fakeIpc();
+    let launches = 0;
+    const setup = createBrainSetup(
+      async () => void launches++,
+      () => undefined,
+    );
+    registerBrainLinkIpc(ipc.handle, { brain: { addr: 'x:1', link: 'offline' }, setup });
+    await ipc.invoke(IPC.brainSetupRetry);
+    expect(launches).toBe(1);
+  });
+});
+
 describe('createBrainSetup', () => {
   it('tells Home on every state the launcher reports', async () => {
     let changes = 0;
