@@ -120,10 +120,7 @@ export const CONNECTIONS_CSS = `
 }
 @keyframes cx-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .home .cx-spin { animation: none; border-top-color: ${t.color.panelMuted}; } }
-.home .cx-progress { display: flex; flex-direction: column; gap: 6px; width: 200px; }
-.home .cx-progress__top { display: flex; justify-content: space-between; ${typeCss('small')}; font-weight: 600; color: ${t.color.panelText}; }
-.home .cx-bar { height: 4px; border-radius: 2px; background: ${t.color.panelTile}; overflow: hidden; }
-.home .cx-bar > i { display: block; height: 100%; background: ${t.color.panelText}; border-radius: 2px; }
+.home .cx-item > .sc { margin: 0 0 12px 50px; }
 .home .cx-errline {
   display: flex; align-items: center; gap: 8px; margin: 0 0 12px 50px; padding: 10px 12px; border-radius: 8px;
   background: ${t.color.errFill}; color: ${t.color.errInk}; ${typeCss('body')}; font-weight: 600;

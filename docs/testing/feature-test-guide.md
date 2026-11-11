@@ -244,11 +244,11 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
     **Expected:** the reply says it could not reach the desktop; no hang.
 11. **Action:** ask Scout to do something that changes a window (for example "move the Notes
     window to the left").
-    **Expected:** the bubble asks in Scout's own words, with **Allow once**, **Always allow** and
-    **Deny**. **Allow once** runs it; the next time the bubble asks again.
-    (Install asks: ask Scout to set up an app; the chat shows one install card with who made it, where it runs and how it signs in. **Allow** keeps the card and it follows the steps to Connected or a failure with **Try again** and **Not now**; **Not now** denies.) Scout's words show once, in the card, never also as streaming text above it.
+    **Expected:** the bubble asks in Scout's own words, with **Allow**, **Always allow** and
+    **Not now**. **Allow** runs it; the next time the bubble asks again.
+    (Install asks: ask Scout to set up an app; the chat shows one install card with who made it, where it runs and how it signs in. **Allow** keeps the card and it follows the steps to Connected or a failure with **Try again** and **Not now**; **Not now** denies.) Scout's words show once, in the card, never also as streaming text above it. Also check: a long answer folds behind **Show more**; a code block has a bar with its language and **Copy**; the header says "Setting up <app>" while an app installs and "Ready" afterwards; in Home's Connections an expert install shows the same card on the light page.
 12. **Action:** repeat and press **Always allow**.
-    **Expected:** it runs, and later asks for the same tool no longer appear. Press **Deny** on
+    **Expected:** it runs, and later asks for the same tool no longer appear. Press **Not now** on
     another tool's ask: Scout tells you it was told no.
 13. **Action:** while an ask is open, restart the desktop app (or drop and restore the connection).
     **Expected:** the ask is still open in the bubble. With a second body connected, answering in
@@ -517,8 +517,8 @@ next section.
 1. **Action:** call `list_preferences` on a fresh data folder.
    **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
 2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow
-   once**. Ask again and press **Deny**. Ask a third time and leave the card
-   for 5 minutes: Scout's turn goes on and says the call is waiting. Then press **Allow once**.
+   once**. Ask again and press **Not now**. Ask a third time and leave the card
+   for 5 minutes: Scout's turn goes on and says the call is waiting. Then press **Allow**.
    **Expected:** the call runs by itself and Scout tells you. `list_approvals` lists three rows for
    that tool, newest first: `approved`, `refused` and `approved`, all `decided_by: "person"`, with `source: "scout_tool"` and a summary of the words Scout wrote before the
    call. Ask for the same thing again while a card is parked: no second card appears.
@@ -1295,7 +1295,7 @@ stands in for a real one (the brain still needs to hear something).
 1. **Setup:** a connected app (see [Connections](#connections-your-apps-over-mcp)).
 2. **Action:** hold the key and ask Scout to make a change in that app.
 3. **Expected:** the confirm card ("Change in <app> — allow?") appears in the bubble and Scout says
-   to check the card rather than reading it out. Nothing changes until **Allow once**.
+   to check the card rather than reading it out. Nothing changes until **Allow**.
 
 ### T.8. Settings → Voice
 
@@ -1433,7 +1433,7 @@ the apps in C1 to C7 use a command or a pasted key.
 
 ### C2. Read with an app
 
-- [ ] Ask Scout "what files are in my Documents folder?". A card asks first (an app's tools default to Ask); press **Allow once** and Scout answers from the app. Set the tool to Auto in Home and it runs with no card.
+- [ ] Ask Scout "what files are in my Documents folder?". A card asks first (an app's tools default to Ask); press **Allow** and Scout answers from the app. Set the tool to Auto in Home and it runs with no card.
 
 ### C3. A change asks first
 
@@ -1441,9 +1441,9 @@ the apps in C1 to C7 use a command or a pasted key.
       app, what will change (the card's text is Scout's own words from that step; if Scout wrote
       none it is empty and the card shows the tool and its input). Nothing has changed yet.
 - [ ] Press **Cancel**. Scout says nothing was changed.
-- [ ] Ask again and press **Allow once**. The file appears.
+- [ ] Ask again and press **Allow**. The file appears.
 - [ ] Ask again and leave the card for 5 minutes. Scout says it is waiting; nothing was changed
-      yet. Press **Allow once** later: the file appears and Scout tells you.
+      yet. Press **Allow** later: the file appears and Scout tells you.
 
 ### C4. A web app with a pasted key
 
@@ -1793,7 +1793,7 @@ is in [The desktop on the Python brain](#the-desktop-on-the-python-brain).
 2. **Action:** ask "Open https://example.com in a new tab."
 3. **Expected:** the desktop bubble shows an approval for `tab_actions`. After **Allow**, a new tab
    opens at example.com with no browser permission window, and Scout says it opened it. After
-   **Deny** nothing opens.
+   **Not now** nothing opens.
 4. **Action:** ask "Switch to the article tab", then "Close the example.com tab."
 5. **Expected:** each one asks for approval in the bubble; after **Allow** the article comes to the
    front, then the example.com tab closes. No browser permission window for either. (Setting

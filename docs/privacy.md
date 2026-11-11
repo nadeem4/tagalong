@@ -208,7 +208,7 @@ when Scout calls one of their tools in a turn you started.
   app.
 - **Changes ask first.** A tool the app marks read-only runs at once. Every other tool, including
   any the app says nothing about, shows a card in Scout's bubble saying which app, which tool and
-  what Scout filled in, every argument in full (long ones scroll); it runs only on **Allow once**.
+  what Scout filled in, every argument in full (long ones scroll); it runs only on **Allow**.
   Cancel, an hour without an answer, a stopped conversation, or Tagalong closing before you answer,
   and nothing changes. A change still waiting when Tagalong closes is never run later. A change too
   long to show in full (over 4,000 characters) is not offered at all. A change that cannot be undone

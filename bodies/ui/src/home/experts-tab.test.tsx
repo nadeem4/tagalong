@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider } from '../host-bridge';
 import type { SetupChoice, SetupExpert, SetupOverview, SetupResult } from '../shapes';
+import { InstallCard } from '../setup/install-card';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
 
@@ -60,7 +61,7 @@ const click = async (element: HTMLElement) => {
   });
 };
 
-const rowOf = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+const rowOf = (name: string) => screen.getAllByText(name)[0]!.closest('li') as HTMLElement;
 
 describe('Experts tab: add an expert', () => {
   it('has the list open, with no Browse and add toggle', async () => {
@@ -201,6 +202,30 @@ describe('Experts tab: add an expert', () => {
     expect(row.getByText('Getting what it needs to run')).toBeVisible();
     expect(screen.queryByText(/Tagalong’s own Node/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add Codex' })).toBeNull();
+  });
+
+  it('Connections installing row is the same component', async () => {
+    await open({
+      browseExperts: [CODEX],
+      showMoreFrom: 1,
+      progress: { expert: 'codex-acp', stage: 'node', percent: 40 },
+    });
+    const card = within(rowOf('Codex')).getByRole('group', { name: 'Set up Codex' });
+    expect(card).toHaveClass('sc', 'sc--light');
+    // Drawn again by the chat's own card with the same facts, it is the same markup.
+    const again = render(
+      <InstallCard
+        subject={{ kind: 'expert', id: 'codex-acp', name: 'Codex', official: true }}
+        view={{
+          phase: 'working',
+          label: 'Installing…',
+          percent: 40,
+          note: 'Getting what it needs to run',
+        }}
+        theme="light"
+      />,
+    );
+    expect(again.container.querySelector('.sc')?.innerHTML).toBe(card.innerHTML);
   });
 
   it('a failed install shows on its row with Try again, not at the top of the page', async () => {
