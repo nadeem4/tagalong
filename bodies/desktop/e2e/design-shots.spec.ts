@@ -155,6 +155,20 @@ test.describe('E3 chat', () => {
     throw new Error('no panel window appeared');
   }
 
+  // The window grows to fit an answer; shoot once its height has stopped moving, with the
+  // speaking indicator gone so the header status keeps one line.
+  async function settle(page: Page): Promise<void> {
+    const stop = page.getByRole('button', { name: 'Stop speaking' });
+    if (await stop.isVisible()) await stop.click();
+    let last = -1;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const height = await page.evaluate(() => window.innerHeight);
+      if (height === last) return;
+      last = height;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 300));
+    }
+  }
+
   const notion = (status: string, toolCount = 0) => ({
     id: 'notion',
     name: 'Notion',
@@ -190,6 +204,7 @@ test.describe('E3 chat', () => {
     await expect(page.getByText('This is the fake brain.').first()).toBeVisible({
       timeout: 30_000,
     });
+    await settle(page);
     await shot(page, 'E3', 'quick-bubble-answer');
     brain.setRunning(
       [{ job: 'j1', expert: 'Claude Code', text: 'npm init -y', at: new Date().toISOString() }],
@@ -200,6 +215,7 @@ test.describe('E3 chat', () => {
     brain.setRunning([], 'jobs');
     await page.getByRole('button', { name: 'Open full chat' }).click();
     await page.getByRole('log').waitFor({ state: 'visible' });
+    await settle(page);
     await shot(page, 'E3', 'header-at-rest');
 
     // Listening off, with its tooltip.
@@ -286,6 +302,7 @@ test.describe('E3 chat', () => {
     await seeing.click();
     await always.click();
     await expect(always).toHaveAttribute('aria-pressed', 'true');
+    await settle(page);
     await shot(page, 'E3', 'header-both-on');
     await page.mouse.move(200, 300);
 
@@ -295,6 +312,18 @@ test.describe('E3 chat', () => {
     await expect(page.getByText('Approve it from now on?')).toBeVisible({ timeout: 30_000 });
     await shot(page, 'E3', 'card-choice');
     await page.getByRole('button', { name: 'Keep asking' }).click();
+    // A choice with a recommended option, then an ask that can never be always allowed.
+    await ask('choose');
+    await expect(page.getByText('Who should fix the fixture?')).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'card-choice-recommended');
+    await page.getByRole('button', { name: /^Claude Code/ }).click();
+    await ask('locked ask');
+    await expect(page.getByText('Always asks')).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'card-ask-locked');
+    await page
+      .getByRole('region', { name: 'Allow gmail__send_message?' })
+      .getByRole('button', { name: 'Not now' })
+      .click();
     await ask('permission');
     await expect(page.getByRole('button', { name: 'Allow', exact: true }).first()).toBeVisible({
       timeout: 30_000,

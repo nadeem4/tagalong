@@ -129,17 +129,41 @@ describe('useRunningStep', () => {
 });
 
 describe('JobLine', () => {
-  it('is a card: the expert working, the step whole in mono, a bar, silent', () => {
+  it('is a card: the expert working, the command in code, silent, and no bar in the quick bubble', () => {
     render(<JobLine step={step('npm init -y')} onOpenTasks={() => undefined} />);
     const card = screen.getByTestId('job-line');
     expect(card).toHaveTextContent('Claude Code is working');
     expect(card.querySelector('code')).toHaveTextContent('npm init -y');
     expect(card.getAttribute('aria-live')).toBe('off');
     expect(card.hasAttribute('title')).toBe(false);
-    // No real progress is known, so the bar only says it is moving.
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+
+  it('the full chat adds a bar that only says the job is moving', () => {
+    render(<JobLine step={step('npm init -y')} onOpenTasks={() => undefined} bar />);
     expect(screen.getByRole('progressbar', { name: 'Working' })).not.toHaveAttribute(
       'aria-valuenow',
     );
+  });
+
+  it("shows the job's title when it has one", () => {
+    render(
+      <JobLine
+        step={{ ...step('npm init -y'), title: 'Claude Code is fixing the fixture' }}
+        onOpenTasks={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('job-line')).toHaveTextContent('Claude Code is fixing the fixture');
+    expect(screen.getByTestId('job-line')).not.toHaveTextContent('is working');
+  });
+
+  it('only a command is in code; any other step reads as plain words', () => {
+    render(
+      <JobLine step={{ ...step('edited src/a.ts'), kind: 'edit' }} onOpenTasks={() => undefined} />,
+    );
+    const card = screen.getByTestId('job-line');
+    expect(card.querySelector('code')).toBeNull();
+    expect(card).toHaveTextContent('edited src/a.ts');
   });
 
   it('Open in Tasks goes to the Tasks page', () => {

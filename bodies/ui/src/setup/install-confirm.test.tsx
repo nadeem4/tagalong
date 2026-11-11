@@ -127,6 +127,34 @@ describe('InstallConfirm', () => {
     );
   });
 
+  it('Not now drops the card even when the brain refuses the answer, never leaving a live Allow', async () => {
+    const bridge = createFakeHostBridge();
+    bridge.approveTool = () => Promise.reject(new Error('gone'));
+    const { onGone } = show(APP_ASK, bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    await waitFor(() => expect(onGone).toHaveBeenCalledOnce());
+  });
+
+  it('a retry that fails with the same error text still ends on the failure, not on Checking it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const bridge = createFakeHostBridge();
+      bridge.apps = [
+        { id: 'notion', name: 'Notion', status: 'error', error: 'same', tools: [] },
+      ] as never;
+      show(APP_ASK, bridge);
+      fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+      await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+      expect(screen.queryByRole('alert')).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9000);
+      });
+      expect(screen.getByRole('alert')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('Allow approves once and the card moves to working, staying in place', async () => {
     const { bridge } = show(APP_ASK);
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));

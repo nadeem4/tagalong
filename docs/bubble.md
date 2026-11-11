@@ -157,10 +157,20 @@ stateDiagram-v2
   message (or "Tagalong could not reach its brain.") and one **Try again**, which asks the same
   question again (never while another answer is running). An earlier failed exchange keeps the box
   without the button.
-- A running job shows as a card: "Claude Code is working", **Open in Tasks** (opens Home on
-  Tasks), a moving bar (the brain reports no share done, so it only says the job is moving) and
-  the whole step in mono.
-- A long answer shows its gist (whole blocks or list items, never cut mid-sentence, no fade) with
+- A running job shows as a card: the job's own title ("Claude Code is working" when it has
+  none), **Open in Tasks** (opens Home on Tasks), the step in body type with only a command in
+  mono, and, in the full chat only, a moving bar (the brain reports no share done, so it only
+  says the job is moving; it starts inside its track).
+- A failed live reply is a full-width error box with no avatar column, the same as a past failure.
+  The brain's error text is "Scout's brain hit a problem with that one."; the one **Try again**
+  is the box's own.
+- An approval offer shows only its question (bold) and its two choices; the sentence and group
+  the brain keeps for its record are not shown. The ask card's Tool row reads the tool in words
+  (`gmail__send_message` as "send message").
+- The header status keeps one line (an ellipsis when long), so the speaking indicator never makes
+  it taller.
+- A long answer shows its gist (whole blocks or list items, never cut mid-sentence) fading out on
+  its last line, with
   a **Show more** chevron; the rest opens in place.
 - An install card sits under Scout's sentence inside the same reply, not after it.
 - **Stop** (while running) calls `interrupt(mine)`.
@@ -195,7 +205,7 @@ panel that was already showing is left alone.
 
 **The cards.** Below the answer, in this order: the drop card, the install cards, then the connector confirm card.
 
-**The install card** (`setup/install-card.tsx`, `setup/install-confirm.tsx`): a `connector.confirm` for `install_app` or `install_expert` carries the brain's card facts (`facts`, from the ask's `input`: who made it, where it runs, how it signs in, community or official) and is drawn as one `InstallCard` instead of the confirm card. Allow answers `approveTool(id, 'once')` and the card stays, following the install (steps, percent, sign in, Connected or Ready, or a failure with **Try again**, which asks Scout again, and **Not now**) from the connections list (apps) or the setup overview (experts). Not now denies. These cards live apart from `confirms`: `connector.dismiss` and the turn ending do not remove them, and a repeat ask for the same app or expert replaces its card. Connections' installing rows draw the same component in its Working state on the light theme (`home/experts-group.tsx` `InstallingCard`), so the two never drift; an app row there has no progress from the brain, so it keeps "Waiting for you…".
+**The install card** (`setup/install-card.tsx`, `setup/install-confirm.tsx`): a `connector.confirm` for `install_app` or `install_expert` carries the brain's card facts (`facts`, from the ask's `input`: who made it, where it runs, how it signs in, community or official) and is drawn as one `InstallCard` instead of the confirm card. Allow answers `approveTool(id, 'once')` and the card stays, following the install (steps, percent, sign in, Connected or Ready, or a failure with **Try again**, which asks Scout again, and **Not now**) from the connections list (apps) or the setup overview (experts). Not now denies, and the card goes even when the brain refuses that answer, so a dead ask never keeps a live Allow. A community app's ask shows only its Check first box (no description line). The Done line uses the circled check and **Manage in Connections** ends in a chevron. An error row that has not changed since Allow is trusted as this install's own after 8 seconds, so a retry failing with the same text never stays on "Checking it". These cards live apart from `confirms`: `connector.dismiss` and the turn ending do not remove them, and a repeat ask for the same app or expert replaces its card. Connections' installing rows draw the same component in its Working state on the light theme (`home/experts-group.tsx` `InstallingCard`), so the two never drift; an app row there has no progress from the brain, so it keeps "Waiting for you…".
 **The chat as the mockup draws it.** Scout's reply sits behind its 24 px mark, capped at 60ch (`.bubble-scout`); your message is the `mine` token (`#2A3160`) with a 14/14/4/14 radius. A fenced code block has a bar with its language and **Copy** (`answer.tsx` `CodeBlock`). In the full chat a long answer (over 8 lines or 480 characters) folds to its gist behind a fade with **Show more** / **Show less**. Both windows share one header: Scout's mark, the name, and a status line. The line reads "Setting up X" (an app install working) or "Installing X" (an expert), else the listening and seeing words, and "Ready" when both are off but a conversation or card is open ("Not listening or looking" when the chat is empty). The install card scrolls into view as it appears. Generic, because the brain does not send the data: an install card's wording is the same for every app, prompt chips on the done card exist only for Gmail and Calendar (`jobs-kinds.ts`), a choice has no option subline, and an expert's name comes from its id until it is listed. There is no Cancel or Open again: the brain has no install cancel.
 
 The bubble keeps each one's state from its notification:
@@ -220,8 +230,9 @@ focusing it holds it. Clicking the text opens the bubble (`onOpen(text)`, so the
 the reading-aloud bars. A status line shows no mark.
 Optional `status` shows a `StatusMark` row with Fix it in place of text.
 
-**The live job line.** While any expert job runs, `CompanionBubble` shows one muted 12 px line
-above the status row: `<expert>: <step title>` (`Claude Code: npm init -y`), from `job-line.tsx`.
+**The live job line.** While any expert job runs, `CompanionBubble` shows a card (see above)
+above the status row, from `job-line.tsx`; its step comes from the brain's `running` list
+(`job`, `part`, `expert`, `text`, `kind`, `title`, `at`).
 `useRunningStep(bridge)` calls `runningSteps()` on mount and on each `onBrainChanged` of
 `job_activity` or `jobs`, at most once per 250 ms (leading read, then one trailing read). With
 several jobs running it shows the first entry, the most recently updated. It shows the step's own

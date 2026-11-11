@@ -98,6 +98,15 @@ describe('the connector confirm card', () => {
       expect(card).not.toHaveTextContent('Change in');
     });
 
+    it('the Tool row reads the tool in words, without its app prefix', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      const row = screen.getByText('Tool').closest('div')!;
+      expect(row).toHaveTextContent('move window');
+      expect(row).not.toHaveTextContent('desktop__');
+    });
+
     it('with no words, shows the tool name and its input', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

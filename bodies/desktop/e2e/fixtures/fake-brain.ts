@@ -305,7 +305,7 @@ const INSTALL_FACTS: Record<string, Record<string, unknown>> = {
     licence: 'MIT',
     repo: 'github.com/vaultkit/obsidian-mcp',
   },
-  claude: { expert: 'claude-acp', official: true, publisher: 'Anthropic' },
+  claude: { expert: 'claude-acp', official: true, publisher: 'Anthropic', recommended: true },
 };
 const expertChoice = (id: string, name: string, over: Record<string, unknown> = {}) => ({
   id,
@@ -727,6 +727,14 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           const which = /install (notion|obsidian|claude)/.exec(String(msg.params?.text))![1]!;
           const ask = `a${turns}`;
           held.set(ask, finish);
+          // Scout says a sentence first, as the real brain does, so the card sits under words.
+          const lead =
+            which === 'obsidian'
+              ? 'That one is made by someone else, so check it first.'
+              : which === 'claude'
+                ? 'Claude Code can take the long jobs. I need to set it up first.'
+                : 'Notion works through its own sign-in. I need to connect it first.';
+          notify('reply', { ...base, delta: lead });
           notify('ask', {
             id: ask,
             state: 'open',
@@ -736,6 +744,31 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             confirm: true,
             tool: which === 'claude' ? 'install_expert' : 'install_app',
             input: INSTALL_FACTS[which],
+          });
+        } else if (msg.params?.text?.includes('locked ask')) {
+          // A tool that can never be always allowed: only Not now and Allow, with the chip.
+          const ask = `a${turns}`;
+          held.set(ask, finish);
+          notify('ask', {
+            id: ask,
+            state: 'open',
+            turn,
+            text: 'Send the reply to Sam?',
+            options: ['allow', 'deny'],
+            confirm: true,
+            tool: 'gmail__send_message',
+            input: { to: 'sam@northwind.example' },
+          });
+        } else if (msg.params?.text?.includes('choose')) {
+          // Scout's own choice: no tool, no confirm, one recommended option.
+          finish();
+          notify('ask', {
+            id: 'c1',
+            state: 'open',
+            text: 'Who should fix the fixture?',
+            options: ['Claude Code', 'Gemini CLI'],
+            recommended: 'Claude Code',
+            free_text: false,
           });
         } else if (msg.params?.text?.includes('offer')) {
           // The turn ends first; the offer is a plain ask, as the brain sends it.

@@ -206,6 +206,26 @@ describe('CompanionBubble', () => {
     await waitFor(() => expect(bridge.asks.map((a) => a.text)).toEqual(['why?', 'why?']));
   });
 
+  it('a failed live reply in the full chat is a full-width box, not inside the avatar column', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { expanded: true });
+    await act(async () => {
+      const input = screen.getByLabelText('Message Scout');
+      fireEvent.change(input, { target: { value: 'why?' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    });
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.error', turnId: 'turn-1', code: 'x', message: 'It broke.' });
+    });
+    expect(screen.getByRole('alert').closest('.bubble-scout')).toBeNull();
+  });
+
   it('opens the full chat on request', () => {
     const onOpenChat = vi.fn();
     renderBubble(createFakeHostBridge(), { onOpenChat });

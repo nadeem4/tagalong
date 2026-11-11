@@ -13,6 +13,9 @@ import type { HostBridge } from '../host-bridge';
 import { InstallCard, subjectOf, type InstallSubject, type InstallView } from './install-card';
 import { appView, findApp } from './install-progress';
 
+/** How long an error row that has not changed since Allow is trusted to be this install's own. */
+const STALE_ERROR_MS = 8000;
+
 /** What an expert install looks like right now, from the setup overview. */
 function expertView(
   overview: Awaited<ReturnType<HostBridge['setupOverview']>>,
@@ -117,10 +120,17 @@ export function InstallConfirm({
       }
     };
     read();
+    // A retry can fail with the very text of the last failure, so an error row that never
+    // changed cannot tell "not started" from "failed again". After a while the row is the answer.
+    const settle = setTimeout(() => {
+      fresh.current = true;
+      read();
+    }, STALE_ERROR_MS);
     const offSetup = bridge.onBrainChanged((what) => what === 'setup' && read());
     const offTurn = bridge.onTurnEvent((event) => event.type === 'connections.changed' && read());
     return () => {
       live = false;
+      clearTimeout(settle);
       offSetup();
       offTurn();
     };
@@ -162,7 +172,9 @@ export function InstallConfirm({
   };
   const notNow = (): void => {
     if (view.phase === 'ask') {
-      void bridge.approveTool(confirm.approvalId, 'deny').then(onGone, () => undefined);
+      // A refused answer (the ask closed, or the brain went away) drops the card too: it must
+      // not stay up with a live Allow for an ask nobody is waiting on.
+      void bridge.approveTool(confirm.approvalId, 'deny').then(onGone, onGone);
     } else {
       onGone();
     }

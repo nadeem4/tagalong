@@ -11,6 +11,10 @@ import type { ConnectorConfirmParams } from './shapes';
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string; apps?: string[] };
 
+/** `gmail__send_message` reads "send message": the app is on its own row, and underscores are not words. */
+const toolLabel = (tool: string): string =>
+  tool.includes(':') ? tool : tool.replace(/^.*?__/, '').replace(/_/g, ' ');
+
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
 
 /**
@@ -62,9 +66,11 @@ export function ConnectorConfirmCard({
     const withApps = confirm.apps !== undefined ? { apps: kept.map((a) => a.id) } : {};
     return (
       <section className="card" aria-label={`${confirm.app} asks`}>
-        <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
-          {confirm.summary}
-        </p>
+        <div className="card-head">
+          <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
+            {confirm.summary}
+          </p>
+        </div>
         {typable && (
           <label className="bubble-field">
             Your answer
@@ -152,7 +158,7 @@ export function ConnectorConfirmCard({
           <dt>{isAsk ? 'Tool' : 'Change'}</dt>
           <dd>
             {isAsk ? (
-              <span>{confirm.tool}</span>
+              <span>{toolLabel(confirm.tool)}</span>
             ) : (
               <>
                 <span>{what}</span>

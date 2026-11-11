@@ -56,8 +56,22 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
   return step;
 }
 
-/** A running job as a card: who is working, a link to Tasks, a moving bar and the whole step. */
-export function JobLine({ step, onOpenTasks }: { step: RunningStep; onOpenTasks: () => void }) {
+/**
+ * A running job as a card: the job's title (else who is working), a link to Tasks, the step in
+ * body type with only a command in code, and, in the full chat only (`bar`), a moving bar.
+ */
+export function JobLine({
+  step,
+  onOpenTasks,
+  bar = false,
+}: {
+  step: RunningStep;
+  onOpenTasks: () => void;
+  bar?: boolean;
+}) {
+  const title = step.title ?? '';
+  // A step from an older brain has no kind; its text is the command.
+  const command = step.kind === undefined || step.kind === 'command';
   return (
     <div className="bubble-jobline" data-testid="job-line" aria-live="off">
       <div className="bubble-jobline-top">
@@ -66,18 +80,26 @@ export function JobLine({ step, onOpenTasks }: { step: RunningStep; onOpenTasks:
           <i />
           <i />
         </span>
-        <b>{step.expert} is working</b>
+        <b>{title !== '' ? title : `${step.expert} is working`}</b>
         <button type="button" className="bubble-link" onClick={onOpenTasks}>
           Open in Tasks
           <Icon name="chevRight" />
         </button>
       </div>
       {/* The brain reports no share done, so the bar only says the job is moving. */}
-      <div className="bubble-jobbar" role="progressbar" aria-label="Working">
-        <i />
-      </div>
+      {bar && (
+        <div className="bubble-jobbar" role="progressbar" aria-label="Working">
+          <i />
+        </div>
+      )}
       <p className="bubble-jobline-step">
-        <code>{step.text}</code>
+        {command ? (
+          <>
+            Running <code>{step.text}</code>
+          </>
+        ) : (
+          step.text
+        )}
       </p>
     </div>
   );

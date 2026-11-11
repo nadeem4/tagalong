@@ -206,7 +206,7 @@ export function InstallCard({
           </span>
           {done ? (
             <span className="sc-ok">
-              <Tick />
+              <Icon name="check" />
               {subject.kind === 'expert' ? 'Ready' : 'Connected'}
             </span>
           ) : (
@@ -217,11 +217,13 @@ export function InstallCard({
 
       {view.phase === 'ask' && (
         <>
-          <p className="sc-what">
-            {subject.kind === 'expert'
-              ? `Scout can hand ${subject.name} code fixes and other long jobs.`
-              : `Scout will be able to read and update your ${subject.name} data. It asks before changing anything.`}
-          </p>
+          {!community && (
+            <p className="sc-what">
+              {subject.kind === 'expert'
+                ? `Scout can hand ${subject.name} code fixes and other long jobs.`
+                : `Scout will be able to read and update your ${subject.name} data. It asks before changing anything.`}
+            </p>
+          )}
           {community && (
             <div className="sc-check">
               <span className="sc-check-t">
@@ -341,6 +343,7 @@ export function InstallCard({
           {subject.kind === 'app' && onManage !== undefined && (
             <button type="button" className="sc-link" onClick={onManage}>
               Manage in Connections
+              <Icon name="chevRight" />
             </button>
           )}
         </>
@@ -385,6 +388,9 @@ export const INSTALL_CARD_CSS = `
   --sc-errink: ${t.color.errInk}; --sc-link: ${t.color.link}; --sc-warnfill: ${t.color.warnFill};
   --sc-warnline: #E6CF8A; --sc-warnink: ${t.color.warnInk};
 }
+/* The renderer's old global ul/li rules (flex, margin-bottom, pre-wrap) must not reach the card. */
+.sc ul { flex: none; overflow: visible; }
+.sc li { margin: 0; white-space: normal; }
 .sc-top { display: flex; gap: 12px; align-items: flex-start; }
 .sc-tile {
   flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--sc-tile);
@@ -424,7 +430,7 @@ export const INSTALL_CARD_CSS = `
   background: var(--sc-warnfill); border: 1px solid var(--sc-warnline); color: var(--sc-warnink); ${typeCss('body')};
 }
 .sc-check-t { display: flex; align-items: center; gap: 6px; font-weight: 600; }
-.sc-check ul { margin: 0; padding-left: 18px; list-style: disc; }
+.sc-check ul { margin: 0; padding: 0 0 0 18px; list-style: disc; }
 .sc-link {
   align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--sc-link);
   font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer; text-decoration: none;
@@ -436,7 +442,7 @@ export const INSTALL_CARD_CSS = `
 .sc .cx-icon { flex: none; width: 14px; height: 14px; }
 .sc-link { display: inline-flex; align-items: center; gap: 4px; }
 .sc-link--gold { color: var(--sc-warnink); }
-.sc-disc ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
+.sc-disc ul { margin: 6px 0 0; padding: 0 0 0 18px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
 .sc-try { display: flex; gap: 6px; flex-wrap: wrap; }
 .sc-prompt {
   display: inline-flex; align-items: center; min-height: 28px; padding: 4px 12px; box-sizing: border-box;

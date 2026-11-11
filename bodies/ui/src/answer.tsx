@@ -179,10 +179,16 @@ export const ANSWER_CSS = `
 .answer > :first-child { margin-top: 0; }
 .answer > :last-child { margin-bottom: 0; }
 .answer p, .answer ul, .answer ol, .answer pre, .answer table { margin: 0 0 8px; }
-.answer ul, .answer ol { padding-left: 20px; }
+.answer ul, .answer ol { flex: none; overflow: visible; padding: 0 0 0 18px; }
+.answer li { margin: 0; white-space: normal; }
 .answer ul { list-style: disc; }
 .answer ol { list-style: decimal; }
-.answer li + li { margin-top: 2px; }
+/* A folded answer fades out on its last line, so the cut reads as "there is more". */
+.answer[data-folded] { position: relative; }
+.answer[data-folded]::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; pointer-events: none;
+  background: linear-gradient(transparent, ${t.color.page});
+}
 .answer h1, .answer h2, .answer h3, .answer h4 { margin: 12px 0 6px; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .answer h1, .answer h2 { ${typeCss('title')}; }
 .answer code {

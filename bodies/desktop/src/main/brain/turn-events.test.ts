@@ -162,7 +162,7 @@ describe('createTurnEvents', () => {
         type: 'turn.error',
         turnId: T,
         code: 'brain_error',
-        message: "Scout's brain hit a problem with that one. Try again?",
+        message: "Scout's brain hit a problem with that one.",
       },
     ]);
   });
@@ -301,6 +301,19 @@ describe('createTurnEvents: asks', () => {
   it('an empty text shows the tool and its input instead', () => {
     const [e] = make().map('ask', open({ text: '', input: { x: 1, title: 'Notes' } }));
     expect(e).toMatchObject({ summary: 'desktop__move_window\nx: 1\ntitle: Notes' });
+  });
+
+  it('an approval offer keeps its words only, not its sentence and group lines', () => {
+    const [e] = make().map(
+      'ask',
+      open({
+        tool: 'approval_offer',
+        confirm: false,
+        text: 'Approve it from now on?',
+        input: { sentence: 'Approve test runs', group: 'C:/work/app' },
+      }),
+    );
+    expect(e).toMatchObject({ summary: 'Approve it from now on?' });
   });
 
   it("a brain tool's ask belongs to Scout", () => {

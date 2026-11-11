@@ -514,8 +514,9 @@ export function CompanionBubble({
     </p>
   );
   const runningStep = useRunningStep(bridge);
+  // The moving bar is the full chat's; the quick bubble keeps just the title and the step.
   const jobLine = runningStep !== null && (
-    <JobLine step={runningStep} onOpenTasks={() => void bridge.openFix('tasks')} />
+    <JobLine step={runningStep} bar={expanded} onOpenTasks={() => void bridge.openFix('tasks')} />
   );
   const statusRow = status != null && (
     <StatusMark
@@ -717,6 +718,18 @@ export function CompanionBubble({
       : null;
   const shownText =
     reply.state !== 'running' ? '' : askStep === null ? reply.text : reply.text.slice(0, askStep);
+  // A failed reply is a full-width box with no avatar, so it sits where a past failure does.
+  const failedBox = reply.state === 'failed' && (
+    <div role="alert" className="bubble-error">
+      <Icon name="error" />
+      <span>{reply.text}</span>
+      {question !== null && (
+        <button type="button" className="bubble-link" onClick={() => askAgain(question)}>
+          Try again
+        </button>
+      )}
+    </div>
+  );
   const turnAnswer = (
     <>
       {reply.state === 'running' && (
@@ -753,17 +766,7 @@ export function CompanionBubble({
           <Answer text={reply.text} gist={expanded} />
         </div>
       )}
-      {reply.state === 'failed' && (
-        <div role="alert" className="bubble-error">
-          <Icon name="error" />
-          <span>{reply.text}</span>
-          {question !== null && (
-            <button type="button" className="bubble-link" onClick={() => askAgain(question)}>
-              Try again
-            </button>
-          )}
-        </div>
-      )}
+      {failedBox}
     </>
   );
   // A line Scout starts: its mark and name above the words.
@@ -925,7 +928,7 @@ export function CompanionBubble({
         <strong>{petName}</strong>
         <span className="bubble-headstatus" data-testid="head-status">
           <span className="bubble-priv" aria-hidden="true" />
-          {headStatus}
+          <span className="bubble-headtext">{headStatus}</span>
         </span>
       </span>
       <span className="bubble-row">
@@ -1003,10 +1006,14 @@ export function CompanionBubble({
             {question !== null && (
               <div className="bubble-exchange">
                 <p className="bubble-mine">{question}</p>
-                <ScoutReply scout={scout}>
-                  {answer}
-                  {installsInReply && installCards}
-                </ScoutReply>
+                {health === null && reply.state === 'failed' ? (
+                  failedBox
+                ) : (
+                  <ScoutReply scout={scout}>
+                    {answer}
+                    {installsInReply && installCards}
+                  </ScoutReply>
+                )}
               </div>
             )}
             {cards}

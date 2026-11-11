@@ -75,7 +75,7 @@ export const CHAT_CSS = `
 .bubble-jobline code { font-family: ${t.font.mono}; ${typeCss('small')}; }
 .bubble-jobbar { height: 4px; border-radius: 2px; background: #222845; overflow: hidden; }
 .bubble-jobbar i { display: block; height: 100%; width: 40%; background: ${t.color.gold}; animation: bubble-job 1.6s ease-in-out infinite; }
-@keyframes bubble-job { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+@keyframes bubble-job { 0% { margin-left: 0; } 100% { margin-left: 60%; } }
 @media (prefers-reduced-motion: reduce) { .bubble-jobbar i { animation: none; width: 55%; } }
 .bubble-link {
   flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent;
@@ -95,7 +95,9 @@ export const CHAT_CSS = `
 .bubble-compact { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
 .bubble-headwho { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bubble-head strong { font-family: ${t.font.wordmark}; ${typeCss('bodyLead')}; font-weight: 600; }
-.bubble-headstatus { display: flex; align-items: center; gap: 6px; ${typeCss('caption')}; font-weight: 400; color: ${t.color.textMuted}; overflow-wrap: anywhere; }
+.bubble-headstatus { display: flex; align-items: center; gap: 6px; ${typeCss('caption')}; font-weight: 400; color: ${t.color.textMuted}; }
+/* One line, cut with an ellipsis: the speaking indicator never makes the header taller. */
+.bubble-headtext { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .bubble-priv { flex: none; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.gold}; box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.18); }
 .bubble-head .bubble-row { flex: none; gap: 4px; }
 .bubble-log {
@@ -146,6 +148,7 @@ export const CHAT_CSS = `
   flex: none; position: static; width: 32px; height: 32px; display: grid; place-items: center;
   padding: 0; border: 0; border-radius: 8px; background: transparent; color: ${t.color.textMuted}; cursor: pointer;
 }
+.bubble-field .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
 .bubble-send { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .bubble-send:disabled { background: #222845; color: ${t.color.textMuted}; cursor: default; }
 .bubble-send:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 1px; }
