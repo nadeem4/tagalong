@@ -1,5 +1,5 @@
 /** Tests for AppSearch: the debounced search, Popular and Show more, grouped results, the empty state. */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HostBridgeProvider } from '../host-bridge';
 import type { AppGroup, AppRow } from '../shapes';
@@ -18,6 +18,7 @@ const row = (id: string, name: string, official: boolean): AppRow => ({
   signIn: 'none',
   licence: 'MIT',
   repo: '',
+  added: false,
 });
 
 const NOTION = row('com.notion/mcp', 'Notion', true);
@@ -78,6 +79,32 @@ describe('AppSearch', () => {
     expect(screen.queryByText('Search the app registry')).toBeNull();
     await type('notion');
     expect(screen.queryByRole('region', { name: 'Popular' })).toBeNull();
+  });
+
+  it('says Results for "term" above the results', async () => {
+    const bridge = createFakeHostBridge({ setupFor: () => ({ appGroups: [GROUP] }) });
+    await renderSearch(bridge);
+    await type('notion');
+    expect(screen.getByRole('status')).toHaveTextContent('Results for "notion"');
+  });
+
+  it('keeps Popular on screen, dimmed, under Searching… while the first search loads', async () => {
+    const bridge = createFakeHostBridge({ setupFor: () => ({ popular: [NOTION] }) });
+    await renderSearch(bridge);
+    bridge.setupOverview = () => new Promise(() => undefined);
+    await type('cal');
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    expect(screen.getByRole('region', { name: 'Popular' })).toHaveClass('cx-stale');
+  });
+
+  it('a curated app already added says Added instead of offering Add', async () => {
+    const bridge = createFakeHostBridge({
+      setupFor: () => ({ popular: [{ ...NOTION, added: true }, LINEAR] }),
+    });
+    await renderSearch(bridge);
+    expect(screen.queryByRole('button', { name: 'Add Notion' })).toBeNull();
+    expect(within(screen.getByText('Notion').closest('li')!).getByText('Added')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Linear' })).toBeVisible();
   });
 
   it('Show more reveals the rest of the curated list and names them beside it', async () => {
@@ -141,7 +168,7 @@ describe('AppSearch', () => {
     expect(screen.getByRole('list', { name: 'Results' })).not.toHaveClass('cx-stale');
   });
 
-  it('Load more asks for the next cursor and appends the page', async () => {
+  it('Show more asks for the next cursor and appends the page', async () => {
     const bridge = createFakeHostBridge({
       setupFor: (_query, cursor) =>
         cursor === undefined
@@ -151,13 +178,13 @@ describe('AppSearch', () => {
     await renderSearch(bridge);
     await type('app');
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
       await Promise.resolve();
     });
     expect(bridge.setupOverviewCalls.at(-1)).toEqual({ query: 'app', cursor: 'c2' });
     expect(screen.getByRole('button', { name: 'Add Notion' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add Linear' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
   });
 
   it('an Official head adds through onAdd with the query it was found by', async () => {
@@ -201,18 +228,18 @@ describe('AppSearch', () => {
     );
   });
 
-  it('a failing search keeps the earlier results and shows the plain line', async () => {
+  it('a failing search drops the earlier results and shows only the plain line', async () => {
     const bridge = createFakeHostBridge({ setupFor: () => ({ appGroups: [GROUP] }) });
     await renderSearch(bridge);
     await type('notion');
     bridge.setupOverview = () => Promise.reject(new Error('boom'));
     await type('notion2');
-    expect(screen.getByRole('button', { name: 'Add Notion' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Add Notion' })).toBeNull();
     expect(screen.getByRole('alert')).toHaveTextContent(/couldn't load the app list/);
     expect(screen.queryByText(/No apps match/)).toBeNull();
   });
 
-  it('a failing Load more keeps the earlier results and shows the plain line', async () => {
+  it('a failing Show more keeps the earlier results and shows the plain line', async () => {
     const bridge = createFakeHostBridge({
       setupFor: () => ({ appGroups: [GROUP], nextCursor: 'c2' }),
     });
@@ -220,7 +247,7 @@ describe('AppSearch', () => {
     await type('app');
     bridge.setupOverview = () => Promise.reject(new Error('boom'));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Add Notion' })).toBeTruthy();

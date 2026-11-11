@@ -17,6 +17,7 @@ const ROW: AppRow = {
   signIn: 'none',
   licence: 'MIT',
   repo: 'https://github.com/bob/x',
+  added: false,
 };
 
 function setup(row: Parameters<typeof CheckCard>[0]['row'] = ROW, busy = false) {

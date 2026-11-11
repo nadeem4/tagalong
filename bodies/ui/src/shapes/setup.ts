@@ -17,6 +17,13 @@ const Choice = z.object({
   // The curated experts: one is Recommended; Tested means Scout ran it. Old brains send neither.
   recommended: z.boolean().default(false),
   tested: z.boolean().default(false),
+  // Already installed: the row says Added instead of offering Add.
+  added: z.boolean().default(false),
+  // The curated claim that it signs in with the person's own account (the registry is silent).
+  account: z.boolean().default(false),
+  // For the check card; the ACP registry's licence and code address, empty when it has none.
+  licence: z.string().default(''),
+  repo: z.string().default(''),
 });
 
 const AppRowWire = z.object({
@@ -32,6 +39,8 @@ const AppRowWire = z.object({
   licence: z.string(),
   repo: z.string(),
   why: z.string().optional(),
+  // A curated row for an app already added: it says Added instead of offering Add.
+  added: z.boolean().default(false),
 });
 const toAppRow = ({ sign_in, ...rest }: z.infer<typeof AppRowWire>) => ({
   ...rest,

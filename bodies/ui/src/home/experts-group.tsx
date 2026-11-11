@@ -9,6 +9,7 @@
 import type { SetupExpert, SetupOverview } from '../shapes';
 import { Button } from '../controls/button';
 import { DEFAULT_EXPERT_JOB, EXPERT_JOB } from '../jobs-kinds';
+import { Icon } from '../setup/icons';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
 
@@ -62,6 +63,7 @@ export function ProgressBlock({ progress }: { progress: Progress }) {
 export function FailLine({ name, onRetry }: { name: string; onRetry: () => void }) {
   return (
     <div className="cx-errline" role="alert">
+      <Icon name="error" />
       Setting up {name} didn&apos;t finish.
       <Button variant="secondary" onClick={onRetry}>
         Try again
@@ -96,8 +98,8 @@ export function ExpertsGroup({
         <section className="cx-row" aria-label={expert.name}>
           <Tile name={expert.name} />
           <div className="cx-row__main">
-            <span className="cx-row__name" title={expert.name}>
-              {expert.name}
+            <span className="cx-row__name">
+              <span title={expert.name}>{expert.name}</span>
               {!expert.tested && (
                 <span className="cx-chip cx-chip--quiet">Not tested with Scout</span>
               )}

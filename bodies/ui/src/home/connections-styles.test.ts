@@ -29,6 +29,27 @@ describe('CONNECTIONS_CSS', () => {
     );
   });
 
+  it('sets the outcome, waiting, error line and link button at body 13 weight 600', () => {
+    for (const rule of ['cx-outcome', 'cx-waiting', 'cx-errline', 'cx-linkbtn']) {
+      expect(CONNECTIONS_CSS).toMatch(
+        new RegExp(`\\.${rule} \\{[^}]*${typeCss('body')}; font-weight: 600`),
+      );
+    }
+  });
+
+  it('keeps a name on one line, with its chips beside it', () => {
+    expect(CONNECTIONS_CSS).not.toMatch(/\.cx-row__name \{[^}]*flex-wrap: wrap/);
+    expect(CONNECTIONS_CSS).toMatch(
+      /\.cx-row__name > span:first-child \{[^}]*white-space: nowrap[^}]*text-overflow: ellipsis/,
+    );
+  });
+
+  it('styles the add form: a segmented control, label-above fields, a two-column grid', () => {
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-seg \{[^}]*border-radius: 10px/);
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-input \{[^}]*height: 36px/);
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-two \{[^}]*grid-template-columns: 1fr 1fr/);
+  });
+
   it('sets text only through the type roles, with no capitals or letter spacing', () => {
     expect(CONNECTIONS_CSS).toContain(typeCss('bodyLead'));
     expect(CONNECTIONS_CSS).toContain(typeCss('small'));

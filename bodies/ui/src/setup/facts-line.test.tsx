@@ -16,6 +16,7 @@ const ROW: AppRow = {
   signIn: 'browser',
   licence: '',
   repo: '',
+  added: false,
 };
 
 describe('FactsLine', () => {

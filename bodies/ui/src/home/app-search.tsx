@@ -1,6 +1,6 @@
 /**
  * "Add an app" on Home's Connections page: the search box (read 300 ms after typing stops), the
- * curated Popular list with Show more, results grouped per service with Load more, the empty
+ * curated Popular list with Show more, results grouped per service with Show more, the empty
  * state and "Add it yourself". The brain does the finding, tagging and grouping; this only asks
  * and shows. Only the newest request may write results. Contains AppSearch.
  */
@@ -77,8 +77,13 @@ export function AppSearch({
       },
       () => {
         if (mine !== latest.current) return;
+        // A failed search shows its one line, never the list of an earlier search beside it.
         setUnreachable(true);
         setLoading(false);
+        setPopular([]);
+        setPopularMore([]);
+        setGroups([]);
+        setCursor(null);
       },
     );
   }, [bridge, term, refresh]);
@@ -99,7 +104,8 @@ export function AppSearch({
   };
 
   const typing = text.trim() !== '';
-  const searching = loading && term !== '';
+  // Until the newest search has answered, the last list stays, dimmed, so the card does not jump.
+  const pending = typing && (loading || term !== text.trim());
   const rowFor = (app: AppRow) => (
     <AppGroupRow
       key={app.id}
@@ -126,7 +132,8 @@ export function AppSearch({
           setText(value);
           clear();
         }}
-        loading={searching}
+        loading={pending}
+        note={typing && !pending && groups.length > 0 ? `Results for "${term}"` : undefined}
       />
 
       {unreachable && !offline && (
@@ -139,8 +146,8 @@ export function AppSearch({
         <AddForm onAdd={onAddApp} onCancel={() => setByHand(false)} />
       ) : (
         <>
-          {!typing && popular.length > 0 && (
-            <section aria-label="Popular">
+          {(!typing || (pending && groups.length === 0)) && popular.length > 0 && (
+            <section aria-label="Popular" className={typing ? 'cx-stale' : undefined}>
               <p className="cx-group-label">Popular</p>
               <ul className="cx-list">
                 {popular.map(rowFor)}
@@ -150,7 +157,7 @@ export function AppSearch({
           )}
 
           {groups.length > 0 && (
-            <ul aria-label="Results" className={searching ? 'cx-list cx-stale' : 'cx-list'}>
+            <ul aria-label="Results" className={pending ? 'cx-list cx-stale' : 'cx-list'}>
               {groups.map((group) => (
                 <AppGroupRow
                   key={group.service}
@@ -182,7 +189,7 @@ export function AppSearch({
             )}
             {cursor !== null && (
               <Button variant="secondary" onClick={loadMore}>
-                Load more
+                Show more
               </Button>
             )}
             <button type="button" className="cx-linkbtn" onClick={() => setByHand(true)}>

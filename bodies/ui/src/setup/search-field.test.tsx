@@ -28,4 +28,23 @@ describe('SearchField', () => {
     rerender(<SearchField label="Search apps" placeholder="" value="x" onChange={vi.fn()} />);
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
+
+  it('shows a note on the same line when not loading, and Searching… wins while loading', () => {
+    const { rerender } = render(
+      <SearchField label="s" placeholder="" value="x" onChange={vi.fn()} note='Results for "x"' />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Results for "x"');
+    rerender(
+      <SearchField
+        label="s"
+        placeholder=""
+        value="x"
+        onChange={vi.fn()}
+        note='Results for "x"'
+        loading
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Searching…');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Results for');
+  });
 });

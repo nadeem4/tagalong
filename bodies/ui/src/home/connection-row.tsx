@@ -73,8 +73,8 @@ export function ConnectionRow({
       <section className="cx-row" aria-label={name}>
         <Tile name={name} />
         <div className="cx-row__main">
-          <span className="cx-row__name" title={name}>
-            {name}
+          <span className="cx-row__name">
+            <span title={name}>{name}</span>
             {trust !== null && (
               <span className={trust === 'official' ? 'cx-chip cx-chip--official' : 'cx-chip'}>
                 {trust === 'official' ? 'Official' : 'Community'}

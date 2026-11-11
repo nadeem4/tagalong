@@ -1,6 +1,6 @@
 /**
- * The shared search box: full width, a search icon, an accessible name, and a live "Searching…"
- * line under it that screen readers announce while a search loads. Used by the Apps and Experts
+ * The shared search box: full width, a search icon, an accessible name, and a live line under it
+ * that screen readers announce: "Searching…" while a search loads, else an optional note. Used by the Apps and Experts
  * tabs now, and by the tour and chat install card later. Contains SearchField.
  */
 import { Icon } from './icons';
@@ -11,7 +11,10 @@ export function SearchField({
   value,
   onChange,
   loading = false,
+  note,
 }: {
+  /** What the line says when nothing is loading, such as `Results for "linear"`. */
+  note?: string;
   label: string;
   placeholder: string;
   value: string;
@@ -31,11 +34,13 @@ export function SearchField({
         />
       </div>
       <p role="status" className="cx-search__status">
-        {loading && (
+        {loading ? (
           <span className="cx-waiting">
             <span className="cx-spin" aria-hidden="true" />
             Searching…
           </span>
+        ) : (
+          note !== undefined && <span className="cx-search__note">{note}</span>
         )}
       </p>
     </div>

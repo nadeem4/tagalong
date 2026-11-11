@@ -16,6 +16,7 @@ const ROW: AppRow = {
   signIn: 'key',
   licence: 'MIT',
   repo: 'https://github.com/acme-dev/linear',
+  added: false,
 };
 
 describe('CheckFacts', () => {
@@ -44,6 +45,24 @@ describe('CheckFacts', () => {
     expect(screen.getByText("The expert list doesn't say who made this or check it.")).toBeTruthy();
     expect(screen.getByText('Runs on your PC')).toBeTruthy();
     expect(container.textContent).not.toMatch(/Unknown|Nobody has checked|Made by/);
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('an expert says its licence and links its code when the list has them', () => {
+    const { container } = render(
+      <CheckFacts
+        row={{ name: 'Kimi CLI', licence: 'Apache-2.0', repo: 'https://github.com/x/kimi' }}
+      />,
+    );
+    expect(screen.getByText('Runs on your PC · Licence Apache-2.0')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /See its code/ }).getAttribute('href')).toBe(
+      'https://github.com/x/kimi',
+    );
+    expect(container.textContent).not.toMatch(/Unknown/);
+  });
+
+  it('an expert with an unsafe code address shows no link', () => {
+    render(<CheckFacts row={{ name: 'Kimi CLI', repo: 'javascript:alert(1)' }} />);
     expect(screen.queryByRole('link')).toBeNull();
   });
 

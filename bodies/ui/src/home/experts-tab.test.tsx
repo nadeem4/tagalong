@@ -14,13 +14,22 @@ const choice = (id: string, name: string, over: Partial<SetupChoice> = {}): Setu
   official: true,
   recommended: false,
   tested: true,
+  added: false,
+  account: true,
+  licence: '',
+  repo: '',
   ...over,
 });
 const CLAUDE = choice('claude-acp', 'Claude Code', { recommended: true });
 const GEMINI = choice('gemini', 'Gemini CLI');
 const CODEX = choice('codex-acp', 'Codex');
-const GOOSE = choice('goose', 'Goose', { official: false, tested: false });
-const SOMEONE = choice('someone-acp', 'Someone', { official: false });
+const GOOSE = choice('goose', 'Goose', { official: false, tested: false, account: false });
+const SOMEONE = choice('someone-acp', 'Someone', {
+  official: false,
+  account: false,
+  licence: 'Apache-2.0',
+  repo: 'https://github.com/x/someone',
+});
 
 const installed = (id: string, name: string, over: Partial<SetupExpert> = {}): SetupExpert => ({
   id,
@@ -132,6 +141,35 @@ describe('Experts tab: add an expert', () => {
     ]);
   });
 
+  it('the check card for an expert shows its licence and a link to its code', async () => {
+    await open({ browseExperts: [SOMEONE], showMoreFrom: 1 });
+    await click(screen.getByRole('button', { name: 'Add Someone' }));
+    expect(screen.getByText('Runs on your PC · Licence Apache-2.0')).toBeVisible();
+    expect(screen.getByRole('link', { name: /See its code/ })).toHaveAttribute(
+      'href',
+      'https://github.com/x/someone',
+    );
+  });
+
+  it('an expert already installed says Added and offers no Add', async () => {
+    await open({ browseExperts: [{ ...CLAUDE, added: true }, CODEX], showMoreFrom: 2 });
+    const row = within(rowOf('Claude Code'));
+    expect(row.getByText('Added')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Add Claude Code' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add Codex' })).toBeVisible();
+  });
+
+  it('signs in with your own account comes from the brain, not the list position', async () => {
+    await open({
+      browseExperts: [{ ...CLAUDE, account: false }, { ...CODEX, account: true }],
+      showMoreFrom: 2,
+    });
+    expect(within(rowOf('Claude Code')).getByText('Runs on your PC')).toBeVisible();
+    expect(
+      within(rowOf('Codex')).getByText('Runs on your PC · Signs in with your own account'),
+    ).toBeVisible();
+  });
+
   it('Back on the check card sends nothing', async () => {
     const bridge = await open({ browseExperts: [SOMEONE], showMoreFrom: 1 });
     await click(screen.getByRole('button', { name: 'Add Someone' }));
@@ -170,6 +208,9 @@ describe('Experts tab: add an expert', () => {
     });
     const row = within(rowOf('Codex'));
     expect(row.getByText("Setting up Codex didn't finish.")).toBeVisible();
+    expect(row.getByRole('alert').querySelector('svg')).not.toBeNull();
+    // Try again is the one action: the plain Add is gone while the failure shows.
+    expect(row.queryByRole('button', { name: 'Add Codex' })).toBeNull();
     expect(within(rowOf('Gemini CLI')).queryByText(/didn't finish/)).toBeNull();
     await click(row.getByRole('button', { name: 'Try again' }));
     expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'codex-acp', approved: false }]);

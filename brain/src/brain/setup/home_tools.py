@@ -131,6 +131,8 @@ def home_setup_tools(
             if dist is None or e.id in skip or e.name in skip or (kinds and dist.kind not in kinds):
                 continue
             row = {"id": e.id, "name": e.name, "version": e.version, "description": e.description}
+            if kinds:  # an expert's check card shows its licence and a link to its code
+                row |= {"licence": e.license, "repo": e.repo}
             out.append({**row, "official": _official(e, kinds)})
         return out
 
@@ -138,9 +140,10 @@ def home_setup_tools(
         # `kinds` is only passed for the expert list, whose ids are vendors, not namespaces.
         return is_official_expert(e.id) if kinds else is_official_app(e.id)
 
-    def app_row(e: RegistryEntry, dist: Distribution | None) -> dict:
+    def app_row(e: RegistryEntry, dist: Distribution | None, added: bool = False) -> dict:
         facts = app_facts(e, dist)
         return {
+            "added": added,
             "id": e.id,
             "name": e.name,
             "version": e.version,
@@ -158,12 +161,12 @@ def home_setup_tools(
         return "ready" if expert.logged_in is True else "needs_login"
 
     async def curated(
-        ids: tuple[str, ...], machine: Machine, skip: set[str]
+        ids: tuple[str, ...], machine: Machine, have: set[str]
     ) -> tuple[list[dict], bool]:
         """One curated row: listed Official ids that resolve in the registry and connect in one
         click here (a hosted app, or a package that needs no key). An id that is missing or cannot
-        be looked up is dropped on its own; the rest stay. Also says whether any lookup was stale
-        or failed."""
+        be looked up is dropped on its own; the rest stay. An app already added stays too, marked
+        `added`, so its row says so. Also says whether any lookup was stale or failed."""
 
         async def look(entry_id: str):
             try:
@@ -180,20 +183,27 @@ def home_setup_tools(
             stale = stale or found.stale
             entry = next((e for e in found.entries if e.id == entry_id), None)
             dist = build_for(entry, machine) if entry else None
-            if entry is None or dist is None or entry.name in skip or entry.id in skip:
+            if entry is None or dist is None:
                 continue
             if not is_official_app(entry.id) or dist.headers or dist.env:
                 continue
-            out.append(app_row(entry, dist))
+            out.append(app_row(entry, dist, entry.name in have or entry.id in have))
         return out, stale
 
-    def ordered_experts(found: list[dict]) -> tuple[list[dict], int]:
+    def ordered_experts(found: list[dict], have: set[str]) -> tuple[list[dict], int]:
         """The curated experts first, in their listed order, then the rest as the registry gave
-        them; also where "Show more" starts."""
+        them; also where "Show more" starts. `account` is the curated claim that an expert signs
+        in with the person's own account (the registry does not say); `added` marks installed."""
         first = [r for i in POPULAR_EXPERTS for r in found if r["id"] == i]
         rest = [r for r in found if r["id"] not in POPULAR_EXPERTS]
         return [
-            {**r, "recommended": r["id"] == RECOMMENDED_EXPERT, "tested": is_tested(r["id"])}
+            {
+                **r,
+                "recommended": r["id"] == RECOMMENDED_EXPERT,
+                "tested": is_tested(r["id"]),
+                "account": r["id"] in POPULAR_EXPERTS,
+                "added": r["id"] in have,
+            }
             for r in first + rest
         ], len(first)
 
@@ -258,7 +268,7 @@ def home_setup_tools(
             )
             stale_mcp = stale_a or stale_b
         browse, show_more_from = ordered_experts(
-            rows(acp, machine, {e.id for e in installed}, _INSTALLABLE)
+            rows(acp, machine, set(), _INSTALLABLE), {e.id for e in installed}
         )
         return json.dumps(
             {

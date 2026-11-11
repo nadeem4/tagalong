@@ -17,6 +17,7 @@ const row = (id: string, name: string, official: boolean, why?: string): AppRow 
   signIn: official ? 'browser' : 'none',
   licence: 'MIT',
   repo: 'https://github.com/x/y',
+  added: false,
   ...(why === undefined ? {} : { why }),
 });
 

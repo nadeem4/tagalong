@@ -28,6 +28,7 @@ export function OutcomeText({ outcome }: { outcome: Outcome }) {
       role={outcome.error ? 'alert' : 'status'}
     >
       {outcome.added && <Icon name="check" />}
+      {outcome.error && <Icon name="error" />}
       {outcome.text}
     </span>
   );
@@ -38,6 +39,16 @@ export function Waiting() {
     <span className="cx-waiting">
       <span className="cx-spin" aria-hidden="true" />
       Waiting for you…
+    </span>
+  );
+}
+
+/** "✓ Added" in place of Add on a curated row for something already installed. */
+export function AddedStatus() {
+  return (
+    <span className="cx-status cx-status--off">
+      <Icon name="check" />
+      Added
     </span>
   );
 }
@@ -66,8 +77,8 @@ export function AppItem({
       <div className="cx-row cx-row--top">
         <Tile name={row.name} />
         <div className="cx-row__main">
-          <span className="cx-row__name" title={row.official ? undefined : row.id}>
-            {label}
+          <span className="cx-row__name">
+            <span title={row.official ? undefined : row.id}>{label}</span>
             <span className={row.official ? 'cx-chip cx-chip--official' : 'cx-chip'}>
               {row.official ? 'Official' : 'Community'}
             </span>
@@ -79,6 +90,8 @@ export function AppItem({
           {outcome !== undefined && <OutcomeText outcome={outcome} />}
           {busy ? (
             <Waiting />
+          ) : row.added ? (
+            outcome === undefined && <AddedStatus />
           ) : (
             outcome?.added !== true && (
               <Button

@@ -9,14 +9,13 @@ import type { SetupChoice, SetupOverview } from '../shapes';
 import { Button } from '../controls/button';
 import { FactsLine } from '../setup/facts-line';
 import { SearchField } from '../setup/search-field';
-import { OutcomeText, Tile, Waiting } from './app-group-row';
+import { AddedStatus, OutcomeText, Tile, Waiting } from './app-group-row';
 import { CheckCard } from './check-card';
 import { ExpertsGroup, FailLine, ProgressBlock } from './experts-group';
 import { useOutcomes, type Outcome } from './outcome';
 
 function ExpertItem({
   item,
-  account,
   progress,
   working,
   outcome,
@@ -25,8 +24,6 @@ function ExpertItem({
   onAddAnyway,
 }: {
   item: SetupChoice;
-  /** Curated experts sign in with the person's own account; the registry does not say for the rest. */
-  account: boolean;
   progress: SetupOverview['progress'];
   working: boolean;
   outcome: Outcome | undefined;
@@ -44,8 +41,8 @@ function ExpertItem({
       <div className="cx-row cx-row--top">
         <Tile name={item.name} />
         <div className="cx-row__main">
-          <span className="cx-row__name" title={item.name}>
-            {item.name}
+          <span className="cx-row__name">
+            <span title={item.name}>{item.name}</span>
             <span className={item.official ? 'cx-chip cx-chip--official' : 'cx-chip'}>
               {item.official ? 'Official' : 'Community'}
             </span>
@@ -56,7 +53,7 @@ function ExpertItem({
             )}
           </span>
           <span className="cx-row__desc">{item.description}</span>
-          <FactsLine row={{ runs: 'pc', account }} />
+          <FactsLine row={{ runs: 'pc', account: item.account }} />
         </div>
         <div className="cx-row__side">
           {outcome !== undefined && <OutcomeText outcome={outcome} />}
@@ -64,8 +61,11 @@ function ExpertItem({
             <ProgressBlock progress={progress} />
           ) : working ? (
             <Waiting />
+          ) : item.added ? (
+            outcome === undefined && <AddedStatus />
           ) : (
-            outcome?.added !== true && (
+            outcome?.added !== true &&
+            !failed && (
               <Button
                 ref={addButton}
                 variant="secondary"
@@ -82,7 +82,7 @@ function ExpertItem({
       {failed && !installing && <FailLine name={item.name} onRetry={add} />}
       {checking && (
         <CheckCard
-          row={{ name: item.name }}
+          row={{ name: item.name, licence: item.licence, repo: item.repo }}
           busy={working}
           returnFocus={addButton}
           onBack={() => setChecking(false)}
@@ -123,11 +123,10 @@ export function ExpertsTab({
   const showRest = more || failedAt >= split;
   const searching = term !== '';
 
-  const row = (item: SetupChoice, index: number) => (
+  const row = (item: SetupChoice) => (
     <ExpertItem
       key={item.id}
       item={item}
-      account={index < split}
       progress={progress}
       working={asking.has(item.id)}
       outcome={outcomes.get(item.id)}
@@ -136,9 +135,8 @@ export function ExpertsTab({
       onAddAnyway={() => void track(item.id, onAddAnyway(item.id))}
     />
   );
-  const indexed = items.map((item, index) => ({ item, index }));
-  const main = searching ? indexed.filter(({ item }) => found(item)) : indexed.slice(0, split);
-  const rest = !searching && showRest ? indexed.slice(split) : [];
+  const main = searching ? items.filter(found) : items.slice(0, split);
+  const rest = !searching && showRest ? items.slice(split) : [];
   const hidden = items.slice(split);
 
   return (
@@ -154,7 +152,7 @@ export function ExpertsTab({
       {items.length > 0 && (
         <section className="home-card" aria-label="Add an expert">
           <h2 className="home-card__label">Add an expert</h2>
-          <p className="cx-meta">Experts take on long jobs for Scout, on your own login.</p>
+          <p>Experts take on long jobs for Scout, on your own login.</p>
           <SearchField
             label="Search experts"
             placeholder="Codex, Goose, an agent for…"
@@ -166,7 +164,7 @@ export function ExpertsTab({
           />
           {main.length > 0 && (
             <ul className="cx-list" aria-label="Experts to add">
-              {main.map(({ item, index }) => row(item, index))}
+              {main.map(row)}
             </ul>
           )}
           {searching && main.length === 0 && (
@@ -178,7 +176,7 @@ export function ExpertsTab({
             <>
               <p className="cx-group-label">More experts that run on this PC</p>
               <ul className="cx-list" aria-label="More experts">
-                {rest.map(({ item, index }) => row(item, index))}
+                {rest.map(row)}
               </ul>
             </>
           )}

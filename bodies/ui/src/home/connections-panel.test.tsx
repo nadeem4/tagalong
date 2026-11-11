@@ -119,6 +119,20 @@ describe('ConnectionsPanel', () => {
     expect(document.querySelector('summary')).toBeNull();
   });
 
+  it('the form picks its kind with a segmented control, not radios, and the arrow keys move it', async () => {
+    await renderPanel(createFakeHostBridge());
+    fireEvent.click(screen.getByRole('button', { name: ADD_YOURSELF }));
+    expect(document.querySelector('.cx-form input[type="radio"]')).toBeNull();
+    const web = screen.getByRole('radio', { name: 'A web address' });
+    expect(web).toHaveAttribute('aria-checked', 'true');
+    fireEvent.keyDown(web, { key: 'ArrowRight' });
+    expect(screen.getByRole('radio', { name: 'A command on this PC' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByLabelText('Command')).toBeInTheDocument();
+  });
+
   it('has no loops panel on Connections', async () => {
     await renderPanel(createFakeHostBridge());
     expect(screen.queryByText(/READ MY MAIL FOR LOOPS/i)).toBeNull();
@@ -149,7 +163,7 @@ describe('ConnectionsPanel', () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
     fireEvent.click(screen.getByRole('button', { name: ADD_YOURSELF }));
-    fireEvent.click(screen.getByLabelText('A command on this PC'));
+    fireEvent.click(screen.getByRole('radio', { name: 'A command on this PC' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Files' } });
     fireEvent.change(screen.getByLabelText('Command'), {
       target: { value: 'npx -y @modelcontextprotocol/server-filesystem C:/notes' },

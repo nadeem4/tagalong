@@ -96,6 +96,38 @@ describe('parseSetupOverview', () => {
     expect(overview.showMoreFrom).toBe(1);
   });
 
+  it('reads added, licence, repo and account on a curated row', () => {
+    const overview = parseSetupOverview({
+      ...WIRE,
+      popular: [{ ...ROW, added: true }],
+      browse_experts: [
+        {
+          id: 'c',
+          name: 'C',
+          version: '1',
+          description: 'd',
+          added: true,
+          account: true,
+          licence: 'MIT',
+          repo: 'https://g/c',
+        },
+      ],
+    });
+    expect(overview.popular[0]?.added).toBe(true);
+    expect(overview.browseExperts[0]).toMatchObject({
+      added: true,
+      account: true,
+      licence: 'MIT',
+      repo: 'https://g/c',
+    });
+    expect(parseSetupOverview(WIRE).browseExperts[0]).toMatchObject({
+      added: false,
+      account: false,
+      licence: '',
+      repo: '',
+    });
+  });
+
   it('an old brain without them parses: apps not official, nothing hidden behind Show more', () => {
     const overview = parseSetupOverview(WIRE);
     expect(overview.apps[0]?.official).toBe(false);
