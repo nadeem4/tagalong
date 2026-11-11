@@ -13,6 +13,7 @@ from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.side_check import AskFacts, SideCheck
 from brain.store import rules
+from brain.telemetry import TIMINGS
 
 AT = "2026-10-28T09:00:00Z"
 
@@ -102,6 +103,13 @@ async def test_approve_returns_the_named_preference(mem):
     assert {t["name"] for t in tools} == {"approve_under_preference", "pass_to_person"}
     prompt = system + str(messages)
     assert p.sentence in prompt and "Read a file" in prompt
+
+
+async def test_a_check_records_a_timing_sample(mem):
+    p = pref(mem)
+    TIMINGS.clear()
+    await check(mem, Model(approve(p.id))).decide(facts())
+    assert len(TIMINGS.samples("side_check")) == 1
 
 
 async def test_pass_returns_none(mem):

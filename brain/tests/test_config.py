@@ -144,6 +144,19 @@ def test_turn_timeout_rejects_zero_negative_nan_and_text(value):
         load_config({"TAGALONG_TURN_TIMEOUT_S": value})
 
 
+def test_loop_lag_defaults_to_200_ms():
+    assert load_config({}).loop_lag_ms == 200
+
+
+def test_loop_lag_from_env():
+    assert load_config({"TAGALONG_LOOP_LAG_MS": "50"}).loop_lag_ms == 50
+
+
+def test_loop_lag_rejects_text():
+    with pytest.raises(ValueError, match="TAGALONG_LOOP_LAG_MS"):
+        load_config({"TAGALONG_LOOP_LAG_MS": "abc"})
+
+
 def test_split_command_keeps_backslashes_in_a_windows_path():
     path = r"C:\Users\x\AppData\Roaming\npm\claude-agent-acp.cmd"
     assert split_command(path, posix=False) == [path]

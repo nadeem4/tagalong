@@ -9,6 +9,7 @@ import urllib.request
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
+from brain.telemetry import timed
 from brain.voice import kokoro, moonshine, silero, smart_turn
 from brain.voice.ears import EarsParts
 from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
@@ -41,14 +42,16 @@ def ears_loader(data_dir: Path) -> LoadEars:
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
         await ensure_files(folder, EARS_FILES, fetch, lambda f: on_progress(f * ONNX_SHARE))
-        vad = await asyncio.to_thread(silero.load, folder / EARS_FILES[0].path)
-        turn = await asyncio.to_thread(smart_turn.load, folder / EARS_FILES[1].path)
+        with timed("voice_hop", op="load_models"):
+            vad = await asyncio.to_thread(silero.load, folder / EARS_FILES[0].path)
+            turn = await asyncio.to_thread(smart_turn.load, folder / EARS_FILES[1].path)
 
         def from_thread(f: float) -> None:
             # Moonshine reports from its worker thread; the sockets and queues are the loop's.
             loop.call_soon_threadsafe(on_progress, ONNX_SHARE + (1 - ONNX_SHARE) * f)
 
-        stt = await asyncio.to_thread(moonshine.load, folder, from_thread)
+        with timed("voice_hop", op="load_models"):
+            stt = await asyncio.to_thread(moonshine.load, folder, from_thread)
         return EarsParts(vad, stt, turn)
 
     return load_ears
@@ -59,6 +62,7 @@ def tts_loader(data_dir: Path) -> Callable[[], Awaitable[Tts]]:
 
     async def load_tts() -> Tts:
         await ensure_files(folder, KOKORO_FILES, fetch, lambda _f: None)
-        return await asyncio.to_thread(kokoro.load, folder)
+        with timed("voice_hop", op="load_models"):
+            return await asyncio.to_thread(kokoro.load, folder)
 
     return load_tts

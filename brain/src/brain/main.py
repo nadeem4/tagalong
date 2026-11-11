@@ -58,6 +58,7 @@ from brain.setup.tools import setup_facts, setup_tools
 from brain.setup.updates import Updates
 from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
+from brain.telemetry import LoopLagMonitor
 from brain.tools import KeySettings, anthropic_check, brain_status_tools
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
@@ -285,6 +286,7 @@ async def _run() -> None:
     )
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
+    lag_watch: asyncio.Task | None = None
     session.voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
@@ -326,14 +328,16 @@ async def _run() -> None:
         )
         await bridges.start()  # Node and the bridge come up on their own task
         update_loop = asyncio.ensure_future(updates.run())  # the daily check and waiting updates
+        lag_watch = asyncio.ensure_future(LoopLagMonitor(config.loop_lag_ms / 1000).run())
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
-        if update_loop is not None:
-            update_loop.cancel()
-            await asyncio.gather(update_loop, return_exceptions=True)
+        for task in (update_loop, lag_watch):
+            if task is not None:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
         await updates.stop()  # an update in flight is cancelled like an install
         await stop_installs()  # cancel running installs; each removes what it staged
         await stop_watches()  # before apps.shutdown(), which would end each watch with an event

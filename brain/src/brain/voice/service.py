@@ -14,6 +14,7 @@ from typing import Literal, Protocol
 
 import numpy as np
 
+from brain.telemetry import timed
 from brain.voice.ears import FRAME, Ears, EarsParts
 from brain.voice.models import ModelIntegrityError
 from brain.voice.mouth import Mouth, Tts
@@ -184,7 +185,8 @@ class VoiceService:
 
         ears = None
         try:
-            ears = await asyncio.to_thread(Ears, parts, session.mode, emit)
+            with timed("voice_hop", op="load_ears"):
+                ears = await asyncio.to_thread(Ears, parts, session.mode, emit)
             rest = np.zeros(0, dtype=np.float32)
             while True:
                 chunk = await session.next()
@@ -196,7 +198,8 @@ class VoiceService:
                 rest = np.concatenate([rest, chunk])
                 while len(rest) >= FRAME and session.live:
                     frame, rest = rest[:FRAME], rest[FRAME:]
-                    await asyncio.to_thread(ears.frame, frame)
+                    with timed("voice_hop", op="frame"):  # VAD and speech-to-text
+                        await asyncio.to_thread(ears.frame, frame)
                     self._flush(session)
         except Exception:
             log.warning("listening failed", exc_info=True)

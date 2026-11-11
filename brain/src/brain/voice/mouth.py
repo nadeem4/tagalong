@@ -16,6 +16,7 @@ from typing import Protocol
 
 import numpy as np
 
+from brain.telemetry import timed
 from brain.voice.speakable import SHORT_LINE, SpokenStream
 
 log = logging.getLogger("brain")
@@ -168,7 +169,8 @@ class Mouth:
         if tts is not None:
             try:
                 async with self._synth:
-                    samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
+                    with timed("voice_hop", op="synth"):
+                        samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
                 pcm = samples.astype("<i2").tobytes()
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:

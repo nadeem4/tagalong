@@ -18,6 +18,7 @@ from brain.mind.turn import Final, Model
 from brain.store import rules
 from brain.store.rules import Preference
 from brain.store.work import WorkStore
+from brain.telemetry import timed
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class SideCheck:
         if verdict.kind != "allow":
             return None
         try:
-            async with asyncio.timeout(self._timeout):
+            async with timed("side_check"), asyncio.timeout(self._timeout):
                 final = await self._ask(facts)
         except Exception:  # TimeoutError included: every failure leaves the ask to the person
             log.exception("side-check failed")

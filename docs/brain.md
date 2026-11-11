@@ -44,6 +44,7 @@ variable still works and is the developer path.
 | `TAGALONG_LOOP_POLL_S`           | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                                       |
 | `TAGALONG_LOOP_STALE_DAYS`       | `7`                | Days a held loop may sit untouched before it goes to one stale wake (a positive whole number)                                                                                     |
 | `TAGALONG_STEP_CAP`              | `25`               | Most model calls in one turn                                                                                                                                                      |
+| `TAGALONG_LOOP_LAG_MS`           | `200`              | Milliseconds the event loop may be blocked before the brain logs it (a positive whole number)                                                                                     |
 | `TAGALONG_TURN_TIMEOUT_S`        | `300`              | Longest one Scout turn may run, in seconds. Time inside tool calls does not count (a positive number)                                                                             |
 | `TAGALONG_EXPERT_CMD`            | none               | Command of one custom ACP expert, listed as `custom` beside the installed ones (split like a shell line)                                                                          |
 | `TAGALONG_JOB_QUIET_MIN`         | `20`               | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                                                 |
@@ -91,6 +92,7 @@ the total can run a little low.
 | `brain/src/brain/waiting.py`           | `WaitingAsks`: Scout asks parked past their turn; finds a repeated call, carries a saved call out on a late yes and emits `ask_ended`; arms the deadline timer, emits `ask_notice`, expires an unanswered ask, and after a restart or an absence decides the waiting asks again when a displaying body joins (`asks_waiting`)                                                                                                                      |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                          |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                   |
+| `brain/src/brain/telemetry.py`         | `timed`, the `TIMINGS` ring buffers and `LoopLagMonitor`: how long steps take and when the event loop stalls (see [Measurement](#measurement))                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/offers.py`            | `Offers`: after a hand approval, may offer to approve that group of asks from now on ("Yes, auto-approve" or "Keep asking")                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/mind/approvals.md`    | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/expert_apps.py`       | `ExpertApps`: the loopback MCP bridge that lets an expert reach chosen connected apps through the brain's gate; one token per job part                                                                                                                                                                                                                                                                                                             |
@@ -244,6 +246,21 @@ flowchart TD
 Decision: the loop is our own, not the SDK tool runner. The runner hides the history, fixes the
 tool list when it starts, cannot take a `say` in the middle of a turn, and ends silently on
 `pause_turn`.
+
+## Measurement
+
+`telemetry.py` only observes; nothing in the brain decides from it.
+
+- **Loop lag.** `LoopLagMonitor` runs beside the server. It sleeps 0.1 s and compares the time
+  that really passed; when the event loop was blocked longer than `TAGALONG_LOOP_LAG_MS` (200 by
+  default) it logs one warning, `event loop blocked for 0.50 s`, in `brain.log`.
+- **Step timings.** `timed(step, **tags)` is a `with` and `async with` block that records its
+  duration in `TIMINGS`, the last 500 samples per step. Steps: `model_call` (start to final
+  message, tagged with the step number), `tool` (the tool's own run, tagged `name`; the wait for
+  an ask card is not counted), `side_check`, and `voice_hop` (tagged `op`: `frame` for voice
+  detection and speech-to-text, `synth` for speaking, `load_ears`, `load_models`). A slow run
+  that shows up in `loop_lag` but not in the steps points at something blocking the loop.
+- `TIMINGS.summary()` gives count, p50, p95 and max per step. Nothing prints it yet.
 
 ## Outbox and replay
 
