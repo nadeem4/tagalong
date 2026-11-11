@@ -273,7 +273,11 @@ class AskRunner:
                 continue
             # A card up already may have opened while no screen showed it: told if it is newer
             # than the absence.
-            if away_s is not None and item.created_at >= since and item.state == "open":
+            if (
+                away_s is not None
+                and item.created_at >= since
+                and self._items.get(item.id).state == "open"
+            ):
                 back.append(item)
         if back:
             asks = [

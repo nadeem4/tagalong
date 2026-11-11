@@ -732,10 +732,11 @@ none if it was never seen. Three things happen, in order. An item that expired s
 frame `state: "closed"`, `reason: "timeout"`, so a card the body still shows goes away; a body that
 never showed it ignores the frame. Every open `ask` item whose card is not live in `Asks` (a restart
 leaves none) gets its card shown again, with the same ask id and no `turn`, for every body. A tool
-that has gone ends the ask `failed` ("that tool is gone"). Then, if any card was shown again, one
+that has gone ends the ask `failed` ("that tool is gone"). Then, if any card was shown again (or, when the absence is known, an open ask created during it, for
+example one opened while no screen was up), one
 `asks_waiting` event goes to the scheduler: `count` and `asks`, a JSON list of `ask`, `tool`,
 `summary` and `age_s` (seconds waited), oldest first, so Scout can say how old each is in his own
-words. Cards already up (a second body joining) are not told again. Nothing is decided without the
+words. A card that cannot be built is logged and skipped; the others still show. Nothing is decided without the
 person on return: the rule and side-check ran when the ask opened. The Held tab lists the open
 items too (see `loops_state`).
 

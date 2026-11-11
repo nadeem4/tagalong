@@ -548,7 +548,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   finds stay on this computer."), "Mail unread since HH:MM" when the brain says reading stopped, the Held
   list (every loop the brain holds: title, what it asks, You owe or Waiting on them, people, due, status,
   never the mail text) with a quiet Forget on each row, above it a "Waiting on you" list of every open item
-  (`open_items` in `loops_state`: a plain title, its kind and how long it has waited, "2 h" or "1 min"), and Stop and wipe, which asks inside the
+  (`open_items` in `loops_state`: a plain title, its kind in words (Permission, Question, Expert request, Offer; setup news is left out, it waits on Scout) and how long it has waited, "2 h" or "1 min"; `LoopsPanel` reads again on `changed` `loops` or `apps` and when a `connector.confirm` or `connector.dismiss` arrives, so a row drops without reopening Home), and Stop and wipe, which asks inside the
   page (a Wipe and Cancel alert, Escape cancels, focus returns to Stop and wipe) before every switch goes off and every loop is
   deleted. The ipc layer checks its arguments (the page is not trusted); the card reads again on
   `changed { what: "loops" }`. The fake brain turns a held loop up when the switch goes on, and
