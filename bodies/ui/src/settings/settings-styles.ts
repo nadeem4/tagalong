@@ -23,15 +23,16 @@ export const SETTINGS_CSS = `
 }
 .tg-settings ::-webkit-scrollbar { width: 8px; height: 8px; }
 .tg-settings ::-webkit-scrollbar-track { background: transparent; }
-.tg-settings ::-webkit-scrollbar-thumb { background: ${t.color.scrollbarThumb}; border-radius: 4px; }
+.tg-settings ::-webkit-scrollbar-thumb { background: ${t.color.scrollbarThumb}; border-radius: ${t.radius.sm}px; }
 .tg-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
   white-space: nowrap;
 }
 .tg-main { overflow-y: auto; padding: ${t.space.xxl}px; display: flex; flex-direction: column; gap: ${t.space.xl}px; }
-.tg-panel {
-  background: ${t.color.panel}; color: ${t.color.panelText}; border-radius: ${t.radius.row}px;
-  padding: ${t.space.xxl}px; margin: 0; border: 0; min-width: 0;
+.tg-panel { color: ${t.color.panelText}; margin: 0; min-width: 0; }
+/* The box is .tg-card's when embedded in Home; the standalone window draws its own. */
+.tg-panel:not(.tg-card) {
+  background: ${t.color.panel}; border-radius: ${t.radius.card}px; padding: ${t.space.xxl}px; border: 0;
 }
 .tg-panel__heading {
   ${typeCss('title')};
@@ -49,7 +50,7 @@ export const SETTINGS_CSS = `
 .tg-panel input:not([type]), .tg-panel input[type='text'], .tg-panel input[type='password'],
 .tg-panel input[type='number'], .tg-panel select, .tg-panel textarea {
   width: 100%; min-height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px;
-  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.field}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.sm}px;
   background: ${t.color.panelTile}; color: ${t.color.panelText};
   font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
@@ -59,7 +60,7 @@ export const SETTINGS_CSS = `
 .tg-note { color: ${t.color.panelMuted}; ${typeCss('small')}; margin: 0 0 ${t.space.lg}px; }
 .tg-error { display: flex; gap: ${t.space.sm}px; align-items: center; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-btn-quiet {
-  height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.field}px;
+  height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.sm}px;
   font-family: ${t.font.ui}; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
 }
 .tg-btn-quiet { border: 1px solid ${t.color.fieldLine}; background: transparent; color: ${t.color.textMuted}; }
@@ -67,7 +68,7 @@ export const SETTINGS_CSS = `
 .tg-panel .tg-btn-quiet { border-color: ${t.color.panelMuted}; color: ${t.color.panelText}; }
 .tg-chip {
   display: inline-flex; align-items: center; gap: ${t.space.xs}px; padding: ${t.space.xxs}px ${t.space.md}px;
-  border-radius: ${t.radius.chip}px; background: ${t.color.chipFree}; color: ${t.color.chipFreeInk};
+  border-radius: ${t.radius.pill}px; background: ${t.color.chipFree}; color: ${t.color.chipFreeInk};
   ${typeCss('caption')};
 }
 .tg-chip--ok { background: ${t.color.okFill}; color: ${t.color.okInk}; }
@@ -80,7 +81,7 @@ export const SETTINGS_CSS = `
 .tg-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: ${t.space.sm}px; margin: 0 0 ${t.space.lg}px; padding: 0; border: 0; }
 .tg-panel label.tg-choice {
   display: block; margin: 0; padding: ${t.space.md}px ${t.space.lg}px; border: 2px solid ${t.color.panelLine};
-  border-radius: ${t.radius.row}px; cursor: pointer;
+  border-radius: ${t.radius.card}px; cursor: pointer;
 }
 .tg-choice:hover { background: ${t.color.panelTile}; }
 .tg-choice:has(input:checked) { border-color: ${t.color.gold}; background: ${t.color.panelTile}; }
@@ -89,16 +90,11 @@ export const SETTINGS_CSS = `
 
 /* The Settings page: sections, ⓘ notes, status and errors. */
 .tg-settings [hidden] { display: none !important; }
-.tg-settings .tg-panel { display: flex; flex-direction: column; gap: 14px; }
+.tg-settings .tg-panel { display: flex; flex-direction: column; gap: ${t.space.xl}px; }
 .tg-settings .tg-panel label { margin-bottom: 0; }
 .tg-settings .tg-panel__heading { margin: 0; }
 .tg-settings .tg-chips { margin: 0; }
 .tg-settings--embedded .tg-main { gap: ${t.space.xxl}px; }
-/* Same box as Home's .home-card; written here too because this sheet loads after Home's. */
-.tg-settings--embedded .tg-panel {
-  background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px;
-  padding: ${t.space.xl}px ${t.space.xxl}px;
-}
 .tg-intro { display: flex; flex-wrap: wrap; align-items: flex-end; gap: ${t.space.xl}px; }
 .tg-intro__text { flex: 1 1 320px; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-intro__save { display: flex; align-items: center; gap: ${t.space.md}px; margin-left: auto; }
@@ -112,13 +108,13 @@ export const SETTINGS_CSS = `
 .tg-help { margin: 0; color: ${t.color.panelMuted}; ${typeCss('body')}; }
 .tg-info {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 12px;
+  width: 24px; height: 24px; padding: 0; border: 0; border-radius: ${t.radius.card}px;
   background: transparent; color: ${t.color.panelMuted}; cursor: pointer;
 }
 .tg-info:hover { background: ${t.color.panelTile}; color: ${t.color.panelText}; }
 .tg-info[aria-expanded='true'] { background: ${t.color.panelText}; color: ${t.color.panel}; }
 .tg-tip {
-  margin: 0; padding: ${t.space.lg}px 14px; border-radius: ${t.radius.field}px;
+  margin: 0; padding: ${t.space.lg}px ${t.space.xl}px; border-radius: ${t.radius.sm}px;
   background: ${t.color.panelTile}; color: ${t.color.panelText}; ${typeCss('body')};
 }
 .tg-labelrow {

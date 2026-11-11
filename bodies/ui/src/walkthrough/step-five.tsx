@@ -82,7 +82,7 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
         />
         <p className="wt-help">(hold it on its own)</p>
       </div>
-      <div className="wt-row wt-switchrow">
+      <div className="tg-card wt-row wt-switchrow">
         <div>
           <span className="wt-strong">Scout talks</span>
           <p className="wt-help">Reads answers aloud, so you can look away.</p>

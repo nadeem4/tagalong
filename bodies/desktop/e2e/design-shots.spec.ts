@@ -1,7 +1,7 @@
 /**
  * Design-refresh screenshots of Home's "Scout's brain" card (D1), the Connections page (D5) and Scout's model (E5),
  * one per state, for review against the mockups. Skipped unless TAGALONG_SHOTS=1; they are not part of CI. Files land in
- * docs/superpowers/specs/design-refresh/shots/<slice>/ (TAGALONG_SHOTS_DIR overrides the root).
+ * docs/superpowers/specs/design-refresh/shots/<slice>/ (TAGALONG_SHOTS_DIR overrides the root, TAGALONG_SHOTS_RUN nests a re-run under shots/<run>/).
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,10 +21,15 @@ const shotsRoot =
   process.env.TAGALONG_SHOTS_DIR ??
   'C:/projects/ai_pet/docs/superpowers/specs/design-refresh/shots';
 
+// TAGALONG_SHOTS_RUN (a slice name such as E4) files a whole re-run under shots/<run>/<slice>/, so
+// a later slice can compare every earlier slice's states with the first take.
+const shotDir = (slice: string): string =>
+  resolve(shotsRoot, process.env.TAGALONG_SHOTS_RUN ?? '', slice);
+
 test.skip(process.env.TAGALONG_SHOTS !== '1', 'set TAGALONG_SHOTS=1 to take design shots');
 
 async function shot(page: Page, slice: string, state: string): Promise<void> {
-  const dir = resolve(shotsRoot, slice);
+  const dir = shotDir(slice);
   mkdirSync(dir, { recursive: true });
   await page.screenshot({ path: join(dir, `${state}.png`) });
 }
@@ -639,7 +644,7 @@ test('E1 updates', async () => {
     // The remote row on its own: "Always up to date", no Update button, no version.
     const notionRow = home.getByRole('region', { name: 'Notion' });
     await notionRow.scrollIntoViewIfNeeded();
-    const dir = resolve(shotsRoot, 'E1');
+    const dir = shotDir('E1');
     await notionRow.screenshot({ path: join(dir, 'remote-row.png') });
   } finally {
     await closeApp(app);
@@ -755,7 +760,7 @@ test('E1 experts updates', async () => {
 // E5: Settings > Scout's model in its four mocked states. The listbox hangs below the card, so
 // the open shot scrolls the card to the top and clips a taller area.
 test('E5 model states', async () => {
-  const dir = resolve(shotsRoot, 'E5');
+  const dir = shotDir('E5');
   mkdirSync(dir, { recursive: true });
   const brain = await startFakeBrain({ hasKey: true });
   const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
@@ -857,7 +862,7 @@ const ALL_FIVE = [
 ];
 
 test('E2 places states', async () => {
-  const dir = resolve(shotsRoot, 'E2');
+  const dir = shotDir('E2');
   mkdirSync(dir, { recursive: true });
   await placesPage(
     {
@@ -897,7 +902,7 @@ test('E2 places states', async () => {
 });
 
 test('E2 tour step ten and finish card', async () => {
-  const dir = resolve(shotsRoot, 'E2');
+  const dir = shotDir('E2');
   mkdirSync(dir, { recursive: true });
   const { find, done } = await launchShot({ hasKey: true, expertInstallingPercent: 40 }, false);
   try {

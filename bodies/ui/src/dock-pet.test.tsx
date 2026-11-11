@@ -117,7 +117,7 @@ describe('DockPet', () => {
     expect(tag.style.fontSize).toBe('9px');
     expect(tag.style.top).toBe('4px');
     expect(tag.style.right).toBe('0px');
-    expect(tag.style.padding).toBe('1px 3px');
+    expect(tag.style.padding).toBe('2px 3px');
   });
 
   it('shows that sight is paused in a mark and in words', () => {

@@ -30,10 +30,15 @@ export const CONTROLS_CSS = `
 .tg-toggle, .tg-select select, .tg-slider input, .tg-money input, .tg-button, .tg-keyfield #tg-api-key,
 .tg-keycap { box-sizing: border-box; }
 .tg-wordmark { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; }
+/* The one card box: Home panels, Settings sections and the tour's cards wear it, and a page adds only its layout. */
+.tg-card {
+  padding: ${t.space.xl}px ${t.space.xxl}px; background: ${t.color.card};
+  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.card}px;
+}
 
 .tg-toggle {
   position: relative; flex: none; width: ${t.size.toggleW}px; height: ${t.size.toggleH}px; padding: 0;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.pill}px;
   background: ${t.color.scrollbarThumb}; color: ${t.color.panelText}; cursor: pointer;
   font-family: ${t.font.ui}; ${typeCss('caption')};
   transition: background 120ms;
@@ -52,11 +57,11 @@ export const CONTROLS_CSS = `
 /* ThreeWay: one pill; the chosen word is filled in gold like an on Toggle. */
 .tg-three {
   display: inline-flex; flex: none; padding: 2px; gap: 2px; box-sizing: border-box;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px; background: var(--tg-ctl-bg);
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.pill}px; background: var(--tg-ctl-bg);
 }
 .tg-three__option {
   min-width: 46px; height: ${t.size.toggleH}px; padding: 0 ${t.space.md}px; border: 0;
-  border-radius: ${t.size.toggleH}px; background: transparent; color: var(--tg-ctl-ink); cursor: pointer;
+  border-radius: ${t.radius.pill}px; background: transparent; color: var(--tg-ctl-ink); cursor: pointer;
   font-family: ${t.font.ui}; ${typeCss('caption')};
   transition: background 120ms;
 }
@@ -68,8 +73,8 @@ export const CONTROLS_CSS = `
 .tg-select__label { color: var(--tg-ctl-muted); ${typeCss('small')}; }
 .tg-select__wrap { position: relative; display: block; }
 .tg-select .tg-select__wrap select {
-  appearance: none; width: 100%; height: ${t.size.control}px; padding: 0 34px 0 ${t.space.lg}px;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
+  appearance: none; width: 100%; height: ${t.size.control}px; padding: 0 ${t.space.page}px 0 ${t.space.lg}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.sm}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
   font-family: ${t.font.ui}; ${typeCss('bodyLead')}; cursor: pointer;
 }
@@ -82,8 +87,8 @@ export const CONTROLS_CSS = `
 
 .tg-shortcut { display: inline-flex; align-items: center; gap: ${t.space.xs}px; white-space: nowrap; }
 .tg-keycap {
-  display: inline-block; min-width: 24px; padding: 2px 7px; text-align: center;
-  border: 1px solid ${t.color.keycapLine}; border-bottom-width: 2px; border-radius: 6px;
+  display: inline-block; min-width: 24px; padding: 2px ${t.space.md}px; text-align: center;
+  border: 1px solid ${t.color.keycapLine}; border-bottom-width: 2px; border-radius: ${t.radius.sm}px;
   background: ${t.color.keycapFill}; color: ${t.color.keycapInk};
   font-family: ${t.font.ui}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold};
 }
@@ -96,11 +101,11 @@ export const CONTROLS_CSS = `
   appearance: none; width: 100%; height: ${t.size.toggleH}px; margin: 0; background: transparent; cursor: pointer;
 }
 .tg-slider input[type='range']::-webkit-slider-runnable-track {
-  height: 6px; border-radius: 3px;
+  height: 6px; border-radius: ${t.radius.sm}px;
   background: linear-gradient(to right, ${t.color.gold} var(--fill), var(--tg-ctl-line) var(--fill));
 }
 .tg-slider input[type='range']::-webkit-slider-thumb {
-  appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
+  appearance: none; width: 18px; height: 18px; margin-top: -${t.space.sm}px; border-radius: 50%;
   background: ${t.color.gold}; border: 2px solid ${t.color.goldInk};
 }
 .tg-slider input[type='range']:hover::-webkit-slider-thumb { background: ${t.color.keycapFill}; }
@@ -111,7 +116,7 @@ export const CONTROLS_CSS = `
 .tg-money__prefix { color: var(--tg-ctl-muted); ${typeCss('bodyLead')}; }
 .tg-money .tg-money__row input[type='text'] {
   width: 96px; height: ${t.size.control}px; padding: 0 ${t.space.lg}px;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.sm}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
   font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
@@ -120,7 +125,7 @@ export const CONTROLS_CSS = `
   width: ${t.size.control}px; padding: 0; color: var(--tg-ctl-ink); border-color: var(--tg-ctl-muted);
 }
 .tg-meter {
-  flex: 1; min-width: 120px; height: 10px; border-radius: 5px; overflow: hidden;
+  flex: 1; min-width: 120px; height: 10px; border-radius: ${t.radius.sm}px; overflow: hidden;
   border: 1px solid var(--tg-ctl-line); background: var(--tg-ctl-bg);
 }
 .tg-meter__bar { width: var(--level); height: 100%; background: var(--tg-ctl-ink); transition: width 80ms linear; }
@@ -136,7 +141,7 @@ export const CONTROLS_CSS = `
 
 .tg-button {
   display: inline-flex; align-items: center; justify-content: center; gap: ${t.space.sm}px;
-  height: ${t.size.control}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.field}px;
+  height: ${t.size.control}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.sm}px;
   border: 1px solid transparent; cursor: pointer;
   font-family: ${t.font.ui}; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold};
 }
@@ -156,8 +161,8 @@ export const CONTROLS_CSS = `
 .tg-keyfield__box { position: relative; flex: 1; min-width: 0; }
 /* The id selector outranks Settings' generic input rule whatever the sheet order. */
 .tg-keyfield #tg-api-key {
-  width: 100%; height: ${t.size.fieldHeight}px; padding: 0 64px 0 ${t.space.lg}px;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
+  width: 100%; height: ${t.size.fieldHeight}px; padding: 0 ${t.space.hero}px 0 ${t.space.lg}px;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.sm}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
   font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
@@ -184,7 +189,7 @@ export const CONTROLS_CSS = `
 .tg-limitfield__row { display: flex; align-items: center; gap: ${t.space.md}px; height: ${t.size.control}px; }
 .tg-limitfield .tg-money__row {
   gap: 0; height: ${t.size.control}px; overflow: hidden; box-sizing: border-box;
-  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px; background: var(--tg-ctl-bg);
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.sm}px; background: var(--tg-ctl-bg);
 }
 .tg-limitfield .tg-money__row:focus-within { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
 .tg-limitfield .tg-money__row:has(input[aria-invalid='true']) { border: 2px solid ${t.color.errInk}; }
@@ -207,8 +212,8 @@ export const CONTROLS_CSS = `
 .tg-spend__top { display: flex; justify-content: space-between; gap: ${t.space.lg}px; ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 .tg-spend__top strong { color: var(--tg-ctl-ink); font-weight: ${t.fontWeight.semibold}; }
 .tg-spend__top span { color: var(--tg-ctl-muted); }
-.tg-spendmeter { height: 6px; border-radius: 3px; background: ${t.color.panelTile}; overflow: hidden; }
-.tg-spendmeter > i { display: block; height: 100%; border-radius: 3px; background: var(--tg-ctl-ink); }
+.tg-spendmeter { height: 6px; border-radius: ${t.radius.sm}px; background: ${t.color.panelTile}; overflow: hidden; }
+.tg-spendmeter > i { display: block; height: 100%; border-radius: ${t.radius.sm}px; background: var(--tg-ctl-ink); }
 .tg-spendmeter--full > i { background: ${t.color.warnBar}; }
 .tg-spend .tg-spend__full { margin: 0; color: ${t.color.warnInk}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); ${typeCss('small')}; font-variant-numeric: tabular-nums; }

@@ -96,11 +96,11 @@ async function opened(group: string, title: string) {
 const radio = (el: HTMLElement, name: string) => within(el).getByRole('radio', { name });
 
 describe('PermissionsPanel', () => {
-  it('sits in a home-card section labelled Permissions with the three modes explained', async () => {
+  it('sits in a tg-card section labelled Permissions with the three modes explained', async () => {
     renderPanel(bridgeOf(MOVE));
     await header('This computer');
     const card = screen.getByRole('region', { name: 'Permissions' });
-    expect(card).toHaveClass('home-card');
+    expect(card).toHaveClass('tg-card');
     expect(card).toHaveTextContent(
       'Off: Scout leaves it alone. Ask: checks with you first. Auto: just does it.',
     );

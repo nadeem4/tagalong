@@ -22,7 +22,7 @@ export function StepTwo() {
         you already are.
       </p>
       <ol className="wt-flow" aria-label="How a request travels">
-        <li className="wt-node">
+        <li className="tg-card wt-node">
           <span className="wt-label">You ask</span>
           <strong>By voice or text</strong>
         </li>
@@ -32,14 +32,14 @@ export function StepTwo() {
         <li>
           <ul className="wt-routes" aria-label="Ways Scout helps">
             {ROUTES.map((route) => (
-              <li key={route.name} className="wt-node">
+              <li key={route.name} className="tg-card wt-node">
                 <strong>{route.name}</strong>
                 <span className="wt-help">{route.detail}</span>
               </li>
             ))}
           </ul>
         </li>
-        <li className="wt-node wt-node--back">
+        <li className="tg-card wt-node wt-node--back">
           <span className="wt-label">Back to you</span>
           <strong>Right where you are</strong>
         </li>

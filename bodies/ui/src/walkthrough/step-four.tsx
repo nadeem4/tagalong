@@ -55,7 +55,7 @@ function AskForm({
         ) : (
           <>
             <span className="wt-label">Ask key</span>
-            <div className="wt-keybox">
+            <div className="tg-card wt-keybox">
               <span data-testid="wt-ask-key">
                 <Shortcut accelerator={ask} />
               </span>
@@ -70,7 +70,7 @@ function AskForm({
       {pause !== undefined && (
         <div className="wt-keyrow">
           <span className="wt-label">Pause key</span>
-          <div className="wt-keybox">
+          <div className="tg-card wt-keybox">
             <span data-testid="wt-pause-key">
               <Shortcut accelerator={pause} />
             </span>

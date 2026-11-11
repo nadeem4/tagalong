@@ -15,7 +15,7 @@ export function StepSix() {
         Say what you need. Scout uses your apps for it and asks before anything leaves this
         computer. You can connect your tools at the end of the tour, or any time in Home.
       </p>
-      <ul className="wt-jobs">
+      <ul className="tg-card wt-jobs">
         {JOB_KINDS.map((job) => (
           <li key={job.label} className="wt-job">
             <div className="wt-job__text">

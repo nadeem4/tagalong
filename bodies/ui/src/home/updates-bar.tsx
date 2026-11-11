@@ -87,7 +87,7 @@ export function UpdatesBar({
   return (
     <>
       <div className="cx-card-top">
-        <h2 className="home-card__label">{title}</h2>
+        <h2 className="tg-card__label">{title}</h2>
         <div className="cx-card-tools">
           <span className="cx-meta">{checkedWords(state.checkedAt, now ?? clock)}</span>
           <Button variant="quiet" disabled={controls.checking} onClick={controls.onCheck}>

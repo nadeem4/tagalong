@@ -47,7 +47,7 @@ export function Section({
 }) {
   const title = SECTIONS.find((section) => section.id === id)?.title ?? id;
   return (
-    <section id={id} className="tg-panel home-card" aria-labelledby={`${id}-heading`}>
+    <section id={id} className="tg-panel tg-card" aria-labelledby={`${id}-heading`}>
       <div className="tg-titlerow">
         <h2 id={`${id}-heading`} className="tg-panel__heading">
           {title}

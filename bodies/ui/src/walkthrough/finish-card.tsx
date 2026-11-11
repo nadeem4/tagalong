@@ -51,7 +51,7 @@ export function FinishCard({
           <div className="wt-cols wt-cols--even">
             <div>
               <span className="wt-label">Keys to remember</span>
-              <ul className="wt-keylist">
+              <ul className="tg-card wt-keylist">
                 <li>
                   <span>Ask</span>
                   <Shortcut accelerator={askKey} />
@@ -66,7 +66,7 @@ export function FinishCard({
               <span className="wt-label" id="wt-try">
                 Try these first
               </span>
-              <ul className="wt-keylist" aria-labelledby="wt-try">
+              <ul className="tg-card wt-keylist" aria-labelledby="wt-try">
                 {TRY.map((line) => (
                   <li key={line}>
                     <q>{line}</q>
@@ -80,7 +80,7 @@ export function FinishCard({
               <span className="wt-label">
                 <span id="wt-ready">Ready to use</span> <span className="wt-new">New</span>
               </span>
-              <ul className="wt-keylist" aria-labelledby="wt-ready">
+              <ul className="tg-card wt-keylist" aria-labelledby="wt-ready">
                 {ready.map((item) => (
                   <li key={item.name}>
                     <span>{item.name}</span>

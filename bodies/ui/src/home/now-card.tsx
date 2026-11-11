@@ -142,8 +142,8 @@ export function NowCard({ onOpenJob }: { onOpenJob: (id: string) => void }) {
   const empty = waiting.length + jobs.length + reading.length + soon.length === 0;
 
   return (
-    <section className="home-card now" aria-label="Now">
-      <h2 className="home-card__label">Now</h2>
+    <section className="tg-card now" aria-label="Now">
+      <h2 className="tg-card__label">Now</h2>
       {waiting.map((ask) => (
         <div key={ask.approvalId} className="now__row now__ask">
           <span className="now__body">

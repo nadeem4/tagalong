@@ -67,7 +67,7 @@ const SIZE = 96;
 type TaggedMood = 'listening' | 'working';
 
 const TAGS: Readonly<Record<TaggedMood, { text: string; color: string }>> = {
-  listening: { text: 'Seeing', color: '#7CB8F2' },
+  listening: { text: 'Seeing', color: t.color.sky },
   working: { text: 'Working', color: t.color.gold },
 };
 
@@ -186,7 +186,7 @@ export function DockPet({
             right: 0,
             // Small and tucked into the corner, so it stays clear of Bean's floating sign (the
             // gear) beside it.
-            padding: '1px 3px',
+            padding: `${t.space.xxs}px ${t.space.hair}px`,
             borderRadius: 999,
             background: tag.color,
             color: t.color.goldInk,
@@ -210,7 +210,7 @@ export function DockPet({
             left: 12,
             padding: '2px 6px',
             borderRadius: 999,
-            background: '#6B7290',
+            background: t.color.dim,
             color: t.color.text,
             fontSize: t.type.caption.size,
             lineHeight: `${t.type.caption.line}px`,
@@ -245,11 +245,11 @@ function reducedMotion(): boolean {
 
 const DOCK_CSS = `
 /* Always listening: a solid dot while on, an outline while paused. Never hidden. */
-.dock-pet__listening { position: absolute; bottom: 8px; right: 16px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid #7DD87F; background: #7DD87F; box-shadow: 0 0 0 1px #fff; }
+.dock-pet__listening { position: absolute; bottom: 8px; right: 16px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid ${t.color.listening}; background: ${t.color.listening}; box-shadow: 0 0 0 1px ${t.color.card}; }
 .dock-pet__listening[data-state='on'] { animation: dock-listening 2.4s ease-in-out infinite; }
 .dock-pet__listening[data-state='paused'] { background: transparent; }
-.dock-pet__listening[data-state='hearing'] { background: #B8F5B9; border-color: #B8F5B9; animation: dock-hearing 0.6s ease-out infinite; }
-.dock-pet__listening[data-state='follow-up'] { box-shadow: 0 0 0 1px #fff, 0 0 0 3px #7DD87F; }
+.dock-pet__listening[data-state='hearing'] { background: ${t.color.hearing}; border-color: ${t.color.hearing}; animation: dock-hearing 0.6s ease-out infinite; }
+.dock-pet__listening[data-state='follow-up'] { box-shadow: 0 0 0 1px ${t.color.card}, 0 0 0 3px ${t.color.listening}; }
 @keyframes dock-hearing { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @keyframes dock-listening { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 /* A backstop: the clips are already drawn still when the system asks for less motion. */

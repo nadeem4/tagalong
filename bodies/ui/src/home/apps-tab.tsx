@@ -59,9 +59,9 @@ export function AppsTab({
 
   return (
     <>
-      <section className="home-card" aria-label="Your apps">
+      <section className="tg-card" aria-label="Your apps">
         {updates === null ? (
-          <h2 className="home-card__label">Your apps</h2>
+          <h2 className="tg-card__label">Your apps</h2>
         ) : (
           <UpdatesBar title="Your apps" kind="app" controls={updates} />
         )}
@@ -94,8 +94,8 @@ export function AppsTab({
         )}
       </section>
 
-      <section className="home-card" aria-label="Add an app">
-        <h2 className="home-card__label">Add an app</h2>
+      <section className="tg-card" aria-label="Add an app">
+        <h2 className="tg-card__label">Add an app</h2>
         <AppSearch
           busy={busy}
           apps={apps}

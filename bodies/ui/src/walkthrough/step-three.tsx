@@ -13,7 +13,7 @@ export function StepThree() {
       <p className="wt-lead">
         Select text or press the ask key, then say it the way you would to a colleague.
       </p>
-      <ul className="wt-moments">
+      <ul className="tg-card wt-moments">
         {MOMENTS.map((moment) => (
           <li key={moment.ask}>
             <span className="wt-where">{moment.where}</span>

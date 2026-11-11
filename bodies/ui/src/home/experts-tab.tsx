@@ -155,8 +155,8 @@ export function ExpertsTab({
         updates={updates}
       />
       {items.length > 0 && (
-        <section className="home-card" aria-label="Add an expert">
-          <h2 className="home-card__label">Add an expert</h2>
+        <section className="tg-card" aria-label="Add an expert">
+          <h2 className="tg-card__label">Add an expert</h2>
           <p>Experts take on long jobs for Scout, on your own login.</p>
           <SearchField
             label="Search experts"

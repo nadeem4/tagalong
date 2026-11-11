@@ -123,7 +123,7 @@ export function BrainCard() {
   const person = card.startedBy === 'person';
 
   return (
-    <section className="home-card brain-card" aria-label="Scout's brain">
+    <section className="tg-card brain-card" aria-label="Scout's brain">
       <h2 className="brain-card__title">Scout's brain</h2>
       <p>
         The part of Scout that thinks, remembers and runs your jobs. It keeps running when you close

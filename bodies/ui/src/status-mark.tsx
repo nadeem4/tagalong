@@ -32,9 +32,9 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
           bottom: 18,
           left: '50%',
           transform: 'translateX(-50%)',
-          padding: '2px 7px',
+          padding: `${t.space.xxs}px ${t.space.md}px`,
           borderRadius: 999,
-          background: tone === 'warn' ? t.color.warnFill : '#6B7290',
+          background: tone === 'warn' ? t.color.warnFill : t.color.dim,
           color: tone === 'warn' ? t.color.warnInk : t.color.text,
           fontFamily: t.font.ui,
           fontSize: t.type.caption.size,
@@ -62,7 +62,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         fontFamily: t.font.ui,
         fontSize: t.type.small.size,
         lineHeight: `${t.type.small.line}px`,
-        color: tone === 'warn' ? '#F2D48A' : t.color.textMuted,
+        color: tone === 'warn' ? t.color.warnOnNavy : t.color.textMuted,
       }}
     >
       <span style={{ flex: 1 }}>{detail}</span>

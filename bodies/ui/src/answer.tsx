@@ -179,7 +179,7 @@ export const ANSWER_CSS = `
 .answer > :first-child { margin-top: 0; }
 .answer > :last-child { margin-bottom: 0; }
 .answer p, .answer ul, .answer ol, .answer pre, .answer table { margin: 0 0 8px; }
-.answer ul, .answer ol { flex: none; overflow: visible; padding: 0 0 0 18px; }
+.answer ul, .answer ol { flex: none; overflow: visible; padding: 0 0 0 ${t.space.xxl}px; }
 .answer li { margin: 0; white-space: normal; }
 .answer ul { list-style: disc; }
 .answer ol { list-style: decimal; }
@@ -192,36 +192,36 @@ export const ANSWER_CSS = `
 .answer h1, .answer h2, .answer h3, .answer h4 { margin: 12px 0 6px; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .answer h1, .answer h2 { ${typeCss('title')}; }
 .answer code {
-  padding: 1px 5px; border-radius: 4px; background: #222845;
+  padding: ${t.space.xxs}px ${t.space.sm}px; border-radius: ${t.radius.sm}px; background: ${t.color.tileNavy};
   font-family: ${t.font.mono}; ${typeCss('small')};
 }
 .answer pre {
-  padding: 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 8px; background: ${t.color.field};
+  padding: 12px; border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.sm}px; background: ${t.color.field};
   overflow-x: auto;
 }
 .answer li::marker { color: ${t.color.textMuted}; }
 .answer pre code { padding: 0; background: none; }
-.answer-code { margin: 0 0 8px; border: 1px solid ${t.color.fieldLine}; border-radius: 10px; overflow: hidden; background: #0E1124; }
+.answer-code { margin: 0 0 8px; border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.card}px; overflow: hidden; background: ${t.color.codeBg}; }
 .answer-code-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 6px 12px;
-  border-bottom: 1px solid ${t.color.line}; background: ${t.color.field}; ${typeCss('small')}; color: #C9CEE0;
+  border-bottom: 1px solid ${t.color.line}; background: ${t.color.field}; ${typeCss('small')}; color: ${t.color.textSoft};
   font-family: ${t.font.mono};
 }
 .answer-copy {
-  min-height: 24px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent;
+  min-height: 24px; padding: 0 8px; border: 0; border-radius: ${t.radius.sm}px; background: transparent;
   color: ${t.color.textMuted}; font: inherit; cursor: pointer;
 }
-.answer-copy:hover { background: #222845; color: ${t.color.text}; }
+.answer-copy:hover { background: ${t.color.tileNavy}; color: ${t.color.text}; }
 .answer .answer-code pre { margin: 0; border: 0; border-radius: 0; background: transparent; white-space: pre-wrap; }
 .answer-more {
-  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
-  background: #222845; color: ${t.color.text}; font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer;
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 ${t.space.lg}px; border: 0; border-radius: 999px;
+  background: ${t.color.tileNavy}; color: ${t.color.text}; font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer;
 }
 .answer-more .cx-icon { flex: none; width: 14px; height: 14px; }
 .answer-more[aria-expanded='true'] .cx-icon { transform: rotate(180deg); }
-.answer blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid #3A4270; color: ${t.color.textMuted}; }
+.answer blockquote { margin: 0 0 8px; padding-left: ${t.space.lg}px; border-left: 2px solid ${t.color.lineStrong}; color: ${t.color.textMuted}; }
 .answer table { border-collapse: collapse; ${typeCss('body')}; }
-.answer th, .answer td { padding: 4px 8px; border: 1px solid #2E3558; text-align: left; }
-.answer a, .answer .answer-link { color: #7CB8F2; text-decoration: underline; }
-.answer hr { border: 0; border-top: 1px solid #2E3558; margin: 10px 0; }
+.answer th, .answer td { padding: 4px 8px; border: 1px solid ${t.color.fieldLine}; text-align: left; }
+.answer a, .answer .answer-link { color: ${t.color.sky}; text-decoration: underline; }
+.answer hr { border: 0; border-top: 1px solid ${t.color.fieldLine}; margin: ${t.space.md}px 0; }
 `;

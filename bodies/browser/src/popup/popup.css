@@ -79,7 +79,7 @@ input {
   color: var(--text);
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
 }
 .grants {
   margin: 0;

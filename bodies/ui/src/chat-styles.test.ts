@@ -26,7 +26,7 @@ describe('CHAT_CSS chat window', () => {
   it('draws your message on the mine token with the mockup radius', () => {
     const rule = ruleOf(CHAT_CSS, '.bubble-mine');
     expect(rule).toContain(t.color.mine);
-    expect(rule).toContain('border-radius: 14px 14px 4px 14px');
+    expect(rule).toContain('border-radius: 12px 12px 8px 12px');
   });
 
   it("sets Scout's reply behind its mark, capped at 60ch", () => {
@@ -47,8 +47,8 @@ describe('CHAT_CSS chat window', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-exchange')).toContain('gap: 12px');
   });
 
-  it('puts a user message on a tile with the mockup padding of 10px 14px', () => {
-    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(10);
+  it('puts a user message on a tile with the snapped mockup padding of 12px 16px', () => {
+    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(12);
   });
 
   it('shows an icon toggle that is on with a gold fill and a muted gold edge', () => {

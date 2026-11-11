@@ -373,12 +373,12 @@ export function InstallCard({
 export const INSTALL_CARD_CSS = `
 .sc {
   --sc-bg: ${t.color.sidebar}; --sc-line: ${t.color.fieldLine}; --sc-text: ${t.color.text};
-  --sc-muted: ${t.color.textMuted}; --sc-soft: #C9CEE0; --sc-tile: #222845; --sc-ok: #8FD19E;
+  --sc-muted: ${t.color.textMuted}; --sc-soft: ${t.color.textSoft}; --sc-tile: ${t.color.tileNavy}; --sc-ok: ${t.color.okOnNavy};
   --sc-okfill: rgba(143, 209, 158, 0.16); --sc-gold: ${t.color.gold}; --sc-goldink: ${t.color.goldInk};
-  --sc-errfill: #3A1D2A; --sc-errink: #FFB4C0; --sc-link: ${t.color.sky};
-  --sc-warnfill: rgba(242, 193, 78, 0.1); --sc-warnline: rgba(242, 193, 78, 0.35); --sc-warnink: #F2D27A;
-  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 14px;
-  border: 1px solid var(--sc-line); border-radius: 12px; background: var(--sc-bg); color: var(--sc-text);
+  --sc-errfill: ${t.color.errNavyFill}; --sc-errink: ${t.color.errNavyInk}; --sc-link: ${t.color.sky};
+  --sc-warnfill: rgba(242, 193, 78, 0.1); --sc-warnline: rgba(242, 193, 78, 0.35); --sc-warnink: ${t.color.warnOnNavy};
+  box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: ${t.space.xl}px;
+  border: 1px solid var(--sc-line); border-radius: ${t.radius.card}px; background: var(--sc-bg); color: var(--sc-text);
   font-family: ${t.font.ui}; ${typeCss('body')};
 }
 .sc--light {
@@ -393,7 +393,7 @@ export const INSTALL_CARD_CSS = `
 .sc li { margin: 0; white-space: normal; }
 .sc-top { display: flex; gap: 12px; align-items: flex-start; }
 .sc-tile {
-  flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--sc-tile);
+  flex: none; width: 36px; height: 36px; border-radius: ${t.radius.card}px; background: var(--sc-tile);
   display: grid; place-items: center; font-weight: 600;
 }
 .sc-id { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -417,20 +417,20 @@ export const INSTALL_CARD_CSS = `
   flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--sc-line);
   display: grid; place-items: center; box-sizing: border-box;
 }
-.st--done { background: #8FD19E; border-color: #8FD19E; color: #12162B; }
-.st--fail { background: #FFB4C0; border-color: #FFB4C0; color: #3A1D2A; }
+.st--done { background: ${t.color.okOnNavy}; border-color: ${t.color.okOnNavy}; color: ${t.color.page}; }
+.st--fail { background: ${t.color.errNavyInk}; border-color: ${t.color.errNavyInk}; color: ${t.color.errNavyFill}; }
 .st--now { border-color: var(--sc-gold); }
 .spin-n { width: 8px; height: 8px; border-radius: 50%; background: var(--sc-gold); }
 .sc-prog { display: flex; flex-direction: column; gap: 6px; }
 .sc-prog-top { display: flex; justify-content: space-between; ${typeCss('small')}; font-weight: 600; }
-.sc-bar { height: 4px; border-radius: 2px; background: var(--sc-tile); overflow: hidden; }
+.sc-bar { height: 4px; border-radius: ${t.radius.sm}px; background: var(--sc-tile); overflow: hidden; }
 .sc-bar i { display: block; height: 100%; background: var(--sc-gold); }
 .sc-check {
-  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 6px; padding: ${t.space.md}px 12px; border-radius: ${t.radius.card}px;
   background: var(--sc-warnfill); border: 1px solid var(--sc-warnline); color: var(--sc-warnink); ${typeCss('body')};
 }
 .sc-check-t { display: flex; align-items: center; gap: 6px; font-weight: 600; }
-.sc-check ul { margin: 0; padding: 0 0 0 18px; list-style: disc; }
+.sc-check ul { margin: 0; padding: 0 0 0 ${t.space.xxl}px; list-style: disc; }
 .sc-link {
   align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--sc-link);
   font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer; text-decoration: none;
@@ -442,7 +442,7 @@ export const INSTALL_CARD_CSS = `
 .sc .cx-icon { flex: none; width: 14px; height: 14px; }
 .sc-link { display: inline-flex; align-items: center; gap: 4px; }
 .sc-link--gold { color: var(--sc-warnink); }
-.sc-disc ul { margin: 6px 0 0; padding: 0 0 0 18px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
+.sc-disc ul { margin: 6px 0 0; padding: 0 0 0 ${t.space.xxl}px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
 .sc-try { display: flex; gap: 6px; flex-wrap: wrap; }
 .sc-prompt {
   display: inline-flex; align-items: center; min-height: 28px; padding: 4px 12px; box-sizing: border-box;
@@ -450,12 +450,12 @@ export const INSTALL_CARD_CSS = `
   font: inherit; ${typeCss('small')}; cursor: pointer;
 }
 .sc-err {
-  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--sc-errfill);
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px ${t.space.lg}px; border-radius: ${t.radius.sm}px; background: var(--sc-errfill);
   color: var(--sc-errink); ${typeCss('body')};
 }
 .sc-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .sc-btn {
-  display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 8px;
+  display: inline-flex; align-items: center; height: 32px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.sm}px;
   font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
 }
 .sc-btn--gold { border: 0; background: var(--sc-gold); color: var(--sc-goldink); }

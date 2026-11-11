@@ -84,11 +84,7 @@ typography:
     fontSize: '12px'
     fontWeight: 400
 rounded:
-  control-sm: '6px'
-  field: '8px'
-  row: '10px'
-  tile: '10px'
-  chip: '10px'
+  sm: '8px'
   card: '12px'
   pill: '999px'
 spacing:
@@ -100,26 +96,28 @@ spacing:
   lg: '12px'
   xl: '16px'
   xxl: '20px'
-  xxxl: '24px'
+  page: '32px'
+  section: '40px'
+  hero: '48px'
 components:
   button-primary:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
     typography: '{typography.title}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 16px'
     height: '40px'
   button-quiet:
     backgroundColor: 'transparent'
     textColor: '{colors.panel-text}'
     typography: '{typography.title}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 16px'
     height: '40px'
   field:
     backgroundColor: '{colors.panel-tile}'
     textColor: '{colors.panel-text}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '40px'
   chip:
@@ -149,13 +147,13 @@ components:
   switch:
     backgroundColor: 'transparent'
     textColor: '{colors.panel-muted}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '32px'
   switch-on:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '32px'
   dock-tag-seeing:
@@ -192,7 +190,7 @@ components:
   bubble-primary:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 16px'
     height: '36px'
   bubble-quiet:
@@ -205,7 +203,7 @@ components:
   bubble-field:
     backgroundColor: '{colors.field-navy}'
     textColor: '{colors.shell-text}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '44px'
   bubble-chip:
@@ -223,17 +221,17 @@ components:
   home-nav-item:
     backgroundColor: 'transparent'
     textColor: '{colors.shell-muted}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '40px'
   home-nav-item-current:
     backgroundColor: '{colors.row-active}'
     textColor: '{colors.shell-text}'
     typography: '{typography.title}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 12px'
     height: '40px'
-  home-card:
+  tg-card:
     backgroundColor: '{colors.card-white}'
     textColor: '{colors.panel-text}'
     rounded: '{rounded.card}'
@@ -247,20 +245,20 @@ components:
     backgroundColor: 'transparent'
     textColor: '{colors.panel-text}'
     typography: '{typography.label}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 8px'
     height: '32px'
   home-day-pressed:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
     typography: '{typography.label}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 8px'
     height: '32px'
   setup-primary:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
-    rounded: '{rounded.field}'
+    rounded: '{rounded.sm}'
     padding: '0 20px'
     height: '44px'
 ---
@@ -289,6 +287,8 @@ Scout's state is always a pose plus a word: Bean's clip changes per mood (with a
 ## Colors
 
 A cool ink-navy family and a cool off-white family, one warm gold, and a few signal colours (sky, green, red) that always travel with a word.
+
+**Every colour is a token.** Each colour named below lives in `themeTokens.color` (`bodies/ui/src/theme/tokens.ts`); no style sheet or component holds a hex literal. The three CSS-only files (the desktop `app.css`, the browser `popup.css`, and its `mic.html` and `permission.html`) declare their colours as CSS variables on `:root`, and a test in each package checks every value against the token. `style-audit.test.ts` fails on any other hex.
 
 ### Primary
 
@@ -356,7 +356,7 @@ Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` wri
 
 ### Named Rules
 
-**The Seven Roles Rule.** Every font size is one of the seven roles, or the 9px dock tag. `bodies/ui/src/type-audit.test.ts` reads every style sheet and fails on any other size, any weight other than 400 or 600, any capitals, any letter spacing (except the display role's -0.015em), any line height off its role and any pixel font.
+**The Seven Roles Rule.** Every font size is one of the seven roles, or the 9px dock tag. `bodies/ui/src/style-audit.test.ts` reads every style sheet and fails on any other size, any weight other than 400 or 600, any capitals, any letter spacing (except the display role's -0.015em), any line height off its role and any pixel font.
 
 **The 11px Floor Rule.** No functional text below 11px (`type.caption`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered Bean's sign in the 96px window, and the accessible name says the state in full.
 
@@ -368,7 +368,7 @@ Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` wri
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the same 920px page as every other tab.
 
-Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
+Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48; `themeTokens.space`). Every padding, margin and gap is a step of it (a -1px margin that lets a tab underline overlap its border is the one exception), and `bodies/ui/src/style-audit.test.ts` fails on any other value. **The Card Box.** One `.tg-card` class (from `CONTROLS_CSS`) draws every card on Home, Settings and the tour: Card White, 1px Panel Line, 12px radius, 16px by 20px padding. Pages add layout (gap, margin) around it, never their own box. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
 
 **The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile it is drawn larger (76px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
 
@@ -390,7 +390,7 @@ Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines
 
 ## Shapes
 
-Gently rounded chrome. The bubble, Home cards use 12px; fields and primary buttons 8px; activity entries, templates, chips and Home's Scout tile 10px; quiet bubble buttons, icon buttons, key caps and error boxes 6px; dock tags and bubble chips are pills. 12px, 6px and the pill are hard-coded. The bubble's tail is a 14px square rotated 45 degrees with two bordered edges, 34px from the bottom, on the side Scout is on. Your own chat messages round three corners at 12px and the one nearest you at 4px. Icons are 14px stroked SVGs (1.6 stroke, currentColor).
+Three radius tokens (`themeTokens.radius`), nothing else: **card** 12px (the bubble, every card, rows, tiles, fields in the bubble, the segmented control), **sm** 8px (fields, buttons, chips, key caps, error boxes, code blocks, small tiles) and **pill** 999px (dock tags, status marks, toggles, bubble chips); a round control is 50%. `style-audit.test.ts` fails on any other border-radius. The bubble's tail is a 14px square rotated 45 degrees with two bordered edges, 34px from the bottom, on the side Scout is on. Your own chat messages round three corners at 12px and the one nearest you at 8px. Icons are 14px stroked SVGs (1.6 stroke, currentColor).
 
 ## Components
 

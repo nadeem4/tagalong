@@ -103,8 +103,8 @@ export function LoopsPanel() {
 
   if (state === null) {
     return failed ? (
-      <section className="home-card loops" aria-labelledby={headingId}>
-        <h2 id={headingId} className="home-card__label">
+      <section className="tg-card loops" aria-labelledby={headingId}>
+        <h2 id={headingId} className="tg-card__label">
           Read my mail for loops
         </h2>
         <p role="alert">Tagalong could not read this. It loads again when Home reopens.</p>
@@ -115,8 +115,8 @@ export function LoopsPanel() {
   const anyOn = state.apps.some((app) => app.on);
   const open = state.loops.filter((loop) => loop.status !== 'done' && loop.status !== 'dropped');
   return (
-    <section className="home-card loops" aria-labelledby={headingId}>
-      <h2 id={headingId} className="home-card__label">
+    <section className="tg-card loops" aria-labelledby={headingId}>
+      <h2 id={headingId} className="tg-card__label">
         Read my mail for loops
       </h2>
       <p>

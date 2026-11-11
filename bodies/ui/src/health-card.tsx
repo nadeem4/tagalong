@@ -78,10 +78,10 @@ export function HealthCard({
 
 const HEALTH_CSS = `
 .health-rows { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.health-row { display: flex; align-items: center; gap: 10px; ${typeCss('body')}; }
+.health-row { display: flex; align-items: center; gap: ${t.space.lg}px; ${typeCss('body')}; }
 .health-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: ${t.color.fieldLine}; }
-.health-row[data-state='ok'] .health-dot { background: #7FD1A4; }
-.health-row[data-state='broken'] .health-dot { background: #FF8A9A; }
+.health-row[data-state='ok'] .health-dot { background: ${t.color.healthOk}; }
+.health-row[data-state='broken'] .health-dot { background: ${t.color.healthBad}; }
 .health-row[data-state='info'], .health-row[data-state='unknown'] { color: ${t.color.textMuted}; }
 .health-what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .health-what strong { ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
