@@ -768,14 +768,6 @@ class WorkStore:
         ).fetchall()
         return [AskLogRow(*r[:4], json.loads(r[4]), *r[5:]) for r in rows]
 
-    def waiting_asks(self) -> list[WorkRow]:
-        """Open Scout asks (no job above them) that carry a deadline, oldest first."""
-        return self._select(
-            "kind = 'ask' AND parent_id IS NULL AND due_at IS NOT NULL AND state = 'active'",
-            (),
-            "created_at, rowid",
-        )
-
     def ask_counts(self) -> dict[str, int]:
         total, scout, refused = self.db.execute(
             "SELECT COUNT(*), COALESCE(SUM(a.decided_by = 'scout'), 0),"

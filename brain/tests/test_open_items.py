@@ -110,3 +110,36 @@ def test_answer_in_a_closed_state_is_refused(tmp_path):
     with pytest.raises(OpenItemRefused) as e:
         items.answer(item.id, "yes", "desktop")
     assert e.value.reason == "closed"
+
+
+def test_list_answered_holds_answered_but_not_done_items(tmp_path):
+    items, _ = make(tmp_path)
+    a = items.open("ask", "desktop", saved_call={"n": 1})
+    b = items.open("ask", "desktop", saved_call={"n": 2})
+    items.open("ask", "desktop", saved_call={"n": 3})
+    items.answer(a.id, "allow", "desktop")
+    items.answer(b.id, "allow", "desktop")
+    items.finish(b.id, "ran")
+    assert [i.id for i in items.list_answered("ask")] == [a.id]
+
+
+def test_find_open_by_saved_call_ignores_closed_and_other_kinds(tmp_path):
+    items, _ = make(tmp_path)
+    call = {"name": "t", "input": {"b": 1, "a": 2}}
+    first = items.open("ask", "desktop", saved_call={**call, "text": "Doing it."})
+    items.open("offer", "desktop", saved_call={"name": "u"})
+    assert items.find_open("ask", {"input": {"a": 2, "b": 1}, "name": "t"}).id == first.id
+    assert items.find_open("ask", {"name": "t", "input": {"a": 9}}) is None
+    assert items.find_open("ask", {"name": "other"}) is None
+    items.answer(first.id, "deny", "desktop")
+    assert items.find_open("ask", call) is None
+
+
+def test_expire_due_and_list_open_can_take_one_kind(tmp_path):
+    items, clock = make(tmp_path)
+    items.open("ask", "desktop")
+    items.open("offer", "desktop")
+    clock.at = T0 + timedelta(seconds=DEADLINE_S)
+    assert [i.kind for i in items.list_open(kind="offer")] == ["offer"]
+    assert [i.kind for i in items.expire_due(clock.at, kind="ask")] == ["ask"]
+    assert [i.kind for i in items.list_open()] == ["offer"]

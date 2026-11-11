@@ -15,7 +15,6 @@ from brain.permission import (
     ASK_WAIT_DEFAULT,
     ASK_WAIT_MAX,
     ASK_WAIT_MIN,
-    PARK_AFTER_S,
     SUMMARY_MAX,
     AskRequest,
     Decision,
@@ -181,9 +180,7 @@ class FakeAsks:
     def anyone_online(self):
         return self.online
 
-    async def permission(
-        self, call, spec_name, locked, *, ask_id, parent_id, record=None, reopen=False
-    ):
+    async def permission(self, call, spec_name, locked, *, ask_id, parent_id):
         self.locked = locked
         self.seen = (call, spec_name, ask_id, parent_id)
         return self.option
@@ -238,10 +235,6 @@ async def test_expert_asker_maps_option_kinds():
         "input": {"f": 1},
         "options": ["Allow once", "Allow always", "Reject"],
     }
-    chosen["pick"] = "Something else"
-    with pytest.raises(RpcError) as e:
-        await how()
-    assert e.value.code is ErrorCode.cancelled
     chosen["pick"] = None
     with pytest.raises(NoOneThere):
         await how()
@@ -565,37 +558,9 @@ async def test_side_check_grant_whose_preference_use_raises_is_a_pass(mem, monke
     assert [r.decided_by for r in rig.rows()] == ["person"]
 
 
-async def test_a_scout_ask_gets_a_masked_saved_call_and_a_deadline(mem):
-    from brain.guards import Guards
-    from brain.masking import Masker, mask_secrets
-
-    guards = Guards()
-    guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
-    seen = []
-
-    async def how(record):
-        seen.append(record)
-        return PersonAnswer("allow")
-
-    approvals = approvals_on(mem, lambda m, p: None, lambda: NOW, guards=guards)
-    clean = {"name": "t", "input": {"a": 1}, "text": "Doing it."}
-    for raw, safe in [(clean, True), ({**clean, "input": {"a": "fake-token-12345678"}}, False)]:
-        engine = Engine([Person()], approvals, None, lambda n: None, now=lambda: NOW)
-        r = req(how_to_ask=how, wait=timedelta(hours=2), call=raw)
-        await engine.decide(r)
-        record = seen[-1]
-        assert record.safe_to_retry is safe
-        assert record.due_at == NOW + timedelta(hours=2)
-        assert "fake-token-12345678" not in str(record.call)
-
-
 def test_ask_wait_default_and_bounds():
     assert ask_wait(None) == ASK_WAIT_DEFAULT == timedelta(days=3)
-    assert (ASK_WAIT_MIN, ASK_WAIT_MAX, PARK_AFTER_S) == (
-        timedelta(hours=1),
-        timedelta(days=7),
-        300.0,
-    )
+    assert (ASK_WAIT_MIN, ASK_WAIT_MAX) == (timedelta(hours=1), timedelta(days=7))
 
 
 async def test_an_expired_ask_logs_its_reason(mem):

@@ -505,7 +505,7 @@ Home's Places page (Home > Places) shows whether the add-on is connected to the 
 
 A body with `display: false` shows nothing, so the brain never counts it when it picks where to
 show a turn, and never opens an ask on it. If the desktop is closed and only the browser is
-connected, a tool that needs your approval is not run yet: the ask is saved and parked at once, Scout is told
+connected, a tool that needs your approval is not run yet: the ask is saved as an open item at once, Scout is told
 the call is waiting for your answer, and the card shows when the desktop joins (the call then runs by
 itself if you allow it). `tab_actions` is such a tool unless you set it to auto in Home, so it waits too. A wake (Scout speaking first) is never labelled with the
 browser either. Tools that need no approval, like `tabs` `list`, still work. The rule is in

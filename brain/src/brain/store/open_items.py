@@ -95,14 +95,34 @@ def _select(db: sqlite3.Connection, where: str, args: tuple = ()) -> list[Stored
     return [_item(r) for r in db.execute(sql, args)]
 
 
-def list_open(db: sqlite3.Connection, origin_body: str | None = None) -> list[StoredItem]:
-    if origin_body is None:
-        return _select(db, "state='open'")
-    return _select(db, "state='open' AND origin_body=?", (origin_body,))
+def list_open(
+    db: sqlite3.Connection, origin_body: str | None = None, kind: str | None = None
+) -> list[StoredItem]:
+    where, args = "state='open'", ()
+    if origin_body is not None:
+        where, args = where + " AND origin_body=?", (*args, origin_body)
+    if kind is not None:
+        where, args = where + " AND kind=?", (*args, kind)
+    return _select(db, where, args)
 
 
-def due(db: sqlite3.Connection, now: str) -> list[StoredItem]:
-    return _select(db, "state='open' AND deadline_at<=?", (now,))
+def due(db: sqlite3.Connection, now: str, kind: str | None = None) -> list[StoredItem]:
+    if kind is None:
+        return _select(db, "state='open' AND deadline_at<=?", (now,))
+    return _select(db, "state='open' AND deadline_at<=? AND kind=?", (now, kind))
+
+
+def answered(db: sqlite3.Connection, kind: str) -> list[StoredItem]:
+    """Answered but not done: the answer came and the work may not have finished."""
+    return _select(db, "state='answered' AND kind=?", (kind,))
+
+
+def find_open(db: sqlite3.Connection, kind: str, match: dict) -> StoredItem | None:
+    """The first open item of this kind whose saved call holds every key and value of `match`."""
+    for item in _select(db, "state='open' AND kind=?", (kind,)):
+        if item.saved_call is not None and match.items() <= item.saved_call.items():
+            return item
+    return None
 
 
 def live_only_open(db: sqlite3.Connection) -> list[StoredItem]:

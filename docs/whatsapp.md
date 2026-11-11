@@ -94,7 +94,7 @@ rule is per body.
   arrives while a long reply is being sent waits until all its parts are out.
 - **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, replies
   `That question is closed.` The same line follows an answer the brain refuses as not found.
-- **Late taps.** An ask that is still open on the brain (for example one parked past its turn) can
+- **Late taps.** An ask that is still open on the brain (for example one whose turn is long over) can
   be answered however long after, as the tap itself reopens the 24-hour window.
 - **Outside the window.** An ask that arrives after the 24 hours is not sent and not remembered
   here; it stays open on the other bodies.

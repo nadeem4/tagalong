@@ -9,8 +9,8 @@ import json
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Literal, Protocol
 
@@ -37,7 +37,6 @@ ASK_WAIT_ARG = "ask_wait_hours"
 ASK_WAIT_DEFAULT = timedelta(days=3)
 ASK_WAIT_MIN = timedelta(hours=1)
 ASK_WAIT_MAX = timedelta(days=7)
-PARK_AFTER_S = 300.0  # how long a tool call waits in its turn before it is parked
 
 
 def ask_wait(value: object) -> timedelta:
@@ -115,25 +114,12 @@ class NoOneThere(Exception):
     """Raised by an asker when a turn-bound card finds nobody displaying to ask."""
 
 
-class Parked(Exception):
-    """A Scout ask is still waiting for the person; the call did not run and the turn goes on."""
+class AskOpen(Exception):
+    """A Scout ask is open for the person; the call did not run and the turn goes on."""
 
     def __init__(self, ask_id: str) -> None:
         super().__init__(ask_id)
         self.ask_id = ask_id
-
-
-@dataclass(frozen=True)
-class OpenRecord:
-    """What an ask row saves when it opens, already masked."""
-
-    source: str
-    summary: str
-    input: dict
-    group_key: str
-    call: dict  # {"name", "input", "text"}
-    safe_to_retry: bool  # false when masking changed the call: it could not be run again as saved
-    due_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -145,17 +131,12 @@ class AskRequest:
     summary: str
     input: dict
     tier: Tier
-    how_to_ask: Callable[..., Awaitable[PersonAnswer]] | None  # given `record` when one is set
+    how_to_ask: Callable[[], Awaitable[PersonAnswer]] | None
     job_id: str | None = None
     turn_id: str | None = None
     ask_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     can_allow_once: bool = True
     offer: bool = True
-    # A Scout-owned ask only (no job, caller scout): how long it may wait, and the model's raw
-    # call. The engine masks the call into `record`, which the asker saves on the ask row.
-    wait: timedelta | None = None
-    call: dict | None = None
-    record: OpenRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -248,10 +229,7 @@ class Person:
         if req.how_to_ask is None:
             return None
         try:
-            if req.record is None:
-                answer = await req.how_to_ask()
-            else:
-                answer = await req.how_to_ask(req.record)
+            answer = await req.how_to_ask()
         except NoOneThere:
             return Refusal("no_one", "nobody online")
         except AskExpired as err:
@@ -275,14 +253,11 @@ def tool_asker(
     tier: Tier,
     ask_id: str,
     parent_id: str | None,
-    reopen: bool = False,
 ) -> Callable[[], Awaitable[PersonAnswer]]:
-    async def ask(record: OpenRecord | None = None) -> PersonAnswer:
+    async def ask() -> PersonAnswer:
         # Only a plain `ask` tier offers "always"; every stricter tier is asked every time.
         locked = tier is not Tier.ask
-        choice = await asks.permission(
-            call, tool, locked, ask_id=ask_id, parent_id=parent_id, record=record, reopen=reopen
-        )
+        choice = await asks.permission(call, tool, locked, ask_id=ask_id, parent_id=parent_id)
         return PersonAnswer(choice)  # type: ignore[arg-type]
 
     return ask
@@ -304,9 +279,7 @@ def expert_asker(
         )
         if answer.option is None:
             raise NoOneThere
-        picked = by_name.get(answer.option)
-        if picked is None:
-            raise RpcError(ErrorCode.cancelled, "That answer was not one of the options.")
+        picked = by_name[answer.option]  # Asks.answer only takes an offered option
         return PersonAnswer("allow" if picked.kind.startswith("allow") else "deny", picked.id)
 
     return ask
@@ -332,17 +305,13 @@ class Engine:
         approvals: "Approvals | None",
         offers: "Offers | None",
         set_auto: Callable[[str], None],
-        now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._deciders = list(deciders)
         self._approvals = approvals  # None writes no rows
         self._offers = offers
         self._set_auto = set_auto
-        self._now = now
 
     async def decide(self, req: AskRequest) -> Decision:
-        if req.wait is not None and req.record is None:
-            req = replace(req, record=self._open_record(req))
         if req.tier is Tier.off:
             return Decision("deny", "off", ask_id=req.ask_id)
         if req.tier is Tier.auto:
@@ -369,22 +338,6 @@ class Engine:
             if isinstance(result, Refusal):
                 return self._refused(req, result)
         return Decision("deny", "no_decider", ask_id=req.ask_id)
-
-    def _open_record(self, req: AskRequest) -> OpenRecord:
-        """The ask row's saved call, masked like the log; a changed call is not safe to rerun."""
-        assert req.wait is not None
-        raw = req.call or {"name": req.tool, "input": req.input, "text": ""}
-        mask = self._approvals.mask if self._approvals is not None else lambda value: value
-        call = mask(raw)
-        return OpenRecord(
-            req.source,
-            mask(req.summary),
-            mask(req.input),
-            req.group_key,
-            call,
-            call == raw,
-            self._now() + req.wait,
-        )
 
     def _granted(self, req: AskRequest, decider: str, grant: Grant) -> Decision:
         # "Always" widens only when the person asks for it, on a tier that can be widened.

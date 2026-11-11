@@ -71,7 +71,7 @@ def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     sent = []
     bodies = bodies or Bodies()
     bodies.notify = lambda m, p: sent.append((m, p))
-    now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0))
+    now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC))
     session = Session(
         model,
         Open(),
@@ -2484,8 +2484,7 @@ async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
     await settle()
     [ask] = open_asks(sent)
     assert ask["tool"] == "tell_expert"
-    assert tool_results(session) == []  # held on the ask
-    session.cancel(session._turn_id)
+    assert "waiting for the person's answer" in str(tool_results(session))  # open, not held
     await idle(session)
 
 
@@ -2510,8 +2509,7 @@ async def test_a_nudge_already_in_flight_when_the_owner_joins_still_asks():
     session.say("desktop", say("hello"))  # the owner joins; they did not ask for this nudge
     await settle()
     assert len(open_asks(sent)) == 1
-    assert tool_results(session) == []
-    session.cancel(session._turn_id)
+    assert "waiting for the person's answer" in str(tool_results(session))
     await idle(session)
 
 
@@ -2523,7 +2521,6 @@ async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await settle()
     assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
-    session.cancel(session._turn_id)
     await idle(session)
 
 
@@ -3143,11 +3140,12 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
         (r.decided_by, r.rule_id) for r in records_for(memory).work.list_asks("all", 10, None)
     ] == [("scout", pref.id)]
     rules.remove_preference(memory.db, pref.id)  # now nothing covers it: the person is asked
-    task = asyncio.create_task(session.toolbox.run(tool_call()))
-    await settle()
+    assert "waiting for the person's answer" in await session.toolbox.run(tool_call())
     [card] = open_asks(sent)
-    session.answer(card["id"], "allow", "desktop")
-    assert await task == "a.txt"
+    session.answer(card["id"], "allow", "desktop")  # the call runs by itself now
+    await settle()
+    latest = records_for(memory).work.list_asks("all", 1, None)[0]
+    assert (latest.outcome, latest.decided_by) == ("approved", "person")
 
 
 # --- return: only a body that shows cards brings the waiting asks back ---
@@ -3156,7 +3154,7 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
 async def test_return_with_a_display_less_body_does_nothing():
     session, _ = make(Gate([]))
     seen = []
-    session.waiting.rejoined = seen.append
+    session.ask_runner.rejoined = lambda: seen.append("desktop")
     join_headless(session)
     assert seen == []
     session._bodies.connect(

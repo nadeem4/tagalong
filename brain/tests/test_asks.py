@@ -6,14 +6,12 @@ validated against the contract's AskParams.
 
 import asyncio
 import time
-from datetime import UTC, datetime
 
 import pytest
 from job_rows import fresh_work
 
 from brain.asks import Answer, AskExpired, Asks
 from brain.mind.turn import Call
-from brain.permission import OpenRecord
 from brain.protocol import AskParams, ErrorCode, RpcError
 
 
@@ -344,34 +342,6 @@ async def test_open_with_nobody_online_returns_unanswered():
     asks = Asks(bodies, fresh_work())
     assert await asks.open(text="Which?", options=["a"]) == Answer(None, None)
     assert bodies.sent == []
-
-
-async def test_scout_ask_row_saves_the_masked_call_and_deadline():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    due = datetime(2026, 11, 10, 9, 0, tzinfo=UTC)
-    saved = {"name": "desktop__x", "input": {"a": "[secret]"}, "text": "Opening it."}
-    record = OpenRecord(
-        "scout_tool", "Opening it.", {"a": "[secret]"}, "desktop__x", saved, False, due
-    )
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False, record=record))
-    params = await opened(bodies)
-    row = work.get(params["id"])
-    assert (row.input, row.due_at, row.safe_to_retry, row.parent_id) == (
-        saved,
-        "2026-11-10T09:00:00+00:00",
-        False,
-        None,
-    )
-    detail = work.ask_detail(params["id"])
-    assert (detail["source"], detail["group_key"], detail["input"]) == (
-        "scout_tool",
-        "desktop__x",
-        {"a": "[secret]"},
-    )
-    assert [r.id for r in work.waiting_asks()] == [params["id"]]
-    task.cancel()
 
 
 async def test_stay_open_ask_waits_with_nobody_online():

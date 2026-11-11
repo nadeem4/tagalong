@@ -522,10 +522,12 @@ next section.
    **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
 2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow**.
    Ask again and press **Not now**. Ask a third time and leave the card
-   for 5 minutes: Scout's turn goes on and says the call is waiting. Then press **Allow**.
+   unanswered: Scout's turn goes on at once and says the call is waiting. Then press **Allow**, even after stopping the turn.
    **Expected:** the call runs by itself and Scout tells you. `list_approvals` lists three rows for
    that tool, newest first: `approved`, `refused` and `approved`, all `decided_by: "person"`, with `source: "scout_tool"` and a summary of the words Scout wrote before the
-   call. Ask for the same thing again while a card is parked: no second card appears.
+   call. Ask for the same thing again while a card is open: no second card appears
+   (`test_ask_returns_open_without_waiting`, `test_answer_after_turn_cancel_runs_saved_call`,
+   `test_the_same_call_again_is_the_same_open_item`).
 3. **Action:** hand off a task that edits a file in Manual mode. Allow one permission ask and
    refuse another.
    **Expected:** two more rows with `source: "claude_code"`, `tool` starting `claude_code:`, and a
@@ -534,13 +536,14 @@ next section.
    reopen the desktop.
    **Expected:** the ask is waiting and is shown when the desktop joins; no `no_one` row.
 5. **Action:** press **Stop** on the turn while its ask is open, and run a read tool.
-   **Expected:** no row for either.
+   **Expected:** no row for either, and the card stays up; answering it later still runs the call
+   (`test_cancel_does_not_close_open_ask`).
    5b. **Action:** ask Scout for a change tool and say it may wait 1 hour for you; leave the card
-   unanswered. After 40 minutes Scout may remind you once (`ask_notice`). After the hour, open
+   unanswered. After the hour, open
    Home, Approvals.
    **Expected:** the card is gone on every open body, the call never ran, Scout says it expired,
    and the history shows an **Expired** row with `decided_by: "none"` and reason `no answer`
-   (`test_deadline_expires_with_no_answer_closes_the_card_and_wakes_scout`). With no wait given,
+   (`test_no_answer_by_the_deadline_expires_it_and_tells_scout`). With no wait given,
    the deadline is 3 days.
    5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
    **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
@@ -551,16 +554,16 @@ next section.
    decided). The ask is an `ask` work row that now reads expired, "brain restarted". The
    `list_approvals` shape and counts are the same as before asks moved onto work rows
    (`test_list_approvals_shape_unchanged`).
-   5c. **Action:** close every screen, have Scout call a change tool so its ask parks, quit the
+   5c. **Action:** close every screen, have Scout call a change tool so its ask opens, quit the
    brain, start it again and open the desktop.
-   **Expected:** the card is back, and Scout says how old the ask is
-   (`test_return_shows_two_parked_asks_oldest_first_with_one_wake`,
-   `test_restart_keeps_a_waiting_scout_ask_with_its_deadline`). Set the tool to Auto before
-   opening the desktop: it runs by itself and Scout says so through an `ask_ended` wake, which can take up to 30 s because
-   wakes of that kind are batched (`test_return_runs_an_ask_a_new_auto_now_allows`).
-   Set it Off instead: the ask expires with reason "turned off" (`test_return_refuses_an_ask_whose_tool_was_turned_off`).
-   With a secret in the call the ask expires at start instead and Scout says it held a secret
-   (`test_restart_expires_a_waiting_ask_that_held_a_secret`).
+   **Expected:** the card is back for the same ask, and allowing it runs the call
+   (`test_a_card_comes_back_when_a_body_joins_after_a_restart`). Set the tool to Off before
+   answering: the ask is refused and Scout says so
+   (`test_a_tool_turned_off_since_refuses_the_late_yes`). Quit the brain right after allowing
+   and before the call finishes: on start Scout says it is not known if it ran, and it is not run
+   again (`test_restart_closes_an_answered_item_it_cannot_vouch_for`). With a secret in the call
+   the yes cannot run it and Scout says it held a secret
+   (`test_a_call_that_held_a_secret_is_not_run_from_its_masked_copy`).
 6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
    stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is

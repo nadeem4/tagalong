@@ -87,10 +87,10 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers          |
-| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Nothing uses it yet (asks and choices move onto it next); the table is in [storage.md](storage.md) |
+| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`; the table is in [storage.md](storage.md) |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                |
-| `brain/src/brain/asks.py`              | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                            |
-| `brain/src/brain/waiting.py`           | `WaitingAsks`: Scout asks parked past their turn; finds a repeated call, carries a saved call out on a late yes and emits `ask_ended`; arms the deadline timer, emits `ask_notice`, expires an unanswered ask, and after a restart or an absence decides the waiting asks again when a displaying body joins (`asks_waiting`)                                                                                                                               |
+| `brain/src/brain/asks.py`              | `Asks`: shows Scout's permission cards with no waiter, runs a job's permission asks (they wait) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                            |
+| `brain/src/brain/open_item_runner.py`  | `AskRunner`: Scout's asks as `ask` open items. A call that needs the person is saved and its card shown, and the turn goes on; the answer, however late, runs the saved call through the same gate and emits `ask_ended`. Also the deadline timer, the restart close and the card shown again when a body joins |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                                   |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                            |
 | `brain/src/brain/telemetry.py`         | `timed`, the `TIMINGS` ring buffers and `LoopLagMonitor`, `ask_event` (the ask log line) and `dump_timings`: how long steps take and when the event loop stalls (see [Measurement](#measurement))                                                                                                                                                                                                                                                           |
@@ -262,7 +262,7 @@ tool list when it starts, cannot take a `say` in the middle of a turn, and ends 
   detection and speech-to-text, `synth` for speaking, `load_ears`, `load_models`). A slow run
   that shows up in `loop_lag` but not in the steps points at something blocking the loop.
 - `TIMINGS.summary()` gives count, p50, p95 and max per step. `dump_timings` writes it (only for steps that changed) to `brain.log` every 60 s, one line per step: `perf t=<epoch> step=turn n=12 p50=1.2 p95=3.4 max=5.0`. `tagalong perf [--since 1h]` reads those lines (the last per step in the window) as a table and counts asks closed by a cancel. It needs no running brain.
-- **Ask life.** `Asks` logs each step of an ask on logger `brain.asks`: `ask.opened`, `ask.shown` (by = the bodies showing it), `ask.answered` (by = the body, why = the option) and `ask.closed` (by `brain`, why = `cancelled`, `timeout` or the job's end); `Approvals.record` adds `ask.decided` (by = who decided, why = the outcome). Each line is `ask.<event> t=<epoch> id=<id> by=<who> why=<why>`, one format in `telemetry.ask_event`. A Scout ask that ends after a restart with no card showing (`waiting.py` `_end_unlive`) logs only `ask.decided`.
+- **Ask life.** `Asks` logs each step of an ask on logger `brain.asks`: `ask.opened`, `ask.shown` (by = the bodies showing it), `ask.answered` (by = the body, why = the option) and `ask.closed` (by `brain`, why = `cancelled`, `timeout` or the job's end); `Approvals.record` adds `ask.decided` (by = who decided, why = the outcome). Each line is `ask.<event> t=<epoch> id=<id> by=<who> why=<why>`, one format in `telemetry.ask_event`. A Scout ask's card is shown with `Asks.show` and logs `ask.opened`, `ask.shown` and `ask.answered` like any other; `ask.decided` follows when the saved call has run or been refused.
 
 ## Outbox and replay
 
@@ -655,124 +655,80 @@ flowchart TD
 
 ### Asks that wait
 
-_Identical calls._ `WaitingAsks.claim` registers a call (tool plus masked input) before the card is awaited, so two identical parallel calls, or a re-call right after an immediate park, share one ask; the claim ends with the decision.
+A turn never waits for a card. A Scout tool call in `ask` mode that needs the person (no rule or
+side-check settles it) becomes an `ask` open item (`open_item_runner.py` `AskRunner`) holding the
+call: `{name, input, text}` masked through the log's guards, plus its source and whether masking
+changed anything. The card goes to every displaying body, with no `turn`, and the toolbox returns
+at once: "<tool> is waiting for the person's answer (ask <id>). It runs by itself if they allow it;
+do not call it again." The same call again (same tool and input) while its item is open is the same
+ask, never a second card. Stopping the turn leaves the card and the item alone. A job's ask is
+different: it waits with its job and ends with it.
 
 A tool in `ask` mode takes one extra argument, `ask_wait_hours` (1 to 168, default 72; shown in
 the tool's schema and named in the capability picture). The toolbox strips it from every call, so
-no tool, card or log line sees it, and keeps `now + hours` as the ask's `due_at`. It applies to
-Scout's own calls only; a job's ask waits with its job.
+no tool, card or log line sees it, and uses it as the item's deadline (`ttl_s`). It applies to
+Scout's own calls only.
 
-The ask row saves the call: `input` is `{name, input, text}` masked through the log's guards, and
-`safe_to_retry` says the masking changed nothing. The Scout ask waits in its turn for five
-minutes (`PARK_AFTER_S`), or not at all when no body displays. Then the decision keeps running
-under `WaitingAsks` (`waiting.py`), the card loses its `turn`, and the call returns a fact line:
-"<tool> is waiting for the person's answer (ask <id>). It runs by itself if they allow it; do not
-call it again." The same call again (same tool, same masked input) while one is parked gets the
-same ask, never a second card. Stopping the turn withdraws only the ask it is still waiting on.
-Nobody is refused for being away: a Scout ask raised with no body displaying parks at once.
+_The answer._ `Asks.answer` hands a card without a waiter to `AskRunner.answered`, which counts the
+answer on the item (`answered`), then runs the saved call through the same gate: the floor (a tool
+turned off since refuses, a tool that no longer exists fails), then the person's word, then
+`Toolbox.carry_out`. The rule and side-check already had their say when the ask opened. It does not
+matter whether the turn is still alive. The item ends `done` and a waking `ask_ended` event
+`{ask, tool, summary, outcome, result | reason}` keyed `ask:<id>` goes to Scout, who words it.
+`outcome` is `approved`, `refused`, `expired` or `failed` (yes, but it could not run). A call whose
+saved copy held a secret fails with "held a secret": the masked copy is never run. A second answer
+to a closed ask gets `not_found`. The log row is made when the ask ends (`Approvals.record`).
 
-When the person answers later, `Toolbox.carry_out` runs the saved call once (it checks the mode
-again: a tool turned off since then refuses), and `WaitingAsks` emits a waking `ask_ended` event
-`{ask, tool, summary, outcome, result | reason}` keyed `ask:<id>`. `outcome` is `approved`,
-`refused`, `expired` or `failed` (yes, but it could not run). A cancelled ask emits nothing. A
-second answer to a closed ask gets `not_found`. A restart does not end a parked ask (see
-[Restart and return](#restart-and-return)).
-
-_Deadline, notice, expiry._ `WaitingAsks` arms one `call_later` for the earliest moment over the
-open Scout asks (`WorkStore.waiting_asks`): the notice at two-thirds of the wait
-(`created_at + 2/3 * (due_at - created_at)`) for a row with no `notice` event yet, else its
-`due_at`. It re-arms when an ask is adopted or ends, and at start. At the notice it adds a `notice`
-event to the row (once) and emits `ask_notice` `{ask, tool, summary, age_s, left_s}` keyed
-`ask:<id>`; Scout writes any reminder. At the deadline `Asks.expire` frees the waiter with
-`AskExpired("no answer")` and closes the card for every body (reason `timeout`); the adopted
-decision then logs the ask `expired`, `decided_by: none`, and emits `ask_ended` with outcome
-`expired` and reason `no answer`. An ask with no waiter is logged and announced the same way
-directly. An expired ask runs nothing; the deadline never changes what is allowed.
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-stateDiagram-v2
-    [*] --> Waiting: Scout ask raised, call saved, deadline set
-    Waiting --> Parked: five minutes in the turn, or nobody displaying
-    Waiting --> Done: person answers in the turn
-    Parked --> Parked: brain restart, decided afresh when a body joins
-    Parked --> Done: person answers, or a rule now allows it
-    Parked --> Expired: held a secret, tool off or gone
-    Parked --> Notice: two-thirds of the wait
-    Notice --> Done: person answers
-    Notice --> Expired: no answer at the deadline
-    Parked --> Expired: no answer at the deadline
-    Done --> [*]: carried out or refused, logged
-    Expired --> [*]: logged with reason, Scout woken
-```
+_Deadline._ One `call_later` is armed for the earliest deadline over the open `ask` items. At the
+deadline the item expires, the card closes for every body (reason `timeout`), the ask is logged
+`expired` (`decided_by: none`, reason `no answer`) and `ask_ended` wakes Scout. An expired ask runs
+nothing; the deadline never changes what is allowed. With no wait given the deadline is 3 days.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 sequenceDiagram
     participant S as Scout turn
     participant T as Toolbox
-    participant W as WaitingAsks
+    participant R as AskRunner
     participant P as Person
     S->>T: call (tool in ask mode)
-    T->>P: ask card, row saved with the call
-    Note over T,P: waits up to five minutes in the turn
-    T->>W: adopt the decision, park the card
+    T->>R: open(call)
+    R->>P: card, item holds the saved call
     T-->>S: waiting for the person's answer
-    P->>W: answers later
-    W->>T: carry_out(saved call)
-    W->>S: ask_ended wake (outcome and result)
+    Note over S,T: the turn goes on, or ends
+    P->>R: answers, even much later
+    R->>T: floor, then carry_out(saved call)
+    R->>S: ask_ended wake (outcome and result)
 ```
 
 ### Restart and return
 
-A Scout ask is owned by Scout, a job's ask by its job, and the owner decides how it ends. A job's
-ask (and a turn-bound card such as a choice) ends with its source; a restart expires it
-("brain restarted"). A Scout ask outlives the turn, your absence and a brain restart.
+A Scout ask is an open item, so it outlives the turn, your absence and a brain restart. A job's
+ask (and a turn-bound card such as a choice) ends with its source; a restart expires it ("brain
+restarted").
 
-_At start._ `WorkStore.resume_scan` leaves an `active` Scout ask (no job above it, a `due_at`)
-alone when `safe_to_retry` is true. When it is false (masking changed the saved call, so it would
-replay as the literal `[secret]`) the ask ends `expired` at once, `decided_by: none`, with a
-`decided` event whose reason is `held a secret`, and `reported_at` stays null. `WaitingAsks.start`
-then emits `ask_ended` (outcome `expired`, reason `held a secret`) for each such row and marks it
-reported when that wake starts, so Scout hears of it once. Every surviving ask is remembered as
-_unseen_, and `fire_due` expires any whose deadline passed while the brain was down.
+_At start._ `AskRunner.start` closes every `ask` item that was answered but not finished: the brain
+cannot know if its call ran, so it is never run twice. The item ends `done`, and Scout hears "the
+brain restarted, so it is not known if it ran" through `ask_ended` (outcome `failed`). Items that
+came due while the brain was away expire as at any deadline. The other open items are kept with
+their deadline.
 
-_On return._ `Session._on_connect` calls `WaitingAsks.rejoined` when the joining body displays
-(a `display: false` body such as the browser does nothing). It acts only when an ask is unseen
-(parked while nobody displayed, or kept across a restart) or has no card live in `Asks`. One task
-then decides each waiting ask with no live card, oldest first, rebuilding the call from the saved
-row and asking the engine again without the person step:
-
-- A rule or Scout's side-check now allows it: `Toolbox.carry_out` runs it and `ask_ended`
-  (`approved`, or `failed`) wakes Scout; the log row says `rule` or `scout`.
-- The floor refuses it: the tool turned Off ends it `expired` ("turned off"), a tool that no longer
-  exists ends it `expired` ("tool gone"); each is logged and wakes Scout with `ask_ended`.
-- Otherwise only the person can decide: the card is opened again for the same ask id, with no
-  `turn`, for every body. All such cards open together, in order, and each decision is adopted as
-  a parked one is, so a later yes carries the call out.
-
-While the return runs, a deadline for an ask it is deciding waits until that ask is settled, and
-one that lapsed meanwhile ends `no answer` and runs nothing; a body joining during a running return
-is ignored (the running one covers every ask). A waiting row whose saved call held a secret ends
-`expired` with the reason `held a secret`. Shutting the brain down leaves a parked ask open.
-
-Then one `asks_waiting` wake `{count, asks}` names the unseen asks still open, each `{ask, tool,
-summary, age_s}`, oldest first; Scout says how old each is in his own words. An ask that was live
-and shown to a displaying body is not decided again. The call goes through the floor again on
-return: a `person_only` tool is never allowed by a rule, only shown.
+_On return._ `Session._on_connect` calls `AskRunner.rejoined` when the joining body displays (a
+`display: false` body such as the browser does nothing). Every open `ask` item whose card is not
+live in `Asks` (a restart leaves none) gets its card shown again, with the same ask id and no
+`turn`, for every body. A tool that has gone ends the ask `failed` ("that tool is gone"). Nothing is
+decided without the person on return: the rule and side-check ran when the ask opened.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
-  S[brain starts] --> Q{Scout ask held a secret?}
-  Q -- yes --> X[expired, held a secret; Scout woken]
-  Q -- no --> K[stays waiting with its deadline, unseen]
+  S[brain starts] --> A{ask item answered, not done?}
+  A -- yes --> X[closed as failed, not run again; Scout woken]
+  A -- no --> K[stays open with its deadline]
   K --> J[a body that displays joins]
-  J --> D{decide again without the person}
-  D -- rule or side-check allows --> R[carried out; ask_ended]
-  D -- off or tool gone --> E[expired with reason; ask_ended]
-  D -- only the person can --> C[card opens again, oldest first]
-  C --> W[one asks_waiting wake with ages]
+  J --> C[card shown again, same ask id]
+  C --> P[person answers]
+  P --> R[saved call runs through the floor; ask_ended]
 ```
 
 ### Choices and preferences
@@ -1494,9 +1450,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 
 | Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
 | ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ask_notice`      | 60 s         | 6            | A parked Scout ask is still waiting and two-thirds of its wait has passed (facts: ask, tool, summary, age_s, left_s); Scout may remind the person once or stay silent                        |
-| `ask_ended`       | 30 s         | 10           | A parked Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                     |
-| `asks_waiting`    | none         | none         | A displaying body joined and asks that waited while the person was away are shown again (facts: count, asks as JSON of ask, tool, summary, age_s); Scout says how old each is                |
+| `ask_ended`       | 30 s         | 10           | A Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                     |
 | `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
 | `work_failed`     | 0 s          | 10           | A goal's step gave up after its retries or was not retryable (facts: goal, step, title, reason); Scout says which step failed and offers `resolve_step`                                      |

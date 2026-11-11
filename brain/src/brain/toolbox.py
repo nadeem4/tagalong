@@ -6,7 +6,6 @@ The permission engine then decides: an ask-mode tool waits for an allow from a s
 Scout's side-check or the person (gate step 3); Home calls skip that step.
 """
 
-import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
@@ -23,11 +22,10 @@ from brain.mind.turn import Call
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     ASK_WAIT_ARG,
-    PARK_AFTER_S,
+    AskOpen,
     AskRequest,
     Decision,
     Engine,
-    Parked,
     Tier,
     ask_wait,
     gate_tier,
@@ -40,7 +38,7 @@ from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 from brain.telemetry import timed
 
 if TYPE_CHECKING:
-    from brain.waiting import WaitingAsks
+    from brain.open_item_runner import AskRunner
 
 log = logging.getLogger("brain")
 
@@ -203,12 +201,11 @@ class Toolbox:
         on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
         | None = None,
         outputs: OutputStore | None = None,
-        waiting: "WaitingAsks | None" = None,
-        park_after: float = PARK_AFTER_S,
+        runner: "AskRunner | None" = None,
     ) -> None:
-        # A Scout ask that finds nobody in time is parked with this; None keeps it in its turn.
-        self._waiting = waiting
-        self._park_after = park_after
+        # Scout's own asks become open items through this and never wait in their turn; without
+        # it (a job's ask, or no runner) the call waits for the card.
+        self._runner = runner
         # Long text results reach the model as a capped preview; None leaves them whole.
         self._outputs = outputs
         # Told after every call of a known tool: (call, spec, source kind, "ok" | "failed" |
@@ -304,41 +301,19 @@ class Toolbox:
         wait: timedelta | None,
     ) -> None:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
-        expert job a call comes from, so its approval rows say so."""
-        assert self._asks is not None and self._engine is not None
-        ask_id = uuid.uuid4().hex  # the open ask's row and its log entry are one row
-        claimed = wait is not None and self._waiting is not None
-        if claimed:  # no await between the check and the registration
-            earlier = self._waiting.claim(spec.name, call.input, ask_id)
-            if earlier is not None:  # the same call again: the same ask, no second card
-                raise Parked(earlier)
-        try:
-            await self._ask_claimed(call, spec, source_kind, job_id, wait, ask_id)
-        except Parked:
-            raise  # the parked decision keeps the claim until it ends
-        except BaseException:
-            if claimed:
-                self._waiting.release(ask_id)
-            raise
-        if claimed:
-            self._waiting.release(ask_id)
-
-    async def _ask_claimed(
-        self,
-        call: Call,
-        spec: ToolSpec,
-        source_kind: str,
-        job_id: str | None,
-        wait: timedelta | None,
-        ask_id: str,
-    ) -> None:
+        expert job a call comes from, so its approval rows say so. Scout's own ask that needs the
+        person opens an item and raises `AskOpen` at once: the answer runs the call later."""
         assert self._asks is not None and self._engine is not None
         req = await self.ask_request(
-            call, spec, source_kind, job_id=job_id, ask_id=ask_id, wait=wait
+            call, spec, source_kind, job_id=job_id, ask_id=uuid.uuid4().hex
         )
-        decision = await self._decide(req, call)
+        later = wait is not None and self._runner is not None
+        decision = await self._engine.decide(replace(req, how_to_ask=None) if later else req)
         if decision.allowed:
             return
+        if later and decision.code == "no_decider":  # only the person is left to say
+            assert wait is not None and self._runner is not None
+            raise AskOpen(self._runner.open(call, req, wait).id)
         # Plain words the model reads; logged reasons never carry tool text.
         name = spec.name
         match decision.code:
@@ -361,11 +336,9 @@ class Toolbox:
         *,
         job_id: str | None,
         ask_id: str,
-        wait: timedelta | None = None,
-        reopen: bool = False,
     ) -> AskRequest:
-        """The engine's request for one tool call: the one shape a new ask and a waiting ask
-        decided again share. `reopen` shows the card of an ask whose row already exists."""
+        """The engine's request for one tool call: the one shape a new ask and an open ask
+        decided again share."""
         assert self._asks is not None
         gate = gate_tier(spec, self._modes().get(spec.name))
         shown = call
@@ -379,14 +352,10 @@ class Toolbox:
             summary=summarise(call.text, spec.name, shown.input),
             input=shown.input,
             tier=gate,
-            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id, reopen),
+            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id),
             job_id=job_id,
             turn_id=call.turn or None,
             ask_id=ask_id,
-            wait=wait,
-            call={"name": call.name, "input": call.input, "text": call.text}
-            if wait is not None
-            else None,
         )
 
     def spec_named(self, name: str) -> tuple[ToolSpec, str] | None:
@@ -406,28 +375,9 @@ class Toolbox:
         return None
 
     async def redecide(self, req: AskRequest) -> Decision:
-        """The engine's decision for a request `ask_request` built, with no parking."""
+        """The engine's decision for a request `ask_request` built."""
         assert self._engine is not None
         return await self._engine.decide(req)
-
-    async def _decide(self, req: AskRequest, call: Call) -> Decision:
-        """The engine's decision. A Scout ask waits in its turn for `park_after` seconds (not at all
-        when nobody displays a body), then keeps running on its own and the call is parked."""
-        assert self._engine is not None and self._asks is not None
-        if req.wait is None or self._waiting is None:
-            return await self._engine.decide(req)
-        task = asyncio.create_task(self._engine.decide(req))
-        try:
-            await asyncio.wait(
-                {task}, timeout=self._park_after if self._asks.anyone_online() else 0
-            )
-        except asyncio.CancelledError:
-            task.cancel()  # the turn stopped: the ask it is waiting on is withdrawn
-            raise
-        if task.done():
-            return task.result()
-        self._waiting.adopt(task, call, req)
-        raise Parked(req.ask_id)
 
     async def run(
         self, call: Call, caller: str = "scout", job_id: str | None = None
@@ -440,12 +390,12 @@ class Toolbox:
         wait = ask_wait(hours) if caller == "scout" and job_id is None else None
         try:
             out = await self._run(call, caller, found, job_id, wait)
-        except Parked as parked:
-            # Not run, not failed: the call waits for the person. Plain facts for the model.
+        except AskOpen as opened:
+            # Not run, not failed: the ask is open for the person. Plain facts for the model.
             if found:
-                self._report(call, found[0], found[1], "refused", None, parked)
+                self._report(call, found[0], found[1], "refused", None, opened)
             return (
-                f"{call.name} is waiting for the person's answer (ask {parked.ask_id}). "
+                f"{call.name} is waiting for the person's answer (ask {opened.ask_id}). "
                 "It runs by itself if they allow it; do not call it again."
             )
         except Exception as err:
@@ -470,8 +420,8 @@ class Toolbox:
         return out
 
     async def carry_out(self, call: Call) -> str | list[dict]:
-        """Run a parked call after the person's late yes. The yes is the ask, so the gate does
-        not ask again, but a tool turned off since then still refuses."""
+        """Run an open ask's saved call after the person's yes (the runner has put it through
+        the engine); a tool turned off since then still refuses."""
         found = self._servable(call.name)
         if found is None:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")

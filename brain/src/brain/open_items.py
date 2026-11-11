@@ -136,10 +136,10 @@ class OpenItems:
             return self._close(item, "done", "brain", reason, only=item.state)
         return item
 
-    def expire_due(self, now: datetime) -> list[OpenItem]:
+    def expire_due(self, now: datetime, kind: str | None = None) -> list[OpenItem]:
         return [
             self._close(_item(s), "expired", "brain", "deadline")
-            for s in store.due(self.db, utc_text(now))
+            for s in store.due(self.db, utc_text(now), kind)
         ]
 
     def expire_live_only(self) -> list[OpenItem]:
@@ -149,8 +149,17 @@ class OpenItems:
             for s in store.live_only_open(self.db)
         ]
 
-    def list_open(self, origin_body: str | None = None) -> list[OpenItem]:
-        return [_item(s) for s in store.list_open(self.db, origin_body)]
+    def list_open(self, origin_body: str | None = None, kind: str | None = None) -> list[OpenItem]:
+        return [_item(s) for s in store.list_open(self.db, origin_body, kind)]
+
+    def list_answered(self, kind: str) -> list[OpenItem]:
+        """Answered but not done: after a restart these are closed or run again, never lost."""
+        return [_item(s) for s in store.answered(self.db, kind)]
+
+    def find_open(self, kind: str, match: dict) -> OpenItem | None:
+        """The open item whose saved call holds all of `match`, so a repeat opens no second one."""
+        s = store.find_open(self.db, kind, match)
+        return None if s is None else _item(s)
 
     def _close(
         self,

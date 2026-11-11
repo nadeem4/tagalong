@@ -32,7 +32,7 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/rules.py`: owns `rules` (modes, preferences, offers).
 - `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model` and, for updates, `auto_update.{app,expert}.{official,community}` (`"1"` or `"0"`: whether that group updates by itself; absent means Official on, Community off). The last check time and the latest versions seen are a cache file, `<TAGALONG_HOME>/cache/updates.json`, not a table.
-- `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `due`, `live_only_open`) and `StoredItem`.
+- `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `list_answered`, `find_open`, `due`, `live_only_open`) and `StoredItem`.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -573,12 +573,9 @@ log entry are one row. Home's log is the ask rows that were decided.
 
 `end_reason` is the outcome word (`approved`, `refused`, `expired`) once decided; `timed_out` and
 `no_one` appear only on older rows (a Scout ask now waits instead of timing out or finding nobody).
-A restart scan leaves an open Scout ask open with its deadline; one whose saved call held a secret
-ends `expired` with a `decided` event whose reason is `held a secret` and is reported to Scout once.
-A Scout ask (no job above it) also saves its call: `input` is `{name, input, text}` masked by the
-log's guards, `due_at` the deadline from `ask_wait_hours`, and `safe_to_retry` is true when the
-masking changed nothing. At two-thirds of the wait the row gets one `notice` event. An `expired`
-ask's `decided` event keeps a plain reason (`no answer` at the deadline).
+A Scout ask (no job above it) has no `ask` row while it waits: its open item holds the saved call
+(masked by the log's guards) and the deadline from `ask_wait_hours`. `Approvals.record` writes the
+row when the ask ends; an `expired` ask's `decided` event keeps a plain reason (`no answer` at the deadline).
 An ask that ended before it was decided (answered, timed out) first ends with its own reason
 and is re-ended with the outcome when `Approvals.record` decides it.
 
@@ -619,8 +616,8 @@ An expert's question to Scout is a `question` row under its job: `active` while 
 ### open_items
 
 Everything waiting on the person (a card, choice, install, sign-in, expert question, offer or
-setup step), one row each with one lifecycle. Nothing writes it yet: the asks, choices and
-installs move onto it in later slices (F6 and F7).
+setup step), one row each with one lifecycle. Scout's asks (kind `ask`) write it today, holding the
+saved call; choices and installs move onto it in a later slice (F7).
 
 | Column            | Type             | Meaning                                                                                   |
 | ----------------- | ---------------- | ----------------------------------------------------------------------------------------- |
@@ -642,7 +639,7 @@ installs move onto it in later slices (F6 and F7).
   while the item is `open`, even if the turn that raised it is gone; after the deadline it is
   refused (`expired`). `live_only` items are expired at start and when their process ends.
 - Written by: `open_items.py` `OpenItems` through `store/open_items.py`.
-- Read by: `OpenItems.list_open`, `get`.
+- Read by: `OpenItems.list_open`, `list_answered`, `find_open` (the open item with a given saved call), `get`.
 - Retention: closed rows stay until a later slice sweeps them.
 - Index: `open_items_open(state, deadline_at)` for the deadline scan.
 
@@ -735,7 +732,7 @@ These are lost when the brain restarts.
 
 | State                | Where                           | What a restart means                                                                                                                                      |
 | -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask row stays open and its card returns when a displaying body joins |
+| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins |
 | Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                    |
 | Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                                                                           |
 | Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                     |
