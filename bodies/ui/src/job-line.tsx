@@ -1,11 +1,12 @@
 /**
- * The bubble's one live line for a running job ("Claude Code: npm init -y"): a hook that reads
- * the newest running step from the brain, and the muted row that shows it. Step title only,
- * never output, shown whole; not Scout's voice, so it is never spoken.
+ * The bubble's live card for a running job ("Claude Code is working", the step, a link to Tasks): a
+ * hook that reads the newest running step from the brain, and the card that shows it. Step title
+ * only, never output, shown whole; not Scout's voice, so it is never spoken.
  * Contains useRunningStep and JobLine.
  */
 import { useEffect, useState } from 'react';
 import type { HostBridge, RunningStep } from './host-bridge';
+import { Icon } from './setup/icons';
 
 /** At most one read per window, as the brain's own `job_activity` notices are throttled. */
 const READ_EVERY_MS = 250;
@@ -55,11 +56,29 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
   return step;
 }
 
-export function JobLine({ step }: { step: RunningStep }) {
-  // The whole step wraps in mono; a title would only repeat it.
+/** A running job as a card: who is working, a link to Tasks, a moving bar and the whole step. */
+export function JobLine({ step, onOpenTasks }: { step: RunningStep; onOpenTasks: () => void }) {
   return (
-    <p className="bubble-status bubble-jobline" data-testid="job-line" aria-live="off">
-      {step.expert}: <code>{step.text}</code>
-    </p>
+    <div className="bubble-jobline" data-testid="job-line" aria-live="off">
+      <div className="bubble-jobline-top">
+        <span className="bubble-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <b>{step.expert} is working</b>
+        <button type="button" className="bubble-link" onClick={onOpenTasks}>
+          Open in Tasks
+          <Icon name="chevRight" />
+        </button>
+      </div>
+      {/* The brain reports no share done, so the bar only says the job is moving. */}
+      <div className="bubble-jobbar" role="progressbar" aria-label="Working">
+        <i />
+      </div>
+      <p className="bubble-jobline-step">
+        <code>{step.text}</code>
+      </p>
+    </div>
   );
 }

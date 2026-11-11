@@ -1,6 +1,6 @@
 /** Tests for useRunningStep and JobLine: the bubble's one live line for a running job. */
 
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HostBridgeProvider, type RunningStep } from './host-bridge';
@@ -129,11 +129,23 @@ describe('useRunningStep', () => {
 });
 
 describe('JobLine', () => {
-  it('shows the expert and the step title, muted and silent', () => {
-    render(<JobLine step={step('npm init -y')} />);
-    const line = screen.getByTestId('job-line');
-    expect(line.textContent).toBe('Claude Code: npm init -y');
-    expect(line.getAttribute('aria-live')).toBe('off');
-    expect(line.hasAttribute('title')).toBe(false);
+  it('is a card: the expert working, the step whole in mono, a bar, silent', () => {
+    render(<JobLine step={step('npm init -y')} onOpenTasks={() => undefined} />);
+    const card = screen.getByTestId('job-line');
+    expect(card).toHaveTextContent('Claude Code is working');
+    expect(card.querySelector('code')).toHaveTextContent('npm init -y');
+    expect(card.getAttribute('aria-live')).toBe('off');
+    expect(card.hasAttribute('title')).toBe(false);
+    // No real progress is known, so the bar only says it is moving.
+    expect(screen.getByRole('progressbar', { name: 'Working' })).not.toHaveAttribute(
+      'aria-valuenow',
+    );
+  });
+
+  it('Open in Tasks goes to the Tasks page', () => {
+    const onOpenTasks = vi.fn();
+    render(<JobLine step={step('npm init -y')} onOpenTasks={onOpenTasks} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Tasks' }));
+    expect(onOpenTasks).toHaveBeenCalledOnce();
   });
 });

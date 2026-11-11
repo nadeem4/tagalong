@@ -1310,8 +1310,12 @@ describe('the live job line', () => {
     const bridge = createFakeHostBridge({ runningSteps: [running('npm init -y')] });
     renderBubble(bridge);
     const line = await screen.findByTestId('job-line');
-    expect(line.textContent).toBe('Claude Code: npm init -y');
+    expect(line).toHaveTextContent('Claude Code is working');
+    expect(line.querySelector('code')).toHaveTextContent('npm init -y');
     expect(line.getAttribute('aria-live')).toBe('off');
+    const openFix = vi.spyOn(bridge, 'openFix');
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Tasks' }));
+    expect(openFix).toHaveBeenCalledWith('tasks');
     bridge.running = [];
     act(() => bridge.emitChanged('jobs'));
     await waitFor(() => expect(screen.queryByTestId('job-line')).toBeNull());
@@ -1328,6 +1332,6 @@ describe('the live job line', () => {
     const long = `cat ${'C:/very/long/path/'.repeat(8)}file.ts`;
     renderBubble(createFakeHostBridge({ runningSteps: [running(long)] }));
     const line = await screen.findByTestId('job-line');
-    expect(line.textContent).toBe(`Claude Code: ${long}`);
+    expect(line.querySelector('code')?.textContent).toBe(long);
   });
 });

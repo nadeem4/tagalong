@@ -513,7 +513,9 @@ export function CompanionBubble({
     </p>
   );
   const runningStep = useRunningStep(bridge);
-  const jobLine = runningStep !== null && <JobLine step={runningStep} />;
+  const jobLine = runningStep !== null && (
+    <JobLine step={runningStep} onOpenTasks={() => void bridge.openFix('tasks')} />
+  );
   const statusRow = status != null && (
     <StatusMark
       mark={status}

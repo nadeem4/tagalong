@@ -64,9 +64,25 @@ export const CHAT_CSS = `
 .bubble-chip { min-height: 28px; padding: 0 8px 0 12px; }
 .bubble-chip span { overflow-wrap: anywhere; }
 
-/* A running job: the expert, then the whole step in mono, wrapped. */
-.bubble-jobline { overflow-wrap: anywhere; }
-.bubble-jobline code { font-family: ${t.font.mono}; }
+/* A running job: a card with who is working, a link to Tasks, a moving bar, then the whole step. */
+.bubble-jobline {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; overflow-wrap: anywhere;
+  border: 1px solid ${t.color.fieldLine}; border-radius: 12px; background: ${t.color.sidebar};
+}
+.bubble-jobline-top { display: flex; align-items: center; gap: 8px; ${typeCss('body')}; }
+.bubble-jobline-top b { flex: 1; min-width: 0; font-weight: 600; }
+.bubble-jobline-step { margin: 0; ${typeCss('small')}; color: #C9CEE0; }
+.bubble-jobline code { font-family: ${t.font.mono}; ${typeCss('small')}; }
+.bubble-jobbar { height: 4px; border-radius: 2px; background: #222845; overflow: hidden; }
+.bubble-jobbar i { display: block; height: 100%; width: 40%; background: ${t.color.gold}; animation: bubble-job 1.6s ease-in-out infinite; }
+@keyframes bubble-job { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bubble-jobbar i { animation: none; width: 55%; } }
+.bubble-link {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent;
+  color: ${t.color.sky}; font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer;
+}
+.bubble-link .cx-icon { width: 14px; height: 14px; }
+.bubble-link:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 
 /* The full chat: a 56px header, a log pinned to the newest message, then the footer. */
 .bubble--chat { height: 100vh; padding: 0; gap: 0; overflow: hidden; }
