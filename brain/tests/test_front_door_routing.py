@@ -6,6 +6,7 @@ finishes, and a phone-only setup still hears a job's question. Fake model and bo
 
 import asyncio
 import json
+from dataclasses import replace
 
 from job_rows import records_for
 from test_sessions import (
@@ -335,3 +336,27 @@ async def test_a_say_joined_to_a_turn_that_errors_gets_its_own_turn():
     gate.set()
     await idle(session)
     assert len(model.seen) == 2  # b was not left unanswered in the failed turn's history
+
+
+async def test_whatsapp_moments_wake_on_the_whatsapp_body():
+    # The bridge reports a closed ask and a many-asks reply as facts; Scout's words must go
+    # back to the phone even when the desktop spoke last.
+    for name, data in (("ask_closed", {"via": "tap"}), ("many_pending", {"asks": 2})):
+        session, sent = make(
+            Gate(["hi desktop", "words for the phone"]),
+            kinds={
+                n: replace(EVENT_KINDS[n], batch_seconds=0) for n in ("ask_closed", "many_pending")
+            },
+        )
+        join(session, "desktop")
+        join(session, "whatsapp")
+        await session.say("desktop", say("first from the desktop"))
+        await idle(session)
+        sent.clear()
+        posted = spy_posts(session)
+        session.body_event("whatsapp", name, data)
+        await idle(session)
+        assert [(i.kind, i.origin_body) for i in posted] == [(name, "whatsapp")]
+        assert wake_started(sent) == ["whatsapp"]
+        replies = [p["body"] for m, p in sent if m == "reply"]
+        assert replies and set(replies) == {"whatsapp"}
