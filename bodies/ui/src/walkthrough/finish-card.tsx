@@ -112,7 +112,7 @@ export function FinishCard({
         <Button variant="secondary" onClick={onOpenHome}>
           Open Home
         </Button>
-        <Button variant="primary" onClick={onClose}>
+        <Button variant="primary" className="wt-final" onClick={onClose}>
           Done
         </Button>
       </footer>

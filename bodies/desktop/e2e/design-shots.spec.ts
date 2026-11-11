@@ -175,7 +175,7 @@ test('D5 connections', async () => {
 
     brain.setSetup({}, true);
     await search.fill('notion');
-    // Not getByRole('alert'): the Bodies card has one too.
+    // Not getByRole('alert'): other Connections cards can show one too.
     await expect(home.getByText("Scout couldn't load the app list")).toBeVisible({
       timeout: 15_000,
     });

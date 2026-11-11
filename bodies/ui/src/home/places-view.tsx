@@ -314,9 +314,6 @@ export function PlacesView() {
                   </p>
                 )}
                 <div className="cx-form__actions">
-                  <Button variant="quiet" onClick={() => setSetup(false)}>
-                    Close
-                  </Button>
                   <Button variant="primary" type="submit" disabled={!dirty || busy}>
                     Save
                   </Button>

@@ -237,11 +237,10 @@ describe('PlacesView', () => {
       expect(screen.getByLabelText(/Access token/)).toHaveValue('EAAG-fake-token');
     });
 
-    it('closes the setup again', async () => {
+    it('has just one Save in the setup, no Close', async () => {
       open();
       await openSetup();
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      expect(screen.queryByLabelText(/Access token/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     });
   });
 

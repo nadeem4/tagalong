@@ -20,6 +20,11 @@ function card(ready?: Parameters<typeof FinishCard>[0]['ready']) {
 }
 
 describe('FinishCard', () => {
+  it('Done carries the shared final-button class', () => {
+    card();
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveClass('wt-final');
+  });
+
   it('Ready to use lists what was connected', () => {
     card([
       { name: 'Google Calendar', state: 'connected' },

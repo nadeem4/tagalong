@@ -53,6 +53,11 @@ describe('Footer', () => {
     expect(props.onNext).toHaveBeenCalledTimes(1);
   });
 
+  it('Finish carries the shared final-button class', () => {
+    mount(10);
+    expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('wt-final');
+  });
+
   it('Finish on step ten is never disabled', () => {
     mount(10);
     expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();

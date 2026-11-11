@@ -16,11 +16,10 @@ const EXPERT_NAME = 'Claude Code';
 const EXPERT_JOB = 'Fix this code, and other long, many-step jobs';
 
 /** The tour's apps: `key` is matched (lowercase, contained) against registry and saved names. */
-const APPS = [
-  { key: 'gmail', name: 'Gmail' },
-  { key: 'calendar', name: 'Google Calendar' },
-  { key: 'notion', name: 'Notion' },
-] as const;
+const APPS: readonly { key: string; name: string }[] = [
+  ...JOB_KINDS.flatMap((j) => (j.app ? [j.app] : [])),
+  { key: 'notion', name: 'Notion' }, // no job needs it, it is just a popular one
+];
 
 const SIGN_IN: Record<AppRow['signIn'], string> = {
   browser: 'Browser sign-in',
@@ -141,7 +140,7 @@ export function StepTen({
       setupOverview(key).then(
         (result) => {
           const rows = rowsOf(result).filter((r) => named(r.id, key) || named(r.name, key));
-          const row = rows.find((r) => r.official) ?? rows[0];
+          const row = rows.find((r) => r.official);
           if (live && row !== undefined) setFound((f) => ({ ...f, [key]: row }));
         },
         () => undefined, // offline: the page already says so

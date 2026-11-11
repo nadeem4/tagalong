@@ -177,6 +177,7 @@ export const WALKTHROUGH_CSS = `
 .wt-back::before { content: '←' / ''; margin-right: 8px; }
 .wt-next::after { content: '→' / ''; margin-left: 8px; }
 .wt-primary:hover:not(:disabled) { filter: brightness(.96); }
+.wt-final { min-width: 96px; }
 .wt-text { border: 0; background: none; color: ${t.color.panelMuted}; padding: 0 4px; }
 .wt-text:hover:not(:disabled) { color: ${t.color.panelText}; }
 /* Step ten and the finish card's ready list reuse Home's connection rows (cx-*). */
@@ -187,13 +188,13 @@ export const WALKTHROUGH_CSS = `
 .wt .cx-list.wt-group__card { background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; padding: 4px 18px; }
 .wt .cx-list.wt-group__card > .cx-item > .cx-row { padding: 12px 0; }
 .wt .cx-list.wt-group__card > .cx-item:first-child > .cx-row { padding-top: 12px; }
-.wt .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; flex: none; }
+.wt .home-dot { width: 8px; height: 8px; border-radius: 50%; background: ${t.color.okDot}; flex: none; }
 .wt .home-dot--warn { background: ${t.color.gold}; }
 .wt-ready { margin-top: 24px; }
 .wt-new {
   display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px;
   background: #DCE4FA; color: #24326B; ${typeCss('caption')}; font-weight: ${t.fontWeight.semibold}; vertical-align: 2px;
 }
-.wt-ready .wt-keylist li { ${typeCss('small')}; }
+.wt-ready .wt-keylist li { ${typeCss('body')}; }
 .wt-error { margin: 0; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; color: ${t.color.errInk}; }
 `;

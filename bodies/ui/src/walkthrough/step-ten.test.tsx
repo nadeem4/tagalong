@@ -76,6 +76,18 @@ describe('StepTen', () => {
     expect(screen.queryByText('Google Calendar')).not.toBeInTheDocument();
   });
 
+  it('never offers a community app in place of the Official one', async () => {
+    open({
+      popular: [
+        row('com.google/gmail', 'Gmail'),
+        { ...row('io.x/notion-fan', 'Notion'), official: false },
+      ],
+      appGroups: [],
+    });
+    await screen.findByText('Gmail');
+    expect(screen.queryByText('Notion')).not.toBeInTheDocument();
+  });
+
   it('Add connects the app by its registry id and shows Waiting for you', async () => {
     const host = open();
     await screen.findByText('Gmail');

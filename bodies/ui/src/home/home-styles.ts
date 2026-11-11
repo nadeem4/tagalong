@@ -87,7 +87,7 @@ export const HOME_CSS = `
 .home-reading__actions { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.lg}px; }
 .home-reading__actions .job-overview__link { color: ${t.color.warnInk}; }
 .home-spend { ${typeCss('display')}; font-variant-numeric: tabular-nums; }
-.home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
+.home-dot { width: 8px; height: 8px; border-radius: 50%; background: ${t.color.okDot}; }
 .home-dot--warn { background: ${t.color.gold}; }
 .home-dot--err { background: ${t.color.errInk}; }
 .home-dot--off { background: ${t.color.panelMuted}; }

@@ -57,7 +57,7 @@ export function Footer({
         </button>
       )}
       {last ? (
-        <button type="button" className="wt-primary" disabled={busy} onClick={onFinish}>
+        <button type="button" className="wt-primary wt-final" disabled={busy} onClick={onFinish}>
           Finish
         </button>
       ) : (
