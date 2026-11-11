@@ -819,9 +819,9 @@ The first-run setup adds four more Home tools (never offered to Scout):
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
-browse_experts, browse_apps, stale, progress, failed}`; an optional `query` searches the app
-registry, so `browse_apps` holds that search's entries instead of the registry's unfiltered first
-page (the tour asks once per job's app), and `setup_app` takes the same `query` so install_app can find
+browse_experts, browse_apps, popular, popular_more, show_more_from, stale, progress, failed}`; an optional `query` searches the app
+registry, so `browse_apps` holds that search's entries (empty with no query)
+(the tour asks once per job's app), and `setup_app` takes the same `query` so install_app can find
 the entry again; an optional `cursor` asks for that search's next page), where `state` is `ready`, `needs_login` or
 `needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
@@ -843,16 +843,26 @@ by name, as `install_app` does). Progress rides `changed {what:
 "setup"}`.
 
 `setup_overview` also answers the registry search for Home (all facts, no wording):
-`browse_experts`, `browse_apps` and the installed `experts` rows carry `official`; `popular` (only
-with no query or cursor) is the seeded Official apps (`trust.POPULAR`) that resolve in the registry
-and connect in one click here (hosted, or a package with no key); `app_groups` is
+`browse_experts`, `browse_apps` and the installed `experts` rows carry `official`. With no query
+or cursor the page shows only curated lists and never reads the registry's raw first page:
+`popular` is `trust.POPULAR_APPS` and `popular_more` (behind "Show more") is `trust.MORE_APPS`,
+each id looked up on its own and kept only if it resolves, is Official and connects in one click
+here (hosted, or a package with no key); an id that is missing or whose lookup fails is dropped
+without an error and the rest stay. The ids were checked against the live registry (Notion,
+Linear as `app.linear/linear`, Jira and Confluence as `com.atlassian/atlassian-mcp-server`);
+Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana publish no Official one-click entry
+there, so they are not listed until one appears. `browse_experts` is ordered with
+`trust.POPULAR_EXPERTS` first (Claude Code, Gemini CLI, Codex), then the rest; each row has
+`recommended` (Claude Code) and `tested` (`env.is_tested`), and `show_more_from` is the index
+where "Show more" starts. `app_groups` is
 `[{service, official: Row | null, others: [Row]}]` for the query, one group per service, Official
 head first (`setup/grouping.py`); `next_cursor` is the registry's cursor for the next page;
 `sources` names the two registries and their base URLs (`MCP_BASE`, `ACP_URL`) so Settings cannot
 drift from the code. A `Row` is `{id, name, version, description, official, publisher, runs
 ("pc" or "hosted"), host, sign_in ("browser", "key" or "none"), licence, repo, why}`; `why` is on
-community rows only. Offline with no cache, `app_groups` and `popular` are empty, `stale` is true
-and the installed lists stay.
+community rows only. The installed `apps` rows carry `official`, the trust kept at install
+(`apps.trust`). Offline with no cache, `app_groups`, `popular` and `popular_more` are empty,
+`stale` is true and the installed lists stay.
 
 Who is Official is decided by code only (`setup/trust.py`): an app whose registry namespace is the
 service's own reversed domain (exactly two labels: `com.notion`, `app.linear`) and whose name
@@ -1020,12 +1030,17 @@ words what the person reads (guidance in `mind/soul.md`).
   the system environment is never changed and nothing is global. A command that is cancelled or
   times out is killed with its whole process tree. The stored command is
   `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`
-  entry is streamed to `tools/<id>.dl`, checked against its listed sha256 (none listed is
-  refused) and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
+  entry is streamed to `tools/<id>.dl`, checked against its listed sha256 and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
   into `tools/<id>/` only on success, and then the record is written: a reinstall keeps the old
   files and record until then, and a failure or cancel removes only what was staged.
+  A binary with no listed sha256 is never offered: the registry reader drops it and `build_for`
+  skips it, so it is absent from Home's list and Scout's `find_experts`, and `install_expert`
+  answers `no_build` without downloading; the `integrity` check stays as the last guard.
   `uvx` and hosted entries are `unsupported`; an entry with no build for this computer is
-  `no_build`. A registry id must be a plain folder name. Failures are `InstallError(kind, detail)`
+  `no_build`. A failed expert or app install is also logged as one WARNING with its id, kind and
+  detail (`expert_tools.py`, `apps.py`), so `brain.log` says why. The expert's ACP client accepts
+  the adapter's `auth/status_update` notification (logged at INFO, `logged_in` untouched) instead
+  of letting the library log an error for a method it has no route for (`experts.py` `_Client`). A registry id must be a plain folder name. Failures are `InstallError(kind, detail)`
   facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
   `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`.
 - `login.py`, `terminal.py`, `env.py`: the `login_expert(id)` tool logs an installed expert in on

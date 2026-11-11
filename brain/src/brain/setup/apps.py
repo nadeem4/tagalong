@@ -179,7 +179,8 @@ async def add_registry_app(
         await node_for(home, machine, fetch, get_json, lambda step: None)  # named on the card
         machine = await inspect_fn()
     params = app_params(entry, dist, machine, home)
-    return await save_app(apps, memory, tokens, notify, params)
+    trust = "official" if is_official_app(entry.id) else "community"
+    return await save_app(apps, memory, tokens, notify, params, trust=trust)
 
 
 def app_setup_tools(

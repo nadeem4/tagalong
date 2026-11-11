@@ -187,7 +187,12 @@ flowchart LR
   opens the **check card** (`check-card.tsx`) first: who made it ("not the service itself"), runs on
   your PC or hosted by whom, how you sign in, licence, "Reviewed: Not yet audited by anyone", **See its code** (only for an http(s) address, opened in your own browser),
   **Back** and **Connect anyway** (`setup_app` with `approved` and `community_ok` true). The brain
-  decides what is Official; a registry that cannot be reached shows one plain line.
+  decides what is Official; a registry that cannot be reached shows one plain line. With an empty
+  box the brain sends only its curated lists (`popular`, then `popular_more` behind "Show more"),
+  never the registry's raw first page.
+- **Trust kept at install**: a registry install saves `official` or `community` on the app row
+  (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
+  back as `official` on each connected app, so the tag survives a restart.
 - **Experts tab**: the **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led
   by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
   (Ready, Needs login, Update available) and a **Log in** or **Update** button; **ADD AN EXPERT**

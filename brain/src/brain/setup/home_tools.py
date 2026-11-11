@@ -11,6 +11,7 @@ import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from brain.apps import AppRow
 from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
@@ -47,6 +48,14 @@ AskFn = Callable[..., Awaitable[Answer]]
 RecordFn = Callable[..., None]
 _INSTALLABLE = ("npx", "binary")
 WHY_PER_REPLY = 12  # model-written lines per search reply; bounds what one search costs
+
+
+def home_app_rows(rows: list[AppRow], state_of: Callable[[str], str]) -> list[dict]:
+    """The connected apps as Home lists them; `official` is the trust kept at install."""
+    return [
+        {"id": r.id, "name": r.name, "state": state_of(r.id), "official": r.trust == "official"}
+        for r in rows
+    ]
 
 
 class SetupProgress:

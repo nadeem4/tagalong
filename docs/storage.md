@@ -41,7 +41,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0027_message_cut`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0028_app_trust`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -627,10 +627,14 @@ Connected apps (MCP servers).
 | `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                         |
 | `enabled`    | INTEGER          | 0 or 1; default 1                                                                          |
 | `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
+| `trust`      | TEXT             | `official` or `community` (CHECK); default `community`. Kept from the install so Home still tags it |
 
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
 - Read by: `store/connections.py` `list_apps`.
 - Retention: until the app is removed.
+- Upgrade: migration `0028_app_trust` adds `trust` and backfills `official` where the saved name
+  passes `is_official_app`. A registry install saves it from the entry's id; an app added by hand
+  is `community`.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
   [connected-apps.md](connected-apps.md).
