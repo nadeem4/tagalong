@@ -10,7 +10,7 @@ import type { ConnectorConfirmParams } from '../shapes';
 import { stageWords } from '../home/experts-group';
 import { useHostBridge } from '../host-bridge';
 import type { HostBridge } from '../host-bridge';
-import { InstallCard, subjectOf, type InstallView } from './install-card';
+import { InstallCard, subjectOf, type InstallSubject, type InstallView } from './install-card';
 import { appView, findApp } from './install-progress';
 
 /** What an expert install looks like right now, from the setup overview. */
@@ -31,7 +31,7 @@ function expertView(
       phase: 'working',
       label: `${words}…`,
       ...(p.percent !== undefined ? { percent: p.percent } : {}),
-      note: 'Into Tagalong’s own folder.',
+      note: "Into Tagalong's own folder, about 60 MB",
     };
   }
   const row = overview.experts.find((e) => e.id === s.id);

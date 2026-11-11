@@ -33,6 +33,7 @@ from brain.setup.node_runtime import (
 from brain.setup.paths import node_dir, tools_dir
 from brain.setup.registry import Distribution, RegistryEntry, build_for
 from brain.setup.store import ExpertStore, InstalledExpert
+from brain.setup.trust import RECOMMENDED_EXPERT
 from brain.voice.models import Fetch
 
 NODE_FLOOR = 22  # the highest floor of the experts checked in the 20a spike; one for all
@@ -135,6 +136,7 @@ async def install_card(
     download = await node_download_fact(home, machine, get_json) if dist.kind == "npx" else None
     return {
         "expert": entry.id,
+        "recommended": entry.id == RECOMMENDED_EXPERT,
         "version": _version(entry, dist),
         "node_download": download,
         "installs_into": str(tools_dir(home, entry.id)),

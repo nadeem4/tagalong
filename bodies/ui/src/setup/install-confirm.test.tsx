@@ -198,6 +198,7 @@ describe('InstallConfirm', () => {
     await waitFor(() =>
       expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '40'),
     );
+    expect(screen.getByText("Into Tagalong's own folder, about 60 MB")).toBeVisible();
   });
 });
 

@@ -5,6 +5,7 @@
  * Contains InstallCard, subjectOf, INSTALL_CARD_CSS and the InstallSubject and InstallView types.
  */
 import { themeTokens as t, typeCss } from '../theme/tokens';
+import { Icon } from './icons';
 
 export interface InstallSubject {
   kind: 'app' | 'expert';
@@ -77,6 +78,7 @@ export function subjectOf(
       id,
       name: nameFromId(id),
       official: facts.official === true,
+      ...(facts.recommended === true ? { recommended: true } : {}),
       ...(str(facts.publisher) !== undefined ? { madeBy: str(facts.publisher)! } : {}),
       runs: 'pc',
       signIn: 'account',
@@ -149,6 +151,10 @@ function Steps({ steps }: { steps: InstallStep[] }) {
   );
 }
 
+/** A bar for steps with no percent of their own: the share done, never empty so it reads as started. */
+const stepsPercent = (steps: InstallStep[]): number =>
+  Math.max(10, Math.round((steps.filter((s) => s.state === 'done').length / steps.length) * 100));
+
 function Bar({ percent }: { percent: number }) {
   return (
     <div
@@ -218,7 +224,10 @@ export function InstallCard({
           </p>
           {community && (
             <div className="sc-check">
-              <span className="sc-check-t">Check first</span>
+              <span className="sc-check-t">
+                <Icon name="caution" />
+                Check first
+              </span>
               <ul>
                 <li>The app list doesn&apos;t say who made this or check it.</li>
                 <li>
@@ -227,12 +236,20 @@ export function InstallCard({
                     `Licence ${subject.licence ?? 'Unknown'}`,
                   ].join(' · ')}
                 </li>
+                {subject.repo !== undefined && (
+                  <li>
+                    <a
+                      className="sc-link sc-link--gold"
+                      href={subject.repo}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      See its code
+                      <Icon name="external" />
+                    </a>
+                  </li>
+                )}
               </ul>
-              {subject.repo !== undefined && (
-                <a className="sc-link" href={subject.repo} target="_blank" rel="noreferrer">
-                  See its code
-                </a>
-              )}
             </div>
           )}
           <div className="sc-actions">
@@ -249,6 +266,9 @@ export function InstallCard({
       {view.phase === 'working' && (
         <>
           {view.steps !== undefined && <Steps steps={view.steps} />}
+          {view.steps !== undefined && view.percent === undefined && (
+            <Bar percent={stepsPercent(view.steps)} />
+          )}
           {view.percent !== undefined && (
             <div className="sc-prog">
               <div className="sc-prog-top">
@@ -294,6 +314,7 @@ export function InstallCard({
           {view.tools !== undefined && view.tools.length > 0 && (
             <details className="sc-disc">
               <summary>
+                <Icon name="chevRight" />
                 {view.tools.length} {view.tools.length === 1 ? 'thing' : 'things'} Scout can do
               </summary>
               <ul>
@@ -317,7 +338,7 @@ export function InstallCard({
               ))}
             </div>
           )}
-          {onManage !== undefined && (
+          {subject.kind === 'app' && onManage !== undefined && (
             <button type="button" className="sc-link" onClick={onManage}>
               Manage in Connections
             </button>
@@ -329,7 +350,8 @@ export function InstallCard({
         <>
           {view.steps !== undefined && <Steps steps={view.steps} />}
           <p className="sc-err" role="alert">
-            {view.error}
+            <Icon name="error" />
+            <span>{view.error}</span>
           </p>
           <div className="sc-actions">
             <button type="button" className="sc-btn sc-btn--ghost" onClick={onNotNow}>
@@ -401,13 +423,19 @@ export const INSTALL_CARD_CSS = `
   display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px;
   background: var(--sc-warnfill); border: 1px solid var(--sc-warnline); color: var(--sc-warnink); ${typeCss('body')};
 }
-.sc-check-t { font-weight: 600; }
+.sc-check-t { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 .sc-check ul { margin: 0; padding-left: 18px; list-style: disc; }
 .sc-link {
   align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--sc-link);
   font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer; text-decoration: none;
 }
 .sc-disc { ${typeCss('body')}; color: var(--sc-soft); font-weight: 600; }
+.sc-disc summary { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; list-style: none; }
+.sc-disc summary::-webkit-details-marker { display: none; }
+.sc-disc[open] summary .cx-icon { transform: rotate(90deg); }
+.sc .cx-icon { flex: none; width: 14px; height: 14px; }
+.sc-link { display: inline-flex; align-items: center; gap: 4px; }
+.sc-link--gold { color: var(--sc-warnink); }
 .sc-disc ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
 .sc-try { display: flex; gap: 6px; flex-wrap: wrap; }
 .sc-prompt {
@@ -416,7 +444,7 @@ export const INSTALL_CARD_CSS = `
   font: inherit; ${typeCss('small')}; cursor: pointer;
 }
 .sc-err {
-  display: flex; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--sc-errfill);
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--sc-errfill);
   color: var(--sc-errink); ${typeCss('body')};
 }
 .sc-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }

@@ -215,7 +215,64 @@ describe('InstallCard failed', () => {
   });
 });
 
+describe('InstallCard as the mockup draws it', () => {
+  const steps = (at: number) =>
+    ['Checking it', 'Connecting', 'Signing in'].map((label, i) => ({
+      label,
+      state: i < at ? ('done' as const) : i === at ? ('now' as const) : ('todo' as const),
+    }));
+
+  it('working with steps but no percent draws a bar from the steps done', () => {
+    render(<InstallCard subject={NOTION} view={{ phase: 'working', steps: steps(2) }} />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '67');
+  });
+
+  it('the first step shows a small bar, not an empty one', () => {
+    render(<InstallCard subject={NOTION} view={{ phase: 'working', steps: steps(0) }} />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '10');
+  });
+
+  it('an expert Ready has no Manage in Connections, an app Done does', () => {
+    const { rerender } = render(
+      <InstallCard subject={CLAUDE} view={{ phase: 'done' }} onManage={() => undefined} />,
+    );
+    expect(screen.queryByRole('button', { name: /Manage in Connections/ })).toBeNull();
+    rerender(<InstallCard subject={NOTION} view={{ phase: 'done' }} onManage={() => undefined} />);
+    expect(screen.getByRole('button', { name: /Manage in Connections/ })).toBeVisible();
+  });
+
+  it('community check has an alert icon and a gold external See its code link', () => {
+    render(<InstallCard subject={VAULT} view={{ phase: 'ask' }} />);
+    expect(card('Vaultkit').querySelector('.sc-check-t svg')).not.toBeNull();
+    const link = screen.getByRole('link', { name: 'See its code' });
+    expect(link.querySelector('svg')).not.toBeNull();
+    expect(link).toHaveClass('sc-link--gold');
+  });
+
+  it('the failure words sit in a box with an error icon', () => {
+    render(
+      <InstallCard
+        subject={NOTION}
+        view={{ phase: 'failed', error: "Notion didn't finish signing in. Nothing was connected." }}
+      />,
+    );
+    expect(screen.getByRole('alert').querySelector('svg')).not.toBeNull();
+  });
+
+  it('the things Scout can do fold behind a chevron', () => {
+    render(<InstallCard subject={NOTION} view={{ phase: 'done', tools: ['search'] }} />);
+    expect(card('Notion').querySelector('.sc-disc summary svg')).not.toBeNull();
+  });
+});
+
 describe('subjectOf', () => {
+  it('reads the recommended flag of an expert ask', () => {
+    expect(subjectOf('install_expert', { expert: 'claude-acp', recommended: true })).toMatchObject({
+      recommended: true,
+    });
+    expect(subjectOf('install_expert', { expert: 'other' }).recommended).toBeUndefined();
+  });
+
   it('reads an app ask: who made it, where it runs, how it signs in', () => {
     expect(
       subjectOf('install_app', {
