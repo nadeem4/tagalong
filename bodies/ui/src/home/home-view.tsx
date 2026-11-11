@@ -16,6 +16,7 @@ import { CONTROLS_CSS } from '../controls/controls-styles';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ApprovalsView } from './approvals-view';
 import { ConnectionsPanel } from './connections-panel';
+import { CONNECTIONS_CSS } from './connections-styles';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
 import { TasksView } from './tasks-view';
@@ -90,6 +91,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
       <style>{CONTROLS_CSS}</style>
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
+      <style>{CONNECTIONS_CSS}</style>
       <nav aria-label="Tagalong" className="home-nav on-navy">
         <div className="home-nav__who">
           <span className="home-nav__tile">

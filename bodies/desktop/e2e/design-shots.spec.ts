@@ -1,6 +1,6 @@
 /**
- * Design-refresh screenshots of Home's "Scout's brain" card, one per state, for review against
- * the mockups. Skipped unless TAGALONG_SHOTS=1; they are not part of CI. Files land in
+ * Design-refresh screenshots of Home's "Scout's brain" card (D1), the Connections page (D5) and Scout's model (E5),
+ * one per state, for review against the mockups. Skipped unless TAGALONG_SHOTS=1; they are not part of CI. Files land in
  * docs/superpowers/specs/design-refresh/shots/<slice>/ (TAGALONG_SHOTS_DIR overrides the root).
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -49,7 +49,6 @@ function status(startedBy: string, workRunning: boolean): Record<string, unknown
       { id: 'browser', kind: 'browser', name: 'Browser' },
     ],
     work_running: workRunning,
-    model: 'Claude Opus 5.5',
   };
 }
 
@@ -121,6 +120,151 @@ for (const scene of SCENES) {
   });
 }
 
+// D5: Home's Connections page, one shot per state, on one app and one fake brain.
+test('D5 connections', async () => {
+  const brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+  });
+  try {
+    const find = async (name: string): Promise<Page> => {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const page = app.windows().find((p) => p.url().includes(`${name}.html`));
+        if (page !== undefined) return page;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+      }
+      throw new Error(`no ${name} window appeared`);
+    };
+    const avatar = await find('avatar');
+    await avatar.evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    await home.getByRole('button', { name: 'Connections' }).click();
+    const search = home.getByRole('searchbox', { name: 'Search apps' });
+    await expect(home.getByRole('button', { name: 'Add Notion', exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(home, 'D5', 'apps-default');
+
+    brain.setSetup({}, 'hang');
+    await search.fill('notion');
+    await expect(home.getByText('Searching…')).toBeVisible();
+    await shot(home, 'D5', 'apps-searching');
+
+    brain.setSetup({}, false);
+    await search.fill('');
+    await search.fill('notion');
+    const results = home.getByRole('list', { name: 'Results' });
+    await expect(results.getByText('Official', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'apps-results');
+
+    await results.getByRole('button', { name: '2 more from other makers' }).click();
+    await shot(home, 'D5', 'apps-other-makers');
+    await results.getByRole('button', { name: 'Add Notion, by Ada' }).click();
+    await shot(home, 'D5', 'apps-check-card');
+    const check = home.getByRole('group', { name: 'Check first' });
+    await check.getByRole('button', { name: 'Back' }).click();
+
+    await search.fill('zzzz');
+    await expect(home.getByText('No apps match', { exact: false })).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(home, 'D5', 'apps-empty');
+
+    brain.setSetup({}, true);
+    await search.fill('notion');
+    // Not getByRole('alert'): the Bodies card has one too.
+    await expect(home.getByText("Scout couldn't load the app list")).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(home, 'D5', 'apps-error');
+    brain.setSetup({}, false);
+    await search.fill('');
+
+    // A curated row for something already installed says "Added"; Linear is added from its row.
+    const curated = (id: string, name: string, added: boolean) => ({
+      id,
+      name,
+      version: '1',
+      description: `${name} for Scout`,
+      official: true,
+      added,
+      publisher: name,
+      runs: 'hosted',
+      host: `mcp.${name.toLowerCase()}.com`,
+      sign_in: 'browser',
+      licence: 'Proprietary',
+      repo: '',
+    });
+    brain.setSetup({
+      popular: [
+        curated('com.notion/mcp', 'Notion', true),
+        curated('app.linear/mcp', 'Linear', false),
+      ],
+    });
+    await expect(home.getByText('Added', { exact: true }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(home, 'D5', 'apps-added-curated');
+    await home.getByRole('button', { name: 'Add Linear', exact: true }).click();
+    await expect(home.getByText('Linear added.')).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'apps-added-outcome');
+    brain.setSetup({});
+
+    await home
+      .getByRole('button', { name: /Add it yourself/ })
+      .first()
+      .click();
+    await shot(home, 'D5', 'apps-add-yourself');
+
+    await home.getByRole('tab', { name: 'Experts' }).click();
+    const add = home.getByRole('region', { name: 'Add an expert' });
+    await expect(add.getByRole('button', { name: 'Add Claude Code' })).toBeVisible();
+    await shot(home, 'D5', 'experts-default');
+    await add.getByRole('button', { name: 'Show more' }).click();
+    await add.getByRole('button', { name: 'Add Goose' }).click();
+    const expertCheck = add.getByRole('group', { name: 'Check first' });
+    await expertCheck.scrollIntoViewIfNeeded();
+    await expect(expertCheck.getByText('See its code')).toBeVisible();
+    await shot(home, 'D5', 'experts-check-card');
+    await expertCheck.getByRole('button', { name: 'Back' }).click();
+
+    brain.setSetup({
+      browse_experts: [
+        {
+          id: 'claude-acp',
+          name: 'Claude Code',
+          version: '1',
+          description: 'Claude Code works on long jobs',
+          official: true,
+          recommended: true,
+          tested: true,
+          added: true,
+          account: true,
+          licence: 'MIT',
+          repo: 'https://example.test/claude-acp',
+        },
+      ],
+      show_more_from: 1,
+    });
+    await expect(add.getByText('Added', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'experts-added');
+    brain.setSetup({});
+
+    brain.setSetup({ progress: { expert: 'codex-acp', stage: 'node', percent: 40 } });
+    await expect(home.getByText('Installing…').first()).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'experts-installing');
+    brain.setSetup({ failed: { expert: 'goose', error: 'download failed' } });
+    await expect(home.getByText(/didn.t finish/).first()).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'experts-setup-failed');
+  } finally {
+    await closeApp(app);
+    await brain.close();
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
 // E5: Settings > Scout's model in its four mocked states. The listbox hangs below the card, so
 // the open shot scrolls the card to the top and clips a taller area.
 test('E5 model states', async () => {

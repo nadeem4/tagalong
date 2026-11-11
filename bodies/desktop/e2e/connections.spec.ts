@@ -1,7 +1,8 @@
 /**
  * Home's Connections page on the fake brain: search the app registry, the Official version comes
- * first, a community version opens the check card before it connects, and the Official Connect
- * goes to the brain approved at once.
+ * first, a community version opens the check card before it is added, and the Official Add goes to
+ * the brain approved at once; the outcome shows on the row. The Experts tab has its list open, with
+ * the rest behind Show more and a check card for a community expert.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,27 +51,54 @@ async function windowFor(name: string): Promise<Page> {
   throw new Error(`no ${name} window appeared`);
 }
 
-test('search_shows_official_first_then_community_card', async () => {
+test('search_shows_official_first_then_community_check_card', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Connections' }).click();
 
+  // Before typing, the curated Popular list is open.
+  await expect(home.getByRole('button', { name: 'Add Notion', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+
   await home.getByRole('searchbox', { name: 'Search apps' }).fill('notion');
   const results = home.getByRole('list', { name: 'Results' });
   await expect(results.getByText('Official', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  // A community version opens the check card first, and Back closes it without connecting.
-  await results.getByRole('button', { name: /Show 2 other versions/ }).click();
-  await results.getByRole('button', { name: 'Connect io.example/notion-a' }).click();
-  const card = home.getByRole('group', { name: 'Check before connecting' });
-  await expect(card).toContainText('Not yet audited by anyone');
+  // A community version opens the check card first, and Back closes it without adding.
+  await results.getByRole('button', { name: '2 more from other makers' }).click();
+  await results.getByRole('button', { name: 'Add Notion, by Ada' }).click();
+  const card = home.getByRole('group', { name: 'Check first' });
+  await expect(card).toContainText('Nobody has checked this one yet');
   await card.getByRole('button', { name: 'Back' }).click();
   await expect(card).toHaveCount(0);
   expect(brain.appSetups).toEqual([]);
 
-  // The Official Connect goes straight to the brain, approved.
-  await results.getByRole('button', { name: 'Connect Notion' }).click();
+  // The Official Add goes straight to the brain, approved, and the row says it was added.
+  await results.getByRole('button', { name: 'Add Notion', exact: true }).click();
   await expect.poll(() => brain.appSetups, { timeout: 15_000 }).toEqual(['com.notion/mcp']);
   expect(brain.appFlags[0]?.approved).toBe(true);
+  await expect(results.getByText('Notion added.')).toBeVisible();
+});
+
+test('experts_list_is_open_and_a_community_one_is_checked_first', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('tab', { name: 'Experts' }).click();
+  const add = home.getByRole('region', { name: 'Add an expert' });
+  await expect(add.getByRole('button', { name: 'Add Claude Code' })).toBeVisible();
+  await expect(add.getByText('Recommended')).toBeVisible();
+
+  // The community expert sits behind Show more and opens the check card before it is added.
+  await add.getByRole('button', { name: 'Show more' }).click();
+  await add.getByRole('button', { name: 'Add Goose' }).click();
+  const card = add.getByRole('group', { name: 'Check first' });
+  await expect(card).toContainText("The expert list doesn't say who made this");
+  await card.getByRole('button', { name: 'Back' }).click();
+  await expect(card).toHaveCount(0);
+  expect(brain.expertSetups).toEqual([]);
+
+  // An Official one is added with one press.
+  await add.getByRole('button', { name: 'Add Codex' }).click();
+  await expect.poll(() => brain.expertSetups, { timeout: 15_000 }).toEqual(['codex-acp']);
 });
