@@ -1,6 +1,6 @@
 """Websocket server for contract v1: hello, tools, error replies and the per-connection writer.
 
-Each connection owns one queue drained by a single writer task, so Peer.send never raises
+Each connection owns one bounded queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
 Hello, tools, say, call, answer and cancel are handled, and listen, mic, unlisten and hush
 go to the voice seam (Session.voice); any other request answers method_not_found.
@@ -19,7 +19,7 @@ from pydantic import BaseModel, ValidationError
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
-from brain.bodies import Bodies
+from brain.bodies import Bodies, WriteQueue
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -46,13 +46,13 @@ log = logging.getLogger("brain")
 
 class _Peer:
     def __init__(self) -> None:
-        self.queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self.queue = WriteQueue()
 
     def send(self, frame: str) -> None:
-        self.queue.put_nowait(frame)
+        self.queue.put(frame)
 
     def close(self) -> None:
-        self.queue.put_nowait(None)
+        self.queue.close()
 
 
 def _error(req_id: Any, code: ErrorCode, message: str, data: Any = None) -> str:

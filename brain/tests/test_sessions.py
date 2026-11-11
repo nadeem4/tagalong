@@ -3158,13 +3158,19 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
     session.toolbox.sources.insert(1, ChangeApp())
     join(session, "desktop")
     assert await session.toolbox.run(tool_call()) == "a.txt"
-    assert open_asks(sent) == []  # Scout's look under the preference was enough
+    [first] = open_asks(sent)  # the card went up at once; Scout's look then took it down
+    assert [(p["id"], p.get("by")) for m, p in sent if m == "ask" and p["state"] == "closed"] == [
+        (
+            first["id"],
+            "side_check",
+        )
+    ]
     assert [
         (r.decided_by, r.rule_id) for r in records_for(memory).work.list_asks("all", 10, None)
     ] == [("scout", pref.id)]
     rules.remove_preference(memory.db, pref.id)  # now nothing covers it: the person is asked
     assert "waiting for the person's answer" in await session.toolbox.run(tool_call())
-    [card] = open_asks(sent)
+    card = open_asks(sent)[-1]
     session.answer(card["id"], "allow", "desktop")  # the call runs by itself now
     await settle()
     latest = records_for(memory).work.list_asks("all", 1, None)[0]

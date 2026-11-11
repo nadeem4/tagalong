@@ -287,8 +287,12 @@ flowchart LR
 - The voice notifications (`heard`, `voice`, `speech`) are live-only. `Bodies.send_live(body_id,
 method, params)` writes one frame with no `seq` straight to the body's current connection and
   returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio.
-- Writes go through one queue per connection. `send` never waits and never raises, so one slow
-  body cannot stop the others.
+- Writes go through one queue per connection (`WriteQueue` in `bodies.py`). `send` never waits and
+  never raises, so one slow body cannot stop the others. The queue is capped
+  (`MAX_QUEUED_FRAMES`, 256 frames). Past the cap the oldest speech audio chunks (`LiveFrame`: a
+  `speech` frame carrying `pcm`, marked by `send_live`) are dropped first; a frame carrying `seq`,
+  a speech `done`, a text-only speech line, the `voice` status frames and every reply are never
+  dropped.
 
 ## The desktop body
 
@@ -573,11 +577,17 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Answering.** Any online body can send `answer {ask, option}`. The first answer wins: the brain
   closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
   `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
-- **Scout first.** If you have made a preference, `SideCheck.decide` runs before the ask is opened
-  (Scout's tools and Claude Code's permission asks go through the engine's side-check decider). When it approves, no ask
-  opens: the call runs once, the row says `decided_by: "scout"`, and an `approved` notification
+- **Scout first.** If you have made a preference, `SideCheck.decide` runs beside the card, never in
+  front of it (Scout's tools and Claude Code's permission asks go through the engine's side-check
+  decider). The card is on screen at once; when the look approves first, the card closes
+  (`reason: "answered"`, `by: "side_check"`) and the call runs once, the row says
+  `decided_by: "scout"`, and an `approved` notification
   `{tool, text, preference}` goes to every body. A pass, an error (in the check or in logging its
-  approval) or a 20 s timeout leaves the ask as described below. A very long input is cut to 4,000 characters in what the model sees.
+  approval) or a 20 s timeout leaves the ask as described below. The look never holds the card
+  back: the card is shown first (a live ask is asked beside the look; a Scout ask's open item is
+  opened first), whoever settles first decides, and Scout's yes answers the item with
+  `by="side_check"` and closes the card (`Engine._beside_card`, `AskRequest.show_card` and
+  `settled`, `AskRunner.settle`). A very long input is cut to 4,000 characters in what the model sees.
   The floor keeps a locked or person-only tool from this look: only a standing rule or you decide it.
 - **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
   true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed

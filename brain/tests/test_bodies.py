@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from brain.bodies import Bodies, Joined, Outbox
+from brain.bodies import Bodies, Joined, LiveFrame, Outbox, WriteQueue
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 
 
@@ -492,3 +492,69 @@ def test_send_live_to_an_offline_body_sends_nothing_and_says_so():
     assert not bodies.send_live("nobody", "heard", {"event": "partial"})
     assert peer.frames == []
     assert bodies.connect(body("a"), [], FakePeer(), 0).backlog == []
+
+
+async def drain(queue: WriteQueue, n: int) -> list[str]:
+    return [await queue.get() for _ in range(n)]
+
+
+async def test_audio_frames_capped_not_seq_frames():
+    queue = WriteQueue(cap=3)
+    queue.put("seq1")
+    for i in range(5):
+        queue.put(LiveFrame(f"audio{i}"))
+    queue.put("seq2")
+    # Oldest audio went first; the numbered frames around it are all still there, in order.
+    assert await drain(queue, 3) == ["seq1", "audio4", "seq2"]
+
+
+async def test_seq_frames_are_kept_past_the_cap():
+    queue = WriteQueue(cap=2)
+    for i in range(5):
+        queue.put(f"seq{i}")
+    assert await drain(queue, 5) == [f"seq{i}" for i in range(5)]
+
+
+async def test_close_marker_is_delivered_after_queued_frames():
+    queue = WriteQueue(cap=2)
+    queue.put("seq1")
+    queue.close()
+    assert await queue.get() == "seq1"
+    assert await queue.get() is None
+
+
+def test_send_live_marks_a_speech_chunk_so_the_connection_may_drop_it():
+    peer = FakePeer()
+    bodies = Bodies()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
+    bodies.notify_one("a", "say", {"text": "hi"})
+    assert isinstance(peer.frames[0], LiveFrame)
+    assert not isinstance(peer.frames[1], LiveFrame)
+
+
+def test_only_speech_audio_chunks_are_droppable():
+    peer = FakePeer()
+    bodies = Bodies()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
+    bodies.send_live("a", "speech", {"turn": "t", "done": True})
+    bodies.send_live("a", "voice", {"status": "ready"})
+    bodies.send_live("a", "heard", {"event": "final", "text": "hi"})
+    assert [isinstance(f, LiveFrame) for f in peer.frames] == [True, False, False, False, False]
+
+
+async def test_voice_status_and_done_survive_past_the_cap():
+    queue = WriteQueue(cap=2)
+    peer = FakePeer()
+    bodies = Bodies()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.send_live("a", "voice", {"status": "ready"})
+    for _ in range(4):
+        bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
+    bodies.send_live("a", "speech", {"turn": "t", "done": True})
+    for frame in peer.frames:
+        queue.put(frame)
+    left = [json.loads(await queue.get())["params"] for _ in range(2)]
+    assert left == [{"status": "ready"}, {"turn": "t", "done": True}]

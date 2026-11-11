@@ -510,6 +510,19 @@ No user-visible change yet: the floor, the deciders and `Engine.decide` (P1) are
 `brain/tests/test_permission.py`. The tool gate and expert jobs move onto them in P2 and P3,
 which add the manual steps.
 
+## The card does not wait for the side-check; the outbox is bounded (automated only)
+
+Run `cd brain && uv run pytest tests/test_permission.py tests/test_ask_runner.py tests/test_bodies.py -q`:
+
+1. An ask that needs the person shows its card before the side-check has returned
+   (`test_card_shows_before_side_check_returns`, `test_the_card_is_up_while_the_side_check_still_looks`).
+2. When the side-check approves first, the card closes with `by: "side_check"` and the call runs
+   once (`test_side_check_decision_first_closes_card`,
+   `test_a_side_check_yes_answers_the_item_and_closes_the_card`); when the person answers first
+   the look is stopped (`test_person_answer_first_stops_the_side_check`).
+3. A connection that cannot keep up drops its oldest audio frames past the cap and never a frame
+   with `seq` (`test_audio_frames_capped_not_seq_frames`).
+
 ## Approvals history (real brain)
 
 Needs the real brain and the desktop, and the hand-off setup above for the Claude Code steps. Read

@@ -433,6 +433,17 @@ def opened_asks(bodies):
     return [p for p in bodies.sent if p["state"] == "open"]
 
 
+def withdrawn(bodies):
+    """Every card that opened was closed again without the person answering."""
+    opened = [p["id"] for p in opened_asks(bodies)]
+    closed = [p for p in bodies.sent if p["state"] == "closed"]
+    return (
+        bool(opened)
+        and [p["id"] for p in closed] == opened
+        and all(p["reason"] == "cancelled" and "option" not in p for p in closed)
+    )
+
+
 async def until(check):
     for _ in range(50):
         if check():
@@ -839,7 +850,7 @@ def preference(mem, sentence="Fine to run t"):
 async def test_scout_approval_runs_the_tool_without_asking_the_person(mem):
     box, source, bodies, _, _ = scouted(mem, FakeSideCheck(preference(mem)))
     assert await box.run(call_with_text("t")) == "ran t"
-    assert bodies.sent == []  # no Ask was ever opened
+    assert withdrawn(bodies)  # the card went up at once and Scout's yes took it down
     assert source.ran == ["t"]
 
 
@@ -902,11 +913,11 @@ async def test_removed_preference_sends_next_ask_to_the_person(mem):
     check = SideCheck(_ApprovingModel(pref.id), _OpenBudget(), mem, work_on(mem))
     box, _, bodies, _, _ = scouted(mem, check)
     await box.run(call_with_text("t"))
-    assert bodies.sent == []
+    assert withdrawn(bodies)
     rules.remove_preference(mem.db, pref.id)
     task = asyncio.create_task(box.run(call_with_text("t")))
-    await until(lambda: opened_asks(bodies))  # the person is asked now
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    await until(lambda: len(opened_asks(bodies)) == 2)  # the person is asked now
+    box._asks.answer(opened_asks(bodies)[-1]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
 
@@ -965,7 +976,7 @@ async def test_side_check_runs_while_a_turn_is_running(mem):
     await until(lambda: check.facts)
     other = asyncio.create_task(asyncio.sleep(0, "other work"))
     assert await other == "other work"  # the loop is free while Scout thinks
-    assert not task.done() and bodies.sent == []  # no ask opens while Scout looks
+    assert not task.done() and len(opened_asks(bodies)) == 1  # the card does not wait for Scout
     gate.set()
     assert await task == "ran t"
 
@@ -1160,7 +1171,7 @@ async def test_tell_expert_on_a_brain_turn_asks_the_owner(mem):
 async def test_tell_expert_on_a_brain_turn_with_a_covering_preference_runs_via_side_check(mem):
     box, jobs, bodies, _ = nudger(mem, FakeSideCheck(preference(mem, "Nudge my jobs")))
     assert await box.run(nudge()) == "note queued for job j1"
-    assert bodies.sent == [] and jobs.told == [("j1", "try tabs")]
+    assert withdrawn(bodies) and jobs.told == [("j1", "try tabs")]
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "scout")
 
