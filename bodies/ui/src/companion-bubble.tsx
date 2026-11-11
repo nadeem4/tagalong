@@ -287,7 +287,9 @@ export function CompanionBubble({
         dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
         setInstalls((current) =>
-          current.filter((c) => c.approvalId !== event.approvalId || allowing.current.has(c.approvalId)),
+          current.filter(
+            (c) => c.approvalId !== event.approvalId || allowing.current.has(c.approvalId),
+          ),
         );
         return;
       case 'turn.started':
@@ -782,6 +784,35 @@ export function CompanionBubble({
     setOpenDrop(undefined);
     onDropDone?.();
   };
+  // Install cards sit under Scout's sentence in the same reply: the current answer, else the
+  // last exchange's. With no reply to join (Scout's own line, a failed turn) they get their own.
+  const installCards = installs.map((install) => (
+    <InstallConfirm
+      key={install.approvalId}
+      confirm={install}
+      onAllowing={(on) =>
+        on ? allowing.current.add(install.approvalId) : allowing.current.delete(install.approvalId)
+      }
+      onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
+      onTry={(text) => submit(text, undefined)}
+      onRetry={(name) => submit(`Set up ${name} again`, undefined)}
+      onWorking={(words) =>
+        setInstalling((current) => {
+          const key = installKey(install);
+          const { [key]: _gone, ...rest } = current;
+          return words === null ? rest : { ...rest, [key]: words };
+        })
+      }
+    />
+  ));
+  const lastPast = past[past.length - 1];
+  const installsInReply =
+    expanded &&
+    installs.length > 0 &&
+    scoutLine === null &&
+    (question !== null
+      ? health === null
+      : lastPast !== undefined && lastPast.question !== null && !lastPast.failed);
   const cards = (
     <>
       {openDrop !== undefined && (
@@ -800,26 +831,9 @@ export function CompanionBubble({
           }}
         />
       )}
-      {installs.map((install) => (
-        <ScoutReply key={install.approvalId} scout={scout}>
-          <InstallConfirm
-            confirm={install}
-            onAllowing={(on) =>
-              on ? allowing.current.add(install.approvalId) : allowing.current.delete(install.approvalId)
-            }
-            onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
-            onTry={(text) => submit(text, undefined)}
-            onRetry={(name) => submit(`Set up ${name} again`, undefined)}
-            onWorking={(words) =>
-              setInstalling((current) => {
-                const key = installKey(install);
-                const { [key]: _gone, ...rest } = current;
-                return words === null ? rest : { ...rest, [key]: words };
-              })
-            }
-          />
-        </ScoutReply>
-      ))}
+      {installs.length > 0 &&
+        !installsInReply &&
+        (expanded ? <ScoutReply scout={scout}>{installCards}</ScoutReply> : installCards)}
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}
@@ -947,6 +961,10 @@ export function CompanionBubble({
                 ) : (
                   <ScoutReply scout={scout}>
                     <Answer text={exchange.answer} gist />
+                    {installsInReply &&
+                      question === null &&
+                      index === past.length - 1 &&
+                      installCards}
                   </ScoutReply>
                 )}
               </div>
@@ -955,7 +973,10 @@ export function CompanionBubble({
             {question !== null && (
               <div className="bubble-exchange">
                 <p className="bubble-mine">{question}</p>
-                <ScoutReply scout={scout}>{answer}</ScoutReply>
+                <ScoutReply scout={scout}>
+                  {answer}
+                  {installsInReply && installCards}
+                </ScoutReply>
               </div>
             )}
             {cards}

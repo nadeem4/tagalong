@@ -211,7 +211,8 @@ describe('install card in the bubble', () => {
     );
     return bridge;
   }
-  const ask = (over: object = {}) => ({ ...APP_ASK, type: 'connector.confirm', turnId: 't1', ...over }) as never;
+  const ask = (over: object = {}) =>
+    ({ ...APP_ASK, type: 'connector.confirm', turnId: 't1', ...over }) as never;
 
   it('one card per install, and an Allowed one survives a dismiss and the turn ending', async () => {
     const bridge = bubble();
@@ -225,6 +226,28 @@ describe('install card in the bubble', () => {
     act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' } as never));
     act(() => bridge.emit({ type: 'turn.completed', turnId: 't1' } as never));
     expect(screen.getByRole('group', { name: 'Set up Notion' })).toBeVisible();
+  });
+
+  it('the card sits under the same Scout reply as its sentence, not in a row of its own', async () => {
+    const bridge = bubble();
+    fireEvent.change(screen.getByLabelText('Message Scout'), {
+      target: { value: 'Connect my Notion' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(bridge.asks).toHaveLength(1));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 't1',
+        petId: 'scout',
+        conversationId: '10000000-0000-4000-8000-0000000000c1',
+      } as never);
+      bridge.emit({ type: 'turn.delta', turnId: 't1', text: 'Sure, here is Notion.' } as never);
+      bridge.emit(ask());
+    });
+    const group = await screen.findByRole('group', { name: 'Set up Notion' });
+    expect(group.closest('.bubble-scout')).toHaveTextContent('Sure, here is Notion.');
+    expect(document.querySelectorAll('.bubble-scout')).toHaveLength(1);
   });
 
   it('a closed ask drops its card while it is still asking, so no live Allow stays', async () => {
