@@ -76,7 +76,6 @@ class AppRow:
     enabled: bool
     trust: str = "community"  # "official" or "community", kept from the install
     version: str = ""  # the package version it runs; empty for a remote or hand-added app
-    auto_update: bool | None = None  # None: by trust (on for Official, off for Community)
 
 
 def slug_for(name: str, taken: set[str] | frozenset[str]) -> str:

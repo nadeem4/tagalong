@@ -42,14 +42,20 @@ from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
-from brain.setup.home_tools import SetupProgress, home_app_rows, home_setup_tools
-from brain.setup.install import NPM_TIMEOUT_S, sweep_staging
+from brain.setup.home_tools import (
+    SetupProgress,
+    home_app_rows,
+    home_setup_tools,
+    home_update_tools,
+)
+from brain.setup.install import NPM_TIMEOUT_S, install_expert, sweep_staging
 from brain.setup.login import LoginDriver
 from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
+from brain.setup.updates import Updates
 from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
 from brain.tools import KeySettings, anthropic_check, brain_status_tools
@@ -179,6 +185,30 @@ async def _run() -> None:
         emit_event,
     )
     login = login_tools(config.data_dir, logins)
+
+    async def reinstall(entry):  # an expert update: the install path's own staging and swap
+        return await install_expert(
+            entry,
+            config.data_dir,
+            await inspect_machine(),
+            partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
+            http_fetch,
+            real_get_json,
+            experts,
+            lambda step: None,
+        )
+
+    updates = Updates(
+        config.data_dir,
+        registry,
+        memory,
+        experts,
+        apps,
+        reinstall,
+        lambda: bool(session.records.running_jobs()),  # session exists by the first tick
+        bodies.notify,
+        lambda: datetime.now(UTC),
+    )
     # Built before the session so Home's loops tools can hold it; the mask and the event path
     # reach the session lazily.
     loops = LoopService(
@@ -244,6 +274,7 @@ async def _run() -> None:
         + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
         + loop_tools(loops)
         + brain_status_tools(brain_status)
+        + home_update_tools(updates)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )
@@ -263,6 +294,7 @@ async def _run() -> None:
         ),
     )
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
+    update_loop: asyncio.Task | None = None
     session.voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
@@ -303,11 +335,15 @@ async def _run() -> None:
             spawn=real_spawn,
         )
         await bridges.start()  # Node and the bridge come up on their own task
+        update_loop = asyncio.ensure_future(updates.run())  # the daily check and waiting updates
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
+        if update_loop is not None:
+            update_loop.cancel()
+        await updates.stop()  # an update in flight is cancelled like an install
         await stop_installs()  # cancel running installs; each removes what it staged
         await stop_watches()  # before apps.shutdown(), which would end each watch with an event
         await logins.stop()

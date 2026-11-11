@@ -55,7 +55,7 @@ SIGN_IN_WAIT_S = 600.0
 MAX_TOOLS_LISTED = 30
 
 
-def _spec(dist: Distribution, version: str) -> str:
+def package_spec(dist: Distribution, version: str) -> str:
     sep = "==" if dist.kind == "uvx" else "@"
     return f"{dist.package}{sep}{version}" if version else str(dist.package)
 
@@ -82,7 +82,7 @@ def app_params(
             "config": {"url": dist.url},
         }
     env = {name: f"${{{name}}}" for name in dist.env}
-    spec = _spec(dist, dist.version or entry.version)
+    spec = package_spec(dist, dist.version or entry.version)
     if dist.kind == "npx":
         node = usable_node(home, machine)
         if node is None:

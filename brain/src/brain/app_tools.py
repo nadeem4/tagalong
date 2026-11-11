@@ -177,9 +177,7 @@ async def save_app(
     if token is not None and row.auth != "token":
         raise AppError("a token only goes with auth token.")
     clean, secrets = split_secrets(row.id, row.config, row.transport)
-    row = AppRow(
-        row.id, row.name, row.transport, clean, row.auth, row.enabled, trust, version
-    )
+    row = AppRow(row.id, row.name, row.transport, clean, row.auth, row.enabled, trust, version)
     try:
         if token is not None:
             tokens.set(row.id, token)

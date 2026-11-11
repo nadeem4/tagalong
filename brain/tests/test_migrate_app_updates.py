@@ -1,4 +1,4 @@
-"""Migration 0030: an app keeps the version it was installed at and its auto-update choice.
+"""Migration 0030: an app keeps the version it was installed at.
 
 Runs on a file seeded at the version before it. The version is read back from the package
 argument the installer pinned (`pkg@1.2.0`, `@scope/pkg@1.2.0`, `pkg==1.2.0`); anything else
@@ -39,7 +39,3 @@ def db(tmp_path):
 def test_the_pinned_version_is_read_from_the_package_argument(db):
     got = dict(db.execute("SELECT id, version FROM apps"))
     assert got == {"a": "1.2.0", "b": "2.0.1", "c": "0.4.3", "d": "", "e": "", "f": ""}
-
-
-def test_auto_update_starts_unset_so_trust_decides(db):
-    assert {r[0] for r in db.execute("SELECT auto_update FROM apps")} == {None}

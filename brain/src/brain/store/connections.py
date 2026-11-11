@@ -1,7 +1,7 @@
 """Connected apps (MCP): the `apps` table, each app's mail switch and its read cursors.
 
 A cursor is where a reader got to in one stream of an app (`mail`, `sent`, `backfill`).
-An app also keeps the package version it runs and its auto-update choice (NULL: by trust).
+An app also keeps the package version it runs.
 """
 
 import json
@@ -22,19 +22,15 @@ def pinned_version(args: list[str]) -> str:
 
 def list_apps(db: sqlite3.Connection) -> list[AppRow]:
     rows = db.execute(
-        "SELECT id, name, transport, config, auth, enabled, trust, version, auto_update"
-        " FROM apps ORDER BY rowid"
+        "SELECT id, name, transport, config, auth, enabled, trust, version FROM apps ORDER BY rowid"
     )
-    return [
-        AppRow(i, n, t, json.loads(c), a, bool(e), r, v, None if u is None else bool(u))
-        for i, n, t, c, a, e, r, v, u in rows
-    ]
+    return [AppRow(i, n, t, json.loads(c), a, bool(e), r, v) for i, n, t, c, a, e, r, v in rows]
 
 
 def add_app(db: sqlite3.Connection, row: AppRow) -> None:
     db.execute(
-        "INSERT INTO apps(id, name, transport, config, auth, enabled, trust, version, auto_update)"
-        " VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO apps(id, name, transport, config, auth, enabled, trust, version)"
+        " VALUES (?,?,?,?,?,?,?,?)",
         (
             row.id,
             row.name,
@@ -44,13 +40,8 @@ def add_app(db: sqlite3.Connection, row: AppRow) -> None:
             int(row.enabled),
             row.trust,
             row.version,
-            None if row.auto_update is None else int(row.auto_update),
         ),
     )
-
-
-def set_app_auto_update(db: sqlite3.Connection, app_id: str, on: bool) -> None:
-    db.execute("UPDATE apps SET auto_update=? WHERE id=?", (int(on), app_id))
 
 
 def set_app_package(db: sqlite3.Connection, app_id: str, config: dict, version: str) -> None:

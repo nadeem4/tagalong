@@ -660,7 +660,7 @@ async def test_install_saves_the_package_version_and_a_remote_app_has_none(rig):
     r = rig()
     await r.run("acme/notes")
     await r.run("acme/cloud")
-    assert {a.name: (a.version, a.auto_update) for a in r.memory.list_apps()} == {
-        "notes": ("1.2.3", None),
-        "cloud": ("", None),
+    assert {a.name: a.version for a in r.memory.list_apps()} == {
+        "notes": "1.2.3",
+        "cloud": "",
     }
