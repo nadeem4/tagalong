@@ -19,6 +19,7 @@ export type {
   ApprovalRow,
   ApprovalCounts,
   PreferenceRow,
+  PermissionGroup,
   PermissionRow,
   SpendToday,
   KeyStatus,
@@ -41,8 +42,9 @@ export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 
-/** The "Spent today" line beside a daily-limit field. */
+/** The "Spent today" line and the spend read behind it, beside a daily-limit field. */
 export { SpentLine } from './home/spent-line';
+export { useSpentToday } from './home/use-spent-today';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
 

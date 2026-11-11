@@ -21,7 +21,12 @@ function setup(answer: (tool: string, input?: object) => Promise<unknown> | unkn
   return { ...ipc, calls };
 }
 
+const GROUP = { id: 'memory', title: 'Memory', note: 'Things Scout keeps between chats.' };
 const TOOL = {
+  title: 'Remember things',
+  line: 'Saves facts and instructions you want kept.',
+  info: 'Scout writes down things worth keeping.',
+  group: 'memory',
   name: 'desktop__move_window',
   description: 'Move a window',
   effect: 'change',
@@ -31,21 +36,21 @@ const TOOL = {
 };
 
 describe('registerPermissionsIpc', () => {
-  it('lists the brain permission rows as Home shows them', async () => {
+  it('parses groups and rows as Home shows them', async () => {
     const { invoke, calls } = setup(() =>
-      text({ tools: [TOOL, { ...TOOL, name: 'forget', locked: true }] }),
+      text({ groups: [GROUP], tools: [TOOL, { ...TOOL, name: 'forget', locked: true }] }),
     );
-    expect(await invoke(IPC.listPermissions)).toEqual([
-      TOOL,
-      { ...TOOL, name: 'forget', locked: true },
-    ]);
+    expect(await invoke(IPC.listPermissions)).toEqual({
+      groups: [GROUP],
+      rows: [TOOL, { ...TOOL, name: 'forget', locked: true }],
+    });
     expect(calls).toEqual([['list_permissions', {}]]);
   });
 
   it('keeps the self_asks flag, so Home can say a tool asks itself', async () => {
     const row = { ...TOOL, name: 'hand_off', self_asks: true };
-    const { invoke } = setup(() => text({ tools: [row] }));
-    expect(await invoke(IPC.listPermissions)).toEqual([row]);
+    const { invoke } = setup(() => text({ groups: [GROUP], tools: [row] }));
+    expect(await invoke(IPC.listPermissions)).toEqual({ groups: [GROUP], rows: [row] });
   });
 
   it('sets a mode through the brain', async () => {
@@ -62,8 +67,8 @@ describe('registerPermissionsIpc', () => {
 
   it('keeps an Off row and its source as the brain sent them', async () => {
     const row = { ...TOOL, mode: 'off', source: 'body:desktop' };
-    const { invoke } = setup(() => text({ tools: [row] }));
-    expect(await invoke(IPC.listPermissions)).toEqual([row]);
+    const { invoke } = setup(() => text({ groups: [GROUP], tools: [row] }));
+    expect(await invoke(IPC.listPermissions)).toEqual({ groups: [GROUP], rows: [row] });
   });
 
   it('rejects when the brain refuses the change', async () => {
@@ -84,6 +89,11 @@ describe('registerPermissionsIpc', () => {
 
   it('rejects a list the brain answered with something that is not permissions', async () => {
     const { invoke } = setup(() => text({ nope: true }));
+    await expect(invoke(IPC.listPermissions)).rejects.toThrow('brain sent bad permissions');
+  });
+
+  it('rejects rows that come without their groups', async () => {
+    const { invoke } = setup(() => text({ tools: [TOOL] }));
     await expect(invoke(IPC.listPermissions)).rejects.toThrow('brain sent bad permissions');
   });
 

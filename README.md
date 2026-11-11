@@ -314,11 +314,12 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
-  **Permissions** lists every tool Scout can use, grouped by where it comes from (built in, then each connected
-  body by the name it gave, then each connected app), each with **Off**, **Ask** or **Auto**: Auto means
-  Scout does it without asking, Off takes the tool away so Scout routes around it. A tool that
+  **Permissions** lists every tool Scout can use in plain words, in groups (Memory, This computer, your browser, each
+  connected app and so on), each collapsed until you open it, with a one-line summary such as "13 · 2 Ask, 11 Auto" and a flag when a risky
+  tool is on Auto. A search box finds a tool by name or description. Each tool has **Off**, **Ask** or **Auto**: Auto means
+  Scout does it without asking, Off takes the tool away so Scout routes around it. Press ⓘ beside a tool for the longer story. A tool that
   always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
-  body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
+  body that is not connected is dimmed. Claude Code's tool shows **Always asks** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
   - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
     **Add folder**; **Remove** takes it away at once.

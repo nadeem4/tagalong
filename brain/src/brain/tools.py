@@ -41,6 +41,7 @@ from brain.store.memory import KINDS, MemoryRefused
 from brain.store.search import Hit
 from brain.store.work import TITLE_CAP, TransitionRefused, WorkEvent, WorkRow, WorkStore
 from brain.timers import MIN_REPEAT_S, Timers, is_return_wake, note_of
+from brain.tool_words import GROUPS, Group, fallback, words_for
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
 
@@ -1163,24 +1164,61 @@ def home_tools(
         origin = {  # name -> where it comes from, built once for the whole list
             s.name: _origin(src, s.name) for src in box.sources for s in src.known_specs()
         }
-        rows = [
-            {
-                "name": s.name,
-                "description": s.description,
-                "effect": s.effect,
-                "mode": box.mode(s),
-                "locked": tier(s) in (Tier.locked, Tier.person_only),
-                "self_asks": s.tier is Tier.auto,
-                "person_only": tier(s) is Tier.person_only,
-                "server_tool": s.server_tool is not None,
-                "online": s.name in current,
-                "source": origin[s.name][0],
-                "source_name": origin[s.name][1],
-            }
-            for s in sorted(box.known_specs(), key=lambda s: s.name)
-            if "scout" in s.audience
-        ]
-        return json.dumps({"tools": rows})
+        rows = []
+        found: dict[str, Group] = {}  # group id -> group, in first-seen order
+        for s in sorted(box.known_specs(), key=lambda s: s.name):
+            if "scout" not in s.audience:
+                continue
+            kind, source_name = origin[s.name]
+            short = s.name.partition(SEP)[2] or s.name
+            words = None if kind.startswith("app:") else words_for(short, s.description)
+            if words is not None:
+                title, line, info, group = words.title, words.line, words.info, words.group
+            else:
+                title, line, info = fallback(short, s.description)
+                group = kind if ":" in kind else "other"
+            if group not in found:
+                found[group] = _group(group, kind, source_name)
+            rows.append(
+                {
+                    "name": s.name,
+                    "description": s.description,
+                    "title": title,
+                    "line": line,
+                    "info": info,
+                    "group": group,
+                    "effect": s.effect,
+                    "mode": box.mode(s),
+                    "locked": tier(s) in (Tier.locked, Tier.person_only),
+                    "self_asks": s.tier is Tier.auto,
+                    "person_only": tier(s) is Tier.person_only,
+                    "server_tool": s.server_tool is not None,
+                    "online": s.name in current,
+                    "source": kind,
+                    "source_name": source_name,
+                }
+            )
+        return json.dumps({"tools": rows, "groups": [asdict(g) for g in _ordered(found)]})
+
+    def _group(group: str, kind: str, source_name: str) -> Group:
+        """One group's heading: the table's wording, else the body or app it comes from. The
+        browser's group is named after the browser body itself and says so as "Your browser"."""
+        table = next((g for g in GROUPS if g.id == group), None)
+        if group == "browser":
+            return Group(group, source_name, "Your browser")
+        if table is not None:
+            return Group(group, table.title, table.note)
+        if group == "other":
+            return Group(group, "Other tools", "Tools without their own wording yet.")
+        return Group(group, source_name, f"From {source_name}")
+
+    def _ordered(found: dict[str, Group]) -> list[Group]:
+        """The table's groups in wording order, then bodies without one, then apps by name."""
+        table = [found[g.id] for g in GROUPS if g.id in found]
+        rest = [g for g in found.values() if g.id not in {t.id for t in GROUPS}]
+        rank = {"body": 0, "app": 2}
+        rest.sort(key=lambda g: (rank.get(g.id.partition(":")[0], 1), g.title.lower()))
+        return table + rest
 
     def _origin(source, name: str) -> tuple[str, str]:
         """Where a tool comes from, so Home can group: (built_in | body:<id> | app:<id>, a name)."""

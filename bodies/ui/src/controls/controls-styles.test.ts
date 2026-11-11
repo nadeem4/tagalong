@@ -62,4 +62,16 @@ describe('CONTROLS_CSS', () => {
   it('has a visually hidden class', () => {
     expect(CONTROLS_CSS).toContain('.tg-sr-only {');
   });
+
+  it('keeps the limit field and Set in one row at the control height', () => {
+    const row = CONTROLS_CSS.match(/\.tg-limitfield__row\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(row).toContain('display: flex');
+    expect(row).toContain('align-items: center');
+    expect(row).toContain(`height: ${t.size.control}px`);
+  });
+
+  it('draws the spend meter 6px slim and turns it amber when the limit is reached', () => {
+    expect(CONTROLS_CSS).toMatch(/\.tg-spendmeter\s*\{[^}]*height: 6px/);
+    expect(CONTROLS_CSS).toMatch(/\.tg-spendmeter--full[^{]*\{[^}]*background: /);
+  });
 });

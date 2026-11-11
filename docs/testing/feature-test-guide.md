@@ -430,8 +430,8 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** a "Claude Code asks" card shows the request and its input with one button per
     option; the question card (when Scout passes the question on, see the next section) has a **Your answer** field and **Send** (Enter sends too). Typing
     an answer and sending it continues the job with your words.
-14. **Action:** open Home → Settings → Permissions.
-    **Expected:** Claude Code's tool shows "Asks itself" with **Off** and **Ask**, no **Auto**.
+14. **Action:** open Home → Settings → Permissions, then open **Jobs and experts**.
+    **Expected:** the groups start collapsed, each with a count and a summary such as "13 · 2 Ask, 11 Auto"; the groups are named in plain words (Memory, This computer, your browser, each app) and each tool has a plain name and one line, with no code names. Opening Jobs and experts shows Claude Code's tool "Hand work to an expert" with an "Always asks" chip and only **Off** and **Ask**, no **Auto**. Press ⓘ beside a tool: its longer text opens below the row; Escape closes it. A risky tool on Auto shows an amber "N risky tool(s) on Auto" chip on its group; type part of a tool's name in **Find a permission**: only groups with a match show, opened, and clearing the box restores the collapsed groups.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
     "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
     naming one.
@@ -956,9 +956,9 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
    section is a card like the other Home tabs, on the same page width. Seeing, Always listening and
    Scout talks are On/Off switches (Space or Enter flips them). The three shortcuts show as keycaps
    (Ctrl, Shift, Space), never "CommandOrControl".
-3. **Action:** change a voice setting, a shortcut and press **Check key** or **Set limit** before
+3. **Action:** change a voice setting, a shortcut and press **Check key** or **Set** (the daily limit) before
    pressing Save.
-4. **Expected:** Check key and Set limit work on their own and do not save the page; Save then saves
+4. **Expected:** Check key and Set work on their own and do not save the page; Save then saves
    the voice and shortcut edits once. With the key set in the environment the key field is disabled
    and reads "Set by your environment".
 
@@ -2100,7 +2100,7 @@ Folders come from Home → Settings → **Files Scout may use**; none by default
    the `rules` table). Automated: `test_store_rules.py`, `test_migrate_rules.py`.
 7. **Never Auto.** Find a tool that always needs your yes (for example a connected app's delete
    tool). **Expected:** it says "Always asks" and offers only **Off** and **Ask**. Claude Code's
-   own tool says "Asks itself" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
+   own tool says "Always asks" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
 8. **Keyboard.** Tab into a tool's control, then press the arrow keys. **Expected:** the choice
    moves between **Off**, **Ask** and **Auto** (skipping any not offered) and the brain follows.
 
@@ -2181,10 +2181,13 @@ with a fake key; the real check against Anthropic is done by hand here.
    again. The key text appears nowhere on screen or in the log file.
 3. **Action:** with the network off, check a key. **Expected:** "Scout could not reach Anthropic.
    Try again." and the button reads **Try again**. Stop the brain: "Scout's brain is not running."
-4. **Action:** set the **Daily limit (USD)** to 0, then to 8. **Expected:** 0 is refused ("Enter an
-   amount above $0."); 8 reads "Daily limit saved." and Home's Spend card shows the new limit. A
-   "Spent today: $x.xx" line sits under the limit and updates after Scout answers something; the
-   same line shows on tour step 8.
+4. **Action:** set the **Daily limit** to 0, then to 8, and press **Set** (or Enter). **Expected:** 0 is
+   refused under the field ("Enter an amount above $0.", red border); 8 reads "Saved. Scout stops at
+   $8.00 a day." under the field, which fades after a few seconds, and Home's Spend card shows the new
+   limit. The amount shows two decimals. Under the field "$x.xx of $8.00 used today" with a percentage and a
+   slim meter updates after Scout answers something. When today's spend reaches the limit the meter turns amber
+   and "Today's $8 is spent; Scout pauses until midnight. Raise the limit to carry on." shows. Tour step 8 keeps its
+   "Spent today: $x.xx" line.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
 

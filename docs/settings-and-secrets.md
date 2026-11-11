@@ -150,8 +150,9 @@ directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directo
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `rules` table of `tagalong.db`, read and set through the
 brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
+Home shows them in groups the brain names, collapsed until opened, in plain words, with a search box.
 
-The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit (USD)** calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
+The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit** (the amount and **Set** in one row, with "$1.20 of $5.00 used today" and a meter under it; the meter turns amber at the limit) calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
 environment or its `.env` (see [brain.md](brain.md#run-it) and
