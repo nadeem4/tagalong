@@ -16,7 +16,7 @@ from typing import Any, Protocol
 
 from brain.builtin_guards import spend_guards
 from brain.guards import Guards, Hook, ModelCallCtx
-from brain.telemetry import TIMINGS
+from brain.telemetry import TIMINGS, timed
 
 log = logging.getLogger(__name__)
 
@@ -127,7 +127,12 @@ def _blames_newest(err: Exception, history: list) -> bool:
     return any(word in str(err).lower() for word in ("image", "document"))
 
 
-async def run_turn(
+async def run_turn(**kwargs) -> str:
+    async with timed("turn"):  # the whole turn, tools and waits included
+        return await _run_turn(**kwargs)
+
+
+async def _run_turn(
     *,
     turn_id: str,
     body_id: str | None,

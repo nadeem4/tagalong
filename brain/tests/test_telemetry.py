@@ -34,11 +34,13 @@ async def run_monitor(stalls, threshold=0.2):
 
 
 async def test_loop_lag_logs_when_blocked(caplog):
+    TIMINGS.clear()
     with caplog.at_level(logging.WARNING, logger="lag"):
         await run_monitor([0.0, 0.5, 0.0])
     lines = [r.getMessage() for r in caplog.records]
     assert len(lines) == 1
     assert "0.50" in lines[0]
+    assert len(TIMINGS.samples("loop_lag")) == 1
 
 
 async def test_loop_lag_quiet_under_threshold(caplog):

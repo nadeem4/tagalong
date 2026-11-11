@@ -2651,8 +2651,6 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
 
 ## Loop lag and step timings (real brain)
 
-1. Start the brain with `TAGALONG_LOOP_LAG_MS=50` and say something to Scout. Normal use leaves
-   no `event loop blocked` line in `brain.log`.
+1. Start the brain with `TAGALONG_LOOP_LAG_MS=50` and use Scout. Any `event loop blocked for ...`
+   line in `brain.log` names a real stall longer than 50 ms.
 2. Start the brain with `TAGALONG_LOOP_LAG_MS=abc`. It refuses to start and names the variable.
-3. Timings are recorded in memory only; the targeted tests (`brain/tests/test_telemetry.py`) cover
-   the percentiles, the ring buffer and the loop-lag warning.

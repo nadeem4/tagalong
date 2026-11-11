@@ -418,8 +418,7 @@ opens a `.env` file. Copying it therefore changes nothing at runtime.
 
 The desktop reads the variables below straight from the process environment. **Set them in the
 shell you launch from**, as shown above. The brain's variables (its key, model, budget and limits) are
-listed in `.env.example` and described in [brain.md](brain.md); `TAGALONG_LOOP_LAG_MS` sets how
-long a blocked event loop may go before the brain logs it.
+listed in `.env.example` and described in [brain.md](brain.md).
 
 | Variable                | Status                                                                                                                                                                                                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

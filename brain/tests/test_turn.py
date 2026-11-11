@@ -13,6 +13,7 @@ import pytest
 from brain.guardrails import Budget
 from brain.guards import ALLOW, Guard, Guards, Hook, stop
 from brain.mind.turn import AnthropicModel, Call, Final, _request, run_turn
+from brain.telemetry import TIMINGS
 
 
 def text_step(text="hi", stop="end_turn", deltas=None):
@@ -112,6 +113,12 @@ async def test_plain_answer_streams_and_finishes():
         ("reply", {"turn": "t1", "body": "desktop", "done": True}),
     ]
     assert history[1:] == [{"role": "assistant", "content": [{"type": "text", "text": "hello"}]}]
+
+
+async def test_a_turn_records_one_total_timing_sample():
+    TIMINGS.clear()
+    await go([text_step("hello")])
+    assert len(TIMINGS.samples("turn")) == 1
 
 
 async def test_tools_run_concurrently_and_results_are_one_message():

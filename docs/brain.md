@@ -256,7 +256,7 @@ tool list when it starts, cannot take a `say` in the middle of a turn, and ends 
   default) it logs one warning, `event loop blocked for 0.50 s`, in `brain.log`.
 - **Step timings.** `timed(step, **tags)` is a `with` and `async with` block that records its
   duration in `TIMINGS`, the last 500 samples per step. Steps: `model_call` (start to final
-  message, tagged with the step number), `tool` (the tool's own run, tagged `name`; the wait for
+  message, tagged with the step number), `turn` (the whole turn), `tool` (the tool's own run, tagged `name`; the wait for
   an ask card is not counted), `side_check`, and `voice_hop` (tagged `op`: `frame` for voice
   detection and speech-to-text, `synth` for speaking, `load_ears`, `load_models`). A slow run
   that shows up in `loop_lag` but not in the steps points at something blocking the loop.
