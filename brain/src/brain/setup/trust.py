@@ -15,7 +15,6 @@ EXPERT_VENDORS: frozenset[str] = frozenset(
     {
         "claude-acp",
         "codex-acp",
-        "gemini",
         "github-copilot-cli",
         "cursor",
         "junie",
@@ -32,7 +31,7 @@ POPULAR_APPS: tuple[str, ...] = ("com.notion/mcp",)
 MORE_APPS: tuple[str, ...] = ("app.linear/linear", "com.atlassian/atlassian-mcp-server")
 
 # Experts shown first, in this order; the rest sit behind "Show more".
-POPULAR_EXPERTS: tuple[str, ...] = ("claude-acp", "gemini", "codex-acp")
+POPULAR_EXPERTS: tuple[str, ...] = ("claude-acp", "codex-acp")
 RECOMMENDED_EXPERT = "claude-acp"
 
 

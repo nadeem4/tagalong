@@ -112,6 +112,10 @@ class _Fold:
         return self.feed(guard, block(f"guard failed ({type(exc).__name__})", "error"))
 
     def result(self) -> Verdict:
+        if self.final and self.rewritten and self.final.value is None:
+            # A block after a rewrite keeps the rewritten text, so a caller can save it masked
+            # in place instead of dropping it whole.
+            return dataclasses.replace(self.final, value=self.ctx.text)
         return self.final or self.asked or self.rewritten or ALLOW
 
     def _log(self, v: Verdict) -> None:

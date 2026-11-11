@@ -238,6 +238,15 @@ async def test_login_required_with_no_methods_is_not_logged_in_without_methods(
     assert isinstance(await d.start(expert()), Failed)
 
 
+async def test_two_login_windows_use_separate_done_files(tmp_path, env):
+    window = Window(write=False)
+    d, _, _ = driver(tmp_path, window)
+    await d.start(expert())
+    await d.start(expert())
+    assert window.calls[0][2] != window.calls[1][2]
+    await d.stop()
+
+
 async def test_the_done_file_wait_times_out_and_emits_one_event(tmp_path, env):
     d, events, store = driver(tmp_path, Window(write=False), timeout_s=0.2)
     await d.start(expert())
@@ -266,13 +275,9 @@ async def test_stop_cancels_a_waiting_login(tmp_path, env):
 
 
 def test_expert_env_strips_per_expert_and_unknown_ids_get_every_key():
-    base = {"PATH": "p", "ANTHROPIC_API_KEY": "a", "OPENAI_API_KEY": "o", "GEMINI_API_KEY": "g"}
-    assert expert_env("claude-acp", base) == {
-        "PATH": "p",
-        "OPENAI_API_KEY": "o",
-        "GEMINI_API_KEY": "g",
-    }
-    assert expert_env("codex-acp", base) == {"PATH": "p", "GEMINI_API_KEY": "g"}
+    base = {"PATH": "p", "ANTHROPIC_API_KEY": "a", "OPENAI_API_KEY": "o"}
+    assert expert_env("claude-acp", base) == {"PATH": "p", "OPENAI_API_KEY": "o"}
+    assert expert_env("codex-acp", base) == {"PATH": "p"}
     assert expert_env("someone-else", base) == {"PATH": "p"}
 
 

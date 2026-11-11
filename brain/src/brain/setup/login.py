@@ -1,7 +1,7 @@
 """Log an installed expert in, on its own subscription: nothing secret passes through Tagalong.
 
 A terminal method (Claude's `claude auth login`) opens a visible window running the adapter's
-own command; a browser method (Codex, Gemini) is ACP `authenticate`, and the adapter opens the
+own command; a browser method (Codex) is ACP `authenticate`, and the adapter opens the
 browser. Either way a background task waits, re-checks login through ACP, records it and emits
 one waking `setup_login` event of facts. API-key methods are never picked.
 """
@@ -36,7 +36,7 @@ LOGIN_TIMEOUT_S = 600.0
 CHECK_TIMEOUT_S = 60.0
 AUTH_REQUIRED = -32000
 # Subscription browser methods, by the ids the adapters use (20a spike).
-_BROWSER_IDS = ("chat-gpt", "oauth-personal")
+_BROWSER_IDS = ("chat-gpt",)
 
 
 @dataclass(frozen=True)

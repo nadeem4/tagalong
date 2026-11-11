@@ -49,7 +49,6 @@ def test_expert_vendors():
     for expert in (
         "claude-acp",
         "codex-acp",
-        "gemini",
         "github-copilot-cli",
         "cursor",
         "junie",
@@ -58,6 +57,7 @@ def test_expert_vendors():
     ):
         assert trust.is_official_expert(expert)
     assert not trust.is_official_expert("some-other-acp")
+    assert not trust.is_official_expert("gemini")
 
 
 def test_third_party_namespaces_for_another_service_are_community():
@@ -80,7 +80,7 @@ def test_popular_apps_are_official_and_ordered():
 
 
 def test_popular_experts_order_and_recommended():
-    assert trust.POPULAR_EXPERTS == ("claude-acp", "gemini", "codex-acp")
+    assert trust.POPULAR_EXPERTS == ("claude-acp", "codex-acp")
     assert trust.RECOMMENDED_EXPERT == "claude-acp"
 
 

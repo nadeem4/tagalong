@@ -549,14 +549,13 @@ async def test_experts_curated_order_and_flags(tmp_path):
     rows = out["browse_experts"]
     assert [r["id"] for r in rows] == [
         "claude-acp",
-        "gemini",
         "codex-acp",
         "zed-acp",
         "other-acp",
     ]
-    assert [r["recommended"] for r in rows] == [True, False, False, False, False]
-    assert rows[0]["tested"] is True and rows[3]["tested"] is False
-    assert out["show_more_from"] == 3
+    assert [r["recommended"] for r in rows] == [True, False, False, False]
+    assert rows[0]["tested"] is True and rows[2]["tested"] is False
+    assert out["show_more_from"] == 2
 
 
 async def test_curated_apps_keep_installed_ones_marked_added(tmp_path):

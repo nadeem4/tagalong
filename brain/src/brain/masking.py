@@ -83,12 +83,16 @@ def mask_secrets(masker: Masker) -> Guard:
 
 
 def mask_json(guards: Guards, what: str, obj: Any) -> Any:
-    """A masked copy of dicts, lists and strings; a blocked string becomes `[withheld]`."""
+    """A masked copy of dicts, lists and strings; a blocked string keeps the masking that ran, or
+    becomes `[withheld]` when none did."""
     if isinstance(obj, str):
         v = guards.run_sync(Hook.save, SaveCtx(what, obj))  # type: ignore[arg-type]
         if v.kind == "rewrite":
             return v.value
-        return WITHHELD if v.kind in ("block", "stop") else obj
+        if v.kind in ("block", "stop"):
+            # Masked text from earlier guards is safe to keep; only no text at all is withheld.
+            return v.value if isinstance(v.value, str) else WITHHELD
+        return obj
     if isinstance(obj, dict):
         return {k: mask_json(guards, what, v) for k, v in obj.items()}
     if isinstance(obj, list):

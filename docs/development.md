@@ -169,7 +169,7 @@ uv run brain                          # start (or restart) the brain afterwards
 ```
 
 On a headless machine, `tagalong login` works only where it can open a terminal window. A
-browser-login expert (Codex, Gemini) cannot log in through the CLI: nothing opens, and it waits
+browser-login expert (Codex) cannot log in through the CLI: nothing opens, and it waits
 until the timeout and exits 1. Log those in on a machine with a screen.
 
 ### Coverage
