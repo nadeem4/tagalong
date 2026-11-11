@@ -143,13 +143,6 @@ export const WALKTHROUGH_CSS = `
 .wt-job:first-child { border-top: 0; }
 .wt-job h3 { margin: 0; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .wt-job__text { min-width: 0; }
-.wt-job__act { flex: none; max-width: 200px; text-align: right; }
-.wt-job__act .wt-help { margin: 0; }
-.wt-expert { margin-top: 8px; }
-.wt-sub-label { margin-top: 24px; color: ${t.color.panelMuted}; ${typeCss('caption')}; }
-.wt-steplist { margin: 0; padding: 0; list-style: none; counter-reset: wt-s; display: flex; flex-direction: column; gap: 10px; }
-.wt-steplist li { counter-increment: wt-s; display: flex; align-items: center; gap: 12px; ${typeCss('bodyLead')}; }
-.wt-steplist li::before { content: counter(wt-s); flex: none; width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; background: ${t.color.sidebar}; color: ${t.color.text}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 /* The preview cards are illustrations of the navy bubble, not live controls. */
 .wt-handoff { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: ${t.color.sidebar}; color: ${t.color.text}; }
 .wt-handoff h3 { margin: 0; ${typeCss('title')}; }
@@ -184,7 +177,24 @@ export const WALKTHROUGH_CSS = `
 .wt-back::before { content: '←' / ''; margin-right: 8px; }
 .wt-next::after { content: '→' / ''; margin-left: 8px; }
 .wt-primary:hover:not(:disabled) { filter: brightness(.96); }
+.wt-final { min-width: 96px; }
 .wt-text { border: 0; background: none; color: ${t.color.panelMuted}; padding: 0 4px; }
 .wt-text:hover:not(:disabled) { color: ${t.color.panelText}; }
+/* Step ten and the finish card's ready list reuse Home's connection rows (cx-*). */
+.wt-group { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+.wt-group__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.wt-group__head h2 { margin: 0; ${typeCss('title')}; }
+.wt-group__head p { margin: 0; ${typeCss('small')}; color: ${t.color.panelMuted}; }
+.wt .cx-list.wt-group__card { background: #fff; border: 1px solid ${t.color.panelLine}; border-radius: 12px; padding: 4px 18px; }
+.wt .cx-list.wt-group__card > .cx-item > .cx-row { padding: 12px 0; }
+.wt .cx-list.wt-group__card > .cx-item:first-child > .cx-row { padding-top: 12px; }
+.wt .home-dot { width: 8px; height: 8px; border-radius: 50%; background: ${t.color.okDot}; flex: none; }
+.wt .home-dot--warn { background: ${t.color.gold}; }
+.wt-ready { margin-top: 24px; }
+.wt-new {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px;
+  background: #DCE4FA; color: #24326B; ${typeCss('caption')}; font-weight: ${t.fontWeight.semibold}; vertical-align: 2px;
+}
+.wt-ready .wt-keylist li { ${typeCss('body')}; }
 .wt-error { margin: 0; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; color: ${t.color.errInk}; }
 `;

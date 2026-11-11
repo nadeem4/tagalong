@@ -2222,7 +2222,7 @@ brain; this checks it on the real one.
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
    "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link (not on step 9) and the primary button; the side list (step 6 is "Everyday jobs") jumps only to steps you
+   link (not on steps 9 and 10) and the primary button; the side list (step 6 is "Everyday jobs", step 10 "Connect your tools") jumps only to steps you
    have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
@@ -2239,51 +2239,51 @@ brain; this checks it on the real one.
 7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
    **Expected:** the tour opens once; after Finish or Skip it never opens again.
 
-### K.5. Steps 6 to 9 and the end
+### K.5. Steps 6 to 10 and the end
 
 The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
-1. **Action:** on step 6 look at the page, then press **Connect Gmail** (and answer the Allow card).
-   **Expected:** the page reads "Scout does the everyday jobs" and lists five jobs ("Draft replies to
-   my inbox", "Plan my day around my calendar", "Research this and write me a summary", "Tidy this
-   folder", "Fix this code"); the word "Claude Code" appears nowhere yet. A job whose app is in the
-   registry has a **Connect** button; it reads "Connecting Gmail…" while the card is open, then
-   "Gmail is connected."; saying no shows "You said no, so nothing was added." and **Try Gmail again**.
-   The button is named after the registry entry found by searching the app's name (for example
-   Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
-   connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
-   Code" until the expert line is opened. Home's **Connections** page lists experts
-   under **Your experts**, each led by the kind of job ("Fix code and other long jobs") with the
-   product and version underneath.
-   Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
-   the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
-   (checking, Node, installing), then "Claude Code is set up." With the login missing the button
-   reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page **Your experts** lists Claude Code with its
-   state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
-2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
+1. **Action:** on step 6 look at the page. **Expected:** it reads "Scout does the everyday jobs" and
+   lists five jobs ("Draft replies to my inbox", "Plan my day around my calendar", "Research this
+   and write me a summary", "Tidy this folder", "Fix this code"); it only explains: no **Connect**
+   button, no Claude Code anywhere, and "Fix this code" says "which you can set up on the last
+   step."
+2. **Action:** on step 10 ("Connect your tools", after the key step) look at the page, then press
+   **Add Gmail** (and answer the Allow card). **Expected:** one card lists Gmail, Google Calendar
+   and Notion (each with its kind of job, how it signs in and an **Official** chip where it is one)
+   and a second card offers Claude Code (Official, Recommended). **Add Gmail** reads "Waiting for
+   you…" while the card is open, then "Connected"; saying no shows "You said no, so nothing was
+   added." A saved app that is not signed in reads "Finish in Home". An app the registry lacks and
+   that is not saved is not listed. Press **Add** on Claude Code: an "Installing…" block with a
+   percent and bar shows, then "Needs sign-in" with a **Sign in** button (the login window opens),
+   then "Ready". With the brain stopped the page says Tagalong could not read this and that you can
+   connect your tools later in Home, under Connections. Step 10 has no Skip: **I’ll do this later**
+   and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
+   Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
-3. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
+4. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
    set it to 0, then 8, press **Next**. **Expected:** **+** raises it by 1; 0 shows "Enter
    an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip**
    with no key goes to step 9 and leaves the limit alone.
-4. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
-   was not accepted." with the field kept and **Finish** off; then the field empties, "A key is
-   already set." shows and **Finish** turns on. With the network off the line reads "Scout could
-   not reach Anthropic. Try again." and Finish stays off.
-5. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
-   Finish off; start the brain and Check turns on by itself. The step never says to edit a file;
+5. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
+   was not accepted." with the field kept and **Next** off; then the field empties, "A key is
+   already set." shows and **Next** turns on. With the network off the line reads "Scout could
+   not reach Anthropic. Try again." and Next stays off.
+6. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
+   Next off; start the brain and Check turns on by itself. The step never says to edit a file;
    it shows where the machine running Scout's brain saved the key, under four notes ("Only sent to
    Anthropic", "Never written to Scout's history or logs", and so on).
-6. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
-   step 9 reads "Set by your environment" and Finish is on.
-7. **Action:** press **Finish**. **Expected:** the card "Scout is on your screen" shows the ask
-   and talk keys as keycaps (never "CommandOrControl") and three things to try, and the tour is
+7. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
+   step 9 reads "Set by your environment" and Next is on.
+8. **Action:** on step 10 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
+   and talk keys as keycaps (never "CommandOrControl"), three things to try and, if you connected
+   anything on step 10, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
    marked seen at once. **Done** (or **Open Home**) closes the
    window and the pet appears; closing the card with the window's X does the same. Either way the
    tour does not open at the next launch (closing part-way, before Finish, brings it back).
-8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
+9. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
    Anthropic Console API keys page.
 
 ## Companion chat window
@@ -2522,10 +2522,10 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
    (`node bodies/whatsapp/dist/index.js < /dev/null`): it prints that it is listening and exits at
    once. With a value missing it prints a message naming the variable and exits 1.
 
-## Home Bodies section and WhatsApp setup
+## Home Places page and WhatsApp setup
 
-1. Automated: `cd brain && uv run pytest tests/test_bodies_tools.py -q` (status never holds a secret, absent keys are unchanged, a bad value is refused unquoted, a failed write applies nothing); `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/bodies.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/home/bodies-panel.test.tsx`.
-2. By hand, Home > Connections: the Bodies card lists Desktop (Connected), Browser and WhatsApp. WhatsApp shows `WhatsApp is off.`, the switch is disabled with `Save all five values to switch WhatsApp on.`
+1. Automated: `cd brain && uv run pytest tests/test_bodies_tools.py -q` (status never holds a secret, absent keys are unchanged, a bad value is refused unquoted, a failed write applies nothing); `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/bodies.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/home/places-view.test.tsx`.
+2. By hand, Home > Places (marked New): the page lists This PC (Connected), the Chrome add-on (Not set up, with **Get the add-on**, which opens tour step 7) and WhatsApp (Offline). WhatsApp shows `WhatsApp is off.`, the switch is disabled with `Save all five values to switch WhatsApp on.`
 3. Type the five values (use the setup in [whatsapp.md](../whatsapp.md)) and press Save. The fields clear and each shows Saved; no value is shown again. The switch becomes usable.
 4. Switch WhatsApp on. The line reads `WhatsApp is starting.` then `WhatsApp is running.` (`The WhatsApp bridge is not built yet.` if the bridge was not built). Send `hello` from the phone: Scout answers there.
 5. Answer a permission ask by its button on the phone; ask for something long and check it arrives in a few messages; quit the desktop and message again: the brain is still running and answers.

@@ -5,6 +5,11 @@ import { themeTokens as t, typeCss } from '../theme/tokens';
 import { CONNECTIONS_CSS } from './connections-styles';
 
 describe('CONNECTIONS_CSS', () => {
+  it('serves the tour as well as Home, with a warning status for Offline and Needs sign-in', () => {
+    expect(CONNECTIONS_CSS).toMatch(/:is\(\.home, \.wt\) \.cx-row \{/);
+    expect(CONNECTIONS_CSS).toMatch(new RegExp(`\\.cx-status--warn \\{[^}]*${t.color.warnInk}`));
+  });
+
   it('lays a row out as a 36px tile, the text and the actions', () => {
     expect(CONNECTIONS_CSS).toMatch(/\.cx-row \{[^}]*grid-template-columns: 36px 1fr auto/);
   });

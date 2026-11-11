@@ -1,12 +1,18 @@
-/** Tests for STEPS and skipTour: nine steps, only the key unskippable, Skip needs a key to close. */
+/** Tests for STEPS and skipTour: ten steps, only the key unskippable, Skip needs a key to close. */
 
 import { describe, expect, it } from 'vitest';
-import { STEPS, skipTour } from './steps';
+import { KEY_STEP, STEPS, skipTour } from './steps';
 
 describe('STEPS', () => {
-  it('has nine steps numbered 1 to 9, and only the last cannot be skipped', () => {
-    expect(STEPS.map((step) => step.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  it('ten steps, key is nine', () => {
+    expect(STEPS.map((step) => step.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(STEPS.filter((step) => !step.skippable).map((step) => step.id)).toEqual([9]);
+    expect(KEY_STEP).toBe(9);
+    expect(STEPS.find((step) => step.id === KEY_STEP)?.title).toBe('API key');
+  });
+
+  it('step ten is Connect your tools and can be skipped', () => {
+    expect(STEPS[9]).toEqual({ id: 10, title: 'Connect your tools', skippable: true });
   });
 });
 

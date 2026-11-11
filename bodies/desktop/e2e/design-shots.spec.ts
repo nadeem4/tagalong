@@ -175,7 +175,7 @@ test('D5 connections', async () => {
 
     brain.setSetup({}, true);
     await search.fill('notion');
-    // Not getByRole('alert'): the Bodies card has one too.
+    // Not getByRole('alert'): other Connections cards can show one too.
     await expect(home.getByText("Scout couldn't load the app list")).toBeVisible({
       timeout: 15_000,
     });
@@ -313,5 +313,127 @@ test('E5 model states', async () => {
     await closeApp(app);
     await brain.close();
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
+
+// E2: Home > Places in three states, tour step 10 before and after adding one, and the finish card.
+async function launchShot(options: Parameters<typeof startFakeBrain>[0], settings = true) {
+  const brain = await startFakeBrain(options);
+  const dataDir = mkdtempSync(join(tmpdir(), 'tagalong-shot-'));
+  if (settings) seedSettings(dataDir);
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_START_BRAIN: '0' },
+  });
+  const find = async (name: string): Promise<Page> => {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const page = app.windows().find((p) => p.url().includes(`${name}.html`));
+      if (page !== undefined) return page;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+    }
+    throw new Error(`no ${name} window appeared`);
+  };
+  const done = async (): Promise<void> => {
+    await closeApp(app);
+    await brain.close();
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  };
+  return { find, done };
+}
+
+async function placesPage(
+  options: Parameters<typeof startFakeBrain>[0],
+  take: (home: Page) => Promise<void>,
+): Promise<void> {
+  const { find, done } = await launchShot(options);
+  try {
+    await (await find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    await home
+      .getByRole('navigation')
+      .getByRole('button', { name: /^Places/ })
+      .click();
+    await expect(home.getByRole('heading', { level: 1, name: 'Places' })).toBeVisible();
+    await take(home);
+  } finally {
+    await done();
+  }
+}
+
+const ALL_FIVE = [
+  'access_token',
+  'app_secret',
+  'verify_token',
+  'phone_number_id',
+  'allowed_number',
+];
+
+test('E2 places states', async () => {
+  const dir = resolve(shotsRoot, 'E2');
+  mkdirSync(dir, { recursive: true });
+  await placesPage(
+    {
+      hasKey: true,
+      bodies: { connected: ['desktop'], whatsappSet: ALL_FIVE, whatsappState: 'off' },
+    },
+    async (home) => {
+      await expect(home.getByText('Not set up').first()).toBeVisible({ timeout: 30_000 });
+      await home.screenshot({ path: join(dir, 'places.png') });
+    },
+  );
+  await placesPage(
+    { hasKey: true, bodies: { connected: ['desktop'], whatsappSet: ALL_FIVE.slice(0, 3) } },
+    async (home) => {
+      await home
+        .getByRole('button', { name: /^Set up/ })
+        .last()
+        .click();
+      await expect(home.getByRole('button', { name: 'Save' })).toBeVisible();
+      await home.screenshot({ path: join(dir, 'whatsapp-setup.png') });
+    },
+  );
+  await placesPage(
+    {
+      hasKey: true,
+      bodies: {
+        connected: ['desktop', 'browser', 'whatsapp'],
+        whatsappSet: ALL_FIVE,
+        whatsappState: 'running',
+      },
+    },
+    async (home) => {
+      await expect(home.getByText('Connected').first()).toBeVisible({ timeout: 30_000 });
+      await home.screenshot({ path: join(dir, 'all-connected.png') });
+    },
+  );
+});
+
+test('E2 tour step ten and finish card', async () => {
+  const dir = resolve(shotsRoot, 'E2');
+  mkdirSync(dir, { recursive: true });
+  const { find, done } = await launchShot({ hasKey: true, expertInstallingPercent: 40 }, false);
+  try {
+    const tour = await find('walkthrough');
+    for (let at = 1; at < 10; at += 1) {
+      await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    }
+    await expect(tour.getByRole('heading', { name: 'Connect your tools' })).toBeVisible();
+    await expect(tour.getByRole('button', { name: 'Add Gmail' })).toBeVisible({ timeout: 15_000 });
+    await tour.waitForTimeout(800); // let the page fade-in finish
+    await tour.screenshot({ path: join(dir, 'tour-step-10-before.png') });
+    await tour.getByRole('button', { name: 'Add Gmail' }).click();
+    await expect(tour.getByText('Connected')).toBeVisible({ timeout: 15_000 });
+    await tour.getByRole('button', { name: 'Add', exact: true }).last().click();
+    await expect(tour.getByText('Installing…')).toBeVisible({ timeout: 15_000 });
+    await tour.waitForTimeout(800);
+    await tour.screenshot({ path: join(dir, 'tour-step-10-after.png') });
+    await tour.getByRole('button', { name: 'Finish' }).click();
+    await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
+    await expect(tour.getByText('Ready to use')).toBeVisible();
+    await tour.waitForTimeout(800); // let the card's fade-in finish
+    await tour.screenshot({ path: join(dir, 'finish-card.png') });
+  } finally {
+    await done();
   }
 });
