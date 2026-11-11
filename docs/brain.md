@@ -1027,7 +1027,8 @@ words what the person reads (guidance in `mind/soul.md`).
   button), so a stored Auto never opens it, `set_mode`
   refuses it and the side-check never sees the ask; a preference in Scout's prompt cannot skip
   the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
-  folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
+  folder, `recommended` (true for the recommended expert, so the chat's card shows its
+  "Recommended" chip), and `node_download` (the Node version and folder, or `null` when a system Node is new
   enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
   background, outside the turn, one per expert id at a time (a second ask for the same id is
   refused with `already_installing` before the Allow card is shown). `tagalong stop` ends the

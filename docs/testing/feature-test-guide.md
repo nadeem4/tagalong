@@ -516,8 +516,8 @@ next section.
 
 1. **Action:** call `list_preferences` on a fresh data folder.
    **Expected:** one preference, "Always ask me before risky actions", with `builtin: true`.
-2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow
-   once**. Ask again and press **Not now**. Ask a third time and leave the card
+2. **Action:** ask Scout to do something that asks first (a tool in `ask` mode). Press **Allow**.
+   Ask again and press **Not now**. Ask a third time and leave the card
    for 5 minutes: Scout's turn goes on and says the call is waiting. Then press **Allow**.
    **Expected:** the call runs by itself and Scout tells you. `list_approvals` lists three rows for
    that tool, newest first: `approved`, `refused` and `approved`, all `decided_by: "person"`, with `source: "scout_tool"` and a summary of the words Scout wrote before the
@@ -720,7 +720,7 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
    **Expected:** the job shows its live step and a clock that ticks; Open shows the job page and Back
    returns to the tab; Stop ends it.
 5. **Action:** trigger a permission ask (for example ask Scout to move a window).
-   **Expected:** the ask shows at the top of Now; Allow, Always or Deny answers it and it goes.
+   **Expected:** the ask shows at the top of Now; Allow, Always or Not now answers it and it goes.
 
 ## The mail switch and the Held list (fake brain, then real)
 
@@ -2065,7 +2065,7 @@ Folders come from Home → Settings → **Files Scout may use**; none by default
 4. **Outside the folder.** Ask Scout to read a file in another folder, or use `..` in a path.
    **Expected:** refused in plain words.
 5. **Delete and overwrite.** Ask Scout to delete a file. **Expected:** it asks with only Allow and
-   Deny, and after Allow the file is in the Recycle Bin, restorable. Same for overwriting a file's
+   Not now, and after Allow the file is in the Recycle Bin, restorable. Same for overwriting a file's
    content. In Home, Permissions: these two say "Always asks" and cannot be set to Auto.
 
 ## Permissions _(real brain)_
@@ -2077,7 +2077,7 @@ Folders come from Home → Settings → **Files Scout may use**; none by default
 2. **Auto.** Choose **Auto** for a tool Scout uses (for example moving a window), then ask Scout to
    use it. **Expected:** Scout stops asking and just does it. Choose **Ask**: it asks again.
 3. **Locked.** Find a tool its body marks as always confirm (one whose ask offers only Allow and
-   Deny). **Expected:** it reads **Ask**, says "Risky action", and **Auto** can be pressed.
+   Not now). **Expected:** it reads **Ask**, says "Risky action", and **Auto** can be pressed.
    Ask Scout to use it: it asks, with no **Always allow**.
    1. Press **Auto**. **Expected:** a warning says it is a risky action and Scout will no longer
       ask. **Cancel** leaves it on **Ask**; nothing changes.
@@ -2354,7 +2354,7 @@ Brain tests only; nothing here installs anything.
    (fakes only: no network, npm or Node download).
 2. By hand with a real brain, clean `<TAGALONG_HOME>` and Node 18 first on PATH: ask Scout to set up
    Claude Code. The Allow card names the expert, its version, `tools/claude-acp` and the Node
-   download, and offers no **Always allow**. Deny: nothing is written. Allow: the tool returns at
+   download, and offers no **Always allow**. Not now: nothing is written. Allow: the tool returns at
    once, Scout is free to talk, and when the install ends Scout says so (a `setup_done` event).
    `tools/claude-acp` and `runtime/node` appear, `experts.json` lists it (with `node` set to
    `private`), and `node --version` and PATH are unchanged.
@@ -2373,7 +2373,7 @@ Brain tests only; nothing here installs anything.
    terminal: no real window, browser or login).
 2. By hand on Windows with a real brain, Claude Code installed from a clean home (no
    `~/.claude`): ask Scout to log it in. The Allow card shows `claude-acp`, the method
-   `claude-ai-login` and `opens: terminal window`, with no **Always allow**. Deny: no window opens.
+   `claude-ai-login` and `opens: terminal window`, with no **Always allow**. Not now: no window opens.
    Allow: a console window opens running the adapter's login; finish it in the browser it opens.
    Scout says it worked (a `setup_login` event), `experts.json` shows `logged_in: true`, and
    no code or link appeared in the chat.
@@ -2406,7 +2406,7 @@ Brain tests only; nothing here installs anything.
 3. Save a preference that sounds like it covers installs, then ask again: the card still opens.
 4. Ask for an app that is not connected (for example one that reads your notes). Scout searches
    the registry, recommends one and asks. After you choose, the Allow card names the package or
-   host and the variable names it needs. Deny: nothing is added. Allow: the app appears on
+   host and the variable names it needs. Not now: nothing is added. Allow: the app appears on
    Home's Connections list. A hosted app opens your browser to sign in when its server asks; a
    local one that needs a key reports the variable name, and no key value is stored anywhere (open
    `tagalong.db`'s apps row: only `${NAME}`). The first start of a local `npx` app downloads its
