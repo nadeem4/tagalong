@@ -1,6 +1,6 @@
 /**
  * Starts the brain for the desktop: when the brain address is local and nothing answers
- * there, runs `uv run brain` from the brain/ folder, detached, its output going to
+ * there, runs `uv run brain` from the brain/ folder, detached (hidden on Windows), its output going to
  * <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
  * reports installing/failed. Quitting the app never stops the brain; only a restart for a
  * version update does (`stopBrain`, never for a brain the person started themselves).
@@ -25,6 +25,8 @@ export interface LaunchOptions {
   uv: string;
   /** True when packaged: install the brain's dependencies (`uv sync`) before starting it. */
   sync: boolean;
+  /** Windows starts the brain hidden instead of detached (see the spawn below). */
+  platform: NodeJS.Platform;
   /** First-run progress for Home: installing while the sync runs, failed if it did not finish. */
   onSetup: (state: SetupState) => void;
   /** Where the detached brain's output goes. */
@@ -124,6 +126,7 @@ export function realLaunch(real: RealLaunch): Promise<void> {
     brainDir,
     uv: packaged?.uv ?? 'uv',
     sync: packaged !== undefined,
+    platform: process.platform,
     onSetup,
     logPath: brainLogPath(env, homedir()),
     openLog: (path) => {
@@ -157,8 +160,8 @@ export function stopBrain(
 }
 
 export async function launchBrain(options: LaunchOptions): Promise<void> {
-  const { env, brainDir, uv, sync, onSetup, logPath, openLog, closeLog, probe, exists, spawn } =
-    options;
+  const { env, brainDir, uv, sync, platform, onSetup, logPath, openLog, closeLog, probe } = options;
+  const { exists, spawn } = options;
   const { log } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
   if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return;
@@ -179,7 +182,10 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
     cwd: brainDir,
     // Tells the brain the desktop owns it, so the version check may restart it.
     env: { ...env, TAGALONG_STARTED_BY: 'desktop' },
-    detached: true,
+    // On Windows, detached means no console at all, so uv's console child (the brain) gets a
+    // new, visible window. Not detached, windowsHide gives uv a hidden console the brain
+    // shares; it still outlives the app. Elsewhere detached keeps it out of the app's session.
+    detached: platform !== 'win32',
     stdio: ['ignore', fd, fd],
     windowsHide: true,
   });
@@ -194,7 +200,7 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
     running = false;
     log.warn(`brain exited with code ${code}; the desktop keeps retrying`);
   });
-  // Detached and unreferenced: quitting the app leaves the brain running.
+  // Unreferenced (and detached or hidden): quitting the app leaves the brain running.
   child.unref();
 
   /** `uv sync` with its output in brain.log and no timeout (the first download is slow). True when it finished cleanly. */
