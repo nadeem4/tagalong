@@ -10,14 +10,25 @@ from brain.apps import AppRow
 
 
 def list_apps(db: sqlite3.Connection) -> list[AppRow]:
-    rows = db.execute("SELECT id, name, transport, config, auth, enabled FROM apps ORDER BY rowid")
-    return [AppRow(i, n, t, json.loads(c), a, bool(e)) for i, n, t, c, a, e in rows]
+    rows = db.execute(
+        "SELECT id, name, transport, config, auth, enabled, trust FROM apps ORDER BY rowid"
+    )
+    return [AppRow(i, n, t, json.loads(c), a, bool(e), r) for i, n, t, c, a, e, r in rows]
 
 
 def add_app(db: sqlite3.Connection, row: AppRow) -> None:
     db.execute(
-        "INSERT INTO apps(id, name, transport, config, auth, enabled) VALUES (?,?,?,?,?,?)",
-        (row.id, row.name, row.transport, json.dumps(row.config), row.auth, int(row.enabled)),
+        "INSERT INTO apps(id, name, transport, config, auth, enabled, trust)"
+        " VALUES (?,?,?,?,?,?,?)",
+        (
+            row.id,
+            row.name,
+            row.transport,
+            json.dumps(row.config),
+            row.auth,
+            int(row.enabled),
+            row.trust,
+        ),
     )
 
 

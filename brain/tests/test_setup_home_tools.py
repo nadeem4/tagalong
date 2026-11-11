@@ -12,6 +12,7 @@ from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
+from brain.setup import home_tools
 from brain.setup import registry as registry_module
 from brain.setup.facts import Machine
 from brain.setup.home_tools import WHY_PER_REPLY, SetupProgress, home_setup_tools
@@ -72,12 +73,14 @@ class Rig:
         card=None,
         mcp=None,
         why=None,
+        acp=None,
+        fail_on=None,
     ):  # answer None: nobody online
         async def get(url: str) -> bytes:
             self.urls.append(url)
-            if offline:
+            if offline or (fail_on and fail_on in url):
                 raise OSError("down")
-            return (mcp or MCP) if "modelcontext" in url else ACP
+            return (mcp or MCP) if "modelcontext" in url else (acp or ACP)
 
         self.urls: list[str] = []
         self.progress = SetupProgress(lambda event: None)
@@ -126,7 +129,7 @@ async def test_overview_lists_installed_and_browsable_with_states(tmp_path):
     assert out["experts"][0]["tested"] is True
     assert out["apps"] == [{"id": "a1", "name": "N", "state": "off"}]
     assert [e["id"] for e in out["browse_experts"]] == ["codex-acp"]
-    assert [a["id"] for a in out["browse_apps"]] == ["acme/cloud"]
+    assert out["browse_apps"] == []  # no search: only the curated lists, never a raw page
     assert out["stale"] is False and out["progress"] is None
 
 
@@ -136,8 +139,8 @@ async def test_overview_searches_the_app_registry_by_the_query(tmp_path):
     assert any("modelcontext" in u and u.endswith("&search=gmail") for u in rig.urls)
     rig = Rig(tmp_path / "plain")
     await rig.call("setup_overview")
-    # The page itself is not a search; only the Popular lookups after it are.
-    assert "search=" not in next(u for u in rig.urls if "modelcontext" in u)
+    # No search: only the curated per-id lookups run, never the registry's raw first page.
+    assert all("search=" in u for u in rig.urls if "modelcontext" in u)
 
 
 async def test_an_expert_not_logged_in_needs_login(tmp_path):
@@ -390,7 +393,7 @@ SEARCH = json.dumps(
             server("com.notion/mcp", "Notion", "Official.", **remote("mcp.notion.test")),
             server("io.github.notion/mcp", "Notion", "Lookalike.", **remote()),
             server(
-                "app.linear/mcp",
+                "app.linear/linear",
                 "Linear",
                 "Issues.",
                 **remote(headers=[{"name": "Authorization", "isRequired": True}]),
@@ -434,9 +437,9 @@ async def test_overview_popular_only_without_query(tmp_path):
 
 
 async def test_popular_drops_what_one_click_cannot_connect(tmp_path):
-    # app.linear/mcp is in the list but needs a header token, so it is not one click.
+    # Linear is in the list but needs a header token here, so it is not one click.
     out = await Rig(tmp_path, mcp=SEARCH).call("setup_overview")
-    assert "app.linear/mcp" not in [r["id"] for r in out["popular"]]
+    assert "app.linear/linear" not in [r["id"] for r in out["popular_more"]]
 
 
 async def test_overview_passes_cursor_and_returns_next_cursor(tmp_path):
@@ -485,3 +488,68 @@ async def test_overview_registry_unavailable_keeps_installed_lists(tmp_path):
     assert out["app_groups"] == [] and out["popular"] == [] and out["stale"] is True
     assert out["apps"] == [{"id": "a1", "name": "N", "state": "off"}]
     assert out["next_cursor"] is None
+
+
+CURATED = json.dumps(
+    {
+        "servers": [
+            *[server(f"io.github.u{i}/tool-{i}", f"Tool {i}", "x", **remote()) for i in range(30)],
+            server("com.notion/mcp", "Notion", "Official.", **remote("mcp.notion.test")),
+            server("app.linear/linear", "Linear", "Issues.", **remote("mcp.linear.test")),
+            server("com.atlassian/atlassian-mcp-server", "Atlassian", "Jira.", **remote()),
+        ]
+    }
+).encode()
+
+
+async def test_no_query_shows_only_the_curated_lists(tmp_path):
+    out = await Rig(tmp_path, mcp=CURATED).call("setup_overview")
+    assert [r["id"] for r in out["popular"]] == ["com.notion/mcp"]
+    assert [r["id"] for r in out["popular_more"]] == [
+        "app.linear/linear",
+        "com.atlassian/atlassian-mcp-server",
+    ]
+    assert out["browse_apps"] == [] and out["app_groups"] == []
+    assert "io.github.u" not in json.dumps(out)
+
+
+async def test_popular_skips_one_failing_id_and_keeps_the_rest(tmp_path, monkeypatch):
+    ids = ("com.notion/mcp", "app.linear/linear", "com.atlassian/atlassian-mcp-server")
+    monkeypatch.setattr(home_tools, "POPULAR_APPS", ids)
+    out = await Rig(tmp_path, mcp=CURATED, fail_on="search=linear").call("setup_overview")
+    assert [r["id"] for r in out["popular"]] == [ids[0], ids[2]]
+
+
+async def test_dropped_unverified_id_is_silent(tmp_path):
+    only_notion = json.dumps(
+        {"servers": [server("com.notion/mcp", "Notion", "Official.", **remote())]}
+    ).encode()
+    out = await Rig(tmp_path, mcp=only_notion).call("setup_overview")
+    assert out["popular_more"] == [] and "error" not in out
+
+
+async def test_experts_curated_order_and_flags(tmp_path):
+    def agent(id):
+        return {
+            "id": id,
+            "name": id,
+            "version": "1",
+            "description": "d",
+            "license": "MIT",
+            "distribution": {"npx": {"package": f"@x/{id}@1"}},
+        }
+
+    ids = ["zed-acp", "codex-acp", "other-acp", "gemini", "claude-acp"]
+    acp = json.dumps({"agents": [agent(i) for i in ids]}).encode()
+    out = await Rig(tmp_path, acp=acp).call("setup_overview")
+    rows = out["browse_experts"]
+    assert [r["id"] for r in rows] == [
+        "claude-acp",
+        "gemini",
+        "codex-acp",
+        "zed-acp",
+        "other-acp",
+    ]
+    assert [r["recommended"] for r in rows] == [True, False, False, False, False]
+    assert rows[0]["tested"] is True and rows[3]["tested"] is False
+    assert out["show_more_from"] == 3

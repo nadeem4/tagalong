@@ -2514,8 +2514,16 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 1. Automated: `pnpm --filter @tagalong/ui exec vitest run src/home/app-search.test.tsx src/home/app-group-row.test.tsx src/home/check-card.test.tsx src/home/experts-tab.test.tsx src/home/connections-panel.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/setup.test.ts src/renderer/src/settings`; `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (after `pnpm --filter @tagalong/desktop build`).
 2. By hand, Home > Connections > Apps: type `notion` in **Search apps**. **Expected:** after a moment one Notion group, the **Official** version first with **Connect Notion**; "Show N other versions" lists community ones, each tagged **Community**.
 3. Press **Connect** on a community version. **Expected:** the check card opens (maker, where it runs, sign-in, licence, "Reviewed: Not yet audited by anyone", **See its code**, which opens your own browser); **Back** closes it and connects nothing. **Connect anyway** connects it.
-4. Clear the box. **Expected:** a **Popular** row. Disconnect from the network and search: one plain line says Scout could not reach the registry.
+4. Clear the box. **Expected:** a **Popular** row (the curated apps only; see D2 below). Disconnect from the network and search: one plain line says Scout could not reach the registry.
 5. Settings > **Where Scout looks for apps** lists the two registries, read only. Home > Jobs now holds the **Read my mail for loops** card.
+
+## Setup fixes: curated lists, installable experts, kept trust (D2)
+
+1. Automated, one file at a time from `brain/`: `uv run pytest tests/test_setup_trust.py -q`, then `tests/test_setup_install.py`, `tests/test_setup_home_tools.py`, `tests/test_setup_apps.py`, `tests/test_migrate_app_trust.py`, `tests/test_store_db.py`, and `uv run pytest tests/test_experts.py -q -k auth_status`.
+2. By hand, with the box empty: **Expected:** only the curated apps (Notion first; Linear, Jira and Confluence behind "Show more"), never a raw page of the registry. Experts list Claude Code first (Recommended, Tested with Scout), then Gemini CLI and Codex. Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana are absent: the registry has no Official one-click entry for them.
+3. An expert whose registry entry has a download but no checksum is not listed, and Scout's `find_experts` does not show it.
+4. Connect an Official app (Notion), restart the brain, open Home > Connections. **Expected:** it still shows as Official. A command added by hand shows as Community.
+5. Make an install fail (switch the network off during an expert install). **Expected:** `brain.log` has one WARNING naming the expert and the reason; a Claude Code login logs no `auth/status_update` error.
 
 ## Stop, restart and decline wording (F10)
 
