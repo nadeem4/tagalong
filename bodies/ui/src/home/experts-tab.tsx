@@ -11,7 +11,7 @@ import { FactsLine } from '../setup/facts-line';
 import { SearchField } from '../setup/search-field';
 import { AddedStatus, OutcomeText, Tile, Waiting } from './app-group-row';
 import { CheckCard } from './check-card';
-import { ExpertsGroup, FailLine, ProgressBlock } from './experts-group';
+import { ExpertsGroup, FailLine, InstallingCard } from './experts-group';
 import { useOutcomes, type Outcome } from './outcome';
 import type { UpdatesControls } from './updates-bar';
 
@@ -58,9 +58,7 @@ function ExpertItem({
         </div>
         <div className="cx-row__side">
           {outcome !== undefined && <OutcomeText outcome={outcome} />}
-          {installing && progress !== null ? (
-            <ProgressBlock progress={progress} />
-          ) : working ? (
+          {installing ? null : working ? (
             <Waiting />
           ) : item.added ? (
             outcome === undefined && <AddedStatus />
@@ -80,6 +78,9 @@ function ExpertItem({
           )}
         </div>
       </div>
+      {installing && progress !== null && (
+        <InstallingCard progress={progress} name={item.name} official={item.official} />
+      )}
       {failed && !installing && <FailLine name={item.name} onRetry={add} />}
       {checking && (
         <CheckCard

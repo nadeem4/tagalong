@@ -446,6 +446,11 @@ async def test_card_input_names_the_node_download_when_the_system_node_is_old(tm
     assert card["node_download"] == {"version": "v22.12.0", "into": str(node_dir(tmp_path))}
 
 
+async def test_card_input_marks_the_recommended_expert(tmp_path):
+    card = await install_card(npx_entry(), tmp_path, machine(), index_only)
+    assert card["recommended"] is True  # npx_entry() is claude-acp, the recommended one
+
+
 async def test_card_and_install_use_the_pinned_version_not_the_entrys(tmp_path, ensure):
     entry = npx_entry(version="0.99.9", pinned="0.99.1")
     card = await install_card(entry, tmp_path, machine(), index_only)

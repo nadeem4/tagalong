@@ -157,8 +157,8 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   const panel = await windowFor('panel');
   const mic = panel.getByRole('button', { name: 'Talk to Scout' });
   await mic.waitFor({ state: 'visible', timeout: 30_000 });
-  // The mic sits inside the ask field's box, not over its text.
-  const fieldBox = await panel.getByRole('textbox', { name: 'Ask Scout' }).boundingBox();
+  // The mic sits inside the composer's box, beside the text.
+  const fieldBox = await panel.locator('.bubble-field').boundingBox();
   const micBox = await mic.boundingBox();
   expect(fieldBox).not.toBeNull();
   expect(micBox).not.toBeNull();

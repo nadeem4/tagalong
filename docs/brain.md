@@ -812,7 +812,7 @@ so there is one gate and no second path.
 | `stop_job`         | `{"job": str, "part?": str}`                   | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                                                                                          |
 | `timers_state`     | `{}`                                           | `{"timers": [{id, note, next_at, repeat_minutes, pending}]}`, soonest first; Home only                                                                                                                                                                                                      |
 | `timer_cancel`     | `{"id": str}`                                  | `{"id"}`; an unknown id or a watch row is `invalid_params`; Home only                                                                                                                                                                                                                       |
-| `job_activity`     | `{"job?": str, "after_rev?": int}`             | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                                                                                                                     |
+| `job_activity`     | `{"job?": str, "after_rev?": int}`             | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, part, expert, text, kind, title, at}]}`; Home only                                                                                                                                                  |
 | `job_report`       | `{"job": str, "part": str}`                    | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                                                                                                             |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
@@ -1041,7 +1041,8 @@ words what the person reads (guidance in `mind/soul.md`).
   button), so a stored Auto never opens it, `set_mode`
   refuses it and the side-check never sees the ask; a preference in Scout's prompt cannot skip
   the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
-  folder, and `node_download` (the Node version and folder, or `null` when a system Node is new
+  folder, `recommended` (true for the recommended expert, so the chat's card shows its
+  "Recommended" chip), and `node_download` (the Node version and folder, or `null` when a system Node is new
   enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
   background, outside the turn, one per expert id at a time (a second ask for the same id is
   refused with `already_installing` before the Allow card is shown). `tagalong stop` ends the

@@ -84,6 +84,8 @@ export interface FakeBrain {
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
   setReading(rows: Record<string, unknown>[]): void;
+  /** Shot scenes: replace the apps list and/or the setup answers (progress, failed, experts) and tell the bodies. */
+  setScene(scene: { apps?: unknown[] | null; setup?: Record<string, unknown> }): void;
   /**
    * Add fields to the `setup_overview` answer (progress, failed...), optionally make searches fail
    * (`true`) or never answer (`'hang'`, for a steady "Searching…" shot), and tell the bodies
@@ -276,6 +278,39 @@ const NOTION_GROUP = {
   ],
 };
 
+const LONG_ANSWER = [
+  "**The test never picks a folder, so every read is refused.** Yesterday's change made the file tools check the chosen folders first.",
+  '',
+  '- Fix: set a chosen folder in the fixture.',
+  '- Three other tests share that fixture and will pass too.',
+  '- Nothing in the app itself needs to change.',
+  '',
+  '```ts',
+  'const home = await tmpHome();',
+  "await chooseFolder(home, 'notes');",
+  'return { home, files: fileTools(home) };',
+  '```',
+].join('\n');
+
+const INSTALL_FACTS: Record<string, Record<string, unknown>> = {
+  notion: {
+    app: 'notion',
+    official: true,
+    publisher: 'Notion',
+    runs: 'hosted',
+    sign_in: 'browser',
+  },
+  obsidian: {
+    app: 'obsidian',
+    official: false,
+    publisher: 'vaultkit',
+    runs: 'pc',
+    sign_in: 'none',
+    licence: 'MIT',
+    repo: 'github.com/vaultkit/obsidian-mcp',
+  },
+  claude: { expert: 'claude-acp', official: true, publisher: 'Anthropic', recommended: true },
+};
 const expertChoice = (id: string, name: string, over: Record<string, unknown> = {}) => ({
   id,
   name,
@@ -395,6 +430,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const appSetups: string[] = [];
   const appFlags: { approved: unknown; communityOk: unknown }[] = [];
   let expertInstalled = false;
+  // A shot scene's own apps and setup answers (null / empty: the defaults).
+  let sceneApps: unknown[] | null = null;
+  let sceneSetup: Record<string, unknown> = {};
   // E1: what `updates_state` answers (Files has an update waiting, Wiki is a remote app), what
   // the page pressed, and the rows `list_apps` answers (a shot swaps them for the mockup's).
   let updatesState: Record<string, unknown> = {
@@ -677,9 +715,16 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         );
         const base = { turn, body: 'desktop' };
         const spoken = msg.params?.spoken === true || readAloud.on === true;
+        // A scene that streams its own sentence leaves the default reply out.
+        let scripted = false;
         const finish = () => {
-          notify('reply', { ...base, delta: 'This is the ' });
-          notify('reply', { ...base, delta: 'fake brain.' });
+          // The shots ask for a long, formatted answer: a gist, a list and a code block.
+          const parts = String(msg.params?.text ?? '').includes('explain the failing test')
+            ? [LONG_ANSWER]
+            : scripted
+              ? []
+              : ['This is the ', 'fake brain.'];
+          for (const delta of parts) notify('reply', { ...base, delta });
           notify('reply', { ...base, done: true });
           notify('turn', { ...base, state: 'ended', reason: 'done' });
           if (spoken) {
@@ -702,6 +747,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               params: { call: `c-${turn}`, tool: 'list_windows', input: {} },
             }),
           );
+        } else if (msg.params?.text?.includes('break it')) {
+          // A turn the brain could not finish: the chat shows its error box.
+          notify('turn', { ...base, state: 'ended', reason: 'error' });
+        } else if (msg.params?.text?.includes('think slowly')) {
+          // A turn that stays open: the chat shows Scout thinking until the app closes.
         } else if (msg.params?.text?.includes('permission')) {
           const ask = `a${turns}`;
           held.set(ask, finish);
@@ -714,6 +764,59 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             confirm: true,
             tool: 'desktop__move_window',
             input: { x: 0 },
+          });
+        } else if (/install (notion|obsidian|claude)/.test(String(msg.params?.text ?? ''))) {
+          // An install ask: its facts ride in `input`, and the chat draws one install card.
+          const which = /install (notion|obsidian|claude)/.exec(String(msg.params?.text))![1]!;
+          const ask = `a${turns}`;
+          held.set(ask, finish);
+          // Scout says a sentence first, as the real brain does, so the card sits under words.
+          const lead =
+            which === 'obsidian'
+              ? 'That one is made by someone else, so check it first.'
+              : which === 'claude'
+                ? 'Claude Code can take the long jobs. I need to set it up first.'
+                : 'Notion works through its own sign-in. I need to connect it first.';
+          notify('reply', { ...base, delta: lead });
+          scripted = true;
+          notify('ask', {
+            id: ask,
+            state: 'open',
+            turn,
+            text: which === 'claude' ? 'Install Claude Code?' : `Install ${which}?`,
+            options: ['allow', 'deny'],
+            confirm: true,
+            tool: which === 'claude' ? 'install_expert' : 'install_app',
+            input: INSTALL_FACTS[which],
+          });
+        } else if (msg.params?.text?.includes('locked ask')) {
+          // A tool that can never be always allowed: only Not now and Allow, with the chip.
+          const ask = `a${turns}`;
+          held.set(ask, finish);
+          notify('ask', {
+            id: ask,
+            state: 'open',
+            turn,
+            text: 'Send the reply to Sam?',
+            options: ['allow', 'deny'],
+            confirm: true,
+            tool: 'gmail__send_message',
+            input: {
+              to: 'sam@northwind.example',
+              body: 'Running 15 minutes late to the design review, sorry.',
+            },
+          });
+        } else if (msg.params?.text?.includes('choose')) {
+          // Scout's own choice: no tool, no confirm, one recommended option.
+          finish();
+          notify('ask', {
+            id: 'c1',
+            state: 'open',
+            text: 'Who should fix the fixture?',
+            options: ['Claude Code', 'Gemini CLI'],
+            recommended: 'Claude Code',
+            free_text: false,
+            tool: 'choose', // as the brain sends it, so the body shows the choice and no text box
           });
         } else if (msg.params?.text?.includes('offer')) {
           // The turn ends first; the offer is a plain ask, as the brain sends it.
@@ -937,6 +1040,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 ? { expert: 'claude-acp', stage: 'node', percent: options.expertInstallingPercent }
                 : null,
             failed: null,
+            ...sceneSetup,
             ...setupPatch,
           };
         } else if (params.tool === 'setup_app') {
@@ -959,7 +1063,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
             ],
           };
-        } else if (params.tool === 'list_apps') value = { apps: appRows };
+        } else if (params.tool === 'list_apps') value = { apps: sceneApps ?? appRows };
         else if (params.tool === 'updates_state') value = updatesState;
         else if (params.tool === 'updates_check') {
           updateCalls.push('check');
@@ -1176,6 +1280,21 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       }
     },
     readingEvents,
+    setScene: (scene) => {
+      if (scene.apps !== undefined) sceneApps = scene.apps;
+      if (scene.setup !== undefined) sceneSetup = scene.setup;
+      for (const what of ['apps', 'setup']) {
+        for (const socket of sockets) {
+          socket.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'changed',
+              params: { seq: ++seq, what },
+            }),
+          );
+        }
+      }
+    },
     setReading: (rows) => {
       readingRows = rows;
       for (const socket of sockets) {

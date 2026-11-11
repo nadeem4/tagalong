@@ -19,11 +19,13 @@ import { CONTROLS_CSS } from './controls/controls-styles';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
-import { CloseIcon, CollapseIcon } from './chat-icons';
+import { CloseIcon, CollapseIcon, ExpandIcon, EyeIcon, MicIcon, SendIcon } from './chat-icons';
 import { ScoutMark } from './scout-mark';
 import { Keycap } from './controls';
+import { Icon } from './setup/icons';
 import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
+import { InstallConfirm } from './setup/install-confirm';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { JobLine, useRunningStep } from './job-line';
@@ -107,6 +109,23 @@ interface Chip {
   label: string;
 }
 
+/** Scout's reply in the full chat: its mark in a 24px gutter, the words beside it. */
+function ScoutReply({ scout, children }: { scout: BeanClipData | undefined; children: ReactNode }) {
+  return (
+    <div className="bubble-scout">
+      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={24} />
+      <div className="bubble-scout-body">{children}</div>
+    </div>
+  );
+}
+
+/** What Scout is doing while a tool runs, in the mockup's words; the brain sends only the tool's name. */
+function doingOf(tool: string): string {
+  if (/search|web/.test(tool)) return 'searching the web';
+  if (/read|screen|file|look/.test(tool)) return 'reading';
+  return 'working on it';
+}
+
 function chipsOf(snapshot: ContextSnapshot | undefined): Chip[] {
   if (snapshot === undefined) return [];
   const chips: Chip[] = [];
@@ -131,9 +150,15 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 type Reply =
   | { state: 'idle' }
   // `steps`: where the text stood when each tool call began, to find where an ask's step starts.
-  | { state: 'running'; turnId: string | null; text: string; steps?: number[] }
+  | { state: 'running'; turnId: string | null; text: string; steps?: number[]; doing?: string }
   | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
+
+/** An app or expert install ask that carries the card's facts. */
+const isInstallAsk = (c: ConnectorConfirmParams): boolean =>
+  (c.tool === 'install_app' || c.tool === 'install_expert') && c.facts !== undefined;
+const installKey = (c: ConnectorConfirmParams): string =>
+  String(c.facts?.app ?? c.facts?.expert ?? c.approvalId);
 
 /**
  * The companion's bubble beside the pet: the quick way to ask about what is on screen.
@@ -165,13 +190,20 @@ export function CompanionBubble({
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
   const [reply, setReply] = useState<Reply>({ state: 'idle' });
-  // A change Scout wants to make in a connected app, waiting for Allow once, Always allow or Deny.
+  // A change Scout wants to make in a connected app, waiting for Allow, Always allow or Not now.
   // The brain can ask about several tools at once, so they queue oldest first and the card
   // shows the head; answering or dismissing it brings up the next.
   const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
+  // Install asks (an app or an expert) are one card each that stays after Allow and follows the
+  // install, so they live apart: a dismiss or the turn's end must not take them away.
+  const [installs, setInstalls] = useState<ConnectorConfirmParams[]>([]);
+  // The header's words while an install card is working, keyed like the card.
+  const [installing, setInstalling] = useState<Record<string, string>>({});
   const confirm = confirms[0] ?? null;
   // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
   const dismissed = useRef(new Set<string>());
+  // Install asks whose Allow was pressed: their card follows the install and outlives the ask.
+  const allowing = useRef(new Set<string>());
   const dropConfirms = (gone: (c: ConnectorConfirmParams) => boolean): void =>
     setConfirms((current) => {
       const next = current.filter((c) => !gone(c));
@@ -235,6 +267,12 @@ export function CompanionBubble({
     switch (event.type) {
       case 'connector.confirm': {
         const { type: _type, ...params } = event;
+        if (isInstallAsk(params)) {
+          // One card per install: a new ask for the same one replaces it.
+          const key = installKey(params);
+          setInstalls((current) => [...current.filter((c) => installKey(c) !== key), params]);
+          return;
+        }
         // A repeat of a queued ask updates it in place; a new one waits its turn.
         setConfirms((current) =>
           current.some((c) => c.approvalId === params.approvalId)
@@ -244,9 +282,16 @@ export function CompanionBubble({
         return;
       }
       case 'connector.dismiss':
-        // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
+        // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes. An
+        // install card goes only while it still asks: once Allowed it follows the install and
+        // the person closes it.
         dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
+        setInstalls((current) =>
+          current.filter(
+            (c) => c.approvalId !== event.approvalId || allowing.current.has(c.approvalId),
+          ),
+        );
         return;
       case 'turn.started':
         // A background turn (Scout's own wake) runs on its own; it never answers here.
@@ -262,6 +307,7 @@ export function CompanionBubble({
             ? {
                 ...current,
                 steps: [...(current.steps ?? []), current.text.length],
+                doing: doingOf(event.tool),
               }
             : current,
         );
@@ -339,51 +385,109 @@ export function CompanionBubble({
   );
 
   const listening = talk !== undefined && talk.state === 'listening';
+  // The mic's tooltip is drawn like the header's (not the native title), and says the talk key.
   const micButton = talk !== undefined && (
-    <button
-      type="button"
-      className="bubble-mic"
-      aria-label={listening ? 'Stop listening' : `Talk to ${petName}`}
-      aria-pressed={listening}
-      title={listening ? 'Stop listening' : `Talk to ${petName} (or hold ${talk.keyLabel})`}
-      onClick={talk.onMic}
-    >
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-        <rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5" fill="currentColor" />
-        <path d="M3 8a5 5 0 0 0 10 0M8 13v2" stroke="currentColor" fill="none" strokeWidth="1.5" />
-      </svg>
-    </button>
+    <span className="bubble-tgwrap">
+      <button
+        type="button"
+        className="bubble-mic"
+        aria-label={listening ? 'Stop listening' : `Talk to ${petName}`}
+        aria-pressed={listening}
+        aria-describedby="tip-mic"
+        onClick={talk.onMic}
+      >
+        <MicIcon state={listening ? 'on' : 'plain'} />
+      </button>
+      <span className="bubble-tip bubble-tip--up" role="tooltip" id="tip-mic">
+        {listening ? (
+          'Stop listening'
+        ) : (
+          <>
+            Hold <Keycap>{talk.keyLabel}</Keycap> to talk
+          </>
+        )}
+      </span>
+    </span>
   );
-  const alwaysToggle = talk?.always !== undefined && (
-    <button
-      type="button"
-      role="switch"
-      className="bubble-toggle"
-      aria-checked={talk.always.on}
-      onClick={talk.always.onToggle}
-      title={
-        talk.always.on
-          ? 'Scout is listening all the time. Click to stop.'
-          : 'Let Scout listen all the time'
-      }
-    >
-      Always listening
-    </button>
+  // A header toggle: an icon button (pressed = on) with the tooltip the mockup draws beside it.
+  const headToggle = (
+    label: string,
+    on: boolean,
+    onToggle: () => void,
+    icon: ReactNode,
+    tip: { title: string; sub?: string },
+  ) => (
+    <span className="bubble-tgwrap">
+      <button
+        type="button"
+        className="bubble-tg"
+        aria-label={label}
+        aria-pressed={on}
+        aria-describedby={`tip-${label.replace(/\s/g, '-')}`}
+        onClick={onToggle}
+      >
+        {icon}
+      </button>
+      <span className="bubble-tip" role="tooltip" id={`tip-${label.replace(/\s/g, '-')}`}>
+        {tip.title}
+        {tip.sub !== undefined && <span className="bubble-tip-sub">{tip.sub}</span>}
+      </span>
+    </span>
   );
-  const seeingToggle = seeing !== undefined && (
+  const alwaysToggle =
+    talk?.always !== undefined &&
+    headToggle(
+      'Always listening',
+      talk.always.on,
+      talk.always.onToggle,
+      <MicIcon state={talk.always.on ? 'on' : 'off'} />,
+      talk.always.on
+        ? { title: 'Always listening: on', sub: 'Click to turn off.' }
+        : {
+            title: 'Always listening: off',
+            sub: `Click to turn on. Hold ${talk.keyLabel} to talk once.`,
+          },
+    );
+  const seeingToggle =
+    seeing !== undefined &&
+    headToggle(
+      'Seeing your screen',
+      seeing.on,
+      seeing.onToggle,
+      <EyeIcon on={seeing.on} />,
+      seeing.on
+        ? { title: 'Seeing your screen: on', sub: 'Click to pause.' }
+        : { title: 'Seeing your screen: off', sub: 'Click to let Scout see.' },
+    );
+  // What Scout is doing right now, in the header's second line.
+  const talking =
+    past.length > 0 ||
+    question !== null ||
+    scoutLine !== null ||
+    confirms.length > 0 ||
+    installs.length > 0;
+  const headStatus =
+    Object.values(installing)[0] ??
+    (talk?.always === undefined && seeing === undefined
+      ? 'Ready'
+      : talk?.always?.on === true && seeing?.on === true
+        ? 'Listening · seeing your screen'
+        : talk?.always?.on === true
+          ? 'Listening'
+          : seeing?.on === true
+            ? 'Seeing your screen'
+            : talking
+              ? 'Ready'
+              : 'Not listening or looking');
+  const expandButton = onOpenChat !== undefined && (
     <button
       type="button"
-      role="switch"
-      className="bubble-toggle"
-      aria-checked={seeing.on}
-      onClick={seeing.onToggle}
-      title={
-        seeing.on
-          ? 'Scout can see your screen. Click to pause.'
-          : 'Sight is paused. Click to let Scout see.'
-      }
+      className="bubble-tg"
+      aria-label="Open full chat"
+      title="Open full chat"
+      onClick={onOpenChat}
     >
-      Seeing
+      <ExpandIcon />
     </button>
   );
   const talkLine =
@@ -410,7 +514,10 @@ export function CompanionBubble({
     </p>
   );
   const runningStep = useRunningStep(bridge);
-  const jobLine = runningStep !== null && <JobLine step={runningStep} />;
+  // The moving bar is the full chat's; the quick bubble keeps just the title and the step.
+  const jobLine = runningStep !== null && (
+    <JobLine step={runningStep} bar={expanded} onOpenTasks={() => void bridge.openFix('tasks')} />
+  );
   const statusRow = status != null && (
     <StatusMark
       mark={status}
@@ -501,6 +608,12 @@ export function CompanionBubble({
       });
   };
 
+  // A card's "try this" or "try again" asks as the person: never over an answer still running.
+  const askAgain = (text: string): void => {
+    if (reply.state === 'running') return;
+    submit(text, undefined);
+  };
+
   const send = (): void => {
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
@@ -550,6 +663,14 @@ export function CompanionBubble({
 
   // The chat opens on, and follows, the newest message. Only new content moves it, never typing.
   const log = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  // The composer grows with its text, up to a few lines, then scrolls.
+  useEffect(() => {
+    const el = box.current;
+    if (el === null) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [draft]);
   const streamed = reply.state === 'idle' ? '' : reply.text;
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -557,7 +678,17 @@ export function CompanionBubble({
       if (element !== null) element.scrollTop = element.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
-  }, [past.length, question, streamed, scoutLine, expanded, confirm, health, openDrop]);
+  }, [
+    past.length,
+    question,
+    streamed,
+    scoutLine,
+    expanded,
+    confirm,
+    installs.length,
+    health,
+    openDrop,
+  ]);
 
   const chips = chipsOf(snapshot).filter((chip) => !removed.has(chip.id));
   const chipList = chips.length > 0 && (
@@ -587,6 +718,18 @@ export function CompanionBubble({
       : null;
   const shownText =
     reply.state !== 'running' ? '' : askStep === null ? reply.text : reply.text.slice(0, askStep);
+  // A failed reply is a full-width box with no avatar, so it sits where a past failure does.
+  const failedBox = reply.state === 'failed' && (
+    <div role="alert" className="bubble-error">
+      <Icon name="error" />
+      <span>{reply.text}</span>
+      {question !== null && (
+        <button type="button" className="bubble-link" onClick={() => askAgain(question)}>
+          Try again
+        </button>
+      )}
+    </div>
+  );
   const turnAnswer = (
     <>
       {reply.state === 'running' && (
@@ -598,8 +741,12 @@ export function CompanionBubble({
           <div className="bubble-live">
             {reply.text === '' ? (
               <span className="bubble-thinking">
-                <span className="bubble-dot" aria-hidden="true" />
-                {petName} is thinking…
+                <span className="bubble-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                {petName} is {reply.doing ?? 'thinking'}…
               </span>
             ) : (
               <span />
@@ -616,14 +763,10 @@ export function CompanionBubble({
       )}
       {reply.state === 'done' && reply.status === undefined && (
         <div className="bubble-answer">
-          <Answer text={reply.text} />
+          <Answer text={reply.text} gist={expanded} />
         </div>
       )}
-      {reply.state === 'failed' && (
-        <p role="alert" className="bubble-error">
-          {reply.text}
-        </p>
-      )}
+      {failedBox}
     </>
   );
   // A line Scout starts: its mark and name above the words.
@@ -671,6 +814,35 @@ export function CompanionBubble({
     setOpenDrop(undefined);
     onDropDone?.();
   };
+  // Install cards sit under Scout's sentence in the same reply: the current answer, else the
+  // last exchange's. With no reply to join (Scout's own line, a failed turn) they get their own.
+  const installCards = installs.map((install) => (
+    <InstallConfirm
+      key={install.approvalId}
+      confirm={install}
+      onAllowing={(on) =>
+        on ? allowing.current.add(install.approvalId) : allowing.current.delete(install.approvalId)
+      }
+      onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
+      onTry={askAgain}
+      onRetry={(name) => askAgain(`Set up ${name} again`)}
+      onWorking={(words) =>
+        setInstalling((current) => {
+          const key = installKey(install);
+          const { [key]: _gone, ...rest } = current;
+          return words === null ? rest : { ...rest, [key]: words };
+        })
+      }
+    />
+  ));
+  const lastPast = past[past.length - 1];
+  const installsInReply =
+    expanded &&
+    installs.length > 0 &&
+    scoutLine === null &&
+    (question !== null
+      ? health === null
+      : lastPast !== undefined && lastPast.question !== null && !lastPast.failed);
   const cards = (
     <>
       {openDrop !== undefined && (
@@ -689,6 +861,9 @@ export function CompanionBubble({
           }}
         />
       )}
+      {installs.length > 0 &&
+        !installsInReply &&
+        (expanded ? <ScoutReply scout={scout}>{installCards}</ScoutReply> : installCards)}
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}
@@ -704,29 +879,79 @@ export function CompanionBubble({
     scoutLine !== null || (question === null && past[past.length - 1]?.question === null);
   const field = (label: string, inChat = false) => (
     <label className="bubble-field">
-      <span className={inChat ? 'bubble-sr' : undefined}>{label}</span>
-      {/* Named outright: the mic button inside the label would join its name in Chromium. */}
-      <input
+      <span className="bubble-sr">{label}</span>
+      {/* Named outright: the buttons inside the label would join its name in Chromium. */}
+      <textarea
+        ref={box}
+        rows={1}
         aria-label={label}
-        placeholder={
-          inChat ? (replying ? `Reply to ${petName}` : `Ask ${petName} anything`) : undefined
-        }
+        placeholder={`${replying ? 'Reply to' : 'Ask'} ${petName}…${
+          talk === undefined ? '' : ` or hold ${talk.keyLabel} to talk`
+        }`}
         value={draft}
         autoFocus
+        data-chat={inChat ? 'true' : undefined}
         aria-busy={reply.state === 'running' ? 'true' : undefined}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') send();
+          // Shift+Enter is left to the browser: it adds the line.
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            send();
+          }
         }}
       />
       {micButton}
+      <button
+        type="button"
+        className="bubble-send"
+        aria-label="Send"
+        disabled={draft.trim() === '' || reply.state === 'running'}
+        onClick={send}
+      >
+        <SendIcon />
+      </button>
     </label>
   );
 
   const closeButton = onClose !== undefined && (
-    <button type="button" className="bubble-close" aria-label="Close" onClick={onClose}>
+    <button type="button" className="bubble-close bubble-tg" aria-label="Close" onClick={onClose}>
       <CloseIcon />
     </button>
+  );
+
+  // The header of both windows: Scout's mark, name and what it is doing, the toggles and the exits.
+  const header = (quick: boolean) => (
+    <header className={quick ? 'bubble-head bubble-head--quick' : 'bubble-head'}>
+      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={quick ? 28 : 32} />
+      <span className="bubble-headwho">
+        <strong>{petName}</strong>
+        <span className="bubble-headstatus" data-testid="head-status">
+          <span className="bubble-priv" aria-hidden="true" />
+          <span className="bubble-headtext">{headStatus}</span>
+        </span>
+      </span>
+      <span className="bubble-row">
+        {alwaysToggle}
+        {seeingToggle}
+        {speakingIndicator}
+        {(alwaysToggle || seeingToggle) && <span className="bubble-sep" aria-hidden="true" />}
+        {quick
+          ? expandButton
+          : onCollapse !== undefined && (
+              <button
+                type="button"
+                className="bubble-tg"
+                aria-label="Back to bubble"
+                title="Back to bubble"
+                onClick={onCollapse}
+              >
+                <CollapseIcon />
+              </button>
+            )}
+        {closeButton}
+      </span>
+    </header>
   );
 
   if (expanded) {
@@ -738,27 +963,7 @@ export function CompanionBubble({
           <style>{ANSWER_CSS}</style>
           <style>{CARD_CSS}</style>
           <style>{CHAT_CSS}</style>
-          <header className="bubble-head">
-            <strong>{petName}</strong>
-            <span className="bubble-row">
-              {alwaysToggle}
-              {seeingToggle}
-              {speakingIndicator}
-              {(alwaysToggle || seeingToggle) && <span className="bubble-sep" aria-hidden="true" />}
-              {onCollapse !== undefined && (
-                <button
-                  type="button"
-                  className="bubble-icon"
-                  aria-label="Back to bubble"
-                  title="Back to bubble"
-                  onClick={onCollapse}
-                >
-                  <CollapseIcon />
-                </button>
-              )}
-              {closeButton}
-            </span>
-          </header>
+          {header(false)}
           <div
             ref={log}
             className="bubble-log"
@@ -782,9 +987,18 @@ export function CompanionBubble({
                 {exchange.question === null ? (
                   scoutSays(exchange.answer)
                 ) : exchange.failed ? (
-                  <p className="bubble-error">{exchange.answer}</p>
+                  <div className="bubble-error">
+                    <Icon name="error" />
+                    <span>{exchange.answer}</span>
+                  </div>
                 ) : (
-                  <Answer text={exchange.answer} />
+                  <ScoutReply scout={scout}>
+                    <Answer text={exchange.answer} gist />
+                    {installsInReply &&
+                      question === null &&
+                      index === past.length - 1 &&
+                      installCards}
+                  </ScoutReply>
                 )}
               </div>
             ))}
@@ -792,7 +1006,14 @@ export function CompanionBubble({
             {question !== null && (
               <div className="bubble-exchange">
                 <p className="bubble-mine">{question}</p>
-                {answer}
+                {health === null && reply.state === 'failed' ? (
+                  failedBox
+                ) : (
+                  <ScoutReply scout={scout}>
+                    {answer}
+                    {installsInReply && installCards}
+                  </ScoutReply>
+                )}
               </div>
             )}
             {cards}
@@ -812,43 +1033,29 @@ export function CompanionBubble({
 
   return (
     <Speech tail={tail}>
-      <div className="bubble on-navy">
+      <div className="bubble bubble--quick on-navy">
         <style>{CONTROLS_CSS}</style>
         <style>{BUBBLE_CSS}</style>
         <style>{ANSWER_CSS}</style>
         <style>{CARD_CSS}</style>
         <style>{CHAT_CSS}</style>
-        <div className="bubble-top">
-          <span className="bubble-row">
-            {alwaysToggle}
-            {seeingToggle}
-            {speakingIndicator}
-            {closeButton}
-          </span>
-        </div>
-        {chipList}
-        {askedAloud && question !== null && (
-          <p className="bubble-heard">
-            <span className="bubble-sr">You said: </span>
-            {question}
-          </p>
-        )}
-        {scoutMessage}
-        {answer}
-        {cards}
-        {jobLine}
-        {statusRow}
-        {talkStatus}
-        {field(`Ask ${petName}`)}
-        <div className="bubble-row bubble-hints">
-          {replyHint}
-          <span>Enter to ask</span>
-          <span>Esc to close</span>
-          {onOpenChat !== undefined && (
-            <button type="button" className="bubble-quiet" onClick={onOpenChat}>
-              Open full chat
-            </button>
+        {header(true)}
+        <div className="bubble-compact">
+          {chipList}
+          {askedAloud && question !== null && (
+            <p className="bubble-heard">
+              <span className="bubble-sr">You said: </span>
+              {question}
+            </p>
           )}
+          {scoutMessage}
+          {answer}
+          {cards}
+          {jobLine}
+          {statusRow}
+          {talkStatus}
+          {field(`Ask ${petName}`)}
+          {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
         </div>
       </div>
     </Speech>
@@ -1011,16 +1218,6 @@ const BUBBLE_CSS = `
 .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
 .bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .bubble-mic:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
-.bubble-toggle {
-  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
-  border: 1px solid ${t.color.fieldLine}; border-radius: 999px; background: transparent;
-  color: ${t.color.textMuted}; font: inherit; ${typeCss('small')}; cursor: pointer;
-}
-.bubble-toggle::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine};
-}
-.bubble-toggle:hover { background: #222845; color: ${t.color.text}; }
-.bubble-toggle:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
   background: #222845; color: #C9CEE0; ${typeCss('body')};
@@ -1048,30 +1245,25 @@ const BUBBLE_CSS = `
 }
 .bubble-text { margin: 0; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble-status { margin: 0; color: #C9CEE0; ${typeCss('small')}; }
-.bubble-jobline {
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
-.bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; ${typeCss('body')}; }
+.bubble-error {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px;
+  background: #3a1d2a; color: #ffb4c0; ${typeCss('body')};
+}
+.bubble-error > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bubble-error .cx-icon { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.bubble-error .bubble-link { color: #ffd9df; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bubble-chip {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px;
   padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; ${typeCss('small')};
 }
-.bubble-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble-chip button {
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; ${typeCss('small')}; color: ${t.color.textMuted}; }
-.bubble-field input {
-  flex: none; height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
-  border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; ${typeCss('bodyLead')};
-}
-.bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
 .bubble-hints { ${typeCss('caption')}; color: ${t.color.textMuted}; }
-.bubble-hints .bubble-quiet { margin-left: auto; }
 .bubble-primary {
   height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: ${t.color.gold};
   color: ${t.color.goldInk}; font: inherit; font-weight: 600; cursor: pointer;

@@ -72,3 +72,20 @@ test('an ask shows in the bubble and Always allow answers the brain', async () =
   await expect(card).toHaveCount(0);
   await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
 });
+
+test('an install ask is one install card that stays after Allow', async () => {
+  const panel = await windowFor('panel');
+  const field = panel.getByLabel(/^(Ask|Reply to) /);
+  await field.fill('please install notion');
+  await field.press('Enter');
+
+  const card = panel.getByRole('group', { name: 'Set up Notion' });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await expect(card).toContainText('Official');
+  await card.getByRole('button', { name: 'Allow' }).click();
+  await expect
+    .poll(() => brain.answers.at(-1), { timeout: 15_000 })
+    .toMatchObject({ option: 'allow' });
+  // The card stays and moves on to its steps; it is not dropped with the answer.
+  await expect(card.getByRole('list', { name: 'Steps' })).toBeVisible({ timeout: 15_000 });
+});

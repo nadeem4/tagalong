@@ -29,7 +29,7 @@ export interface StatusMark {
 
 /** Where a Fix it button lands: a Settings section, or a Home page. */
 /** `key` opens the walkthrough's key step (step 9), not a Settings section. */
-export type FixTarget = 'voice' | 'connections' | 'key';
+export type FixTarget = 'voice' | 'connections' | 'tasks' | 'key';
 
 /**
  * tag: the 1-2 words on Scout. detail: the tooltip, the aria label and the bubble row. A mark

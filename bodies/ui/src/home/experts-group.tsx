@@ -1,8 +1,8 @@
 /**
  * "Your experts" on Home's Connections page: the installed experts grouped Official then
  * Community, each with its version and the kind of job it does, its state and the action that
- * fits it (Sign in, Update). Also the pieces both expert lists share: the install progress block
- * and the "didn't finish" line. Contains ExpertsGroup, ProgressBlock and FailLine.
+ * fits it (Sign in, Update). Also the pieces both expert lists share: the install card
+ * (the chat's own, in its Working state) and the "didn't finish" line. Contains ExpertsGroup, InstallingCard, stageWords and FailLine.
  * The brain sends short tokens; the words are this page's.
  */
 
@@ -10,6 +10,7 @@ import type { SetupExpert, SetupOverview } from '../shapes';
 import { Button } from '../controls/button';
 import { DEFAULT_EXPERT_JOB, EXPERT_JOB } from '../jobs-kinds';
 import { Icon } from '../setup/icons';
+import { InstallCard } from '../setup/install-card';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
 import {
@@ -39,29 +40,32 @@ const STAGES: Record<string, string> = {
 
 type Progress = NonNullable<SetupOverview['progress']>;
 
-/** An install under way: its percent, a bar, and what it is doing now. */
-export function ProgressBlock({ progress }: { progress: Progress }) {
-  const { percent } = progress;
+/** The stage in this page's words; the install card in the chat uses them too. */
+export function stageWords(progress: { stage: string }): string {
+  return STAGES[progress.stage] ?? 'Working';
+}
+
+/** An install under way: the one install card in its Working state, on the light page. */
+export function InstallingCard({
+  progress,
+  name,
+  official,
+}: {
+  progress: Progress;
+  name: string;
+  official: boolean;
+}) {
   return (
-    <div className="cx-progress">
-      <div className="cx-progress__top">
-        <span>Installing…</span>
-        {percent !== undefined && <span>{percent}%</span>}
-      </div>
-      {percent !== undefined && (
-        <div
-          className="cx-bar"
-          role="progressbar"
-          aria-label="Installing"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-        >
-          <i style={{ width: `${percent}%` }} />
-        </div>
-      )}
-      <span className="cx-meta">{STAGES[progress.stage] ?? 'Working'}</span>
-    </div>
+    <InstallCard
+      subject={{ kind: 'expert', id: progress.expert ?? name, name, official }}
+      view={{
+        phase: 'working',
+        label: 'Installing…',
+        ...(progress.percent !== undefined ? { percent: progress.percent } : {}),
+        note: stageWords(progress),
+      }}
+      theme="light"
+    />
   );
 }
 
@@ -130,9 +134,7 @@ export function ExpertsGroup({
           </div>
           <div className="cx-row__side">
             {outcome !== undefined && <OutcomeText outcome={outcome} />}
-            {progress?.expert === expert.id ? (
-              <ProgressBlock progress={progress} />
-            ) : (
+            {progress?.expert === expert.id ? null : (
               <>
                 {update?.status === 'updated' && side}
                 <span
@@ -159,6 +161,9 @@ export function ExpertsGroup({
             )}
           </div>
         </section>
+        {progress?.expert === expert.id && (
+          <InstallingCard progress={progress} name={expert.name} official={expert.official} />
+        )}
         {failedId === expert.id && <FailLine name={expert.name} onRetry={() => onAct(expert.id)} />}
       </li>
     );

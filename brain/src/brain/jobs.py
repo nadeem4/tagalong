@@ -827,6 +827,8 @@ class Jobs:
                             "part": part.id,
                             "expert": names.get(part.agent, part.agent),
                             "text": step.text,
+                            "kind": step.kind,
+                            "title": job.title,
                             "at": step.at,
                         }
                     )

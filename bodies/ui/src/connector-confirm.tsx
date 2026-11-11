@@ -11,12 +11,21 @@ import type { ConnectorConfirmParams } from './shapes';
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string; apps?: string[] };
 
+/** `gmail__send_message` reads "send message": the app is on its own row, and underscores are not words. */
+const toolLabel = (tool: string): string =>
+  tool.includes(':') ? tool : tool.replace(/^.*?__/, '').replace(/_/g, ' ');
+
+/** A fact's row label: `to` reads "To", a message `body` reads "Says". */
+const factLabel = (key: string): string =>
+  key === 'body' ? 'Says' : key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
 
 /**
- * Built like the hand-off card: what will happen, then Allow once, Always allow and Deny.
+ * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
+ * A tool that cannot be always allowed carries the "Always asks" chip.
  * A brain ask (it carries `options`) leads with Scout's own words and drops Always allow when
- * the tool is locked; an app change keeps the connector wording and offers Allow once or Deny.
+ * the tool is locked; an app change keeps the connector wording and offers Allow or Not now.
  * A job's ask has options of its own (modes, Claude Code's permission names) or is a question,
  * so it shows each option as a button and, for a question, a text field; it answers by name.
  */
@@ -51,17 +60,21 @@ export function ConnectorConfirmCard({
     const sendTyped = (): void => {
       onReply({ option: confirm.question === true ? text : '', text });
     };
-    // The recommended option is listed first (so it is first in tab order) and marked.
-    const options = [...(confirm.options ?? [])].sort(
-      (a, b) => Number(b === confirm.recommended) - Number(a === confirm.recommended),
-    );
+    // The options keep the order Scout gave; the recommended one is the gold, marked row.
+    const options = confirm.options ?? [];
+    const gold =
+      confirm.recommended !== undefined && options.includes(confirm.recommended)
+        ? confirm.recommended
+        : options[0];
     // Only a card that came with apps answers with a list, so other asks stay as they were.
     const withApps = confirm.apps !== undefined ? { apps: kept.map((a) => a.id) } : {};
     return (
       <section className="card" aria-label={`${confirm.app} asks`}>
-        <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
-          {confirm.summary}
-        </p>
+        <div className="card-head">
+          <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
+            {confirm.summary}
+          </p>
+        </div>
         {typable && (
           <label className="bubble-field">
             Your answer
@@ -94,14 +107,15 @@ export function ConnectorConfirmCard({
           </div>
         )}
         <div className="bubble-choices" role="group" aria-label="Options">
-          {options.map((option, i) => (
+          {options.map((option) => (
             <button
               key={option}
               type="button"
-              className={`bubble-choice ${i === 0 ? 'bubble-primary' : 'bubble-quiet'}`}
+              className={`bubble-choice ${option === gold ? 'bubble-primary' : 'bubble-quiet'}`}
               onClick={() => onReply({ option, ...withApps })}
             >
-              <span>{option}</span>
+              <span className="bubble-radio" aria-hidden="true" />
+              <span className="bubble-choice-text">{option}</span>
               {option === confirm.recommended && (
                 <>
                   {' '}
@@ -132,9 +146,12 @@ export function ConnectorConfirmCard({
       className="card"
       aria-label={isAsk ? `Allow ${confirm.tool}?` : `Change something in ${confirm.app}?`}
     >
-      <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
-        {isAsk ? what : `Change in ${confirm.app} — allow?`}
-      </p>
+      <div className="card-head">
+        <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
+          {isAsk ? what : `Change in ${confirm.app} — allow?`}
+        </p>
+        {!canAlways && <span className="card-chip">Always asks</span>}
+      </div>
       {confirm.risk === 'high' && <p className="card-brief">Can’t be undone</p>}
       <dl className="card-rows">
         <div>
@@ -145,7 +162,7 @@ export function ConnectorConfirmCard({
           <dt>{isAsk ? 'Tool' : 'Change'}</dt>
           <dd>
             {isAsk ? (
-              <span>{confirm.tool}</span>
+              <span>{toolLabel(confirm.tool)}</span>
             ) : (
               <>
                 <span>{what}</span>
@@ -154,6 +171,15 @@ export function ConnectorConfirmCard({
             )}
           </dd>
         </div>
+        {isAsk &&
+          Object.entries(confirm.facts ?? {}).map(([key, value]) => (
+            <div key={key}>
+              <dt>{factLabel(key)}</dt>
+              <dd>
+                <span>{typeof value === 'string' ? value : JSON.stringify(value)}</span>
+              </dd>
+            </div>
+          ))}
         {filled.length > 0 && (
           <div>
             <dt>Details</dt>
@@ -166,29 +192,17 @@ export function ConnectorConfirmCard({
           </div>
         )}
       </dl>
-      <div className="bubble-choices" role="group" aria-label="Options">
-        <button
-          type="button"
-          className="bubble-choice bubble-primary"
-          onClick={() => onAnswer('once')}
-        >
-          <span>Allow once</span>
+      <div className="card-actions" role="group" aria-label="Options">
+        <button type="button" className="bubble-quiet" onClick={() => onAnswer('deny')}>
+          Not now
         </button>
         {canAlways && (
-          <button
-            type="button"
-            className="bubble-choice bubble-quiet"
-            onClick={() => onAnswer('always')}
-          >
-            <span>Always allow</span>
+          <button type="button" className="bubble-quiet" onClick={() => onAnswer('always')}>
+            Always allow
           </button>
         )}
-        <button
-          type="button"
-          className="bubble-choice bubble-quiet"
-          onClick={() => onAnswer('deny')}
-        >
-          <span>Deny</span>
+        <button type="button" className="bubble-primary" onClick={() => onAnswer('once')}>
+          Allow
         </button>
       </div>
     </section>

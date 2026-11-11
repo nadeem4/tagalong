@@ -1,4 +1,4 @@
-/** Tests for the confirm card: Allow once, Always allow and Deny, for apps and the brain's asks. */
+/** Tests for the confirm card: Allow, Always allow and Not now, for apps and the brain's asks. */
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -28,8 +28,15 @@ function renderBubble(bridge: FakeHostBridge, expanded = false) {
   );
 }
 
+// The card's own Send, not the composer's.
+const cardSend = () =>
+  within(screen.getByRole('textbox', { name: 'Your answer' }).closest('section')!).getByRole(
+    'button',
+    { name: 'Send' },
+  );
+
 describe('the connector confirm card', () => {
-  it('says which app, which tool and what will happen, and runs only on Allow once', async () => {
+  it('says which app, which tool and what will happen, and runs only on Allow', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);
     act(() => bridge.emit(confirm()));
@@ -41,7 +48,7 @@ describe('the connector confirm card', () => {
     expect(card).toHaveTextContent('Change in Notion — allow?');
     expect(card).not.toHaveTextContent(/\bI[’']/);
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
       await Promise.resolve();
     });
     expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision: 'once' }]);
@@ -53,7 +60,7 @@ describe('the connector confirm card', () => {
     renderBubble(bridge, true);
     act(() => bridge.emit(confirm()));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
       await Promise.resolve();
     });
     expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision: 'deny' }]);
@@ -70,7 +77,7 @@ describe('the connector confirm card', () => {
         ...over,
       }) as const;
 
-    it('stacks Allow once, Always allow and Deny as rows', () => {
+    it('puts Not now, Always allow and Allow in one row, Allow last', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
       act(() => bridge.emit(ask()));
@@ -79,7 +86,7 @@ describe('the connector confirm card', () => {
         within(list)
           .getAllByRole('button')
           .map((b) => b.textContent),
-      ).toEqual(['Allow once', 'Always allow', 'Deny']);
+      ).toEqual(['Not now', 'Always allow', 'Allow']);
     });
 
     it('shows Scout’s words, never the connector wording', () => {
@@ -89,6 +96,28 @@ describe('the connector confirm card', () => {
       const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
       expect(card).toHaveTextContent("I'll move the Notes window to the left.");
       expect(card).not.toHaveTextContent('Change in');
+    });
+
+    it('the Tool row reads the tool in words, without its app prefix', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      const row = screen.getByText('Tool').closest('div')!;
+      expect(row).toHaveTextContent('move window');
+      expect(row).not.toHaveTextContent('desktop__');
+    });
+
+    it('shows each fact the ask carries as its own row, a body as "Says"', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() =>
+        bridge.emit(ask({ facts: { to: 'sam@northwind.example', body: 'Running late, sorry.' } })),
+      );
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(within(card).getByText('To').closest('div')).toHaveTextContent(
+        'sam@northwind.example',
+      );
+      expect(within(card).getByText('Says').closest('div')).toHaveTextContent('Running late');
     });
 
     it('with no words, shows the tool name and its input', () => {
@@ -101,9 +130,9 @@ describe('the connector confirm card', () => {
     });
 
     it.each([
-      ['Allow once', 'once'],
+      ['Allow', 'once'],
       ['Always allow', 'always'],
-      ['Deny', 'deny'],
+      ['Not now', 'deny'],
     ] as const)('%s answers %s', async (name, decision) => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
@@ -133,7 +162,7 @@ describe('the connector confirm card', () => {
       expect(screen.getByText('Move the window.')).toBeInTheDocument();
       expect(screen.queryByText('Close the tab.')).toBeNull();
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
         await Promise.resolve();
       });
       expect(screen.getByText('Close the tab.')).toBeInTheDocument();
@@ -148,7 +177,7 @@ describe('the connector confirm card', () => {
       act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a2' }));
       expect(screen.getByText('Move the window.')).toBeInTheDocument();
       act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
-      expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
     });
 
     it('a dismissed first ask hands over to the next', () => {
@@ -166,33 +195,41 @@ describe('the connector confirm card', () => {
       renderBubble(bridge);
       act(() => bridge.emit(ask()));
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
         await Promise.resolve();
       });
-      expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
     });
 
     it('a locked tool has no Always allow', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
       act(() => bridge.emit(ask({ options: ['allow', 'deny'] })));
-      expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Not now' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Always allow' })).toBeNull();
       const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
       expect(rows).toHaveLength(2);
-      expect(rows[0]).toHaveClass('bubble-primary');
-      expect(rows[1]).toHaveClass('bubble-quiet');
+      expect(rows[0]).toHaveClass('bubble-quiet');
+      expect(rows[1]).toHaveClass('bubble-primary');
+      expect(screen.getByText('Always asks')).toBeVisible();
     });
 
-    it('marks the first row primary and the rest quiet', () => {
+    it('an ask that can be always allowed has no Always asks chip', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      expect(screen.queryByText('Always asks')).toBeNull();
+    });
+
+    it('marks Allow primary and the rest quiet', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
       act(() => bridge.emit(ask()));
       const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
-      expect(rows[0]).toHaveClass('bubble-primary');
+      expect(rows[0]).toHaveClass('bubble-quiet');
       expect(rows[1]).toHaveClass('bubble-quiet');
-      expect(rows[2]).toHaveClass('bubble-quiet');
+      expect(rows[2]).toHaveClass('bubble-primary');
     });
   });
 
@@ -216,7 +253,7 @@ describe('the connector confirm card', () => {
       const card = screen.getByRole('region', { name: 'Scout asks' });
       expect(card).toHaveTextContent('Fix the login bug');
       expect(card).toHaveTextContent('folder: C:\\work\\app');
-      expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
         await Promise.resolve();
@@ -324,7 +361,7 @@ describe('the connector confirm card', () => {
         target: { value: 'duckdb' },
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+        fireEvent.click(cardSend());
         await Promise.resolve();
       });
       expect(bridge.jobAnswers).toEqual([
@@ -355,7 +392,7 @@ describe('the connector confirm card', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
       act(() => bridge.emit(jobAsk({ tool: 'question', question: true, options: [] })));
-      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+      expect(cardSend()).toBeDisabled();
     });
 
     describe("Scout's choose ask", () => {
@@ -391,21 +428,25 @@ describe('the connector confirm card', () => {
           target: { value: 'my words' },
         });
         await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+          fireEvent.click(cardSend());
           await Promise.resolve();
         });
         expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: '', text: 'my words' }]);
       });
 
-      it('marks the recommended option and puts it first', () => {
+      it('recommended option is the gold one even when second, in its given order', () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
         act(() => bridge.emit(choose({ recommended: 'Claude Code' })));
-        const buttons = screen.getAllByRole('button');
-        expect(buttons[0]).toHaveTextContent('Claude Code');
-        expect(buttons[0]).toHaveTextContent('Recommended');
-        expect(buttons[1]).toHaveTextContent('Gemini CLI');
-        expect(buttons[1]).not.toHaveTextContent('Recommended');
+        const buttons = within(screen.getByRole('group', { name: 'Options' })).getAllByRole(
+          'button',
+        );
+        expect(buttons[0]).toHaveTextContent('Gemini CLI');
+        expect(buttons[0]).not.toHaveTextContent('Recommended');
+        expect(buttons[0]).toHaveClass('bubble-quiet');
+        expect(buttons[1]).toHaveTextContent('Claude Code');
+        expect(buttons[1]).toHaveTextContent('Recommended');
+        expect(buttons[1]).toHaveClass('bubble-primary');
       });
 
       it('stacks the options as full-width rows with the Recommended tag in its own element', () => {
@@ -416,9 +457,16 @@ describe('the connector confirm card', () => {
         expect(list).toHaveClass('bubble-choices');
         const rows = within(list).getAllByRole('button');
         expect(rows.every((b) => b.classList.contains('bubble-choice'))).toBe(true);
+        expect(within(rows[1]!).getByText('Recommended')).toHaveClass('bubble-tag');
+      });
+
+      it('with nothing recommended the first option stays the gold one', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose()));
+        const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
         expect(rows[0]).toHaveClass('bubble-primary');
         expect(rows[1]).toHaveClass('bubble-quiet');
-        expect(within(rows[0]!).getByText('Recommended')).toHaveClass('bubble-tag');
       });
 
       it('the recommended row reads "Claude Code Recommended" to a screen reader', () => {
@@ -479,10 +527,10 @@ describe('the connector confirm card', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);
     act(() => bridge.emit(confirm()));
-    expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Allow' })).toBeInTheDocument();
     act(() =>
       bridge.emit({ type: 'turn.error', turnId: TURN, code: 'aborted', message: 'Stopped.' }),
     );
-    expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
   });
 });

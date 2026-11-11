@@ -31,35 +31,75 @@ export const CHAT_CSS = `
   font: inherit; text-align: left; cursor: pointer;
 }
 
-/* The close and back buttons are drawn icons. */
-.bubble-close, .bubble-icon { display: grid; place-items: center; padding: 0; }
-.bubble-icon {
-  flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
+/* Header icon buttons (close, back, expand, mic, eye): 32px, gold fill when pressed. */
+.bubble-tg {
+  position: relative; flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-icon:hover { background: #222845; color: ${t.color.text}; }
-.bubble-icon:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
+.bubble-tg:hover { background: #222845; color: ${t.color.text}; }
+.bubble-tg:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 1px; }
+.bubble-tg[aria-pressed='true'] {
+  color: ${t.color.gold}; background: rgba(242, 193, 78, 0.12); border-color: rgba(242, 193, 78, 0.35);
+}
 .bubble-sep { width: 1px; height: 16px; background: ${t.color.line}; margin: 0 2px; }
+/* The tooltip sits under its button and shows on hover or keyboard focus. */
+.bubble-tgwrap { position: relative; display: inline-flex; }
+.bubble-tip {
+  display: none; position: absolute; z-index: 3; top: 40px; right: 0; width: max-content; max-width: 220px;
+  padding: 8px 10px; border-radius: 8px; background: #E9ECF5; color: #12162B;
+  ${typeCss('small')}; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.bubble-tip::before {
+  content: ''; position: absolute; top: -5px; right: 12px; width: 10px; height: 10px; background: #E9ECF5;
+  transform: rotate(45deg);
+}
+/* Above its button, for the composer at the foot of the window. */
+.bubble-tip--up { top: auto; bottom: 40px; }
+.bubble-tip--up::before { top: auto; bottom: -5px; }
+.bubble-tgwrap:hover .bubble-tip, .bubble-tgwrap:focus-within .bubble-tip { display: block; }
+.bubble-tip-sub { display: block; margin-top: 2px; color: #4A5168; }
 
-/* The pills: on is a gold dot with a muted gold edge, off a plain edge. */
-.bubble-toggle[aria-checked='true'] { color: ${t.color.text}; border-color: #6B5A2A; background: #1E1D2A; }
-.bubble-toggle[aria-checked='true']::before { background: ${t.color.gold}; }
-
-/* Context chips: a pill with its remove button inside. */
+/* Context chips: a pill with its remove button inside. Long names wrap, never cut. */
 .bubble-chip { min-height: 28px; padding: 0 8px 0 12px; }
+.bubble-chip span { overflow-wrap: anywhere; }
 
-/* The full chat: a 52px header, a log pinned to the newest message, then the footer. */
+/* A running job: a card with who is working, a link to Tasks, a moving bar, then the whole step. */
+.bubble-jobline {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; overflow-wrap: anywhere;
+  border: 1px solid ${t.color.fieldLine}; border-radius: 12px; background: ${t.color.sidebar};
+}
+.bubble-jobline-top { display: flex; align-items: center; gap: 8px; ${typeCss('body')}; }
+.bubble-jobline-top b { flex: 1; min-width: 0; font-weight: 600; }
+.bubble-jobline-step { margin: 0; ${typeCss('small')}; color: #C9CEE0; }
+.bubble-jobline code { font-family: ${t.font.mono}; ${typeCss('small')}; }
+.bubble-jobbar { height: 4px; border-radius: 2px; background: #222845; overflow: hidden; }
+.bubble-jobbar i { display: block; height: 100%; width: 40%; background: ${t.color.gold}; animation: bubble-job 1.6s ease-in-out infinite; }
+@keyframes bubble-job { 0% { margin-left: 0; } 100% { margin-left: 60%; } }
+@media (prefers-reduced-motion: reduce) { .bubble-jobbar i { animation: none; width: 55%; } }
+.bubble-link {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent;
+  color: ${t.color.sky}; font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer;
+}
+.bubble-link .cx-icon { width: 14px; height: 14px; }
+.bubble-link:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
+
+/* The full chat: a 56px header, a log pinned to the newest message, then the footer. */
 .bubble--chat { height: 100vh; padding: 0; gap: 0; overflow: hidden; }
 .bubble-head {
-  flex: none; box-sizing: border-box; height: 52px; display: flex; align-items: center; gap: 8px;
-  padding: 0 8px 0 16px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.sidebar};
+  flex: none; box-sizing: border-box; height: 56px; display: flex; align-items: center; gap: 10px;
+  padding: 0 8px 0 12px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.sidebar};
 }
-.bubble-head strong {
-  margin-right: auto; font-family: ${t.font.wordmark};
-  ${typeCss('title')};
-}
-.bubble-head .bubble-toggle { min-height: 26px; }
-.bubble-head .bubble-row { gap: 8px; }
+.bubble-head--quick { height: 52px; }
+.bubble--quick { padding: 0; gap: 0; }
+.bubble-compact { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.bubble-headwho { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bubble-head strong { font-family: ${t.font.wordmark}; ${typeCss('bodyLead')}; font-weight: 600; }
+.bubble-headstatus { display: flex; align-items: center; gap: 6px; ${typeCss('caption')}; font-weight: 400; color: ${t.color.textMuted}; }
+/* One line, cut with an ellipsis: the speaking indicator never makes the header taller. */
+.bubble-headtext { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bubble-priv { flex: none; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.gold}; box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.18); }
+.bubble-head .bubble-row { flex: none; gap: 4px; }
 .bubble-log {
   flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 24px;
   padding: 20px 16px 20px 20px; scrollbar-width: thin; scrollbar-color: ${t.color.fieldLine} transparent;
@@ -68,15 +108,22 @@ export const CHAT_CSS = `
 .bubble-log > :first-child { margin-top: auto; }
 .bubble-exchange { display: flex; flex-direction: column; gap: 12px; }
 .bubble-mine {
-  align-self: flex-end; max-width: 82%; margin: 0; padding: 12px 16px; border-radius: 12px 12px 4px 12px;
-  background: #222845; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere;
+  align-self: flex-end; max-width: 82%; margin: 0; padding: 10px 14px; border-radius: 14px 14px 4px 14px;
+  background: ${t.color.mine}; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+.bubble-scout { display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: start; max-width: 60ch; }
+.bubble-scout-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 
 /* A turn in progress: the thinking row with Stop beside it, then a gold cursor on the text. */
 .bubble-live { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .bubble-thinking { display: flex; align-items: center; gap: 10px; ${typeCss('body')}; color: #C9CEE0; }
-.bubble-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: ${t.color.gold}; }
+.bubble-dots { display: inline-flex; align-items: center; gap: 4px; }
+.bubble-dots i { width: 6px; height: 6px; border-radius: 50%; background: ${t.color.gold}; animation: bubble-dot 1.2s ease-in-out infinite; }
+.bubble-dots i:nth-child(2) { animation-delay: 0.15s; }
+.bubble-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bubble-dot { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bubble-dots i { animation: none; } }
 .bubble-stop { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px 0 8px; }
 .bubble-stop i { width: 8px; height: 8px; border-radius: 2px; background: #C9CEE0; display: block; }
 .bubble--chat .bubble-answer { max-height: none; overflow: visible; }
@@ -84,12 +131,27 @@ export const CHAT_CSS = `
   content: ''; display: inline-block; width: 2px; height: 16px; margin-left: 2px; border-radius: 1px;
   background: ${t.color.gold}; vertical-align: -3px;
 }
-.bubble-field input[aria-busy='true'] { opacity: 0.55; }
+.bubble-field textarea[aria-busy='true'] { opacity: 0.55; }
 
-/* The footer field: 12px inside, the mic within it, a 2px focus ring. */
-.bubble--chat .bubble-field input { padding: 12px 48px 12px 14px; border-color: ${t.color.fieldLine}; }
-.bubble--chat .bubble-field input:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 0; }
-.bubble--chat .bubble-field input::placeholder { color: ${t.color.textMuted}; }
+/* The composer: a bordered row, the text box growing inside, then mic and send. */
+.bubble-field {
+  flex: none; position: relative; display: flex; flex-direction: row; align-items: flex-end; gap: 6px;
+  padding: 8px 8px 8px 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 12px; background: ${t.color.field};
+}
+.bubble-field:focus-within { border-color: ${t.color.sky}; box-shadow: 0 0 0 3px rgba(124, 184, 242, 0.18); }
+.bubble-field textarea, .bubble-field input {
+  flex: 1; min-width: 0; max-height: 120px; padding: 4px 0; border: 0; outline: 0; resize: none;
+  background: transparent; color: ${t.color.text}; font: inherit; ${typeCss('bodyLead')}; overflow-wrap: anywhere;
+}
+.bubble-field textarea::placeholder, .bubble-field input::placeholder { color: ${t.color.textMuted}; }
+.bubble-field .bubble-mic, .bubble-send {
+  flex: none; position: static; width: 32px; height: 32px; display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 8px; background: transparent; color: ${t.color.textMuted}; cursor: pointer;
+}
+.bubble-field .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
+.bubble-send { background: ${t.color.gold}; color: ${t.color.goldInk}; }
+.bubble-send:disabled { background: #222845; color: ${t.color.textMuted}; cursor: default; }
+.bubble-send:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 1px; }
 
 /* The empty chat: Bean, the one sentence, and the real talk key. */
 .bubble-empty {

@@ -372,8 +372,7 @@ Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and 
 
 **The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile it is drawn larger (76px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
 
-**The companion chat.** A 52 px header (Onest name, compact pills where on is a gold dot with a muted
-gold edge, icon buttons for back and close). 24 px between turns, 12 px inside a turn. Your
+**The companion chat.** A 56 px header (Scout's mark, Onest name over a muted status line, 32 px icon toggles for listening and seeing that turn gold when on and show a tooltip, icon buttons for back and close). The composer is a bordered multiline field with the mic and a send button inside. The install card (`setup/install-card.tsx`) is one card: a tile, name with an Official or Community chip, a muted facts line, the steps with done, now, failed and todo marks, and quiet Not now with a gold Allow. 24 px between turns, 12 px inside a turn. Your
 messages sit on an avatar-tile bubble (12 px by 16 px inside), Scout's replies run full width, code
 blocks have a 1 px field-line edge and 12 px inside, list markers are muted. Scout's mark (Bean's
 still, 20 px, 48 px when the chat is empty) and name appear only on lines Scout starts. The footer
@@ -413,7 +412,7 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 
 ### Cards in the bubble
 
-The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Allow once** for a connector change or a permission ask, with Always allow and Deny beside it. Long details scroll inside 160px and take keyboard focus.
+The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Allow** (last, Gold) for a connector change or a permission ask, with Always allow and Not now before it; a locked tool shows an "Always asks" chip in the card head. Long details scroll inside 160px and take keyboard focus.
 
 ### Home
 

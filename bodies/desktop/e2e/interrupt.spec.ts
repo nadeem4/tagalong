@@ -56,7 +56,7 @@ test('speech over Scout is sent to the brain as an interruption', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.togglePanel());
   const panel = await windowFor('panel');
-  await panel.getByRole('switch', { name: 'Always listening' }).click();
+  await panel.getByRole('button', { name: 'Always listening' }).click();
 
   // The fake brain hears a first question and speaks a 3 s answer.
   await expect.poll(() => brain.voice.spokenSays, { timeout: 30_000 }).toBeGreaterThan(0);

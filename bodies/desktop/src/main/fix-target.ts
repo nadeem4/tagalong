@@ -13,6 +13,7 @@ import type { FixTarget } from '@tagalong/ui/shapes';
 const PAGES: Record<Exclude<FixTarget, 'key'>, string> = {
   voice: 'settings#voice',
   connections: 'connections',
+  tasks: 'tasks',
 };
 
 /** The Home page to open for `target`; plain Settings when none is named. */

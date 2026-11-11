@@ -131,6 +131,7 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .cx-progress__top { display: flex; justify-content: space-between; ${typeCss('small')}; font-weight: 600; color: ${t.color.panelText}; }
 :is(.home, .wt) .cx-bar { height: 4px; border-radius: 2px; background: ${t.color.panelTile}; overflow: hidden; }
 :is(.home, .wt) .cx-bar > i { display: block; height: 100%; background: ${t.color.panelText}; border-radius: 2px; }
+:is(.home, .wt) .cx-item > .sc { margin: 0 0 12px 50px; }
 :is(.home, .wt) .cx-errline {
   display: flex; align-items: center; gap: 8px; margin: 0 0 12px 50px; padding: 10px 12px; border-radius: 8px;
   background: ${t.color.errFill}; color: ${t.color.errInk}; ${typeCss('body')}; font-weight: 600;

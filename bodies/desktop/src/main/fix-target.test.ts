@@ -11,6 +11,7 @@ describe('fixPage', () => {
   it.each([
     ['voice', 'settings#voice'],
     ['connections', 'connections'],
+    ['tasks', 'tasks'],
   ])('sends %s to %s', (target, page) => {
     expect(fixPage(target)).toBe(page);
   });

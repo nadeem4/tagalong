@@ -98,6 +98,7 @@ export function AppsTab({
         <h2 className="home-card__label">Add an app</h2>
         <AppSearch
           busy={busy}
+          apps={apps}
           refresh={refresh}
           offline={offline}
           onAdd={onAdd}

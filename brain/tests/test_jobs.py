@@ -1760,6 +1760,9 @@ async def test_running_steps_lists_each_running_job_that_has_a_step(make_rig):
         (one, "Claude Code", "npm run b")
     ]
     assert steps[0]["at"]
+    # The bubble's card names the job by its title and draws a command in code.
+    assert steps[0]["kind"] == "command"
+    assert "title" in steps[0]
     await rig.jobs.stop(one)
     assert rig.jobs.running_steps() == []  # an ended job is absent
 

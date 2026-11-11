@@ -162,7 +162,7 @@ describe('createTurnEvents', () => {
         type: 'turn.error',
         turnId: T,
         code: 'brain_error',
-        message: "Scout's brain hit a problem with that one. Try again?",
+        message: "Scout's brain hit a problem with that one.",
       },
     ]);
   });
@@ -289,6 +289,7 @@ describe('createTurnEvents: asks', () => {
         tool: 'desktop__move_window',
         summary: "I'll move the window.",
         options: ['allow', 'always', 'deny'],
+        facts: { x: 1 },
       },
     ]);
   });
@@ -301,6 +302,35 @@ describe('createTurnEvents: asks', () => {
   it('an empty text shows the tool and its input instead', () => {
     const [e] = make().map('ask', open({ text: '', input: { x: 1, title: 'Notes' } }));
     expect(e).toMatchObject({ summary: 'desktop__move_window\nx: 1\ntitle: Notes' });
+  });
+
+  it('an approval offer keeps its words only, not its sentence and group lines', () => {
+    const [e] = make().map(
+      'ask',
+      open({
+        tool: 'approval_offer',
+        confirm: false,
+        text: 'Approve it from now on?',
+        input: { sentence: 'Approve test runs', group: 'C:/work/app' },
+      }),
+    );
+    expect(e).toMatchObject({ summary: 'Approve it from now on?' });
+  });
+
+  it("a tool-gate ask carries the tool's input as facts for the card's rows", () => {
+    const [e] = make().map(
+      'ask',
+      open({ tool: 'gmail__send_message', text: 'Send it?', input: { to: 'sam@x.example' } }),
+    );
+    expect(e).toMatchObject({ summary: 'Send it?', facts: { to: 'sam@x.example' } });
+  });
+
+  it('an approval offer carries no facts', () => {
+    const [e] = make().map(
+      'ask',
+      open({ tool: 'approval_offer', confirm: false, text: 'Approve?', input: { group: 'g' } }),
+    );
+    expect(e).not.toHaveProperty('facts');
   });
 
   it("a brain tool's ask belongs to Scout", () => {
@@ -433,6 +463,20 @@ describe('createTurnEvents: asks', () => {
       );
       expect(e).toMatchObject({ app: 'Scout', tool: 'save_preference' });
       expect(e).not.toHaveProperty('question');
+    });
+
+    it('an install ask carries its card facts, so the chat can draw the one install card', () => {
+      const facts = { app: 'Notion', official: true, runs: 'hosted', sign_in: 'browser' };
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: '', tool: 'install_app', input: facts, options: ['allow', 'deny'] }),
+      );
+      expect(e).toMatchObject({ tool: 'install_app', facts });
+    });
+
+    it('other asks carry no facts', () => {
+      const [e] = make().map('ask', jobAsk({ tool: 'save_preference', input: { a: 1 } }));
+      expect(e).not.toHaveProperty('facts');
     });
 
     it('an ask without free_text or recommended adds neither field', () => {

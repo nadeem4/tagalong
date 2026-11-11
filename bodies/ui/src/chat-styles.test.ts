@@ -3,8 +3,10 @@
  * Reads the rules as text, so it needs no browser. Uses the helpers in test-support/css-rules.
  */
 import { describe, expect, it } from 'vitest';
+import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
 import { minPadding, ruleOf } from './test-support/css-rules';
+import { themeTokens as t } from './theme/tokens';
 
 describe('minPadding', () => {
   it('reads shorthand and ignores the vertical sides of a fixed-height rule', () => {
@@ -21,8 +23,23 @@ describe('CHAT_CSS padding', () => {
 });
 
 describe('CHAT_CSS chat window', () => {
-  it('has a 52px header', () => {
-    expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 52px');
+  it('draws your message on the mine token with the mockup radius', () => {
+    const rule = ruleOf(CHAT_CSS, '.bubble-mine');
+    expect(rule).toContain(t.color.mine);
+    expect(rule).toContain('border-radius: 14px 14px 4px 14px');
+  });
+
+  it("sets Scout's reply behind its mark, capped at 60ch", () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-scout')).toContain('max-width: 60ch');
+    expect(ruleOf(CHAT_CSS, '.bubble-scout')).toContain('grid-template-columns: 24px 1fr');
+  });
+
+  it('folds a long answer by whole blocks, so nothing is clipped or faded mid-line', () => {
+    expect(CHAT_CSS).not.toContain('answer-gist');
+    expect(CHAT_CSS).not.toContain('linear-gradient');
+  });
+  it('has a 56px header', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 56px');
   });
 
   it('keeps turns 24px apart and 12px inside', () => {
@@ -30,15 +47,14 @@ describe('CHAT_CSS chat window', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-exchange')).toContain('gap: 12px');
   });
 
-  it('puts a user message on a tile with at least 12px inside', () => {
-    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(12);
+  it('puts a user message on a tile with the mockup padding of 10px 14px', () => {
+    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(10);
   });
 
-  it('shows a pill that is on with a gold dot and a muted gold edge', () => {
-    expect(ruleOf(CHAT_CSS, ".bubble-toggle[aria-checked='true']")).toContain(
-      'border-color: #6B5A2A',
+  it('shows an icon toggle that is on with a gold fill and a muted gold edge', () => {
+    expect(ruleOf(CHAT_CSS, ".bubble-tg[aria-pressed='true']")).toContain(
+      'rgba(242, 193, 78, 0.35)',
     );
-    expect(ruleOf(CHAT_CSS, ".bubble-toggle[aria-checked='true']::before")).toContain('#F2C14E');
   });
 
   it('keeps the context chips at least 8px from their edge', () => {
@@ -57,13 +73,35 @@ describe('CHAT_CSS chat window', () => {
   });
 
   it('dims the field while a turn runs', () => {
-    expect(ruleOf(CHAT_CSS, ".bubble-field input[aria-busy='true']")).toContain('opacity');
+    expect(ruleOf(CHAT_CSS, ".bubble-field textarea[aria-busy='true']")).toContain('opacity');
   });
 
-  it('rings the field in the focus variable, 2px, with at least 12px inside', () => {
-    expect(ruleOf(CHAT_CSS, '.bubble--chat .bubble-field input:focus-visible')).toContain(
-      'outline: 2px solid var(--tg-focus)',
+  it('styles an input in a field like the textarea, so a card answer is no bare box', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-field textarea, .bubble-field input')).toContain('background');
+  });
+
+  it('rings the composer in sky and keeps 8px inside it', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-field:focus-within')).toContain('border-color');
+    expect(minPadding(CHAT_CSS, '.bubble-field')).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('CARD_CSS ask card', () => {
+  it('right-aligns its actions and shows the Always asks chip as a small pill', () => {
+    expect(ruleOf(CARD_CSS, '.card-actions')).toContain('justify-content: flex-end');
+    expect(ruleOf(CARD_CSS, '.card-chip')).toContain('border-radius: 999px');
+  });
+
+  it('draws a choice as a radio row, the recommended one edged in gold', () => {
+    expect(ruleOf(CARD_CSS, '.bubble-radio')).toContain('border-radius: 50%');
+    expect(ruleOf(CARD_CSS, '.bubble-choices .bubble-choice.bubble-primary')).toContain(
+      t.color.gold,
     );
-    expect(minPadding(CHAT_CSS, '.bubble--chat .bubble-field input')).toBeGreaterThanOrEqual(12);
+  });
+});
+
+describe('CARD_CSS recommended tag', () => {
+  it('shows the Recommended tag at full strength', () => {
+    expect(ruleOf(CARD_CSS, '.bubble-tag')).not.toContain('opacity');
   });
 });

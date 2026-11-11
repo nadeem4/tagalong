@@ -170,6 +170,10 @@ export interface RunningStep {
   job: string;
   expert: string;
   text: string;
+  /** What kind of step this is; a `command` is drawn in code. */
+  kind?: string;
+  /** The job's own title, when Scout has given it one. */
+  title?: string | null;
   at: string;
 }
 

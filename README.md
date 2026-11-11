@@ -104,7 +104,7 @@ If the brain is not running, the desktop still opens and shows "Scout's brain is
 connects by itself once the brain is up.
 
 When Scout's brain wants to use a tool that needs your say-so, the bubble asks in Scout's words
-with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
+with **Allow**, **Always allow** (not offered for a locked tool) and **Not now**. Several asks
 queue and show one at a time; if the brain is offline when you click, the card stays up. One
 engine decides every ask, and an ask waits for you, up to a deadline Scout sets (3 days by default,
 7 at most), even if you are away or the brain restarts; when you come back the cards are there again
@@ -308,7 +308,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     **Remove** (which asks once more).
   - Which of an app's tools ask first is set in Settings › Permissions.
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
-    mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
+    mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow** or
     **Cancel**.
 - **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/whatsapp.md](docs/whatsapp.md)).
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
@@ -395,7 +395,7 @@ such as `.env` are refused.
   applications. Its file tools are file access only: they list, read, move and rename files
   inside folders you chose (none until you choose one), and deleting (to the Recycle Bin) or
   overwriting a file always asks first. It changes things only through apps you connect, and only after you press
-  **Allow once**.
+  **Allow**.
 - Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. The
   Python brain keeps an app's secrets in its own files (`app-tokens.json` and `app-oauth/`), not in
   the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and

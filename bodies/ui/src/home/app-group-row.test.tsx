@@ -2,6 +2,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { AppGroup, AppRow } from '../shapes';
+import type { AppInfo } from '../shapes';
+import { InstallCard } from '../setup/install-card';
+import { appWorking, subjectOfRow } from '../setup/install-progress';
 import { AppGroupRow } from './app-group-row';
 import type { Outcome } from './outcome';
 
@@ -29,6 +32,7 @@ function setup(
   group: AppGroup,
   busy: ReadonlySet<string> = new Set(),
   outcomes: ReadonlyMap<string, Outcome> = new Map(),
+  apps: AppInfo[] = [],
 ) {
   const onAdd = vi.fn();
   const onAddAnyway = vi.fn();
@@ -38,6 +42,7 @@ function setup(
         group={group}
         busy={busy}
         outcomes={outcomes}
+        apps={apps}
         onAdd={onAdd}
         onAddAnyway={onAddAnyway}
       />
@@ -120,6 +125,31 @@ describe('AppGroupRow', () => {
     setup({ service: 'notion', official: HEAD, others: [] }, new Set([HEAD.id]));
     expect(screen.getByText('Waiting for you…')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Add Notion' })).toBeNull();
+  });
+
+  const SIGNING: AppInfo = {
+    id: HEAD.id,
+    name: 'Notion',
+    transport: 'http',
+    auth: 'oauth',
+    enabled: true,
+    status: 'needs-sign-in',
+    error: '',
+    tools: [],
+  };
+
+  it('Connections installing row is the same component for apps', () => {
+    setup({ service: 'notion', official: HEAD, others: [] }, new Set([HEAD.id]), new Map(), [
+      SIGNING,
+    ]);
+    const card = screen.getByRole('group', { name: 'Set up Notion' });
+    expect(card).toHaveClass('sc', 'sc--light');
+    expect(screen.queryByText('Waiting for you…')).toBeNull();
+    // The chat draws the same card from the same connection row, so it is the same markup.
+    const again = render(
+      <InstallCard subject={subjectOfRow(HEAD)} view={appWorking(SIGNING)} theme="light" />,
+    );
+    expect(again.container.querySelector('.sc')?.innerHTML).toBe(card.innerHTML);
   });
 
   it('an added outcome replaces the button on that row', () => {

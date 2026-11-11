@@ -7,7 +7,7 @@ import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/c
 import type { TurnEvent } from '@tagalong/ui/shapes';
 
 const BUDGET_MESSAGE = "Scout has used today's budget. It starts again tomorrow.";
-const ERROR_MESSAGE = "Scout's brain hit a problem with that one. Try again?";
+const ERROR_MESSAGE = "Scout's brain hit a problem with that one.";
 const LOST_MESSAGE = 'Scout lost the thread there. Ask again?';
 
 const STOP_REASON = { done: 'end', cancelled: 'aborted', step_cap: 'tool_limit' } as const;
@@ -95,7 +95,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     const tool = p.tool ?? 'question';
     // A hand-off's apps are a list on the card, not a line of JSON in its words.
     const { apps, ...rest } = (p.input ?? {}) as { apps?: unknown } & Record<string, unknown>;
-    const input = Object.entries(rest).map(
+    // An approval offer's input is for the brain's record; its words say all there is to say.
+    const input = (tool === 'approval_offer' ? [] : Object.entries(rest)).map(
       ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
     );
     // Scout's own words lead; with none, the tool and what it was given stand in. A job's ask
@@ -132,6 +133,12 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ...(p.free_text ? { freeText: true } : {}),
       ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
       ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
+      // The install card draws itself from these; every other card is built from the summary.
+      ...(tool === 'install_app' || tool === 'install_expert' ? { facts: p.input ?? {} } : {}),
+      // A gate ask's input becomes the card's rows (To, Says), since its words are Scout's own.
+      ...(p.confirm && tool !== 'approval_offer' && Object.keys(rest).length > 0
+        ? { facts: rest }
+        : {}),
     };
     asks.set(p.id, card);
     return [card];

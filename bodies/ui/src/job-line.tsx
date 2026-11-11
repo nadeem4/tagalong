@@ -1,11 +1,12 @@
 /**
- * The bubble's one live line for a running job ("Claude Code: npm init -y"): a hook that reads
- * the newest running step from the brain, and the muted row that shows it. Step title only,
- * never output; not Scout's voice, so it is never spoken.
+ * The bubble's live card for a running job ("Claude Code is working", the step, a link to Tasks): a
+ * hook that reads the newest running step from the brain, and the card that shows it. Step title
+ * only, never output, shown whole; not Scout's voice, so it is never spoken.
  * Contains useRunningStep and JobLine.
  */
 import { useEffect, useState } from 'react';
 import type { HostBridge, RunningStep } from './host-bridge';
+import { Icon } from './setup/icons';
 
 /** At most one read per window, as the brain's own `job_activity` notices are throttled. */
 const READ_EVERY_MS = 250;
@@ -55,11 +56,51 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
   return step;
 }
 
-export function JobLine({ step }: { step: RunningStep }) {
-  const text = `${step.expert}: ${step.text}`;
+/**
+ * A running job as a card: the job's title (else who is working), a link to Tasks, the step in
+ * body type with only a command in code, and, in the full chat only (`bar`), a moving bar.
+ */
+export function JobLine({
+  step,
+  onOpenTasks,
+  bar = false,
+}: {
+  step: RunningStep;
+  onOpenTasks: () => void;
+  bar?: boolean;
+}) {
+  const title = step.title ?? '';
+  // A step from an older brain has no kind; its text is the command.
+  const command = step.kind === undefined || step.kind === 'command';
   return (
-    <p className="bubble-status bubble-jobline" data-testid="job-line" aria-live="off" title={text}>
-      {text}
-    </p>
+    <div className="bubble-jobline" data-testid="job-line" aria-live="off">
+      <div className="bubble-jobline-top">
+        <span className="bubble-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <b>{title !== '' ? title : step.expert}</b>
+        <button type="button" className="bubble-link" onClick={onOpenTasks}>
+          Open in Tasks
+          <Icon name="chevRight" />
+        </button>
+      </div>
+      {/* The brain reports no share done, so the bar only says the job is moving. */}
+      {bar && (
+        <div className="bubble-jobbar" role="progressbar" aria-label="Working">
+          <i />
+        </div>
+      )}
+      <p className="bubble-jobline-step">
+        {command ? (
+          <>
+            Running <code>{step.text}</code>
+          </>
+        ) : (
+          step.text
+        )}
+      </p>
+    </div>
   );
 }
